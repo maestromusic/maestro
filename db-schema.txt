@@ -1,0 +1,45 @@
+TABLE containers (PRIMARY KEY: id):
+------------------------------------------------------------------------------------
+id        | MEDIUMINT UNSIGNED NOT NULL AUTO_INCREMENT | eindeutige ID des containers
+name      | VARCHAR(256) NOT NULL                      | bei Dateien leer
+elements  | SMALLINT UNSIGNED NOT NULL DEFAULT(0)      | anzahl elemente (bei dateien:0)
+------------------------------------------------------------------------------------
+Semantik: Jeder container (datei \in {container}) erhält eine eind. ID, evt. einen
+Namen und die gecachte Anzahl der Elemente
+
+
+TABLE contents (PRIMARY KEY: (id, position)):
+-----------------------------------------------------------------------------------
+container_id   | MEDIUMINT UNSIGNED NOT NULL
+position       | SMALLINT UNSIGNED NOT NULL
+element_id     | MEDIUMINT UNSIGNED NOT NULL
+-----------------------------------------------------------------------------------
+Semantik: (x,y,z) \in contents <==> z ist y-tes Element von x
+
+
+TABLE files: (PRIMARY KEY: id)
+------------------------------------------------------------------------------------
+id        | MEDIUMINT UNSIGNED NOT NULL UNIQUE | id aus Table 'containers'
+path      | VARCHAR(512) UNIQUE                | relativer pfad zur Musiksammlung
+hash      | VARCHAR(??)                        | sha1-summe über den audiostream
+verified  | DATE                               | datum wann der hash erzeugt wurde
+------------------------------------------------------------------------------------
+
+
+for t in [user defined tag list]:
+TABLE tag_t (PRIMARY KEY: id):
+------------------------------------------------------------------------------------
+id    | MEDIUMINT UNSIGNED NOT NULL AUTO_INCREMENT | eindeutige ID des tag-werts
+value | VARCHAR(128) unique                        | der tag-wert
+------------------------------------------------------------------------------------
+Alle vorkommenden Werte für Tag 't' erhalten eine ID.
+
+
+TABLE tags:
+------------------------------------------------------------------------------------
+song_id    | MEDIUMINT UNSIGNED NOT NULL | song_id existiert in containers.id
+tag_id     | SMALLINT UNSIGNED NOT NULL  | 'id' des tags (z.B. position in der conf-datei)
+value_id   | MEDIUMINT UNSIGNED NOT NULL | value_id existiert in tag_name(tag_id).id
+------------------------------------------------------------------------------------
+Semantik: (x,y,z) \in tags <==> x hat einen Tag y mit Wert-ID z.
+
