@@ -6,15 +6,29 @@ elements  | SMALLINT UNSIGNED NOT NULL DEFAULT(0)      | anzahl elemente (bei da
 ------------------------------------------------------------------------------------
 Semantik: Jeder container (datei \in {container}) erhält eine eind. ID, evt. einen
 Namen und die gecachte Anzahl der Elemente
+CREATE TABLE containers (
+    id MEDIUMINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    name VARCHAR(256) NOT NULL,
+    elements SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+    PRIMARY KEY(id),
+    INDEX name_idx(name(15)),
+    );
 
 
-TABLE contents (PRIMARY KEY: (id, position)):
+TABLE contents (PRIMARY KEY: (container_id, position)):
 -----------------------------------------------------------------------------------
 container_id   | MEDIUMINT UNSIGNED NOT NULL
 position       | SMALLINT UNSIGNED NOT NULL
 element_id     | MEDIUMINT UNSIGNED NOT NULL
 -----------------------------------------------------------------------------------
 Semantik: (x,y,z) \in contents <==> z ist y-tes Element von x
+CREATE TABLE contents (
+    container_id MEDIUMINT UNSIGNED NOT NULL,
+    position SMALLINT UNSIGNED NOT NULL,
+    element_id MEDIUMINT UNSIGNED NOT NULL,
+    PRIMARY KEY(container_id,position),
+    INDEX element_idx(element_id)
+    );
 
 
 TABLE files: (PRIMARY KEY: id)
@@ -22,9 +36,17 @@ TABLE files: (PRIMARY KEY: id)
 id        | MEDIUMINT UNSIGNED NOT NULL UNIQUE | id aus Table 'containers'
 path      | VARCHAR(512) UNIQUE                | relativer pfad zur Musiksammlung
 hash      | VARCHAR(??)                        | sha1-summe über den audiostream
-verified  | DATE                               | datum wann der hash erzeugt wurde
+verified  | TIMESTAMP                          | datum wann der hash erzeugt wurde
 ------------------------------------------------------------------------------------
-
+CREATE TABLE files (
+    id MEDIUMINT UNSIGNED NOT NULL,
+    path VARCHAR(512) UNIQUE,
+    hash VARCHAR(64) UNIQUE,
+    verified TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY(id),
+    INDEX path_idx(path),
+    INDEX hash_idx(hash)
+    );
 
 for t in [user defined tag list]:
 TABLE tag_t (PRIMARY KEY: id):
@@ -33,7 +55,12 @@ id    | MEDIUMINT UNSIGNED NOT NULL AUTO_INCREMENT | eindeutige ID des tag-werts
 value | VARCHAR(128) unique                        | der tag-wert
 ------------------------------------------------------------------------------------
 Alle vorkommenden Werte für Tag 't' erhalten eine ID.
-
+CREATE TABLE tag_{0} (
+    id MEDIUMINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    value VARCHAR(128) UNIQUE NOT NULL,
+    PRIMARY KEY(id),
+    INDEX value_idx(value(15))
+    );
 
 TABLE tags:
 ------------------------------------------------------------------------------------
@@ -42,4 +69,10 @@ tag_id     | SMALLINT UNSIGNED NOT NULL  | 'id' des tags (z.B. position in der c
 value_id   | MEDIUMINT UNSIGNED NOT NULL | value_id existiert in tag_name(tag_id).id
 ------------------------------------------------------------------------------------
 Semantik: (x,y,z) \in tags <==> x hat einen Tag y mit Wert-ID z.
-
+CREATE TABLE tags (
+    song_id MEDIUMINT UNSIGNED NOT NULL,
+    tag_id SMALLINT UNSIGNED NOT NULL,
+    value_id MEDIUMINT UNSIGNED NOT NULL,
+    INDEX tag_value_idx(tag_id,value_id),
+    INDEX song_idx(song_id)
+    );

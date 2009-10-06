@@ -44,7 +44,10 @@ ID3_MAPPING = {
             # "language" should not make to TLAN. TLAN requires 
             # an ISO language code, and QL tags are freeform.   
             }
-ID3_IGNORE = ["TLEN"] # no need to get file length from a tag ...
+ID3_IGNORE = [
+        "TLEN", # no need to get file length from a tag ...
+        "APIC"  # pictures not supported
+        ]
 
 def gettags(filename):
     """Obtains all tags from a filename and returns them as dictionary with tagnames as keys and values
@@ -61,10 +64,12 @@ def gettags(filename):
             frameid = tags[tag].FrameID
             if tag in ID3_IGNORE:
                 continue
+            elif tag.startswith("APIC"):
+                continue #pictures
             try:
                 nice_tag = ID3_MAPPING[frameid]
             except:
-                print("Unsupported ID3 tag: {0}".format(frameid))
+                print("Unsupported ID3 tag: {0} ({1})".format(frameid,tag))
                 nice_tag = frameid
             ntags[nice_tag] = []
             for value in tags[tag].text:
