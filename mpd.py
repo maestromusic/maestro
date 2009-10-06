@@ -135,13 +135,13 @@ class MPDClient(object):
         try:
             retval = self._commands[attr]
         except KeyError:
-            raise AttributeError("'%s' object has no attribute '%s'" %
-                                 (self.__class__.__name__, attr))
+            raise AttributeError("'{0}' object has no attribute '{1}'".format(
+                                 (self.__class__.__name__, attr)))
         return lambda *args: self._execute(attr, args, retval)
 
     def _execute(self, command, args, retval):
         if self._command_list is not None and not hasattr(retval, '__call__'):
-            raise CommandListError("%s not allowed in command list" % command)
+            raise CommandListError("{0} not allowed in command list".format(command))
         self._write_command(command, args)
         if self._command_list is None:
             if hasattr(retval, '__call__'):
@@ -156,7 +156,7 @@ class MPDClient(object):
     def _write_command(self, command, args=[]):
         parts = [command]
         for arg in args:
-            parts.append('"%s"' % escape(str(arg)))
+            parts.append('"{0}"'.format(escape(str(arg))))
         self._write_line(" ".join(parts))
 
     def _read_line(self):
@@ -171,7 +171,7 @@ class MPDClient(object):
             if line == NEXT:
                 return
             if line == SUCCESS:
-                raise ProtocolError("Got unexpected '%s'" % SUCCESS)
+                raise ProtocolError("Got unexpected '{0}'".format(SUCCESS))
         elif line == SUCCESS:
             return
         return line
@@ -182,7 +182,7 @@ class MPDClient(object):
             return
         pair = line.split(separator, 1)
         if len(pair) < 2:
-            raise ProtocolError("Could not parse pair: '%s'" % line)
+            raise ProtocolError("Could not parse pair: '{0}'".format(line))
         return pair
 
     def _read_pairs(self, separator=": "):
@@ -197,8 +197,8 @@ class MPDClient(object):
         for key, value in self._read_pairs():
             if key != seen:
                 if seen is not None:
-                    raise ProtocolError("Expected key '%s', got '%s'" %
-                                        (seen, key))
+                    raise ProtocolError("Expected key '{0}', got '{1}'".format(
+                                        (seen, key)))
                 seen = key
             yield value
         raise StopIteration
@@ -242,7 +242,7 @@ class MPDClient(object):
     def _fetch_nothing(self):
         line = self._read_line()
         if line is not None:
-            raise ProtocolError("Got unexpected return value: '%s'" % line)
+            raise ProtocolError("Got unexpected return value: '{0}'".format(line))
 
     def _fetch_item(self):
         pairs = list(self._read_pairs())
@@ -286,10 +286,11 @@ class MPDClient(object):
     def _hello(self):
         line = self._rfile.readline().decode("utf-8")
         if not line.endswith("\n"):
+            print(line)
             raise ConnectionError("Connection lost while reading MPD hello")
         line = line.rstrip("\n")
         if not line.startswith(HELLO_PREFIX):
-            raise ProtocolError("Got invalid MPD hello: '%s'" % line)
+            raise ProtocolError("Got invalid MPD hello: '{0}'".format(line))
         self.mpd_version = line[len(HELLO_PREFIX):].strip()
 
     def _reset(self):

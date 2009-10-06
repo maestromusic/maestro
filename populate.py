@@ -1,12 +1,12 @@
 #!/usr/bin/env python3.1
 # -*- coding: utf-8 -*-
 
-import mpde
+import omg
 import sys
 import pprint
 import mpd
 
-client = mpde.mpdClient()
+client = omg.mpdClient()
 def generate_album_name(files):
     """Generates a string name for an album consisting of the given files. Very intelligent. """
     
@@ -72,10 +72,11 @@ def walk(path):
                 albums_in_this_directory[el["album"]].append(el["file"])
             else:
                 print("Here is a file without album: {0}".format(el["file"]))
-    core = mpde.MPDe()
+    core = omg.MPDe()
     for album in albums_in_this_directory.values():
         name = generate_album_name(album)
         print("I found an album '{0}' in directory '{1}' containing {2} files.".format(name,path,len(album)))
         core.add_file_container(name,album)
+    core._mpdclient.disconnect()
             
 walk(sys.argv[1])
