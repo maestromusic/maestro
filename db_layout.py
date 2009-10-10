@@ -49,7 +49,7 @@ CREATE_TABLE_COMMANDS = {
     
     "tags": """
     CREATE TABLE tags (
-        song_id MEDIUMINT UNSIGNED NOT NULL,
+        container_id MEDIUMINT UNSIGNED NOT NULL,
         tag_id SMALLINT UNSIGNED NOT NULL,
         value_id MEDIUMINT UNSIGNED NOT NULL,
         INDEX tag_value_idx(tag_id,value_id),
