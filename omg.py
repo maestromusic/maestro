@@ -1,5 +1,11 @@
 #!/usr/bin/env python3.1
 # -*- coding: utf-8 -*-
+# Copyright 2009 Michael Helmling
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 3 as
+# published by the Free Software Foundation
+#
 
 import mpd
 import mysql
@@ -28,13 +34,10 @@ def init():
 def close():
     _mpdclient.disconnect()
 
+# -------- "file functions": Functions for operating with real files on the filesystem. -----------
 def abs_path(file):
     """Returns the absolute path of a music file inside the collection directory."""
     return os.path.join(config.get("music","collection"),file)
-    
-def add_container(name, tags={}, description=""):
-    _db.query("INSERT INTO containers (name,tags,description) VALUES('?','?','?');", name, tags,description)
-    return _db.query('SELECT LAST_INSERT_ID();').get_single() # the new container's ID
 
 
 def read_tags_from_file(file):
@@ -67,7 +70,15 @@ def compute_hash(file):
     handle.close()
     os.remove(tmpfile)
     return hashcode
-    
+# -------------------------------------------------------------------------------------------------
+
+
+
+# ------------------- database management functions -----------------------------------------------
+def add_container(name, tags={}, description=""):
+    _db.query("INSERT INTO containers (name,tags,description) VALUES('?','?','?');", name, tags,description)
+    return _db.query('SELECT LAST_INSERT_ID();').get_single() # the new container's ID
+
 def add_file(path):
     """Adds a new file to the database.
     
@@ -106,6 +117,7 @@ def add_file_container(name, files):
             file_id = add_file(file)
         add_content(container_id, index, file_id)
 
+# ---------- deprecated / temporary / debugging / omgwtf functions
 def mpdClient(host=MPD_HOST, port=MPD_PORT):
     client = mpd.MPDClient()
     client.connect(host=host, port=port)
