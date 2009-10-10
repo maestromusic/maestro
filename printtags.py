@@ -78,9 +78,9 @@ def gettags(filename):
     else:
         tags = {}
         for tag,value in f.tags:
-            if not tag in tags:
-                tags[tag] = []
-            tags[tag].append(value)
+            if not tag.lower() in tags:
+                tags[tag.lower()] = []
+            tags[tag.lower()].append(value)
     return tags
 
 if __name__=="__main__":

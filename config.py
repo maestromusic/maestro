@@ -26,6 +26,10 @@ def init(*config_files):
         "tags": {
             "indexed_tags":"album,artist,title,composer,performer,genre,date",
             "ignored_tags":"encodedby"
+        },
+        
+        "misc": {
+            "printtags_cmd":"printtags.py"
         }
     }
     
@@ -35,3 +39,5 @@ def init(*config_files):
             _config.set(section, key, value)
     
     _config.read(config_files)
+
+init(constants.CONFIG)
