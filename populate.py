@@ -5,8 +5,8 @@ import omg
 import sys
 import pprint
 import mpd
+import os
 
-client = omg.mpdClient()
 def generate_album_name(files):
     """Generates a string name for an album consisting of the given files. Very intelligent. """
     
@@ -56,8 +56,25 @@ def generate_album_name(files):
         ret += " ({0})".format(date)
     return ret
            
-
 def walk(path):
+    for dirpath, dirnames, filenames in os.walk(path):
+        albums_in_this_directory = {}
+        tags = {}
+        for f in filenames:
+            tags[f] = t = omg.read_tags_from_file(os.path.join(dirpath,f))
+            if "album" in t:
+                album = t["album"][0]
+                if not album in albums_in_this_directory:
+                    albums_in_this_directory[album] = []
+                albums_in_this_directory[album].append(os.path.join(dirpath,f))
+            else:
+                print("Here is a file without album: {0}".format(os.path.join(dirpath,f)))
+        for name,album in albums_in_this_directory.items():
+            #name = album generate_album_name(album)
+            print("I found an album '{0}' in directory '{1}' containing {2} files.".format(name,dirpath,len(album)))
+            
+    
+def walk_old(path):
     elements = client.lsinfo(path)
     albums_in_this_directory = {}
     for el in elements:
@@ -78,5 +95,6 @@ def walk(path):
         print("I found an album '{0}' in directory '{1}' containing {2} files.".format(name,path,len(album)))
         core.add_file_container(name,album)
     core._mpdclient.disconnect()
-            
+
+#omg.init()
 walk(sys.argv[1])

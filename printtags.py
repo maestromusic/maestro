@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2.6
 # -*- coding: utf-8 -*-
 
 import sys
@@ -46,7 +46,8 @@ ID3_MAPPING = {
             }
 ID3_IGNORE = [
         "TLEN", # no need to get file length from a tag ...
-        "APIC"  # pictures not supported
+        "APIC",  # pictures not supported
+        "PRIV",
         ]
 
 def gettags(filename):
@@ -66,13 +67,21 @@ def gettags(filename):
                 continue
             elif tag.startswith("APIC"):
                 continue #pictures
+            elif tag.startswith("PRIV"):
+                continue #private tags are bäh
             try:
                 nice_tag = ID3_MAPPING[frameid]
             except:
                 print("Unsupported ID3 tag: {0} ({1})".format(frameid,tag))
                 nice_tag = frameid
-            ntags[nice_tag] = []
+            if not nice_tag in ntags:
+                ntags[nice_tag] = []
             for value in tags[tag].text:
+                if frameid=="TXXX":
+                    try:
+                        value = tags[tag].desc + "=" + value
+                    except AttributeError:
+                        pass
                 ntags[nice_tag].append(value)
         tags = ntags
     else:
@@ -88,6 +97,6 @@ if __name__=="__main__":
     tags = gettags(filename)
     for tag in tags:
         for value in tags[tag]:
-            print(u"{0}={1}".format(tag,value))
+            print(u"{0}={1}".format(tag,value).encode("utf-8"))
     
     
