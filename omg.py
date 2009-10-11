@@ -7,28 +7,25 @@
 # published by the Free Software Foundation
 #
 
-import mpd
 import db
 import config
 import os
 
-MPD_HOST = "localhost"
-MPD_PORT = "6600"
-_mpdclient = mpd.MPDClient()
 itags = {} # dict of indexed tags and their tagid
 itags_reverse = {} # same in other direction (bäh)
+initialized = False
 def init():
-    #_mpdclient.connect(host=MPD_HOST, port=MPD_PORT)
-    
+    global initialized
+    if initialized:
+        raise Exception("Already init'ed.")
     db.connect()
+    db.check_tables(create_tables=True)
     result = db.query("SELECT * FROM tagids;")
     for id,name in result:
--        itags[name] = id
+        itags[name] = id
     itags_reverse = {y:x for x,y in itags.items()} # <3 python :)
+    initialized = True
     
-    
-def close():
-    _mpdclient.disconnect()
 
 # -------- "file functions": Functions for operating with real files on the filesystem. -----------
 def abs_path(file):
@@ -81,26 +78,27 @@ def compute_hash(file):
 # ------------------- database management functions -----------------------------------------------
 
 def id_from_filename(filename):
-    """Tries to retrieve the ID from the file with the given path.
-    
-    May return None if the path is not present in the database. This function does NOT check
-    for uniqueness of the path."""
+    """Retrieves the container_id of a file from the given path, or None if it is not found."""
     return db.query("SELECT id FROM files WHERE path='?';", filename).get_single()
+
+def id_from_hash(hash):
+    """Retrieves the container_id of a file from its hash, or None if it is not found."""
+    return db.query("SELECT id FROM files WHERE hash='?';", hash).get_single()
 
 
 def get_value_id(tag,value,insert=False):
     """Looks up the id of a tag value. If the value is not found and insert=True, create an entry,
     otherwise return None."""
-    result = db.query("SELECT id FROM tag_{0} WHERE 'value'='?';".format(tag),value).get_single()
+    result = db.query("SELECT id FROM tag_{0} WHERE value='?';".format(tag),value).get_single()
     if insert and not result:
         result = add_tag_value(tag,value)
     return result
     
-
 def add_container(name,tags={},elements=0):
     db.query("INSERT INTO containers (name,elements) VALUES('?','?');", name,elements)
     newid = db.query('SELECT LAST_INSERT_ID();').get_single() # the new container's ID
-    set_tags(cid, tags)
+    set_tags(newid, tags)
+    return newid
 
 
 def add_tag(container_id, tagname=None, tagid=None, value=None, valueid=None):
@@ -119,7 +117,7 @@ def add_tag(container_id, tagname=None, tagid=None, value=None, valueid=None):
     else: # other tag
         if not value:
             raise ValueError("add_tag called for and unindexed tag, so value must be set.")
-    db.query("INSERT INTO othertags VALUES('?','?','?');", container_id, tagname, value)        
+        db.query("INSERT INTO othertags VALUES('?','?','?');", container_id, tagname, value)        
 
 
 def add_tag_value(tagname,value):
@@ -152,12 +150,16 @@ def add_file(path):
     
     if not os.path.isabs(path):
         path = abs_path(path)
-    db.query("INSERT INTO files (path,hash) VALUES('?','?');", rel_path(path),compute_hash(path))
-    # read the files tags and add them to the database
-
-    file_id = db.query('SELECT LAST_INSERT_ID();').get_single() #the new file's ID
-    tags = read_tags_from_file(path)
-    set_tags(file_id,tags)
+    
+    # a file is just a special container, so add a container first
+    file_id = add_container(name=os.path.basename(path),tags=read_tags_from_file(path),elements=0)
+    # now take care of the files table
+    db.query(
+        "INSERT INTO files (container_id,path,hash) VALUES('?','?','?');",
+        file_id,
+        rel_path(path),
+        compute_hash(path)
+        )
     return file_id
     
 def add_content(container_id, i, file_id):
@@ -176,9 +178,29 @@ def add_file_container(name, files):
         if file_id == None:
             file_id = add_file(file)
         add_content(container_id, index, file_id)
+    
+def del_container(cid):
+    """Removes a container together with all of its content and tag references from the database.
+    
+    If the content is a file, also deletes its entry from the files table."""
+    
+    db.query("DELETE FROM tags WHERE container_id='?';", cid) # delete tag references
+    db.query("DELETE FROM othertags WHERE container_id='?';",cid) # delete othertag references
+    db.query("DELETE FROM contents WHERE container_id='?' OR element_id='?';",cid,cid) # delete content relations
+    db.query("DELETE FROM files WHERE container_id='?';",cid) # delete file entry, if present
+    db.query("DELETE FROM containers WHERE id='?';",cid) # remove container itself
 
-# ---------- deprecated / temporary / debugging / omgwtf functions
-def mpdClient(host=MPD_HOST, port=MPD_PORT):
-    client = mpd.MPDClient()
-    client.connect(host=host, port=port)
-    return client
+def del_file(path=None,hash=None,id=None):
+    """Deletes a file from the database, either by path, hash or id."""
+    
+    if id:
+        return del_container(id)
+    elif path:
+        return del_container(id_from_filename(path))
+    elif hash:
+        return del_container(id_from_hash(path))
+    else:
+        raise ValueError("One of the arguments must be set.")
+
+# initialize module on loading
+init()

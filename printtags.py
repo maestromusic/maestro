@@ -48,6 +48,7 @@ ID3_IGNORE = [
         "TLEN", # no need to get file length from a tag ...
         "APIC",  # pictures not supported
         "PRIV",
+        "MCDI", # binary crap
         ]
 
 def gettags(filename):
@@ -82,7 +83,8 @@ def gettags(filename):
                         value = tags[tag].desc + "=" + value
                     except AttributeError:
                         pass
-                ntags[nice_tag].append(value)
+                else:
+                    ntags[nice_tag].append(value)
         tags = ntags
     else:
         tags = {}

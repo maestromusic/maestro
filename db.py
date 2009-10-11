@@ -192,7 +192,7 @@ def check_foreign_keys():
     # Ok now things get messier...as the value ids in tags must be found in the corresponding tag-table we use a subquery to select only a part of tags with identical tag_id.
     for tagid,tagname in query("SELECT id,tagname FROM tagids"):
         foreign_keys.append(("(SELECT value_id FROM tags WHERE tag_id={0}) AS subtable".format(tagid),
-                             "value_id","tag_{0}".format(tagname),"id",tablename="tags"))
+                             "value_id","tag_{0}".format(tagname),"id","tags"))
 
     for args in foreign_keys:
         _check_foreign_key(*args)
