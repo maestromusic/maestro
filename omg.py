@@ -8,7 +8,7 @@
 #
 
 import mpd
-import mysql
+import db
 import config
 import os
 
@@ -20,16 +20,10 @@ itags_reverse = {} # same in other direction (bäh)
 def init():
     #_mpdclient.connect(host=MPD_HOST, port=MPD_PORT)
     
-    global _db
-    _db = mysql.MySQL(
-        config.get("database","mysql_user"),
-        config.get("database","mysql_password"),
-        config.get("database","mysql_db"),
-        config.get("database","mysql_host")
-        )
-    result = _db.query("SELECT * FROM tagids;")
-    for id,name in result:
-        itags[name] = id
+    db.connect()
+    result = db.query("SELECT * FROM tagids;")
+    for row in result:
+        itags[row["tagname"]] = row["id"]
     itags_reverse = {y:x for x,y in itags.items()} # <3 python :)
     
     
@@ -91,21 +85,21 @@ def id_from_filename(filename):
     
     May return None if the path is not present in the database. This function does NOT check
     for uniqueness of the path."""
-    return _db.query("SELECT id FROM files WHERE path='?';", filename).get_single()
+    return db.query("SELECT id FROM files WHERE path='?';", filename).get_single()
 
 
 def get_value_id(tag,value,insert=False):
     """Looks up the id of a tag value. If the value is not found and insert=True, create an entry,
     otherwise return None."""
-    result = _db.query("SELECT id FROM tag_{0} WHERE 'value'='?';".format(tag),value).get_single()
+    result = db.query("SELECT id FROM tag_{0} WHERE 'value'='?';".format(tag),value).get_single()
     if insert and not result:
         result = add_tag_value(tag,value)
     return result
     
 
 def add_container(name,tags={},elements=0):
-    _db.query("INSERT INTO containers (name,elements) VALUES('?','?');", name,elements)
-    newid = _db.query('SELECT LAST_INSERT_ID();').get_single() # the new container's ID
+    db.query("INSERT INTO containers (name,elements) VALUES('?','?');", name,elements)
+    newid = db.query('SELECT LAST_INSERT_ID();').get_single() # the new container's ID
     set_tags(cid, tags)
 
 
@@ -121,18 +115,18 @@ def add_tag(container_id, tagname=None, tagid=None, value=None, valueid=None):
             if not value:
                 raise ValueError("Either value or valueid must be set.")
             valueid=get_value_id(tagname,value,insert=True)
-        _db.query("INSERT INTO tags VALUES('?','?','?');", container_id, itags[tagname], valueid)
+        db.query("INSERT INTO tags VALUES('?','?','?');", container_id, itags[tagname], valueid)
     else: # other tag
         if not value:
             raise ValueError("add_tag called for and unindexed tag, so value must be set.")
-    _db.query("INSERT INTO othertags VALUES('?','?','?');", container_id, tagname, value)        
+    db.query("INSERT INTO othertags VALUES('?','?','?');", container_id, tagname, value)        
 
 
 def add_tag_value(tagname,value):
     """Adds a new value entry to an indexed tag. Returns the newly created ID."""
     
-    _db.query("INSERT INTO tag_{0} (value) VALUES('?');".format(tagname), value)
-    return _db.query('SELECT LAST_INSERT_ID();').get_single()
+    db.query("INSERT INTO tag_{0} (value) VALUES('?');".format(tagname), value)
+    return db.query('SELECT LAST_INSERT_ID();').get_single()
     
     
 def set_tags(cid, tags, append=False):
@@ -141,10 +135,10 @@ def set_tags(cid, tags, append=False):
     If the optional parameter append is set to True, existing tags won't be touched, instead the 
     given ones will be added. This function will not check for duplicates in that case."""
     
-    existing_tags = _db.query("SELECT * FROM tags WHERE 'container_id'='?';", cid)
+    existing_tags = db.query("SELECT * FROM tags WHERE 'container_id'='?';", cid)
     if len(existing_tags) > 0:
         print("Warning: Deleting existing tags from container {0}".format(cid))
-    _db.query("DELETE FROM tags WHERE 'container_id'='?';", cid)
+    db.query("DELETE FROM tags WHERE 'container_id'='?';", cid)
     for tag in tags.keys():
         for value in tags[tag]:
             add_tag(container_id=cid,tagname=tag,value=value)
@@ -158,10 +152,10 @@ def add_file(path):
     
     if not os.path.isabs(path):
         path = abs_path(path)
-    _db.query("INSERT INTO files (path,hash) VALUES('?','?');", rel_path(path),compute_hash(path))
+    db.query("INSERT INTO files (path,hash) VALUES('?','?');", rel_path(path),compute_hash(path))
     # read the files tags and add them to the database
 
-    file_id = _db.query('SELECT LAST_INSERT_ID();').get_single() #the new file's ID
+    file_id = db.query('SELECT LAST_INSERT_ID();').get_single() #the new file's ID
     tags = read_tags_from_file(path)
     set_tags(file_id,tags)
     return file_id
@@ -171,7 +165,7 @@ def add_content(container_id, i, file_id):
     
     The file with given file_id will be the i-th element of the container with container_id. May throw
     an exception if this container already has an element with the given file_id."""
-    _db.query('INSERT INTO contents VALUES(?,?,?);', container_id, i, file_id)
+    db.query('INSERT INTO contents VALUES(?,?,?);', container_id, i, file_id)
 
 def add_file_container(name, files):
     """Adds a new file container to the database, whose contents are ordered as in files."""

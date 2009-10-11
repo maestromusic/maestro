@@ -14,6 +14,7 @@ get = _config.get
 set = _config.set
 
 def init(*config_files):
+    """Sets default options and overwrites them with the options in the given config files."""
     default_options = {
         "database": {
             "mysql_host":"localhost",
@@ -34,7 +35,8 @@ def init(*config_files):
     }
     
     for section, configs in default_options.items():
-        _config.add_section(section)
+        if not _config.has_section(section):
+            _config.add_section(section)
         for key, value in configs.items():
             _config.set(section, key, value)
     

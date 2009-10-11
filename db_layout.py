@@ -134,6 +134,5 @@ def check_tables():
 
 if __name__=="__main__":
     config.init(constants.CONFIG)
-    omg.init()
     check_tables()
     
