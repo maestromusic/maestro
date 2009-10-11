@@ -22,8 +22,8 @@ def init():
     
     db.connect()
     result = db.query("SELECT * FROM tagids;")
-    for row in result:
-        itags[row["tagname"]] = row["id"]
+    for id,name in result:
+-        itags[name] = id
     itags_reverse = {y:x for x,y in itags.items()} # <3 python :)
     
     
