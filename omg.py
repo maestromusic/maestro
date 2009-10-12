@@ -19,7 +19,7 @@ def init():
     if initialized:
         raise Exception("Already init'ed.")
     db.connect()
-    db.check_tables(create_tables=True)
+    db.check_tables(create_tables=True,insert_tagids=True)
     result = db.query("SELECT * FROM tagids;")
     for id,name in result:
         itags[name] = id

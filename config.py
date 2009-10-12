@@ -25,7 +25,7 @@ def init(*config_files):
         },
         
         "tags": {
-            "indexed_tags":"album,artist,title,composer,performer,genre,date",
+            "indexed_tags":"album,artist,title,composer,performer,genre,date(date)",
             "ignored_tags":"encodedby"
         },
         

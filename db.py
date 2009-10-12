@@ -13,6 +13,7 @@
 #
 import config
 from mysql import MySQL
+import re
 
 # MySQL-commands to create these static tables
 CREATE_STATIC_TABLE_CMDS = {
@@ -62,29 +63,49 @@ CREATE_STATIC_TABLE_CMDS = {
     CREATE TABLE tagids (
         id SMALLINT UNSIGNED NOT NULL AUTO_INCREMENT,
         tagname VARCHAR(63) NOT NULL,
-        PRIMARY KEY(id)
+        tagtype ENUM('varchar','date','text') DEFAULT 'varchar',
+        PRIMARY KEY(id),
+        UNIQUE INDEX(tagname)
     );""",
     
     "othertags":"""
     CREATE TABLE othertags (
         container_id MEDIUMINT UNSIGNED NOT NULL,
         tagname VARCHAR(63),
-        value VARCHAR(255)
+        value VARCHAR(255),
+        PRIMARY KEY(container_id)
     );"""
     }
 
-# MySQL-command to create a table for a specific tag. Replace the placeholder before use...
-CREATE_TAG_TABLE_CMD = """
-    CREATE TABLE ? (
+# MySQL-command to create a table for a tag with a specific type.  Replace the placeholder before use...
+CREATE_TAG_TABLE_CMDS = {
+    "varchar" : """
+    CREATE TABLE {0} (
         id MEDIUMINT UNSIGNED NOT NULL AUTO_INCREMENT,
         value VARCHAR(255) NOT NULL,
         PRIMARY KEY(id),
-        UNIQUE INDEX value_idx(value(15))
-    );
-    """
+        UNIQUE INDEX value_idx(value(15)),
+        FULLTEXT INDEX fulltext_idx(value)
+    );""",
 
-# List of static tables
-STATIC_TABLES = CREATE_STATIC_TABLE_CMDS.keys()
+    "date" : """
+    CREATE TABLE {0} (
+        id MEDIUMINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        value DATE NOT NULL,
+        PRIMARY KEY(id),
+        UNIQUE INDEX value_idx(value)
+    );""",
+
+    "text" : """
+    CREATE TABLE {0} (
+        id MEDIUMINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        value TEXT NOT NULL,
+        PRIMARY KEY(id),
+        INDEX value_idx(value(15)),
+        FULLTEXT INDEX fulltext_idx(value)
+    );"""
+    }
+
 
 # The MySQL-object
 _db = None
@@ -111,13 +132,24 @@ def query_dict(query,**args):
     _db.useDict = False
 
 
-def create_table(name):
-    """Creates the given table (either a static table or a tag-table, which must begin with "tag_")."""
-    if name in CREATE_STATIC_TABLE_CMDS:
-        query(CREATE_STATIC_TABLE_CMDS[name])
-    elif name.startswith("tag_"):
-        query(CREATE_TAG_TABLE_CMD,name)
-    else: raise Exception("Unknown table name: {0}".format(name))
+def _parse_indexed_tags(string):
+    """Parses the given string. This option should contain a comma-separated list of strings of the form tagname(tagtype) where the part in brackets is optional and defaults to 'varchar'. It checks whether the syntax is correct and all types have a corresponding CREATE_TAG_TABLE_CMDS-command and returns a dictionary {tagname : tagtype}. Otherwise an exception is raised."""
+
+    # Matches strings like "   tagname (   tagtype   )   " (the part in brackets is optional) and stores the interesting parts in the first and third group.
+    prog = re.compile('\s*(\w+)\s*(\(\s*(\w*)\s*\))?\s*$')
+    tags = {}
+    for tagstring in string.split(","):
+        result = prog.match(tagstring)
+        if result == None:
+            raise Exception("Invalid syntax in the indexed_tags-option of the config-file ('{0}').".format(tagstring))
+        tagname = result.groups()[0]
+        tagtype = result.groups()[2]
+        if not tagtype:
+            tagtype = "varchar"
+        if tagtype.lower() not in CREATE_TAG_TABLE_CMDS.keys():
+            raise Exception("Unsupported tag type '{0}' in the indexed_tags-option of the config-file.".format(tagtype))
+        tags[tagname] = tagtype
+    return tags
 
 
 def get_tagnames():
@@ -133,44 +165,47 @@ def get_tagid(tagname):
 def check_tables(create_tables=False,insert_tagids=False):
     """Checks if all necessary tables exists and creates them if <create_tables> is true. Prints a warning if the database contains tables which are not necessary. If <insert_tagids> is true, this method inserts missing tags into the tagids-table ensuring that it contains at least the tags which are given in the indexed_tags-option. In any case it prints warnings if something is wrong with that table."""
     existent_tables = set(list_tables())
-    necessary_tables = set(STATIC_TABLES)
-    indexed_tags = config.get("tags","indexed_tags").split(",")
-    for tag in indexed_tags:
-        necessary_tables.add("tag_{0}".format(tag))
-    superflous_tables = existent_tables - necessary_tables
-    missing_tables = necessary_tables - existent_tables
+    # While existent_tables is just a set, necessary_tables is a dictionary with the corresponding SQL-commands as values.
+    necessary_tables = CREATE_STATIC_TABLE_CMDS.copy()
+    indexed_tags = _parse_indexed_tags(config.get("tags","indexed_tags"))
+    for tag,tagtype in indexed_tags.items():
+        table = "tag_{0}".format(tag)
+        necessary_tables[table] = CREATE_TAG_TABLE_CMDS[tagtype].format(table) # replace placeholder in SQL-command
+    superflous_tables = existent_tables - set(necessary_tables.keys())
+    missing_tables = {table:command for table,command in necessary_tables.items() if table not in existent_tables}
     if len(superflous_tables) > 0:
         print("Warning: Superflous tables found: ",end="")
         print(superflous_tables)
     if len(missing_tables) > 0:
         if create_tables:
-            for table in missing_tables:
+            for table,command in missing_tables.items():
                 print("Table {0} is missing...".format(table),end="")
-                create_table(table)
+                query(command)
                 print("created")
-        else: raise Exception("Missing tables found: {0}".format(missing_tables))
+        else: raise Exception("Missing tables found: {0}".format(set(missing_tables.keys())))
 
     # In the second part of this method we check if the tags in tagids are consistent with those in the indexed_tags-option.
-    existent_tables = set(list_tables())
-    if "tagids" in existent_tables:
-        tags_in_table = get_tagnames()
-        for tag in tags_in_table:
+    if "tagids" in list_tables():
+        tags_in_table = {tag:tagtype for tag,tagtype in query("SELECT tagname,tagtype FROM tagids")}
+        for tag,tagtype in tags_in_table.items():
             if not tag in indexed_tags:
                 print("Warning: tagids-table contains the tag '{0}' which is not listed in the indexed_tags-options.".format(tag))
+            elif tagtype != indexed_tags[tag]:
+                print("Warning: The type of tag '{0}' in tagids-table differs from the type in the config-file.".format(tag))
         if insert_tagids:
-            for tag in indexed_tags:
+            for tag,tagtype in indexed_tags.items():
                 if not tag in tags_in_table:
                     print("Tag '{0}' missing in tagids-table...".format(tag),end="")
-                    query("INSERT INTO tagids(tagname) VALUES ('?')",tag)
+                    query("INSERT INTO tagids(tagname,tagtype) VALUES ('?','?')",tag,tagtype)
                     print("inserted")
         else:
-            missing_tagids = set(indexed_tags) - set(tags_in_table)
+            missing_tagids = [tag for tag in indexed_tags if not tag in tags_in_table]
             if len(missing_tagids) > 0:
                 raise Exception("Some tags are missing in tagids-table: {0}".format(missing_tagids))
 
 
 def _check_foreign_key(table,key,ref_table,ref_key,tablename=None):
-    """Checks whether each value in <table>.<key> is also contained in <ref_table>.<ref_key>. Prints a warning otherwise. If given, <tablename> will be used in this warning <tablename> instead of <table> so subqueries may be used in <table>."""
+    """Checks whether each value in <table>.<key> is also contained in <ref_table>.<ref_key>. Prints a warning otherwise. If given, <tablename> will be used in this warning <tablename> instead of <table> so subqueries may be used in <table> """
     result = query("SELECT COUNT(*) FROM ? WHERE ? NOT IN (SELECT ? FROM ?)",table,key,ref_key,ref_table).get_single()
     if result > 0:
         if tablename == None:
@@ -191,8 +226,10 @@ def check_foreign_keys():
                   ]
     # Ok now things get messier...as the value ids in tags must be found in the corresponding tag-table we use a subquery to select only a part of tags with identical tag_id.
     for tagid,tagname in query("SELECT id,tagname FROM tagids"):
-        foreign_keys.append(("(SELECT value_id FROM tags WHERE tag_id={0}) AS subtable".format(tagid),
-                             "value_id","tag_{0}".format(tagname),"id","tags"))
+        tablename = "tag_{0}".format(tagname)
+        if tablename in list_tables(): # If something's wrong with the tagids-table, tablename may not exist
+            foreign_keys.append(("(SELECT value_id FROM tags WHERE tag_id={0}) AS subtable".format(tagid),
+                                "value_id",tablename,"id","tags"))
 
     for args in foreign_keys:
         _check_foreign_key(*args)
