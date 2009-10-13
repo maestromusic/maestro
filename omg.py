@@ -20,7 +20,7 @@ def init():
         raise Exception("Already init'ed.")
     db.connect()
     db.check_tables(create_tables=True,insert_tagids=True)
-    result = db.query("SELECT * FROM tagids;")
+    result = db.query("SELECT id,tagname FROM tagids;")
     for id,name in result:
         itags[name] = id
     itags_reverse = {y:x for x,y in itags.items()} # <3 python :)
@@ -45,11 +45,14 @@ def read_tags_from_file(file):
     proc = subprocess.Popen([config.get("misc","printtags_cmd"),file], stdout=subprocess.PIPE)
     stdout = proc.communicate()[0].decode("utf-8")
     if proc.returncode > 0:
-        print(file)
-        print(stdout)
+        raise RuntimeError("Error calling printtags on file '{0}': {1}".format(file,stdout))
     tags = {}
     for line in stdout.splitlines():
-        tag, value = line.split("=",1)
+        try:
+            tag, value = line.split("=",1)
+        except ValueError as e:
+            print("Exception parsing line '{0}' in file '{1}'".format(line,file))
+            raise e
         if not tag in tags:
             tags[tag] = []
         tags[tag].append(value)
@@ -58,7 +61,7 @@ def read_tags_from_file(file):
 
 def compute_hash(file):
     """Computes the hash of the audio stream of the given file."""
-    
+
     import hashlib,tempfile,subprocess
     handle, tmpfile = tempfile.mkstemp()
     subprocess.check_call(

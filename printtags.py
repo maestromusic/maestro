@@ -8,6 +8,14 @@ import mutagen
 class UnsupportedFileExtension(Exception):
     pass
 
+class TagReader:
+    def readTags(path):
+        pass
+
+class ID3Reader(TagReader):
+    def read(file):
+        pass
+    
 ID3_MAPPING = {
             "TIT1": "grouping",                                 
             "TIT2": "title",                                    
@@ -40,7 +48,9 @@ ID3_MAPPING = {
             "TMED": "media",                                    
             "TCMP": "compilation",
             "TCON": "genre",
-            "TXXX": "decsription" #this is getting messy if you wanna do it 'right'
+            "TXXX": "description", #this is getting messy if you wanna do it 'right'
+            "COMM": "description", #omgwtf
+  
             # "language" should not make to TLAN. TLAN requires 
             # an ISO language code, and QL tags are freeform.   
             }
@@ -49,6 +59,18 @@ ID3_IGNORE = [
         "APIC",  # pictures not supported
         "PRIV",
         "MCDI", # binary crap
+        "TLAN", #language
+        "PCNT", #play count WTF
+        "TSSE", # encoder settings freakscheiße die keinen interessiert
+        "POPM", #popularity rating könnte man implementieren als popularity, aber hässlich da kein text-tag
+        "TFLT", # file type, erkennt man auch so an der datei -.-
+        "USLT", #todo: multiline lyrics? :(
+        "WXXX",
+        "GEOB", #general object 
+        "TDEN", #encoding time
+        "TDTG",
+        "LINK", #freakscheiß den eh keiner richtig benutzt
+		"UFID", # unique file identifier; don't need this since we use own hashes
         ]
 
 def gettags(filename):
@@ -64,16 +86,19 @@ def gettags(filename):
         ntags = {}
         for tag in tags:
             frameid = tags[tag].FrameID
-            if tag in ID3_IGNORE:
+            if tag in ID3_IGNORE or frameid in ID3_IGNORE:
                 continue
-            elif tag.startswith("APIC"):
-                continue #pictures
-            elif tag.startswith("PRIV"):
-                continue #private tags are bäh
+            #elif tag.startswith("APIC"):
+            #    continue #pictures
+            #elif tag.startswith("PRIV"):
+            #    continue #private tags are bäh
             try:
                 nice_tag = ID3_MAPPING[frameid]
-            except:
-                print("Unsupported ID3 tag: {0} ({1})".format(frameid,tag))
+            except KeyError:
+                try:
+                    nice_tag = ID3_MAPPING[tag]
+                except KeyError:
+                    print("Unsupported ID3 tag: {0} ({1})".format(frameid,tag))
                 nice_tag = frameid
             if not nice_tag in ntags:
                 ntags[nice_tag] = []

@@ -59,42 +59,21 @@ def generate_album_name(files):
 def walk(path):
     for dirpath, dirnames, filenames in os.walk(path):
         albums_in_this_directory = {}
-        tags = {}
         for f in filenames:
-            tags[f] = t = omg.read_tags_from_file(os.path.join(dirpath,f))
+            try:
+                t = omg.read_tags_from_file(os.path.abspath(os.path.join(dirpath,f)))
+            except RuntimeError as e:
+                print("Ecxeption while trying to read tags from file, skipping...\n({0})".format(e))
+                continue
             if "album" in t:
                 album = t["album"][0]
                 if not album in albums_in_this_directory:
-                    albums_in_this_directory[album] = []
-                albums_in_this_directory[album].append(os.path.join(dirpath,f))
+                    albums_in_this_directory[album] = {}
+                albums_in_this_directory[album][os.path.join(dirpath,f)] = t
             else:
                 print("Here is a file without album: {0}".format(os.path.join(dirpath,f)))
         for name,album in albums_in_this_directory.items():
             #name = album generate_album_name(album)
             print("I found an album '{0}' in directory '{1}' containing {2} files.".format(name,dirpath,len(album)))
-            
-    
-def walk_old(path):
-    elements = client.lsinfo(path)
-    albums_in_this_directory = {}
-    for el in elements:
-        if "directory" in el:
-            # this means the element is a subdirectory of path
-            walk(el["directory"])
-        else:
-            # we have a file
-            if "album" in el:
-                if not el["album"] in albums_in_this_directory:
-                    albums_in_this_directory[el["album"]] = []
-                albums_in_this_directory[el["album"]].append(el["file"])
-            else:
-                print("Here is a file without album: {0}".format(el["file"]))
-    core = omg.MPDe()
-    for album in albums_in_this_directory.values():
-        name = generate_album_name(album)
-        print("I found an album '{0}' in directory '{1}' containing {2} files.".format(name,path,len(album)))
-        core.add_file_container(name,album)
-    core._mpdclient.disconnect()
 
-#omg.init()
 walk(sys.argv[1])
