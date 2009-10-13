@@ -84,7 +84,7 @@ CREATE_TAG_TABLE_CMDS = {
         id MEDIUMINT UNSIGNED NOT NULL AUTO_INCREMENT,
         value VARCHAR(255) NOT NULL,
         PRIMARY KEY(id),
-        UNIQUE INDEX value_idx(value(15)),
+        INDEX value_idx(value(15)),
         FULLTEXT INDEX fulltext_idx(value)
     );""",
 
@@ -113,16 +113,18 @@ _db = None
 # After connecting with the database the following variables will contain the corresponding functions from the wrapped MySQL-object.
 query = None
 list_tables = None
+tagtypes = None
 
 def connect():
     """Connects to the database server with the information from the config file."""
-    global _db,query,list_tables
+    global _db,query,list_tables,tagtypes
     _db = MySQL(config.get("database","mysql_user"),
                 config.get("database","mysql_password"),
                 config.get("database","mysql_db"),
                 config.get("database","mysql_host"))
     query = _db.query
     list_tables = _db.list_tables
+    tagtypes = _parse_indexed_tags(config.get("tags","indexed_tags"))
 
 
 def query_dict(query,**args):

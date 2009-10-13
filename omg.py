@@ -10,10 +10,13 @@
 import db
 import config
 import os
+import pickle
+import datetime
 
 itags = {} # dict of indexed tags and their tagid
 itags_reverse = {} # same in other direction (bäh)
 initialized = False
+ignored_tags = None
 def init():
     global initialized
     if initialized:
@@ -24,6 +27,8 @@ def init():
     for id,name in result:
         itags[name] = id
     itags_reverse = {y:x for x,y in itags.items()} # <3 python :)
+    global ignored_tags
+    ignored_tags = config.get("tags","ignored_tags").split(",")
     initialized = True
     
 
@@ -43,19 +48,10 @@ def read_tags_from_file(file):
     if not os.path.isabs(file):
         file = abs_path(file)
     proc = subprocess.Popen([config.get("misc","printtags_cmd"),file], stdout=subprocess.PIPE)
-    stdout = proc.communicate()[0].decode("utf-8")
+    stdout = proc.communicate()[0]
     if proc.returncode > 0:
         raise RuntimeError("Error calling printtags on file '{0}': {1}".format(file,stdout))
-    tags = {}
-    for line in stdout.splitlines():
-        try:
-            tag, value = line.split("=",1)
-        except ValueError as e:
-            print("Exception parsing line '{0}' in file '{1}'".format(line,file))
-            raise e
-        if not tag in tags:
-            tags[tag] = []
-        tags[tag].append(value)
+    tags = pickle.loads(stdout)
     return tags
 
 
@@ -82,16 +78,20 @@ def compute_hash(file):
 
 def id_from_filename(filename):
     """Retrieves the container_id of a file from the given path, or None if it is not found."""
-    return db.query("SELECT id FROM files WHERE path='?';", filename).get_single()
+    return db.query("SELECT container_id FROM files WHERE path='?';", rel_path(filename)).get_single()
 
 def id_from_hash(hash):
     """Retrieves the container_id of a file from its hash, or None if it is not found."""
-    return db.query("SELECT id FROM files WHERE hash='?';", hash).get_single()
+    return db.query("SELECT container_id FROM files WHERE hash='?';", hash).get_single()
 
 
 def get_value_id(tag,value,insert=False):
     """Looks up the id of a tag value. If the value is not found and insert=True, create an entry,
     otherwise return None."""
+    
+    if db.tagtypes[tag]=="date":
+        if len(value)==4: # only year is given
+            value="{0}-00-00".format(value)
     result = db.query("SELECT id FROM tag_{0} WHERE value='?';".format(tag),value).get_single()
     if insert and not result:
         result = add_tag_value(tag,value)
@@ -111,6 +111,8 @@ def add_tag(container_id, tagname=None, tagid=None, value=None, valueid=None):
         tagname=itags_reverse[tagid]
     if not tagname:
         raise ValueError("Either tagid or tagname must be set.")
+    if tagname in ignored_tags:
+        return
     if tagname in itags: # yap, indexed tag
         if not valueid:
             if not value:
@@ -138,9 +140,15 @@ def set_tags(cid, tags, append=False):
     
     existing_tags = db.query("SELECT * FROM tags WHERE 'container_id'='?';", cid)
     if len(existing_tags) > 0:
-        print("Warning: Deleting existing tags from container {0}".format(cid))
+        print("Warning: Deleting existing indexed tags from container {0}".format(cid))
     db.query("DELETE FROM tags WHERE 'container_id'='?';", cid)
+    existing_othertags = db.query("SELECT * FROM othertags WHERE 'container_id'='?';",cid)
+    if len(existing_othertags) >0:
+        print("Warning: Deleting existing indexed tags from container {0}".format(cid))
+    db.query("DELETE FROM othertags WHERE 'container_id'='?';", cid)
     for tag in tags.keys():
+        if tag in ignored_tags:
+            continue
         for value in tags[tag]:
             add_tag(container_id=cid,tagname=tag,value=value)
 
@@ -172,11 +180,11 @@ def add_content(container_id, i, file_id):
     an exception if this container already has an element with the given file_id."""
     db.query('INSERT INTO contents VALUES(?,?,?);', container_id, i, file_id)
 
-def add_file_container(name, files):
+def add_file_container(name, contents, tags={}):
     """Adds a new file container to the database, whose contents are ordered as in files."""
     
-    container_id = add_container(name)
-    for index, file in enumerate(files,1):
+    container_id = add_container(name,tags=tags, elements=len(contents))
+    for index, file in enumerate(contents,1):
         file_id = id_from_filename(file)
         if file_id == None:
             file_id = add_file(file)
