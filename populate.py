@@ -79,7 +79,7 @@ def do_album(album):
 def walk(path):
     for dirpath, dirnames, filenames in os.walk(path):
         albums_in_this_directory = {}
-        for f in sorted(filenames):
+        for f in filenames:
             if omg.id_from_filename(os.path.join(dirpath,f)):
                 continue #file already exists
             try:
@@ -95,6 +95,7 @@ def walk(path):
             else:
                 print("Here is a file without album: {0}".format(os.path.join(dirpath,f)))
         for name,album in albums_in_this_directory.items():
+            album.sort(key=lambda x: x[1].get("tracknumber"))
             print("\n**************************************************************************")
             print("I found an album '{0}' in directory '{1}' containing {2} files.".format(name,dirpath,len(album)))
             do_album(album)

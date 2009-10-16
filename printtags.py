@@ -27,4 +27,7 @@ if __name__=="__main__":
                 print(u"  {0}".format(value))
     if write_pickle:
         print(pickle.dumps(tags))
+    #of = open("test.p","wb")
+    #pickle.dump(tags,of)
+    #of.close()
     

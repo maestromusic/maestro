@@ -43,9 +43,11 @@ CREATE_STATIC_TABLE_CMDS = {
         path VARCHAR(511),
         hash VARCHAR(63),
         verified TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        length MEDIUMINT UNSIGNED NOT NULL,
         PRIMARY KEY(container_id),
         UNIQUE INDEX path_idx(path),
-        UNIQUE INDEX hash_idx(hash)
+        INDEX hash_idx(hash),
+        INDEX length_idx(length)
     );
     """,
     

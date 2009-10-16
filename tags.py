@@ -3,6 +3,7 @@
 
 import mutagen
 import sys
+from dirty import TagDict
 
 class UnsupportedFileExtension(Exception):
     pass
@@ -123,12 +124,13 @@ MP4_IGNORE = [
     "cpil",
     '----:com.apple.iTunes:iTunNORM'
     ]
-
     
 class TagFile:
-    def __init__(self):
-        self.tags = {}
+    def __init__(self,path):
+        self.tags = TagDict()
         self.ignored = []
+        self.mutagen_file = mutagen.File(path)
+        self.tags.length = self.mutagen_file.info.length
         self.__getitem__=self.tags.__getitem__
     
     def delete_ignored(self):
@@ -140,9 +142,8 @@ class TagFile:
 
 class MP3File(TagFile):
     def __init__(self,path):
-        TagFile.__init__(self)
-        f = mutagen.File(path)
-        self.mutagen_file = f
+        TagFile.__init__(self,path)
+        f = self.mutagen_file
         tags = f.tags
         if tags == None:
             return
@@ -174,19 +175,16 @@ class MP3File(TagFile):
  
 class EasyFile(TagFile):
     def __init__(self,path):
-        TagFile.__init__(self)
-        f = mutagen.File(path)
-        self.mutagen_file = f
-        for tag,value in f.tags:
+        TagFile.__init__(self,path)
+        for tag,value in self.mutagen_file.tags:
             if not tag.lower() in self.tags:
                 self.tags[tag.lower()] = []
             self.tags[tag.lower()].append(value)
 
 class ApeFile(TagFile):
     def __init__(self,path):
-        TagFile.__init__(self)
-        f = mutagen.File(path)
-        self.mutagen_file = f
+        TagFile.__init__(self,path)
+        f = self.mutagen_file
         for tag in f.tags:
             value = f.tags[tag].value.decode("utf-8")
             if tag in APE_MAPPING:
@@ -197,9 +195,8 @@ class ApeFile(TagFile):
             
 class MP4File(TagFile):
     def __init__(self,path):
-        TagFile.__init__(self)
-        f = mutagen.File(path)
-        self.mutagen_file = f
+        TagFile.__init__(self, path)
+        f = self.mutagen_file
         for tag in f.keys():
             if tag in MP4_IGNORE:
                 self.ignored.append(tag)

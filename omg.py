@@ -163,13 +163,15 @@ def add_file(path):
         path = abs_path(path)
     
     # a file is just a special container, so add a container first
-    file_id = add_container(name=os.path.basename(path),tags=read_tags_from_file(path),elements=0)
+    tags = read_tags_from_file(file)
+    file_id = add_container(name=os.path.basename(path),tags=tags,elements=0)
     # now take care of the files table
     db.query(
-        "INSERT INTO files (container_id,path,hash) VALUES('?','?','?');",
+        "INSERT INTO files (container_id,path,hash,length) VALUES('?','?','?','?');",
         file_id,
         rel_path(path),
-        compute_hash(path)
+        compute_hash(path),
+        tags.length
         )
     return file_id
     
