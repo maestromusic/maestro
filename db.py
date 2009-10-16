@@ -131,9 +131,10 @@ def connect():
 
 def query_dict(query,**args):
     """Queries the database like query but returns results as dictionary."""
-    _db.useDict = True
-    _db.query(query,**args)
-    _db.useDict = False
+    _db.use_dict = True
+    omgwtf = _db.query(query,**args)
+    _db.use_dict = False
+    return omgwtf
 
 
 def _parse_indexed_tags(string):
