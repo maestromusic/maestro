@@ -13,10 +13,32 @@ import os
 import pickle
 import datetime
 
+class Container(dict):
+    """Python representation of a Container, which is just a dictionary position->container that has an id, a name and tags."""
+    def __init__(self,id,name=None,tags={}):
+        dict.__init__(self)
+        self.name=name
+        self.id=id
+        self.tags=tags
+
+class File(Container):
+    """A File is a special container that may have a length and a hash. If the read_file-Parameter is True, length,name,tags and hash will be read from the file."""
+    def __init__(self,id,path,tags={},length=None,hash=None,read_file=False):
+        Container.__init__(self,id,name=os.path.basename(path),tags=tags)
+        self.length = length
+        self.hash=hash
+        if read_file:
+            t = read_tags_from_file(path)
+            self.length = t.length
+            self.tags = t #hm...
+            self.hash = compute_hash(path)
+            
+
 itags = {} # dict of indexed tags and their tagid
 itags_reverse = {} # same in other direction (bäh)
 initialized = False
 ignored_tags = None
+tagtypes = None
 def init():
     global initialized
     if initialized:
@@ -27,8 +49,9 @@ def init():
     for id,name in result:
         itags[name] = id
     itags_reverse = {y:x for x,y in itags.items()} # <3 python :)
-    global ignored_tags
+    global ignored_tags,tagtypes
     ignored_tags = config.get("tags","ignored_tags").split(",")
+    tagtypes = db.tagtypes
     initialized = True
     
 
@@ -158,21 +181,19 @@ def add_file(path):
     If path is a relative path, the music collection base path is added.
     Does  not check for uniqueness, so only call this when you need. Returns the new file's ID.
     Also adds all tags of the file to the database."""
-    
     if not os.path.isabs(path):
         path = abs_path(path)
     
     # a file is just a special container, so add a container first
-    tags = read_tags_from_file(file)
+    tags = read_tags_from_file(path)
     file_id = add_container(name=os.path.basename(path),tags=tags,elements=0)
     # now take care of the files table
     db.query(
-        "INSERT INTO files (container_id,path,hash,length) VALUES('?','?','?','?');",
+        "INSERT INTO files (container_id,path,hash,length) VALUES(?,'?','?',?);",
         file_id,
         rel_path(path),
         compute_hash(path),
-        tags.length
-        )
+        int(tags.length))
     return file_id
     
 def add_content(container_id, i, file_id):

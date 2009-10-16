@@ -95,7 +95,7 @@ def walk(path):
             else:
                 print("Here is a file without album: {0}".format(os.path.join(dirpath,f)))
         for name,album in albums_in_this_directory.items():
-            album.sort(key=lambda x: x[1].get("tracknumber"))
+            album.sort(key=lambda x: int(x[1].get("tracknumber")[0]))
             print("\n**************************************************************************")
             print("I found an album '{0}' in directory '{1}' containing {2} files.".format(name,dirpath,len(album)))
             do_album(album)
