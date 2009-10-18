@@ -9,20 +9,23 @@ import os
 from functools import reduce
 
 def do_album(album):
-    """Processes an album, which should be a list of tuples of (filename, tags)."""
+    """Processes an album, which should be of type omg.Container."""
     
-    album_name = album[0][1]["album"][0] # O M G :)
+    album_name = album[list(album.keys())[0]].tags["album"][0] # O M G :)
     
-    common_tags = reduce(lambda x,y: x & y, [set(a[1].keys()) for a in album]) - set(["tracknumber","title"])
+    common_tags = reduce(lambda x,y: x & y, [set(album[a].tags.keys()) for a in album]) - set(["tracknumber","title"])
     common_tag_values = {}
     different_tags=set()
-    for path,tags in album:
+    for file in album.values():
+        tags = file.tags
         for tag in common_tags:
             if tag not in common_tag_values:
                 common_tag_values[tag] = tags[tag]
             if common_tag_values[tag] != tags[tag]:
                 different_tags.add(tag)
-    same_tags = common_tags - different_tags 
+    same_tags = common_tags - different_tags
+    for tag in same_tags:
+        album.tags[tag]=common_tag_values[tag]
 
     # build a name
     if max([len(common_tag_values[x]) for x in  set(["composer","artist","album"]) & same_tags])>1:
@@ -42,16 +45,17 @@ def do_album(album):
                 name = "{0} - {1}".format(common_tag_values["artist"][0],album_name)
             else:
                 name = album_name
+    album.name = name
     accepted = False
     while not accepted:
         print("+++++ I SUGGEST: +++++")
-        print("1]  Name of the Container: {0}".format(name))
+        print("1]  Name of the Container: {0}".format(album.name))
         print("2]  Contents:")
-        for path,tags in album:
-            print("      {0}".format(os.path.basename(path)))
+        for track in sorted(album.keys()):
+            print("      {0}".format(os.path.basename(album[track].path)))
         print("3]  Tags (common to all files):")
-        for tag in same_tags:
-            for v in common_tag_values[tag]:
+        for tag in album.tags:
+            for v in album.tags[tag]:
                 print("    {0}={1}".format(tag,v))
         if len(different_tags) > 0:
             print("4]  !!TAKE CARE: Tags which are NOT equal on all songs!!:")
@@ -59,43 +63,52 @@ def do_album(album):
                 print("    {0}".format(tag))
         
         have_extratags = False
-        for path,tags in album:
-            extratags = set(tags.keys()) - common_tags - set(["tracknumber","title"])
+        for track in sorted(album.keys()):
+            extratags = set(album[track].tags.keys()) - set(album.tags.keys()) - set(["tracknumber","title"])
             if len(extratags) > 0:
                 if not have_extratags:
                     print("5] !!TAKE CARE!!: We have some extra tags in some files:")
                     extratags = True
                 print("The file '{0}' has extra tags:".format(path))
                 for tag in extratags:
-                    print("  {0}={1}".format(tag,tags[tag]))
+                    print("  {0}={1}".format(tag,album[track].tags[tag]))
         ans = input("What do you want me to do? Accept [Enter] or further examine a section [1-6]?")
         if ans=="1":
-            name = input("Enter new name:\n")
+            album.name = input("Enter new name:\n")
         elif ans=="":
             accepted = True
     print("you have accepted. spast ...")
-    omg.add_file_container(name,[x[0] for x in album], tags={x:common_tag_values[x] for x in same_tags})
+    album.tags = {x:common_tag_values[x] for x in same_tags}
+    omg.add_file_container(container=album)
+
 
 def walk(path):
     for dirpath, dirnames, filenames in os.walk(path):
         albums_in_this_directory = {}
-        for f in filenames:
-            if omg.id_from_filename(os.path.join(dirpath,f)):
+        for filename in [os.path.join(dirpath, f) for f in filenames]:
+            if omg.id_from_filename(filename):
                 continue #file already exists
             try:
-                t = omg.read_tags_from_file(os.path.abspath(os.path.join(dirpath,f)))
+                t = omg.read_tags_from_file(os.path.abspath(filename))
             except RuntimeError as e:
                 print("Ecxeption while trying to read tags from file, skipping...\n({0})".format(e))
                 raise e
             if "album" in t:
                 album = t["album"][0]
+                file = omg.File(filename, tags=t, length=t.length)
                 if not album in albums_in_this_directory:
-                    albums_in_this_directory[album] = []
-                albums_in_this_directory[album].append((os.path.join(dirpath,f), t))
+                    albums_in_this_directory[album] = omg.Container()
+                if "tracknumber" in t:
+                    trkn = int(t["tracknumber"][0])
+                    albums_in_this_directory[album][trkn] = file
+                else:
+                    if 0 in albums_in_this_directory[album]:
+                        print("More than one files in this album without tracknumber, don't know what to do: \n{0}".format(filename))
+                    else:
+                        albums_in_this_directory[album][0] = file
             else:
-                print("Here is a file without album: {0}".format(os.path.join(dirpath,f)))
+                print("Here is a file without album: {0}".format(filename))
         for name,album in albums_in_this_directory.items():
-            album.sort(key=lambda x: int(x[1].get("tracknumber")[0]))
             print("\n**************************************************************************")
             print("I found an album '{0}' in directory '{1}' containing {2} files.".format(name,dirpath,len(album)))
             do_album(album)

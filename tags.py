@@ -3,7 +3,7 @@
 
 import mutagen
 import sys
-from dirty import TagDict
+from tagdict import TagDict
 
 class UnsupportedFileExtension(Exception):
     pass

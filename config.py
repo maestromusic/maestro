@@ -21,16 +21,17 @@ def init(*config_files):
             "mysql_port":"3306",
             "mysql_user":"",
             "mysql_password":"",
-            "mysql_db":"omg"
+            "mysql_db":"omg",
         },
         
         "tags": {
             "indexed_tags":"album,artist,title,composer,performer,genre,date(date)",
-            "ignored_tags":"encodedby,tracktotal,disctotal,tracknumber,discnumber"
+            "ignored_tags":"encodedby,tracktotal,disctotal,tracknumber,discnumber",
         },
         
         "misc": {
-            "printtags_cmd":"printtags.py"
+            "printtags_cmd":"printtags.py",
+            "loglevel":"warning",
         }
     }
     
