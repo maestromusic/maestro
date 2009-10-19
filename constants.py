@@ -12,3 +12,5 @@ LOGLEVELS = {'debug': logging.DEBUG,
              'error':logging.ERROR,
              'critical':logging.CRITICAL
              }
+
+YES_ANSWERS = ["y", "Y", ""]

@@ -14,6 +14,8 @@
 import config
 from mysql import MySQL
 import re
+import logging
+
 
 # MySQL-commands to create these static tables
 CREATE_STATIC_TABLE_CMDS = {
@@ -75,7 +77,7 @@ CREATE_STATIC_TABLE_CMDS = {
         container_id MEDIUMINT UNSIGNED NOT NULL,
         tagname VARCHAR(63),
         value VARCHAR(255),
-        PRIMARY KEY(container_id)
+        INDEX container_id_idx(container_id)
     );"""
     }
 
@@ -116,10 +118,11 @@ _db = None
 query = None
 list_tables = None
 tagtypes = None
-
+logger = None
 def connect():
     """Connects to the database server with the information from the config file."""
-    global _db,query,list_tables,tagtypes
+    global _db,query,list_tables,tagtypes, logger
+    logger = logging.getLogger(name="db")
     _db = MySQL(config.get("database","mysql_user"),
                 config.get("database","mysql_password"),
                 config.get("database","mysql_db"),
@@ -209,16 +212,19 @@ def check_tables(create_tables=False,insert_tagids=False):
                 raise Exception("Some tags are missing in tagids-table: {0}".format(missing_tagids))
 
 
-def _check_foreign_key(table,key,ref_table,ref_key,tablename=None):
+def _check_foreign_key(table,key,ref_table,ref_key,tablename=None,autofix=False):
     """Checks whether each value in <table>.<key> is also contained in <ref_table>.<ref_key>. Prints a warning otherwise. If given, <tablename> will be used in this warning <tablename> instead of <table> so subqueries may be used in <table> """
     result = query("SELECT COUNT(*) FROM ? WHERE ? NOT IN (SELECT ? FROM ?)",table,key,ref_key,ref_table).get_single()
     if result > 0:
         if tablename == None:
             tablename = table
-        print("Warning: Foreign key '{0}' in table '{1}' has {2} broken entries.".format(key,tablename,result))
+        logger.warning("Foreign key '{0}' in table '{1}' has {2} broken entries.".format(key,tablename,result))
+        if autofix:
+            logger.warning("Deleting {0} entries in table {1}".format(result,tablename))
+            query("DELETE FROM ? WHERE ? NOT IN (SELECT ? FROM ?)",table,key,ref_key,ref_table)
 
 
-def check_foreign_keys():
+def check_foreign_keys(autofix=False):
     """Checks foreign key constraints in the database as the current MySQL doesn't support such constraints by itself (at least not in MyISAM). A foreign key is a column which values must be contained in another column in another table (the referenced table). For example: Every container_id-value in the contents-table must have a corresponding entry in the container-table."""
     print("Checking foreign keys in database...")
     # Argument sets to use with _check_foreign_key
@@ -235,9 +241,10 @@ def check_foreign_keys():
         if tablename in list_tables(): # If something's wrong with the tagids-table, tablename may not exist
             foreign_keys.append(("(SELECT value_id FROM tags WHERE tag_id={0}) AS subtable".format(tagid),
                                 "value_id",tablename,"id","tags"))
+            foreign_keys.append((tablename, "id", "tags", "value_id")) # aus db-theoretischer sicht kein foreign key :-p
 
     for args in foreign_keys:
-        _check_foreign_key(*args)
+        _check_foreign_key(*args,autofix=autofix)
     print("...done")
 
 

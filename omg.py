@@ -111,7 +111,8 @@ def compute_hash(file):
 
 
 # ------------------- database management functions -----------------------------------------------
-
+def escape(str):
+    return str.replace("'", r"\'")
 def id_from_filename(filename):
     """Retrieves the container_id of a file from the given path, or None if it is not found."""
     return db.query("SELECT container_id FROM files WHERE path='?';", rel_path(filename)).get_single()
@@ -196,6 +197,7 @@ def set_tags(cid, tags, append=False):
     db.query("DELETE FROM othertags WHERE 'container_id'='?';", cid)
     for tag in tags.keys():
         if tag in ignored_tags:
+            logger.debug("Ignoring tag '{0}' in container with id {1}".format(tag, cid))
             continue
         for value in tags[tag]:
             add_tag(container_id=cid,tagname=tag,value=value)
@@ -224,12 +226,12 @@ def add_file(path=None, file=None):
         hash = file.hash
     file_id = add_container(name=os.path.basename(path),tags=tags,elements=0)
     # now take care of the files table
-    db.query(
-        "INSERT INTO files (container_id,path,hash,length) VALUES(?,'?','?',?);",
-        file_id,
-        rel_path(path),
+    querytext = "INSERT INTO files (container_id,path,hash,length) VALUES({0},'{1}','{2}',{3});".format(file_id,
+        escape(rel_path(path)),
         hash,
         int(tags.length))
+    print(querytext)
+    db.query(querytext)
     return file_id
     
 def add_content(container_id, i, content_id):
@@ -256,6 +258,7 @@ def add_file_container(name=None, contents=None, tags={}, container=None):
             if file_id == None:
                 file_id = add_file(file=file)
             add_content(container_id, index, file_id)
+    return container_id
     
 def del_container(cid):
     """Removes a container together with all of its content and tag references from the database.

@@ -11,17 +11,25 @@
 import omg
 import getopt
 import sys
+import db
 
 def usage():
     print("""See source code for usage info :-p""")
     
 if __name__=="__main__":
-    opts, args = getopt.getopt(sys.argv[1:], "ph", ['help', 'populate'])
+    opts, args = getopt.getopt(sys.argv[1:], "phl", ['help', 'list','populate'])
     
     for opt, arg in opts:
         if opt in ("-h", "--help"):
             usage()
             sys.exit()
+        elif opt in ("-l", "--list"):
+            print("Here is a list of non-file containers in my database:")
+            print("{0:>5}: {1}".format("id", "name"))
+            print("------------------------------------------------------")
+            result = db.query('SELECT container_id,name,count(element_id) FROM containers INNER JOIN contents ON containers.id=container_id group by container_id')
+            for id, name, elements in result:
+                print("{0:5d}: {1} ({2} Elements)".format(id, name, elements))
         elif opt in ("-p", "--populate"):
             if len(args) == 0:
                 import config
