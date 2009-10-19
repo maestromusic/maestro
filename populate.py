@@ -1,5 +1,12 @@
 #!/usr/bin/env python3.1
 # -*- coding: utf-8 -*-
+# Copyright 2009 Michael Helmling
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 3 as
+# published by the Free Software Foundation
+#
+# populate.py
 
 import omg
 import sys
@@ -33,7 +40,7 @@ def do_album(album):
     else:
         if 'composer' in common_tags:
             if 'composer' in same_tags and 'artist' in same_tags:
-                name = "{0}: {1} ({2})".format(common_tag_values["composer"][0],common_tag_values["artist"][0],album_name)
+                name = "{0}: {1} ({2})".format(common_tag_values["composer"][0],album_name,common_tag_values["artist"][0])
             elif 'composer' in same_tags: #'artist' not in same_tags
                 name = "{0} - {1}".format(common_tag_values["composer"][0],album_name)
             elif 'artist' in same_tags: ##composer not in same_tags
@@ -113,4 +120,5 @@ def walk(path):
             print("I found an album '{0}' in directory '{1}' containing {2} files.".format(name,dirpath,len(album)))
             do_album(album)
 
-walk(sys.argv[1])
+if __name__=="__main__":
+    walk(sys.argv[1])
