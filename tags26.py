@@ -3,7 +3,6 @@
 
 import mutagen
 import sys
-from tagdict import TagDict
 
 class UnsupportedFileExtension(Exception):
     pass
@@ -53,6 +52,7 @@ ID3_MAPPING = {
             # "language" should not make to TLAN. TLAN requires 
             # an ISO language code, and QL tags are freeform.   
             }
+ID3_REVERSE = dict(((v, k) for k, v in ID3_MAPPING.iteritems()))
 ID3_IGNORE = [
         "TLEN", # no need to get file length from a tag ...
         "APIC",  # pictures not supported
@@ -121,16 +121,19 @@ MP4_IGNORE = [
     "\xa9enc",
     "----:com.apple.iTunes:iTunes_CDDB_IDs",
     "----:com.apple.iTunes:iTunes_CDDB_1",
+    '----:com.apple.iTunes:Encoding Params',
     "cpil",
-    '----:com.apple.iTunes:iTunNORM'
+    '----:com.apple.iTunes:iTunNORM',
+    "pgap",
     ]
     
 class TagFile:
     def __init__(self,path):
-        self.tags = TagDict()
+        self.tags = {}
+        self.length = None
         self.ignored = []
         self.mutagen_file = mutagen.File(path)
-        self.tags.length = self.mutagen_file.info.length
+        self.length = self.mutagen_file.info.length
         self.__getitem__=self.tags.__getitem__
     
     def delete_ignored(self):
@@ -139,6 +142,10 @@ class TagFile:
         for tag in self.ignored:
             del self.mutagen_file[tag]
         self.mutagen_file.save()
+        
+    def save_tags(self, tags):
+        """Save tags into the file."""
+        raise NotImplementedError
 
 class MP3File(TagFile):
     def __init__(self,path):
@@ -149,6 +156,9 @@ class MP3File(TagFile):
             return
         for tag in tags:
             frameid = tags[tag].FrameID
+            if frameid=="APIC":
+                self.has_pic=True
+                continue
             if tag in ID3_IGNORE:
                 self.ignored.append(tag)
                 continue
@@ -172,14 +182,36 @@ class MP3File(TagFile):
                     except AttributeError:
                         pass
                 self.tags[nice_tag].append(unicode(value))
+    def save_tags(self, tags):
+        mf = self.mutagen_file
+        # first, examine which tags are to be deleted
+        for tag in mf.tags:
+            if mf.tags[tag].FrameID in ID3_IGNORE or tag in ID3_IGNORE:
+                continue
+            elif ID3_MAPPING[tag] not in tags:
+                del mf[tag]
+        
+        for tag in tags.keys():
+            pass
+            
+        
  
 class EasyFile(TagFile):
     def __init__(self,path):
         TagFile.__init__(self,path)
-        for tag,value in self.mutagen_file.tags:
-            if not tag.lower() in self.tags:
-                self.tags[tag.lower()] = []
-            self.tags[tag.lower()].append(value)
+        if self.mutagen_file.tags==None:
+            print("File '{0}' has _no_ tags!".format(path))
+        else:
+            for tag,value in self.mutagen_file.tags:
+                if not tag.lower() in self.tags:
+                    self.tags[tag.lower()] = []
+                self.tags[tag.lower()].append(value)
+    
+    def save_tags(self, tags):
+        self.mutagen_file.clear()
+        for key in tags.keys():
+            self.mutagen_file[key] = tags[key]
+        self.mutagen_file.save()
 
 class ApeFile(TagFile):
     def __init__(self,path):
@@ -201,7 +233,11 @@ class MP4File(TagFile):
             if tag in MP4_IGNORE:
                 self.ignored.append(tag)
                 continue
-            nice_tag = MP4_MAPPING[tag]
+            try:
+                nice_tag = MP4_MAPPING[tag]
+            except KeyError as e:
+                print("Error reading file '{0}'".format(path))
+                raise e
             for value in f[tag]:
                 if value=="":
                     continue
@@ -220,10 +256,10 @@ def File(path):
     extension = path.rsplit(".",1)[1].lower()
     if extension=="mp3":
         return MP3File(path)
-    elif extension in ["flac", "ogg"]:
+    elif extension in ["flac", "ogg", "spx"]:
         return EasyFile(path)
     elif extension=="mpc": #APE
         return ApeFile(path)
     elif extension in ["mp4", "m4a"]:
         return MP4File(path)
-    raise UnsupportedFileExtension
+    raise UnsupportedFileExtension(path)

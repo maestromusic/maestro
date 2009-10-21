@@ -112,7 +112,7 @@ def compute_hash(file):
 
 # ------------------- database management functions -----------------------------------------------
 def escape(str):
-    return str.replace("'", r"\'")
+    return str.replace("'", '\\\'')
 def id_from_filename(filename):
     """Retrieves the container_id of a file from the given path, or None if it is not found."""
     return db.query("SELECT container_id FROM files WHERE path='?';", rel_path(filename)).get_single()
@@ -231,7 +231,9 @@ def add_file(path=None, file=None):
         hash,
         int(tags.length))
     print(querytext)
-    db.query(querytext)
+    global hassqt, hassresult
+    hassqt = querytext
+    hassresult = db.query(querytext)
     return file_id
     
 def add_content(container_id, i, content_id):
@@ -244,8 +246,11 @@ def add_content(container_id, i, content_id):
 def add_file_container(name=None, contents=None, tags={}, container=None):
     """Adds a new container to the database whose contents are only files."""
     
-    if not container==None:
-        container_id = add_container(container.name, tags=container.tags, elements=len(container))
+    if container!=None:
+        if container.id == None:
+            container_id = add_container(container.name, tags=container.tags, elements=len(container))
+        else:
+            container_id = container.id
         for tracknumber in container:
             file_id = id_from_filename(container[tracknumber].path)
             if file_id == None:

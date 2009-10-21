@@ -19,7 +19,7 @@ import db
 import constants
 import subprocess
 import logging
-
+FIND_DISC_RE=r" ?[([]?(?:cd|disc|part|teil|disk) ?([iI1-9]+)[)\]]?$"
 
 logger = logging.getLogger(name="populate")
 
@@ -68,8 +68,14 @@ def do_album(album):
     
     accepted = False
     while not accepted:
+        result = db.query("SELECT id FROM containers WHERE name='?';", album.name)
+        if len(result) == 1:
+            album.id = result[0][0]
+            
         print("+++++ I SUGGEST: +++++")
         print("1]  Name of the Container: {0}".format(album.name))
+        if (album.id!=None):
+            print("     [EXISTS WITH ID: {0}]".format(album.id))
         print("2]  Contents:")
         for track in sorted(album.keys()):
             print("      {0}".format(os.path.basename(album[track].path)))
@@ -109,16 +115,18 @@ def do_album(album):
     discnumber = None
     if "discnumber" in album.tags:
         discnumber = int(album.tags["discnumber"][0])
-    discstring = re.findall(r" ?[([](?:cd|disc) ?([1-9])[)\]]$",album.name,flags=re.IGNORECASE)
+    discstring = re.findall(FIND_DISC_RE,album.name,flags=re.IGNORECASE)
     if len(discstring) > 0 and discnumber==None:
         discnumber = discstring[0]
+        if discnumber.lower().startswith("i"): #roman number, support I-III :)
+            discnumber = len(discnumber)
         print("This looks like a part of a multi-disc container; I found a discnumber {0}".format(discnumber))
         ans = input("Add this to the album tags? [Yn]")
         if ans in constants.YES_ANSWERS:
             album.tags["discnumber"] = [ discnumber ]
             print("Added 'discnumber={0}' to the album tags".format(discnumber))
     if discnumber != None:
-        discname_reduced = re.sub(r" ?[([](?:cd|disc) ?([1-9])[)\]]$","",album.name,flags=re.IGNORECASE)
+        discname_reduced = re.sub(FIND_DISC_RE,"",album.name,flags=re.IGNORECASE)
         result = db.query("SELECT id FROM containers WHERE name='?';", discname_reduced)
         container_id = None
         if len(result)==0:
@@ -142,7 +150,7 @@ def walk(path):
         for filename in [os.path.join(dirpath, f) for f in filenames]:
             if omg.id_from_filename(filename):
                 logger.debug("Skipping file '{0}' which is already in the database.".format(filename))
-                continue #file already exists
+                continue
             try:
                 t = omg.read_tags_from_file(os.path.abspath(filename))
             except RuntimeError as e:
@@ -154,7 +162,7 @@ def walk(path):
                 if not album in albums_in_this_directory:
                     albums_in_this_directory[album] = omg.Container()
                 if "tracknumber" in t:
-                    trkn = int(t["tracknumber"][0])
+                    trkn = int(t["tracknumber"][0].split("/")[0]) # support 02/15 style
                     albums_in_this_directory[album][trkn] = file
                 else:
                     if 0 in albums_in_this_directory[album]:
