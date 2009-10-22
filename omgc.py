@@ -36,5 +36,7 @@ if __name__=="__main__":
                 path = config.get("music","collection")
             else:
                 path = args[0]
-            import populate
-            populate.walk(path)
+            import populate                    
+            finder = populate.find_new_albums(path)
+            for album in finder:
+                populate.do_album(album)

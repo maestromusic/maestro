@@ -208,7 +208,7 @@ def add_file(path=None, file=None):
     If path is a relative path, the music collection base path is added.
     Does  not check for uniqueness, so only call this when you need. Returns the new file's ID.
     Also adds all tags of the file to the database."""
-    if not path==None:
+    if path!=None:
         return add_file(path=None, file=File(path=path))
     if file==None:
         raise ValueError("Either path or file must not be None.")
@@ -229,11 +229,9 @@ def add_file(path=None, file=None):
     querytext = "INSERT INTO files (container_id,path,hash,length) VALUES({0},'{1}','{2}',{3});".format(file_id,
         escape(rel_path(path)),
         hash,
-        int(tags.length))
-    print(querytext)
-    global hassqt, hassresult
-    hassqt = querytext
-    hassresult = db.query(querytext)
+        int(file.length))
+    logger.debug(querytext)
+    db.query(querytext)
     return file_id
     
 def add_content(container_id, i, content_id):

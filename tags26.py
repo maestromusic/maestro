@@ -143,7 +143,7 @@ class TagFile:
             del self.mutagen_file[tag]
         self.mutagen_file.save()
         
-    def save_tags(self, tags):
+    def save_tags(self, tags=None):
         """Save tags into the file."""
         raise NotImplementedError
 
@@ -182,7 +182,8 @@ class MP3File(TagFile):
                     except AttributeError:
                         pass
                 self.tags[nice_tag].append(unicode(value))
-    def save_tags(self, tags):
+    def save_tags(self, tags=None):
+        raise NotImplementedError
         mf = self.mutagen_file
         # first, examine which tags are to be deleted
         for tag in mf.tags:
@@ -207,7 +208,9 @@ class EasyFile(TagFile):
                     self.tags[tag.lower()] = []
                 self.tags[tag.lower()].append(value)
     
-    def save_tags(self, tags):
+    def save_tags(self, tags=None):
+        if tags==None:
+            tags = self.tags
         self.mutagen_file.clear()
         for key in tags.keys():
             self.mutagen_file[key] = tags[key]

@@ -19,6 +19,7 @@ import db
 import constants
 import subprocess
 import logging
+import realfiles
 FIND_DISC_RE=r" ?[([]?(?:cd|disc|part|teil|disk) ?([iI1-9]+)[)\]]?$"
 
 logger = logging.getLogger(name="populate")
@@ -144,37 +145,36 @@ def do_album(album):
     
 
 
-def walk(path):
+def find_new_albums(path):
+    """Generator function which tries to find albums in the filesystem tree.
+    
+    Yields an omg.Container without any tags. The tags and the name for the album should be examined by another function."""
     for dirpath, dirnames, filenames in os.walk(path):
         albums_in_this_directory = {}
-        for filename in [os.path.join(dirpath, f) for f in filenames]:
+        for filename in (os.path.join(dirpath, f) for f in filenames):
             if omg.id_from_filename(filename):
                 logger.debug("Skipping file '{0}' which is already in the database.".format(filename))
                 continue
-            try:
-                t = omg.read_tags_from_file(os.path.abspath(filename))
-            except RuntimeError as e:
-                print("Ecxeption while trying to read tags from file, skipping...\n({0})".format(e))
-                raise e
+            realfile = realfiles.File(os.path.abspath(filename))
+            realfile.read()
+            t = realfile.tags
             if "album" in t:
                 album = t["album"][0]
-                file = omg.File(filename, tags=t, length=t.length)
+                file = omg.File(filename, tags=t, length=realfile.length)
                 if not album in albums_in_this_directory:
                     albums_in_this_directory[album] = omg.Container()
                 if "tracknumber" in t:
                     trkn = int(t["tracknumber"][0].split("/")[0]) # support 02/15 style
                     albums_in_this_directory[album][trkn] = file
-                else:
+                else: # file without tracknumber, bah
                     if 0 in albums_in_this_directory[album]:
                         print("More than one files in this album without tracknumber, don't know what to do: \n{0}".format(filename))
                     else:
                         albums_in_this_directory[album][0] = file
             else:
-                print("Here is a file without album: {0}".format(filename))
+                print("Here is a file without album, I'll skip this: {0}".format(filename))
         for name,album in albums_in_this_directory.items():
             print("\n**************************************************************************")
             print("I found an album '{0}' in directory '{1}' containing {2} files.".format(name,dirpath,len(album)))
-            do_album(album)
+            yield album
 
-if __name__=="__main__":
-    walk(sys.argv[1])
