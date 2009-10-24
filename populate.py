@@ -105,7 +105,9 @@ def do_album(album):
         elif ans=="E":
             subprocess.call(["exfalso", os.path.split(list(album.values())[0].path)[0]])
             for file in album.values():
-                file.tags = omg.read_tags_from_file(file.path)
+                realfile = realfiles.File(os.path.abspath(file.path))
+                realfile.read()
+                file.tags = realfile.tags
             different_tags = guess_album(album)
         elif ans=="":
             accepted = True
@@ -116,7 +118,7 @@ def do_album(album):
     discnumber = None
     if "discnumber" in album.tags:
         discnumber = int(album.tags["discnumber"][0])
-    discstring = re.findall(FIND_DISC_RE,album.name,flags=re.IGNORECASE)
+    discstring = re.findall(FIND_DISC_RE,album.tags["album"][0],flags=re.IGNORECASE)
     if len(discstring) > 0 and discnumber==None:
         discnumber = discstring[0]
         if discnumber.lower().startswith("i"): #roman number, support I-III :)
@@ -127,7 +129,7 @@ def do_album(album):
             album.tags["discnumber"] = [ discnumber ]
             print("Added 'discnumber={0}' to the album tags".format(discnumber))
     if discnumber != None:
-        discname_reduced = re.sub(FIND_DISC_RE,"",album.name,flags=re.IGNORECASE)
+        discname_reduced = re.sub(FIND_DISC_RE,"",album.tags["album"][0],flags=re.IGNORECASE)
         result = db.query("SELECT id FROM containers WHERE name='?';", discname_reduced)
         container_id = None
         if len(result)==0:

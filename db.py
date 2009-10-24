@@ -17,6 +17,14 @@ import re
 import logging
 
 
+class DatabaseLayoutException(Exception):
+    """Exception that occurs if the existing database layout doesn't meet the requirements of this module."""
+    def __init__(self,message):
+        self.value = message
+    
+    def __str__(self):
+        return repr(self.value)
+    
 # MySQL-commands to create these static tables
 CREATE_STATIC_TABLE_CMDS = {
     "containers" : """
@@ -122,7 +130,7 @@ logger = None
 def connect():
     """Connects to the database server with the information from the config file."""
     global _db,query,list_tables,tagtypes, logger
-    logger = logging.getLogger(name="db")
+    logger = logging.getLogger(name="omg.db")
     _db = MySQL(config.get("database","mysql_user"),
                 config.get("database","mysql_password"),
                 config.get("database","mysql_db"),
@@ -182,14 +190,13 @@ def check_tables(create_tables=False,insert_tagids=False):
     superflous_tables = existent_tables - set(necessary_tables.keys())
     missing_tables = {table:command for table,command in necessary_tables.items() if table not in existent_tables}
     if len(superflous_tables) > 0:
-        print("Warning: Superflous tables found: ",end="")
-        print(superflous_tables)
+        logger.warning("Superflous tables found: {0}".format(superflous_tables))
     if len(missing_tables) > 0:
         if create_tables:
             for table,command in missing_tables.items():
-                print("Table {0} is missing...".format(table),end="")
+                logger.info("Table {0} is missing...".format(table))
                 query(command)
-                print("created")
+                logger.info("Table {0} created".format(table))
         else: raise Exception("Missing tables found: {0}".format(set(missing_tables.keys())))
 
     # In the second part of this method we check if the tags in tagids are consistent with those in the indexed_tags-option.
@@ -197,19 +204,19 @@ def check_tables(create_tables=False,insert_tagids=False):
         tags_in_table = {tag:tagtype for tag,tagtype in query("SELECT tagname,tagtype FROM tagids")}
         for tag,tagtype in tags_in_table.items():
             if not tag in indexed_tags:
-                print("Warning: tagids-table contains the tag '{0}' which is not listed in the indexed_tags-options.".format(tag))
+                logger.warning("The tagids table contains the tag '{0}' which is not listed in the indexed_tags-options.".format(tag))
             elif tagtype != indexed_tags[tag]:
-                print("Warning: The type of tag '{0}' in tagids-table differs from the type in the config-file.".format(tag))
-        if insert_tagids:
-            for tag,tagtype in indexed_tags.items():
-                if not tag in tags_in_table:
-                    print("Tag '{0}' missing in tagids-table...".format(tag),end="")
+                logger.warning("The type of tag '{0}' in tagids-table differs from the type in the config-file.".format(tag))
+        for tag,tagtype in indexed_tags.items():
+            if not tag in tags_in_table:
+                logger.warning("Tag '{0}' missing in tagids table".format(tag))
+                if insert_tagids:
                     query("INSERT INTO tagids(tagname,tagtype) VALUES ('?','?')",tag,tagtype)
-                    print("inserted")
+                    logger.info("Tag '{0}' inserted into the tagids table.".format(tag))
         else:
             missing_tagids = [tag for tag in indexed_tags if not tag in tags_in_table]
             if len(missing_tagids) > 0:
-                raise Exception("Some tags are missing in tagids-table: {0}".format(missing_tagids))
+                raise DatabaseLayoutException("Some tags are missing in tagids-table: {0}".format(missing_tagids))
 
 
 def _check_foreign_key(table,key,ref_table,ref_key,tablename=None,autofix=False):
@@ -222,11 +229,12 @@ def _check_foreign_key(table,key,ref_table,ref_key,tablename=None,autofix=False)
         if autofix:
             logger.warning("Deleting {0} entries in table {1}".format(result,tablename))
             query("DELETE FROM ? WHERE ? NOT IN (SELECT ? FROM ?)",table,key,ref_key,ref_table)
+    return result
 
 
 def check_foreign_keys(autofix=False):
     """Checks foreign key constraints in the database as the current MySQL doesn't support such constraints by itself (at least not in MyISAM). A foreign key is a column which values must be contained in another column in another table (the referenced table). For example: Every container_id-value in the contents-table must have a corresponding entry in the container-table."""
-    print("Checking foreign keys in database...")
+    logger.info("Checking foreign keys in database  ")
     # Argument sets to use with _check_foreign_key
     foreign_keys = [("contents","container_id","containers","id"),
                     ("contents","element_id","containers","id"),
@@ -242,10 +250,10 @@ def check_foreign_keys(autofix=False):
             foreign_keys.append(("(SELECT value_id FROM tags WHERE tag_id={0}) AS subtable".format(tagid),
                                 "value_id",tablename,"id","tags"))
             foreign_keys.append((tablename, "id", "tags", "value_id")) # aus db-theoretischer sicht kein foreign key :-p
-
+    broken_entries = 0
     for args in foreign_keys:
-        _check_foreign_key(*args,autofix=autofix)
-    print("...done")
+        broken_entries += _check_foreign_key(*args,autofix=autofix)
+    return broken_entries
 
 
 def update_element_counters():
@@ -255,6 +263,11 @@ def update_element_counters():
     print("done")
 
 
+def reset():
+    """Resets the database, i.e. deletes all tables. :-)"""
+    for table in list_tables():
+        query("DROP TABLE ?", table)
+    
 # If this script is run directly it just performes the database check - without changing the DB.
 if __name__=="__main__":
     connect()
