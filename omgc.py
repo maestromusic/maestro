@@ -28,6 +28,8 @@ Valid options are:
                 
 """.format(os.path.basename(sys.argv[0])))
 
+def print_container(cid):
+    pass
 if __name__=="__main__":
     opts, args = getopt.getopt(sys.argv[1:], "phli:", ['help', 'list','populate','reset','check','id='])
     if len(opts) == 0:

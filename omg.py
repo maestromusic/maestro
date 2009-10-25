@@ -14,6 +14,7 @@ import pickle
 import datetime
 import logging
 import constants
+import realfiles
 
 class Container(dict):
     """Python representation of a Container, which is just a dictionary position->container that has an id, a name and tags."""
@@ -31,10 +32,19 @@ class File(Container):
         self.hash=hash
         self.path=path
         if read_file:
-            t = read_tags_from_file(path)
-            self.length = t.length
-            self.tags = t #hm...
+            read_tags_from_filesystem(self)
             self.hash = compute_hash(path)
+    
+    def read_tags_from_filesystem(self):
+        real = realfiles.File(abs_path(path))
+        real.read()
+        self.tags = real.tags
+        self.length = real.length
+    
+    def write_tags_to_filesystem(self):
+        real = realfiles.File(abs_path(self.path))
+        real.tags = self.tags
+        real.save_tags()
             
 
 itags = {} # dict of indexed tags and their tagid
@@ -111,8 +121,6 @@ def compute_hash(file):
 
 
 # ------------------- database management functions -----------------------------------------------
-def escape(str):
-    return str.replace("'", '\\\'')
 def id_from_filename(filename):
     """Retrieves the container_id of a file from the given path, or None if it is not found."""
     return db.query("SELECT container_id FROM files WHERE path='?';", rel_path(filename)).get_single()
@@ -143,6 +151,46 @@ def get_value_id(tag,value,insert=False):
     if insert and not result:
         result = add_tag_value(tag,value)
     return result
+
+def get_tags(container_id):
+    """Returns all tags of the given container_id as a dict of lists."""
+    
+    tags = {}
+    for tag in itags:
+        result = db.query(
+            "SELECT value FROM tags INNER JOIN tag_{0} ON value_id=id AND tag_id=? WHERE container_id=?;".format(tag),itags[tag], container_id)
+        for x in result:
+            if not tag in tags:
+                tags[tag] = []
+            tags[tag].append(x[0])
+    result = db.query("SELECT tagname,value FROM othertags WHERE container_id=?;",container_id)
+    for tag,value in result:
+        if not tag in tags:
+            tags[tag] = []
+        tags[tag].append(value)
+    return tags
+            
+def path_by_id(container_id):
+    """Returns the path of a file, or None if it's not a file."""
+    
+    return db.query("SELECT path FROM files WHERE container_id=?;",container_id).get_single()
+    
+def get_container_by_id(cid):
+    """Returns a Container/File class hierarchy representing the container of given ID."""
+    
+    path = path_by_id(cid)
+    if path==None: # this is a non-file container
+        ret = Container(id=cid)
+        ret.name = db.query("SELECT name FROM containers WHERE id=?;",cid).get_single()
+        ret.id = id
+        ret.tags = get_tags(cid)
+        contents = db.query("SELECT position,element_id FROM contents WHERE container_id=?;",cid)
+        for pos,el in contents:
+            ret[pos] = get_container_by_id(el)
+    else:
+        ret = File(path,id=cid)
+        ret.tags = get_tags(cid)
+    return ret
     
 def add_container(name,tags={},elements=0):
     """Adds a container to the database, which can have tags and a number of elements."""
@@ -226,12 +274,17 @@ def add_file(path=None, file=None):
         hash = file.hash
     file_id = add_container(name=os.path.basename(path),tags=tags,elements=0)
     # now take care of the files table
-    querytext = "INSERT INTO files (container_id,path,hash,length) VALUES({0},'{1}','{2}',{3});".format(file_id,
-        escape(rel_path(path)),
-        hash,
-        int(file.length))
-    logger.debug(querytext)
-    db.query(querytext)
+    querytext = "INSERT INTO files (container_id,path,hash,length) VALUES(?,?,?,?);"
+    from PyQt4 import QtSql
+    q = QtSql.QSqlQuery()
+    q.prepare(querytext)
+    q.addBindValue(file_id)
+    q.addBindValue(rel_path(path))
+    q.addBindValue(hash)
+    q.addBindValue(int(file.length))
+    q.exec_()
+    logger.debug(q.executedQuery())
+    #db.query(querytext)
     return file_id
     
 def add_content(container_id, i, content_id):

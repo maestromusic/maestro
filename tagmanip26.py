@@ -56,7 +56,6 @@ def store(cmdline):
         sys.exit(1)
     path = args[0]
     data = pickle.load(sys.stdin)
-    store(path,data)
     f = tags26.File(path)
     f.save_tags(data["tags"])
 

@@ -15,7 +15,7 @@ import config
 from mysql import MySQL
 import re
 import logging
-
+from PyQt4 import QtSql
 
 class DatabaseLayoutException(Exception):
     """Exception that occurs if the existing database layout doesn't meet the requirements of this module."""
@@ -129,12 +129,18 @@ tagtypes = None
 logger = None
 def connect():
     """Connects to the database server with the information from the config file."""
-    global _db,query,list_tables,tagtypes, logger
+    global _db,_db2,query,list_tables,tagtypes, logger
     logger = logging.getLogger(name="omg.db")
     _db = MySQL(config.get("database","mysql_user"),
                 config.get("database","mysql_password"),
                 config.get("database","mysql_db"),
                 config.get("database","mysql_host"))
+    _db2 = QtSql.QSqlDatabase.addDatabase("QMYSQL")
+    _db2.setHostName(config.get("database","mysql_host"))
+    _db2.setDatabaseName(config.get("database","mysql_db"))
+    _db2.setUserName(config.get("database","mysql_user"))
+    _db2.setPassword(config.get("database","mysql_password"))
+    _db2.open()
     query = _db.query
     list_tables = _db.list_tables
     tagtypes = _parse_indexed_tags(config.get("tags","indexed_tags"))
@@ -262,6 +268,14 @@ def update_element_counters():
     query("UPDATE containers SET elements = (SELECT COUNT(*) FROM contents WHERE container_id = id)")
     print("done")
 
+def find_empty_containers(delete=False):
+    """Finds (and, if you wish, deletes) empty containers which are NOT files. These are usually there because of a crash in populate."""
+    
+    q = query("SELECT id,name FROM containers WHERE elements=0 AND NOT id IN (SELECT container_id FROM files);")
+    for elem in q:
+        print(elem)
+    if delete:
+        query("DELETE FROM containers WHERE elements=0 AND NOT id IN (SELECT container_id FROM files);")
 
 def reset():
     """Resets the database, i.e. deletes all tables. :-)"""

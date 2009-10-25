@@ -20,7 +20,7 @@ import constants
 import subprocess
 import logging
 import realfiles
-FIND_DISC_RE=r" ?[([]?(?:cd|disc|part|teil|disk) ?([iI1-9]+)[)\]]?$"
+FIND_DISC_RE=r" ?[([]?(?:cd|disc|part|teil|disk) ?([iI1-9]+)[)\]]?"
 
 logger = logging.getLogger(name="populate")
 
@@ -50,7 +50,7 @@ def guess_album(album):
                 name = "{0}: {1} ({2})".format(common_tag_values["composer"][0],album_name,common_tag_values["artist"][0])
             elif 'composer' in same_tags: #'artist' not in same_tags
                 name = "{0} - {1}".format(common_tag_values["composer"][0],album_name)
-            elif 'artist' in same_tags: ##composer not in same_tags
+            elif 'artist' in same_tags: #composer not in same_tags
                 name = "{0} - {1}".format(common_tag_values["artist"][0],album_name)
             else:
                 name = album_name
@@ -68,27 +68,37 @@ def do_album(album):
     different_tags = guess_album(album)
     
     accepted = False
+    discnumber = None
+    write_discnumber_to_tags = False
+    meta_container = None
     while not accepted:
         result = db.query("SELECT id FROM containers WHERE name='?';", album.name)
         if len(result) == 1:
             album.id = result[0][0]
-            
         print("+++++ I SUGGEST: +++++")
+        #-------- 1.: Name of the container ----------------------------------
         print("1]  Name of the Container: {0}".format(album.name))
         if (album.id!=None):
             print("     [EXISTS WITH ID: {0}]".format(album.id))
+        
+        #-------- 2.: Contents -----------------------------------------------
         print("2]  Contents:")
         for track in sorted(album.keys()):
             print("      {0}".format(os.path.basename(album[track].path)))
+        
+        #-------- 3.: Tags of the container (common tags) --------------------
         print("3]  Tags (common to all files):")
         for tag in album.tags:
             for v in album.tags[tag]:
                 print("    {0}={1}".format(tag,v))
+        
+        #-------- 4.: Different tags -----------------------------------------
         if len(different_tags) > 0:
             print("4]  !!TAKE CARE: Tags which are NOT equal on all songs!!:")
             for tag in different_tags:
                 print("    {0}".format(tag))
         
+        #-------- 5.: Extra tags ---------------------------------------------
         have_extratags = False
         for track in sorted(album.keys()):
             extratags = set(album[track].tags.keys()) - set(album.tags.keys()) - set(["tracknumber","title"]) - different_tags
@@ -99,51 +109,68 @@ def do_album(album):
                 print("The file '{0}' has extra tags:".format(album[track].path))
                 for tag in extratags:
                     print("  {0}={1}".format(tag,album[track].tags[tag]))
-        ans = input("What do you want me to do? Accept [Enter] or further examine a section [1-6]?")
+        
+        #-------- 6.: Multi-Disc Container Identification -------------------
+
+        if "discnumber" in album.tags:
+            discnumber = int(album.tags["discnumber"][0])
+        discstring = re.findall(FIND_DISC_RE,album.tags["album"][0],flags=re.IGNORECASE)
+        if len(discstring) > 0 and discnumber==None:
+            discnumber = discstring[0]
+            if discnumber.lower().startswith("i"): #roman number, support I-III :)
+                discnumber = len(discnumber)
+            write_discnumber_to_tags = True
+        if discnumber!= None:
+            album.tags["discnumber"] = [ discnumber ]
+            print("6]  Part of Multi-Disc container:")
+            discname_reduced = re.sub(FIND_DISC_RE,"",album.name,flags=re.IGNORECASE)
+            result = db.query("SELECT id FROM containers WHERE name='?';", discname_reduced)
+            if len(result)==0:
+                meta_container = discname_reduced
+            elif len(result)==1:
+                meta_container = int(result[0][0])
+            else:
+                print("Sorry, you already have more than one container named '{0}', you have to do this by hand.".format(discname_reduced))
+            print("    This is disc number {0} of container '{1}'".format(discnumber, discname_reduced))
+            if write_discnumber_to_tags:
+                print("      [write the discnumber to the files]")
+            if isinstance(meta_container,str):
+                print("      [create meta container]")
+            elif isinstance(meta_container,int):
+                print("      [exists with id {0}]".format(meta_container))
+        
+        
+        ans = input("What do ou want me to do? Accept [Enter] or further examine a section [1-6], [e] to run exfalso, [s] to skip?")
         if ans=="1":
             album.name = input("Enter new name:\n")
-        elif ans=="E":
+        elif ans in ["e","E"]:
             subprocess.call(["exfalso", os.path.split(list(album.values())[0].path)[0]])
             for file in album.values():
                 realfile = realfiles.File(os.path.abspath(file.path))
                 realfile.read()
                 file.tags = realfile.tags
             different_tags = guess_album(album)
+        elif ans in ["s","S"]:
+            return
         elif ans=="":
             accepted = True
     print("you have accepted. I will now do some SQL magic")
     album_id = omg.add_file_container(container=album)
     
-    # find out if this is part of a multi-disc collection
-    discnumber = None
-    if "discnumber" in album.tags:
-        discnumber = int(album.tags["discnumber"][0])
-    discstring = re.findall(FIND_DISC_RE,album.tags["album"][0],flags=re.IGNORECASE)
-    if len(discstring) > 0 and discnumber==None:
-        discnumber = discstring[0]
-        if discnumber.lower().startswith("i"): #roman number, support I-III :)
-            discnumber = len(discnumber)
-        print("This looks like a part of a multi-disc container; I found a discnumber {0}".format(discnumber))
-        ans = input("Add this to the album tags? [Yn]")
-        if ans in constants.YES_ANSWERS:
-            album.tags["discnumber"] = [ discnumber ]
-            print("Added 'discnumber={0}' to the album tags".format(discnumber))
+    if write_discnumber_to_tags:
+        for file in album.values():
+            file.tags["discnumber"] = [ discnumber ]
+            file.write_tags_to_filesystem()
+            logger.info("discnumber tag added to file {0}".format(file.path))
     if discnumber != None:
-        discname_reduced = re.sub(FIND_DISC_RE,"",album.tags["album"][0],flags=re.IGNORECASE)
-        result = db.query("SELECT id FROM containers WHERE name='?';", discname_reduced)
-        container_id = None
-        if len(result)==0:
-            ans = input("Create a new Container '{0}'? [Yn]".format(discname_reduced))
-            if ans in constants.YES_ANSWERS:
-                container_id = omg.add_container(name=discname_reduced)
-        elif len(result)==1:
-            container_id = result[0][0]
+        if isinstance(meta_container,str):
+            meta_container_id = omg.add_container(name=meta_container)
+        elif isinstance(meta_container,int):
+            meta_container_id = meta_container
         else:
-            print("Sorry, you already have more than one container named '{0}', you have to do this by hand.".format(discname_reduced))
-        if container_id != None:
-            ans = input("Add album '{0}' as element number {1} to container '{2}'? [Yn]".format(album.tags["album"][0], discnumber, discname_reduced))
-            if ans in constants.YES_ANSWERS:
-                omg.add_content(container_id, discnumber, album_id)
+            print("Sorry, you already have more than one meta container of the desired name, you have to do this by hand.")
+        if meta_container_id != None:
+            omg.add_content(meta_container_id, discnumber, album_id)
     
 
 
@@ -153,7 +180,8 @@ def find_new_albums(path):
     Yields an omg.Container without any tags. The tags and the name for the album should be examined by another function."""
     for dirpath, dirnames, filenames in os.walk(path):
         albums_in_this_directory = {}
-        for filename in (os.path.join(dirpath, f) for f in filenames):
+        ignored_albums=[]
+        for filename in (os.path.normpath(os.path.abspath(os.path.join(dirpath, f))) for f in filenames):
             if omg.id_from_filename(filename):
                 logger.debug("Skipping file '{0}' which is already in the database.".format(filename))
                 continue
@@ -162,6 +190,8 @@ def find_new_albums(path):
             t = realfile.tags
             if "album" in t:
                 album = t["album"][0]
+                if album in ignored_albums:
+                    continue
                 file = omg.File(filename, tags=t, length=realfile.length)
                 if not album in albums_in_this_directory:
                     albums_in_this_directory[album] = omg.Container()
@@ -170,7 +200,9 @@ def find_new_albums(path):
                     albums_in_this_directory[album][trkn] = file
                 else: # file without tracknumber, bah
                     if 0 in albums_in_this_directory[album]:
-                        print("More than one files in this album without tracknumber, don't know what to do: \n{0}".format(filename))
+                        print("More than one file in this album without tracknumber, don't know what to do: \n{0}".format(filename))
+                        del albums_in_this_directory[album]
+                        ignored_albums.append(album)
                     else:
                         albums_in_this_directory[album][0] = file
             else:
