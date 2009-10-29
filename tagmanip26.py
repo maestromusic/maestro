@@ -70,10 +70,12 @@ def regex_tag_replace(path,tag,search,replace,dry):
         if not dry:
             file.tags[tag][0] = result
             file.save_tags()
+            
 def regex(cmdline):
     """Performs regular expression based string substitution in tags."""
     opts, args = getopt.getopt(cmdline, "dRs:r:t:", ("search=","replace=","dry","tag=","recursive"))
-    search = replace = tag = None
+    search = tag = None
+    replace = '' # if no replacement is given, just delete
     dry = recursive = False
     for o,a in opts:
         if o in ("-s", "--search"):
@@ -96,7 +98,7 @@ def regex(cmdline):
                     for f in sorted(filenames):
                         regex_tag_replace(os.path.join(dirpath,f), tag, search, replace, dry)
                 
-        else:
+        elif os.path.exists(arg):
             regex_tag_replace(arg,tag,search,replace,dry)
 
             

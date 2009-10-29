@@ -19,11 +19,6 @@ from PyQt4 import QtSql
 
 class DatabaseLayoutException(Exception):
     """Exception that occurs if the existing database layout doesn't meet the requirements of this module."""
-    def __init__(self,message):
-        self.value = message
-    
-    def __str__(self):
-        return repr(self.value)
     
 # MySQL-commands to create these static tables
 CREATE_STATIC_TABLE_CMDS = {

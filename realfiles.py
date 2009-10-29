@@ -13,12 +13,16 @@ import subprocess
 import config
 import pickle
 import sys
-try:
+import os
+try: # we try to favor native Pyk3 stagger support over the ugly26 shit
     import stagger
     from stagger.id3 import * #frame definitions
 except ImportError:
     pass
 
+class NoTagError(Exception):
+    """This Exception occurs if you try to read tags from a file that has no tags."""
+    pass
     
 class MartinIstEinSpast:
     """Base class for special file types. All files have a path."""
@@ -81,7 +85,8 @@ class StaggerID3(MartinIstEinSpast):
             "TOLY": "author",                                   
             "TMOO": "mood",                                     
             "TBPM": "bpm",                                      
-            "TDRC": "date",                                     
+            "TDRC": "date",        
+            "TYER": "date", #replaced by TDRC in id3v2.4
             "TDOR": "originaldate",                             
             "TOAL": "originalalbum",                            
             "TOPE": "originalartist",                                                        
@@ -103,12 +108,30 @@ class StaggerID3(MartinIstEinSpast):
     @staticmethod
     def _decode(encodingNr, string):
         if encodingNr==0: # do we really need this?
-            return string.encode("iso-8859-1").decode("utf-8")
+            return string #.encode("iso-8859-1").decode("utf-8")
         else:
             return string
         
+    def _decode_id3v1(self):
+        
+        for key in self._stag.__dict__:
+            if key=="_genre":
+                self.tags["genre"] = [ stagger.id3.genres[self._stag.__dict__[key]] ]
+            else:
+                self.tags[key] = [ self._stag.__dict__[key] ]
+        
     def read(self):
-        self._stag = stagger.read_tag(self.path)
+        try:
+            self._stag = stagger.read_tag(self.path)
+        except stagger.errors.NoTagError as e:
+            # try to find an id3v1 tag (stagger.read_tag() only finds id3v1 atm
+            try:
+                self._stag = stagger.id3v1.Tag1.read(self.path)
+                self._decode_id3v1
+                return
+            except stagger.errors.NoTagError as e2:
+                raise NoTagError(str(e)) # we use our own errors, ofc
+            
         for key in self._stag:
             if key in StaggerID3.text_frames:
                 frame = self._stag[key]
@@ -142,3 +165,24 @@ def File(path):
         return StaggerID3(path)
     else:
         return UglyPython26PickleFile(path)
+
+if __name__=="__main__":
+    """Small testing procedure that searches for MP3 files and tries to read all their tags."""
+    path = sys.argv[1]
+    for dp,dn,fn in os.walk(path):
+        for f in fn:
+            filename = os.path.join(dp,f)
+            try:
+                ending = filename.rsplit(".",1)[1].lower()
+                if ending=="mp3":
+                    testfile = File(filename)
+                    try:
+                        testfile.read()
+                        if isinstance(testfile._stag, stagger.id3v1.Tag1):
+                            print("File '{0}' has id3v1 Tag".format(filename))
+                        else:
+                            print("File '{0}' read OK.".format(filename))
+                    except NoTagError:
+                        input("File '{0}' has no tag at all. [enter] to continue".format(filename))
+            except IndexError:
+                pass
