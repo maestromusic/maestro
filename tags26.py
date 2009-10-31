@@ -3,6 +3,7 @@
 
 import mutagen
 import sys
+import os
 
 class UnsupportedFileExtension(Exception):
     pass
@@ -266,3 +267,8 @@ def File(path):
     elif extension in ["mp4", "m4a"]:
         return MP4File(path)
     raise UnsupportedFileExtension(path)
+
+if __name__=="__main__":
+    path = sys.argv[1]
+    for dp,dn,fn in os.walk(path):
+        

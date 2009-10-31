@@ -121,6 +121,7 @@ class StaggerID3(MartinIstEinSpast):
                 self.tags[key] = [ self._stag.__dict__[key] ]
         
     def read(self):
+        self._bad_id3v1 = False
         try:
             self._stag = stagger.read_tag(self.path)
         except stagger.errors.NoTagError as e:
@@ -128,6 +129,7 @@ class StaggerID3(MartinIstEinSpast):
             try:
                 self._stag = stagger.id3v1.Tag1.read(self.path)
                 self._decode_id3v1
+                self._bad_id3v1 = True
                 return
             except stagger.errors.NoTagError as e2:
                 raise NoTagError(str(e)) # we use our own errors, ofc
@@ -135,8 +137,16 @@ class StaggerID3(MartinIstEinSpast):
         for key in self._stag:
             if key in StaggerID3.text_frames:
                 frame = self._stag[key]
-                tag = [StaggerID3._decode(frame.encoding,t) for t in frame.text]
-                self.tags[StaggerID3.text_frames[key]] = tag
+                if not isinstance(frame, stagger.frames.ErrorFrame):
+                    if isinstance(frame, list):
+                        self.bahlist = True
+                        textkey = StaggerID3.text_frames[key]
+                        self.tags[textkey] = []
+                        for subframe in frame:
+                            self.tags[textkey].append(subframe.text)
+                    else:
+                        # this should be the normal case
+                        self.tags[StaggerID3.text_frames[key]] = frame.text
             elif key=="TXXX":
                 # the TXXX frame is a list of description,value pairs
                 for part in self._stag["TXXX"]:
@@ -169,6 +179,11 @@ def File(path):
 if __name__=="__main__":
     """Small testing procedure that searches for MP3 files and tries to read all their tags."""
     path = sys.argv[1]
+    id3v1count = 0
+    badid3v1count = 0
+    mp3count = 0
+    notagcount = 0
+    bahlistcount = 0
     for dp,dn,fn in os.walk(path):
         for f in fn:
             filename = os.path.join(dp,f)
@@ -176,13 +191,27 @@ if __name__=="__main__":
                 ending = filename.rsplit(".",1)[1].lower()
                 if ending=="mp3":
                     testfile = File(filename)
+                    mp3count += 1
+                    print("Reading file '{0}'".format(filename))
                     try:
                         testfile.read()
+                        if hasattr(testfile,"bahlist"):
+                            bahlistcount +=1
                         if isinstance(testfile._stag, stagger.id3v1.Tag1):
-                            print("File '{0}' has id3v1 Tag".format(filename))
+                            print("    file has id3v1 Tag")
+                            id3v1count += 1
+                            if testfile._bad_id3v1:
+                                badid3v1count += 1
                         else:
-                            print("File '{0}' read OK.".format(filename))
+                            print("    OK.")
                     except NoTagError:
-                        input("File '{0}' has no tag at all. [enter] to continue".format(filename))
+                        print("    File has no tag at all. [enter] to continue")
+                        notagcount += 1
             except IndexError:
                 pass
+    print("Statistics I have collected:")
+    print("You have {0} mp3 files, of which:".format(mp3count))
+    print("   * {0} have no tag at all".format(notagcount))
+    print("   * {0} have an id3v1 tag".format(id3v1count))
+    print("   * {0} have a bad id3v1 tag".format(id3v1count))
+    print("   * {0} have wrong multiple tags".format(bahlistcount))

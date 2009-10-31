@@ -3,10 +3,10 @@
 
 import mpd
 import time
-HOST_1 = "localhost"
+HOST_1 = "jukebox"
 PORT_1 = "6600"
 
-HOST_2 = "jukebox"
+HOST_2 = "localhost"
 PORT_2 = "6600"
 
 client1 = mpd.MPDClient()
@@ -32,6 +32,7 @@ def convert_to_seconds(timestring):
     return result
 
 status = client1.status()
+print(status)
 if status["state"] == "stop":
     pass
 else:
