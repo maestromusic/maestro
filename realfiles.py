@@ -66,17 +66,23 @@ class StaggerID3(MartinIstEinSpast):
     
     text_frames = {
             "TIT1": "grouping",                                 
-            "TIT2": "title",                                    
-            "TIT3": "version",                                  
-            "TPE1": "artist",                                   
+            "TT1" : "grouping",
+            "TIT2": "title", 
+            "TT2" : "title",                                   
+            "TIT3": "version", 
+            "TT3" : "version",                                 
+            "TPE1": "artist",    
+            "TP1" : "artist",                               
             "TPE2": "performer",                                
             "TPE3": "conductor",                                
             "TPE4": "arranger",                                 
             "TEXT": "lyricist",                                 
             "TCOM": "composer",                                 
             "TENC": "encodedby",                                
-            "TALB": "album",                                    
-            "TRCK": "tracknumber",                              
+            "TALB": "album", 
+            "TAL" : "album",                                   
+            "TRCK": "tracknumber",
+            "TRK": "tracknumber",                           
             "TPOS": "discnumber",                               
             "TSRC": "isrc",                                     
             "TCOP": "copyright",                                
@@ -87,6 +93,7 @@ class StaggerID3(MartinIstEinSpast):
             "TBPM": "bpm",                                      
             "TDRC": "date",        
             "TYER": "date", #replaced by TDRC in id3v2.4
+            "TYE": "date",
             "TDOR": "originaldate",                             
             "TOAL": "originalalbum",                            
             "TOPE": "originalartist",                                                        
@@ -96,22 +103,33 @@ class StaggerID3(MartinIstEinSpast):
             "TMED": "media",                                    
             "TCMP": "compilation",
             "TCON": "genre",
+            "TCO" : "genre",
             "TOWN": "owner", # file owner/licensee
             "TLAN": "language",  # "language" should not make to TLAN. TLAN requires
             # an ISO language code, and QL tags are freeform.   
             "TLEN": "length", #milliseconds in string format
+            "USLT": "lyrics", # not a text frame, but should also have a text attribute
+            "TSSE": "encoder",
+            "TFLT": "filetype",
             }
+    ignored_frames = [
+        "XDOR", # old experimental date format, not read correctly by stagger
+        "XSOP", # replaced by TSOP, not read by stagger
+        "PIC", "APIC", #pictures not handled yet
+        "NCON", #nonstandard tag by musicmatch :(
+        "TDAT", #month/day date in id3v2.3
+        "PRIV", #private stuff
+        "UFID", #unique file identifier
+        "MCDI", #binary zeugs
+        "PCNT", # playcount shouldn't be inside the file!?
+        "GEOB", #general object
+        
+        ] #TODO: don't simpy ignore those
+
     def __init__(self,path):
         MartinIstEinSpast.__init__(self,path)
         self._stag = None
-    
-    @staticmethod
-    def _decode(encodingNr, string):
-        if encodingNr==0: # do we really need this?
-            return string #.encode("iso-8859-1").decode("utf-8")
-        else:
-            return string
-        
+          
     def _decode_id3v1(self):
         
         for key in self._stag.__dict__:
@@ -121,7 +139,7 @@ class StaggerID3(MartinIstEinSpast):
                 self.tags[key] = [ self._stag.__dict__[key] ]
         
     def read(self):
-        self._bad_id3v1 = False
+        self.ignored_tags = set()
         try:
             self._stag = stagger.read_tag(self.path)
         except stagger.errors.NoTagError as e:
@@ -129,12 +147,14 @@ class StaggerID3(MartinIstEinSpast):
             try:
                 self._stag = stagger.id3v1.Tag1.read(self.path)
                 self._decode_id3v1
-                self._bad_id3v1 = True
                 return
             except stagger.errors.NoTagError as e2:
                 raise NoTagError(str(e)) # we use our own errors, ofc
             
         for key in self._stag:
+            if key in StaggerID3.ignored_frames:
+                self.ignored_tags.add(key)
+                continue
             if key in StaggerID3.text_frames:
                 frame = self._stag[key]
                 if not isinstance(frame, stagger.frames.ErrorFrame):
@@ -150,22 +170,35 @@ class StaggerID3(MartinIstEinSpast):
             elif key=="TXXX":
                 # the TXXX frame is a list of description,value pairs
                 for part in self._stag["TXXX"]:
-                    description = StaggerID3._decode(part.encoding, part.description)
+                    description = part.description
                     if description.startswith("QuodLibet::"):
                         description = description[11:] # hass auf quodlibet ...
-                    value = StaggerID3._decode(part.encoding, part.value)
-                    self.tags[description] = [ value ]
-            elif key=="COMM":
+                    self.tags[description] = [ part.value ]
+            elif key in ("COMM", "COM"):
                 # comment tag
-                for part in self._stag["COMM"]:
-                    value = StaggerID3._decode(part.encoding, part.text)
+                for part in self._stag[key]:
+                    value = part.text
                     if part.desc=="":
                         self.tags["comment"] = [ value ]
                     else:
-                        description = StaggerID3._decode(part.encoding, part.desc)
-                        self.tags[description] = [ value ]
+                        self.tags[part.desc] = [ value ]
+            elif key=="WXXX":
+                # user defined url
+                for part in self._stag["WXXX"]:
+                    value = part.url
+                    if part.description=="":
+                        self.tags["url"] = [ value ]
+                    else:
+                        self.tags[part.description] = [ value ]
+            elif isinstance(self._stag[key][0], stagger.frames.URLFrame):
+                if "url" not in self.tags:
+                    self.tags["url"] = []
+                for part in self._stag[key]:
+                    self.tags["url"].append(part.url)
+                    
             else:
                 print("Skipping unsupported tag {0} in id3 file '{1}'".format(key,self.path))
+                self.ignored_tags.add(key)
                 
         
 
@@ -178,12 +211,15 @@ def File(path):
 
 if __name__=="__main__":
     """Small testing procedure that searches for MP3 files and tries to read all their tags."""
+    import logging
+    logger = logging.getLogger("spast")
+    logger.setLevel(logging.WARNING)
     path = sys.argv[1]
-    id3v1count = 0
-    badid3v1count = 0
     mp3count = 0
     notagcount = 0
     bahlistcount = 0
+    ignored = {}
+    types = {}
     for dp,dn,fn in os.walk(path):
         for f in fn:
             filename = os.path.join(dp,f)
@@ -192,26 +228,30 @@ if __name__=="__main__":
                 if ending=="mp3":
                     testfile = File(filename)
                     mp3count += 1
-                    print("Reading file '{0}'".format(filename))
+                    logger.debug("Reading file '{0}'".format(filename))
                     try:
                         testfile.read()
                         if hasattr(testfile,"bahlist"):
                             bahlistcount +=1
-                        if isinstance(testfile._stag, stagger.id3v1.Tag1):
-                            print("    file has id3v1 Tag")
-                            id3v1count += 1
-                            if testfile._bad_id3v1:
-                                badid3v1count += 1
-                        else:
-                            print("    OK.")
+                        for ign in testfile.ignored_tags:
+                            if ign not in ignored:
+                                ignored[ign] = []
+                            ignored[ign].append(filename)
+                        classname = type(testfile._stag).__name__
+                        if classname not in types:
+                            types[classname] = 0
+                        types[classname] += 1
                     except NoTagError:
-                        print("    File has no tag at all. [enter] to continue")
+                        logger.info("    File has no tag at all. [enter] to continue")
                         notagcount += 1
             except IndexError:
                 pass
     print("Statistics I have collected:")
     print("You have {0} mp3 files, of which:".format(mp3count))
     print("   * {0} have no tag at all".format(notagcount))
-    print("   * {0} have an id3v1 tag".format(id3v1count))
-    print("   * {0} have a bad id3v1 tag".format(id3v1count))
+    for t in types:
+        print("   * {0} have tag of type {1}".format(types[t], t))
     print("   * {0} have wrong multiple tags".format(bahlistcount))
+    print("Ignored tags I have found:")
+    for frame in ignored:
+        print("  {0} ({1})".format(frame,len(ignored[frame])))
