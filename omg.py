@@ -18,16 +18,32 @@ import realfiles
 
 class Container(dict):
     """Python representation of a Container, which is just a dictionary position->container that has an id, a name and tags."""
-    def __init__(self,id=None,name=None,tags={}):
+    def __init__(self,container_id=None,name=None,tags={}):
         dict.__init__(self)
         self.name=name
-        self.id=id
+        self.container_id=container_id
         self.tags=tags
+    
+    def __str__(self):
+        ret = "({}: ".format(self.name)
+        for el in self.keys():
+            ret += "{0}:{1} ".format(el, self[el])
+        ret += ")"
+        return ret
+    
+    def _pprint(self,depth):
+        indent = "    "*depth
+        print(indent + self.name)
+        for el in sorted(self.keys()):
+            self[el]._pprint(depth+1)
+    
+    def pprint(self):
+        self._pprint(0)
 
 class File(Container):
     """A File is a special container that may have a length and a hash. If the read_file-Parameter is True, length,name,tags and hash will be read from the file."""
-    def __init__(self,path,id=None,tags={},length=None,hash=None,read_file=False):
-        Container.__init__(self,id,name=os.path.basename(path),tags=tags)
+    def __init__(self,path,container_id=None,tags={},length=None,hash=None,read_file=False):
+        Container.__init__(self,container_id,name=os.path.basename(path),tags=tags)
         self.length = length
         self.hash=hash
         self.path=path
@@ -45,7 +61,12 @@ class File(Container):
         real = realfiles.File(abs_path(self.path))
         real.tags = self.tags
         real.save_tags()
-            
+    
+    def _pprint(self,depth):
+        print("    "*depth + self.path)
+    
+    def __str__(self):
+        return self.path
 
 itags = {} # dict of indexed tags and their tagid
 itags_reverse = {} # same in other direction (bäh)
@@ -171,24 +192,31 @@ def get_tags(container_id):
     return tags
             
 def path_by_id(container_id):
-    """Returns the path of a file, or None if it's not a file."""
-    
+    """Returns the path of a file."""
+    #~ q = QtSql.QSqlQuery()
+    #~ q.prepare("SELECT path FROM files WHERE container_id=?;")
+    #~ q.addBindValue(container_id)
+    #~ q.exec_()
+    #~ 
+    #~ while q.next():
+        #~ return q.value(0)
+    #~ return None
     return db.query("SELECT path FROM files WHERE container_id=?;",container_id).get_single()
+    
     
 def get_container_by_id(cid):
     """Returns a Container/File class hierarchy representing the container of given ID."""
-    
     path = path_by_id(cid)
     if path==None: # this is a non-file container
-        ret = Container(id=cid)
+        ret = Container(container_id=cid)
         ret.name = db.query("SELECT name FROM containers WHERE id=?;",cid).get_single()
-        ret.id = id
+        ret.container_id = cid
         ret.tags = get_tags(cid)
         contents = db.query("SELECT position,element_id FROM contents WHERE container_id=?;",cid)
         for pos,el in contents:
             ret[pos] = get_container_by_id(el)
     else:
-        ret = File(path,id=cid)
+        ret = File(path,container_id=cid)
         ret.tags = get_tags(cid)
     return ret
     
@@ -274,17 +302,21 @@ def add_file(path=None, file=None):
         hash = file.hash
     file_id = add_container(name=os.path.basename(path),tags=tags,elements=0)
     # now take care of the files table
-    querytext = "INSERT INTO files (container_id,path,hash,length) VALUES(?,?,?,?);"
-    from PyQt4 import QtSql
-    q = QtSql.QSqlQuery()
-    q.prepare(querytext)
-    q.addBindValue(file_id)
-    q.addBindValue(rel_path(path))
-    q.addBindValue(hash)
-    q.addBindValue(int(file.length))
-    q.exec_()
-    logger.debug(q.executedQuery())
-    #db.query(querytext)
+    querytext = "INSERT INTO files (container_id,path,hash,length) VALUES('?','?','?','?');"
+    #~ from PyQt4 import QtSql
+    #~ q = QtSql.QSqlQuery()
+    #~ q.prepare(querytext)
+    #~ q.addBindValue(file_id)
+    #~ q.addBindValue(rel_path(path))
+    #~ q.addBindValue(hash)
+    #~ q.addBindValue(int(file.length))
+    #~ q.exec_()
+    #~ logger.debug(q.executedQuery())
+    if file.length is None:
+        length = 0
+    else:
+        length = int(file.length)
+    db.query(querytext, file_id, rel_path(path), hash, length)
     return file_id
     
 def add_content(container_id, i, content_id):
@@ -298,10 +330,10 @@ def add_file_container(name=None, contents=None, tags={}, container=None):
     """Adds a new container to the database whose contents are only files."""
     
     if container!=None:
-        if container.id == None:
+        if container.container_id == None:
             container_id = add_container(container.name, tags=container.tags, elements=len(container))
         else:
-            container_id = container.id
+            container_id = container.container_id
         for tracknumber in container:
             file_id = id_from_filename(container[tracknumber].path)
             if file_id == None:

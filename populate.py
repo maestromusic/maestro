@@ -74,12 +74,12 @@ def do_album(album):
     while not accepted:
         result = db.query("SELECT id FROM containers WHERE name='?';", album.name)
         if len(result) == 1:
-            album.id = result[0][0]
+            album.container_id = result[0][0]
         print("+++++ I SUGGEST: +++++")
         #-------- 1.: Name of the container ----------------------------------
         print("1]  Name of the Container: {0}".format(album.name))
-        if (album.id!=None):
-            print("     [EXISTS WITH ID: {0}]".format(album.id))
+        if (album.container_id!=None):
+            print("     [EXISTS WITH ID: {0}]".format(album.container_id))
         
         #-------- 2.: Contents -----------------------------------------------
         print("2]  Contents:")
@@ -185,8 +185,12 @@ def find_new_albums(path):
             if omg.id_from_filename(filename):
                 logger.debug("Skipping file '{0}' which is already in the database.".format(filename))
                 continue
-            realfile = realfiles.File(os.path.abspath(filename))
-            realfile.read()
+            try:
+                realfile = realfiles.File(os.path.abspath(filename))
+                realfile.read()
+            except realfiles.NoTagError:
+                logger.warning("Skipping file '{0}' which has no tag".format(filename))
+                continue
             t = realfile.tags
             if "album" in t:
                 album = t["album"][0]
