@@ -23,7 +23,7 @@ database = input("Please enter the SQL database I should use: ")
 class SqlTest(unittest.TestCase):
     
     def setUpTestTable(self,driver):
-        self.db = sql.newDatabase(driver)
+        self.db = sql.newConnection(driver)
         self.db.connect(username,password,database)
         self.db.query("""
             CREATE TEMPORARY TABLE {0} (
@@ -38,7 +38,7 @@ class SqlTest(unittest.TestCase):
     def performTests(self):
         result = self.db.query("SELECT * FROM "+testTable)
         self.assertEqual(result.size(),10)
-        self.assertEqual(result.lastQuery(),"SELECT * FROM "+testTable)
+        self.assertEqual(result.executedQuery(),"SELECT * FROM "+testTable)
         row = result.next()
         self.assertEqual(len(row),2)
         self.assertEqual(row[1],"ebbes0")

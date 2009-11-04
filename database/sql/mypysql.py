@@ -15,7 +15,7 @@ from . import DBException
 class Sql:    
     def connect(self,username,password,database,host="localhost",port=3306):
         try:
-            self._db = mysql.MySQL(username,password,database,host,port)
+            self._db = mysql.MySQL(username,password,database,host,int(port))
         except mysql.error:
             raise DBException(self._db.error())
             
@@ -43,7 +43,7 @@ class SqlResult:
     def next(self):
         return next(self._result.__iter__())
         
-    def lastQuery(self):
+    def executedQuery(self):
         return self._result.__str__()
         
     def affectedRows(self):

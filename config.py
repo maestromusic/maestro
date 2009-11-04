@@ -19,11 +19,12 @@ def init(*config_files):
     """Sets default options and overwrites them with the options in the given config files."""
     default_options = {
         "database": {
-            "mysql_host":"localhost",
-            "mysql_port":"3306",
+            "driver": "mypysql",
             "mysql_user":"",
             "mysql_password":"",
             "mysql_db":"omg",
+            "mysql_host":"localhost",
+            "mysql_port":"3306"
         },
         
         "tags": {

@@ -6,16 +6,9 @@
 # it under the terms of the GNU General Public License version 3 as
 # published by the Free Software Foundation
 #
-# Methods to create the database, connect to it, check its integrity and
-# perform some minor corrections. If this file is invoked directly it will
-# check the database without correcting or changing anything (just printing
-# warnings to stdout).
-#
 import config
-from mysql import MySQL
 import re
 import logging
-from PyQt4 import QtSql
 
 class DatabaseLayoutException(Exception):
     """Exception that occurs if the existing database layout doesn't meet the requirements of this module."""

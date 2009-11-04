@@ -55,8 +55,8 @@ class SqlResult:
     def next(self):
         return next(self.__iter__())
         
-    def lastQuery(self):
-        return str(self._result.lastQuery()) # QSqlQuery.lastQuery returns a QString
+    def executedQuery(self):
+        return str(self._result.executedQuery()) # QSqlQuery.executedQuery returns a QString
     
     def affectedRows(self):
         return self._result.numRowsAffected()
