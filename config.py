@@ -32,6 +32,7 @@ def init(*config_files):
         },
         
         "misc": {
+            "printtags_cmd":"./printtags.py",
             "tagmanip26_cmd":os.path.abspath(os.path.join(os.path.split(__file__)[0],"tagmanip26.py")), # assume tagmanip26.py lives in the same directory as this module
             "loglevel":"warning",
         }

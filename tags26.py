@@ -266,4 +266,3 @@ def File(path):
         return ApeFile(path)
     elif extension in ["mp4", "m4a"]:
         return MP4File(path)
-    raise UnsupportedFileExtension(path)
