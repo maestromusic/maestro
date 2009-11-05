@@ -33,11 +33,11 @@ class MartinIstEinSpast:
     
     def read(self):
         """Reads all information, like tags, length, and perhaps more in the future, from the filesystem"""
-        pass
+        raise NotImplementedError
         
     def save_tags(self):
         """Stores the tags that are currently present in the tags attribute in the file."""
-        pass
+        raise NotImplementedError
     
     
 

@@ -20,7 +20,7 @@ import constants
 import subprocess
 import logging
 import realfiles
-FIND_DISC_RE=r" ?[([]?(?:cd|disc|part|teil|disk) ?([iI1-9]+)[)\]]?"
+FIND_DISC_RE=r" ?[([]?(?:cd|disc|part|teil|disk) ?([iI0-9]+)[)\]]?"
 
 logger = logging.getLogger(name="populate")
 

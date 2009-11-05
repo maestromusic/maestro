@@ -7,7 +7,7 @@
 # published by the Free Software Foundation
 #
 
-import db
+import database, db
 import config
 import os
 import pickle
@@ -82,9 +82,10 @@ def init():
         raise Exception("Already init'ed.")
     logging.basicConfig(level=constants.LOGLEVELS[config.get("misc","loglevel")], format='%(levelname)s: %(message)s')
     logger = logging.getLogger(name="omg")
+    database.connect()
     db.connect()
     db.check_tables(create_tables=True,insert_tagids=True)
-    result = db.query("SELECT id,tagname FROM tagids;")
+    result = database.db.query("SELECT id,tagname FROM tagids;")
     for id,name in result:
         itags[name] = id
     itags_reverse = {y:x for x,y in itags.items()} # <3 python :)
@@ -144,13 +145,13 @@ def compute_hash(file):
 # ------------------- database management functions -----------------------------------------------
 def id_from_filename(filename):
     """Retrieves the container_id of a file from the given path, or None if it is not found."""
-    return db.query("SELECT container_id FROM files WHERE path='?';", rel_path(filename)).get_single()
+    return database.db.query("SELECT container_id FROM files WHERE path='?';", rel_path(filename)).getSingle()
 
 def id_from_hash(hash):
     """Retrieves the container_id of a file from its hash, or None if it is not found."""
-    result =  db.query("SELECT container_id FROM files WHERE hash='?';", hash)
+    result =  database.db.query("SELECT container_id FROM files WHERE hash='?';", hash)
     if len(result)==1:
-        return result.get_single()
+        return result.getSingle()
     else:
         raise RuntimeError("Hash not unique upon filenames!")
 
@@ -168,7 +169,7 @@ def get_value_id(tag,value,insert=False):
             else:
                 value="19{0}-00-00".format(value)
 
-    result = db.query("SELECT id FROM tag_{0} WHERE value='?';".format(tag),value).get_single()
+    result = database.db.query("SELECT id FROM tag_{0} WHERE value='?';".format(tag),value).getSingle()
     if insert and not result:
         result = add_tag_value(tag,value)
     return result
@@ -178,13 +179,13 @@ def get_tags(container_id):
     
     tags = {}
     for tag in itags:
-        result = db.query(
+        result = database.db.query(
             "SELECT value FROM tags INNER JOIN tag_{0} ON value_id=id AND tag_id=? WHERE container_id=?;".format(tag),itags[tag], container_id)
         for x in result:
             if not tag in tags:
                 tags[tag] = []
             tags[tag].append(x[0])
-    result = db.query("SELECT tagname,value FROM othertags WHERE container_id=?;",container_id)
+    result = database.db.query("SELECT tagname,value FROM othertags WHERE container_id=?;",container_id)
     for tag,value in result:
         if not tag in tags:
             tags[tag] = []
@@ -192,16 +193,8 @@ def get_tags(container_id):
     return tags
             
 def path_by_id(container_id):
-    """Returns the path of a file."""
-    #~ q = QtSql.QSqlQuery()
-    #~ q.prepare("SELECT path FROM files WHERE container_id=?;")
-    #~ q.addBindValue(container_id)
-    #~ q.exec_()
-    #~ 
-    #~ while q.next():
-        #~ return q.value(0)
-    #~ return None
-    return db.query("SELECT path FROM files WHERE container_id=?;",container_id).get_single()
+    """Returns the path of a file (None if it doesn't exist)."""
+    return database.db.query("SELECT path FROM files WHERE container_id=?;",container_id).getSingle()
     
     
 def get_container_by_id(cid):
@@ -209,10 +202,10 @@ def get_container_by_id(cid):
     path = path_by_id(cid)
     if path==None: # this is a non-file container
         ret = Container(container_id=cid)
-        ret.name = db.query("SELECT name FROM containers WHERE id=?;",cid).get_single()
+        ret.name = database.db.query("SELECT name FROM containers WHERE id=?;",cid).getSingle()
         ret.container_id = cid
         ret.tags = get_tags(cid)
-        contents = db.query("SELECT position,element_id FROM contents WHERE container_id=?;",cid)
+        contents = database.db.query("SELECT position,element_id FROM contents WHERE container_id=?;",cid)
         for pos,el in contents:
             ret[pos] = get_container_by_id(el)
     else:
@@ -222,8 +215,8 @@ def get_container_by_id(cid):
     
 def add_container(name,tags={},elements=0):
     """Adds a container to the database, which can have tags and a number of elements."""
-    db.query("INSERT INTO containers (name,elements) VALUES('?','?');", name,elements)
-    newid = db.query('SELECT LAST_INSERT_ID();').get_single() # the new container's ID
+    database.db.query("INSERT INTO containers (name,elements) VALUES('?','?');", name,elements)
+    newid = database.db.query('SELECT LAST_INSERT_ID();').getSingle() # the new container's ID
     set_tags(newid, tags)
     return newid
 
@@ -243,18 +236,18 @@ def add_tag(container_id, tagname=None, tagid=None, value=None, valueid=None):
             if not value:
                 raise ValueError("Either value or valueid must be set.")
             valueid=get_value_id(tagname,value,insert=True)
-        db.query("INSERT INTO tags VALUES('?','?','?');", container_id, itags[tagname], valueid)
+        database.db.query("INSERT INTO tags VALUES('?','?','?');", container_id, itags[tagname], valueid)
     else: # other tag
         if not value:
             raise ValueError("add_tag called for and unindexed tag, so value must be set.")
-        db.query("INSERT INTO othertags VALUES('?','?','?');", container_id, tagname, value)        
+        database.db.query("INSERT INTO othertags VALUES('?','?','?');", container_id, tagname, value)        
 
 
 def add_tag_value(tagname,value):
     """Adds a new value entry to an indexed tag. Returns the newly created ID. Warning: Does NOT check for uniqueness."""
     
-    db.query("INSERT INTO tag_{0} (value) VALUES('?');".format(tagname), value)
-    return db.query('SELECT LAST_INSERT_ID();').get_single()
+    database.db.query("INSERT INTO tag_{0} (value) VALUES('?');".format(tagname), value)
+    return database.db.query('SELECT LAST_INSERT_ID();').getSingle()
     
     
 def set_tags(cid, tags, append=False):
@@ -266,11 +259,11 @@ def set_tags(cid, tags, append=False):
     existing_tags = db.query("SELECT * FROM tags WHERE 'container_id'='?';", cid)
     if len(existing_tags) > 0:
         logger.warning("Deleting existing indexed tags from container {0}".format(cid))
-    db.query("DELETE FROM tags WHERE 'container_id'='?';", cid)
+    database.db.query("DELETE FROM tags WHERE 'container_id'='?';", cid)
     existing_othertags = db.query("SELECT * FROM othertags WHERE 'container_id'='?';",cid)
     if len(existing_othertags) >0:
         logger.warning("Deleting existing othertags from container {0}".format(cid))
-    db.query("DELETE FROM othertags WHERE 'container_id'='?';", cid)
+    database.db.query("DELETE FROM othertags WHERE 'container_id'='?';", cid)
     for tag in tags.keys():
         if tag in ignored_tags:
             logger.debug("Ignoring tag '{0}' in container with id {1}".format(tag, cid))
@@ -303,20 +296,11 @@ def add_file(path=None, file=None):
     file_id = add_container(name=os.path.basename(path),tags=tags,elements=0)
     # now take care of the files table
     querytext = "INSERT INTO files (container_id,path,hash,length) VALUES('?','?','?','?');"
-    #~ from PyQt4 import QtSql
-    #~ q = QtSql.QSqlQuery()
-    #~ q.prepare(querytext)
-    #~ q.addBindValue(file_id)
-    #~ q.addBindValue(rel_path(path))
-    #~ q.addBindValue(hash)
-    #~ q.addBindValue(int(file.length))
-    #~ q.exec_()
-    #~ logger.debug(q.executedQuery())
     if file.length is None:
         length = 0
     else:
         length = int(file.length)
-    db.query(querytext, file_id, rel_path(path), hash, length)
+    database.db.query(querytext, file_id, rel_path(path), hash, length)
     return file_id
     
 def add_content(container_id, i, content_id):
@@ -324,7 +308,7 @@ def add_content(container_id, i, content_id):
     
     The file with given file_id will be the i-th element of the container with container_id. May throw
     an exception if this container already has an element with the given file_id."""
-    db.query('INSERT INTO contents VALUES(?,?,?);', container_id, i, content_id)
+    database.db.query('INSERT INTO contents VALUES(?,?,?);', container_id, i, content_id)
 
 def add_file_container(name=None, contents=None, tags={}, container=None):
     """Adds a new container to the database whose contents are only files."""
