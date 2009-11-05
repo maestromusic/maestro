@@ -9,7 +9,7 @@ Usage of the module:
 =====================================
 import sql
 
-db = sql. newConnection(drivername)    # use the driver's string identifier above
+db = sql.newConnection(drivername)    # use the driver's string identifier above
 
 result = db.query("SELECT name,country FROM persons WHERE id = ?",person)   # Use ? as placeholder to insert parameters which are automatically escaped
 
@@ -51,7 +51,7 @@ class Sql:
        Executes the query queryString and returns an SqlResult object which yields the result's rows in dictionaries. Placeholders may be used (confer query).
 
 class SqlResult:
-    This class encapsulates the result of the execution of an SQL query. It may contain selected rows from the database or information like the number of affected rows. SqlResult implements __iter__ so it may be used in for loops to retrieve all rows from the result set. Depending on whether query or queryDict was used to create this SqlResult-instance the rows are returned as tuple or as dictionary. In the latter case the column-names are used as keys unless the query specified an alias. A short way to retrieve a single value from the database is getSingle But be careful not to mix getSingle and iterator methods (e.g. next) since both may change internal cursors and could interfere with each other.
+    This class encapsulates the result of the execution of an SQL query. It may contain selected rows from the database or information like the number of affected rows. SqlResult implements __iter__ so it may be used in for loops to retrieve all rows from the result set. Depending on whether query or queryDict was used to create this SqlResult-instance the rows are returned as tuple or as dictionary. In the latter case the column-names are used as keys unless the query specified an alias. A short way to retrieve a single value from the database is getSingle. But be careful not to mix different access methods like getSingle, getSingleColumn and iterator methods (e.g. next) since they may change internal cursors and could interfere with each other.
 
     size(self)
         Returns the number of rows selected in a select query. You can also use the built-in len-method.
@@ -69,8 +69,10 @@ class SqlResult:
         Retrieves the ID generated for an AUTO_INCREMENT column by the previous INSERT query.
 
     def getSingle(self):
-        Returns the first value from the first row of the result set and should be used as a shorthand method if the result contains only one value. Do not use this method together with iterators as both of them may move the internal cursor.
+        Returns the first value from the first row of the result set and should be used as a shorthand method if the result contains only one value. Do not use this method together with iterators or getSingleColumn as both of them may move the internal cursor.
 
+    def getSingleColumn(self):
+        Returns a generator for the first column of the result set and should be used as a shorthand method if the result contains only one column. Do not use this method together with iterators or getSingle as both of them may move the internal cursor.
         
 Driver modules
 ====================================

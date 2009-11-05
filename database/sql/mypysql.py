@@ -20,16 +20,22 @@ class Sql:
             raise DBException(self._db.error())
             
     def query(self,querystring,*args):
-        self._db.use_dict = False
-        return SqlResult(self._db.query(querystring,*args))
+        #self._db.use_dict = False
+        return SqlResult(self._db.query(querystring,*args),self._db)
         
     def queryDict(self,querystring,*args):
         self._db.use_dict = True
-        return SqlResult(self._db.query(querystring,*args))
+        result = SqlResult(self._db.query(querystring,*args),self._db)
+        self._db.use_dict = False
+        return result
+
         
 class SqlResult:
-    def __init__(self,mysqlResult):
+    def __init__(self,mysqlResult,db):
         self._result = mysqlResult
+        print(db.affected_rows)
+        self._affectedRows = db.affected_rows
+        self._insertId = db.insert_id
     
     def __iter__(self):
         return self._result.__iter__()
@@ -47,10 +53,13 @@ class SqlResult:
         return self._result.__str__()
         
     def affectedRows(self):
-        return self._result.affected_rows()
+        return self._affectedRows
     
     def insertId(self):
-        return self._result.insert_id()
+        return self._insertId
     
     def getSingle(self):
         return self._result.get_single()
+        
+    def getSingleColumn(self):
+        return (row[0] for row in self)

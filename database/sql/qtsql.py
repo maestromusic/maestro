@@ -15,7 +15,7 @@ class Sql:
 
     def connect(self,username,password,database,host="localhost",port=3306):
         self._db.setHostName(host)
-        self._db.setPort(port)
+        self._db.setPort(int(port))
         self._db.setDatabaseName(database)
         ok = self._db.open(username,password)
         if not ok:
@@ -68,6 +68,9 @@ class SqlResult:
         if not self._result.isValid():
             self._result.next()
         return self._result.value(0)
+    
+    def getSingleColumn(self):
+        return (row[0] for row in self)
 
 
 class SqlResultIterator:

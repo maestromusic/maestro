@@ -19,7 +19,7 @@ def init(*config_files):
     """Sets default options and overwrites them with the options in the given config files."""
     default_options = {
         "database": {
-            "driver": "mypysql",
+            "driver": "qtsql",
             "mysql_user":"",
             "mysql_password":"",
             "mysql_db":"omg",

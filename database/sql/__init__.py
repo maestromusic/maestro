@@ -18,7 +18,7 @@ drivers = {"mypysql","qtsql"}
 # When a driver is loaded _modules[driverIdentifier] will contain the driver's module.
 _modules = {}
 
-def newDatabase(driver):
+def newConnection(driver):
     """Creates a new database connection object using the given driver identifier. It
        does not open the connection."""
     if not driver in drivers:

@@ -15,14 +15,18 @@ import getpass
 
 testTable = "testtable"
 
-username = input("Please enter the SQL username I should use: ")
-password = getpass.getpass("Please enter the SQL password I should use: ")
-database = input("Please enter the SQL database I should use: ")
+username = "music"
+password = "1fnEnV!un13NV"
+database = "music"
+#username = input("Please enter the SQL username I should use: ")
+#password = getpass.getpass("Please enter the SQL password I should use: ")
+#database = input("Please enter the SQL database I should use: ")
 
 
 class SqlTest(unittest.TestCase):
     
     def setUpTestTable(self,driver):
+        self._driver = driver
         self.db = sql.newConnection(driver)
         self.db.connect(username,password,database)
         self.db.query("""
@@ -34,7 +38,8 @@ class SqlTest(unittest.TestCase):
         )
         for i in range(10):
             self.db.query("INSERT INTO {0}(text) VALUES ('ebbes{1}')".format(testTable,i))
-    
+        print("muell")
+        
     def performTests(self):
         result = self.db.query("SELECT * FROM "+testTable)
         self.assertEqual(result.size(),10)
@@ -43,24 +48,38 @@ class SqlTest(unittest.TestCase):
         self.assertEqual(len(row),2)
         self.assertEqual(row[1],"ebbes0")
 
-        result = self.db.queryDict("SELECT * FROM "+testTable)
-        self.assertEqual(result.size(),10)
-        data = result.next()
-        self.assertDictEqual({'text':'ebbes0','id':1},data)
-        
         result = self.db.query("SELECT COUNT(*) FROM "+testTable)
         self.assertEqual(result.getSingle(),10)
         self.assertEqual(result.getSingle(),10) # check twice to ensure that getSingle doesn't move the cursor
-
+        
+        result = self.db.query("SELECT id FROM "+testTable+" ORDER BY id")
+        self.assertListEqual(list(result.getSingleColumn()),list(range(1,11))) # AUTO_INCREMENT-column starts at 1
+        print("ebbes")
+        result = self.db.query("INSERT INTO {0} VALUES (11,'ebbes11')".format(testTable))
+        self.assertEqual(result.insertId(),11)
+        self.assertEqual(result.affectedRows(),1)
+        
+        result = self.db.queryDict("SELECT * FROM "+testTable+" ORDER BY id")
+        self.assertEqual(result.size(),11)
+        data = result.next()
+        self.assertDictEqual({'text':'ebbes0','id':1},data)
+        
+        result = self.db.queryDict("SELECT * FROM "+testTable)
+        data = result.next()
+        self.assertTrue('text' in data.keys())
+            
         result = self.db.queryDict("SELECT text AS ebbes FROM "+testTable)
         data = result.next()
-        self.assertTrue('ebbes' in data)
-        
+        self.assertTrue('ebbes' in data.keys())
+            
+            
     def testQtSqlDriver(self):
+        print("Checking QtSQL driver...")
         self.setUpTestTable("qtsql")
         self.performTests()
         
     def testMyPySqlDriver(self):
+        print("Checking MyPySql driver...")
         self.setUpTestTable("mypysql")
         self.performTests()
         
