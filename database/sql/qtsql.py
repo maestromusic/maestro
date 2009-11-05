@@ -29,10 +29,12 @@ class Sql:
         
     def _query(self,queryString,useDict,*args):
         query = QtSql.QSqlQuery(self._db)
-        query.prepare(queryString)
-        for arg in args:
-            query.addBindValue(arg)
-        ok = query.exec_()
+        if len(args) > 0:
+            query.prepare(queryString)
+            for arg in args:
+                query.addBindValue(arg)
+            ok = query.exec_()
+        else: ok = query.exec_(queryString)
         if not ok:
             raise DBException("Query failed: {0}".format(self._db.lastError().databaseText()))
         return SqlResult(query,useDict)
@@ -74,6 +76,7 @@ class SqlResult:
 
 
 class SqlResultIterator:
+    """Iterator-object which is used to iterate over an SqlResult."""
     def __init__(self,qSqlResult,useDict):
         self._result = qSqlResult
         if useDict:
@@ -89,7 +92,9 @@ class SqlResultIterator:
         else: return self._convertMethod(self._result.record())
         
     def _recordToTuple(self,record):
+        """Converts a QSqlRecord to a tuple."""
         return tuple([record.value(i) for i in range(record.count())])
     
     def _recordToDict(self,record):
+        """Converts a QSqlRecord to a dictionary which maps columnnames (or aliases) to the corresponding values."""
         return {record.fieldName(i): record.value(i) for i in range(record.count())}
