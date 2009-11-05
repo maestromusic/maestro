@@ -7,8 +7,10 @@
 # published by the Free Software Foundation
 #
 import config
+from mysql import MySQL
 import re
 import logging
+from PyQt4 import QtSql
 
 class DatabaseLayoutException(Exception):
     """Exception that occurs if the existing database layout doesn't meet the requirements of this module."""
