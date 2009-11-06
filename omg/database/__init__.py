@@ -13,7 +13,7 @@
 # import database
 # db = database.connect()
 #
-import config
+from omg import config
 import logging
 from . import sql
 

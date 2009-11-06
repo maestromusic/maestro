@@ -3,5 +3,6 @@ This is OMG, "Order your Music in Groups", the revolutionary music collection ma
 Dependencies:
 - python3
 - mypysql
+- PyQt4
 
-The included printtags.py needs python2.6 and the mutagen library.
+The included tagmanip26.py needs python2.6 and the mutagen library.

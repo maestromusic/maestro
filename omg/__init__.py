@@ -7,7 +7,8 @@
 # published by the Free Software Foundation
 #
 
-import database, db
+import database
+from database import db
 import config
 import os
 import pickle
@@ -48,11 +49,11 @@ class File(Container):
         self.hash=hash
         self.path=path
         if read_file:
-            read_tags_from_filesystem(self)
+            self.read_tags_from_filesystem()
             self.hash = compute_hash(path)
     
     def read_tags_from_filesystem(self):
-        real = realfiles.File(abs_path(path))
+        real = realfiles.File(abs_path(self.path))
         real.read()
         self.tags = real.tags
         self.length = real.length
@@ -83,14 +84,15 @@ def init():
     logging.basicConfig(level=constants.LOGLEVELS[config.get("misc","loglevel")], format='%(levelname)s: %(message)s')
     logger = logging.getLogger(name="omg")
     database.connect()
-    db.connect()
-    db.check_tables(create_tables=True,insert_tagids=True)
-    result = database.db.query("SELECT id,tagname FROM tagids;")
+    if len(database.checkMissingTables()) > 0:
+        logger.warning("There are tables missing in the database, will create them.")
+        database.checkMissingTables(True)
+    result = db.query("SELECT id,tagname FROM tagids;")
     for id,name in result:
         itags[name] = id
     itags_reverse = {y:x for x,y in itags.items()} # <3 python :)
     ignored_tags = config.get("tags","ignored_tags").split(",")
-    tagtypes = db.tagtypes
+    tagtypes = database.tagtypes
     initialized = True
     logger.debug("omg module initialized")
     

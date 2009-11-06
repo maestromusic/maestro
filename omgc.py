@@ -32,6 +32,7 @@ def print_container(cid):
     import omg
     container = omg.get_container_by_id(cid)
     container.pprint()
+    
 if __name__=="__main__":
     opts, args = getopt.getopt(sys.argv[1:], "phli:", ['help', 'list','populate','reset','check','id='])
     if len(opts) == 0:
