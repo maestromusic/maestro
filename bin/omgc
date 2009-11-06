@@ -10,9 +10,9 @@
 
 import getopt
 import sys
-import db
-import constants
 import os.path
+import omg
+from omg import constants, database, config
 
 def usage():
     print("""Usage: {0} options [path]
@@ -38,7 +38,8 @@ if __name__=="__main__":
     if len(opts) == 0:
         usage()
         sys.exit()
-    db.connect()
+    database.connect()
+    db = database.db
     for opt, arg in opts:
         if opt in ("-h", "--help"):
             usage()
@@ -53,12 +54,12 @@ if __name__=="__main__":
                 print("{0:5d}: {1} ({2} Elements)".format(id, name, elements))
                 
         elif opt in ("-p", "--populate"):
+            omg.init()
             if len(args) == 0:
-                import config
                 path = config.get("music","collection")
             else:
                 path = args[0]
-            import populate                    
+            from omg import populate                    
             finder = populate.find_new_albums(path)
             for album in finder:
                 populate.do_album(album)

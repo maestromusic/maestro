@@ -1,11 +1,16 @@
-#Fri Nov 06 20:11:51 CET 2009
+#Fri Nov 06 21:04:41 CET 2009
 eclipse.preferences.version=1
+encoding//bin/extractimages=utf-8
+encoding//bin/omgc=utf-8
 encoding//omg/__init__.py=utf-8
+encoding//omg/config.py=utf-8
 encoding//omg/database/__init__.py=utf-8
+encoding//omg/database/sql/__init__.py=utf-8
+encoding//omg/database/sql/mypysql.py=utf-8
+encoding//omg/database/sql/qtsql.py=utf-8
 encoding//omg/database/tables.py=utf-8
+encoding//omg/populate.py=utf-8
 encoding//omg/realfiles.py=utf-8
 encoding//tags26/__init__.py=utf-8
 encoding/db.py=utf-8
-encoding/extractimages.py=utf-8
-encoding/omgc.py=utf-8
 encoding/tagmanip26.py=utf-8

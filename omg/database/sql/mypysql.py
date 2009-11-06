@@ -11,7 +11,9 @@
 #
 import mysql
 from . import DBException
+import logging
 
+logger = logging.getLogger("omg.sql.mypysql")
 class Sql:    
     def connect(self,username,password,database,host="localhost",port=3306):
         try:
@@ -33,7 +35,7 @@ class Sql:
 class SqlResult:
     def __init__(self,mysqlResult,db):
         self._result = mysqlResult
-        print(db.affected_rows)
+        #logger.debug(db.affected_rows) nervt wie sau ;)
         self._affectedRows = db.affected_rows
         self._insertId = db.insert_id
     

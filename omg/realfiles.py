@@ -10,7 +10,6 @@
 from various file formats."""
 
 import subprocess
-import config
 import pickle
 import sys
 import os
@@ -19,6 +18,8 @@ try: # we try to favor native Pyk3 stagger support over the ugly26 shit
     from stagger.id3 import * #frame definitions
 except ImportError:
     pass
+
+from omg import config
 
 class NoTagError(Exception):
     """This Exception occurs if you try to read tags from a file that has no tags."""

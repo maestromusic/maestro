@@ -7,15 +7,13 @@
 # published by the Free Software Foundation
 #
 
-import database
-from database import db
-import config
+from omg import realfiles, database, constants, config
 import os
 import pickle
 import datetime
 import logging
-import constants
-import realfiles
+
+logging.basicConfig(level=constants.LOGLEVELS[config.get("misc","loglevel")], format='%(levelname)s: %(message)s')
 
 class Container(dict):
     """Python representation of a Container, which is just a dictionary position->container that has an id, a name and tags."""
@@ -75,15 +73,16 @@ initialized = False
 ignored_tags = None
 tagtypes = None
 logger = None
+db = None
 
 
 def init():
-    global initialized, logger, ignored_tags, tagtypes
+    global initialized, logger, ignored_tags, tagtypes, db
     if initialized:
         raise Exception("Already init'ed.")
-    logging.basicConfig(level=constants.LOGLEVELS[config.get("misc","loglevel")], format='%(levelname)s: %(message)s')
     logger = logging.getLogger(name="omg")
     database.connect()
+    db = database.db
     if len(database.checkMissingTables()) > 0:
         logger.warning("There are tables missing in the database, will create them.")
         database.checkMissingTables(True)
@@ -92,7 +91,7 @@ def init():
         itags[name] = id
     itags_reverse = {y:x for x,y in itags.items()} # <3 python :)
     ignored_tags = config.get("tags","ignored_tags").split(",")
-    tagtypes = database.tagtypes
+    tagtypes = database._parseIndexedTags()
     initialized = True
     logger.debug("omg module initialized")
     
@@ -162,7 +161,7 @@ def get_value_id(tag,value,insert=False):
     """Looks up the id of a tag value. If the value is not found and insert=True, create an entry,
     otherwise return None."""
     
-    if db.tagtypes[tag]=="date": #translate date into a format that MySQL likes
+    if tagtypes[tag]=="date": #translate date into a format that MySQL likes
         if len(value)==4: # only year is given
             value="{0}-00-00".format(value)
         elif len(value)==2: # year in 2-digit form
@@ -238,18 +237,18 @@ def add_tag(container_id, tagname=None, tagid=None, value=None, valueid=None):
             if not value:
                 raise ValueError("Either value or valueid must be set.")
             valueid=get_value_id(tagname,value,insert=True)
-        database.db.query("INSERT INTO tags VALUES('?','?','?');", container_id, itags[tagname], valueid)
+        db.query("INSERT INTO tags VALUES('?','?','?');", container_id, itags[tagname], valueid)
     else: # other tag
         if not value:
             raise ValueError("add_tag called for and unindexed tag, so value must be set.")
-        database.db.query("INSERT INTO othertags VALUES('?','?','?');", container_id, tagname, value)        
+        db.query("INSERT INTO othertags VALUES('?','?','?');", container_id, tagname, value)        
 
 
 def add_tag_value(tagname,value):
     """Adds a new value entry to an indexed tag. Returns the newly created ID. Warning: Does NOT check for uniqueness."""
     
-    database.db.query("INSERT INTO tag_{0} (value) VALUES('?');".format(tagname), value)
-    return database.db.query('SELECT LAST_INSERT_ID();').getSingle()
+    db.query("INSERT INTO tag_{0} (value) VALUES('?');".format(tagname), value)
+    return db.query('SELECT LAST_INSERT_ID();').getSingle()
     
     
 def set_tags(cid, tags, append=False):
@@ -358,4 +357,4 @@ def del_file(path=None,hash=None,id=None):
         raise ValueError("One of the arguments must be set.")
 
 # initialize module on loading
-init()
+#init()

@@ -9,21 +9,19 @@
 # populate.py
 
 import omg
+from omg import constants, realfiles
 import sys
 import pprint
 import mpd
 import os
 from functools import reduce
 import re
-import db
-import constants
 import subprocess
 import logging
-import realfiles
 FIND_DISC_RE=r" ?[([]?(?:cd|disc|part|teil|disk) ?([iI0-9]+)[)\]]?"
 
 logger = logging.getLogger(name="populate")
-
+db = omg.database.db
 def guess_album(album):
     """Try to guess name and tags of an album. Modifies the argument; in addition, returns a set of tags which are present in all files but different."""
     
@@ -74,7 +72,7 @@ def do_album(album):
     while not accepted:
         result = db.query("SELECT id FROM containers WHERE name='?';", album.name)
         if len(result) == 1:
-            album.container_id = result[0][0]
+            album.container_id = result.getSingle()
         print("+++++ I SUGGEST: +++++")
         #-------- 1.: Name of the container ----------------------------------
         print("1]  Name of the Container: {0}".format(album.name))
@@ -128,7 +126,7 @@ def do_album(album):
             if len(result)==0:
                 meta_container = discname_reduced
             elif len(result)==1:
-                meta_container = int(result[0][0])
+                meta_container = int(result.getSingle())
             else:
                 print("Sorry, you already have more than one container named '{0}', you have to do this by hand.".format(discname_reduced))
             print("    This is disc number {0} of container '{1}'".format(discnumber, discname_reduced))
