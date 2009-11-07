@@ -13,8 +13,8 @@
 # import database
 # db = database.connect()
 #
-from omg import config
 import logging
+from omg import config
 from . import sql
 
 class DBLayoutException(Exception):
@@ -52,6 +52,9 @@ def getCheckMethods():
 
 def checkElementCounters(fix=False):
     """Searches containers.elements for wrong entries and corrects them if fix is true. The number of wrong entries is returned."""
+    if "containers" not in listTables():
+        return 0
+        
     if fix:
         return db.query("UPDATE containers \
                          SET elements = (SELECT COUNT(*) FROM contents WHERE container_id = id)").affectedRows()
@@ -60,9 +63,8 @@ def checkElementCounters(fix=False):
     
 def checkTagIds(fix=False):
     """Compares the tagids-table with the 'indexed-tags'-option from the config-file and returns a tuple with two lists. The first list contains the tags which are in only the config-file, the second one contains the tags which are only in the tagids-table. If fix is true the tagids-table is corrected to contain exactly the tags from the config-file."""
-    from . import tables
     if "tagids" not in listTables():
-        return 0
+        return tuple()
     tags = _parseIndexedTags()
     existingTags = set(db.query("SELECT tagname FROM tagids").getSingleColumn())
     necessaryTags = set(tags.keys())
@@ -94,7 +96,7 @@ def checkSuperfluousTables(fix=False):
     return superfluousTables
 
 def _checkForeignKey(fix,table,key,refTable,refKey,additionalWhereClause = None):
-    """Checks whether each value in <table>.<key> is also contained in <refTable>.<refKey> and returns the number of broken entries. If fix is true those entries are also deleted from the database. <additionalWhereClause> may be given to check only some of the rows of <table>."""
+    """Checks whether each value in <table>.<key> is also contained in <refTable>.<refKey> and returns the number of broken entries. If <fix> is true those entries are also deleted from the database. <additionalWhereClause> may be given to check only some of the rows of <table>."""
     if additionalWhereClause == None:
         whereClause = "{0} NOT IN (SELECT {1} FROM {2})".format(key,refKey,refTable)
     else: whereClause = "{0} AND {1} NOT IN (SELECT {2} FROM {3})".format(additionalWhereClause,key,refKey,refTable)
@@ -131,7 +133,7 @@ def checkForeignKeys(fix=False):
             # Use the additionalWhereClause-argument to check only the tags corresponding to tag_id because there is a different refTable for each tag_id.
             brokenEntries[("tags","tag_id")] = _checkForeignKey(fix,"tags","value_id",tablename,"id",
                                                                 "tag_id={0}".format(tagid))
-    # Remove tables where zero broken entries where found
+    # Remove tables where zero broken entries were found
     return {k:v for k,v in brokenEntries.items() if v != 0}
 
 
@@ -142,7 +144,7 @@ def checkEmptyContainers(fix=False):
         return 0
     if fix:
         return db.query("DELETE FROM containers WHERE elements=0 \
-                        AND NOT id IN (SELECT container_id FROM files)").affectedRows()
+                         AND NOT id IN (SELECT container_id FROM files)").affectedRows()
     else: return db.query("SELECT COUNT(*) FROM containers WHERE elements=0 \
                            AND NOT id IN (SELECT container_id FROM files)").getSingle()
 

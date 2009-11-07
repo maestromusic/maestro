@@ -15,12 +15,9 @@ import getpass
 
 testTable = "testtable"
 
-username = "music"
-password = "1fnEnV!un13NV"
-database = "music"
-#username = input("Please enter the SQL username I should use: ")
-#password = getpass.getpass("Please enter the SQL password I should use: ")
-#database = input("Please enter the SQL database I should use: ")
+username = input("Please enter the SQL username I should use: ")
+password = getpass.getpass("Please enter the SQL password I should use: ")
+database = input("Please enter the SQL database I should use: ")
 
 
 class SqlTest(unittest.TestCase):
@@ -38,7 +35,6 @@ class SqlTest(unittest.TestCase):
         )
         for i in range(10):
             self.db.query("INSERT INTO {0}(text) VALUES ('ebbes{1}')".format(testTable,i))
-        print("muell")
         
     def performTests(self):
         result = self.db.query("SELECT * FROM "+testTable)
@@ -54,7 +50,7 @@ class SqlTest(unittest.TestCase):
         
         result = self.db.query("SELECT id FROM "+testTable+" ORDER BY id")
         self.assertListEqual(list(result.getSingleColumn()),list(range(1,11))) # AUTO_INCREMENT-column starts at 1
-        print("ebbes")
+
         result = self.db.query("INSERT INTO {0} VALUES (11,'ebbes11')".format(testTable))
         self.assertEqual(result.insertId(),11)
         self.assertEqual(result.affectedRows(),1)
