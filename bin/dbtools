@@ -1,0 +1,74 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+# Copyright 2009 Martin Altmayer
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 3 as
+# published by the Free Software Foundation
+#
+from omg import database
+import sys
+
+db=database.connect()
+
+checkMethods = database.getCheckMethods()
+checkMethodNames = list(checkMethods.keys())
+
+foundMessages = {
+"checkElementCounters": "I found {0} broken element counters.",
+"checkForeignKeys": "I found broken foreign keys in some tables: {0}",
+"checkEmptyContainers": "I found {0} empty containers which are not files.",
+"checkTagIds": "I found missing and/or superfluous tag-IDs: {0}",
+"checkMissingTables": "I found some missing tables: {0}",
+"checkSuperfluousTables": "I found some superfluous tables: {0}",
+"checkSuperfluousTags": "I found some superfluous tags in the tags_*-tables: {0}"
+}
+
+def formatResult(checkMethodName,result):
+    if checkMethodName in foundMessages:
+        foundMessage = foundMessages[checkMethodName]
+    else: foundMessage = "Something's wrong: {0}"
+    return foundMessage.format(result)
+    
+def performCheck(checkMethodName):
+    print("Performing {0}...".format(checkMethodName),end="")
+    result = checkMethods[checkMethodName](False)
+    if not result or (checkMethodName == "checkTagIds" and not result[0] and not result[1]):
+        print("ok")
+    else:
+        print("") # Just a linebreak
+        print(formatResult(checkMethodName,result))
+        answer = input("Should I try to fix (y,n)?")
+        if answer == 'y':
+            print("Performing {0} with fix=True...".format(checkMethodName),end="")
+            result2 = checkMethods[checkMethodName](True)
+            if result2 == result:
+                print("ok")
+            else:
+                print("Probably something went wrong...I fixed and got a different result this time:")
+                print(result2)
+
+
+while True:
+    print("Choose a check to perform:")
+    print("[0] All checks")
+    i = 0
+    for name in checkMethodNames:
+        i = i + 1
+        print("[{0}] {1}".format(i,name))
+    print("[q]: quit")
+
+    selection = input()
+    if selection == 'q':
+        sys.exit(0)
+    else: 
+        try:
+            selection = int(selection)
+        except ValueError:
+            continue
+        if 1 <= selection and selection <= len(checkMethods):
+            performCheck(checkMethodNames[selection-1])
+        elif selection == 0:
+            for name in checkMethodNames:
+                performCheck(name)
+        else: continue
