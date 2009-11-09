@@ -45,7 +45,7 @@ def listTables():
     return list(db.query("SHOW TABLES").getSingleColumn())
     
 def getCheckMethods():
-    """Returns all methods of this module that check the database."""
+    """Returns all methods of this module that check the database in a dictionary using the method names as keys."""
     import types, sys
     module = sys.modules[globals()['__name__']]
     return {k:v for k,v in module.__dict__.items() if type(v) is types.FunctionType and k.startswith("check")}
@@ -93,7 +93,7 @@ def checkSuperfluousTables(fix=False):
     if fix:
         for table in superfluousTables:
             db.query("DROP TABLE {0}".format(table))
-    return superfluousTables
+    return list(superfluousTables)
 
 def _checkForeignKey(fix,table,key,refTable,refKey,additionalWhereClause = None):
     """Checks whether each value in <table>.<key> is also contained in <refTable>.<refKey> and returns the number of broken entries. If <fix> is true those entries are also deleted from the database. <additionalWhereClause> may be given to check only some of the rows of <table>."""
@@ -103,7 +103,7 @@ def _checkForeignKey(fix,table,key,refTable,refKey,additionalWhereClause = None)
     
     if fix:
         return db.query("DELETE FROM {0} WHERE {1}".format(table,whereClause)).affectedRows()
-    else: return db.query("SELECT COUNT(*) FROM {0} WHERE {1}".format(table,whereClause)).size()
+    else: return db.query("SELECT COUNT(*) FROM {0} WHERE {1}".format(table,whereClause)).getSingle()
     
 def checkForeignKeys(fix=False):
     """Checks foreign key constraints in the database as the current MySQL doesn't support such constraints by itself (at least not in MyISAM). A foreign key is a column which values must be contained in another column in another table (the referenced table). For example: Every container_id-value in the contents-table must have a corresponding entry in the container-table. This method returns a dictionary mapping (tablename,keycolumn) to the number of broken entries (e.g. (contents,container_id):4 to indicate that 4 rows of contents.container_id are not in the container-table)."""
@@ -149,7 +149,7 @@ def checkEmptyContainers(fix=False):
                            AND NOT id IN (SELECT container_id FROM files)").getSingle()
 
 def checkSuperfluousTags(fix=False):
-    """Searches the tag_*-tables for values that are never used in the tags-table. If fix is true these entries are deleted."""
+    """Searches the tag_*-tables for values that are never used in the tags-table. If fix is true these entries are deleted. This method returns a dictionary mapping tagnames to the number of superfluous tags with this name (but only where this number is positive)."""
     if "tagids" not in listTables():
         return {}
     result = {}
