@@ -10,10 +10,9 @@
 # (http://sourceforge.net/projects/mypysql/).
 #
 import mysql
-from . import DBException
+from . import DBException, _replaceQueryArgs
 import logging
 
-logger = logging.getLogger("omg.sql.mypysql")
 class Sql:    
     def connect(self,username,password,database,host="localhost",port=3306):
         try:
@@ -21,21 +20,24 @@ class Sql:
         except mysql.error:
             raise DBException(self._db.error())
             
-    def query(self,querystring,*args):
+    def query(self,queryString,*args):
         #self._db.use_dict = False
-        return SqlResult(self._db.query(querystring,*args),self._db)
+        if len(args) > 0:
+            queryString = _replaceQueryArgs(queryString,*args)
+        return SqlResult(self._db.query(queryString),self._db)
         
-    def queryDict(self,querystring,*args):
+    def queryDict(self,queryString,*args):
+        if len(args) > 0:
+            queryString = _replaceQueryArgs(queryString,*args)
         self._db.use_dict = True
-        result = SqlResult(self._db.query(querystring,*args),self._db)
+        result = SqlResult(self._db.query(queryString),self._db)
         self._db.use_dict = False
         return result
 
-        
+
 class SqlResult:
     def __init__(self,mysqlResult,db):
         self._result = mysqlResult
-        #logger.debug(db.affected_rows) nervt wie sau ;)
         self._affectedRows = db.affected_rows
         self._insertId = db.insert_id
     

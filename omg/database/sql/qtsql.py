@@ -7,7 +7,7 @@
 # published by the Free Software Foundation
 #
 from PyQt4 import QtSql
-from . import DBException
+from . import DBException, _replaceQueryArgs
 
 class Sql:
     def __init__(self):
@@ -29,16 +29,16 @@ class Sql:
         
     def _query(self,queryString,useDict,*args):
         query = QtSql.QSqlQuery(self._db)
+        
         if len(args) > 0:
-            query.prepare(queryString)
-            for arg in args:
-                query.addBindValue(arg)
-            ok = query.exec_()
-        else: ok = query.exec_(queryString)
-        if not ok:
-            raise DBException("Query failed: {0}".format(self._db.lastError().databaseText()))
+            queryString = _replaceQueryArgs(queryString,*args)
+            
+        if not query.exec_(queryString):
+            if self._db.lastError() != None:
+                message = "Query failed: {0} | Query: {1}".format(self._db.lastError().text(),queryString)
+            else: message = "Query failed {0}".format(queryString)
+            raise DBException(message)
         return SqlResult(query,useDict)
-
     
 class SqlResult:
     def __init__(self,qSqlResult,useDict):
@@ -67,8 +67,10 @@ class SqlResult:
         return self._result.lastInsertId()
         
     def getSingle(self):
-        if not self._result.isValid():
+        if not self._result.isValid(): # usually the cursor is positioned before the first entry
             self._result.next()
+        if not self._result.isValid():
+            return None;
         return self._result.value(0)
     
     def getSingleColumn(self):

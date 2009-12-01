@@ -17,6 +17,7 @@ import logging
 from omg import config
 from . import sql
 
+
 class DBLayoutException(Exception):
     """Exception that occurs if the existing database layout doesn't meet the requirements."""
 
@@ -29,9 +30,11 @@ logger = logging.getLogger("database")
 def connect():
     """Connects to the database server with information from the config file."""
     global db
-    db = sql.newConnection(config.get("database","driver"))
-    db.connect(*[config.get("database",key) for key in ("mysql_user","mysql_password","mysql_db","mysql_host","mysql_port")])
-    logger.debug("Database connection is open.")
+    if db == None:
+        db = sql.newConnection(config.get("database","driver"))
+        db.connect(*[config.get("database",key) for key in ("mysql_user","mysql_password","mysql_db","mysql_host","mysql_port")])
+        logger.debug("Database connection is open.")
+    else: logger.warning("database.connect has been called although the database connection was already open")
     return db
     
 def resetDatabase():
@@ -43,7 +46,7 @@ def resetDatabase():
 def listTables():
     """Returns a list of all tables in the database."""
     return list(db.query("SHOW TABLES").getSingleColumn())
-    
+
 def getCheckMethods():
     """Returns all methods of this module that check the database in a dictionary using the method names as keys."""
     import types, sys

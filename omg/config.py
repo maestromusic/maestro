@@ -19,17 +19,29 @@ def init(*config_files):
     """Sets default options and overwrites them with the options in the given config files."""
     default_options = {
         "database": {
+            # Database driver to use
             "driver": "qtsql",
+            # Database access information
             "mysql_user":"",
             "mysql_password":"",
-            "mysql_db":"omg",
             "mysql_host":"localhost",
-            "mysql_port":"3306"
+            "mysql_port":"3306",
+            # Name of the database
+            "mysql_db":"omg"
         },
         
         "tags": {
-            "indexed_tags":"album,artist,title,composer,performer,genre,date(date)",
+            # Tags which will be indexed in their own database tables. Indexed tags have a type which defaults to varchar and may be specified in parentheses after the tagname (e.g. date(date)).
+            "indexed_tags":"album,artist,composer,date(date),genre,performer,title",
+            # Tags which will be totally ignored by this application.
             "ignored_tags":"encodedby,tracktotal,disctotal,tracknumber,discnumber",
+            
+            # Names of the tags which have a special meaning for the application and cannot always be treated generically.
+            "title_tag": "title",
+            "album_tag": "album",
+            "artist_tag": "artist",
+            "composer_tag": "composer",
+            "date_tag": "date"
         },
         
         "misc": {

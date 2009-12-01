@@ -70,7 +70,7 @@ def do_album(album):
     write_discnumber_to_tags = False
     meta_container = None
     while not accepted:
-        result = db.query("SELECT id FROM containers WHERE name='?';", album.name)
+        result = db.query("SELECT id FROM containers WHERE name=?;", album.name)
         if len(result) == 1:
             album.container_id = result.getSingle()
         print("+++++ I SUGGEST: +++++")
@@ -122,7 +122,7 @@ def do_album(album):
             album.tags["discnumber"] = [ discnumber ]
             print("6]  Part of Multi-Disc container:")
             discname_reduced = re.sub(FIND_DISC_RE,"",album.name,flags=re.IGNORECASE)
-            result = db.query("SELECT id FROM containers WHERE name='?';", discname_reduced)
+            result = db.query("SELECT id FROM containers WHERE name=?;", discname_reduced)
             if len(result)==0:
                 meta_container = discname_reduced
             elif len(result)==1:
@@ -138,7 +138,7 @@ def do_album(album):
                 print("      [exists with id {0}]".format(meta_container))
         
         
-        ans = input("What do ou want me to do? Accept [Enter] or further examine a section [1-6], [e] to run exfalso, [s] to skip?")
+        ans = input("What do you want me to do? Accept [Enter] or further examine a section [1-6], [e] to run exfalso, [s] to skip?")
         if ans=="1":
             album.name = input("Enter new name:\n")
         elif ans in ["e","E"]:

@@ -146,11 +146,11 @@ def compute_hash(file):
 # ------------------- database management functions -----------------------------------------------
 def id_from_filename(filename):
     """Retrieves the container_id of a file from the given path, or None if it is not found."""
-    return database.db.query("SELECT container_id FROM files WHERE path='?';", rel_path(filename)).getSingle()
+    return database.db.query("SELECT container_id FROM files WHERE path=?;", rel_path(filename)).getSingle()
 
 def id_from_hash(hash):
     """Retrieves the container_id of a file from its hash, or None if it is not found."""
-    result =  database.db.query("SELECT container_id FROM files WHERE hash='?';", hash)
+    result =  database.db.query("SELECT container_id FROM files WHERE hash=?;", hash)
     if len(result)==1:
         return result.getSingle()
     else:
@@ -170,7 +170,7 @@ def get_value_id(tag,value,insert=False):
             else:
                 value="19{0}-00-00".format(value)
 
-    result = database.db.query("SELECT id FROM tag_{0} WHERE value='?';".format(tag),value).getSingle()
+    result = database.db.query("SELECT id FROM tag_{0} WHERE value=?;".format(tag),value).getSingle()
     if insert and not result:
         result = add_tag_value(tag,value)
     return result
@@ -216,8 +216,8 @@ def get_container_by_id(cid):
     
 def add_container(name,tags={},elements=0):
     """Adds a container to the database, which can have tags and a number of elements."""
-    database.db.query("INSERT INTO containers (name,elements) VALUES('?','?');", name,elements)
-    newid = database.db.query('SELECT LAST_INSERT_ID();').getSingle() # the new container's ID
+    result = database.db.query("INSERT INTO containers (name,elements) VALUES(?,?);", name,elements)
+    newid = result.insertId() # the new container's ID
     set_tags(newid, tags)
     return newid
 
@@ -237,18 +237,17 @@ def add_tag(container_id, tagname=None, tagid=None, value=None, valueid=None):
             if not value:
                 raise ValueError("Either value or valueid must be set.")
             valueid=get_value_id(tagname,value,insert=True)
-        db.query("INSERT INTO tags VALUES('?','?','?');", container_id, itags[tagname], valueid)
+        db.query("INSERT INTO tags VALUES(?,?,?);", container_id, itags[tagname], valueid)
     else: # other tag
         if not value:
             raise ValueError("add_tag called for and unindexed tag, so value must be set.")
-        db.query("INSERT INTO othertags VALUES('?','?','?');", container_id, tagname, value)        
+        db.query("INSERT INTO othertags VALUES(?,?,?);", container_id, tagname, value)        
 
 
 def add_tag_value(tagname,value):
     """Adds a new value entry to an indexed tag. Returns the newly created ID. Warning: Does NOT check for uniqueness."""
-    
-    db.query("INSERT INTO tag_{0} (value) VALUES('?');".format(tagname), value)
-    return db.query('SELECT LAST_INSERT_ID();').getSingle()
+    result = db.query("INSERT INTO tag_{0} (value) VALUES(?);".format(tagname), value)
+    return result.insertId()
     
     
 def set_tags(cid, tags, append=False):
@@ -257,14 +256,14 @@ def set_tags(cid, tags, append=False):
     If the optional parameter append is set to True, existing tags won't be touched, instead the 
     given ones will be added. This function will not check for duplicates in that case."""
     
-    existing_tags = db.query("SELECT * FROM tags WHERE 'container_id'='?';", cid)
+    existing_tags = db.query("SELECT * FROM tags WHERE 'container_id'=?;", cid)
     if len(existing_tags) > 0:
         logger.warning("Deleting existing indexed tags from container {0}".format(cid))
-    database.db.query("DELETE FROM tags WHERE 'container_id'='?';", cid)
-    existing_othertags = db.query("SELECT * FROM othertags WHERE 'container_id'='?';",cid)
+    database.db.query("DELETE FROM tags WHERE 'container_id'=?;", cid)
+    existing_othertags = db.query("SELECT * FROM othertags WHERE 'container_id'=?;",cid)
     if len(existing_othertags) >0:
         logger.warning("Deleting existing othertags from container {0}".format(cid))
-    database.db.query("DELETE FROM othertags WHERE 'container_id'='?';", cid)
+    database.db.query("DELETE FROM othertags WHERE 'container_id'=?;", cid)
     for tag in tags.keys():
         if tag in ignored_tags:
             logger.debug("Ignoring tag '{0}' in container with id {1}".format(tag, cid))
@@ -296,7 +295,7 @@ def add_file(path=None, file=None):
         hash = file.hash
     file_id = add_container(name=os.path.basename(path),tags=tags,elements=0)
     # now take care of the files table
-    querytext = "INSERT INTO files (container_id,path,hash,length) VALUES('?','?','?','?');"
+    querytext = "INSERT INTO files (container_id,path,hash,length) VALUES(?,?,?,?);"
     if file.length is None:
         length = 0
     else:
@@ -338,11 +337,11 @@ def del_container(cid):
     
     If the content is a file, also deletes its entry from the files table."""
     
-    db.query("DELETE FROM tags WHERE container_id='?';", cid) # delete tag references
-    db.query("DELETE FROM othertags WHERE container_id='?';",cid) # delete othertag references
-    db.query("DELETE FROM contents WHERE container_id='?' OR element_id='?';",cid,cid) # delete content relations
-    db.query("DELETE FROM files WHERE container_id='?';",cid) # delete file entry, if present
-    db.query("DELETE FROM containers WHERE id='?';",cid) # remove container itself
+    db.query("DELETE FROM tags WHERE container_id=?;", cid) # delete tag references
+    db.query("DELETE FROM othertags WHERE container_id=?;",cid) # delete othertag references
+    db.query("DELETE FROM contents WHERE container_id=? OR element_id=?;",cid,cid) # delete content relations
+    db.query("DELETE FROM files WHERE container_id=?;",cid) # delete file entry, if present
+    db.query("DELETE FROM containers WHERE id=?;",cid) # remove container itself
 
 def del_file(path=None,hash=None,id=None):
     """Deletes a file from the database, either by path, hash or id."""

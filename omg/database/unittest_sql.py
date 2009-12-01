@@ -33,8 +33,8 @@ class SqlTest(unittest.TestCase):
             PRIMARY KEY(id)
             )""".format(testTable)
         )
-        for i in range(10):
-            self.db.query("INSERT INTO {0}(text) VALUES ('ebbes{1}')".format(testTable,i))
+        for i in range(1,11): # Start with 1 or MySQL will complain
+            self.db.query("INSERT INTO {0}(id,text) VALUES ({1},'ebbes{1}')".format(testTable,i))
         
     def performTests(self):
         result = self.db.query("SELECT * FROM "+testTable)
@@ -42,7 +42,7 @@ class SqlTest(unittest.TestCase):
         self.assertEqual(result.executedQuery(),"SELECT * FROM "+testTable)
         row = result.next()
         self.assertEqual(len(row),2)
-        self.assertEqual(row[1],"ebbes0")
+        self.assertEqual(row[1],"ebbes1")
 
         result = self.db.query("SELECT COUNT(*) FROM "+testTable)
         self.assertEqual(result.getSingle(),10)
@@ -51,14 +51,20 @@ class SqlTest(unittest.TestCase):
         result = self.db.query("SELECT id FROM "+testTable+" ORDER BY id")
         self.assertListEqual(list(result.getSingleColumn()),list(range(1,11))) # AUTO_INCREMENT-column starts at 1
 
-        result = self.db.query("INSERT INTO {0} VALUES (11,'ebbes11')".format(testTable))
+        result = self.db.query("SELECT id FROM "+testTable+" WHERE text = ?",'ebbes4').getSingle()
+        self.assertEqual(result,4)
+        
+        result = self.db.query("SELECT ?",'abc\'\\def').getSingle()
+        self.assertEqual(result,'abc\'\\def')
+        
+        result = self.db.query("INSERT INTO "+testTable+" VALUES (11,'ebbes11')")
         self.assertEqual(result.insertId(),11)
         self.assertEqual(result.affectedRows(),1)
         
         result = self.db.queryDict("SELECT * FROM "+testTable+" ORDER BY id")
         self.assertEqual(result.size(),11)
         data = result.next()
-        self.assertDictEqual({'text':'ebbes0','id':1},data)
+        self.assertDictEqual({'text':'ebbes1','id':1},data)
         
         result = self.db.queryDict("SELECT * FROM "+testTable)
         data = result.next()
