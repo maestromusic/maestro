@@ -34,6 +34,10 @@ class Sql:
         self._db.use_dict = False
         return result
 
+    def getDate(self,date):
+        """Converts a date value retrieved from the database to a Python date-object. This function must be used since the QtSql database-driver returns QDate-objects from date-columns."""
+        return date
+
 
 class SqlResult:
     def __init__(self,mysqlResult,db):

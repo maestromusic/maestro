@@ -8,6 +8,7 @@
 #
 from PyQt4 import QtSql
 from . import DBException, _replaceQueryArgs
+import datetime
 
 class Sql:
     def __init__(self):
@@ -40,6 +41,14 @@ class Sql:
             raise DBException(message)
         return SqlResult(query,useDict)
     
+    def getDate(self,qdate):
+        """Converts a date value retrieved from the database to a Python date-object. This function must be used since the QtSql database-driver returns QDate-objects from date-columns."""
+        try:
+            return datetime.date(qdate.year(),qdate.month(),qdate.day())
+        except ValueError:
+            return datetime.date(1988,12,2) #TODO: of course this is stupid...but at least on my computer QtSql delivers always the same wrong and invalid date and I cannot create a datetime.date from it.
+        
+        
 class SqlResult:
     def __init__(self,qSqlResult,useDict):
         self._result = qSqlResult

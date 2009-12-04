@@ -27,16 +27,22 @@ db = None
 # Logger for database warnings
 logger = logging.getLogger("database")
 
-def connect():
-    """Connects to the database server with information from the config file."""
+def connect(driver=None):
+    """Connects to the database server with information from the config file. Usually the driver specified in the config file is used, but you can use the <driver>-parameter to use another one."""
     global db
     if db == None:
-        db = sql.newConnection(config.get("database","driver"))
+        if driver == None:
+            driver = config.get("database","driver")
+        db = sql.newConnection(driver)
         db.connect(*[config.get("database",key) for key in ("mysql_user","mysql_password","mysql_db","mysql_host","mysql_port")])
         logger.debug("Database connection is open.")
     else: logger.warning("database.connect has been called although the database connection was already open")
     return db
-    
+
+def get():
+    """Returns the database connection object or None if the connection has not yet been opened."""
+    return db
+
 def resetDatabase():
     """Drops all tables and creates them without data again. All table rows will be lost!"""
     from . import tables
