@@ -37,11 +37,17 @@ def init(*config_files):
             "ignored_tags":"encodedby,tracktotal,disctotal,tracknumber,discnumber",
             
             # Names of the tags which have a special meaning for the application and cannot always be treated generically.
+            # This allows to use other strings for the title-tag for example.
             "title_tag": "title",
             "album_tag": "album",
             "artist_tag": "artist",
             "composer_tag": "composer",
+            "performer_tag": "performer",
             "date_tag": "date"
+        },
+        
+        "browser": {
+            "artist_tags": "composer,artist"
         },
         
         "misc": {
@@ -60,4 +66,5 @@ def init(*config_files):
     _config.read(config_files)
     logging.basicConfig(level=constants.LOGLEVELS[get("misc","loglevel")], format='%(levelname)s: in Module %(name)s: %(message)s')
 
+#TODO: shouldn't be called automatically
 init(constants.CONFIG)

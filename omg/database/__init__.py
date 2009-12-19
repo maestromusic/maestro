@@ -176,11 +176,8 @@ def checkSuperfluousTags(fix=False):
                                         .format(tablename),tagid).getSingle()
     return {k:v for k,v in result.items() if v > 0}
     
-    
-# TODO:
-# The following code actually doesn't belong to this module.
 def _parseIndexedTags():
-    """Parses the given string. This option should contain a comma-separated list of strings of the form tagname(tagtype) where the part in brackets is optional and defaults to 'varchar'. It checks whether the syntax is correct and all types have a corresponding CREATE_TAG_TABLE_CMDS-command and returns a dictionary {tagname : tagtype}. Otherwise an exception is raised."""
+    """Parses the "indexed_tags"-option of the config-file. This option should contain a comma-separated list of strings of the form tagname(tagtype) where the part in brackets is optional and defaults to 'varchar'. It checks whether the syntax is correct and returns a dictionary {tagname : tagtype}. Otherwise an exception is raised."""
     import re
     string = config.get("tags","indexed_tags")
     # Matches strings like "   tagname (   tagtype   )   " (the part in brackets is optional) and stores the interesting parts in the first and third group.
