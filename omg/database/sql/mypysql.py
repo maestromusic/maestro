@@ -10,10 +10,10 @@
 # (http://sourceforge.net/projects/mypysql/).
 #
 import mysql
-from . import DBException, _replaceQueryArgs
+from . import DBException, _replaceQueryArgs, AbstractSql, AbstractSqlResult
 import logging
 
-class Sql:    
+class Sql(AbstractSql):    
     def connect(self,username,password,database,host="localhost",port=3306):
         try:
             self._db = mysql.MySQL(username,password,database,host,int(port))
@@ -21,13 +21,12 @@ class Sql:
             raise DBException(self._db.error())
             
     def query(self,queryString,*args):
-        #self._db.use_dict = False
-        if len(args) > 0:
+        if args:
             queryString = _replaceQueryArgs(queryString,*args)
         return SqlResult(self._db.query(queryString),self._db)
         
     def queryDict(self,queryString,*args):
-        if len(args) > 0:
+        if args:
             queryString = _replaceQueryArgs(queryString,*args)
         self._db.use_dict = True
         result = SqlResult(self._db.query(queryString),self._db)
@@ -35,11 +34,10 @@ class Sql:
         return result
 
     def getDate(self,date):
-        """Converts a date value retrieved from the database to a Python date-object. This function must be used since the QtSql database-driver returns QDate-objects from date-columns."""
         return date
 
 
-class SqlResult:
+class SqlResult(AbstractSqlResult):
     def __init__(self,mysqlResult,db):
         self._result = mysqlResult
         self._affectedRows = db.affected_rows

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2.6
 # -*- coding: utf-8 -*-
 # Copyright 2009 Martin Altmayer
 #
@@ -6,22 +6,20 @@
 # it under the terms of the GNU General Public License version 3 as
 # published by the Free Software Foundation
 #
-# Module / standalone-script to extract images from the APIC-ID3-tag to a given folder and (optionally) delete them from the mp3-files.
-#
-import sys
-import getopt
-import os
-from mutagen.id3 import ID3
 
-def usage():
-    print("""
-Usage: python extractimages.py [options] file/directory ...
+"""Usage: python2.6 extractimages.py [options] file/directory ...
 This little script extracts all images from the given mp3-files and from all mp3-files in the given directories (and all subdirectories).
+
 Options:
 -h,--help: Prints this help message
 -o,--output=[dir]: Specifies the directory in which the images will be saved. Defaults to the current working directory.
 --delete: After extracting, images tags will be deleted from the original mp3-file. Use with care...
-""")
+"""
+
+import sys
+import getopt
+import os
+from mutagen.id3 import ID3
 
 
 def extract(path,output,delete=False):
@@ -86,7 +84,7 @@ if __name__=="__main__":
 
     for option,value in options:
         if option in ("-h","--help"):
-            usage()
+            print(__doc__)
             sys.exit(1)
         elif option in ("-o","--output"):
             output = os.path.expanduser(value)

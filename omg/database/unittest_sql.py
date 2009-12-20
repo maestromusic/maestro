@@ -6,22 +6,15 @@
 # it under the terms of the GNU General Public License version 3 as
 # published by the Free Software Foundation
 #
-# Unittests for the sql-module.
-#
+
+"""Unittests for the sql-package."""
+
 import sql
 import sys
 import unittest
 import getpass
 
-testTable = "testtable"
-
-username = input("Please enter the SQL username I should use: ")
-password = getpass.getpass("Please enter the SQL password I should use: ")
-database = input("Please enter the SQL database I should use: ")
-
-
 class SqlTest(unittest.TestCase):
-    
     def setUpTestTable(self,driver):
         self._driver = driver
         self.db = sql.newConnection(driver)
@@ -84,5 +77,11 @@ class SqlTest(unittest.TestCase):
         print("Checking MyPySql driver...")
         self.setUpTestTable("mypysql")
         self.performTests()
-        
-unittest.main()
+
+if __name__ == "__main__":
+    testTable = "testtable"
+
+    username = input("Please enter the SQL username I should use: ")
+    password = getpass.getpass("Please enter the SQL password I should use: ")
+    database = input("Please enter the SQL database I should use: ")
+    unittest.main()

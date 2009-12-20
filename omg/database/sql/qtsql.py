@@ -7,10 +7,10 @@
 # published by the Free Software Foundation
 #
 from PyQt4 import QtSql
-from . import DBException, _replaceQueryArgs
+from . import DBException, _replaceQueryArgs, AbstractSql, AbstractSqlResult
 import datetime
 
-class Sql:
+class Sql(AbstractSql):
     def __init__(self):
         self._db = QtSql.QSqlDatabase("QMYSQL")
 
@@ -31,7 +31,7 @@ class Sql:
     def _query(self,queryString,useDict,*args):
         query = QtSql.QSqlQuery(self._db)
         
-        if len(args) > 0:
+        if args:
             queryString = _replaceQueryArgs(queryString,*args)
             
         if not query.exec_(queryString):
@@ -42,14 +42,13 @@ class Sql:
         return SqlResult(query,useDict)
     
     def getDate(self,qdate):
-        """Converts a date value retrieved from the database to a Python date-object. This function must be used since the QtSql database-driver returns QDate-objects from date-columns."""
         try:
             return datetime.date(qdate.year(),qdate.month(),qdate.day())
         except ValueError:
             return datetime.date(1988,12,2) #TODO: of course this is stupid...but at least on my computer QtSql delivers always the same wrong and invalid date and I cannot create a datetime.date from it.
         
         
-class SqlResult:
+class SqlResult(AbstractSqlResult):
     def __init__(self,qSqlResult,useDict):
         self._result = qSqlResult
         self._useDict = useDict
@@ -103,9 +102,9 @@ class SqlResultIterator:
         else: return self._convertMethod(self._result.record())
         
     def _recordToTuple(self,record):
-        """Converts a QSqlRecord to a tuple."""
+        """Convert a QSqlRecord to a tuple."""
         return tuple([record.value(i) for i in range(record.count())])
     
     def _recordToDict(self,record):
-        """Converts a QSqlRecord to a dictionary which maps columnnames (or aliases) to the corresponding values."""
+        """Convert a QSqlRecord to a dictionary which maps columnnames (or aliases) to the corresponding values."""
         return {record.fieldName(i): record.value(i) for i in range(record.count())}

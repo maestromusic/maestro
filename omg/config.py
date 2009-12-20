@@ -66,5 +66,4 @@ def init(*config_files):
     _config.read(config_files)
     logging.basicConfig(level=constants.LOGLEVELS[get("misc","loglevel")], format='%(levelname)s: in Module %(name)s: %(message)s')
 
-#TODO: shouldn't be called automatically
 init(constants.CONFIG)

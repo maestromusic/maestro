@@ -6,37 +6,36 @@
 # it under the terms of the GNU General Public License version 3 as
 # published by the Free Software Foundation
 #
-from omg import config
+
+"""Module to manage the database tables used by omg."""
+
 import re
-from . import db, DBLayoutException, _parseIndexedTags
+from omg import config, database
+from . import db, DBLayoutException
 
 class SQLTable:
-    """This class contains methods to create, check and drop a table in an SQL database."""
-    name = None # The name of this table.
-    createQuery = None # The SQL-query which creates this table.
-    
+    """This class contains methods to create, check and drop a table in an SQL database. Note that instantiating SQLTable does not create an actual table or modify the database in any way."""
     def __init__(self,createQuery):
-        """Initialises this table with the given create_query."""
+        """Initialise this table-object with the given create_query. The name of the table is extracted from the query. This method does not execute the query (in most cases a table created by this query will already exist in the database)."""
         self.createQuery = createQuery
         result = re.match("\s*CREATE\s*TABLE\s*(\w+)",createQuery,re.I)
         self.name = result.group(1)
-        if self.name == None:
+        if self.name is None:
             raise Exception("Bad SQL-Query: {0}".format(createQuery))
 
     def exists(self):
-        """Returns whether this table exists in the database."""
-        # In the QtSql-database driver placeholders in some SHOW-queries don't work...therefore we use format
-        result = db.query("SHOW TABLES LIKE '{0}'".format(self.name))
+        """Return whether this table exists in the database."""
+        result = db.query("SHOW TABLES LIKE ?",self.name)
         return result.size() > 0
         
     def create(self):
-        """Creates this table by executing its createQuery."""
+        """Create this table by executing its createQuery."""
         if self.exists():
             raise DBLayoutException("Table '{0}' does already exist.".format(self.name))
         db.query(self.createQuery)
     
     def reset(self):
-        """Drops this table and creates it without data again. All table rows will be lost!"""
+        """Drop this table and create it without data again. All table rows will be lost!"""
         if not self.exists():
             raise DBLayoutException("Table '{0}' does not exist.".format(self.name))
         db.query("DROP table {0}".format(self.name))
@@ -104,12 +103,14 @@ tables = {table.name:table for table in (SQLTable(createQuery) for createQuery i
 # Tag tables
 #========================
 class TagTable(SQLTable):
+    """Class for tables which hold all values of a certain tag. Because these tables are created by common queries only depending on tagname and tagtype there is a special class for them."""
     def __init__(self,tagname,tagtype):
+        """Initialise this table-object with the given tagname and tagtype."""
         if not tagtype in self._tag_queries:
             raise Exception("Unknown tag type '{0}'".format(tagtype))
         SQLTable.__init__(self,self._tag_queries[tagtype].format("tag_"+tagname))
 
-    #queries to create the tag tables. Replace the placeholder before use...
+    #queries to create the tag tables. Replace the placeholder with the tagname before use...
     _tag_queries = {
         "varchar" : """
         CREATE TABLE {0} (
@@ -138,6 +139,6 @@ class TagTable(SQLTable):
         );"""
     }
 
-for tagname,tagtype in _parseIndexedTags().items():
+for tagname,tagtype in database._parseIndexedTags().items():
     newTable = TagTable(tagname,tagtype)
     tables[newTable.name] = newTable

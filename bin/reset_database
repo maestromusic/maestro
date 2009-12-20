@@ -6,8 +6,9 @@
 # it under the terms of the GNU General Public License version 3 as
 # published by the Free Software Foundation
 #
-# Convenience script to reset the database (drop all tables and create them again) and fill the tagids-table according to the indexed_tags-option of the config-file.
-#
+
+"""Convenience script to reset the database (drop all tables and create them again) and fill the tagids-table according to the indexed_tags-option of the config-file."""
+
 from omg import database
 
 if input("Really? (y,n)") != "y":
