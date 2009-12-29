@@ -52,6 +52,8 @@ class SqlResult(AbstractSqlResult):
     def __init__(self,qSqlResult,useDict):
         self._result = qSqlResult
         self._useDict = useDict
+        self._affectedRows = self._result.numRowsAffected()
+        self._insertId = self._result.lastInsertId()
         
     def __iter__(self):
         return SqlResultIterator(self._result,self._useDict)
@@ -69,10 +71,10 @@ class SqlResult(AbstractSqlResult):
         return str(self._result.executedQuery()) # QSqlQuery.executedQuery returns a QString
     
     def affectedRows(self):
-        return self._result.numRowsAffected()
+        return self._affectedRows
         
     def insertId(self):
-        return self._result.lastInsertId()
+        return self._insertId
         
     def getSingle(self):
         if not self._result.isValid(): # usually the cursor is positioned before the first entry

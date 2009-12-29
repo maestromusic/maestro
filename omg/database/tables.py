@@ -14,7 +14,12 @@ from omg import config, database
 from . import db, DBLayoutException
 
 class SQLTable:
-    """This class contains methods to create, check and drop a table in an SQL database. Note that instantiating SQLTable does not create an actual table or modify the database in any way."""
+    """A table in the database.
+    
+    This class contains methods to create, check and drop a table in an SQL database. Note that instantiating SQLTable does not create an actual table or modify the database in any way. The class has two public attributes:
+    - createQuery contains the query which can be used to create the table
+    - name contains the name of the table
+    """
     def __init__(self,createQuery):
         """Initialise this table-object with the given create_query. The name of the table is extracted from the query. This method does not execute the query (in most cases a table created by this query will already exist in the database)."""
         self.createQuery = createQuery
@@ -106,19 +111,17 @@ class TagTable(SQLTable):
     """Class for tables which hold all values of a certain tag. Because these tables are created by common queries only depending on tagname and tagtype there is a special class for them."""
     def __init__(self,tagname,tagtype):
         """Initialise this table-object with the given tagname and tagtype."""
-        if not tagtype in self._tag_queries:
+        if not tagtype in self._tagQueries:
             raise Exception("Unknown tag type '{0}'".format(tagtype))
-        SQLTable.__init__(self,self._tag_queries[tagtype].format("tag_"+tagname))
+        SQLTable.__init__(self,self._tagQueries[tagtype].format("tag_"+tagname))
 
     #queries to create the tag tables. Replace the placeholder with the tagname before use...
-    _tag_queries = {
+    _tagQueries = {
         "varchar" : """
         CREATE TABLE {0} (
             id MEDIUMINT UNSIGNED NOT NULL AUTO_INCREMENT,
             value VARCHAR(255) NOT NULL,
-            PRIMARY KEY(id),
-            INDEX value_idx(value(15)),
-            FULLTEXT INDEX fulltext_idx(value)
+            PRIMARY KEY(id)
         );""",
 
         "date" : """
@@ -133,9 +136,7 @@ class TagTable(SQLTable):
         CREATE TABLE {0} (
             id MEDIUMINT UNSIGNED NOT NULL AUTO_INCREMENT,
             value TEXT NOT NULL,
-            PRIMARY KEY(id),
-            INDEX value_idx(value(15)),
-            FULLTEXT INDEX fulltext_idx(value)
+            PRIMARY KEY(id)
         );"""
     }
 

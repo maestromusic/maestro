@@ -23,7 +23,7 @@ db.query(...)
 """
 
 import logging
-from omg import config
+from omg import config, strutils
 from . import sql
 
 
@@ -61,7 +61,7 @@ def resetDatabase():
 def listTables():
     """Return a list of all tables in the database."""
     return list(db.query("SHOW TABLES").getSingleColumn())
-
+    
 def getCheckMethods():
     """Return all methods of this module that check the database in a dictionary using the method names as keys."""
     import types, sys
