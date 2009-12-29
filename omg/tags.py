@@ -36,7 +36,10 @@ COMPOSER = None
 DATE = None
 
 class Tag:
-    """Baseclass for tags. Tags contain a tagname and compare equal if and only this tagname is equal. Tags may be used as dictionary keys."""
+    """Baseclass for tags.
+    
+    Tags contain a tagname and compare equal if and only this tagname is equal. Tags may be used as dictionary keys. The only public attribute is name.
+    """
     def __init__(self,name):
         self.name = name
     
@@ -61,7 +64,10 @@ class Tag:
         
         
 class IndexedTag(Tag):
-    """Subclass for all indexed tags. These tags contain in addition to their name an id and compare equal if and only if this id is equal. In most cases you won't instantiate this class but use tags.get to get the already existing instances."""
+    """Subclass for all indexed tags.
+    
+    Indexed tags contain in addition to their name an id and compare equal if and only if this id is equal. In most cases you won't instantiate this class but use tags.get to get the already existing instances. Indexed tags have three public attributes: id, name and type where type must be one of the keys in database.tables.TagTable._tagQueries.
+    """
     def __init__(self,id,name,type):
         self.id = id
         self.name = name
