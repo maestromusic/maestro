@@ -83,22 +83,22 @@ class AbstractSql:
         """Convert a date value retrieved from the database to a Python date-object. This function must be used since the QtSql database-driver returns QDate-objects from date-columns."""
         
     def escapeString(self,string,likeStatement=False):
-    """Escape a string for insertion in MySql queries.
-    
-    This function escapes the characters which are listed in the documentation of mysql_real_escape_string and is used as a replacement for that function. But it doesn't emulate mysql_real_escape string correctly, which would be difficult since that function needs a database connection to determine the connection's encoding. If <likeStatement> is true this method also escapes '%' and '_' so that the return value may safely be used in LIKE-statements.
-    """
-    escapeDict = {
-         '\\': '\\\\',
-         "'": "\\'",
-         '"': '\\"',
-         '\x00': '\\0',
-         '0x1A': '\\Z', # ASCII 26
-         '\n': '\\n',
-         '\r': '\\r'
-         }
-    if likeStatement:
-        esacpeDict.extend({'%':'\%','_':'\_'})
-    return strutils.replace(string,escapeDict)
+        """Escape a string for insertion in MySql queries.
+        
+        This function escapes the characters which are listed in the documentation of mysql_real_escape_string and is used as a replacement for that function. But it doesn't emulate mysql_real_escape string correctly, which would be difficult since that function needs a database connection to determine the connection's encoding. If <likeStatement> is true this method also escapes '%' and '_' so that the return value may safely be used in LIKE-statements.
+        """
+        escapeDict = {
+             '\\': '\\\\',
+             "'": "\\'",
+             '"': '\\"',
+             '\x00': '\\0',
+             '0x1A': '\\Z', # ASCII 26
+             '\n': '\\n',
+             '\r': '\\r'
+             }
+        if likeStatement:
+            escapeDict.update({'%':'\%','_':'\_'})
+        return strutils.replace(string,escapeDict)
 
 
 class AbstractSqlResult:
