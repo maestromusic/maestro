@@ -11,8 +11,6 @@ from PyQt4.QtCore import Qt
 from omg import tags
 from omg.browser import models
 
-counter = 0
-
 class Delegate(QtGui.QStyledItemDelegate):
     def __init__(self,parent,model,layouter):
         QtGui.QStyledItemDelegate.__init__(self,parent)
@@ -54,9 +52,6 @@ class Delegate(QtGui.QStyledItemDelegate):
         return self._sizeFromOption(option)
         
     def paint(self,painter,option,index):
-        global counter
-        counter = counter + 1
-        print("paint {0}".format(counter))
         node = self.model.data(index,Qt.DisplayRole)
         option = QtGui.QStyleOptionViewItemV4(option)
         

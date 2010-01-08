@@ -37,7 +37,7 @@ class ValueNode:
         search.search(query,TT_SMALL_RESULT,TT_BIG_RESULT,addChildren=True,addParents=True)
         
         result = database.get().query("SELECT id FROM {0} WHERE toplevel = 1".format(TT_SMALL_RESULT)).getSingleColumn()
-        self.elements = [ElementNode(id) for id in result]
+        self.elements = [ElementNode(id,self) for id in result]
         blacklist = Blacklist({k:[self.value] for k in self.query.getTags()})
         for element in self.elements:
             element.load(TT_SMALL_RESULT,blacklist)
@@ -55,11 +55,14 @@ class ValueNode:
     def __str__(self):
         return "<ValueNode '{0}'>".format(self.value)#.format(self.value,"\n".join([str(e) for e in self.elements]))
 
+    def getParent(self):
+        return None
 
 class ElementNode(models.Container):
-    def __init__(self,id):
+    def __init__(self,id,parent):
         models.Container.__init__(self,id)
         self.elements = []
+        self.parent = parent
         
     def load(self,table,blacklist):
         self.updateElements(table)
@@ -82,9 +85,12 @@ class ElementNode(models.Container):
         
         for element in self.elements:
             element.load(table,newBlacklist)
-            
+    
+    def getParent(self):
+        return self.parent
+        
     def __str__(self):
         return '<ElementNode "{0}">'.format(self.getTitle())#{1}'.format(self.getTitle(),"\n".join([str(e) for e in self.elements]))
         
     def _createChild(self,id):
-        return ElementNode(id)
+        return ElementNode(id,self)

@@ -76,6 +76,7 @@ class Browser(QtGui.QWidget):
             #~ print(node)
         
         self.browser.model().setRoots(valueNodes)
+        self.browser.expandAll()
         
         
 def printResultTable(): #TODO only a debug-method
