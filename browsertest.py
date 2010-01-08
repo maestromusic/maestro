@@ -16,15 +16,11 @@ db = database.get()
 tags.updateIndexedTags()
 search.init()
 
-forest = []
-
-model = forestmodel.ForestModel(forest)
-
-initialSearchString = 'QWERTY'
+initialSearchString = 'h-Moll Sonate'
     
 if __name__ == "__main__":
     app = QtGui.QApplication(sys.argv)
-    browser = browser.Browser(model,None)
+    browser = browser.Browser(forestmodel.ForestModel([]),None)
     browser.resize(299, 409)
     screen = QtGui.QDesktopWidget().screenGeometry()
     size =  browser.geometry()

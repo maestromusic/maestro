@@ -44,17 +44,17 @@ def createResultTempTable(tableName,dropIfExists):
         """.format(tableName))
     
     
-def textSearch(searchString,resultTable,fromTable='containers',addChildren=True,addParents=True):
-    search(searchparser.parseSearchString(searchString),CONJUNCTION,resultTable,fromTable,addChildren,addParents)
+def textSearch(searchString,resultTable,fromTable='containers',logicalMode=CONJUNCTION,addChildren=True,addParents=True):
+    search(searchparser.parseSearchString(searchString),resultTable,fromTable,logicalMode,addChildren,addParents)
 
 
-def search(queries,logicalMode,resultTable,fromTable='containers',addChildren=True,addParents=True):
+def search(queries,resultTable,fromTable='containers',logicalMode=CONJUNCTION,addChildren=True,addParents=True):
     # Build a list if only one query is submitted
     if not hasattr(queries,'__iter__'):
         queries = (queries,)
-        
-    # Sort the most complicated queries to the front hoping that we get right from the beginning only a few results
-    queries.sort(key=queryclasses.sortKey,reverse=True)
+    else:
+        # Sort the most complicated queries to the front hoping that we get right from the beginning only a few results
+        queries.sort(key=queryclasses.sortKey,reverse=True)
         
     db.query("TRUNCATE TABLE {0}".format(resultTable))
     
@@ -83,12 +83,11 @@ def search(queries,logicalMode,resultTable,fromTable='containers',addChildren=Tr
             if result.affectedRows() == 0:
                 break
             db.query("UPDATE {0} SET new = 0".format(resultTable))
-            # Then insert their children in resultTable and set their toplevel-value to 0
-            # Warning: all children are added from the containers-table regardless of fromTable
             db.query("""
                 INSERT IGNORE INTO {0} (id,new)
                     SELECT contents.element_id,1
-                    FROM {1} JOIN contents ON {1}.id = contents.container_id
+                    FROM {1} AS parents JOIN contents ON parents.id = contents.container_id
+                             JOIN {1} AS children ON children.id = contents.element_id
                     GROUP BY contents.element_id
                     """.format(resultTable,TT_HELP))
     

@@ -6,12 +6,14 @@
 # it under the terms of the GNU General Public License version 3 as
 # published by the Free Software Foundation
 #
-from PyQt4 import QtGui
-from omg import search, database
 
-# Temporary tables used for search results
+# Temporary tables used for search results (have to appear before the imports as they will be imported in some imports)
 TT_BIG_RESULT = 'tmp_browser_bigres'
 TT_SMALL_RESULT = 'tmp_browser_smallres'
+
+from PyQt4 import QtGui
+from omg import search, database, tags
+from . import delegate, layouter
 
 class Browser(QtGui.QWidget):
     def __init__(self,model,parent=None):
@@ -20,10 +22,13 @@ class Browser(QtGui.QWidget):
         search.createResultTempTable(TT_BIG_RESULT,True)
         search.createResultTempTable(TT_SMALL_RESULT,True)
         
+        self.valueNodeTags = [tags.ARTIST,tags.COMPOSER]
+        
         # Browser
         self.browser = QtGui.QTreeView(self)
         self.browser.setHeaderHidden(True)
         self.browser.setModel(model)
+        self.browser.setItemDelegate(delegate.Delegate(self,model,layouter.ComplexLayouter()))
         
         # OptionMenu
         optionMenu = QtGui.QMenu(self)
@@ -48,9 +53,29 @@ class Browser(QtGui.QWidget):
         controlLineLayout.addWidget(self.optionButton)
 
     def search(self):
-        roots = search.textSearch(self.searchBox.text(),TT_BIG_RESULT)
-        #self.browser.model.setRoots(roots)
-        printResultTable()
+        db = database.get()
+        
+        search.textSearch(self.searchBox.text(),TT_BIG_RESULT)
+        
+        # Create value nodes
+        valueNodes = []
+        
+        for tag in self.valueNodeTags:
+            result = db.query("""
+                SELECT DISTINCT tag_{0}.id,tag_{0}.value
+                FROM {1} JOIN tags ON {1}.id = tags.container_id AND tags.tag_id = {2}
+                         JOIN tag_{0} ON tags.value_id = tag_{0}.id
+                """.format(tag.name,TT_BIG_RESULT,tag.id))
+            for row in result:
+                valueNodes.append(models.ValueNode(row[1],search.queryclasses.TagIdQuery({tag:row[0]})))
+        
+        for node in valueNodes:
+            node.load()
+        
+        #~ for node in valueNodes:
+            #~ print(node)
+        
+        self.browser.model().setRoots(valueNodes)
         
         
 def printResultTable(): #TODO only a debug-method

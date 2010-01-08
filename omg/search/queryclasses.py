@@ -39,11 +39,13 @@ class TagIdQuery:
         return """
             SELECT {0}
             FROM {1} JOIN tags ON {1}.id = tags.container_id
-            WHERE {2}"
+            WHERE {2}
             GROUP BY {1}.id
             """.format(_formatColumns(columns,fromTable),fromTable,whereExpression)
 
-
+    def getTags(self):
+        return self.valueIds.keys()
+        
 def _buildSelectForSingleTag(tag,value,fromTable,columns=None):
     if tag.type == 'date':
         whereExpression = " = {0}".format(value)
