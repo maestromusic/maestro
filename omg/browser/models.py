@@ -53,7 +53,7 @@ class ValueNode:
         return self.elements
         
     def __str__(self):
-        return "<ValueNode '{0}'>{1}".format(self.value,"\n".join([str(e) for e in self.elements]))
+        return "<ValueNode '{0}'>".format(self.value)#.format(self.value,"\n".join([str(e) for e in self.elements]))
 
 
 class ElementNode(models.Container):
@@ -84,7 +84,7 @@ class ElementNode(models.Container):
             element.load(table,newBlacklist)
             
     def __str__(self):
-        return '<ElementNode "{0}">{1}'.format(self.getTitle(),"\n".join([str(e) for e in self.elements]))
+        return '<ElementNode "{0}">'.format(self.getTitle())#{1}'.format(self.getTitle(),"\n".join([str(e) for e in self.elements]))
         
     def _createChild(self,id):
         return ElementNode(id)

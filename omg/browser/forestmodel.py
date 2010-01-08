@@ -10,8 +10,11 @@ from PyQt4 import QtCore
 from PyQt4.QtCore import Qt
 from omg.models import Element
 
+debugForest = False
+
 class Rootline:
-    def __init__(self,parent,furtherRootline):
+    def __init__(self,parent,furtherRootline,len=-1):
+        print("Rootline.__init__: parent: {0}, furtherRootline: {1}, number: {2}".format(parent,furtherRootline,len))
         self.parent = parent
         assert furtherRootline is None or isinstance(furtherRootline,Rootline)
         self.furtherRootline = furtherRootline
@@ -38,6 +41,8 @@ class ForestModel(QtCore.QAbstractItemModel):
         self.reset()
         
     def parent(self,index):
+        if debugForest:
+            print("ForestModel.parent: {0}".format(printIndex(index)))
         rootline = index.internalPointer()
         if rootline is None: # index refers to a top-level element
             return QtCore.QModelIndex()
@@ -50,23 +55,43 @@ class ForestModel(QtCore.QAbstractItemModel):
         return self.createIndex(row,0,rootline.furtherRootline)
 
     def index(self,row,column,index=QtCore.QModelIndex()):
+        if debugForest:
+            print("ForestModel.index: row {0}, column {1}, index {2}".format(row,column,printIndex(index)))
         if not index.isValid():
             return self.createIndex(row,column,None)
         else:
-            newRootline = Rootline(self.data(index),index.internalPointer())
+            newRootline = Rootline(self.data(index),index.internalPointer(),len(self._listOfRootlines)+1)
             self._listOfRootlines.append(newRootline)
             return self.createIndex(row,column,newRootline)
+    
+    def createIndex(self,row,column,internalPointer=None):
+        if not internalPointer is None and not isinstance(internalPointer,Rootline):
+            raise Exception("internalPointer must be a rootline")
+        if debugForest:
+            print("ForestModel.createIndex: row {0}, column {1}, iPointer {2}".format(row,column,internalPointer))
+        
+        if internalPointer is None:
+            return QtCore.QAbstractItemModel.createIndex(self,row,column)
+        else: return QtCore.QAbstractItemModel.createIndex(self,row,column,internalPointer)
         
     def data(self,index,role=Qt.DisplayRole):
+        if role == Qt.DisplayRole:
+            print("ForestModel.data: {0}".format(printIndex(index)))
         if not index.isValid() or index.column() != 0 or role != Qt.DisplayRole:
             return None
         else:
             rootline = index.internalPointer()
             if rootline is None:
+                # BEGIN DEBUG
+                if index.row() >= len(self._roots):
+                    print("Keine Wurzel für {0}".format(index.row()))
+                # END DEBUG
                 return self._roots[index.row()]
             else: return rootline.parent.getElements()[index.row()]
     
     def rowCount(self,index=QtCore.QModelIndex()):
+        if debugForest:
+            print("ForestModel.rowCount: {0}".format(printIndex(index)))
         if not index.isValid():
             return len(self._roots)
         else: return self.data(index).getElementsCount()
@@ -78,3 +103,13 @@ class ForestModel(QtCore.QAbstractItemModel):
         if not index.isValid():
             return Qt.ItemIsEnabled;
         else: return Qt.ItemIsEnabled | Qt.ItemIsSelectable
+        
+# TODO only debug
+def printIndex(index):
+    if index is None:
+        return "None"
+    elif index.internalPointer() is None:
+        if isinstance(index,QtCore.QModelIndex):
+            return str(index)
+        else: return "WRONG INDEX: {0}".format(index)
+    else: return str(index.internalPointer())
