@@ -35,7 +35,7 @@ class Sql(AbstractSql):
             queryString = _replaceQueryArgs(queryString,*args)
             
         if not query.exec_(queryString):
-            if self._db.lastError() != None:
+            if self._db.lastError() is not None:
                 message = "Query failed: {0} | Query: {1}".format(self._db.lastError().text(),queryString)
             else: message = "Query failed {0}".format(queryString)
             raise DBException(message)
@@ -91,17 +91,15 @@ class SqlResultIterator:
     """Iterator-object which is used to iterate over an SqlResult."""
     def __init__(self,qSqlResult,useDict):
         self._result = qSqlResult
-        if useDict:
-            self._convertMethod = self._recordToDict
-        else: self._convertMethod = self._recordToTuple
+        self._convertMethod = self._recordToDict if useDict else self._recordToTuple
         
     def __iter__(self):
         return self
         
     def __next__(self):
-        if not self._result.next():
-            raise StopIteration
-        else: return self._convertMethod(self._result.record())
+        if self._result.next():
+            return self._convertMethod(self._result.record())
+        else: raise StopIteration
         
     def _recordToTuple(self,record):
         """Convert a QSqlRecord to a tuple."""

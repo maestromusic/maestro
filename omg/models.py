@@ -8,62 +8,51 @@
 #
 from omg import tags, database
 
-def getTagValue(tag,valueId):
-    """Retrieve the value of the indexed tag <tag> with the given <valueId> from the corresponding tag-table."""
-    tableName = "tag_"+tag.name
-    value = database.get().query("SELECT value FROM "+tableName+" WHERE id = ?",valueId).getSingle()
-    if tag.type == 'date':
-        value = database.get().getDate(value)
-    return value
-
-
 class Element:
     """Base class for files and containers. This class stores an id of a row in the containers-table and can fetch the corresponding tags from the database.
     
     Public attributes:
-    tags: Dictionary mapping tags to lists (!) of values. The methods of this class guarantee that the dictionary contains no empty lists and you should keep this invariant then modifying tags directly. If tags is None, methods like getTag will automatically call updateTags to fetch values from the database.
+    tags: Storage for the tags of this element. May be None if the tags have not yet been loaded. Instead of accessing tags directly you can use getTag/getTags which will load the tags automatically if that didn't happen yet.
     """
     
-    def __init__(self,id,tags=None):
-        """Initialize a new element with the given id and optionally define its tags."""
+    def __init__(self,id,tagData=None):
+        """Initialize a new element with the given id and optionally define its tags. tagData may be a tags.Storage-instance or any value accepted by the constructor of tags.Storage."""
         self.id = id
-        self.tags = tags
+        if tagData is None:
+            self.tags = None
+        elif isinstance(tagData,tags.Storage):
+            self.tags = tagData
+        else: self.tags = tags.Storage(tagData)
         
     def getTag(self,tag):
-        """Get a list of all tag-values of the given tag stored in this element. If """
+        """Return a (possibly empty) list of all tag-values of the given tag stored in this element."""
         if self.tags is None:
             self.updateTags(False)
-        if tag in self.tags:
-            return self.tags[tag]
-        else: return None
+        return self.tags[tag]
         
     def getTags(self):
-        """Return self.tag if not None, otherwise update indexed tags from the database and return them."""
+        """Return self.tags if not None, otherwise update indexed tags from the database and return them."""
         if self.tags is None:
             self.updateTags(False)
         return self.tags
     
     def updateTags(self,otherTags=False):
         """Delete the tags stored in this element and fetch the tags from the database. If otherTags is false (which is the default), only indexed tags are fetched."""
-        self.tags = {}
+        self.tags = tags.Storage()
         result = database.get().query("SELECT tag_id,value_id FROM tags WHERE container_id = ?",self.id)
         for row in result:
             tag = tags.get(row[0])
-            if tag not in self.tags:
-                self.tags[tag] = []
-            self.tags[tag].append(getTagValue(tag,row[1]))
+            self.tags[tag].append(tag.getValue(row[1])) # TODO: caching would reduce the number of MySQL-queries
 
         if otherTags:
             result = database.get().query("SELECT tagname,value FROM othertags WHERE container_id = ?",self.id)
             for row in result:
                 tag = tags.OtherTag(row[0])
-                if tag not in self.tags:
-                    tagsToReturn[tag] = []
                 self.tags[tag].append(row[1])
 
     def getTitle(self):
         """Return a title of this element which is created from the title-tags. If this element does not contain a title-tag some dummy-title is returned."""
-        if self.getTag(tags.TITLE) is None:
+        if tags.TITLE not in self.tags:
             return '<Kein Titel>'
         else: return " - ".join(self.getTag(tags.TITLE))
 
@@ -73,7 +62,7 @@ class Container(Element):
     
     public attributes:
     tags: confer Element
-    elements: list of child elements. If elements is None, methods like getElements will call updateElements to fetch them from the database.
+    elements: list of child elements. May be None if the elements have not yet been loaded. Instead of accessing elements directly you can use getElements which will load the elements automatically if that didn't happen yet.
     """
     
     def __init__(self,id,tags=None,elements=None):

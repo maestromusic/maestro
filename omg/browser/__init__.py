@@ -29,6 +29,7 @@ class Browser(QtGui.QWidget):
         self.browser.setHeaderHidden(True)
         self.browser.setModel(model)
         self.browser.setItemDelegate(delegate.Delegate(self,model,layouter.ComplexLayouter()))
+        self.browser.expandsOnDoubleClick = False
         
         # OptionMenu
         optionMenu = QtGui.QMenu(self)
@@ -67,7 +68,7 @@ class Browser(QtGui.QWidget):
                          JOIN tag_{0} ON tags.value_id = tag_{0}.id
                 """.format(tag.name,TT_BIG_RESULT,tag.id))
             for row in result:
-                valueNodes.append(models.ValueNode(row[1],search.queryclasses.TagIdQuery({tag:row[0]})))
+                valueNodes.append(models.ValueNode(row[1],search.matchclasses.TagIdMatch({tag:row[0]})))
         
         for node in valueNodes:
             node.load()
@@ -77,14 +78,3 @@ class Browser(QtGui.QWidget):
         
         self.browser.model().setRoots(valueNodes)
         self.browser.expandAll()
-        
-        
-def printResultTable(): #TODO only a debug-method
-    print("Printing result:")
-    result = database.get().query("SELECT name FROM containers WHERE id IN (SELECT id FROM {0})".format(TT_BIG_RESULT))
-    
-    if not result:
-        print("Kein Ergebnis")
-    for row in result:
-        print(row[0])
-    print("===")

@@ -33,7 +33,7 @@ class ForestModel(QtCore.QAbstractItemModel):
     def data(self,index,role=Qt.DisplayRole):
         if not index.isValid() or role != Qt.DisplayRole:
             return None
-        return index.internalPointer()
+        else: return index.internalPointer()
     
     def rowCount(self,parent):
         if parent.column() > 0:
@@ -53,17 +53,13 @@ class ForestModel(QtCore.QAbstractItemModel):
         if parent is None: # toplevel element
             return QtCore.QModelIndex()
         else: # Now we must find out the list containing the parent to get the parent's position in this list
-            if parent.getParent() is None:
-                containingList = self._roots
-            else: containingList = parent.getParent().getElements()
+            containingList = parent.getParent().getElements() if parent.getParent() is not None else self._roots
             return self.createIndex(containingList.index(parent),0,parent)
     
     def index(self,row,column,parent):
         if not self.hasIndex(row,column,parent): # Check if parent has a child at the given row and column
             return QtCore.QModelIndex()
-        if parent.isValid():
-            child = parent.internalPointer().getElements()[row]
-        else: child = self._roots[row] 
+        child = parent.internalPointer().getElements()[row] if parent.isValid() else self._roots[row]
         return self.createIndex(row,column,child)
         
     def flags(self,index):

@@ -9,13 +9,14 @@
 
 """Module for tag handling.
 
-This module provides methods to initialize the tag lists ased on the database, to convert tag-ids to tagnames and vice versa, etc.. Call updateIndexedTags at program start to initialize and use one of the following ways to get tags:
+This module provides methods to initialize the tag lists based on the database, to convert tag-ids to tagnames and vice versa, to store tags, etc.. Call updateIndexedTags at program start to initialize and use one of the following ways to get tags:
 
 - The easiest way is the get-method which takes a tag-id or an tag-name as parameter.
 - For some tags which have a special meaning to the program and cannot always be treated generically (e.g. the title-tag) where exist constants (e.g. TITLE). This allows to use tags.TITLE instead of tags.get(config.get("tags","title_tag")) as the user may decide to use another tagname than "title" for his titles.
 - To iterate over all indexed tags use the list-method.
 - You may create tags simply via the constructors of IndexedTag or OtherTag. But in case of indexed tags the get-method translates automatically from tag-ids to tagnames and vice versa and it doesn't create new instances and in the other case it does just the same job as the OtherTag-constructor, so it is usually better to use that method.
 """
+from collections import defaultdict
 from omg import config, database
 
 # Module variables - Will be initialized with the first call of updateIndexedTags.
@@ -25,7 +26,7 @@ _tagsById = None
 _tagsByName = None
 
 # List of all indexed tags in unspecified order. Use this to iterate over all indexed tags.
-list = None
+tagList = None
 
 # Tags which have a special meaning for the application and cannot always be treated generically.
 # Will be initialized with the first call of updateIndexedTags, so remember to change also that function whenever changing the following lines.
@@ -72,6 +73,14 @@ class IndexedTag(Tag):
         self.id = id
         self.name = name
         self.type = type
+    
+    def getValue(self,valueId):
+        """Retrieve the value of this tag with the given <valueId> from the corresponding tag-table."""
+        tableName = "tag_"+self.name
+        value = database.get().query("SELECT value FROM "+tableName+" WHERE id = ?",valueId).getSingle()
+        if self.type == 'date':
+            return database.get().getDate(value)
+        else: return value
 
     def __eq__(self,other):
         return self.id == other.id
@@ -114,7 +123,7 @@ def get(identifier):
 
 def updateIndexedTags():
     """Initialize (or update) the variables of this module based on the information of the tagids-table. At program start or after changes of that table this method must be called to ensure the module has the correct indexed tags and their IDs."""
-    global _tagsById,_tagsByName,list
+    global _tagsById,_tagsByName,tagList
     _tagsById = {}
     _tagsByName = {}
     db = database.get()
@@ -123,7 +132,7 @@ def updateIndexedTags():
         _tagsById[row[0]] = newTag
         _tagsByName[row[1]] = newTag
     
-    list = _tagsById.values()
+    tagList = _tagsById.values()
     
     global TITLE,ARTIST,ALBUM,COMPOSER,PERFORMER,DATE
     TITLE = _tagsByName[config.get("tags","title_tag")]
@@ -132,3 +141,46 @@ def updateIndexedTags():
     COMPOSER = _tagsByName[config.get("tags","composer_tag")]
     PERFORMER = _tagsByName[config.get("tags","performer_tag")]
     DATE = _tagsByName[config.get("tags","date_tag")]
+    
+
+class Storage(defaultdict):
+    """Dictionary subclass used to store tags. As a container may have several values for the same tag, Storage maps tags to lists of values. Storage adds a few useful functions to deal with such datastructures and modifies dict in two ways:
+    - Storage will not raise a KeyError if it does not contain a tag but return an empty list instead. This is useful as in most cases the functions dealing with tag lists will just skip an empty list.
+    - 'tag in storage' will return true if and only if 'storage[tag]' will return a list of at least one element.
+    """
+    def __init__(self,*args):
+        """Initialize a Storage-instance from the given arguments (confer the constructor of dict)."""
+        defaultdict.__init__(self,list,*args)
+    
+    # Since the constructor's signature differs from the one in the baseclass, we have to overwrite copy (see Modules/_collectionsmodule.c in the Python source.)
+    def copy(self):
+        return Storage(self)
+        
+    def addUnique(self,tag,*values):
+        """Add one or more values to the list of the given tag. If a value is already contained in the list, do not add it again."""
+        for value in values:
+            if value not in self[tag]:
+                self[tag].append(value)
+                
+    def removeValues(self,tag,*values):
+        """Remove one or more values from the list of the given tag. If a value is not contained in this Storage just skip it."""
+        for value in values:
+            try:
+                self[tag].remove(value)
+            except ValueError: pass 
+        if not self[tag]:
+            del self[tag]
+            
+    def merge(self,other):
+        """Add all tags from <other> to this Storage. <other> may be another Storage-instance or a dict mapping tags to value-lists. Do not add already existing values again."""
+        for tag,valueList in other.items():
+            self.addUnique(tag,*valueList)
+                
+    def removeTags(self,other):
+        """Remove all values from <other> from this Storage. <other> may be another Storage-instance or a dict mapping tags to value-lists. If <other> contains tags and values which are not contained in this Storage, just skip them."""
+        for tag,valueList in other.items():
+            self.removeValues(tag,*valueList)
+    
+    def __contains__(self,key):
+        # Return false even if the key exists and has [] as value (which actually should not happen). If the key really does not exist, self[key] will also return [].
+        return len(self[key]) > 0

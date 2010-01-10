@@ -52,9 +52,9 @@ class DBException(Exception):
 
 def newConnection(driver):
     """Create a new database connection object using the given driver identifier. This method does not open a connection."""
-    if not driver in drivers:
+    if driver not in drivers:
         raise Exception("driver '{0}' is not known.".format(driver))
-    if not driver in _modules:
+    if driver not in _modules:
         _modules[driver] = __import__(driver,globals(),locals())
     return _modules[driver].Sql()
     
@@ -130,7 +130,7 @@ class AbstractSqlResult:
 
 def _replaceQueryArgs(query,*args):
     """Replace occurences of '?' in query by the arguments which must be either string or int. String arguments are escaped."""
-    if not query.count('?') == len(args):
+    if query.count('?') != len(args):
         raise DBException("Number of '?' must match number of query parameters.")
     for arg in args:
         if isinstance(arg,str):

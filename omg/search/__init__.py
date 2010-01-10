@@ -7,21 +7,20 @@
 # published by the Free Software Foundation
 #
 from omg import database, tags
-from . import searchparser, queryclasses
+from . import searchparser, matchclasses
 
 # Temporary table used by the search algorithm
 TT_HELP = 'tmp_help'
-
-# When deciding which query should be performed first, queries with tag prefix are favored by this factor since they tend to give less results than searches in all indexed tags.
-SINGLE_TAG_QUERY_MULTIPLIER = 3
 
 # Logical modes
 DISJUNCTION = 1
 CONJUNCTION = 2
 
+# Reference to the database connection
 db = None
 
 def init():
+    """Initialize the search-module."""
     global db
     db = database.get()
     db.query("DROP TABLE IF EXISTS {0}".format(TT_HELP))
@@ -33,8 +32,9 @@ def init():
 
 
 def createResultTempTable(tableName,dropIfExists):
+    """Create a temporary table of the given name which may be used as resultTable for the search- and textSearch-methods. If dropIfExists is true, an existing table of the same name will be dropped (otherwise an DBException will be raised when performing the CREATE-query)."""
     if dropIfExists:
-        db.query("DROP TABLE IF EXISTS {0}".format(tableName))
+        db.query("DROP TABLE IF EXISTS {0}".format(tableName)) # TODO: For debugging reasons a persistent table is created
     db.query("""
         CREATE TABLE IF NOT EXISTS {0} (
             id MEDIUMINT UNSIGNED,
@@ -45,25 +45,38 @@ def createResultTempTable(tableName,dropIfExists):
     
     
 def textSearch(searchString,resultTable,fromTable='containers',logicalMode=CONJUNCTION,addChildren=True,addParents=True):
+    """Parse the given search string to TextMatches and submit them together with all other arguments to the search-method."""
     search(searchparser.parseSearchString(searchString),resultTable,fromTable,logicalMode,addChildren,addParents)
 
 
-def search(queries,resultTable,fromTable='containers',logicalMode=CONJUNCTION,addChildren=True,addParents=True):
-    # Build a list if only one query is submitted
-    if not hasattr(queries,'__iter__'):
-        queries = (queries,)
+def search(matches,resultTable,fromTable='containers',logicalMode=CONJUNCTION,addChildren=True,addParents=True):
+    """Search the database and store the result in a table.
+    
+    Firstly this method will find all 'direct results' and write them into <resultTable> (what containers are direct results depends on <matches>, <fromTable> and <logicalMode>. If <addChildren> or <addParents> are true afterwards all children or parents, respectively, will be added to <resultTable>.
+    
+    Detailed parameter description:
+    - <matches> is a list of matches (confer the matchclasses module). Depending on <logicalMode> only containers matching all or at least one of the matches will be found.
+    - The id of each container found by the search is stored in the 'id'-column of <resultTable>. This table should be created with the createResultTempTable-method (or has to contain at least the columns created by that method and default values for all other columns. This table will be truncated before the search is performed!
+    - This method will find only containers with records in <fromTable>. Since <fromTable> defaults to 'containers' usually all containers are searched but you may use this parameter to use another table. <fromTable> must contain an 'id'-column holding container-ids.
+    - <logicalMode> specifies if a container must match all matches (CONJUNCTION) or only at least one match (DISJUNCTION) to be found.
+    - If <addChildren> is true after performing the search all child elements of direct results and recursively all their children are added to <resultTable> (if they do not already exist in that table). Again only elements from <fromTable> are added. 
+    - If <addParents> is true after performing the search all parent elements of the elements in <resultTable> and recursively all their parents are added to <resultTable> (if they do not already exist in that table). Again only elements from <fromTable> are added. If both <addChildren> and <addParents> are true, the children are added first. In that case even parents of elements which are not direct results may be added. If <addParents> is true, the 'toplevel'-column of <resultTable> will contain a 1 if and only if a container does not have any parents.
+    """
+    # Build a list if only one match is submitted
+    if not hasattr(matches,'__iter__'):
+        matches = (matches,)
     else:
-        # Sort the most complicated queries to the front hoping that we get right from the beginning only a few results
-        queries.sort(key=queryclasses.sortKey,reverse=True)
+        # Sort the most complicated matches to the front hoping that we get right from the beginning only a few results
+        matches.sort(key=matchclasses.sortKey,reverse=True)
         
     db.query("TRUNCATE TABLE {0}".format(resultTable))
     
     # We firstly search for the direct results of the first query... 
-    db.query("INSERT INTO {0} (id) {1}".format(resultTable,queries[0].getDBQuery(fromTable)))
+    db.query("INSERT INTO {0} (id) {1}".format(resultTable,matches[0].getQuery(fromTable)))
     # ...and afterwards delete those entries which do not match the other queries
-    for query in queries[1:]:
+    for match in matches[1:]:
         db.query("TRUNCATE TABLE {0}".format(TT_HELP))
-        db.query("INSERT INTO {0} (id) {1}".format(TT_HELP,query.getDBQuery(resultTable)))
+        db.query("INSERT INTO {0} (id) {1}".format(TT_HELP,match.getQuery(resultTable)))
         db.query("DELETE FROM {0} WHERE id NOT IN (SELECT id FROM {1})".format(resultTable,TT_HELP))
 
     # Add all children
