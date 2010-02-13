@@ -44,6 +44,10 @@ class ComplexLayouter:
             cursor.insertText(", ".join(artistList),_stdCharFormat)
             cursor.insertBlock()
         
+        for container in element.containers:
+            cursor.insertText(container.getTitle(),_titleCharFormat)
+            cursor.insertBlock()
+            
         if element.isFile():
             cursor.insertText(element.getTitle(),_stdCharFormat)
         elif tags.DATE in element.tags:

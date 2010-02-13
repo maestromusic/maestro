@@ -59,7 +59,11 @@ class TagIdMatch:
     def getTags(self):
         """Return a list of all tags appearing in this TagIdMatch."""
         return self.valueIds.keys()
-
+        
+    def addMatches(self,valueIds):
+        """Add one or more tag=>id-mappings to this match. A container will match this match if it contains at least one tag together with a value with the corresponding id."""
+        self.valueIds.update(valueIds)
+        
 
 def _buildSelectForSingleTag(tag,value,fromTable,columns=None):
     """Build a select query that will select all containers matching a given tag-value.
