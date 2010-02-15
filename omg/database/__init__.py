@@ -78,7 +78,17 @@ def checkElementCounters(fix=False):
                          SET elements = (SELECT COUNT(*) FROM contents WHERE container_id = id)").affectedRows()
     else: return db.query("SELECT COUNT(*) FROM containers \
                            WHERE elements != (SELECT COUNT(*) FROM contents WHERE container_id = id)").getSingle()
+
+def checkTopLevelFlags(fix=False):
+    """Search containers.toplevel for wrong entries and corrects them if fix is true. Return the number of wrong entries."""
+    if "containers" not in listTables():
+        return 0
     
+    if fix:
+        return db.query("UPDATE containers SET toplevel = (NOT id IN (SELECT element_id FROM contents))").affectedRows()
+    else: return db.query("SELECT COUNT(*) FROM containers \
+                           WHERE toplevel != (NOT id IN (SELECT element_id FROM contents))").getSingle()
+
 def checkTagIds(fix=False):
     """Compare the tagids-table with the 'indexed-tags'-option from the config-file and return a tuple with two lists. The first list contains the tags which are in only the config-file, the second one contains the tags which are only in the tagids-table. If fix is true the tagids-table is corrected to contain exactly the tags from the config-file."""
     if "tagids" not in listTables():
