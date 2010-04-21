@@ -35,6 +35,9 @@ ALBUM = None
 ARTIST = None
 COMPOSER = None
 DATE = None
+GENRE = None
+
+artistTags = None
 
 class Tag:
     """Baseclass for tags.
@@ -134,14 +137,17 @@ def updateIndexedTags():
     
     tagList = _tagsById.values()
     
-    global TITLE,ARTIST,ALBUM,COMPOSER,PERFORMER,DATE
+    global TITLE,ARTIST,ALBUM,COMPOSER,PERFORMER,DATE,GENRE
     TITLE = _tagsByName[config.get("tags","title_tag")]
     ARTIST = _tagsByName[config.get("tags","artist_tag")]
     ALBUM = _tagsByName[config.get("tags","album_tag")]
     COMPOSER = _tagsByName[config.get("tags","composer_tag")]
     PERFORMER = _tagsByName[config.get("tags","performer_tag")]
     DATE = _tagsByName[config.get("tags","date_tag")]
+    GENRE = _tagsByName[config.get("tags","genre_tag")]
     
+    global artistTags
+    artistTags = tuple(_tagsByName[tagname] for tagname in config.get("browser","artist_tags").split(','))
 
 class Storage(defaultdict):
     """Dictionary subclass used to store tags. As a container may have several values for the same tag, Storage maps tags to lists of values. Storage adds a few useful functions to deal with such datastructures and modifies dict in two ways:

@@ -43,7 +43,8 @@ def init(*config_files):
             "artist_tag": "artist",
             "composer_tag": "composer",
             "performer_tag": "performer",
-            "date_tag": "date"
+            "date_tag": "date",
+            "genre_tag": "genre"
         },
         
         "browser": {

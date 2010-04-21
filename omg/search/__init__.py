@@ -7,7 +7,8 @@
 # published by the Free Software Foundation
 #
 from omg import database, tags
-from . import searchparser, matchclasses
+from . import searchparser
+from . import criteria as criteriaModule
 
 # Temporary table used by the search algorithm
 TT_HELP = 'tmp_help'
@@ -27,7 +28,7 @@ def init():
     db.query("""
         CREATE TABLE IF NOT EXISTS {0} (
             id MEDIUMINT UNSIGNED NOT NULL,
-            parent_id MEDIUMINT UNSIGNED NULL)
+            value MEDIUMINT UNSIGNED NULL)
         """.format(TT_HELP))
 
 
@@ -42,96 +43,126 @@ def createResultTempTable(tableName,dropIfExists):
             new TINYINT UNSIGNED DEFAULT 1,
             PRIMARY KEY(id))
         """.format(tableName))
-    
-    
-def textSearch(searchString,resultTable,fromTable='containers',logicalMode=CONJUNCTION,addChildren=True,addParents=True):
-    """Parse the given search string to TextMatches and submit them together with all other arguments to the search-method."""
-    search(searchparser.parseSearchString(searchString),resultTable,fromTable,logicalMode,addChildren,addParents)
 
 
-def search(matches,resultTable,fromTable='containers',logicalMode=CONJUNCTION,addChildren=True,addParents=True):
+def stdTextSearch(searchString,resultTable,fromTable,logicalMode):
+    stdSearch(searchparser.parseSearchString(searchString),resultTable,fromTable,logicalMode)
+
+
+def stdSearch(criteria,resultTable,fromTable='containers',logicalMode=CONJUNCTION):
+    search(criteria,resultTable,fromTable,logicalMode)
+    addChildren(resultTable)
+    addFilledParents(resultTable)
+    setTopLevelFlag(resultTable)
+
+
+def textSearch(searchString,resultTable,fromTable='containers',logicalMode=CONJUNCTION):
+    """Parse the given search string to TextCriteria and submit them together with all other arguments to the search-method."""
+    search(searchparser.parseSearchString(searchString),resultTable,fromTable,logicalMode)
+
+
+def search(criteria,resultTable,fromTable='containers',logicalMode=CONJUNCTION):
     """Search the database and store the result in a table.
     
-    Firstly this method will find all 'direct results' and write them into <resultTable> (what containers are direct results depends on <matches>, <fromTable> and <logicalMode>. If <addChildren> or <addParents> are true afterwards all children or parents, respectively, will be added to <resultTable>.
+    This method finds all direct results fulfilling all or at least one of the given criteria and writes them into <resultTable>.
     
     Detailed parameter description:
-    - <matches> is a list of matches (confer the matchclasses module). Depending on <logicalMode> only containers matching all or at least one of the matches will be found.
+    - <criteria> is a list of criteria (confer the criteria-module). Depending on <logicalMode> only containers fulfilling all or at least one of the criteria will be found.
     - The id of each container found by the search is stored in the 'id'-column of <resultTable>. This table should be created with the createResultTempTable-method (or has to contain at least the columns created by that method and default values for all other columns. This table will be truncated before the search is performed!
-    - This method will find only containers with records in <fromTable>. Since <fromTable> defaults to 'containers' usually all containers are searched but you may use this parameter to use another table. <fromTable> must contain an 'id'-column holding container-ids.
-    - <logicalMode> specifies if a container must match all matches (CONJUNCTION) or only at least one match (DISJUNCTION) to be found.
-    - If <addChildren> is true after performing the search all child elements of direct results and recursively all their children are added to <resultTable> (if they do not already exist in that table). Again only elements from <fromTable> are added. 
-    - If <addParents> is true after performing the search all parent elements of the elements in <resultTable> and recursively all their parents are added to <resultTable> (if they do not already exist in that table). Again only elements from <fromTable> are added. If both <addChildren> and <addParents> are true, the children are added first. In that case even parents of elements which are not direct results may be added. If <addParents> is true, the 'toplevel'-column of <resultTable> will contain a 1 if and only if a container does not have any parents.
+    - This method will find only containers with records in <fromTable>. Since <fromTable> defaults to 'containers' usually all containers are searched. <fromTable> must contain an 'id'-column holding container-ids.
+    - <logicalMode> specifies if a container must fulfill all criteria (CONJUNCTION) or only at least one criterion (DISJUNCTION) to be found.
     """
-    # Build a list if only one match is submitted
-    if not hasattr(matches,'__iter__'):
-        matches = (matches,)
+    assert(logicalMode == CONJUNCTION) #TODO: Support DISJUNCTION
+    
+    # Build a list if only one criterion is submitted
+    if not hasattr(criteria,'__iter__'):
+        criteria = (criteria,)
     else:
-        # Sort the most complicated matches to the front hoping that we get right from the beginning only a few results
-        matches.sort(key=matchclasses.sortKey,reverse=True)
+        # Sort the most complicated criteria to the front hoping that we get right from the beginning only a few results
+        criteria.sort(key=criteriaModule.sortKey,reverse=True)
         
     db.query("TRUNCATE TABLE {0}".format(resultTable))
     
     # We firstly search for the direct results of the first query... 
-    db.query("INSERT INTO {0} (id) {1}".format(resultTable,matches[0].getQuery(fromTable)))
+    db.query("INSERT INTO {0} (id) {1}".format(resultTable,criteria[0].getQuery(fromTable)))
     # ...and afterwards delete those entries which do not match the other queries
-    for match in matches[1:]:
+    for criterion in criteria[1:]:
         db.query("TRUNCATE TABLE {0}".format(TT_HELP))
-        db.query("INSERT INTO {0} (id) {1}".format(TT_HELP,match.getQuery(resultTable)))
+        db.query("INSERT INTO {0} (id) {1}".format(TT_HELP,criterion.getQuery(resultTable)))
         db.query("DELETE FROM {0} WHERE id NOT IN (SELECT id FROM {1})".format(resultTable,TT_HELP))
 
-    # Add all children
-    if addChildren:
-        while True:
-            db.query("TRUNCATE TABLE {0}".format(TT_HELP))
-            # First store all direct results which have children in TT_HELP
-            if resultTable == 'containers':
-                result = db.query("INSERT INTO {0} (id) SELECT id FROM containers WHERE new = 1 AND elements > 0"
-                                     .format(TT_HELP))
-            else: result = db.query("""
-                INSERT INTO {0} (id)
-                    SELECT {1}.id
-                    FROM {1} JOIN containers ON {1}.id = containers.id
-                    WHERE {1}.new = 1 AND containers.elements > 0
-                """.format(TT_HELP,resultTable))
-            if result.affectedRows() == 0:
-                break
-            db.query("UPDATE {0} SET new = 0".format(resultTable))
-            db.query("""
-                INSERT IGNORE INTO {0} (id,new)
-                    SELECT contents.element_id,1
-                    FROM {1} AS parents JOIN contents ON parents.id = contents.container_id
-                             JOIN {1} AS children ON children.id = contents.element_id
-                    GROUP BY contents.element_id
-                    """.format(resultTable,TT_HELP))
-    
-    # Add all parents
-    if addParents:
-        db.query("UPDATE {0} SET new = 1".format(resultTable))
-        while True:
-            db.query("TRUNCATE TABLE {0}".format(TT_HELP))
-            # Warning: all parents are added from the containers-table regardless of fromTable
-            result = db.query("""
-                INSERT INTO {0} (id,parent_id)
-                SELECT {1}.id,contents.container_id
-                FROM {1} LEFT JOIN contents ON {1}.id = contents.element_id
-                WHERE {1}.new = 1 AND {1}.toplevel = 0
-                """.format(TT_HELP,resultTable))
 
-            # update those elements which have no parent (these rows exist due to the left join)
-            db.query("""
-                REPLACE INTO {0} (id,toplevel)
+def addChildren(resultTable,fromTable="containers"):
+    while True:
+        db.query("TRUNCATE TABLE {0}".format(TT_HELP))
+        # First store all direct results which have children in TT_HELP
+        result = db.query("""
+            INSERT INTO {0} (id)
+                SELECT {1}.id
+                FROM {1} JOIN containers ON {1}.id = containers.id
+                WHERE {1}.new = 1 AND containers.elements > 0
+            """.format(TT_HELP,resultTable))
+        if result.affectedRows() == 0:
+            break
+        db.query("UPDATE {0} SET new = 0".format(resultTable))
+        # If fromTable is not containers this query part will ensure that only elements in fromTable will be added.
+        if fromTable != 'containers':
+            restrictToFromTablePart = "JOIN {0} ON {0}.id = contents.element_id".format(fromTable)
+        else: restrictToFromTablePart = ''
+        db.query("""
+            INSERT IGNORE INTO {0} (id,new)
+                SELECT contents.element_id,1
+                FROM {1} AS parents JOIN contents ON parents.id = contents.container_id {2}
+                GROUP BY contents.element_id
+                """.format(resultTable,TT_HELP,restrictToFromTablePart))
+
+
+def addFilledParents(resultTable,fromTable="containers"):
+    db.query("TRUNCATE TABLE {0}".format(TT_HELP))
+    db.query("UPDATE {0} SET new = 1".format(resultTable))
+    while True:
+         # If fromTable is not containers this query part will ensure that only elements in fromTable will be added.
+        if fromTable != 'containers':
+            restrictToFromTablePart = "JOIN {0} ON {0}.id = contents.element_id".format(fromTable)
+        else: restrictToFromTablePart = ''
+        result = db.query("""
+            INSERT INTO {0} (id,value)
+                SELECT contents.container_id, COUNT(*)
+                FROM {1} JOIN contents ON {1}.id = contents.element_id {2}
+                WHERE {1}.new = 1
+                GROUP BY contents.container_id
+                """.format(TT_HELP,resultTable,restrictToFromTablePart))
+        if result.affectedRows() == 0:
+            break
+        db.query("UPDATE {0} SET new = 0".format(resultTable))
+        db.query("""
+            INSERT IGNORE INTO {0} (id,new)
                 SELECT {1}.id,1
-                FROM {1}
-                WHERE {1}.parent_id IS NULL
+                FROM {1} JOIN containers ON {1}.id = containers.id
+                WHERE containers.elements = {1}.value
                 """.format(resultTable,TT_HELP))
-            
-            if result.affectedRows() == 0:
-                break
-            db.query("UPDATE {0} SET new = 0".format(resultTable))
-            db.query("""
-                INSERT IGNORE INTO {0} (id,new)
-                    SELECT {1}.parent_id,1
-                    FROM {1}
-                    WHERE {1}.parent_id IS NOT NULL
-                    GROUP BY {1}.parent_id
-                """.format(resultTable,TT_HELP))
+
+
+def setTopLevelFlag(table):
+    db.query("TRUNCATE TABLE {0}".format(TT_HELP))
+    if table != "containers":
+        restrictToTablePart = "JOIN {0} ON contents.element_id = {0}.id".format(table)
+    else: restrictToTablePart = ''
+    db.query("""
+        INSERT INTO {0} (id)
+            SELECT DISTINCT contents.element_id
+            FROM {1} AS parents JOIN contents ON parents.id = contents.container_id {2}
+            """.format(TT_HELP,table,restrictToTablePart))
+    db.query("UPDATE {0} SET toplevel = 1".format(table))
+    db.query("INSERT INTO {0} (id) (SELECT id FROM {1}) ON DUPLICATE KEY UPDATE toplevel = 0".format(table,TT_HELP))
+    
+    
+def printResultTable(table):
+    result = db.query("""
+        SELECT res.id,res.toplevel,res.new,containers.name
+        FROM {0} as res JOIN containers ON res.id = containers.id
+        """.format(table))
+    print("Printing result table "+table)
+    for row in result:
+        print("{0} '{3}' Toplevel: {1} New: {2}".format(*row))
+                

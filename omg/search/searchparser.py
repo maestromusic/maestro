@@ -9,7 +9,7 @@
 # Methods to parse queries of the form "Symphony composer:Haydn  title:'Le Matin'".
 #
 from omg import strutils, tags
-from .matchclasses import TextMatch
+from .criteria import TextCriterion
         
 # Abbreviations for tags which may be used in queries
 TAG_ABBREVIATIONS = {"t": "title",
@@ -69,8 +69,8 @@ def _splitStringQuot(string):
     return [_removeQuotationMarks(item) for item in splitList]
 
 
-def _createMatchFromString(string):
-    """Splits a queryString like "composer:Beethoven" into a tuple consisting of a tag prefix and a search value and creates a TextMatch-instance from it."""
+def _createCriterionFromString(string):
+    """Splits a queryString like "composer:Beethoven" into a tuple consisting of a tag prefix and a search value and creates a TextCriterion-instance from it."""
     try:
         index = string.index(':')
         if index > 0:
@@ -78,13 +78,13 @@ def _createMatchFromString(string):
             searchValue = string[index+1:]
             if tagname in TAG_ABBREVIATIONS:
                 tagname = TAG_ABBREVIATIONS[tagname]
-            return TextMatch(tags.get(tagname),searchValue)
-        else: return TextMatch(None,string[1:]) # Skip the colon at the beginning
+            return TextCriterion(tags.get(tagname),searchValue)
+        else: return TextCriterion(None,string[1:]) # Skip the colon at the beginning
     except ValueError: # No colon found
-        return TextMatch(None,string);
+        return TextCriterion(None,string);
 
 
 def parseSearchString(searchString):
     """Parses searchString and returns a list of the queries contained in it. Queries with empty values are left out."""
-    matches = [_createMatchFromString(queryString) for queryString in _splitStringQuot(searchString)]
-    return [match for match in matches if len(match.value) > 0]
+    criteria = [_createCriterionFromString(queryString) for queryString in _splitStringQuot(searchString)]
+    return [criterion for criterion in criteria if len(criterion.value) > 0]

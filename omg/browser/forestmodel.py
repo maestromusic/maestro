@@ -8,7 +8,6 @@
 #
 from PyQt4 import QtCore
 from PyQt4.QtCore import Qt
-from omg.models import Element
 
 class ForestModel(QtCore.QAbstractItemModel):
     """ForestModel is a simple model for QTreeViews. It takes a list of root elements which may have child elements. Elements in a ForestModel may have every type Each element in the ForestModel must have the following methods:
@@ -16,14 +15,14 @@ class ForestModel(QtCore.QAbstractItemModel):
     - getElementCount(): return the number of childrens of the element
     - getParent(): return the element's parent or None if the element is a root
     """
-    
-    # List of the roots of the trees stored in this model
-    _roots = []
 
-    def __init__(self,roots):
+    # List of the root nodes
+    _roots = None
+    
+    def __init__(self,roots=None):
         """Initialize a new ForestModel with the given list of roots."""
         QtCore.QAbstractItemModel.__init__(self)
-        self._roots = roots
+        self._roots = roots if roots is not None else []
     
     def setRoots(self,roots):
         """Set the list of roots of this ForestModel and reset the model so that QTreeViews using this model will be resetted."""
