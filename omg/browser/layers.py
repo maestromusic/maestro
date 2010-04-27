@@ -8,7 +8,7 @@
 #
 
 class TagLayer():
-    DIRECT_LOAD_LIMIT = 0
+    DIRECT_LOAD_LIMIT = 100
     
     def __init__(self,tagSet):
         self.tagSet = tagSet

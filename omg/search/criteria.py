@@ -67,13 +67,19 @@ class TagIdCriterion:
         
 
 class MissingTagCriterion:
+    """A MissingTagCriterion specifies a list of tags which a container must not have in order to match this criterion."""
+    
     def __init__(self,tags):
+        """Initialize a new MissingTagCriterion with the given list of tags."""
         self.tags = tags
     
     def getTags(self):
+        """Return the list of tags a container must not have in order to match this criterion."""
         return self.tags
-        
+    
     def getQuery(self,fromTable,columns=None):
+        """Return a SELECT-query fetching the rows of <fromTable> which fulfill this criterion. <fromTable> must contain an 'id'-column holding container-ids. By default only the id-column of <fromTable> is selected, but you can specify a list of columns in the <column>-parameter.
+        """
         return """
             SELECT {0}
             FROM {1} LEFT JOIN tags ON {1}.id = tags.container_id AND tags.tag_id IN ({2})

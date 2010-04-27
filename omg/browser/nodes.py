@@ -6,19 +6,33 @@
 # it under the terms of the GNU General Public License version 3 as
 # published by the Free Software Foundation
 #
+from PyQt4 import QtCore
 from omg import search, database, tags
 from . import TT_BIG_RESULT, TT_SMALL_RESULT, layers
+from PyQt4.QtCore import SIGNAL
 
 db = database.get()
 
 class Node:
+    index = None
+    
     # Methods for ForestModel
+    def hasChildren(self): pass
     def getElementsCount(self): pass
     def getElements(self): pass
 
     def getParent(self):
         return self.parent
-        
+    
+    def getIndex(self):
+        model = self.getModel()
+        if self.getParent() is None:
+            containingList = model.getRoots()
+            return model.index(containingList.index(self),0,QtCore.QModelIndex())
+        else:
+            containingList = self.getParent().getElements()
+            return model.index(containingList.index(self),0,self.getParent().getIndex())
+
     def getTitle(self):
         """Return a title of this element which is created from the title-tags. If this element does not contain a title-tag some dummy-title is returned."""
         if tags.TITLE in self.tags:
@@ -48,16 +62,23 @@ class CriterionNode(Node):
     
     def getCriterion(self):
         return self.criterion
+    
+    def hasChildren(self):
+        return True
         
     def getElementsCount(self):
-        # If nodes haven't been loaded yet, pretend to have one child so that this node will be expandable.
-        return len(self.elements) if self.elements is not None else 1
+        if self.elements is None:
+            self.update()
+        return len(self.elements)
         
     def getElements(self):
         if self.elements is None:
             self.update()
         return self.elements
     
+    def getModel(self):
+        return self.parent.getModel()
+        
     def _getTable(self):
         return self.parent._getTable()
         
@@ -66,6 +87,7 @@ class CriterionNode(Node):
         
     def update(self):
         search.stdSearch(self._collectCriteria(),TT_SMALL_RESULT,self._getTable())
+        model = self.getModel()
         if isinstance(self._getNextLayer(),layers.TagLayer):
             self._loadTagLayer(TT_SMALL_RESULT)
             if db.query("SELECT COUNT(*) FROM {0}".format(TT_SMALL_RESULT)).getSingle()\
@@ -73,6 +95,18 @@ class CriterionNode(Node):
                 for element in self.elements:
                     element.update()
         else: self._loadContainerLayer(TT_SMALL_RESULT)
+        
+        #model.browser.collapse(self.getParent().getIndex())
+        #model.browser.expand(self.getParent().getIndex())
+        #model.browser.emit(SIGNAL("dataChanged"),index,index)
+        #~ index = self.getIndex()
+        #~ model.browser.emit(SIGNAL("rowsRemoved"),index,0,0)
+        #~ model.browser.emit(SIGNAL("rowsInserted"),index,0,len(self.elements)-1)
+        #~ for element in self.getParent().getElements():
+            #~ model.browser.update(element.getIndex())
+        #~ model.browser.update(self.getParent().getIndex())
+        #~ model.browser.collapse(self.getParent().getIndex())
+        #~ model.browser.expand(self.getParent().getIndex())
     
     def _loadTagLayer(self,fromTable):
         valueNodes = []
@@ -133,17 +167,21 @@ class ValueNode(CriterionNode):
 
                 
 class RootNode(CriterionNode):
-    def __init__(self,table):
+    def __init__(self,table,model):
         self.table = table
         self.elements = None
         self.nextLayer = None # Set by the browser when the layers are created
-
+        self.model = model
+        
     def getParent(self):
         return None
     
     def getCriterion(self):
         return None
-    
+
+    def getModel(self):
+        return self.model
+        
     def update(self):
         if isinstance(self._getNextLayer(),layers.TagLayer):
             self._loadTagLayer(self.table)
@@ -173,6 +211,12 @@ class ElementNode(Node):
         self.elements = []
         self.parent = parent
         self.position = position
+    
+    def getModel(self):
+        return self.parent.getModel()
+    
+    def hasChildren(self):
+        return len(self.elements) > 0
         
     def getElements(self):
         return self.elements

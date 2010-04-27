@@ -11,11 +11,11 @@
 TT_BIG_RESULT = 'tmp_browser_bigres'
 TT_SMALL_RESULT = 'tmp_browser_smallres'
 
-from PyQt4 import QtGui
+from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import SIGNAL
 
 from omg import search, tags
-from . import forestmodel, nodes, layers, delegate, layouter
+from . import rootedtreemodel, forestmodel, nodes, layers, delegate, layouter
 
 class Browser(QtGui.QWidget):
     # Maximal number of tag layers
@@ -44,7 +44,7 @@ class Browser(QtGui.QWidget):
     
     def __init__(self,parent=None,model=None):
         QtGui.QWidget.__init__(self,parent)
-        self.model = model if model is not None else forestmodel.ForestModel()
+        self.model = model if model is not None else rootedtreemodel.RootedTreeModel() #forestmodel.ForestModel()
         
         search.createResultTempTable(TT_BIG_RESULT,True)
         search.createResultTempTable(TT_SMALL_RESULT,True)
@@ -55,7 +55,7 @@ class Browser(QtGui.QWidget):
         self.browser.setModel(self.model)
         self.browser.setItemDelegate(delegate.Delegate(self,self.model,layouter.Layouter()))
         self.browser.setExpandsOnDoubleClick(False)
-        self.browser.expanded.connect(self.onExpand)
+        self.model.browser = self.browser
         
         # OptionMenu
         optionMenu = QtGui.QMenu(self)
@@ -101,7 +101,6 @@ class Browser(QtGui.QWidget):
         controlLineLayout.addWidget(self.optionButton)
         
         # Initialize
-        self.root = nodes.RootNode("containers")
         self.updateLayers() # Create layers and content
         
         # DEBUG
@@ -119,8 +118,11 @@ class Browser(QtGui.QWidget):
         for layer in self.layers[1:]:
             previousLayer.nextLayer = layer
             previousLayer = layer
+        oldTable = self.root.table if self.root is not None else "containers"
+        self.root = nodes.RootNode(oldTable,self.model)
         self.root.nextLayer = self.layers[0]
-        self.model.setRoots([self.root])
+        self.model.setRoot(self.root)
+        #self.model.setRoots([self.root])
         self.model.reset()
         self.root.update()
         
@@ -134,12 +136,6 @@ class Browser(QtGui.QWidget):
             database.get().query("TRUNCATE TABLE ?",TT_BIG_RESULT)
             self.root.table = "containers"
         self.root.update(self.table)
-    
-    def onExpand(self,index):
-        pass # TODO: either do something sensible or remove this method
-        #print("onExpand")
-        #self.emit(SIGNAL("rowsInserted"),index,index,0,self.model.rowCount(index)-1)
-        #self.browser.rowsInserted(index,1,1)
         
 def printNode(node,level):
     print(level*"    "+str(node))
