@@ -7,4 +7,3 @@
 # published by the Free Software Foundation
 #
 from omg import application
-application.run()

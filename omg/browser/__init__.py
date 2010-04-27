@@ -14,7 +14,7 @@ TT_SMALL_RESULT = 'tmp_browser_smallres'
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import SIGNAL
 
-from omg import search, tags, constants
+from omg import search, tags
 from . import rootedtreemodel, forestmodel, nodes, layers, delegate, layouter
 
 class Browser(QtGui.QWidget):
@@ -42,10 +42,6 @@ class Browser(QtGui.QWidget):
     # Root node
     root = None
     
-    # This signal is emitted when the user double-clicks on a node.
-    nodeDoubleClicked = QtCore.pyqtSignal(int)
-
-
     def __init__(self,parent=None,model=None):
         QtGui.QWidget.__init__(self,parent)
         self.model = model if model is not None else rootedtreemodel.RootedTreeModel() #forestmodel.ForestModel()
@@ -59,7 +55,6 @@ class Browser(QtGui.QWidget):
         self.browser.setModel(self.model)
         self.browser.setItemDelegate(delegate.Delegate(self,self.model,layouter.Layouter()))
         self.browser.setExpandsOnDoubleClick(False)
-        self.browser.doubleClicked.connect(self._handleDoubleClicked)
         self.model.browser = self.browser
         
         # OptionMenu
@@ -91,7 +86,7 @@ class Browser(QtGui.QWidget):
         self.searchBox = QtGui.QLineEdit(self)
         self.searchBox.returnPressed.connect(self.search)
         self.optionButton = QtGui.QToolButton(self)
-        self.optionButton.setIcon(QtGui.QIcon(constants.IMAGES+"icons/options.png"))
+        self.optionButton.setIcon(QtGui.QIcon("images/icons/options.png"))
         self.optionButton.setPopupMode(QtGui.QToolButton.InstantPopup)
         self.optionButton.setMenu(optionMenu)
         
@@ -107,7 +102,10 @@ class Browser(QtGui.QWidget):
         
         # Initialize
         self.updateLayers() # Create layers and content
-    
+        
+        # DEBUG
+        #printNode(self.root,0)
+        
     def updateLayers(self,action=None):
         self.layers = []
         for actionGroup in self.actionGroups:
@@ -124,12 +122,13 @@ class Browser(QtGui.QWidget):
         self.root = nodes.RootNode(oldTable,self.model)
         self.root.nextLayer = self.layers[0]
         self.model.setRoot(self.root)
+        #self.model.setRoots([self.root])
         self.model.reset()
         self.root.update()
+        
         #printNode(self.root,0)
         
     def search(self):
-        """Search for the value in the search-box. If it is empty, display all values."""
         if self.searchBox.text():
             search.stdTextSearch(self.searchBox.text(),TT_BIG_RESULT)
             self.root.table = TT_BIG_RESULT
@@ -137,14 +136,8 @@ class Browser(QtGui.QWidget):
             database.get().query("TRUNCATE TABLE ?",TT_BIG_RESULT)
             self.root.table = "containers"
         self.root.update(self.table)
-    
-    def _handleDoubleClicked(self,index):
-        node = self.model.data(index)
-        if isinstance(node,nodes.ElementNode):
-            self.nodeDoubleClicked.emit(node.id)
         
 def printNode(node,level):
-    """Debugging method to print a node together with all of its children."""
     print(level*"    "+str(node))
     for element in node.getElements():
         printNode(element,level+1)
