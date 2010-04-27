@@ -13,16 +13,14 @@ db = database.get()
 client = mpd.MPDClient()
 client.connect(config.get("mpd","host"),config.get("mpd","port"))
 
+# Redirect methods to the client
+for name in ("play","pause","stop","next","previous","clear"):
+    globals()[name] = getattr(client,name)
 
-    
-def addContainer(id):
-    file = db.query("SELECT path FROM files WHERE container_id = {0}".format(id)).getSingle()
-    client.add(file)
+
+def addContainer(container):
+    client.add(container.getPath())
     
 def addContainers(list):
     for id in list:
         addContainer(id)
-        
-# Redirect methods to the client
-for name in ("play","pause","stop","next","previous","clear"):
-    globals()[name] = getattr(client,name)

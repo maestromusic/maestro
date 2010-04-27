@@ -233,7 +233,7 @@ class ElementNode(Node):
         return len(self.elements) == 0
         
     def loadElements(self,table):
-        """Delete the stored element list and fetch the child elements from the database. You may use the <table>-parameter to restrict the elements to a specific table: The table with name <table> must contain a column 'id' and this method will only fetch elements which appear in that column. If <recursive> is true updateElements will be called recursively for all child elements."""
+        """Delete the stored element list and fetch the child elements from the database. You may use the <table>-parameter to restrict the elements to a specific table: The table with name <table> must contain a column 'id' and this method will only fetch elements which appear in that column."""
         self.elements = []
         result = db.query("""
                 SELECT contents.element_id,contents.position
