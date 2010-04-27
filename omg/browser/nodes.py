@@ -7,7 +7,7 @@
 # published by the Free Software Foundation
 #
 from PyQt4 import QtCore
-from omg import search, database, tags
+from omg import search, database, tags, models
 from . import TT_BIG_RESULT, TT_SMALL_RESULT, layers
 from PyQt4.QtCore import SIGNAL
 
@@ -78,35 +78,33 @@ class CriterionNode(Node):
     
     def getModel(self):
         return self.parent.getModel()
-        
+    
+    def retrieveElementList(self):
+        if self.elements is None:
+            self.update(True)
+        result = []
+        for element in self.elements:
+            result.extend(element.retrieveElementList())
+        return result
+
     def _getTable(self):
         return self.parent._getTable()
         
     def _getNextLayer(self):
         return self.layer.nextLayer
         
-    def update(self):
+    def update(self,recursive=False):
         search.stdSearch(self._collectCriteria(),TT_SMALL_RESULT,self._getTable())
         model = self.getModel()
         if isinstance(self._getNextLayer(),layers.TagLayer):
             self._loadTagLayer(TT_SMALL_RESULT)
-            if db.query("SELECT COUNT(*) FROM {0}".format(TT_SMALL_RESULT)).getSingle()\
-                    < self._getNextLayer().DIRECT_LOAD_LIMIT:
+            if (recursive or 
+                db.query("SELECT COUNT(*) FROM {0}".format(TT_SMALL_RESULT)).getSingle()
+                     < self._getNextLayer().DIRECT_LOAD_LIMIT):
                 for element in self.elements:
-                    element.update()
+                    element.update(recursive)
         else: self._loadContainerLayer(TT_SMALL_RESULT)
         
-        #model.browser.collapse(self.getParent().getIndex())
-        #model.browser.expand(self.getParent().getIndex())
-        #model.browser.emit(SIGNAL("dataChanged"),index,index)
-        #~ index = self.getIndex()
-        #~ model.browser.emit(SIGNAL("rowsRemoved"),index,0,0)
-        #~ model.browser.emit(SIGNAL("rowsInserted"),index,0,len(self.elements)-1)
-        #~ for element in self.getParent().getElements():
-            #~ model.browser.update(element.getIndex())
-        #~ model.browser.update(self.getParent().getIndex())
-        #~ model.browser.collapse(self.getParent().getIndex())
-        #~ model.browser.expand(self.getParent().getIndex())
     
     def _loadTagLayer(self,fromTable):
         valueNodes = []
@@ -182,9 +180,14 @@ class RootNode(CriterionNode):
     def getModel(self):
         return self.model
         
-    def update(self):
+    def update(self,recursive=False):
         if isinstance(self._getNextLayer(),layers.TagLayer):
             self._loadTagLayer(self.table)
+            if (recursive or 
+                db.query("SELECT COUNT(*) FROM {0}".format(self.table)).getSingle()
+                     < self._getNextLayer().DIRECT_LOAD_LIMIT):
+                for element in self.elements:
+                    element.update(recursive)
         else: self._loadContainerLayer(TT_SMALL_RESULT)
         
     def _getNextLayer(self):
@@ -223,7 +226,16 @@ class ElementNode(Node):
     
     def getElementsCount(self):
         return len(self.elements)
-        
+    
+    def retrieveElementList(self):
+        if not self.elements:
+            return [models.Container(self.id)]
+        else:
+            result = []
+            for element in self.elements:
+                result.extend(element.retrieveElementList())
+            return result
+            
     def __str__(self):
         if self.position is not None:
             return '<ElementNode "{0}">'.format(self.getTitle())

@@ -66,9 +66,11 @@ class PlayList(QtGui.QWidget):
         layout.addWidget(self.listView)
 
 
-    def addContainer(self,id):
-        self.model.appendRow(QtGui.QStandardItem("Container {0}".format(id)))
-        mpclient.addContainer(id)
+    def addNode(self,node):
+        elementList = node.retrieveElementList()
+        for element in elementList:
+            self.model.appendRow(QtGui.QStandardItem(element.getTitle()))
+            mpclient.addContainer(element)
     
     def _handlePrevious(self,checked=False):
         mpclient.previous()

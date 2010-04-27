@@ -14,11 +14,20 @@ class Container:
     elements = None
     
     def __init__(self,id):
+        assert isinstance(id,int)
         self.id = id
-    
+
     def getPath(self):
-        return db.query("SELECT path FROM files WHERE container_id = {0}".format(id)).getSingle()
+        return db.query("SELECT path FROM files WHERE container_id = {0}".format(self.id)).getSingle()
     
+    def getTitle(self):
+        """Return a title of this element which is created from the title-tags. If this element does not contain a title-tag some dummy-title is returned."""
+        if self.tags is None:
+            self.loadTags()
+        if tags.TITLE in self.tags:
+            return " - ".join(self.tags[tags.TITLE])
+        else: return '<Kein Titel>'
+        
     def loadElements(self,recursive=False,table="containers"):
         """Delete the stored element list and fetch the child elements from the database. You may use the <table>-parameter to restrict the elements to a specific table: The table with name <table> must contain a column 'id' and this method will only fetch elements which appear in that column. If <recursive> is true updateElements will be called recursively for all child elements."""
         self.elements = []
@@ -39,6 +48,8 @@ class Container:
         
         if tagList is not None:
             additionalWhereClause = " AND tag_id IN ({0})".format(",".join(str(tag.id) for tag in tagList))
+        else: additionalWhereClause = ''
+        
         result = db.query("""
             SELECT tag_id,value_id 
             FROM tags
@@ -46,8 +57,12 @@ class Container:
             """.format(self.id,additionalWhereClause))
         for row in result:
             tag = tags.get(row[0])
-            if row[1] not in blacklist[tag]:
-                self.tags[tag].append(tag.getValue(row[1]))
+            self.tags[tag].append(tag.getValue(row[1]))
         if recursive:
             for element in self.elements:
                 element.loadTags(newBlacklist)
+    
+    def __str__(self):
+        if self.tags is not None:
+            return "<Container {0}".format(self.getTitle())
+        else: return "<Container {0}>".format(self.id)

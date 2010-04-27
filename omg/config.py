@@ -30,6 +30,12 @@ def init(*config_files):
             "mysql_db":"omg"
         },
         
+        "mpd": {
+            # Host and port where MPD is running
+            "host": "localhost",
+            "port": "6600"
+        },
+
         "tags": {
             # Tags which will be indexed in their own database tables. Indexed tags have a type which defaults to varchar and may be specified in parentheses after the tagname (e.g. date(date)).
             "indexed_tags":"album,artist,composer,date(date),genre,performer,title",
