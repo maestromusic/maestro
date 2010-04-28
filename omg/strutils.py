@@ -38,6 +38,9 @@ def nextWhiteSpace(string,pos=0):
     
 def formatLength(lengthInSeconds):
     """Converts a number of seconds in a string like '01:34', '00:05' or '1:20:00'. Hours are only displayed when <lengthInSeconds> is at least 3600. Minutes and seconds are displayed with leading zeros."""
+    if not isinstance(lengthInSeconds,int):
+        lengthInSeconds = int(lengthInSeconds)
+        
     seconds = lengthInSeconds % 60
     minutes = int(lengthInSeconds / 60) % 60
     if lengthInSeconds < 3600:

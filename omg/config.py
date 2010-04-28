@@ -30,6 +30,11 @@ def init(*config_files):
             "mysql_db":"omg"
         },
         
+        "control": {
+            # Interval of the control timer syncing with mpd in milliseconds.
+            "timer_interval": "100"
+        },
+        
         "mpd": {
             # Host and port where MPD is running
             "host": "localhost",

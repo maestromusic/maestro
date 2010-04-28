@@ -18,23 +18,30 @@ def run():
     database.connect()
     from omg import tags
     tags.updateIndexedTags()
-    from omg import config, mpclient, search, browser, playlist
+    from omg import config, mpclient, search, control, browser, playlist
     search.init()
 
     # Create GUI
     gui = QtGui.QWidget()
-    layout = QtGui.QHBoxLayout()
+    layout = QtGui.QVBoxLayout()
     gui.setLayout(layout)
 
+    controlWidget = control.createWidget(gui)
+    layout.addWidget(controlWidget,0)
+    
+    bottomLayout = QtGui.QHBoxLayout()
+    layout.addLayout(bottomLayout,1)
+    
     browser = browser.Browser(gui)
-    layout.addWidget(browser,2)
+    bottomLayout.addWidget(browser,2)
 
     playlist = playlist.Playlist(gui)
-    layout.addWidget(playlist,5)
+    bottomLayout.addWidget(playlist,5)
 
     browser.nodeDoubleClicked.connect(playlist.addNode)
-
-
+    
+    control.startSynchronization()
+    
     gui.resize(800, 600)
     screen = QtGui.QDesktopWidget().screenGeometry()
     size =  gui.geometry()
