@@ -35,3 +35,13 @@ def nextWhiteSpace(string,pos=0):
     while pos < len(string) and not string[pos].isspace():
         pos = pos + 1
     return pos
+    
+def formatLength(lengthInSeconds):
+    """Converts a number of seconds in a string like '01:34', '00:05' or '1:20:00'. Hours are only displayed when <lengthInSeconds> is at least 3600. Minutes and seconds are displayed with leading zeros."""
+    seconds = lengthInSeconds % 60
+    minutes = int(lengthInSeconds / 60) % 60
+    if lengthInSeconds < 3600:
+        return "{0:02d}:{1:02d}".format(minutes,seconds)
+    else:
+        hours = int(lengthInSeconds / 3600)
+        return "{0:d}:{1:02d}:{2:02d}".format(hours,minutes,seconds)

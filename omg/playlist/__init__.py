@@ -8,40 +8,23 @@
 #
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import SIGNAL
-from omg import constants, mpclient
+from omg import constants, mpclient, tags
+from . import playlistmodel, delegate
 
-class PPButton(QtGui.QPushButton):
-    play = QtCore.pyqtSignal()
-    pause = QtCore.pyqtSignal()
-    playIcon = QtGui.QIcon(constants.IMAGES+"icons/play.png")
-    pauseIcon = QtGui.QIcon(constants.IMAGES+"icons/pause.png")
     
-    def __init__(self,parent):
-        QtGui.QPushButton.__init__(self,self.playIcon,'',parent)
-        self.playing = False
-        self.clicked.connect(self._handleClicked)
-    
-    def _handleClicked(self,checked = False):
-        if self.playing:
-            self.setIcon(self.playIcon)
-            self.pause.emit()
-        else:
-            self.setIcon(self.pauseIcon)
-            self.play.emit()
-        self.playing = not self.playing
-            
-    
-class PlayList(QtGui.QWidget):
+class Playlist(QtGui.QWidget):
     listView = None
     model = None
     
     def __init__(self,parent=None):
         QtGui.QWidget.__init__(self,parent)
-        self.model = QtGui.QStandardItemModel(self)
+        self.model = playlistmodel.PlaylistModel([playlistmodel.DataColumn('title'),playlistmodel.TagColumn(tags.ALBUM),playlistmodel.DataColumn('path'),playlistmodel.DataColumn('length')])
         
         # listView
-        self.listView = QtGui.QListView(self)
-        self.listView.setModel(self.model)
+        self.treeView = QtGui.QTreeView(self)
+        self.treeView.setModel(self.model)
+        self.treeView.setItemDelegate(delegate.Delegate(self,self.model))
+        self.treeView.setRootIsDecorated(False)
         
         # ControlLine
         controlLineLayout = QtGui.QHBoxLayout()
@@ -63,14 +46,11 @@ class PlayList(QtGui.QWidget):
     
         layout = QtGui.QVBoxLayout(self)
         layout.addLayout(controlLineLayout)
-        layout.addWidget(self.listView)
-
-
+        layout.addWidget(self.treeView)
+        
     def addNode(self,node):
         elementList = node.retrieveElementList()
-        for element in elementList:
-            self.model.appendRow(QtGui.QStandardItem(element.getTitle()))
-            mpclient.addContainer(element)
+        self.model.setRoots([playlistmodel.ContainerNode(element) for element in elementList])
     
     def _handlePrevious(self,checked=False):
         mpclient.previous()
@@ -80,3 +60,24 @@ class PlayList(QtGui.QWidget):
         
     def _handleStop(self,checked=False):
         mpclient.stop()
+        
+        
+class PPButton(QtGui.QPushButton):
+    play = QtCore.pyqtSignal()
+    pause = QtCore.pyqtSignal()
+    playIcon = QtGui.QIcon(constants.IMAGES+"icons/play.png")
+    pauseIcon = QtGui.QIcon(constants.IMAGES+"icons/pause.png")
+    
+    def __init__(self,parent):
+        QtGui.QPushButton.__init__(self,self.playIcon,'',parent)
+        self.playing = False
+        self.clicked.connect(self._handleClicked)
+    
+    def _handleClicked(self,checked = False):
+        if self.playing:
+            self.setIcon(self.playIcon)
+            self.pause.emit()
+        else:
+            self.setIcon(self.pauseIcon)
+            self.play.emit()
+        self.playing = not self.playing

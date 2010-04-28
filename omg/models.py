@@ -17,6 +17,11 @@ class Container:
         assert isinstance(id,int)
         self.id = id
 
+    def isFile(self):
+        if self.elements is None:
+            return None
+        else: return len(self.elements) == 0
+        
     def getPath(self):
         return db.query("SELECT path FROM files WHERE container_id = {0}".format(self.id)).getSingle()
     
@@ -40,7 +45,7 @@ class Container:
             self.elements.append(Container(id))
         if recursive:
             for element in self.elements:
-                element.loadElements(True,table)
+                element.loadElements(recursive,table)
 
 
     def loadTags(self,recursive=False,tagList=None):
@@ -62,6 +67,29 @@ class Container:
             for element in self.elements:
                 element.loadTags(newBlacklist)
     
+    def index(self,container):
+        for i in range(0,len(self.elements)):
+            if self.elements[i].id == container.id:
+                return i
+        raise ValueError("Container.index: Container {0} is not an element of container {1}.".format(container.id,self.id))
+        
+    def find(self,container):
+        for i in range(0,len(self.elements)):
+            if self.elements[i].id == container.id:
+                return i
+        return -1
+    
+    def getLength(self):
+        if self.elements is None:
+            return None
+        if len(self.elements) == 0:
+            return db.query("SELECT length FROM files WHERE container_id = {0}".format(self.id)).getSingle()
+        else:
+            try:
+                return sum(element.getLength() for element in self.elements)
+            except TypeError: # At least one container does not no its length
+                return None
+
     def __str__(self):
         if self.tags is not None:
             return "<Container {0}".format(self.getTitle())

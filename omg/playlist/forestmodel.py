@@ -10,7 +10,8 @@ from PyQt4 import QtCore
 from PyQt4.QtCore import Qt
 
 class ForestModel(QtCore.QAbstractItemModel):
-    """ForestModel is a simple model for QTreeViews. It takes a list of root elements which may have child elements. Elements in a ForestModel may have every type Each element in the ForestModel must have the following methods:
+    """ForestModel is a simple model for QTreeViews. It takes a list of root elements which may have child elements. Elements in a ForestModel may have every type, but must implement the following methods:
+    - hasChildren(): return whether the element has children. Using this method you can implement elements which determine the exact number of elements not until they are first expanded.
     - getElements(): return the list of childrens of the element
     - getElementCount(): return the number of childrens of the element
     - getParent(): return the element's parent or None if the element is a root
@@ -19,10 +20,11 @@ class ForestModel(QtCore.QAbstractItemModel):
     # List of the root nodes
     _roots = None
     
-    def __init__(self,roots=None):
+    def __init__(self,columnCount,roots=None):
         """Initialize a new ForestModel with the given list of roots."""
         QtCore.QAbstractItemModel.__init__(self)
         self._roots = roots if roots is not None else []
+        self.columnCount = columnCount
     
     def getRoots(self):
         """Return the list of roots of this model."""
@@ -33,6 +35,12 @@ class ForestModel(QtCore.QAbstractItemModel):
         self._roots = roots
         self.reset()
     
+    def getColumnCount(self):
+        return self.columnCount
+    
+    def setColumnCount(self,columnCount):
+        self.columnCount = columnCount
+        
     def data(self,index,role=Qt.DisplayRole):
         if not index.isValid() or role != Qt.DisplayRole:
             return None
@@ -44,14 +52,14 @@ class ForestModel(QtCore.QAbstractItemModel):
         return self.data(index).hasChildren()
         
     def rowCount(self,parent):
-        if parent.column() > 0:
+        if parent.column() > self.columnCount:
             return 0
         if not parent.isValid():
             return len(self._roots)
         else: return self.data(parent).getElementsCount()
 
     def columnCount(self,parent):
-        return 1
+        return self.columnCount
     
     def parent(self,index):
         if not index.isValid():

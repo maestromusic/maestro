@@ -29,13 +29,13 @@ def run():
     browser = browser.Browser(gui)
     layout.addWidget(browser,2)
 
-    playlist = playlist.PlayList(gui)
-    layout.addWidget(playlist,3)
+    playlist = playlist.Playlist(gui)
+    layout.addWidget(playlist,5)
 
     browser.nodeDoubleClicked.connect(playlist.addNode)
 
 
-    gui.resize(600, 410)
+    gui.resize(800, 600)
     screen = QtGui.QDesktopWidget().screenGeometry()
     size =  gui.geometry()
     gui.move((screen.width()-size.width())/2, (screen.height()-size.height())/2)
