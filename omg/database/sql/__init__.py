@@ -87,18 +87,7 @@ class AbstractSql:
         
         This function escapes the characters which are listed in the documentation of mysql_real_escape_string and is used as a replacement for that function. But it doesn't emulate mysql_real_escape string correctly, which would be difficult since that function needs a database connection to determine the connection's encoding. If <likeStatement> is true this method also escapes '%' and '_' so that the return value may safely be used in LIKE-statements.
         """
-        escapeDict = {
-             '\\': '\\\\',
-             "'": "\\'",
-             '"': '\\"',
-             '\x00': '\\0',
-             '0x1A': '\\Z', # ASCII 26
-             '\n': '\\n',
-             '\r': '\\r'
-             }
-        if likeStatement:
-            escapeDict.update({'%':'\%','_':'\_'})
-        return strutils.replace(string,escapeDict)
+        return _escapeString(self,string,likeStatement)
 
 
 class AbstractSqlResult:
@@ -128,13 +117,31 @@ class AbstractSqlResult:
         """Returns a generator for the first column of the result set and should be used as a shorthand method if the result contains only one column. Do not use this method together with iterators or getSingle as both of them may move the internal cursor."""
 
 
+def _escapeString(string,likeStatement=False):
+        """Escape a string for insertion in MySql queries.
+        
+        This function escapes the characters which are listed in the documentation of mysql_real_escape_string and is used as a replacement for that function. But it doesn't emulate mysql_real_escape string correctly, which would be difficult since that function needs a database connection to determine the connection's encoding. If <likeStatement> is true this method also escapes '%' and '_' so that the return value may safely be used in LIKE-statements.
+        """
+        escapeDict = {
+             '\\': '\\\\',
+             "'": "\\'",
+             '"': '\\"',
+             '\x00': '\\0',
+             '0x1A': '\\Z', # ASCII 26
+             '\n': '\\n',
+             '\r': '\\r'
+             }
+        if likeStatement:
+            escapeDict.update({'%':'\%','_':'\_'})
+        return strutils.replace(string,escapeDict)
+        
 def _replaceQueryArgs(query,*args):
     """Replace occurences of '?' in query by the arguments which must be either string or int. String arguments are escaped."""
     if query.count('?') != len(args):
         raise DBException("Number of '?' must match number of query parameters.")
     for arg in args:
         if isinstance(arg,str):
-            arg = "'"+escapeString(arg)+"'"
+            arg = "'"+_escapeString(arg)+"'"
         elif isinstance(arg,int):
             arg = str(arg)
         else: raise DBException("All arguments must be either string or int, but I got one of type {0}".format(type(arg)))
