@@ -11,14 +11,19 @@ from PyQt4.QtCore import SIGNAL
 from omg import constants, mpclient, strutils
 
 class ControlWidget(QtGui.QWidget):
-    SLIDER_MAX = 1000
+    """Widget providing buttons to control a music player."""
     
-    # Storing time information of the currently played song.
+    # Maximal value for the seekSlider
+    SEEK_SLIDER_MAX = 1000
+    
+    # Time information of the currently played song.
     time = None
     
     def __init__(self,parent):
+        """Initialize this ControlWidget with the given parent."""
         QtGui.QWidget.__init__(self,parent)
         
+        # Layout
         layout = QtGui.QVBoxLayout()
         self.setLayout(layout)
         firstLine = QtGui.QHBoxLayout()
@@ -26,6 +31,7 @@ class ControlWidget(QtGui.QWidget):
         layout.addLayout(firstLine)
         layout.addLayout(secondLine)
         
+        # Controls in the first line
         self.previousButton = QtGui.QPushButton(QtGui.QIcon(constants.IMAGES+"icons/previous.png"),'',self)
         self.ppButton = PPButton(self)
         self.stopButton = QtGui.QPushButton(QtGui.QIcon(constants.IMAGES+"icons/stop.png"),'',self)
@@ -49,6 +55,7 @@ class ControlWidget(QtGui.QWidget):
         firstLine.addWidget(self.seekSlider,1)
         firstLine.addWidget(self.secondLabel)
         
+        # Controls in the second line
         self.titleLabel = QtGui.QLabel(self)
         self.volumeLabel = VolumeLabel(self)
         self.volumeSlider = QtGui.QSlider(QtCore.Qt.Horizontal,self)
@@ -61,6 +68,7 @@ class ControlWidget(QtGui.QWidget):
 
 
     def setStatus(self,status):
+        """Sets all controls in this widget to reflect the given status (which should be returned by mpclient.status())."""
         self.ppButton.setPlaying(status['state'] == 'play')
         if 'time' in status:
             if self.time != status['time']:
@@ -80,51 +88,65 @@ class ControlWidget(QtGui.QWidget):
         self.volumeSlider.setValue(status['volume'])
     
     def _handlePrevious(self,checked=False):
+        """Handle the click on self.previousButton."""
         mpclient.previous()
         
     def _handleNext(self,checked=False):
+        """Handle the click on self.nextButton."""
         mpclient.next()
         
     def _handleStop(self,checked=False):
+        """Handle the click on self.stopButton."""
         mpclient.stop()
         
     def _handleSeekSliderAction(self,action):
-        if self.time is not None:
+        """Handle any change of the seekSlider."""
+        if self.time is not None: # i.e. some music file is playing at the moment
             mpclient.seek(0,int(self.seekSlider.sliderPosition() / self.SLIDER_MAX * self.time.getTotal()))
 
     def _handleVolumeSliderAction(self,action):
-        # mpcline.volume adds its parameter to the volume...so we pass the difference between old and new slider value:
+        """Handle any change of the volumeSlider."""
+        # mpclient.volume adds its parameter to the volume...so we pass the difference between old and new slider value:
         mpclient.volume(self.volumeSlider.sliderPosition()-self.volumeSlider.value())
 
         
 class PPButton(QtGui.QPushButton):
+    """Special button with two states. Depending on the state different signals (play and pause) are emitted when the button is clicked and the button shows different icons."""
+    
+    # Signals and icons used for the two states
     play = QtCore.pyqtSignal()
     pause = QtCore.pyqtSignal()
     playIcon = QtGui.QIcon(constants.IMAGES+"icons/play.png")
     pauseIcon = QtGui.QIcon(constants.IMAGES+"icons/pause.png")
     
     def __init__(self,parent):
+        """Initialize this button with the given parent. The button will be in pause-state."""
         QtGui.QPushButton.__init__(self,self.playIcon,'',parent)
         self.playing = False
         self.clicked.connect(self._handleClicked)
 
     def _handleClicked(self,checked = False):
+        """Handle a click on the button."""
         if self.playing:
             self.pause.emit()
         else: self.play.emit()
         # Do NOT change self.playing! The flag will be changed, when a change in mpd's status is detected.
 
     def setPlaying(self,playing):
+        """Set the state of this button to play if <playing> is true or pause otherwise."""
         if playing != self.playing:
             self.playing = playing
             self.setIcon(self.pauseIcon if playing else self.playIcon)
 
 
 class VolumeLabel(QtGui.QLabel):
+    """Special label displaying the icon next to the volumeSlider. The icon which is shown depends on the current volume level."""
     def __init__(self,parent):
+        """Initialize this label with the given parent."""
         QtGui.QLabel.__init__(self,parent)
     
     def setVolume(self,volume):
+        """Display the icon appropriate for the given volume."""
         if volume == 0:
             self.setPixmap(QtGui.QPixmap(constants.IMAGES+"icons/volume_muted.png"))
         elif volume <= 33:
