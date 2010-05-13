@@ -87,7 +87,7 @@ class AbstractSql:
         
         This function escapes the characters which are listed in the documentation of mysql_real_escape_string and is used as a replacement for that function. But it doesn't emulate mysql_real_escape string correctly, which would be difficult since that function needs a database connection to determine the connection's encoding. If <likeStatement> is true this method also escapes '%' and '_' so that the return value may safely be used in LIKE-statements.
         """
-        return _escapeString(self,string,likeStatement)
+        return _escapeString(string,likeStatement)
 
 
 class AbstractSqlResult:
@@ -115,6 +115,12 @@ class AbstractSqlResult:
         
     def getSingleColumn(self):
         """Returns a generator for the first column of the result set and should be used as a shorthand method if the result contains only one column. Do not use this method together with iterators or getSingle as both of them may move the internal cursor."""
+        
+    def getSingleRow(self):
+        """Returns the first row of the result set or None if there is no row. This method should be used as a shorthand if there is only one row in the result set."""
+        if self.size() == 0:
+            return None
+        else: return self.next()
 
 
 def _escapeString(string,likeStatement=False):

@@ -6,10 +6,11 @@
 # it under the terms of the GNU General Public License version 3 as
 # published by the Free Software Foundation
 #
-import sys
+import sys, os
 from PyQt4 import QtCore, QtGui
 
 def run():
+    os.chdir(os.path.dirname(__file__)+"/../")
     # Some Qt-classes need a running QApplication before they can be created
     app = QtGui.QApplication(sys.argv)
 
@@ -38,7 +39,8 @@ def run():
     playlist = playlist.Playlist(gui)
     bottomLayout.addWidget(playlist,5)
 
-    browser.nodeDoubleClicked.connect(playlist.addNode)
+    #browser.nodeDoubleClicked.connect(playlist.addNode)
+    playlist.getModel().connectToSyncPlaylist(control.playlist)
     
     control.startSynchronization()
     

@@ -149,6 +149,7 @@ def updateIndexedTags():
     global artistTags
     artistTags = tuple(_tagsByName[tagname] for tagname in config.get("browser","artist_tags").split(','))
 
+
 class Storage(defaultdict):
     """Dictionary subclass used to store tags. As a container may have several values for the same tag, Storage maps tags to lists of values. Storage adds a few useful functions to deal with such datastructures and modifies dict in two ways:
     - Storage will not raise a KeyError if it does not contain a tag but return an empty list instead. This is useful as in most cases the functions dealing with tag lists will just skip an empty list.
