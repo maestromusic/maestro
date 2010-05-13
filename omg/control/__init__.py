@@ -9,34 +9,31 @@
 from PyQt4.QtCore import QTimer
 from omg import config, mpclient
 from . import widget as widgetModule
-
-class State:
-    PLAY,PAUSE,STOP = range(0,3)
-    
-    def fromString(string):
-        if string == 'play':
-            return PLAY
-        elif string == 'pause':
-            return PAUSE
-        elif string == 'stop':
-            return STOP
-        raise ValueError("Unknown state")
+from . import syncplaylist
 
 # A reference to the ControlWidget
 widget = None
 
+# The playlist which is synchronized with MPD.
+playlist = syncplaylist.Playlist()
+
 # The timer used to synchronize with MPD.
-timer = QTimer()
+_timer = QTimer()
 
 def createWidget(parent):
-    """Creates a ControlWidget and stores a reference to it in this module."""
+    """Create a ControlWidget and store a reference to it in this control.widget."""
     globals()["widget"] = widgetModule.ControlWidget(parent)
     return widget
 
 def startSynchronization():
-    timer.timeout.connect(_sync)
-    timer.start(int(config.get("control","timer_interval")))
+    """Start synchronization with MPD."""
+    _timer.timeout.connect(_sync)
+    _timer.start(int(config.get("control","timer_interval")))
+    _sync() # Synchronize right away. In particular this is useful when the timer-interval is large for debugging.
     
 def _sync():
-    status = mpclient.status()
-    widget.setStatus(status)
+    """Synchronize playlist and widget with MPD."""
+    if _timer.interval() >= 1000: #TODO: Remove this debugging feature
+        print("Control: Syncing with MPD")
+    widget.setStatus(mpclient.status())
+    playlist.synchronize(mpclient.playlist())

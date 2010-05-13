@@ -10,57 +10,11 @@ from PyQt4 import QtCore
 from omg import models, strutils
 from . import forestmodel
 
-class ContainerNode(models.Container):
-    def __init__(self,param,position=None,parent=None):
-        if isinstance(param,int):
-            models.Container.__init__(self,param)
-        else:
-            assert isinstance(param,models.Container)
-            models.Container.__init__(self,param.id)
-            self.elements = param.elements
-            self.tags = param.tags
-        if self.elements is None:
-            self.loadElements(True)
-        if self.tags is None:
-            self.loadTags(True)
-        self.position = position
-        self.parent = parent
-    
-    # Methods for ForestModel
-    def hasChildren(self):
-        return len(self.elements) > 0
-        
-    def getElementsCount(self):
-        return len(self.elements)
-        
-    def getElements(self):
-        return self.elements
-
-    def getParent(self):
-        return self.parent
-
-    def getPosition(self):
-        return self.position
-        
-    def getPath(self):
-        try:
-            return self.path
-        except AttributeError:
-            self.path = models.Container.getPath(self)
-            return self.path
-        
-    def getLength(self):
-        try:
-            return self.length
-        except AttributeError:
-            self.length = models.Container.getLength(self)
-            return self.length
-            
-            
-class PlaylistModel(forestmodel.ForestModel):
-    def __init__(self,columns,roots=None):
-        forestmodel.ForestModel.__init__(self,len(columns),roots)
+class PlaylistModel(QtCore.QAbstractTableModel):
+    def __init__(self,columns,elements=None):
+        QtCore.QAbstractTableModel.__init__(self)
         self.columns = columns
+        self.elements = elements if elements is not None else []
         
     def headerData(self,section,orientation,role = QtCore.Qt.DisplayRole):
         if role != QtCore.Qt.DisplayRole or orientation != QtCore.Qt.Horizontal:
@@ -74,13 +28,52 @@ class PlaylistModel(forestmodel.ForestModel):
     
     def setColumns(self,columns):
         self.columns = columns
-        forestmodel.ForestModel.setColumnCount(len(columns))
     
-    def addNode(self,node):
-        elementList = node.retrieveElementList()
-        self.model.setRoots([playlistmodel.ContainerNode(element) for element in elementList])
+    def rowCount(self,parent=None):
+        return len(self.elements)
+        
+    def columnCount(self,parent=None):
+        return len(self.columns)
+        
+    def data(self,index,role=QtCore.Qt.DisplayRole):
+        if role != QtCore.Qt.DisplayRole:
+            return None
+        if index.row() >= self.rowCount() or index.column() >= self.columnCount():
+            return None
+        return self.elements[index.row()] # Data is the same for all columns. The delegate will display different values in different columns.
+        
+    def _handleFilesInserted(self,start,end):
+        print("filesInserted: {0} {1}".format(start,end))
+        self.elements[start:start] = self.syncPlaylist.get()[start:end+1]
+        for element in self.elements[start:end+1]:
+            element.ensureTagsAreLoaded()
+        self.rowsInserted.emit(QtCore.QModelIndex(),start,end)
+        
+    def _handleFilesRemoved(self,start,end):
+        print("filesRemoved: {0} {1}".format(start,end))
+        del self.elements[start:end+1]
+        self.rowsRemoved.emit(QtCore.QModelIndex(),start,end)
+        
+    def _handleReset(self):
+        print("RESET")
+        self.elements = self.syncPlaylist.get()[:]
+        for element in self.elements:
+            element.ensureTagsAreLoaded()
+        self.modelReset.emit()
 
-
+    def connectToSyncPlaylist(self,syncPlaylist):
+        self.syncPlaylist = syncPlaylist
+        syncPlaylist.filesInserted.connect(self._handleFilesInserted)
+        syncPlaylist.filesRemoved.connect(self._handleFilesRemoved)
+        syncPlaylist.listReset.connect(self._handleReset)
+        
+    def disconnectFromSyncPlaylist(self):
+        self.syncPlaylist.filesInserted.disconnect(self._handleFilesInserted)
+        self.syncPlaylist.filesRemoved.disconnect(self._handleFilesRemoved)
+        self.syncPlaylist.listReset.disconnect(self._handleReset)
+        self.syncPlaylist = None
+    
+    
 class Column:
     def getName(self): pass
     def getData(self,container): pass
@@ -96,27 +89,29 @@ class TagColumn(Column):
         return ", ".join(str(value) for value in container.tags[self.tag])
 
 class DataColumn(Column):
+    types = {
+        'title': "Titel",
+        'length': "Länge",
+        'path': "Pfad"
+        }
+        
     def __init__(self,type):
+        assert type in self.types
         self.type = type
     
     def getName(self):
-        if self.type == 'title':
-            return "Titel"
-        elif self.type == 'length':
-            return "Länge"
-        elif self.type == 'path':
-            return "Pfad"
-        assert False
+        return self.types[self.type]
     
-    def getData(self,container):
+    def getData(self,element):
         if self.type == 'title':
-            if container.getPosition() is not None:
-                return "{0} - {1}".format(position,container.getTitle())
-            else: return container.getTitle()
+            return element.getTitle()
         elif self.type == 'length':
-            return strutils.formatLength(container.getLength())
+            length = element.getLength()
+            if length is not None:
+                return strutils.formatLength(element.getLength())
+            else: return ""
         elif self.type == 'path':
-            if container.isFile():
-                return container.getPath()
+            if element.isFile():
+                return element.getPath()
             else: return ''
         assert False
