@@ -45,7 +45,7 @@ def createResultTempTable(tableName,dropIfExists):
         """.format(tableName))
 
 
-def stdTextSearch(searchString,resultTable,fromTable,logicalMode):
+def stdTextSearch(searchString,resultTable,fromTable='containers',logicalMode=CONJUNCTION):
     stdSearch(searchparser.parseSearchString(searchString),resultTable,fromTable,logicalMode)
 
 
@@ -165,4 +165,3 @@ def printResultTable(table):
     print("Printing result table "+table)
     for row in result:
         print("{0} '{3}' Toplevel: {1} New: {2}".format(*row))
-                

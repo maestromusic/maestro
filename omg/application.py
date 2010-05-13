@@ -10,7 +10,12 @@ import sys, os
 from PyQt4 import QtCore, QtGui
 
 def run():
-    os.chdir(os.path.dirname(__file__)+"/../")
+    # Switch first to the directory containing this file
+    if os.path.dirname(__file__):
+        os.chdir(os.path.dirname(__file__))
+    # And then one directory above
+    os.chdir("../")
+    
     # Some Qt-classes need a running QApplication before they can be created
     app = QtGui.QApplication(sys.argv)
 

@@ -15,7 +15,7 @@ from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import SIGNAL
 
 from omg import search, tags, constants, models
-from . import rootedtreemodel, forestmodel, nodes, layers, delegate, layouter
+from . import rootedtreemodel, nodes, layers, delegate, layouter
 
 class Browser(QtGui.QWidget):
     # Maximal number of tag layers
@@ -45,7 +45,7 @@ class Browser(QtGui.QWidget):
     # This signal is emitted when the user double-clicks on a node. The
     nodeDoubleClicked = QtCore.pyqtSignal(nodes.Node)
     
-    containerDoubleClicked = QtCore.pyqtSignal(models.Container)
+    containerDoubleClicked = QtCore.pyqtSignal(models.Element)
 
 
     def __init__(self,parent=None,model=None):
@@ -138,13 +138,14 @@ class Browser(QtGui.QWidget):
         else:
             database.get().query("TRUNCATE TABLE ?",TT_BIG_RESULT)
             self.root.table = "containers"
-        self.root.update(self.table)
+        self.model.reset()
+        self.root.update()
     
     def _handleDoubleClicked(self,index):
         node = self.model.data(index)
         self.nodeDoubleClicked.emit(node)
         if isinstance(node,nodes.ElementNode):
-            self.containerDoubleClicked.emit(models.Container(node.id))
+            self.containerDoubleClicked.emit(models.Element(node.id))
 
 
 def printNode(node,level):

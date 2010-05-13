@@ -32,7 +32,7 @@ def init(*config_files):
         
         "control": {
             # Interval of the control timer syncing with mpd in milliseconds.
-            "timer_interval": "100"
+            "timer_interval": "300"
         },
         
         "mpd": {

@@ -229,7 +229,7 @@ class ElementNode(Node):
     
     def retrieveElementList(self):
         if not self.elements:
-            return [models.Container(self.id)]
+            return [models.Element(self.id)]
         else:
             result = []
             for element in self.elements:
