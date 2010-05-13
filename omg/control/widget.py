@@ -40,7 +40,7 @@ class ControlWidget(QtGui.QWidget):
         self.secondLabel = QtGui.QLabel(self)
         
         self.seekSlider = QtGui.QSlider(QtCore.Qt.Horizontal,self)
-        self.seekSlider.setRange(0,self.SLIDER_MAX)
+        self.seekSlider.setRange(0,self.SEEK_SLIDER_MAX)
         self.seekSlider.setTracking(False)
         self.seekSlider.actionTriggered.connect(self._handleSeekSliderAction)
         
@@ -77,7 +77,7 @@ class ControlWidget(QtGui.QWidget):
                 self.secondLabel.setText("-"+strutils.formatLength(self.time.getRemaining()))
                 # Don't move the slider, if the user presses it down to move it personally.
                 if not self.seekSlider.isSliderDown():
-                    self.seekSlider.setValue(int(self.SLIDER_MAX * self.time.getRatio()))
+                    self.seekSlider.setValue(int(self.SEEK_SLIDER_MAX * self.time.getRatio()))
         else:
             self.time = None
             self.firstLabel.setText('')
@@ -102,7 +102,7 @@ class ControlWidget(QtGui.QWidget):
     def _handleSeekSliderAction(self,action):
         """Handle any change of the seekSlider."""
         if self.time is not None: # i.e. some music file is playing at the moment
-            mpclient.seek(0,int(self.seekSlider.sliderPosition() / self.SLIDER_MAX * self.time.getTotal()))
+            mpclient.seek(0,int(self.seekSlider.sliderPosition() / self.SEEK_SLIDER_MAX * self.time.getTotal()))
 
     def _handleVolumeSliderAction(self,action):
         """Handle any change of the volumeSlider."""

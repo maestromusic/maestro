@@ -13,7 +13,7 @@ This module provides methods to initialize the tag lists based on the database, 
 
 - The easiest way is the get-method which takes a tag-id or an tag-name as parameter.
 - For some tags which have a special meaning to the program and cannot always be treated generically (e.g. the title-tag) where exist constants (e.g. TITLE). This allows to use tags.TITLE instead of tags.get(config.get("tags","title_tag")) as the user may decide to use another tagname than "title" for his titles.
-- To iterate over all indexed tags use the list-method.
+- To iterate over all indexed tags use tagList.
 - You may create tags simply via the constructors of IndexedTag or OtherTag. But in case of indexed tags the get-method translates automatically from tag-ids to tagnames and vice versa and it doesn't create new instances and in the other case it does just the same job as the OtherTag-constructor, so it is usually better to use that method.
 """
 from collections import defaultdict
