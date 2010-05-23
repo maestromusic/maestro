@@ -46,7 +46,7 @@ class Delegate(QtGui.QStyledItemDelegate):
         else: return document.size().toSize() # transforming QSizeF into QSize
         
     def _drawControl(self,option,painter):
-        option.widget.style().drawControl(QtGui.QStyle.CE_ItemViewItem,option,painter)
+        QtGui.QApplication.style().drawControl(QtGui.QStyle.CE_ItemViewItem,option,painter)
         
     def _sizeFromOption(self,option):
-        return option.widget.style().sizeFromContents(QtGui.QStyle.CT_ItemViewItem,option,QtCore.QSize())
+        return QtGui.QApplication.style().sizeFromContents(QtGui.QStyle.CT_ItemViewItem,option,QtCore.QSize())
