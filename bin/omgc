@@ -63,6 +63,8 @@ if __name__=="__main__":
             finder = populate.find_new_albums(path)
             for album in finder:
                 populate.do_album(album)
+            # TODO: Set the correct toplevel-flags from the beginning
+            database.checkTopLevelFlags(fix=True)
         
         elif opt in ("--reset"):
             if input("Warning: This will reset your _complete_ database! Are you sure!?") in constants.YES_ANSWERS:
