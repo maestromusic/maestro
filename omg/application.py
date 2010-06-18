@@ -24,36 +24,35 @@ def run():
     database.connect()
     from omg import tags
     tags.updateIndexedTags()
-    from omg import config, mpclient, search, control, browser, playlist
+    from omg import config, mpclient, search, control, browser, gui
     search.init()
+    from gui import playlist
 
     # Create GUI
-    gui = QtGui.QWidget()
+    widget = QtGui.QWidget()
     layout = QtGui.QVBoxLayout()
-    gui.setLayout(layout)
+    widget.setLayout(layout)
 
-    controlWidget = control.createWidget(gui)
+    controlWidget = control.createWidget(widget)
     layout.addWidget(controlWidget,0)
     
     bottomLayout = QtGui.QHBoxLayout()
     layout.addLayout(bottomLayout,1)
     
-    browser = browser.Browser(gui)
+    browser = browser.Browser(widget)
     bottomLayout.addWidget(browser,2)
 
-    playlist = playlist.Playlist(gui)
+    playlist = playlist.Playlist(widget)
     bottomLayout.addWidget(playlist,5)
 
     #browser.nodeDoubleClicked.connect(playlist.addNode)
-    playlist.getModel().connectToSyncPlaylist(control.playlist)
+    control.synchronizePlaylist(playlist.getModel())
     
-    control.startSynchronization()
-    
-    gui.resize(800, 600)
+    widget.resize(800, 600)
     screen = QtGui.QDesktopWidget().screenGeometry()
-    size =  gui.geometry()
-    gui.move((screen.width()-size.width())/2, (screen.height()-size.height())/2)
-    gui.show()
+    size =  widget.geometry()
+    widget.move((screen.width()-size.width())/2, (screen.height()-size.height())/2)
+    widget.show()
     sys.exit(app.exec_())
 
 

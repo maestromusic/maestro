@@ -24,15 +24,6 @@ class Node:
     def getParent(self):
         return self.parent
     
-    def getIndex(self):
-        model = self.getModel()
-        if self.getParent() is None:
-            containingList = model.getRoots()
-            return model.index(containingList.index(self),0,QtCore.QModelIndex())
-        else:
-            containingList = self.getParent().getElements()
-            return model.index(containingList.index(self),0,self.getParent().getIndex())
-
     def getTitle(self):
         """Return a title of this element which is created from the title-tags. If this element does not contain a title-tag some dummy-title is returned."""
         if tags.TITLE in self.tags:

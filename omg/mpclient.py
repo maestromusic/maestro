@@ -27,12 +27,6 @@ def status():
         status['time'] = Time(status['time'])
     return status
     
-def addContainer(container):
-    client.add(container.getPath())
-    
-def addContainers(list):
-    for id in list:
-        addContainer(id)
         
 class Time:
     """Class representing time of current song."""

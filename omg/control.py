@@ -7,28 +7,34 @@
 # published by the Free Software Foundation
 #
 from PyQt4.QtCore import QTimer
-from omg import config, mpclient
-from . import widget as widgetModule
-from . import syncplaylist
+from . import config, mpclient
+from gui import control as controlwidget
 
 # A reference to the ControlWidget
 widget = None
 
 # The playlist which is synchronized with MPD.
-playlist = syncplaylist.Playlist()
+playlist = None
 
 # The timer used to synchronize with MPD.
 _timer = QTimer()
 
 def createWidget(parent):
     """Create a ControlWidget and store a reference to it in this control.widget."""
-    globals()["widget"] = widgetModule.ControlWidget(parent)
+    globals()["widget"] = controlwidget.ControlWidget(parent)
     return widget
 
-def startSynchronization():
-    """Start synchronization with MPD."""
-    _timer.timeout.connect(_sync)
-    _timer.start(int(config.get("control","timer_interval")))
+def synchronizePlaylist(playlist):
+    """Start synchronization between MPD and the given playlist. This method also calls the playlist's startSynchronizatin-method and the stopSynchronization-method of the last playlist which was synchronized."""
+    playlist.startSynchronization()
+    oldPlaylist = globals()["playlist"]
+    globals()["playlist"] = playlist
+    if oldPlaylist is not None:
+        oldPlaylist.stopSynchronization()
+    else: # Start Timer for the first time
+        _timer.timeout.connect(_sync)
+        _timer.start(int(config.get("control","timer_interval")))
+        
     _sync() # Synchronize right away. In particular this is useful when the timer-interval is large for debugging.
     
 def _sync():

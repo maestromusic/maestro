@@ -12,6 +12,7 @@ db = database.get()
 class Element:
     tags = None
     contents = None
+    path = None
     
     def __init__(self,id):
         assert isinstance(id,int)
@@ -23,7 +24,11 @@ class Element:
         else: return len(self.contents) == 0
         
     def getPath(self):
-        return db.query("SELECT path FROM files WHERE container_id = {0}".format(self.id)).getSingle()
+        if self.path is None:
+            self.path = db.query("SELECT path FROM files WHERE container_id = {0}".format(self.id)).getSingle()
+            if self.path is None:
+                raise ValueError("The element with id {0} has no path. Maybe it is a container.".format(self.id))
+        return self.path
     
     def getTitle(self):
         """Return a title of this element which is created from the title-tags. If this element does not contain a title-tag some dummy-title is returned."""
@@ -74,7 +79,7 @@ class Element:
     def ensureContentsAreLoaded(self):
         if self.contents is None:
             self.loadContents()
-            
+        
     def index(self,element):
         for i in range(0,len(self.contents)):
             if self.contents[i].id == element.id:
@@ -98,6 +103,59 @@ class Element:
             except TypeError: # At least one element does not know its length
                 return None
 
+    # Methods to access list of files
+    #=================================================
+    def getAllFiles(self):
+        assert self.contents is not None
+        if len(self.contents) == 0:
+            yield self
+        else:
+            for element in self.contents:
+                for file in element.getAllFiles():
+                    yield file
+                        
+    def fileCount(self):
+        assert self.contents is not None
+        if len(self.contents) == 0: # This is a file
+            return 1
+        else: return sum(element.fileCount() for element in self.contents)
+        
+    def getFileByIndex(self,index):
+        assert self.contents is not None
+        if index < 0:
+            raise IndexError("Index {0} is out of bounds".format(index))
+        if len(self.contents) == 0 and index == 0:
+            return self
+        else: 
+            for element in self.contents:
+                fileCount = element.fileCount()
+                if index < fileCount:
+                    return element.getFileByIndex(index)
+                else: index = index - fileCount
+            raise IndexError("Index {0} is out of bounds".format(index))
+            
+                
+            
+            
+    # Methods for RootedTreeModel
+    #==================================================
+    def getChildren(self):
+        return self.contents
+    
+    def getChildrenCount(self):
+        if self.contents is None:
+            return 0
+        else: return len(self.contents)
+    
+    def hasChildren(self):
+        return self.contents is not None and len(self.contents) > 0
+    
+    def getParent(self):
+        return self.parent
+    
+    
+    # Misc
+    #====================================================
     def __str__(self):
         if self.tags is not None:
             return "<Element {0}".format(self.getTitle())
