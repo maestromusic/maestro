@@ -1,0 +1,43 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+# Copyright 2009 Martin Altmayer
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 3 as
+# published by the Free Software Foundation
+#
+
+"""Usage: cachecovers -s40,60
+This little script creates thumbnails in the given sizes of all covers.
+
+Options:
+-h,--help: Print this help message
+-s,--sizes=[listOfSizes]: Specify a (comma-separated) list of sizes
+"""
+
+import sys
+import getopt
+from omg import covers
+
+if __name__=="__main__":
+    sizes = None
+    try:
+        options,args = getopt.getopt(sys.argv[1:],"s:h",("sizes=","help"))
+    except getopt.GetoptError as e:
+        print(e)
+        usage()
+        sys.exit(2)
+
+    for option,value in options:
+        if option in ("-h","--help"):
+            print(__doc__)
+            sys.exit(1)
+        elif option in ("-s","--sizes"):
+            sizes = [size for size in value.split(",") if size.isdigit()]
+
+    if sizes is None:
+        print("No sizes given")
+        sys.exit(2)
+
+    for size in sizes:
+        covers.cacheAll(size)
