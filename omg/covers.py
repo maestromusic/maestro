@@ -27,13 +27,13 @@ def getCover(container,size=None):
         dir = COVER_DIR+"large/"
     else: dir = COVER_DIR+"cache_{0}/".format(size)
     
-    if not os.path.exists(dir+str(id)):
+    if not os.path.exists(dir+str(container.id)):
         try:
-            cacheCover(id,size)
+            cacheCover(container.id,size)
         except IOError:
             return None
     
-    cover = QtGui.QImage(dir+str(id))
+    cover = QtGui.QImage(dir+str(container.id))
     if cover.isNull(): # Loading failed
         return None
     else: return cover

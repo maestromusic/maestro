@@ -41,31 +41,4 @@ class PlaylistLayouter():
             else: titleString = "{0} - {1}".format(element.getPosition(),element.getTitle())
             return delegate.TwoColumnsLayout(titleString,strutils.formatLength(element.getLength()))
         else:
-            document = QtGui.QTextDocument()
-            cursor = QtGui.QTextCursor(document)
-            
-            cover = covers.getCover(element.id,60)
-            if cover is not None:
-                cursor.insertTable(1,2,_tableFormat)
-                cursor.insertImage(cover)
-                cursor.movePosition(QtGui.QTextCursor.NextCell)
-            
-            if element.getPosition() is None:
-                titleString = element.getTitle()
-            else: titleString = "{0} - {1}".format(element.getPosition(),element.getTitle())
-            cursor.insertText(titleString,_titleCharFormat)
-            cursor.insertBlock()
-            cursor.insertText(",".join(element.tags[tags.COMPOSER] + element.tags[tags.ARTIST]),_artistCharFormat)
-            cursor.insertBlock()
-            cursor.insertTable(2,2,_tableFormat)
-            cursor.insertText(",".join(element.tags[tags.GENRE]),_stdCharFormat)
-            cursor.movePosition(QtGui.QTextCursor.NextCell)
-            piecesString = "Stück" if element.getChildrenCount() == 1 else "Stücke"
-            cursor.insertText("{0} {1}".format(element.getChildrenCount(),piecesString),_stdCharFormat)
-            cursor.movePosition(QtGui.QTextCursor.NextCell)
-            cursor.insertText(",".join(str(date) for date in element.tags[tags.DATE]),_stdCharFormat)
-            cursor.movePosition(QtGui.QTextCursor.NextCell)
-            cursor.insertText(strutils.formatLength(element.getLength()),_stdCharFormat)
-            
-        
-            return delegate.DocumentLayout(document)
+            return delegate.ContainerLayout(element)

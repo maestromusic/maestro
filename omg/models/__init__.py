@@ -6,7 +6,7 @@
 # it under the terms of the GNU General Public License version 3 as
 # published by the Free Software Foundation
 #
-from omg import tags, database
+from omg import tags, database, covers
 db = database.get()
 
 class Element:
@@ -102,6 +102,21 @@ class Element:
                 return sum(element.getLength() for element in self.contents)
             except TypeError: # At least one element does not know its length
                 return None
+
+    def getCover(self,size=None,cache=True):
+        """Get this container's cover with <size>x<size> pixels or the large version if <size> is None. If <cache> is True, this method will store the cover in this Element-instance. Warning: Subsequent calls of this method will return the stored cover only if <cache> is again True."""
+        if cache:
+            try:
+                return self._covers[size]
+            except AttributeError: pass
+            except KeyError: pass
+        cover = covers.getCover(self,size)
+        if cache:
+            if not hasattr(self,"_covers"):
+                self._covers = {}
+            self._covers[size] = cover
+        return cover
+
 
     # Methods to access list of files
     #=================================================

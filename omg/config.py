@@ -32,7 +32,7 @@ def init(*config_files):
         
         "control": {
             # Interval of the control timer syncing with mpd in milliseconds.
-            "timer_interval": "3000"
+            "timer_interval": "300"
         },
         
         "mpd": {
@@ -60,6 +60,10 @@ def init(*config_files):
         
         "browser": {
             "artist_tags": "composer,artist"
+        },
+        
+        "playlist": {
+            "cover_size": 60
         },
         
         "misc": {

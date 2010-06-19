@@ -36,8 +36,8 @@ class Playlist(QtGui.QWidget):
         self.view.setExpandsOnDoubleClick(False)
         self.view.setAlternatingRowColors(True)
         palette = QtGui.QPalette()
-        palette.setColor(QtGui.QPalette.Base,QtGui.QColor(0xD9,0xD9,0xD9))
-        palette.setColor(QtGui.QPalette.AlternateBase,QtGui.QColor(0xA9,0xA9,0xA9))
+        palette.setColor(QtGui.QPalette.Base,QtGui.QColor(0xE9,0xE9,0xE9))
+        palette.setColor(QtGui.QPalette.AlternateBase,QtGui.QColor(0xD9,0xD9,0xD9))
         self.view.setPalette(palette)
         self.model.modelReset.connect(self._handleReset)
         
