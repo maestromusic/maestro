@@ -9,7 +9,7 @@
 import difflib
 
 from omg import database
-from . import rootedtreemodel, treebuilder, Element
+from . import rootedtreemodel, treebuilder, Node, Element, FilelistMixin, IndexMixin
 
 db = database.get()
 
@@ -38,12 +38,19 @@ class Playlist(rootedtreemodel.RootedTreeModel):
     pathList = None
     toplevelElements = None
     
+    currentlyPlayingIndex = None
+    currentlyPlayingElement = None
+    
     _treeBuilder = None
     
     def __init__(self):
-        rootedtreemodel.RootedTreeModel.__init__(self,RootNode(self))
+        rootedtreemodel.RootedTreeModel.__init__(self,RootNode())
         self.toplevelElements = []
         self._treeBuilder = treebuilder.TreeBuilder(self._getId,self._getParentIds,self._createNode)
+    
+    def setToplevelElements(self,toplevelElements):
+        self.toplevelElements = toplevelElements
+        self.root.contents = toplevelElements
         
     def startSynchronization(self):
         self.pathList = [file.getPath() for file in self.root.getAllFiles()]
@@ -70,7 +77,7 @@ class Playlist(rootedtreemodel.RootedTreeModel):
                 offset == offset + j2 - j1
             else: raise ValueError("Opcode tag {0} is not supported.".format(tag))
                         
-    def synchronize(self,pathList):
+    def synchronize(self,pathList,status):
         if len(pathList) == 0 and len(self.toplevelElements) > 0:
             self.toplevelElements = []
             self.reset()
@@ -78,12 +85,22 @@ class Playlist(rootedtreemodel.RootedTreeModel):
             for tag,j1,j2,i1,i2 in self._getFilteredOpcodes(self.pathList,pathList):
                 #~ if tag == 'delete':  # TODO
                 #~ elif tag == 'insert' # TODO
-                self.toplevelElements = self._treeBuilder.build([self._createItem(path) for path in pathList])
+                self.setToplevelElements(self._treeBuilder.build([self._createItem(path) for path in pathList]))
                 for element in self.toplevelElements:
                     element.parent = self.root
                 self.pathList = pathList
                 self.reset()
                 break
+            
+            # Synchronize currently playing song
+            if status['song'] != self.currentlyPlayingIndex:
+                self.currentlyPlayingIndex = status['song']
+                self.currentlyPlayingElement = self.root.getFileByIndex(status['song'])
+                index = self.currentlyPlayingElement.getQtIndex(self)
+                self.dataChanged.emit(index,index)
+                
+    def isPlaying(self,element):
+        return element == self.currentlyPlayingElement
     
     def _createItem(self,path):
         id = db.query("SELECT container_id FROM files WHERE path = ?",path).getSingle()
@@ -106,13 +123,16 @@ class Playlist(rootedtreemodel.RootedTreeModel):
         return newElement
 
 
-class ExternalFile:
+class ExternalFile(Node):
     def __init__(self,path,parent = None):
         self.path = path
         self.parent = parent
     
     def isFile(self):
         return True
+    
+    def isContainer(self):
+        return False
         
     def getParent(self):
         return self.parent
@@ -122,25 +142,11 @@ class ExternalFile:
     
     def hasChildren(self):
         return False
-        
 
-class RootNode:
-    def __init__(self,model):
-        self.model = model
-    
-    def hasChildren(self):
-        return len(self.model.toplevelElements) > 0
-        
-    def getChildren(self):
-        return self.model.toplevelElements
-    
-    def getChildrenCount(self):
-        return len(self.model.toplevelElements)
+
+class RootNode(Node,FilelistMixin,IndexMixin):
+    def __init__(self):
+        self.contents = []
     
     def getParent(self):
         return None
-    
-    def getAllFiles(self):
-        for child in self.model.toplevelElements:
-            for file in child.getAllFiles():
-                yield file

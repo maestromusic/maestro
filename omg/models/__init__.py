@@ -6,24 +6,125 @@
 # it under the terms of the GNU General Public License version 3 as
 # published by the Free Software Foundation
 #
+from PyQt4 import QtCore
+
 from omg import tags, database, covers
 db = database.get()
 
-class Element:
-    tags = None
-    contents = None
-    path = None
+class Node:
+    """(Abstract) base class for elements in a RootedTreeModel...that is almost everything in playlists, browser etc.. Node implements the methods required by RootedTreeModel using self.contents as the list of children and self.parent as parent, but does not create these variables. Subclasses must either self.contents and self.parent or overwrite the methods."""
+    
+    def hasChildren(self):
+        """Return whether this node has at least one child node or None if it is unknown."""
+        return len(self.contents) > 0
+        
+    def getChildren(self):
+        """Return the list of children."""
+        return self.contents
+    
+    def getChildrenCount(self):
+        """Return the number of children or None if it is unknown."""
+        return len(self.contents)
+    
+    def getParent(self):
+        """Return the parent of this element."""
+        return self.parent
+    
+    def isFile(self):
+        """Return whether this node holds a file. Note that this is in general not the opposite of isContainer as e.g. rootnodes are neither."""
+        return False
+    
+    def isContainer(self):
+        """Return whether this node holds a container. Note that this is in general not the opposite of isFile as e.g. rootnodes are neither."""
+        return False
+        
+    
+# Methods to access the list of files at the end of the treemodel.
+class FilelistMixin:
+    def getAllFiles(self):
+        assert self.contents is not None
+        if self.isFile():
+            yield self
+        else:
+            for element in self.contents:
+                for file in element.getAllFiles():
+                    yield file
+                        
+    def fileCount(self):
+        assert self.contents is not None
+        if self.isFile():
+            return 1
+        else: return sum(element.fileCount() for element in self.contents)
+        
+    def getFileByIndex(self,index):
+        assert self.contents is not None
+        index = int(index)
+        if index < 0:
+            raise IndexError("Index {0} is out of bounds".format(index))
+        if index == 0 and self.isFile():
+            return self
+        else: 
+            for element in self.contents:
+                fileCount = element.fileCount()
+                if index < fileCount:
+                    return element.getFileByIndex(index)
+                else: index = index - fileCount
+            raise IndexError("Index {0} is out of bounds".format(index))
+            
+class IndexMixin:
+    def index(self,node):
+        for i in range(0,len(self.contents)):
+            if self.contents[i] == node:
+                return i
+        raise ValueError("Element.index: Element {0} is not contained in element {1}.".format(element.id,self.id))
+        
+    def find(self,node):
+        for i in range(0,len(self.contents)):
+            if self.contents[i] == node:
+                return i
+        return -1
+        
+    def getQtIndex(self,model):
+        if self.getParent() is None: # Root nodes don't have an qt-index because they aren't displayed
+            return QtCore.QModelIndex()
+        else: return model.index(self.getParent().index(self),0,self.getParent().getQtIndex(model))
+        
+        
+class Element(Node,FilelistMixin,IndexMixin):
+    """Base class for elements (files or containers) in playlists, browser, etc.. Contains methods to load tags and contents from the database and to get the path, cover, length etc.."""
+    tags = None # tags.Storage to store the tags. None until they are loaded
+    contents = None # list of contents. None until they are loaded; [] if this element has no contents
+    path = None # path of this Element, use getPath
     
     def __init__(self,id):
+        """Initialize this element with the given id, which must be an integer."""
         assert isinstance(id,int)
         self.id = id
-
+        
+    def hasChildren(self):
+        """Return whether this node has at least one child node or None if it is unknown since the contents are not loaded yet."""
+        return self.contents is not None and len(self.contents) > 0
+    
+    def getChildrenCount(self):
+        """Return the number of children or None if it is unknown since the contents are not loaded yet."""
+        if self.contents is None:
+            return 0
+        else: return len(self.contents)
+        
     def isFile(self):
+        """Return whether this Element holds a file or None if it is unknown since the contents are not loaded yet."""
         if self.contents is None:
             return None
         else: return len(self.contents) == 0
+    
+    def isContainer(self):
+        """Return whether this Element holds a container or None if it is unknown since the contents are not loaded yet."""
+        if self.contents is None:
+            return None
+        else: return len(self.contents) > 0
         
     def getPath(self):
+        """Return the path of this Element and cache it for subsequent calls. If the element has no path (e.g. containers), a ValueError is raised."""
         if self.path is None:
             self.path = db.query("SELECT path FROM files WHERE container_id = {0}".format(self.id)).getSingle()
             if self.path is None:
@@ -73,26 +174,17 @@ class Element:
                 element.loadTags(recursive,tagList)
     
     def ensureTagsAreLoaded(self):
+        """Load tags if they are not loaded yet."""
         if self.tags is None:
             self.loadTags()
         
     def ensureContentsAreLoaded(self):
+        """Load contents if they are not loaded yet."""
         if self.contents is None:
             self.loadContents()
-        
-    def index(self,element):
-        for i in range(0,len(self.contents)):
-            if self.contents[i].id == element.id:
-                return i
-        raise ValueError("Element.index: Element {0} is not contained in element {1}.".format(element.id,self.id))
-        
-    def find(self,element):
-        for i in range(0,len(self.contents)):
-            if self.contents[i].id == elements.id:
-                return i
-        return -1
     
     def getLength(self):
+        """Return the length of this element. If it is a container, return the sum of the lengths of all its contents. If the length can't be computed, None is returned. This happens for example if the contents have not been loaded yet."""
         if self.contents is None:
             return None
         if len(self.contents) == 0:
@@ -116,58 +208,6 @@ class Element:
                 self._covers = {}
             self._covers[size] = cover
         return cover
-
-
-    # Methods to access list of files
-    #=================================================
-    def getAllFiles(self):
-        assert self.contents is not None
-        if len(self.contents) == 0:
-            yield self
-        else:
-            for element in self.contents:
-                for file in element.getAllFiles():
-                    yield file
-                        
-    def fileCount(self):
-        assert self.contents is not None
-        if len(self.contents) == 0: # This is a file
-            return 1
-        else: return sum(element.fileCount() for element in self.contents)
-        
-    def getFileByIndex(self,index):
-        assert self.contents is not None
-        if index < 0:
-            raise IndexError("Index {0} is out of bounds".format(index))
-        if len(self.contents) == 0 and index == 0:
-            return self
-        else: 
-            for element in self.contents:
-                fileCount = element.fileCount()
-                if index < fileCount:
-                    return element.getFileByIndex(index)
-                else: index = index - fileCount
-            raise IndexError("Index {0} is out of bounds".format(index))
-            
-                
-            
-            
-    # Methods for RootedTreeModel
-    #==================================================
-    def getChildren(self):
-        return self.contents
-    
-    def getChildrenCount(self):
-        if self.contents is None:
-            return 0
-        else: return len(self.contents)
-    
-    def hasChildren(self):
-        return self.contents is not None and len(self.contents) > 0
-    
-    def getParent(self):
-        return self.parent
-    
     
     # Misc
     #====================================================

@@ -41,5 +41,6 @@ def _sync():
     """Synchronize playlist and widget with MPD."""
     if _timer.interval() >= 1000: #TODO: Remove this debugging feature
         print("Control: Syncing with MPD")
-    widget.setStatus(mpclient.status())
-    playlist.synchronize(mpclient.playlist())
+    status = mpclient.status()
+    widget.setStatus(status)
+    playlist.synchronize(mpclient.playlist(),status)

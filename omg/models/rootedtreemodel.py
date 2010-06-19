@@ -76,20 +76,3 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
         if not index.isValid():
             return Qt.ItemIsEnabled;
         else: return Qt.ItemIsEnabled | Qt.ItemIsSelectable
-
-
-class RootNode:
-    def __init__(self,children):
-        self.children = children
-    
-    def hasChildren(self):
-        return len(self.children) > 0
-        
-    def getChildren(self):
-        return self.children
-    
-    def getChildrenCount(self):
-        return len(self.children)
-    
-    def getParent(self):
-        return None

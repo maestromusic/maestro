@@ -14,8 +14,6 @@ from PyQt4.QtCore import SIGNAL
 db = database.get()
 
 class Node:
-    index = None
-    
     # Methods for ForestModel
     def hasChildren(self): pass
     def getElementsCount(self): pass

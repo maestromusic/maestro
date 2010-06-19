@@ -5,6 +5,7 @@
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 3 as
 #
+import random
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import SIGNAL
 
@@ -29,7 +30,7 @@ class Playlist(QtGui.QWidget):
         controlLineLayout = QtGui.QHBoxLayout()
         layout.addLayout(controlLineLayout)
         
-        self.view = QtGui.QTreeView(self)
+        self.view = PlaylistTreeView(self)
         self.view.setHeaderHidden(True)
         self.view.setModel(self.model)
         self.view.setItemDelegate(delegate.Delegate(self,self.model,layouter.PlaylistLayouter(),self.font()))
@@ -48,3 +49,18 @@ class Playlist(QtGui.QWidget):
         
     def _handleReset(self):
         self.view.expandAll()
+        
+
+class PlaylistTreeView(QtGui.QTreeView):
+    """Specialized QTreeView, which draws the currently playing track highlighted."""
+    def __init__(self,parent):
+        QtGui.QTreeView.__init__(self,parent)
+    
+    def drawRow(self,painter,option,index):
+        element = self.model().data(index)
+        if self.model().isPlaying(element):
+            self.setAlternatingRowColors(False)
+            painter.fillRect(option.rect,QtGui.QColor(110,149,229))
+            QtGui.QTreeView.drawRow(self,painter,option,index)
+            self.setAlternatingRowColors(True)
+        else: QtGui.QTreeView.drawRow(self,painter,option,index)

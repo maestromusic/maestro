@@ -63,6 +63,7 @@ def init(*config_files):
         },
         
         "playlist": {
+            # Size in pixels of covers in playlists
             "cover_size": 60
         },
         
