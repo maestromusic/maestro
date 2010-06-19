@@ -66,6 +66,12 @@ class ControlWidget(QtGui.QWidget):
         secondLine.addWidget(self.titleLabel,1)
         secondLine.addWidget(self.volumeLabel)
         secondLine.addWidget(self.volumeSlider)
+        
+        #TODO: This button just helps debugging
+        from omg import test
+        testButton = QtGui.QPushButton("Test")
+        testButton.clicked.connect(test.test)
+        secondLine.addWidget(testButton)
 
 
     def setStatus(self,status):
