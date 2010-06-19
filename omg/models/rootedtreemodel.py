@@ -9,6 +9,8 @@
 from PyQt4 import QtCore
 from PyQt4.QtCore import Qt
 
+from . import Node
+
 class RootedTreeModel(QtCore.QAbstractItemModel):
     """The RootedTreeModel subclasses QAbstractItemModel to create a simple model for QTreeViews. It takes one root node which is not considered part of the data of this model (and is not displayed by QTreeViews). Nodes in a RootedTreeModel may have every type, but must implement the following methods:
     - hasChildren(): return if a node has children
@@ -76,3 +78,8 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
         if not index.isValid(): # should not happen
             return Qt.ItemIsEnabled;
         else: return Qt.ItemIsEnabled | Qt.ItemIsSelectable
+    
+    def createIndex(self,row,column,internalPointer):
+        if not isinstance(internalPointer,Node):
+            raise TypeError("Internal pointers in a RootedTreeModel must be subclasses of node")
+        return QtCore.QAbstractItemModel.createIndex(self,row,column,internalPointer)

@@ -6,7 +6,7 @@
 # it under the terms of the GNU General Public License version 3 as
 #
 from PyQt4 import QtGui, QtCore
-from PyQt4.QtCore import SIGNAL
+from PyQt4.QtCore import Qt,SIGNAL
 
 from omg import mpclient
 from omg.models import playlist as playlistmodel
@@ -36,6 +36,7 @@ class Playlist(QtGui.QWidget):
         self.view.setItemDelegate(delegate.Delegate(self,self.model,layouter.PlaylistLayouter(),self.font()))
         self.view.setExpandsOnDoubleClick(False)
         self.view.setAlternatingRowColors(True)
+        self.view.setSelectionMode(QtGui.QAbstractItemView.ExtendedSelection)
         self.view.doubleClicked.connect(self._handleDoubleClick)
         palette = QtGui.QPalette()
         palette.setColor(QtGui.QPalette.Base,QtGui.QColor(0xE9,0xE9,0xE9))
@@ -54,7 +55,6 @@ class Playlist(QtGui.QWidget):
     def _handleDoubleClick(self,index):
         element = self.model.data(index)
         mpclient.play(element.getIndexInFilelist())
-        
 
 class PlaylistTreeView(QtGui.QTreeView):
     """Specialized QTreeView, which draws the currently playing track highlighted."""
@@ -69,3 +69,8 @@ class PlaylistTreeView(QtGui.QTreeView):
             QtGui.QTreeView.drawRow(self,painter,option,index)
             self.setAlternatingRowColors(True)
         else: QtGui.QTreeView.drawRow(self,painter,option,index)
+        
+    def keyReleaseEvent(self,keyEvent):
+        if keyEvent.key() == Qt.Key_Delete:
+            for index in self.selectedIndexes():
+                self.parent().model.removeByQtIndex(index)

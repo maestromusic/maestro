@@ -26,7 +26,13 @@ def status():
     if 'time' in status:
         status['time'] = Time(status['time'])
     return status
-    
+
+def delete(start,end=None):
+    if end is None:
+        end = start + 1
+    for i in range(start,end):
+        client.delete(start) # Always delete start since the indices will decrease
+        
 class Time:
     """Class representing time of current song."""
     def __init__(self,string):

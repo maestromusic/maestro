@@ -39,6 +39,12 @@ def synchronizePlaylist(playlist):
         _timer.start(int(config.get("control","timer_interval")))
         
     _sync() # Synchronize right away. In particular this is useful when the timer-interval is large for debugging.
+
+def stopSynchronization():
+    if playlist is not None:
+        playlist.stopSynchronization()
+    _timer.stop()
+    globals()["playlist"] = None
     
 def _sync():
     """Synchronize playlist and widget with MPD."""
