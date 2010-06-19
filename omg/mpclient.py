@@ -27,7 +27,6 @@ def status():
         status['time'] = Time(status['time'])
     return status
     
-        
 class Time:
     """Class representing time of current song."""
     def __init__(self,string):

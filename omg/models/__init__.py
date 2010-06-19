@@ -70,13 +70,26 @@ class FilelistMixin:
                     return element.getFileByIndex(index)
                 else: index = index - fileCount
             raise IndexError("Index {0} is out of bounds".format(index))
+    
+    def getIndexInFilelist(self):
+        if self.getParent() is None:
+            return 0
+        else:
+            index = self.getParent().getIndexInFilelist()
+            for child in self.getParent().getChildren():
+                if child == self:
+                    return index
+                else: index = index + child.fileCount()
+            raise ValueError("FilelistMixin.getIndexInFilelist: Node {0} is not contained in its parent {1}."
+                                .format(self,self.getParent()))
+
             
 class IndexMixin:
     def index(self,node):
         for i in range(0,len(self.contents)):
             if self.contents[i] == node:
                 return i
-        raise ValueError("Element.index: Element {0} is not contained in element {1}.".format(element.id,self.id))
+        raise ValueError("IndexMixin.index: Node {0} is not contained in element {1}.".format(node,self))
         
     def find(self,node):
         for i in range(0,len(self.contents)):

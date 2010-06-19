@@ -8,7 +8,6 @@
 #
 from PyQt4.QtCore import QTimer
 from . import config, mpclient
-from gui import control as controlwidget
 
 # A reference to the ControlWidget
 widget = None
@@ -19,8 +18,12 @@ playlist = None
 # The timer used to synchronize with MPD.
 _timer = QTimer()
 
+# Status of MPD
+status = None
+
 def createWidget(parent):
     """Create a ControlWidget and store a reference to it in this control.widget."""
+    from gui import control as controlwidget
     globals()["widget"] = controlwidget.ControlWidget(parent)
     return widget
 
@@ -39,6 +42,7 @@ def synchronizePlaylist(playlist):
     
 def _sync():
     """Synchronize playlist and widget with MPD."""
+    global status
     if _timer.interval() >= 1000: #TODO: Remove this debugging feature
         print("Control: Syncing with MPD")
     status = mpclient.status()

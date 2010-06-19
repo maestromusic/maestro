@@ -73,6 +73,6 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
         return self.createIndex(row,column,child)
         
     def flags(self,index):
-        if not index.isValid():
+        if not index.isValid(): # should not happen
             return Qt.ItemIsEnabled;
         else: return Qt.ItemIsEnabled | Qt.ItemIsSelectable

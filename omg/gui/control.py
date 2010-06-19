@@ -9,6 +9,7 @@
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import SIGNAL
 from omg import constants, mpclient, strutils
+from omg import control as controlModule
 
 class ControlWidget(QtGui.QWidget):
     """Widget providing buttons to control a music player."""
@@ -102,7 +103,8 @@ class ControlWidget(QtGui.QWidget):
     def _handleSeekSliderAction(self,action):
         """Handle any change of the seekSlider."""
         if self.time is not None: # i.e. some music file is playing at the moment
-            mpclient.seek(0,int(self.seekSlider.sliderPosition() / self.SEEK_SLIDER_MAX * self.time.getTotal()))
+            mpclient.seek(controlModule.status['song'],
+                           int(self.seekSlider.sliderPosition() / self.SEEK_SLIDER_MAX * self.time.getTotal()))
 
     def _handleVolumeSliderAction(self,action):
         """Handle any change of the volumeSlider."""
