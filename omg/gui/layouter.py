@@ -8,7 +8,7 @@
 #
 from PyQt4 import QtGui
 
-from omg import strutils, tags
+from omg import strutils, tags, covers
 from omg.models import playlist
 from . import delegate
 
@@ -27,6 +27,8 @@ _artistCharFormat.setFontItalic(True)
 _tableFormat = QtGui.QTextTableFormat()
 _tableFormat.setBorderStyle(QtGui.QTextFrameFormat.BorderStyle_None)
 _tableFormat.setWidth(QtGui.QTextLength(QtGui.QTextLength.PercentageLength,100))
+_tableFormat.setCellSpacing(0)
+_tableFormat.setCellPadding(0)
 
 class PlaylistLayouter():
     def layout(self,element):
@@ -41,6 +43,13 @@ class PlaylistLayouter():
         else:
             document = QtGui.QTextDocument()
             cursor = QtGui.QTextCursor(document)
+            
+            cover = covers.getCover(element.id,60)
+            if cover is not None:
+                cursor.insertTable(1,2,_tableFormat)
+                cursor.insertImage(cover)
+                cursor.movePosition(QtGui.QTextCursor.NextCell)
+            
             if element.getPosition() is None:
                 titleString = element.getTitle()
             else: titleString = "{0} - {1}".format(element.getPosition(),element.getTitle())
