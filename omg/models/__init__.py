@@ -158,5 +158,5 @@ class Element:
     #====================================================
     def __str__(self):
         if self.tags is not None:
-            return "<Element {0}".format(self.getTitle())
+            return "<Element {0}>".format(self.getTitle())
         else: return "<Element {0}>".format(self.id)

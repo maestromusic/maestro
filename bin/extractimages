@@ -11,8 +11,8 @@
 This little script extracts all images from the given mp3-files and from all mp3-files in the given directories (and all subdirectories).
 
 Options:
--h,--help: Prints this help message
--o,--output=[dir]: Specifies the directory in which the images will be saved. Defaults to the current working directory.
+-h,--help: Print this help message
+-o,--output=[dir]: Specify the directory in which the images will be saved. Defaults to the current working directory.
 --delete: After extracting, images tags will be deleted from the original mp3-file. Use with care...
 """
 

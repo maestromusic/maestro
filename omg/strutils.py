@@ -16,7 +16,7 @@
 import re
 
 def replace(text,dict):
-    """Replaces multiple pairs at a single blow. To be exact: The keys of dict are replaced by the corresponding values."""
+    """Replace multiple pairs at a single blow. To be exact: The keys of dict are replaced by the corresponding values."""
     regex = re.compile('|'.join(map(re.escape,dict)))
     def translate(match):
         return dict[match.group(0)]
@@ -24,20 +24,20 @@ def replace(text,dict):
 
 
 def nextNonWhiteSpace(string,pos=0):
-    """Returns the position of the first non-whitespace character in string, beginning at pos. If no such character is found len(string) will be returned."""
+    """Return the position of the first non-whitespace character in string, beginning at pos. If no such character is found, return len(string)."""
     while pos < len(string) and string[pos].isspace():
         pos = pos + 1
     return pos
 
 
 def nextWhiteSpace(string,pos=0):
-    """Returns the position of the first whitespace character in string, beginning at pos. If no such character is found len(string) will be returned."""
+    """Return the position of the first whitespace character in string, beginning at pos. If no such character is found, return len(string)."""
     while pos < len(string) and not string[pos].isspace():
         pos = pos + 1
     return pos
     
 def formatLength(lengthInSeconds):
-    """Converts a number of seconds in a string like '01:34', '00:05' or '1:20:00'. Hours are only displayed when <lengthInSeconds> is at least 3600. Minutes and seconds are displayed with leading zeros."""
+    """Convert a number of seconds in a string like '01:34', '00:05' or '1:20:00'. Hours are only displayed when <lengthInSeconds> is at least 3600. Minutes and seconds are displayed with leading zeros."""
     if not isinstance(lengthInSeconds,int):
         lengthInSeconds = int(lengthInSeconds)
         

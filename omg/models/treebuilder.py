@@ -53,8 +53,8 @@ class TreeBuilder:
             self._updateItemSequences(items[i],i)
         
         # Debug after the first step
-        for node in self.containerNodes.values():
-            print(node)
+        #for node in self.containerNodes.values():
+        #    print(node)
         
         # Second step: Choose optimal container structure for the given items
         roots = self._createTree((0,len(items)-1),self.containerNodes.values())
@@ -159,7 +159,7 @@ class TreeBuilder:
     
     def _createTree(self,sequence,containerNodes):
         """Create a tree using some of the nodes in <containerNodes> as roots and covering all item from <sequence>."""
-        print("This is createTree over the sequence {0}-{1}".format(*sequence))
+        #print("This is createTree over the sequence {0}-{1}".format(*sequence))
         coveredItems = set()
         
         roots = []
@@ -170,7 +170,7 @@ class TreeBuilder:
                 maxSequence,cNode = self._findMaximalSequence(containerNodes,sequence)
                 if maxSequence is None: # No sequence found: remaining items are direct children
                     break
-                print("Found a maximal sequence: {0}-{1}".format(*maxSequence))
+                #print("Found a maximal sequence: {0}-{1}".format(*maxSequence))
                 newNode = self._createNode(cNode.id,self._createTree(maxSequence,cNode.childContainers))
                 pos = self._findPos(maxSequence[0],rootSeqs)
                 roots.insert(pos,newNode)
