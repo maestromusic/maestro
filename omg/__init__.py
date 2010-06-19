@@ -218,9 +218,7 @@ def add_container(name,tags={},elements=0):
     """Adds a container to the database, which can have tags and a number of elements."""
     result = database.db.query("INSERT INTO containers (name,elements) VALUES(?,?);", name,elements)
     newid = result.insertId() # the new container's ID
-    
-    if 'title' not in tags:
-        tags['title'] = name
+
     set_tags(newid, tags)
     return newid
 

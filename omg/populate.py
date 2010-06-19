@@ -22,6 +22,7 @@ FIND_DISC_RE=r" ?[([]?(?:cd|disc|part|teil|disk) ?([iI0-9]+)[)\]]?"
 
 logger = logging.getLogger(name="populate")
 db = omg.database.db
+
 def guess_album(album):
     """Try to guess name and tags of an album. Modifies the argument; in addition, returns a set of tags which are present in all files but different."""
     
@@ -39,6 +40,10 @@ def guess_album(album):
                 different_tags.add(tag)
     same_tags = common_tags - different_tags
     album.tags = { tag:common_tag_values[tag] for tag in same_tags }
+    
+    # Ensure that the album has a title-tag...before changing album.name to contain artists/composers
+    album.tags['title'] = [album_name]
+    
     # build a name
     if max([len(common_tag_values[x]) for x in  set(["composer","artist","album"]) & same_tags])>1:
         name = "Sorry, you have multiple tags in {composer,artist,album}, please have a look"
