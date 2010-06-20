@@ -96,12 +96,7 @@ class IndexMixin:
             if self.contents[i] == node:
                 return i
         return -1
-        
-    def getQtIndex(self,model):
-        if self.getParent() is None: # Root nodes don't have an qt-index because they aren't displayed
-            return QtCore.QModelIndex()
-        else: return model.index(self.getParent().index(self),0,self.getParent().getQtIndex(model))
-        
+
         
 class Element(Node,FilelistMixin,IndexMixin):
     """Base class for elements (files or containers) in playlists, browser, etc.. Contains methods to load tags and contents from the database and to get the path, cover, length etc.."""

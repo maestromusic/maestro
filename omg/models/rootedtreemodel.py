@@ -59,11 +59,9 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
         child = index.internalPointer()
         parent = child.getParent()
         assert parent is not None # This method should never be called on the root-node because it is not displayed in the treeview.
-        if parent == self.root: # toplevel node
+        if parent == self.root:
             return QtCore.QModelIndex()
-        else: # Now we must find out the list containing the parent to get the parent's position in this list
-            containingList = parent.getParent().getChildren()
-            return self.createIndex(containingList.index(parent),0,parent)
+        else: return self.getIndex(parent)
     
     def index(self,row,column,parent):
         if not self.hasIndex(row,column,parent): # Check if parent has a child at the given row and column
@@ -83,3 +81,10 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
         if not isinstance(internalPointer,Node):
             raise TypeError("Internal pointers in a RootedTreeModel must be subclasses of node")
         return QtCore.QAbstractItemModel.createIndex(self,row,column,internalPointer)
+        
+    def getIndex(self,node):
+        """Return the (Qt)-index of the given node. <node> mustn't be the rootnode, as it has no index (otherwise a ValueError is raised."""
+        if node == self.root:
+            raise ValueError("RootedTreeModel.getIndex: Rootnode has no Index")
+        parent = node.getParent()
+        return self.createIndex(parent.getChildren().index(node),0,node)

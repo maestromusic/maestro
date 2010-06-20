@@ -119,13 +119,13 @@ class Playlist(rootedtreemodel.RootedTreeModel):
             if 'song' not in status:
                 if self.currentlyPlayingIndex is not None:
                     self.currentlyPlayingIndex = None
-                    index = self.currentlyPlayingElement.getQtIndex(self)
+                    index = self.getIndex(self.currentlyPlayingElement)
                     self.dataChanged.emit(index,index)
                     self.currentlyPlayingElement = None
             elif status['song'] != self.currentlyPlayingIndex:
                 self.currentlyPlayingIndex = status['song']
                 self.currentlyPlayingElement = self.root.getFileByIndex(status['song'])
-                index = self.currentlyPlayingElement.getQtIndex(self)
+                index = self.getIndex(self.currentlyPlayingElement)
                 self.dataChanged.emit(index,index)
                 
     def isPlaying(self,element):
@@ -216,7 +216,7 @@ class Playlist(rootedtreemodel.RootedTreeModel):
             self._removeByFileIndices(element.contents[bIndex],max(start-bPos,0),end-bPos)
 
         if delStart<delEnd:
-            self.beginRemoveRows(element.getQtIndex(self),delStart,delEnd-1)
+            self.beginRemoveRows(self.getIndex(element),delStart,delEnd-1)
             del element.contents[delStart:delEnd]
             self.endRemoveRows()
         
