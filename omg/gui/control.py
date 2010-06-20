@@ -10,6 +10,7 @@ from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import SIGNAL
 from omg import constants, mpclient, strutils
 from omg import control as controlModule
+from omg.models import playlist
 
 class ControlWidget(QtGui.QWidget):
     """Widget providing buttons to control a music player."""
@@ -85,11 +86,25 @@ class ControlWidget(QtGui.QWidget):
                 # Don't move the slider, if the user presses it down to move it personally.
                 if not self.seekSlider.isSliderDown():
                     self.seekSlider.setValue(int(self.SEEK_SLIDER_MAX * self.time.getRatio()))
-        else:
+            
+            element = controlModule.playlist.currentlyPlayingElement
+            if isinstance(element,playlist.ExternalFile):
+                title = element.getPath()
+            else: title = element.getTitle()
+            if self.titleLabel.text() != title:
+                font = self.titleLabel.font()
+                font.setPixelSize(14)
+                font.setBold(True)
+                font.setItalic(isinstance(element,playlist.ExternalFile))
+                self.titleLabel.setFont(font)
+                self.titleLabel.setText(title)
+                
+        else: # Currently nothing is playing
             self.time = None
             self.firstLabel.setText('')
             self.secondLabel.setText('')
             self.seekSlider.setValue(0)
+            self.titleLabel.setText('')
         
         self.volumeLabel.setVolume(status['volume'])
         self.volumeSlider.setValue(status['volume'])

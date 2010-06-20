@@ -36,14 +36,16 @@ def run():
     controlWidget = control.createWidget(widget)
     layout.addWidget(controlWidget,0)
     
-    bottomLayout = QtGui.QHBoxLayout()
-    layout.addLayout(bottomLayout,1)
+    splitter = QtGui.QSplitter(widget)
+    layout.addWidget(splitter,1)
     
     browser = browser.Browser(widget)
-    bottomLayout.addWidget(browser,2)
-
+    splitter.addWidget(browser)
+    splitter.setStretchFactor(0,2)
+    
     playlist = playlist.Playlist(widget)
-    bottomLayout.addWidget(playlist,5)
+    splitter.addWidget(playlist)
+    splitter.setStretchFactor(1,5)
 
     #browser.nodeDoubleClicked.connect(playlist.addNode)
     control.synchronizePlaylist(playlist.getModel())

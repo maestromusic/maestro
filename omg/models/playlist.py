@@ -248,7 +248,7 @@ class Playlist(rootedtreemodel.RootedTreeModel):
         return newElement
 
 
-class ExternalFile(Node):
+class ExternalFile(Node,FilelistMixin):
     """This class holds a file that appears in the playlist, but is not in the database."""
     
     def __init__(self,path,parent = None):
@@ -270,6 +270,17 @@ class ExternalFile(Node):
     
     def hasChildren(self):
         return False
+
+    def getAllFiles(self):
+        return (self,)
+    
+    def fileCount(self):
+        return 1
+        
+    def getFileByIndex(self,index):
+        if index != 0:
+            raise IndexError("Index {0} is out of bounds".format(index))
+        return self
 
 
 class RootNode(Node,FilelistMixin,IndexMixin):
