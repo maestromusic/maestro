@@ -51,11 +51,8 @@ def cacheCover(id,size):
     if not os.path.isdir(dir):
         os.mkdir(dir)
     
-    # Since QImage.save won't accept a string as second parameter (which is the type given in the documentation of PyQt...), we have to use a file extension to specify the file format. Afterwards the file extension is removed.
-    #TODO: Remove this hack
-    if not smallCover.save(dir+str(id)+".png"):
+    if not smallCover.save(dir+str(id),"png"):
         raise IOError("File {0} could not be saved.".format(dir+str(id)))
-    shutil.move(dir+str(id)+".png",dir+str(id))
 
 
 def cacheAll(size):
