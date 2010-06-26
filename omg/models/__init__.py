@@ -39,9 +39,10 @@ class Node:
         return False
         
     
-# Methods to access the list of files at the end of the treemodel.
+# Methods to access the flat playlist: the list of files at the end of the treemodel.
 class FilelistMixin:
     def getAllFiles(self):
+        """Generator which will return all files contained in this element or in child-elements of it."""
         assert self.contents is not None
         if self.isFile():
             yield self
@@ -51,12 +52,14 @@ class FilelistMixin:
                     yield file
                         
     def getFileCount(self):
+        """Return the number of files contained in this element or in child-elements of it."""
         assert self.contents is not None
         if self.isFile():
             return 1
         else: return sum(element.getFileCount() for element in self.contents)
         
     def getFileByOffset(self,offset):
+        """Get the file at the given <offset>. Note that <offset> is relative to this element, not to the whole playlist (unless the element is the rootnode)."""
         assert self.contents is not None
         offset = int(offset)
         if offset == 0 and self.isFile():
@@ -68,6 +71,7 @@ class FilelistMixin:
             else: return child.getFileByOffset(innerOffset)
     
     def getOffset(self):
+        """Get the offset of this element in the playlist."""
         if self.getParent() is None:
             return 0
         else:
@@ -80,6 +84,9 @@ class FilelistMixin:
                                 .format(self,self.getParent()))
         
     def getChildIndexAtOffset(self,offset):
+        """Return a tuple: the index of the child C that contains the file F with the given offset (relative to this element) and the offset of F relative to C ("inner offset").
+        For example: If this element is the rootnode and the playlist contains an album with 13 songs and one with 12 songs, then getChildIndexAtOffset(17) will return (1,3), since the 18th file if the playlist (i.e. with offset 17), is contained in the second album (i.e with index 1) and it is the 4th song on that album (i.e. it has offset 3 relative to the album).
+        """
         assert self.contents is not None
         offset = int(offset)
         if offset < 0:
@@ -93,6 +100,7 @@ class FilelistMixin:
         raise IndexError("Offset {0} is out of bounds".format(offset))
     
     def getChildAtOffset(self,offset):
+        """Return the child containing the file with the given (relative) offset, and the offset of that file relative to the child. This is a convenience-method for getChildren()[getChildIndexAtOffset(offset)]. Confer getChildIndexAtOffset."""
         return self.getChildren()[self.getChildIndexAtOffset(offset)]
 
 

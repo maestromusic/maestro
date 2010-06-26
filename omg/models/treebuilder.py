@@ -32,103 +32,46 @@ class ContainerNode:
 
 class TreeBuilder:
     """This class encapsulates an algorithm that - given a list of items and information in what containers these items are contained - builds a tree structure covering all nodes in a nice way."""
-    def __init__(self,getId,getParentIds,createNode,insertIntoNode):
+    def __init__(self,items,getId,getParentIds,createNode):
         """Intialize the algorithm with two methods:
         - get an item and return its id (or None if it doesn't has an id)
         - getParentIds takes an ID of an item or a container and returns a list of the IDs of all parent containers.
         - createNode takes a container-ID and a list of children (which may be items or containers previously created with this method), creates a new node and returns it.
         """
+        self.items = items
         self._getId = getId
         self._getParentIds = getParentIds
         self._createNode = createNode
-        self._insertIntoNode = insertIntoNode
-    
-    def build(self,items):
-        """Build a tree over the given items."""
-        self.items = items
+            
+    def buildParentGraph(self):
         self.containerNodes = {}
         
-        # First step: Build a graph of all items and containers.
-        for i in range(0,len(items)):
-            self._buildContainerNodes(items[i])
-            self._updateItemSequences(items[i],i)
+        for i in range(0,len(self.items)):
+            self._buildContainerNodes(self.items[i])
+            self._updateItemSequences(self.items[i],i)
         
-        # Debug after the first step
         #for node in self.containerNodes.values():
         #    print(node)
         
-        # Second step: Choose optimal container structure for the given items
-        roots = self._createTree((0,len(items)-1),self.containerNodes.values())
-        
-        # Free unused variables
-        del self.items
-        del self.containerNodes
-        
-        return roots
-
-    def insert(self,node,pos,items):
-        self.containerNodes = {}
-        self.items = items
-        
-        for i in range(0,len(items)):
-            self._buildContainerNodes(items[i])
-            self._updateItemSequences(items[i],i)
-            
-        # Debug after the first step
-        #for n in self.containerNodes.values():
-        #    print(n)
-            
-        self._insert(node,pos,(0,len(items)-1),self.containerNodes.values())
-        
-        # Free variables
-        del self.containerNodes
+    def buildTree(self,sequence = None,parent = None):
+        """Build a tree over the given sequence (which defaults to all items)."""
+        if sequence is None:
+            sequence = (0,len(self.items)-1)
+        if parent is None:
+            containerNodes = self.containerNodes.values()
+        else: containerNodes = self.containerNodes[self._getId(parent)].childContainers
+        return self._createTree(sequence,containerNodes)
     
-    def _insert(self,node,pos,sequence,cNodes):
-        print("This is _insert for node {0} at pos {1} and with sequence {2}".format(node,pos,sequence))
+    def isParent(self,node):
+        return self._getId(node) in self.containerNodes
+    
+    def containsAll(self,node):
+        if self._getId(node) not in self.containerNodes:
+            return False
+        else:
+            cNode = self.containerNodes[self._getId(node)]
+            return len(cNode.itemSequences) == 1 and cNode.itemSequences[0] == (0,len(self.items)-1)
             
-        # Items will be inserted between these two items
-        if pos > 0:
-            prev = node.getChildren()[pos-1]
-        else: prev = None
-        if pos < node.getChildrenCount():
-            next = node.getChildren()[pos]
-        else: next = None
-        print("prev: {0}".format(prev))
-        print("next: {0}".format(next))
-        
-        startSeq = None
-        endSeq = None
-        if prev is not None and self._getId(prev) is not None and self._getId(prev) in self.containerNodes:
-            prevCNode = self.containerNodes[self._getId(prev)]
-            for seq in prevCNode.itemSequences:
-                if seq[0] == sequence[0]:
-                    startSeq = seq
-                    # Yeah: The previous node contains some of the first items
-                    self._insert(prev,prev.getChildrenCount(),startSeq,prevCNode.childContainers)
-                    break
-        
-        if next is not None and self._getId(next) is not None and self._getId(next) in self.containerNodes:
-            nextCNode = self.containerNodes[self._getId(next)]
-            for seq in nextCNode.itemSequences:
-                if seq[1] == sequence[1]:
-                    endSeq = seq
-                    # Yeah: The next node contains some of the last items
-                    self._insert(next,0,endSeq,nextCNode.childContainers)
-                    break
-                
-        # It may happen that startSeq and endSeq overlap. In this case we shrink endSet.
-        if startSeq is not None and endSeq is not None and startSeq[1] >= endSeq[0]:
-            endSeq = (startSeq[1] + 1,endSeq[1])
-            if self._seqLen(endSeq) < 1:
-                endSeq = None
-            
-        # Get the remaining items
-        remSeqStart = sequence[0] if startSeq is None else startSeq[1]+1
-        remSeqEnd = sequence[1] if endSeq is None else endSeq[0]-1
-        remainingSequence = (remSeqStart,remSeqEnd)
-        if self._seqLen(remainingSequence) > 0:
-            self._insertIntoNode(node,pos,self._createTree(remainingSequence,cNodes))
-        
     def _buildContainerNodes(self,node):
         """If they do not exist already, create ContainerNodes for all ancestors of the given node.
         

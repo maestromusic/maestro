@@ -46,9 +46,6 @@ class Playlist(rootedtreemodel.RootedTreeModel):
     currentlyPlayingIndex = None
     currentlyPlayingElement = None
     
-    # TreeBuilder to create the playlist-tree from MPD's playlist-list.
-    _treeBuilder = None
-    
     # While _syncLock is True, synchronization with MPD pauses. This is used during complex changes of the model.
     _syncLock = False
     
@@ -56,13 +53,12 @@ class Playlist(rootedtreemodel.RootedTreeModel):
         """Initialize with an empty playlist."""
         rootedtreemodel.RootedTreeModel.__init__(self,RootNode())
         self.setContents([])
-        self._treeBuilder = treebuilder.TreeBuilder(self._getId,self._getParentIds,self._createNode,self._insertIntoNode)
     
     def setContents(self,contents):
         """Set the contents of this playlist. The contents are only the toplevel-elements in the playlist, not all files."""
         self.contents = contents
         self.root.contents = contents
-        
+    
     def startSynchronization(self):
         """Start to synchronize this playlist with MPD."""
         self.pathList = [file.getPath() for file in self.root.getAllFiles()]
@@ -109,11 +105,8 @@ class Playlist(rootedtreemodel.RootedTreeModel):
                     self._removeFiles(self.root,i1,i2)
                 #~ elif tag == 'insert' # TODO
                 else: #TODO: This can be removed when handling of 'insert' is implemented
-                    self.setContents(self._treeBuilder.build([self._createItem(path) for path in pathList]))
-                    for element in self.contents:
-                        element.parent = self.root
                     self.pathList = pathList
-                    self.reset()
+                    self.restructure() 
                     break
             
             # Synchronize currently playing song
@@ -128,7 +121,15 @@ class Playlist(rootedtreemodel.RootedTreeModel):
                 self.currentlyPlayingElement = self.root.getFileByIndex(status['song'])
                 index = self.getIndex(self.currentlyPlayingElement)
                 self.dataChanged.emit(index,index)
-                
+    
+    def restructure(self):
+        treeBuilder = self._createTreeBuilder([self._createItem(path) for path in self.pathList])
+        treeBuilder.buildParentGraph()
+        self.setContents(treeBuilder.buildTree())
+        for element in self.contents:
+            element.parent = self.root
+        self.reset()
+        
     def isPlaying(self,element):
         """Return whether the song <element> is the one which is currently played by MPD."""
         return element == self.currentlyPlayingElement
@@ -221,7 +222,81 @@ class Playlist(rootedtreemodel.RootedTreeModel):
         
         if aIndex != bIndex and not removeA: # If a == b, we've removed the children above
             self._removeFiles(element.contents[aIndex],start-aOffset,aFileCount)
+    
+    def insertElements(self,elements,offset):
+        treeBuilder = self._createTreeBuilder(elements)
+        treeBuilder.buildParentGraph()
+        self._insert(treeBuilder,self.root,elements,offset)
         
+    def _insert(self,treeBuilder,parent,elements,offset,sequence=None):
+        fileCount = parent.getFileCount()
+        if sequence is None:
+            sequence = (0,len(elements)-1)
+        assert 0 <= offset <= fileCount
+        
+        # First step: Prepare the position to insert: split if necessary and get prev and next
+        if offset != fileCount: # there is no child at offset fileCount
+            insertIndex,innerOffset = parent.getChildIndexAtOffset(offset)
+            child = parent.contents[insertIndex]
+            if innerOffset > 0: # We want to insert somewhere in the middle of a container...
+                # ...that is no problem if the container is a parent of all elements we want to insert
+                if treeBuilder.containsAll(child):
+                    self._insert(treeBuilder,child,elements,innerOffset)
+                    return
+                else:
+                    self.split(parent,offset) # But otherwise we have to split
+                    insertIndex = insertIndex + 1
+                    prev = child
+                    next = parent.contents[insertIndex]
+            else:
+                prev = parent.contents[insertIndex-1] if insertIndex > 0 else None
+                next = child
+        else:
+            insertIndex = len(parent.contents)
+            prev = parent.contents[-1]
+            next = None
+            
+        # Second step: Branch off elements fitting in prev or next
+        startSeq = None
+        endSeq = None
+        if prev is not None and prev.isContainer() and treeBuilder.isParent(prev):
+            prevCNode = treeBuilder.containerNodes[prev.id]
+            for seq in prevCNode.itemSequences:
+                if seq[0] == sequence[0]:
+                    startSeq = seq
+                    # Yeah: The previous node contains some of the first items
+                    self._insert(treeBuilder,prev,elements,prev.getFileCount(),startSeq)
+                    break
+        
+        
+        if next is not None and next.isContainer() and treeBuilder.isParent(next):
+            nextCNode = treeBuilder.containerNodes[next.id]
+            for seq in nextCNode.itemSequences:
+                if seq[1] == sequence[1]:
+                    endSeq = seq
+                    
+                    if startSeq is None:
+                        endSeq = seq
+                    else: # things get more complicated when startSeq and endSeq overlap
+                        endSeq = (max(seq[0],startSeq[1]+1),endSeq[1])
+                        if self._seqLen(endSeq) < 1: # endSeq is contained in startSeq
+                            endSeq = None
+                            break 
+                    self._insert(treeBuilder,next,elements,0,endSeq)
+                    break
+
+            
+        # Get the remaining items
+        remainingSequence = (sequence[0] if startSeq is None else startSeq[1]+1,
+                             sequence[1] if endSeq is None else endSeq[0]-1)
+        if self._seqLen(remainingSequence) > 0:
+            newChildren = treeBuilder.buildTree(remainingSequence,parent if parent != self.root else None)
+            for element in newChildren:
+                element.parent = parent
+            self.beginInsertRows(self.getIndex(parent),insertIndex,insertIndex+len(newChildren)-1)
+            parent.contents[insertIndex:insertIndex] = newChildren
+            self.endInsertRows()
+                    
     def _createItem(self,path):
         """Create a playlist-item for the given path. If the path is in the database, an instance of PlaylistElement is created, otherwise an instance of ExternalFile. This method is used to create items based on the MPD-playlist."""
         id = db.query("SELECT container_id FROM files WHERE path = ?",path).getSingle()
@@ -245,9 +320,6 @@ class Playlist(rootedtreemodel.RootedTreeModel):
         for element in contents:
             element.parent = newElement
         return newElement
-
-    def _insertIntoNode(self):
-        pass
         
     def split(self,element,offset):
         """Split <element> at the given offset. This method will ensure, that element has a child starting at offset <offset>. Note that this method does not change the flat playlist, but only the tree-structure.
@@ -288,6 +360,13 @@ class Playlist(rootedtreemodel.RootedTreeModel):
             del element.contents[index+1:]
             self.endRemoveRows()
             return result
+    
+    def _createTreeBuilder(self,items):
+        return treebuilder.TreeBuilder(items,self._getId,self._getParentIds,self._createNode)
+        
+    def _seqLen(self,sequence):
+        """Return the length of an item-sequence."""
+        return sequence[1] - sequence[0] + 1
             
     
 class ExternalFile(Node,FilelistMixin):
