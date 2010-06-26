@@ -105,7 +105,7 @@ class Playlist(rootedtreemodel.RootedTreeModel):
             for tag,i1,i2,j1,j2 in self._getFilteredOpcodes(self.pathList,pathList):
                 if tag == 'delete':
                     del self.pathList[i1:i2]
-                    self._removeByFileIndices(self.root,i1,i2)
+                    self._removeFiles(self.root,i1,i2)
                 #~ elif tag == 'insert' # TODO
                 else: #TODO: This can be removed when handling of 'insert' is implemented
                     self.setContents(self._treeBuilder.build([self._createItem(path) for path in pathList]))
