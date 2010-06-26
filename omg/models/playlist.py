@@ -55,7 +55,7 @@ class Playlist(rootedtreemodel.RootedTreeModel):
         """Initialize with an empty playlist."""
         rootedtreemodel.RootedTreeModel.__init__(self,RootNode())
         self.setContents([])
-        self._treeBuilder = treebuilder.TreeBuilder(self._getId,self._getParentIds,self._createNode)
+        self._treeBuilder = treebuilder.TreeBuilder(self._getId,self._getParentIds,self._createNode,self._insertIntoNode)
     
     def setContents(self,contents):
         """Set the contents of this playlist. The contents are only the toplevel-elements in the playlist, not all files."""
@@ -149,8 +149,8 @@ class Playlist(rootedtreemodel.RootedTreeModel):
         else: parent = self.root
                 
         # Update playlists
-        start = element.getIndexInFilelist()
-        end = start+element.fileCount()
+        start = element.getOffset()
+        end = start+element.getFileCount()
         mpclient.delete(start,end)
         del self.pathList[start:end]
         
@@ -161,59 +161,57 @@ class Playlist(rootedtreemodel.RootedTreeModel):
         self.endRemoveRows()
         self._syncLock = False
         
-    def removeByFileIndices(self,start,end):
-        """Remove the files with indices <start>-<end> (without <end>!) from the playlist. Containers which are empty after removal are removed, too. <start> must be >= 0 and < self.root.fileCount(), <end> must be > <start> and <= self.root.fileCount(), or otherwise an IndexError is raised."""
+    def removeFiles(self,start,end):
+        """Remove the files with offsets <start>-<end> (without <end>!) from the playlist. Containers which are empty after removal are removed, too. <start> must be >= 0 and < self.root.getFileCount(), <end> must be > <start> and <= self.root.getFileCount(), or otherwise an IndexError is raised."""
         self._syncLock = True
         mpclient.delete(start,end)
         del self.pathList[start:end]
-        self._removeByFileIndices(self.root,start,end)
+        self._removeFiles(self.root,start,end)
         self._syncLock = False
         
-    def _removeByFileIndices(self,element,start,end):
-        """Remove the files with indices <start>-<end> (without <end>!) from <element>s children. <start> and <end> are file indices, so the files which are removed are not necessarily direct children. Containers which are empty after removal are removed, too. But note that <element> may be empty after this method. <start> must be >= 0 and < element.fileCount(), <end> must be > <start> and <= element.fileCount(), or otherwise an IndexError is raised.
+    def _removeFiles(self,element,start,end):
+        """Remove the files with offsets <start>-<end> (without <end>!) from <element>s children. <start> and <end> are file offset, so the files which are removed are not necessarily direct children. Containers which are empty after removal are removed, too. But note that <element> may be empty after this method. <start> must be >= 0 and < element.getFileCount(), <end> must be > <start> and <= element.getFileCount(), or otherwise an IndexError is raised.
         
-        Warning: This method does not update the pathlist used to synchronize with MPD, nor does update MPD itself. Use removeByFileIndices, to keep the model consistent.
+        Warning: This method does not update the pathlist used to synchronize with MPD, nor does it update MPD itself. Use removeFiles, to keep the model consistent.
         """
         if start <0 or end <= start:
-            raise IndexError("Playlist._removeViaFileIndices: Wrong values for start ({0}) and end ({0})"
+            raise IndexError("Playlist._removeFiles: Offsets out of bounds: start is {0} and end is {0}."
                                 .format(start,end))
-        # a is the first item which is deleted or from which children are deleted
-        # b is the last item which is deleted or from which children are deleted
+        # a is the first item which is removed or from which children are removed
+        # b is the last item which is removed or from which children are removed
         aIndex = None
         bIndex = None
         
         # Find a and b and gather information about them
-        pos = 0
+        offset = 0
         for i in range(0,len(element.contents)):
-            fileCount = element.contents[i].fileCount()
-            if aIndex is None and pos + fileCount > start:
+            fileCount = element.contents[i].getFileCount()
+            if aIndex is None and offset + fileCount > start:
                 aIndex = i
                 aFileCount = fileCount
-                aPos = pos
+                aOffset = offset
                 # If all of a's children are going to be removed, remove also a
-                removeA = pos == start and pos + fileCount <= end
-            if pos + fileCount >= end:
+                removeA = offset == start and offset + fileCount <= end
+            if offset + fileCount >= end:
                 bIndex = i
                 bFileCount = fileCount
-                bPos = pos
+                bOffset = offset
                 # If all of b's children are going to be removed, remove also b
-                removeB = pos >= start and pos+fileCount == end
+                removeB = offset >= start and offset + fileCount == end
                 break
-            pos = pos + fileCount
+            offset = offset + fileCount
         
-        # If a or b was not found, something is wrong with the indices
-        if aIndex is None:
-            raise IndexError("aIndex out of bounds. I tried to delete elements {0}-{1} from {2}".format(start,end,element))
-        if bIndex is None:
-            raise IndexError("bIndex out of bounds. I tried to delete elements {0}-{1} from {2}".format(start,end,element))
+        # If a or b were not found, something is wrong with the offsets
+        if aIndex is None or bIndex is None:
+            raise IndexError("Something is wrong with the offsets. I tried to remove elements {0}-{1} from {2}".format(start,end,element))
         
         # self.contents[delStart:delEnd] will be removed completely. Now the question is whether to include a or b in this range or not.
-        delStart = aIndex if removeA else aIndex + 1
+        delStart = aIndex if removeA else aIndex+1
         delEnd = bIndex+1 if removeB else bIndex
         
         # Now we start to actually remove elements. We start at the end, because the indices are going to become invalid.
         if not removeB:
-            self._removeByFileIndices(element.contents[bIndex],max(start-bPos,0),end-bPos)
+            self._removeFiles(element.contents[bIndex],max(start-bOffset,0),end-bOffset)
 
         if delStart<delEnd:
             self.beginRemoveRows(self.getIndex(element),delStart,delEnd-1)
@@ -221,7 +219,7 @@ class Playlist(rootedtreemodel.RootedTreeModel):
             self.endRemoveRows()
         
         if aIndex != bIndex and not removeA: # If a == b, we've removed the children above
-            self._removeByFileIndices(element.contents[aIndex],start-aPos,aFileCount)
+            self._removeFiles(element.contents[aIndex],start-aOffset,aFileCount)
         
     def _createItem(self,path):
         """Create a playlist-item for the given path. If the path is in the database, an instance of PlaylistElement is created, otherwise an instance of ExternalFile. This method is used to create items based on the MPD-playlist."""
@@ -247,7 +245,10 @@ class Playlist(rootedtreemodel.RootedTreeModel):
             element.parent = newElement
         return newElement
 
-
+    def _insertIntoNode(self):
+        pass
+        
+    
 class ExternalFile(Node,FilelistMixin):
     """This class holds a file that appears in the playlist, but is not in the database."""
     
@@ -274,12 +275,12 @@ class ExternalFile(Node,FilelistMixin):
     def getAllFiles(self):
         return (self,)
     
-    def fileCount(self):
+    def getFileCount(self):
         return 1
         
-    def getFileByIndex(self,index):
-        if index != 0:
-            raise IndexError("Index {0} is out of bounds".format(index))
+    def getFileByOffset(self,offset):
+        if offset != 0:
+            raise IndexError("Offset {0} is out of bounds".format(offset))
         return self
 
 

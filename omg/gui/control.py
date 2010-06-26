@@ -88,16 +88,18 @@ class ControlWidget(QtGui.QWidget):
                     self.seekSlider.setValue(int(self.SEEK_SLIDER_MAX * self.time.getRatio()))
             
             element = controlModule.playlist.currentlyPlayingElement
-            if isinstance(element,playlist.ExternalFile):
-                title = element.getPath()
-            else: title = element.getTitle()
-            if self.titleLabel.text() != title:
-                font = self.titleLabel.font()
-                font.setPixelSize(14)
-                font.setBold(True)
-                font.setItalic(isinstance(element,playlist.ExternalFile))
-                self.titleLabel.setFont(font)
-                self.titleLabel.setText(title)
+            if element is not None: # This may happen when the playlist has not been synchronized already.
+                if isinstance(element,playlist.ExternalFile):
+                    title = element.getPath()
+                else: title = element.getTitle()
+                if self.titleLabel.text() != title:
+                    font = self.titleLabel.font()
+                    font.setPixelSize(14)
+                    font.setBold(True)
+                    font.setItalic(isinstance(element,playlist.ExternalFile))
+                    self.titleLabel.setFont(font)
+                    self.titleLabel.setText(title)
+            
                 
         else: # Currently nothing is playing
             self.time = None

@@ -54,23 +54,29 @@ class Playlist(QtGui.QWidget):
         
     def _handleDoubleClick(self,index):
         element = self.model.data(index)
-        mpclient.play(element.getIndexInFilelist())
+        mpclient.play(element.getOffset())
 
 class PlaylistTreeView(QtGui.QTreeView):
     """Specialized QTreeView, which draws the currently playing track highlighted."""
     def __init__(self,parent):
         QtGui.QTreeView.__init__(self,parent)
     
-    def drawRow(self,painter,option,index):
-        element = self.model().data(index)
-        if self.model().isPlaying(element):
-            self.setAlternatingRowColors(False)
-            painter.fillRect(option.rect,QtGui.QColor(110,149,229))
-            QtGui.QTreeView.drawRow(self,painter,option,index)
-            self.setAlternatingRowColors(True)
-        else: QtGui.QTreeView.drawRow(self,painter,option,index)
-        
+    #~ # Does not work...
+    #~ def drawRow(self,painter,option,index):
+        #~ element = self.model().data(index)
+        #~ if self.model().isPlaying(element):
+            #~ #self.alternatingRColors = False # does not work
+            #~ #self.setAlternatingRowColors(False)
+            #~ painter.fillRect(option.rect,QtGui.QColor(110,149,229))
+            #~ QtGui.QTreeView.drawRow(self,painter,option,index)
+            #~ #self.alternatingColors = True
+            #~ #self.setAlternatingRowColors(True) # forces the TreeView to be redrawn and thus an infinite loop is created
+        #~ else: QtGui.QTreeView.drawRow(self,painter,option,index)
+
     def keyReleaseEvent(self,keyEvent):
         if keyEvent.key() == Qt.Key_Delete:
-            for index in self.selectedIndexes():
-                self.parent().model.removeByQtIndex(index)
+            # It may happen that an element and its parent element are selected. When removing the parent, the element will also be removed and will disappear from selectedIndexes(). An easy solution like 
+            # for i in selectedIndexes(): removeByQtIndex(i)
+            # would try to remove the child a second time.
+            while len(self.selectedIndexes()) > 0:
+                self.parent().model.removeByQtIndex(self.selectedIndexes()[0])

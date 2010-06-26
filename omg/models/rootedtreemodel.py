@@ -79,7 +79,7 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
     
     def createIndex(self,row,column,internalPointer):
         if not isinstance(internalPointer,Node):
-            raise TypeError("Internal pointers in a RootedTreeModel must be subclasses of node")
+            raise TypeError("Internal pointers in a RootedTreeModel must be subclasses of Node")
         return QtCore.QAbstractItemModel.createIndex(self,row,column,internalPointer)
         
     def getIndex(self,node):

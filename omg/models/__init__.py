@@ -50,40 +50,49 @@ class FilelistMixin:
                 for file in element.getAllFiles():
                     yield file
                         
-    def fileCount(self):
+    def getFileCount(self):
         assert self.contents is not None
         if self.isFile():
             return 1
-        else: return sum(element.fileCount() for element in self.contents)
+        else: return sum(element.getFileCount() for element in self.contents)
         
-    def getFileByIndex(self,index):
+    def getFileByOffset(self,offset):
         assert self.contents is not None
-        index = int(index)
-        if index < 0:
-            raise IndexError("Index {0} is out of bounds".format(index))
-        if index == 0 and self.isFile():
+        offset = int(offset)
+        if offset == 0 and self.isFile():
             return self
         else: 
-            for element in self.contents:
-                fileCount = element.fileCount()
-                if index < fileCount:
-                    return element.getFileByIndex(index)
-                else: index = index - fileCount
-            raise IndexError("Index {0} is out of bounds".format(index))
+            child,innerOffset = self.getChildAtOffset(offset)
+            if child.isFile():
+                return child
+            else: return child.getFileByOffset(innerOffset)
     
-    def getIndexInFilelist(self):
+    def getOffset(self):
         if self.getParent() is None:
             return 0
         else:
-            index = self.getParent().getIndexInFilelist()
+            offset = self.getParent().getOffset()
             for child in self.getParent().getChildren():
                 if child == self:
-                    return index
-                else: index = index + child.fileCount()
-            raise ValueError("FilelistMixin.getIndexInFilelist: Node {0} is not contained in its parent {1}."
+                    return offset
+                else: offset = offset + child.getFileCount()
+            raise ValueError("FilelistMixin.getOffset: Node {0} is not contained in its parent {1}."
                                 .format(self,self.getParent()))
+    
+    def getChildAtOffset(self,offset):
+        assert self.contents is not None
+        offset = int(offset)
+        if offset < 0:
+            raise IndexError("Offset {0} is out of bounds".format(offset))
+        cOffset = 0
+        for child in self.contents:
+            fileCount = child.getFileCount()
+            if offset < cOffset + fileCount:
+                return child,offset-cOffset
+            else: cOffset = cOffset + fileCount
+        raise IndexError("Offset {0} is out of bounds".format(offset))
 
-            
+
 class IndexMixin:
     def index(self,node):
         for i in range(0,len(self.contents)):
