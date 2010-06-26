@@ -42,8 +42,8 @@ class Playlist(rootedtreemodel.RootedTreeModel):
     # Toplevel elements in the playlist
     contents = None
     
-    # Currently playing index (file-index; position in the playlist) and element
-    currentlyPlayingIndex = None
+    # Currently playing offset and element
+    currentlyPlayingOffset = None
     currentlyPlayingElement = None
     
     # While _syncLock is True, synchronization with MPD pauses. This is used during complex changes of the model.
@@ -111,14 +111,14 @@ class Playlist(rootedtreemodel.RootedTreeModel):
             
             # Synchronize currently playing song
             if 'song' not in status:
-                if self.currentlyPlayingIndex is not None:
-                    self.currentlyPlayingIndex = None
+                if self.currentlyPlayingOffset is not None:
+                    self.currentlyPlayingOffset = None
                     index = self.getIndex(self.currentlyPlayingElement)
                     self.dataChanged.emit(index,index)
                     self.currentlyPlayingElement = None
-            elif status['song'] != self.currentlyPlayingIndex:
-                self.currentlyPlayingIndex = status['song']
-                self.currentlyPlayingElement = self.root.getFileByIndex(status['song'])
+            elif status['song'] != self.currentlyPlayingOffset:
+                self.currentlyPlayingOffset = status['song']
+                self.currentlyPlayingElement = self.root.getFileByOffset(status['song'])
                 index = self.getIndex(self.currentlyPlayingElement)
                 self.dataChanged.emit(index,index)
     
@@ -224,6 +224,8 @@ class Playlist(rootedtreemodel.RootedTreeModel):
             self._removeFiles(element.contents[aIndex],start-aOffset,aFileCount)
     
     def insertElements(self,elements,offset):
+        if offset == -1:
+            offset = len(self.pathList)
         treeBuilder = self._createTreeBuilder(elements)
         treeBuilder.buildParentGraph()
         self._insert(treeBuilder,self.root,elements,offset)
@@ -296,30 +298,6 @@ class Playlist(rootedtreemodel.RootedTreeModel):
             self.beginInsertRows(self.getIndex(parent),insertIndex,insertIndex+len(newChildren)-1)
             parent.contents[insertIndex:insertIndex] = newChildren
             self.endInsertRows()
-                    
-    def _createItem(self,path):
-        """Create a playlist-item for the given path. If the path is in the database, an instance of PlaylistElement is created, otherwise an instance of ExternalFile. This method is used to create items based on the MPD-playlist."""
-        id = db.query("SELECT container_id FROM files WHERE path = ?",path).getSingle()
-        if id is None:
-            return ExternalFile(path)
-        else: return PlaylistElement(id,[])
-    
-    def _getId(self,item):
-        """Return the id of item or None if it is an ExternalFile. This is a helper method for the TreeBuilder-algorithm."""
-        if isinstance(item,ExternalFile):
-            return None
-        else: return item.id
-        
-    def _getParentIds(self,id):
-        """Return a list containing the ids of all parents of the given id. This is a helper method for the TreeBuilder-algorithm."""
-        return [id for id in db.query("SELECT container_id FROM contents WHERE element_id = ?",id).getSingleColumn()]
-               
-    def _createNode(self,id,contents):
-        """Create a PlaylistElement for a container with the given id and contents. This is a helper method for the TreeBuilder-algorithm."""
-        newElement = PlaylistElement(id,contents)
-        for element in contents:
-            element.parent = newElement
-        return newElement
         
     def split(self,element,offset):
         """Split <element> at the given offset. This method will ensure, that element has a child starting at offset <offset>. Note that this method does not change the flat playlist, but only the tree-structure.
@@ -362,7 +340,32 @@ class Playlist(rootedtreemodel.RootedTreeModel):
             return result
     
     def _createTreeBuilder(self,items):
+        """Create a TreeBuilder to create container-trees over the given list of elements."""
         return treebuilder.TreeBuilder(items,self._getId,self._getParentIds,self._createNode)
+   
+    def _createItem(self,path):
+        """Create a playlist-item for the given path. If the path is in the database, an instance of PlaylistElement is created, otherwise an instance of ExternalFile. This method is used to create items based on the MPD-playlist."""
+        id = db.query("SELECT container_id FROM files WHERE path = ?",path).getSingle()
+        if id is None:
+            return ExternalFile(path)
+        else: return PlaylistElement(id,[])
+    
+    def _getId(self,item):
+        """Return the id of item or None if it is an ExternalFile. This is a helper method for the TreeBuilder-algorithm."""
+        if isinstance(item,ExternalFile):
+            return None
+        else: return item.id
+        
+    def _getParentIds(self,id):
+        """Return a list containing the ids of all parents of the given id. This is a helper method for the TreeBuilder-algorithm."""
+        return [id for id in db.query("SELECT container_id FROM contents WHERE element_id = ?",id).getSingleColumn()]
+               
+    def _createNode(self,id,contents):
+        """Create a PlaylistElement for a container with the given id and contents. This is a helper method for the TreeBuilder-algorithm."""
+        newElement = PlaylistElement(id,contents)
+        for element in contents:
+            element.parent = newElement
+        return newElement
         
     def _seqLen(self,sequence):
         """Return the length of an item-sequence."""

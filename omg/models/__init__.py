@@ -101,7 +101,8 @@ class FilelistMixin:
     
     def getChildAtOffset(self,offset):
         """Return the child containing the file with the given (relative) offset, and the offset of that file relative to the child. This is a convenience-method for getChildren()[getChildIndexAtOffset(offset)]. Confer getChildIndexAtOffset."""
-        return self.getChildren()[self.getChildIndexAtOffset(offset)]
+        index,innerOffset = self.getChildIndexAtOffset(offset)
+        return self.getChildren()[index],innerOffset
 
 
 class IndexMixin:

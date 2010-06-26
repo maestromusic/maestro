@@ -44,6 +44,7 @@ class TreeBuilder:
         self._createNode = createNode
             
     def buildParentGraph(self):
+        """Find all ancestors of the items used in this TreeBuilder, gather information about them (e.g. itemSequences) and create a graph with this information."""
         self.containerNodes = {}
         
         for i in range(0,len(self.items)):
