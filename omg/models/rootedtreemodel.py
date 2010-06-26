@@ -83,8 +83,8 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
         return QtCore.QAbstractItemModel.createIndex(self,row,column,internalPointer)
         
     def getIndex(self,node):
-        """Return the (Qt)-index of the given node. <node> mustn't be the rootnode, as it has no index (otherwise a ValueError is raised."""
+        """Return the (Qt)-index of the given node. If <node> is the root of this model, return an invalid QModelIndex."""
         if node == self.root:
-            raise ValueError("RootedTreeModel.getIndex: Rootnode has no Index")
+            return QtCore.QModelIndex()
         parent = node.getParent()
         return self.createIndex(parent.getChildren().index(node),0,node)

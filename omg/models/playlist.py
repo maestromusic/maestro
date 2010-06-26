@@ -14,11 +14,12 @@ from . import rootedtreemodel, treebuilder, Node, Element, FilelistMixin, IndexM
 db = database.get()
 
 class PlaylistElement(Element):
-    def __init__(self,id,contents):
+    def __init__(self,id,contents,tags = None):
         Element.__init__(self,id)
         self.length = None
         self.position = None
         self.contents = contents
+        self.tags = tags
     
     def getPosition(self):
         if self.parent is None or isinstance(self.parent,RootNode): # Without parent, there can't be a position
@@ -248,6 +249,46 @@ class Playlist(rootedtreemodel.RootedTreeModel):
     def _insertIntoNode(self):
         pass
         
+    def split(self,element,offset):
+        """Split <element> at the given offset. This method will ensure, that element has a child starting at offset <offset>. Note that this method does not change the flat playlist, but only the tree-structure.
+        
+        Example: Assume <element> contains a container which contains 10 files. After splitting <element> at offset 5, <element> will contain two copys of the container, containing the files 0-4 and 5-9, respectively.
+        """
+        index,innerOffset = element.getChildIndexAtOffset(offset)
+        child = element.contents[index]
+        if innerOffset == 0: # child starts at the given offset, so we there is no need to split
+            return
+        newChild = PlaylistElement(child.id,self._splitHelper(child,innerOffset),child.tags)
+        for c in newChild.contents:
+            c.parent = newChild
+        newChild.parent = element
+        self.beginInsertRows(self.getIndex(element),index+1,index+1)
+        element.contents.insert(index+1,newChild)
+        self.endInsertRows()
+        
+    def _splitHelper(self,element,offset):
+        """Helper for the split-Algorithm: Crop <element> to contain only the files before the given offset and return a tree containing the remaining children. If <element> contains a child starting at <offset>, this method will remove that child and all further children from <element> and return the removed children as list. Otherwise the method will copy the child containing <offset>, crop the original and insert the removed nodes in the copy. It will return the copy together with all further children."""
+        index,innerOffset = element.getChildIndexAtOffset(offset)
+        child = element.contents[index]
+        
+        # If there is a child starting at offset, we just remove all later children from this node and return them
+        if innerOffset == 0:
+            result = element.contents[index:]
+            self.beginRemoveRows(self.getIndex(element),index,len(element.contents)-1)
+            del element.contents[index:]
+            self.endRemoveRows()
+            return result
+        else:
+            # Otherwise we have to create a copy of child containing the files starting at offset. Here we use _splitHelper recursively.
+            newChild = PlaylistElement(child.id,self._splitHelper(child,innerOffset),child.tags)
+            for c in newChild.contents:
+                c.parent = newChild
+            result = [newChild].extend(element.contents[index+1:])
+            self.beginRemoveRows(self.getIndex(element),index+1,len(element.contents)-1)
+            del element.contents[index+1:]
+            self.endRemoveRows()
+            return result
+            
     
 class ExternalFile(Node,FilelistMixin):
     """This class holds a file that appears in the playlist, but is not in the database."""
