@@ -14,7 +14,7 @@ TT_SMALL_RESULT = 'tmp_browser_smallres'
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import SIGNAL
 
-from omg import search, tags, constants, models
+from omg import search, tags, constants, models, control
 from . import rootedtreemodel, nodes, layers, delegate, layouter
 
 class Browser(QtGui.QWidget):
@@ -44,9 +44,7 @@ class Browser(QtGui.QWidget):
     
     # This signal is emitted when the user double-clicks on a node. The
     nodeDoubleClicked = QtCore.pyqtSignal(nodes.Node)
-    
-    containerDoubleClicked = QtCore.pyqtSignal(models.Element)
-
+    containerDoubleClicked = QtCore.pyqtSignal(nodes.Node)
 
     def __init__(self,parent=None,model=None):
         QtGui.QWidget.__init__(self,parent)
@@ -61,6 +59,9 @@ class Browser(QtGui.QWidget):
         self.browser.setModel(self.model)
         self.browser.setItemDelegate(delegate.Delegate(self,self.model,layouter.Layouter()))
         self.browser.setExpandsOnDoubleClick(False)
+        self.browser.setDragEnabled(True)
+        self.browser.setAcceptDrops(True)
+        self.browser.setDropIndicatorShown(True)
         self.browser.doubleClicked.connect(self._handleDoubleClicked)
         self.model.browser = self.browser
         
@@ -145,7 +146,9 @@ class Browser(QtGui.QWidget):
         node = self.model.data(index)
         self.nodeDoubleClicked.emit(node)
         if isinstance(node,nodes.ElementNode):
+            control.playlist.insertElements(control.playlist.importElements([node]),-1)
             self.containerDoubleClicked.emit(models.Element(node.id))
+        
 
 
 def printNode(node,level):

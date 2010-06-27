@@ -27,6 +27,12 @@ def status():
         status['time'] = Time(status['time'])
     return status
 
+def insert(offset,paths):
+    for path in paths:
+        client.add(path)
+        client.move(int(client.status()['playlistlength'])-1,offset)
+        offset = offset + 1
+        
 def delete(start,end=None):
     if end is None:
         end = start + 1

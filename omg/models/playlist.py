@@ -117,8 +117,13 @@ class Playlist(rootedtreemodel.RootedTreeModel):
                     self.dataChanged.emit(index,index)
                     self.currentlyPlayingElement = None
             elif status['song'] != self.currentlyPlayingOffset:
+                oldElement = self.currentlyPlayingElement
                 self.currentlyPlayingOffset = status['song']
                 self.currentlyPlayingElement = self.root.getFileByOffset(status['song'])
+                # Update the new and the old song
+                if oldElement is not None:
+                    index = self.getIndex(oldElement)
+                    self.dataChanged.emit(index,index)
                 index = self.getIndex(self.currentlyPlayingElement)
                 self.dataChanged.emit(index,index)
     
@@ -176,6 +181,7 @@ class Playlist(rootedtreemodel.RootedTreeModel):
         
         Warning: This method does not update the pathlist used to synchronize with MPD, nor does it update MPD itself. Use removeFiles, to keep the model consistent.
         """
+        #print("This is _removeFiles for element {0} at start {1} and end {2}".format(element,start,end))
         if start <0 or end <= start:
             raise IndexError("Playlist._removeFiles: Offsets out of bounds: start is {0} and end is {0}."
                                 .format(start,end))
@@ -226,16 +232,27 @@ class Playlist(rootedtreemodel.RootedTreeModel):
     def insertElements(self,elements,offset):
         if offset == -1:
             offset = len(self.pathList)
+        self._syncLock = True
         treeBuilder = self._createTreeBuilder(elements)
         treeBuilder.buildParentGraph()
         self._insert(treeBuilder,self.root,elements,offset)
         
+        # Update pathList
+        for element in elements:
+            pathList = [file.getPath() for file in element.getAllFiles()]
+            self.pathList[offset:offset] = pathList
+            mpclient.insert(offset,pathList)
+            offset = offset + len(pathList)
+        
+        self._syncLock = False
+        
     def _insert(self,treeBuilder,parent,elements,offset,sequence=None):
         fileCount = parent.getFileCount()
+        
         if sequence is None:
             sequence = (0,len(elements)-1)
         assert 0 <= offset <= fileCount
-        
+
         # First step: Prepare the position to insert: split if necessary and get prev and next
         if offset != fileCount: # there is no child at offset fileCount
             insertIndex,innerOffset = parent.getChildIndexAtOffset(offset)
@@ -255,7 +272,9 @@ class Playlist(rootedtreemodel.RootedTreeModel):
                 next = child
         else:
             insertIndex = len(parent.contents)
-            prev = parent.contents[-1]
+            if fileCount > 0:
+                prev = parent.contents[-1]
+            else: prev = None
             next = None
             
         # Second step: Branch off elements fitting in prev or next
@@ -339,6 +358,15 @@ class Playlist(rootedtreemodel.RootedTreeModel):
             self.endRemoveRows()
             return result
     
+    def importElements(self,elements):
+        return [self._importElement(element,None) for element in elements]
+        
+    def _importElement(self,element,parent):
+        result = PlaylistElement(element.id,None,element.tags)
+        result.contents = [self._importElement(child,result) for child in element.getElements()]
+        result.parent = parent
+        return result
+        
     def _createTreeBuilder(self,items):
         """Create a TreeBuilder to create container-trees over the given list of elements."""
         return treebuilder.TreeBuilder(items,self._getId,self._getParentIds,self._createNode)

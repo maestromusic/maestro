@@ -164,6 +164,8 @@ class Delegate(QtGui.QStyledItemDelegate):
         layout = self.layouter.layout(node)
         painter.save()
         painter.setFont(self.font)
+        if node.isFile() and self.model.isPlaying(node):
+            painter.fillRect(option.rect,QtGui.QColor(110,149,229))
         layout.paint(painter,option)
         painter.restore()
 

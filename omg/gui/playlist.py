@@ -37,7 +37,11 @@ class Playlist(QtGui.QWidget):
         self.view.setExpandsOnDoubleClick(False)
         self.view.setAlternatingRowColors(True)
         self.view.setSelectionMode(QtGui.QAbstractItemView.ExtendedSelection)
+        self.view.setDragEnabled(True)
+        self.view.setAcceptDrops(True)
+        self.view.setDropIndicatorShown(True)
         self.view.doubleClicked.connect(self._handleDoubleClick)
+        
         palette = QtGui.QPalette()
         palette.setColor(QtGui.QPalette.Base,QtGui.QColor(0xE9,0xE9,0xE9))
         palette.setColor(QtGui.QPalette.AlternateBase,QtGui.QColor(0xD9,0xD9,0xD9))
@@ -60,18 +64,6 @@ class PlaylistTreeView(QtGui.QTreeView):
     """Specialized QTreeView, which draws the currently playing track highlighted."""
     def __init__(self,parent):
         QtGui.QTreeView.__init__(self,parent)
-    
-    #~ # Does not work...
-    #~ def drawRow(self,painter,option,index):
-        #~ element = self.model().data(index)
-        #~ if self.model().isPlaying(element):
-            #~ #self.alternatingRColors = False # does not work
-            #~ #self.setAlternatingRowColors(False)
-            #~ painter.fillRect(option.rect,QtGui.QColor(110,149,229))
-            #~ QtGui.QTreeView.drawRow(self,painter,option,index)
-            #~ #self.alternatingColors = True
-            #~ #self.setAlternatingRowColors(True) # forces the TreeView to be redrawn and thus an infinite loop is created
-        #~ else: QtGui.QTreeView.drawRow(self,painter,option,index)
 
     def keyReleaseEvent(self,keyEvent):
         if keyEvent.key() == Qt.Key_Delete:
