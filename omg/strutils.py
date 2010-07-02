@@ -12,8 +12,8 @@
 #
 
 #This file contains just several useful string functions.
- 
 import re
+from omg import config
 
 def replace(text,dict):
     """Replace multiple pairs at a single blow. To be exact: The keys of dict are replaced by the corresponding values."""
@@ -48,3 +48,7 @@ def formatLength(lengthInSeconds):
     else:
         hours = int(lengthInSeconds / 3600)
         return "{0:d}:{1:02d}:{2:02d}".format(hours,minutes,seconds)
+        
+def formatDate(date):
+    """Return a date in the application's date-format (specified in the config)."""
+    return date.strftime(config.get("misc","date_format"))

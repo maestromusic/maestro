@@ -8,7 +8,7 @@
 #
 from PyQt4 import QtCore
 
-from omg import tags, database, covers
+from omg import tags, database, covers, config
 db = database.get()
 
 class Node:
@@ -165,8 +165,11 @@ class Element(Node,FilelistMixin,IndexMixin):
         if self.tags is None:
             self.loadTags()
         if tags.TITLE in self.tags:
-            return " - ".join(self.tags[tags.TITLE])
-        else: return '<Kein Titel>'
+            result = " - ".join(self.tags[tags.TITLE])
+        else: result = "<Kein Titel>"
+        if config.get("misc","show_ids"):
+            return "[{0}] {1}".format(self.id,result)
+        else: return result
         
     def loadContents(self,recursive=False,table="containers"):
         """Delete the stored contents-list and fetch the contents from the database. You may use the <table>-parameter to restrict the child elements to a specific table: The table with name <table> must contain a column 'id' and this method will only fetch elements which appear in that column. If <recursive> is true loadContents will be called recursively for all child elements."""
@@ -224,6 +227,10 @@ class Element(Node,FilelistMixin,IndexMixin):
             except TypeError: # At least one element does not know its length
                 return None
 
+    def hasCover(self):
+        """Return whether this container has a cover."""
+        return covers.hasCover(self)
+        
     def getCover(self,size=None,cache=True):
         """Get this container's cover with <size>x<size> pixels or the large version if <size> is None. If <cache> is True, this method will store the cover in this Element-instance. Warning: Subsequent calls of this method will return the stored cover only if <cache> is again True."""
         if cache:

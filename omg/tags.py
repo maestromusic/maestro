@@ -34,6 +34,8 @@ TITLE = None
 ALBUM = None
 ARTIST = None
 COMPOSER = None
+CONDUCTOR = None
+PERFORMER = None
 DATE = None
 GENRE = None
 
@@ -139,12 +141,15 @@ def updateIndexedTags():
     
     global TITLE,ARTIST,ALBUM,COMPOSER,PERFORMER,DATE,GENRE
     TITLE = _tagsByName[config.get("tags","title_tag")]
+    COMPOSER = _tagsByName[config.get("tags","composer_tag")]
     ARTIST = _tagsByName[config.get("tags","artist_tag")]
     ALBUM = _tagsByName[config.get("tags","album_tag")]
-    COMPOSER = _tagsByName[config.get("tags","composer_tag")]
-    PERFORMER = _tagsByName[config.get("tags","performer_tag")]
     DATE = _tagsByName[config.get("tags","date_tag")]
-    GENRE = _tagsByName[config.get("tags","genre_tag")]
+    
+    # The following tags shouldn't be treated specially
+    CONDUCTOR = _tagsByName["conductor"]
+    PERFORMER = _tagsByName["performer"]
+    GENRE = _tagsByName["genre"]
     
     global artistTags
     artistTags = tuple(_tagsByName[tagname] for tagname in config.get("browser","artist_tags").split(','))

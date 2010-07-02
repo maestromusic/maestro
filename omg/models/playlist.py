@@ -362,7 +362,8 @@ class Playlist(rootedtreemodel.RootedTreeModel):
         return [self._importElement(element,None) for element in elements]
         
     def _importElement(self,element,parent):
-        result = PlaylistElement(element.id,None,element.tags)
+        result = PlaylistElement(element.id,None)
+        result.loadTags()
         result.contents = [self._importElement(child,result) for child in element.getElements()]
         result.parent = parent
         return result

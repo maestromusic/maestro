@@ -10,7 +10,7 @@ from PyQt4.QtCore import Qt,SIGNAL
 
 from omg import mpclient
 from omg.models import playlist as playlistmodel
-from . import delegate,layouter
+from . import delegates
 
 class Playlist(QtGui.QWidget):
     model = None
@@ -31,21 +31,8 @@ class Playlist(QtGui.QWidget):
         layout.addLayout(controlLineLayout)
         
         self.view = PlaylistTreeView(self)
-        self.view.setHeaderHidden(True)
-        self.view.setModel(self.model)
-        self.view.setItemDelegate(delegate.Delegate(self,self.model,layouter.PlaylistLayouter(),self.font()))
-        self.view.setExpandsOnDoubleClick(False)
-        self.view.setAlternatingRowColors(True)
-        self.view.setSelectionMode(QtGui.QAbstractItemView.ExtendedSelection)
-        self.view.setDragEnabled(True)
-        self.view.setAcceptDrops(True)
-        self.view.setDropIndicatorShown(True)
         self.view.doubleClicked.connect(self._handleDoubleClick)
         
-        palette = QtGui.QPalette()
-        palette.setColor(QtGui.QPalette.Base,QtGui.QColor(0xE9,0xE9,0xE9))
-        palette.setColor(QtGui.QPalette.AlternateBase,QtGui.QColor(0xD9,0xD9,0xD9))
-        self.view.setPalette(palette)
         self.model.modelReset.connect(self._handleReset)
         
         layout.addWidget(self.view)
@@ -64,6 +51,20 @@ class PlaylistTreeView(QtGui.QTreeView):
     """Specialized QTreeView, which draws the currently playing track highlighted."""
     def __init__(self,parent):
         QtGui.QTreeView.__init__(self,parent)
+        self.setHeaderHidden(True)
+        self.setModel(parent.model)
+        self.setItemDelegate(delegates.PlaylistDelegate(self,parent.model))
+        self.setExpandsOnDoubleClick(False)
+        self.setAlternatingRowColors(True)
+        self.setSelectionMode(QtGui.QAbstractItemView.ExtendedSelection)
+        self.setDragEnabled(True)
+        self.setAcceptDrops(True)
+        self.setDropIndicatorShown(True)
+        
+        palette = QtGui.QPalette()
+        palette.setColor(QtGui.QPalette.Base,QtGui.QColor(0xE9,0xE9,0xE9))
+        palette.setColor(QtGui.QPalette.AlternateBase,QtGui.QColor(0xD9,0xD9,0xD9))
+        self.setPalette(palette)
 
     def keyReleaseEvent(self,keyEvent):
         if keyEvent.key() == Qt.Key_Delete:
