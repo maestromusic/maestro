@@ -62,9 +62,14 @@ def init(*config_files):
             "artist_tags": "composer,artist"
         },
         
-        "playlist": {
-            # Size in pixels of covers in playlists
-            "cover_size": 60
+        "gui": {
+            # Size in pixels of covers
+            "large_cover_size": 60,
+            "small_cover_size": 30,
+            "detail_cover_size": 160,
+            
+            # Order in which tags will be displayed. Must contain title and album! Tags which don't appear in this list will be displayed in arbitrary order after the tags in the list.
+            "tag_order": "title,album,composer,artist,performer,conductor,date,genre"
         },
         
         "misc": {
@@ -72,7 +77,6 @@ def init(*config_files):
             "tagmanip26_cmd":os.path.abspath(os.path.join(os.path.split(os.path.split(__file__)[0])[0],"tagmanip26.py")), # assume tagmanip26.py lives in the same directory as this module
             "loglevel":"warning",
             "show_ids":0,
-            "date_format":"%Y",
         }
     }
     

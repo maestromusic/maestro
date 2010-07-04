@@ -20,9 +20,7 @@ def hasCover(container):
     """Return whether the given container has a cover."""
     return os.path.exists(COVER_DIR+"large/"+str(container.id))
 
-
-def getCover(container,size=None):
-    """Return the cover of the given container as QImage. If no cover is found or Qt was not able to load the image, return None. If <size> is None, the large cover will be returned. Otherwise the cover will be scaled to size x size pixels and cached in the appropriate folder."""
+def getCoverPath(container,size=None):
     if size is None:
         dir = COVER_DIR+"large/"
     else: dir = COVER_DIR+"cache_{0}/".format(size)
@@ -33,11 +31,16 @@ def getCover(container,size=None):
         except IOError:
             return None
     
-    cover = QtGui.QImage(dir+str(container.id))
-    if cover.isNull(): # Loading failed
-        return None
-    else: return cover
+    return dir+str(container.id)
     
+def getCover(container,size=None):
+    """Return the cover of the given container as QImage. If no cover is found or Qt was not able to load the image, return None. If <size> is None, the large cover will be returned. Otherwise the cover will be scaled to size x size pixels and cached in the appropriate folder."""
+    path = getCoverPath(container,size)
+    if path is not None:
+        cover = QtGui.QImage(path)
+        if not cover.isNull(): # Loading succeeded
+            return cover
+    return None
     
 def cacheCover(id,size):
     """Create a thumbnail of the cover of the container with the given id with <size>x<size> pixels and cache it in the appropriate cache-folder."""

@@ -6,8 +6,6 @@
 # it under the terms of the GNU General Public License version 3 as
 # published by the Free Software Foundation
 #
-import sys
-
 from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
@@ -17,10 +15,11 @@ class DelegateStyle:
         self.bold = bold
         self.italic = italic
 
-
+# Standard style which is used by default
 STD_STYLE = DelegateStyle(11,False,False)
 
 class DelegateContext:
+    """A DelegateContext stores stuff during the process of painting a widget or computing its size."""
     def __init__(self,painter,option,rect=None):
         self.painter = painter
         self.option = option
@@ -33,12 +32,12 @@ class DelegateContext:
 
 
 class AbstractDelegate(QtGui.QStyledItemDelegate):
+    """This is how AbstractDelegate works: Whenever the view calls paint or sizeHint a DelegateContext is created to store some variables needed for the paint process (e.g. the painter) or the size computation (e.g. the size). In particular the context stores whether we are painting or computing the size. In the case of painting now getBackground is called and the background of the item is drawn. Now layout is invoked in both cases. This method which must be implemented in subclasses should use methods like addLine and drawCover to fill the item with data. The implementations of addLine, drawCover, etc. will paint or compute the size using the information of the stored DelegateContext. The advantage of this method is that you have to write only one method in the subclass that works for both paint and sizeHint...and that you don't have to deal with ugly size computations and drawing code."""
     context = None
     hSpace = 2
     vSpace = 1
     hMargin = 2
     vMargin = 1
-    
     
     def __init__(self,parent):
         QtGui.QStyledItemDelegate.__init__(self,parent)
@@ -46,10 +45,19 @@ class AbstractDelegate(QtGui.QStyledItemDelegate):
     
     def setFont(self,font):
         self.font = font
-        
+
+    # Abstract methods which must be implemented in subclasses
+    def layout(self,index):
+        raise NotImplementedError()
+
+    def getBackground(self,index):
+        raise NotImplementedError()
+
+    # This is the implementation of QItemDelegate.paint and will be called to draw an item.
     def paint(self,painter,option,index):
         if self.context is not None:
             # When an exception is raised in paint or sizeHint, it won't stop the programm. Paint/sizeHint is then called all the time and spams the console with unhelpful errors ("painter ended with unrestored states") which hide the exception's own error message. Therefore we stop here.
+            import sys
             sys.exit("Fatal error: AbstractDelegate.paint was called during painting.")
         
         # Initialize
@@ -71,9 +79,11 @@ class AbstractDelegate(QtGui.QStyledItemDelegate):
         painter.restore()
         self.context = None
 
+    # This is the implementation of QItemDelegate.sizeHint and will be called to compute the size of an item
     def sizeHint(self,option,index):
         if self.context is not None:
             # Confer self.paint
+            import sys
             sys.exit("Fatal error: AbstractDelegate.paint was called during painting.")
         self.context = DelegateContext(None,option)
         self.layout(index)
@@ -101,7 +111,7 @@ class AbstractDelegate(QtGui.QStyledItemDelegate):
                 context.rect = QtCore.QRect(0,0,context.rect.width()-coverSize-self.hSpace,context.rect.height())
         
     def addLine(self,text1,text2,style=STD_STYLE):
-        assert text2 is None or isinstance(text2,str)
+        assert isinstance(text1,str) and isinstance(text2,str)
         
         if text1 == "" and text2 == "":
             return

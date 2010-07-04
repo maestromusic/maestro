@@ -6,10 +6,13 @@
 # it under the terms of the GNU General Public License version 3 as
 # published by the Free Software Foundation
 #
+import logging
 from PyQt4 import QtCore
 
 from omg import tags, database, covers, config
 db = database.get()
+
+logger = logging.getLogger(name="omg")
 
 class Node:
     """(Abstract) base class for elements in a RootedTreeModel...that is almost everything in playlists, browser etc.. Node implements the methods required by RootedTreeModel using self.contents as the list of children and self.parent as parent, but does not create these variables. Subclasses must either self.contents and self.parent or overwrite the methods."""
@@ -123,7 +126,6 @@ class Element(Node,FilelistMixin,IndexMixin):
     """Base class for elements (files or containers) in playlists, browser, etc.. Contains methods to load tags and contents from the database and to get the path, cover, length etc.."""
     tags = None # tags.Storage to store the tags. None until they are loaded
     contents = None # list of contents. None until they are loaded; [] if this element has no contents
-    path = None # path of this Element, use getPath
     
     def __init__(self,id):
         """Initialize this element with the given id, which must be an integer."""
@@ -154,22 +156,13 @@ class Element(Node,FilelistMixin,IndexMixin):
         
     def getPath(self):
         """Return the path of this Element and cache it for subsequent calls. If the element has no path (e.g. containers), a ValueError is raised."""
-        if self.path is None:
+        try:
+            return self.path
+        except AttributeError:
             self.path = db.query("SELECT path FROM files WHERE container_id = {0}".format(self.id)).getSingle()
             if self.path is None:
                 raise ValueError("The element with id {0} has no path. Maybe it is a container.".format(self.id))
-        return self.path
-    
-    def getTitle(self):
-        """Return a title of this element which is created from the title-tags. If this element does not contain a title-tag some dummy-title is returned."""
-        if self.tags is None:
-            self.loadTags()
-        if tags.TITLE in self.tags:
-            result = " - ".join(self.tags[tags.TITLE])
-        else: result = "<Kein Titel>"
-        if config.get("misc","show_ids"):
-            return "[{0}] {1}".format(self.id,result)
-        else: return result
+            return self.path
         
     def loadContents(self,recursive=False,table="containers"):
         """Delete the stored contents-list and fetch the contents from the database. You may use the <table>-parameter to restrict the child elements to a specific table: The table with name <table> must contain a column 'id' and this method will only fetch elements which appear in that column. If <recursive> is true loadContents will be called recursively for all child elements."""
@@ -200,7 +193,12 @@ class Element(Node,FilelistMixin,IndexMixin):
             """.format(self.id,additionalWhereClause))
         for row in result:
             tag = tags.get(row[0])
-            self.tags[tag].append(tag.getValue(row[1]))
+            value = tag.getValue(row[1])
+            if value is None:
+                logger.warning("Database is corrupt: Container {0} has a {1}-tag with id {2} but "
+                              +"this id does not exist in tag_{1}.".format(self.id,tag.name,row[1]))
+                continue
+            self.tags[tag].append(value)
         if recursive:
             for element in self.contents:
                 element.loadTags(recursive,tagList)
@@ -226,7 +224,58 @@ class Element(Node,FilelistMixin,IndexMixin):
                 return sum(element.getLength() for element in self.contents)
             except TypeError: # At least one element does not know its length
                 return None
+    
+    def getParentIds(self,recursive):
+        """Return a list containing the ids of all parents of this element from the database. If <recursive> is True all ancestors will be added recursively."""
+        newList = list(db.query("SELECT container_id FROM contents WHERE element_id = ?",self.id).getSingleColumn())
+        if not recursive:
+            return newList
+        resultList = newList
+        while len(newList) > 0:
+            newList = list(db.query("""
+                    SELECT container_id
+                    FROM contents
+                    WHERE element_id IN ({0})
+                    """.format(",".join(str(n) for n in newList))).getSingleColumn())
+            newList = [id for id in newList if id not in resultList] # Do not add twice
+            resultList.extend(newList)
+        return resultList
+    
+    def hasAlbumTitle(self,container):
+        """Return whether the given container has a title-tag equal to an album-tag of this element. Thus, to check whether <container> is an album of this element, it remains to check that it is a parent (see getParentIds)."""
+        for title in container.tags[tags.TITLE]:
+            if title in self.tags[tags.ALBUM]:
+                return True
+        return False
 
+    def isContainedInAlbum(self):
+        """Check whether this element is in the current tree-structure contained in an album of itself."""
+        if tags.ALBUM in self.tags:
+            parent = self.getParent()
+            while isinstance(parent,Element):
+                if self.isAlbum(parent):
+                    return True
+                parent = parent.getParent()
+        return False
+        
+    def getAlbumIds(self):
+        """Return the ids of all album-containers of this element."""
+        parentIds = self.getParentIds(True)
+        albumTitles = self.tags[tags.ALBUM]
+        if len(albumTitles) > 0:
+            albums = []
+            for id in parentIds:
+                titles = db.query("""
+                    SELECT tag_{0}.value
+                    FROM tags JOIN tag_{0} ON tags.value_id = tag_{0}.id
+                    WHERE tags.container_id = {1} AND tags.tag_id = {2}
+                    """.format(tags.TITLE.name,id,tags.TITLE.id)).getSingleColumn()
+                for title in titles:
+                    if title in albumTitles:
+                        albums.append(id)
+            return albums
+        else: return []
+        
     def hasCover(self):
         """Return whether this container has a cover."""
         return covers.hasCover(self)
@@ -244,9 +293,14 @@ class Element(Node,FilelistMixin,IndexMixin):
                 self._covers = {}
             self._covers[size] = cover
         return cover
-    
+        
     # Misc
     #====================================================
+    def getTitle(self):
+        """Convenience method to get the formatted title of this element."""
+        from omg.gui import formatter
+        return formatter.Formatter(self).title()
+        
     def __str__(self):
         if self.tags is not None:
             return "<Element {0}>".format(self.getTitle())

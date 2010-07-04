@@ -8,7 +8,7 @@
 #
 import difflib
 
-from omg import database, mpclient
+from omg import database, mpclient, tags
 from . import rootedtreemodel, treebuilder, Node, Element, FilelistMixin, IndexMixin
 
 db = database.get()
@@ -19,7 +19,9 @@ class PlaylistElement(Element):
         self.length = None
         self.position = None
         self.contents = contents
-        self.tags = tags
+        if tags is not None:
+            self.tags = tags
+        else: self.loadTags()
     
     def getPosition(self):
         if self.parent is None or isinstance(self.parent,RootNode): # Without parent, there can't be a position
@@ -30,10 +32,11 @@ class PlaylistElement(Element):
         return self.position
     
     def getLength(self):
+        """Cache the length, which is not done by Element."""
         if self.length is None:
             self.length = Element.getLength(self)
         return self.length
-        
+
         
 class Playlist(rootedtreemodel.RootedTreeModel):
     # List of all paths of songs in the playlist. Used for fast synchronization with MPD.

@@ -139,7 +139,7 @@ def updateIndexedTags():
     
     tagList = _tagsById.values()
     
-    global TITLE,ARTIST,ALBUM,COMPOSER,PERFORMER,DATE,GENRE
+    global TITLE,ARTIST,ALBUM,COMPOSER,PERFORMER,DATE,GENRE,CONDUCTOR
     TITLE = _tagsByName[config.get("tags","title_tag")]
     COMPOSER = _tagsByName[config.get("tags","composer_tag")]
     ARTIST = _tagsByName[config.get("tags","artist_tag")]
