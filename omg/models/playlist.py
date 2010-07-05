@@ -131,9 +131,10 @@ class Playlist(rootedtreemodel.RootedTreeModel):
                 self.dataChanged.emit(index,index)
     
     def restructure(self):
+        """Restructure the whole container tree in this model. This method does not change the flat playlist, but it uses treebuilder to create an optimal container structure over the MPD playlist."""
         treeBuilder = self._createTreeBuilder([self._createItem(path) for path in self.pathList])
         treeBuilder.buildParentGraph()
-        self.setContents(treeBuilder.buildTree())
+        self.setContents(treeBuilder.buildTree(createOnlyChildren=False))
         for element in self.contents:
             element.parent = self.root
         self.reset()
@@ -292,7 +293,6 @@ class Playlist(rootedtreemodel.RootedTreeModel):
                     self._insert(treeBuilder,prev,elements,prev.getFileCount(),startSeq)
                     break
         
-        
         if next is not None and next.isContainer() and treeBuilder.isParent(next):
             nextCNode = treeBuilder.containerNodes[next.id]
             for seq in nextCNode.itemSequences:
@@ -308,13 +308,14 @@ class Playlist(rootedtreemodel.RootedTreeModel):
                             break 
                     self._insert(treeBuilder,next,elements,0,endSeq)
                     break
-
             
         # Get the remaining items
         remainingSequence = (sequence[0] if startSeq is None else startSeq[1]+1,
                              sequence[1] if endSeq is None else endSeq[0]-1)
         if self._seqLen(remainingSequence) > 0:
-            newChildren = treeBuilder.buildTree(remainingSequence,parent if parent != self.root else None)
+            newChildren = treeBuilder.buildTree(remainingSequence,
+                                                parent if parent != self.root else None,
+                                                createOnlyChildren = False)
             for element in newChildren:
                 element.parent = parent
             self.beginInsertRows(self.getIndex(parent),insertIndex,insertIndex+len(newChildren)-1)

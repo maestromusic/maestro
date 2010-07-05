@@ -9,7 +9,7 @@
 from PyQt4 import QtCore,QtGui
 
 from omg.models.playlist import ExternalFile
-from omg import strutils, tags, config
+from omg import strutils, tags, config, covers
 from . import abstractdelegate, formatter
 
 STD_STYLE = abstractdelegate.DelegateStyle(11,False,False)
@@ -31,11 +31,13 @@ class PlaylistDelegate(abstractdelegate.AbstractDelegate):
         f = formatter.Formatter(element)
         if element.isFile():
             if tags.ALBUM in element.tags and not element.isContainedInAlbum():
-                # This is the complicated version: The element has an album but is not displayed within the album. So draw an album cover an display the album tags.
-                coverSize = config.get("gui","small_cover_size")
-                albums = element.getAlbums()
-                if len(albums) > 0:
-                    self.drawCover(coverSize,albums[0])
+                # This is the complicated version: The element has an album but is not displayed within the album. So draw an album cover and display the album tags.
+                albumIds = element.getAlbumIds()
+                for albumId in albumIds:
+                    cover = covers.getCover(albumId,config.get("gui","small_cover_size"))
+                    if cover is not None:
+                        self.drawCover(config.get("gui","small_cover_size"),None,cover)
+                        break # Draw only one cover even if there are several albums
                 self.addLine(f.titleWithPos(),f.length(),TITLE_STYLE)
                 self.addLine(f.album(),"",ALBUM_STYLE)
             else:

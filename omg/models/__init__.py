@@ -253,7 +253,7 @@ class Element(Node,FilelistMixin,IndexMixin):
         if tags.ALBUM in self.tags:
             parent = self.getParent()
             while isinstance(parent,Element):
-                if self.isAlbum(parent):
+                if self.hasAlbumTitle(parent):
                     return True
                 parent = parent.getParent()
         return False
@@ -278,7 +278,7 @@ class Element(Node,FilelistMixin,IndexMixin):
         
     def hasCover(self):
         """Return whether this container has a cover."""
-        return covers.hasCover(self)
+        return covers.hasCover(self.id)
         
     def getCover(self,size=None,cache=True):
         """Get this container's cover with <size>x<size> pixels or the large version if <size> is None. If <cache> is True, this method will store the cover in this Element-instance. Warning: Subsequent calls of this method will return the stored cover only if <cache> is again True."""
@@ -287,12 +287,13 @@ class Element(Node,FilelistMixin,IndexMixin):
                 return self._covers[size]
             except AttributeError: pass
             except KeyError: pass
-        cover = covers.getCover(self,size)
+        cover = covers.getCover(self.id,size)
         if cache:
             if not hasattr(self,"_covers"):
                 self._covers = {}
             self._covers[size] = cover
         return cover
+        
         
     # Misc
     #====================================================

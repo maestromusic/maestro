@@ -54,14 +54,14 @@ class TreeBuilder:
         #for node in self.containerNodes.values():
         #    print(node)
         
-    def buildTree(self,sequence = None,parent = None):
+    def buildTree(self,sequence = None,parent = None,createOnlyChildren = True):
         """Build a tree over the given sequence (which defaults to all items)."""
         if sequence is None:
             sequence = (0,len(self.items)-1)
         if parent is None:
             containerNodes = self.containerNodes.values()
         else: containerNodes = self.containerNodes[self._getId(parent)].childContainers
-        return self._createTree(sequence,containerNodes)
+        return self._createTree(sequence,containerNodes,createOnlyChildren)
     
     def isParent(self,node):
         return self._getId(node) in self.containerNodes
@@ -164,8 +164,8 @@ class TreeBuilder:
         return len(itemSequences) # Behind the last item
     
     
-    def _createTree(self,sequence,containerNodes):
-        """Create a tree using some of the nodes in <containerNodes> as roots and covering all item from <sequence>."""
+    def _createTree(self,sequence,containerNodes,createOnlyChildren=True):
+        """Create a tree using some of the nodes in <containerNodes> as roots and covering all item from <sequence>. If <createOnlyChildren> is false, the root-nodes of the returned tree are guaranteed to contain either none or at least two children."""
         #print("This is createTree over the sequence {0}-{1}".format(*sequence))
         coveredItems = set()
         
@@ -176,6 +176,8 @@ class TreeBuilder:
             while len(coveredItems) < self._seqLen(sequence):
                 maxSequence,cNode = self._findMaximalSequence(containerNodes,sequence)
                 if maxSequence is None: # No sequence found: remaining items are direct children
+                    break
+                if createOnlyChildren == False and self._seqLen(maxSequence) == 1:
                     break
                 #print("Found a maximal sequence: {0}-{1}".format(*maxSequence))
                 newNode = self._createNode(cNode.id,self._createTree(maxSequence,cNode.childContainers))

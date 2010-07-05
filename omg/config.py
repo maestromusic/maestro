@@ -65,7 +65,7 @@ def init(*config_files):
         "gui": {
             # Size in pixels of covers
             "large_cover_size": 60,
-            "small_cover_size": 30,
+            "small_cover_size": 40,
             "detail_cover_size": 160,
             
             # Order in which tags will be displayed. Must contain title and album! Tags which don't appear in this list will be displayed in arbitrary order after the tags in the list.
