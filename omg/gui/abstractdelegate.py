@@ -48,9 +48,11 @@ class AbstractDelegate(QtGui.QStyledItemDelegate):
 
     # Abstract methods which must be implemented in subclasses
     def layout(self,index):
+        """Layout the node with the given index. This method is called by paint and sizeHint. Its implementation should use drawCover and addLine."""
         raise NotImplementedError()
 
     def getBackground(self,index):
+        """Return a QBrush which should be used to fill the background of the node with the given index, or None if the background should not be filled. This method is called by paint."""
         raise NotImplementedError()
 
     # This is the implementation of QItemDelegate.paint and will be called to draw an item.
@@ -96,6 +98,7 @@ class AbstractDelegate(QtGui.QStyledItemDelegate):
         return result
     
     def drawCover(self,coverSize,element=None,cover=None):
+        """Draw the cover of <element> or, if <element> is None, the given cover using <coverSize>x<coverSize> pixels."""
         context = self.context
         if context.painter is None:
             if cover is not None or element.hasCover():
@@ -103,35 +106,44 @@ class AbstractDelegate(QtGui.QStyledItemDelegate):
         else: 
             if cover is None:
                 cover = element.getCover(coverSize,cache=True)
-            if cover is not None:
+            elif cover is not None:
                 imageRect = QtCore.QRect(0,0,min(context.option.rect.width(),coverSize),
                                          min(context.option.rect.height(),coverSize))
                 context.painter.drawImage(imageRect,cover,imageRect)
                 context.painter.translate(coverSize+self.hSpace,0)
                 context.rect = QtCore.QRect(0,0,context.rect.width()-coverSize-self.hSpace,context.rect.height())
+            else: raise ValueError("Either element or cover must be given")
         
-    def addLine(self,text1,text2,style=STD_STYLE):
+    def addLine(self,text1,text2,style1=STD_STYLE,style2=None):
+        """Add a line with one or two texts. <text1> will be aligned left, <text2> will be aligned right. Via the optional parameters <style1> and <style2> you may specify DelegateStyles which will be used for <text1> and <text2>, respectively. Note that <style1> defaults to abstractdelegate.STD_STYLE and <style2> defaults to None, which means that <style1> is used for both texts."""
         assert isinstance(text1,str) and isinstance(text2,str)
         
         if text1 == "" and text2 == "":
             return
+        
+        if style2 is None:
+            style2 = style1
             
         context = self.context
         if context.painter is None:
-            if text2 == "":
-                text = text1
-                space = 0
-            else:
-                text = text1+text2
-                space = self.hSpace
-            size = self._getFontMetrics(style).size(Qt.TextSingleLine,text)
-            context.width = max(context.width,size.width()+space) # space between the two entries
-            context.height = context.height + space + size.height()
+            if text1 != "":
+                size1 = self._getFontMetrics(style1).size(Qt.TextSingleLine,text1)
+            else: size1 = QtCore.QSize(0,0)
+            if text2 != "":
+                size2 = self._getFontMetrics(style2).size(Qt.TextSingleLine,text2)
+            else: size2 = QtCore.QSize(0,0)
+            space = self.hSpace if text1 != "" and text2 != "" else 0  # space between the two entries
+            
+            context.width = max(context.width,size1.width()+size2.width()+space)
+            context.height = context.height + self.vSpace + max(size1.height(),size2.height())
         else:
-            self._configurePainter(style)
-            boundingRect1 = context.painter.drawText(context.rect,Qt.TextSingleLine,text1)
+            if text1 != "":
+                self._configurePainter(style1)
+                boundingRect1 = context.painter.drawText(context.rect,Qt.TextSingleLine,text1)
+            else: boundingRect1 = QtCore.QRect(context.rect.left,context.rect.top,0,0)
             
             if text2 != "":
+                self._configurePainter(style2)
                 # Compute the topleft corner of the second text
                 topLeft = QtCore.QPoint(boundingRect1.right()+self.hSpace,context.rect.top())
                 boundingRect2 = context.painter.drawText(QtCore.QRect(topLeft,context.rect.bottomRight()),

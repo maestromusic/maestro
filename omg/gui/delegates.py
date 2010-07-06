@@ -30,15 +30,21 @@ class PlaylistDelegate(abstractdelegate.AbstractDelegate):
           
         f = formatter.Formatter(element)
         if element.isFile():
+            
+            # First find out whether the file has a cover (usually not...)
+            if element.hasCover():
+                self.drawCover(config.get("gui","small_cover_size"),element)
+            
             if tags.ALBUM in element.tags and not element.isContainedInAlbum():
                 # This is the complicated version: The element has an album but is not displayed within the album. So draw an album cover and display the album tags.
-                albumIds = element.getAlbumIds()
-                for albumId in albumIds:
-                    cover = covers.getCover(albumId,config.get("gui","small_cover_size"))
-                    if cover is not None:
-                        self.drawCover(config.get("gui","small_cover_size"),None,cover)
-                        break # Draw only one cover even if there are several albums
-                self.addLine(f.titleWithPos(),f.length(),TITLE_STYLE)
+                if not element.hasCover(): # Do not draw a second cover (see above)
+                    albumIds = element.getAlbumIds()
+                    for albumId in albumIds:
+                        cover = covers.getCover(albumId,config.get("gui","small_cover_size"))
+                        if cover is not None:
+                            self.drawCover(config.get("gui","small_cover_size"),None,cover)
+                            break # Draw only one cover even if there are several albums
+                self.addLine(f.titleWithPos(),f.length(),TITLE_STYLE,STD_STYLE)
                 self.addLine(f.album(),"",ALBUM_STYLE)
             else:
                 self.addLine(f.titleWithPos(),f.length())
