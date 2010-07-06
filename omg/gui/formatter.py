@@ -85,7 +85,7 @@ class HTMLFormatter(Formatter):
     def detailView(self):
         lines = []
         
-        coverPath = covers.getCoverPath(self.element,config.get("gui","detail_cover_size"))
+        coverPath = covers.getCoverPath(self.element.id,config.get("gui","detail_cover_size"))
         if coverPath is not None:
             lines.append('<table><tr><td valign="top"><img src="{0}"></td><td valign="top">'
                             .format(cgi.escape(coverPath)))

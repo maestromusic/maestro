@@ -41,9 +41,8 @@ class SQLTable:
     
     def reset(self):
         """Drop this table and create it without data again. All table rows will be lost!"""
-        if not self.exists():
-            raise DBLayoutException("Table '{0}' does not exist.".format(self.name))
-        db.query("DROP table {0}".format(self.name))
+        if self.exists():
+            db.query("DROP table {0}".format(self.name))
         self.create()
 
 
