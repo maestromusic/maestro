@@ -7,6 +7,7 @@
 # published by the Free Software Foundation
 #
 import difflib
+from PyQt4 import QtCore
 
 from omg import database, mpclient, tags
 from . import rootedtreemodel, treebuilder, Node, Element, FilelistMixin, IndexMixin
@@ -234,12 +235,62 @@ class Playlist(rootedtreemodel.RootedTreeModel):
             self._removeFiles(element.contents[aIndex],start-aOffset,aFileCount)
     
     def insertElements(self,elements,offset):
+        fileCount = len(self.pathList)
+        
         if offset == -1:
-            offset = len(self.pathList)
+            offset = fileCount
+        
+        if offset < 0 or offset > fileCount:
+            raise IndexError("Offset {0} is out of bounds".format(offset))
+        
+        # Replace nodes with only one child by the child. This is necessary to be consistent with using the TreeBuilder with createOnlyChildren=False.
+        for i in range(0,len(elements)):
+            if elements[i].getChildrenCount() == 1:
+                elements[i] = elements[i].getChildren()[0]
+                
         self._syncLock = True
-        treeBuilder = self._createTreeBuilder(elements)
+        
+        if fileCount == 0:
+            leaves = elements
+            insertIndex = 0
+        elif offset == fileCount:
+            leaves = list(self.contents[-1].getAllFiles()) + elements
+            self.beginRemoveRows(QtCore.QModelIndex(),len(self.contents)-1,len(self.contents)-1)
+            del self.contents[-1]
+            self.endRemoveRows()
+            insertIndex = len(self.contents)
+        elif offset == 0:
+            leaves = elements + self.contents[0].getAllFiles()
+            insertIndex = 0
+            self.beginRemoveRows(QtCore.QModelIndex(),0,0)
+            del self.contents[0]
+            self.endRemoveRows()
+        else:
+            insertIndex,innerOffset = parent.getChildIndexAtOffset(offset)
+            child = parent.contents[insertIndex]
+            if innerOffset > 0: # We are trying to insert in the middle of an element:
+                leaves = list(child.getAllFiles())
+                leaves[innerOffset:innerOffset] = elements
+                self.beginRemoveRows(QtCore.QModelIndex(),insertIndex,insertIndex)
+                del self.contents[insertIndex]
+                self.endRemoveRows()
+            else: # We are inserting between to files
+                leaves = list(self.contents[insertIndex-1].getAllFiles())
+                leaves.extend(elements)
+                leaves.extend(self.contents[insertIndex].getAllFiles())
+                self.beginRemoveRows(QtCore.QModelIndex(),insertIndex-1,insertIndex)
+                del self.contents[insertIndex-1:insertIndex+1]
+                self.endRemoveRows()
+                insertIndex = insertIndex - 1 # The previous node was deleted
+            
+        treeBuilder = self._createTreeBuilder(leaves)
         treeBuilder.buildParentGraph()
-        self._insert(treeBuilder,self.root,elements,offset)
+        treeRoots = treeBuilder.buildTree(createOnlyChildren=False)
+        for root in treeRoots:
+            root.parent = self.root
+        self.beginInsertRows(QtCore.QModelIndex(),insertIndex,insertIndex+len(treeRoots)-1)
+        self.contents[insertIndex:insertIndex] = treeRoots
+        self.endInsertRows()
         
         # Update pathList
         for element in elements:
@@ -249,78 +300,6 @@ class Playlist(rootedtreemodel.RootedTreeModel):
             offset = offset + len(pathList)
         
         self._syncLock = False
-        
-    def _insert(self,treeBuilder,parent,elements,offset,sequence=None):
-        fileCount = parent.getFileCount()
-        
-        if sequence is None:
-            sequence = (0,len(elements)-1)
-        assert 0 <= offset <= fileCount
-
-        # First step: Prepare the position to insert: split if necessary and get prev and next
-        if offset != fileCount: # there is no child at offset fileCount
-            insertIndex,innerOffset = parent.getChildIndexAtOffset(offset)
-            child = parent.contents[insertIndex]
-            if innerOffset > 0: # We want to insert somewhere in the middle of a container...
-                # ...that is no problem if the container is a parent of all elements we want to insert
-                if treeBuilder.containsAll(child):
-                    self._insert(treeBuilder,child,elements,innerOffset)
-                    return
-                else:
-                    self.split(parent,offset) # But otherwise we have to split
-                    insertIndex = insertIndex + 1
-                    prev = child
-                    next = parent.contents[insertIndex]
-            else:
-                prev = parent.contents[insertIndex-1] if insertIndex > 0 else None
-                next = child
-        else:
-            insertIndex = len(parent.contents)
-            if fileCount > 0:
-                prev = parent.contents[-1]
-            else: prev = None
-            next = None
-            
-        # Second step: Branch off elements fitting in prev or next
-        startSeq = None
-        endSeq = None
-        if prev is not None and prev.isContainer() and treeBuilder.isParent(prev):
-            prevCNode = treeBuilder.containerNodes[prev.id]
-            for seq in prevCNode.itemSequences:
-                if seq[0] == sequence[0]:
-                    startSeq = seq
-                    # Yeah: The previous node contains some of the first items
-                    self._insert(treeBuilder,prev,elements,prev.getFileCount(),startSeq)
-                    break
-        
-        if next is not None and next.isContainer() and treeBuilder.isParent(next):
-            nextCNode = treeBuilder.containerNodes[next.id]
-            for seq in nextCNode.itemSequences:
-                if seq[1] == sequence[1]:
-                    endSeq = seq
-                    
-                    if startSeq is None:
-                        endSeq = seq
-                    else: # things get more complicated when startSeq and endSeq overlap
-                        endSeq = (max(seq[0],startSeq[1]+1),endSeq[1])
-                        if self._seqLen(endSeq) < 1: # endSeq is contained in startSeq
-                            endSeq = None
-                            break 
-                    self._insert(treeBuilder,next,elements,0,endSeq)
-                    break
-            
-        # Get the remaining items
-        remainingSequence = (sequence[0] if startSeq is None else startSeq[1]+1,
-                             sequence[1] if endSeq is None else endSeq[0]-1)
-        if self._seqLen(remainingSequence) > 0:
-            newChildren = treeBuilder.buildTree(remainingSequence,
-                                                parent if parent != self.root else None,
-                                                createOnlyChildren = False)
-            for element in newChildren:
-                element.parent = parent
-            self.beginInsertRows(self.getIndex(parent),insertIndex,insertIndex+len(newChildren)-1)
-            parent.contents[insertIndex:insertIndex] = newChildren
-            self.endInsertRows()
         
     def split(self,element,offset):
         """Split <element> at the given offset. This method will ensure, that element has a child starting at offset <offset>. Note that this method does not change the flat playlist, but only the tree-structure.
