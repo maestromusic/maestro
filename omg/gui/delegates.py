@@ -43,18 +43,18 @@ class PlaylistDelegate(abstractdelegate.AbstractDelegate):
             else:
                 self.addLine(f.titleWithPos(),f.length())
             # Independent of the album problem above we list the artists which were not listed in parent containers.
-            self.addLine(f.tag(tags.COMPOSER,True),f.tag(tags.CONDUCTOR,True))
-            self.addLine(f.tag(tags.ARTIST,True),f.tag(tags.PERFORMER,True))
+            self.addLine(f.tag(tags.get("composer"),True),f.tag(tags.get("conductor"),True))
+            self.addLine(f.tag(tags.get("artist"),True),f.tag(tags.get("performer"),True))
         else:
             coverSize = config.get("gui","large_cover_size")
             self.drawCover(coverSize,element)
             
             self.addLine(f.title(),"",TITLE_STYLE)
             self.addLine(f.album(),"",ALBUM_STYLE)
-            self.addLine(f.tag(tags.COMPOSER,True),f.tag(tags.CONDUCTOR,True))
-            self.addLine(f.tag(tags.ARTIST,True),f.tag(tags.PERFORMER,True))
+            self.addLine(f.tag(tags.get("composer"),True),f.tag(tags.get("conductor"),True))
+            self.addLine(f.tag(tags.get("artist"),True),f.tag(tags.get("performer"),True))
             self.addLine(f.files(),f.length())
-            self.addLine(f.tag(tags.GENRE),f.tag(tags.DATE))
+            self.addLine(f.tag(tags.get("genre")),f.tag(tags.DATE))
 
     def getBackground(self,index):
         element = self.model.data(index)

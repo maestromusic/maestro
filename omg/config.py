@@ -51,11 +51,7 @@ def init(*config_files):
             # This allows to use other strings for the title-tag for example.
             "title_tag": "title",
             "album_tag": "album",
-            "artist_tag": "artist",
-            "composer_tag": "composer",
-            "performer_tag": "performer",
             "date_tag": "date",
-            "genre_tag": "genre"
         },
         
         "browser": {

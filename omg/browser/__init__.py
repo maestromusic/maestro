@@ -22,11 +22,11 @@ class Browser(QtGui.QWidget):
     MAX_TAG_LAYER_NUMBER = 3
     
     # Tagsets which can be selected for a tag layer
-    SELECTABLE_TAG_SETS = [(tags.ARTIST,tags.COMPOSER),(tags.ALBUM,),(tags.GENRE,)]
+    SELECTABLE_TAG_SETS = [(tags.get("artist"),tags.get("composer")),(tags.get("genre"),)]
     
     # This list specifies the default tag layers: for each number n in this list a
     # tag layer with the tag-set SELECTABLE_TAG_SETS[n] will be generated.
-    DEFAULT_TAG_LAYERS = [2,0]
+    DEFAULT_TAG_LAYERS = [1,0]
     
     # The components of this browser
     browser = None # QTreeView

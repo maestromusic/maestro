@@ -38,7 +38,7 @@ class TextCriterion:
 
 
 class TagIdCriterion:
-    """A TagIdCriterion contains a dictionary mapping tags to value-ids. It will be fulfilled for all containers having at least one of the tags with the corresponding value. For example {tags.GENRE: 1,tags.ARTIST:2} will match all containers which have either the value of id 1 (in table tag_genre) as a genre-tag or the value of id 2 (in table tag_artist) as an artist-tag or both. TagIdCriterion works only with indexed tags.
+    """A TagIdCriterion contains a dictionary mapping tags to value-ids. It will be fulfilled for all containers having at least one of the tags with the corresponding value. For example {<genre-tag>: 1,<artist-tag>:2} will match all containers which have either the value of id 1 (in table tag_genre) as a genre-tag or the value of id 2 (in table tag_artist) as an artist-tag or both. TagIdCriterion works only with indexed tags.
     """
     def __init__(self,valueIds):
         """Initialize a new TagIdCriterion with the given dictionary mapping tags to value-ids."""

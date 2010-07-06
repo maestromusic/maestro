@@ -32,12 +32,7 @@ tagList = None
 # Will be initialized with the first call of updateIndexedTags, so remember to change also that function whenever changing the following lines.
 TITLE = None
 ALBUM = None
-ARTIST = None
-COMPOSER = None
-CONDUCTOR = None
-PERFORMER = None
 DATE = None
-GENRE = None
 
 artistTags = None
 
@@ -139,17 +134,10 @@ def updateIndexedTags():
     
     tagList = _tagsById.values()
     
-    global TITLE,ARTIST,ALBUM,COMPOSER,PERFORMER,DATE,GENRE,CONDUCTOR
+    global TITLE,ALBUM,DATE
     TITLE = _tagsByName[config.get("tags","title_tag")]
-    COMPOSER = _tagsByName[config.get("tags","composer_tag")]
-    ARTIST = _tagsByName[config.get("tags","artist_tag")]
     ALBUM = _tagsByName[config.get("tags","album_tag")]
     DATE = _tagsByName[config.get("tags","date_tag")]
-    
-    # The following tags shouldn't be treated specially
-    CONDUCTOR = _tagsByName["conductor"]
-    PERFORMER = _tagsByName["performer"]
-    GENRE = _tagsByName["genre"]
     
     global artistTags
     artistTags = tuple(_tagsByName[tagname] for tagname in config.get("browser","artist_tags").split(','))
