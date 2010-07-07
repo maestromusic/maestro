@@ -63,6 +63,7 @@ def init(*config_files):
             "large_cover_size": 60,
             "small_cover_size": 40,
             "detail_cover_size": 160,
+            "cover_fetcher_cover_size": 400,
             
             # Order in which tags will be displayed. Must contain title and album! Tags which don't appear in this list will be displayed in arbitrary order after the tags in the list.
             "tag_order": "title,album,composer,artist,performer,conductor,date,genre"

@@ -105,14 +105,15 @@ class AbstractDelegate(QtGui.QStyledItemDelegate):
                 context.coverSize = coverSize
         else: 
             if cover is None:
-                cover = element.getCover(coverSize,cache=True)
-            elif cover is not None:
+                if element is None:
+                    raise ValueError("Either element or cover must be given")
+                cover = element.getCover(coverSize,cache=True) # is None if element has no cover
+            if cover is not None:
                 imageRect = QtCore.QRect(0,0,min(context.option.rect.width(),coverSize),
                                          min(context.option.rect.height(),coverSize))
                 context.painter.drawImage(imageRect,cover,imageRect)
                 context.painter.translate(coverSize+self.hSpace,0)
                 context.rect = QtCore.QRect(0,0,context.rect.width()-coverSize-self.hSpace,context.rect.height())
-            else: raise ValueError("Either element or cover must be given")
         
     def addLine(self,text1,text2,style1=STD_STYLE,style2=None):
         """Add a line with one or two texts. <text1> will be aligned left, <text2> will be aligned right. Via the optional parameters <style1> and <style2> you may specify DelegateStyles which will be used for <text1> and <text2>, respectively. Note that <style1> defaults to abstractdelegate.STD_STYLE and <style2> defaults to None, which means that <style1> is used for both texts."""

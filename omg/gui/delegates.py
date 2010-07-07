@@ -12,12 +12,14 @@ from omg.models.playlist import ExternalFile
 from omg import strutils, tags, config, covers
 from . import abstractdelegate, formatter
 
-STD_STYLE = abstractdelegate.DelegateStyle(11,False,False)
+# Styles used in the delegates
+STD_STYLE = abstractdelegate.STD_STYLE
 TITLE_STYLE = abstractdelegate.DelegateStyle(13,True,False)
 ALBUM_STYLE = abstractdelegate.DelegateStyle(13,True,True)
 EXTERNAL_FILE_STYLE = abstractdelegate.DelegateStyle(11,False,True)
 
 class PlaylistDelegate(abstractdelegate.AbstractDelegate):
+    """ItemDelegate used in the playlists"""
     def __init__(self,parent,model):
         abstractdelegate.AbstractDelegate.__init__(self,parent)
         self.model = model

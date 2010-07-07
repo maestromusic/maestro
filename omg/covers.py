@@ -70,3 +70,16 @@ def cacheAll(size):
                 cacheCover(path,size)
             except IOError as e:
                 print(e)
+                
+
+def setCover(id,cover):
+    assert isinstance(id,int)
+    print(COVER_DIR+"large/"+str(id))
+    if not cover.save(COVER_DIR+"large/"+str(id),"png"):
+        return False
+    else:
+        # Remove cached files
+        for path in os.listdir(COVER_DIR):
+            if path[0:6] == "cache_" and os.path.isfile(COVER_DIR+path+"/"+str(id)):
+                os.remove(COVER_DIR+path+"/"+str(id))
+        return True
