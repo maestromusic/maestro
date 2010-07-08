@@ -11,12 +11,32 @@ import os.path
 from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
-from omg import covers, config
-from . import formatter
+from omg import covers, config, models
+from omg.gui import formatter, playlist
 
+def enable():
+    playlist.contextMenuProvider.append(getMenuEntries)
+    
+def disable():
+    playlist.contextMenuProvider.remove(getMenuEntries)
+
+def getMenuEntries(playlist,node):
+    """Provides an action for the playlist's context menu (confer playlist.contextMenuProvider). The action will only be enabled if at least one album is selected and in this case open a CoverFetcher-dialog for the selected albums."""
+    action = QtGui.QAction("Cover holen...",playlist)
+    elements = []
+    for index in playlist.selectedIndexes():
+        node = playlist.model().data(index)
+        if isinstance(node,models.Element) and node.isAlbum():
+            elements.append(node)
+    if len(elements) == 0:
+        action.setEnabled(False)
+    else: action.triggered.connect(lambda: CoverFetcher(QtGui.QApplication.activeWindow(),elements).open())
+    return [action]
+    
 class CoverFetcher(QtGui.QDialog):
     def __init__(self,parent,elements):
         QtGui.QWidget.__init__(self,parent)
+        self.setWindowTitle("Cover holen")
         
         assert len(elements) >= 1
         self.elements = elements
@@ -38,6 +58,7 @@ class CoverFetcher(QtGui.QDialog):
         coverSize = config.get("gui","cover_fetcher_cover_size")
         self.imageLabel.setMinimumSize(coverSize,coverSize)
         self.imageLabel.setScaledContents(True)
+        self.imageLabel.setFrameStyle(QtGui.QFrame.Box)
         leftLayout.addWidget(self.imageLabel)
         
         self.textLabel = QtGui.QLabel(self)
@@ -69,12 +90,15 @@ class CoverFetcher(QtGui.QDialog):
         bottomRightLayout1.addWidget(self.coverFetchButton)
         customCoverButton = QtGui.QPushButton("Eigenes Cover laden",self)
         bottomRightLayout1.addWidget(customCoverButton)
-        customCoverButton.clicked.connect(self._customCover)
+        customCoverButton.clicked.connect(self._handleCustomCoverButton)
         
         bottomRightLayout2 = QtGui.QHBoxLayout()
         rightLayout.addLayout(bottomRightLayout2)
         rightLayout.addStretch(1)
         
+        self.skipButton = QtGui.QPushButton("Überspringen",self)
+        self.skipButton.clicked.connect(self.nextElement)
+        bottomRightLayout2.addWidget(self.skipButton)
         self.saveButton = QtGui.QPushButton("Cover speichern",self)
         self.saveButton.clicked.connect(self.save)
         bottomRightLayout2.addWidget(self.saveButton)
@@ -84,7 +108,7 @@ class CoverFetcher(QtGui.QDialog):
         
         self.nextElement()
     
-    def _customCover(self):
+    def _handleCustomCoverButton(self):
         fileName = QtGui.QFileDialog.getOpenFileName(self,"Cover öffnen",os.path.expanduser("~"),
                                                      "Bilddateien (*.png *.jpg *.bmp);;Alle Dateien (*)");
         if fileName == "": # user cancelled the dialog
@@ -138,6 +162,7 @@ class CoverFetcher(QtGui.QDialog):
         if self.elementIndex < len(self.elements) - 1:
             self.elementIndex = self.elementIndex + 1
             self.detailViewLabel.setText(formatter.HTMLFormatter(self.elements[self.elementIndex]).detailView())
+            self.skipButton.setEnabled(self.elementIndex != len(self.elements) - 1)
             self.clear()
         else: self.close()
         
@@ -155,5 +180,3 @@ class CoverFetcher(QtGui.QDialog):
                               "Das Cover konnte nicht gespeichert werden.",
                               QtGui.QMessageBox.Ok,self).exec_()
         else: self.nextElement()
-        
-        #http://ws.audioscrobbler.com/2.0/?method=album.search&album=Apocalyptica&api_key=b25b959554ed76058ac220b7b2e0a026

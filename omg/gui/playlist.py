@@ -12,6 +12,12 @@ from omg import mpclient
 from omg.models import playlist as playlistmodel
 from . import delegates, formatter
 
+# Plugins may insert functions here to insert entries in the context menu. Each function must take two parameters:
+# - the playlist where the context-menu is opened
+# - the node where the mouse was clicked (None if the mouse was not over an element)
+# The function must return a list of QActions which will be inserted into the menu.
+contextMenuProvider = []
+
 class Playlist(QtGui.QWidget):
     model = None
     view = None
@@ -79,10 +85,31 @@ class PlaylistTreeView(QtGui.QTreeView):
             return True
         return super(PlaylistTreeView,self).event(event)
 
+    def removeSelected(self):
+        # It may happen that an element and its parent element are selected. When removing the parent, the element will also be removed and will disappear from selectedIndexes(). An easy solution like 
+        # for i in selectedIndexes(): removeByQtIndex(i)
+        # would try to remove the child a second time.
+        while len(self.selectedIndexes()) > 0:
+            self.model().removeByQtIndex(self.selectedIndexes()[0])
+            
     def keyReleaseEvent(self,keyEvent):
         if keyEvent.key() == Qt.Key_Delete:
-            # It may happen that an element and its parent element are selected. When removing the parent, the element will also be removed and will disappear from selectedIndexes(). An easy solution like 
-            # for i in selectedIndexes(): removeByQtIndex(i)
-            # would try to remove the child a second time.
-            while len(self.selectedIndexes()) > 0:
-                self.parent().model.removeByQtIndex(self.selectedIndexes()[0])
+            self.removeSelected()
+    
+    def contextMenuEvent(self,event):
+        menu = QtGui.QMenu(self)
+         
+        restructureAction = QtGui.QAction("Restrukturieren",self)
+        restructureAction.triggered.connect(self.model().restructure)
+        menu.addAction(restructureAction)
+
+        removeAction = QtGui.QAction("Entfernen",self)
+        removeAction.triggered.connect(self.removeSelected)
+        menu.addAction(removeAction)
+
+        node = self.model().data(self.indexAt(event.pos()))
+        for provider in contextMenuProvider:
+         for action in provider(self,node):
+            menu.addAction(action)
+
+        menu.exec_(event.globalPos())        

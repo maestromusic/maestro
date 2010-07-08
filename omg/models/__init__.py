@@ -241,6 +241,9 @@ class Element(Node,FilelistMixin,IndexMixin):
             resultList.extend(newList)
         return resultList
     
+    def isAlbum(self):
+        return self.isContainer() and not set(self.tags[tags.ALBUM]).isdisjoint(set(self.tags[tags.TITLE]))
+        
     def hasAlbumTitle(self,container):
         """Return whether the given container has a title-tag equal to an album-tag of this element. Thus, to check whether <container> is an album of this element, it remains to check that it is a parent (see getParentIds)."""
         for title in container.tags[tags.TITLE]:

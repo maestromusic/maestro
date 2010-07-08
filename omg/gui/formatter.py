@@ -10,10 +10,13 @@ import cgi
 
 from omg import config,covers,models,strutils,tags
 
+# Order in which tags will be displayed. Tags which don't appear in this list will be displayed in arbitrary order after the tags in the list.
 tagOrder = [tags.get(name) for name in config.get("gui","tag_order").split(",")]
 
 class Formatter:
+    """A Formatter takes an element and offers several functions to get formatted output from the tags, length, title etc. of the element."""
     def __init__(self,element):
+        """Create a formatter for the given element."""
         self.element = element
         
     def tag(self,tag,removeParentTags=False):
@@ -47,7 +50,7 @@ class Formatter:
     def album(self):
         """Return a string containing the album names, but if the element is an album itself or is contained in an album, remove it from the list. If you just want the album tags, use Formatter.tag(tags.ALBUM)."""
         if tags.ALBUM in self.element.tags: # There is at least one album
-            albums = self.element.tags[tags.ALBUM]
+            albums = list(self.element.tags[tags.ALBUM]) # copy the list
 
             if self.element.isContainer():
                 # In the first iteration check whether the element is an album itself. Don't do this for files as it is quite common to have a song with the same name as its album.
@@ -79,10 +82,13 @@ class Formatter:
 
 
 class HTMLFormatter(Formatter):
+    """HTMLFormatter creates a detailed HTML-view of an element, displaying all tags and an album cover."""
     def __init__(self,element):
+        """Create an HTMLFormatter for the given element."""
         Formatter.__init__(self,element)
 
     def detailView(self):
+        """Return HTML-code which renders a detailed view of the element."""
         lines = []
         
         coverPath = covers.getCoverPath(self.element.id,config.get("gui","detail_cover_size"))

@@ -9,6 +9,12 @@
 import sys, os
 from PyQt4 import QtCore, QtGui
 
+# Global variables. Only for debugging! Later there may be more than one browser, playlist, etc.
+widget = None
+browser = None
+playlist = None
+controlWidget = None
+
 def run():
     # Switch first to the directory containing this file
     if os.path.dirname(__file__):
@@ -24,11 +30,16 @@ def run():
     database.connect()
     from omg import tags
     tags.updateIndexedTags()
-    from omg import config, mpclient, search, control, browser, gui
+    from omg import config, mpclient, search, control
     search.init()
-    from gui import playlist
+    from omg import browser as browserModule
+    from omg.gui import playlist as playlistModule
 
+    from omg import plugins
+    plugins.loadPlugins()
+    
     # Create GUI
+    global widget,browser,playlist,controlWidget
     widget = QtGui.QWidget()
     layout = QtGui.QVBoxLayout()
     widget.setLayout(layout)
@@ -39,15 +50,14 @@ def run():
     splitter = QtGui.QSplitter(widget)
     layout.addWidget(splitter,1)
     
-    browser = browser.Browser(widget)
+    browser = browserModule.Browser(widget)
     splitter.addWidget(browser)
     splitter.setStretchFactor(0,2)
     
-    playlist = playlist.Playlist(widget)
+    playlist = playlistModule.Playlist(widget)
     splitter.addWidget(playlist)
     splitter.setStretchFactor(1,5)
-
-    #browser.nodeDoubleClicked.connect(playlist.addNode)
+    
     control.synchronizePlaylist(playlist.getModel())
     
     widget.resize(800, 600)
