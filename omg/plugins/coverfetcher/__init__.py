@@ -7,11 +7,12 @@
 # published by the Free Software Foundation
 #
 import os.path
+import webbrowser
 
 from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
-from omg import covers, config, models
+from omg import covers, config, constants, models
 from omg.gui import formatter, playlist
 
 def enable():
@@ -23,16 +24,13 @@ def disable():
 def getMenuEntries(playlist,node):
     """Provides an action for the playlist's context menu (confer playlist.contextMenuProvider). The action will only be enabled if at least one album is selected and in this case open a CoverFetcher-dialog for the selected albums."""
     action = QtGui.QAction("Cover holen...",playlist)
-    elements = []
-    for index in playlist.selectedIndexes():
-        node = playlist.model().data(index)
-        if isinstance(node,models.Element) and node.isAlbum():
-            elements.append(node)
+    elements = [playlist.model().data(index) for index in playlist.selectedIndexes()]
     if len(elements) == 0:
         action.setEnabled(False)
     else: action.triggered.connect(lambda: CoverFetcher(QtGui.QApplication.activeWindow(),elements).open())
     return [action]
-    
+
+
 class CoverFetcher(QtGui.QDialog):
     def __init__(self,parent,elements):
         QtGui.QWidget.__init__(self,parent)
@@ -60,8 +58,10 @@ class CoverFetcher(QtGui.QDialog):
         self.imageLabel.setScaledContents(True)
         self.imageLabel.setFrameStyle(QtGui.QFrame.Box)
         leftLayout.addWidget(self.imageLabel)
-        
+    
         self.textLabel = QtGui.QLabel(self)
+        self.textLabel.setMaximumWidth(coverSize)
+        self.textLabel.setWordWrap(True)
         leftLayout.addWidget(self.textLabel)
         
         bottomLeftLayout = QtGui.QHBoxLayout()
@@ -88,24 +88,35 @@ class CoverFetcher(QtGui.QDialog):
         
         self.coverFetchButton = QtGui.QPushButton("Cover von Last.fm holen",self)
         bottomRightLayout1.addWidget(self.coverFetchButton)
-        customCoverButton = QtGui.QPushButton("Eigenes Cover laden",self)
-        bottomRightLayout1.addWidget(customCoverButton)
-        customCoverButton.clicked.connect(self._handleCustomCoverButton)
+        lastfmLabel = LastFmLabel(self)
+        bottomRightLayout1.addWidget(lastfmLabel)
         
         bottomRightLayout2 = QtGui.QHBoxLayout()
         rightLayout.addLayout(bottomRightLayout2)
-        rightLayout.addStretch(1)
+        
+        customCoverButton = QtGui.QPushButton("Eigenes Cover laden...",self)
+        customCoverButton.clicked.connect(self._handleCustomCoverButton)
+        bottomRightLayout2.addWidget(customCoverButton)
+        urlCoverButton = QtGui.QPushButton("URL öffnen...",self)
+        urlCoverButton.clicked.connect(self._handleUrlCoverButton)
+        bottomRightLayout2.addWidget(urlCoverButton)
+        
+        bottomRightLayout3 = QtGui.QHBoxLayout()
+        rightLayout.addLayout(bottomRightLayout3)
         
         self.skipButton = QtGui.QPushButton("Überspringen",self)
         self.skipButton.clicked.connect(self.nextElement)
-        bottomRightLayout2.addWidget(self.skipButton)
+        bottomRightLayout3.addWidget(self.skipButton)
         self.saveButton = QtGui.QPushButton("Cover speichern",self)
         self.saveButton.clicked.connect(self.save)
-        bottomRightLayout2.addWidget(self.saveButton)
+        bottomRightLayout3.addWidget(self.saveButton)
         cancelButton = QtGui.QPushButton("Abbrechen",self)
-        bottomRightLayout2.addWidget(cancelButton)
+        bottomRightLayout3.addWidget(cancelButton)
         cancelButton.clicked.connect(self.reject)
         
+        rightLayout.addStretch(1)
+        
+        # Jump to the first element and initialize the gui
         self.nextElement()
     
     def _handleCustomCoverButton(self):
@@ -123,6 +134,18 @@ class CoverFetcher(QtGui.QDialog):
             self.addImage(image,"{0} - {1}x{2} Pixel".format(fileName,image.size().width(),image.size().height()))
             self.setPosition(len(self.covers)-1)
     
+    def _handleUrlCoverButton(self):
+        url = QtGui.QInputDialog.getText(self,"URL öffnen","Geben Sie die URL des Covers ein:")
+        #~ QUrl url("http://mydomain.com/images/image.jpg";);
+#~ http = new QHttp(this);
+#~ connect(http, SIGNAL(requestFinished(int, bool)),this, SLOT(Finished(int, 
+#~ bool)));
+#~ buffer = new QBuffer(&bytes);
+#~ buffer->open(QIODevice::WriteOnly);
+#~ http->setHost(url.host());
+#~ Request=http->get (url.path(),buffer);
+
+        
     def addImage(self,image,text):
         self.covers.append(image)
         self.texts.append(text)
@@ -180,3 +203,14 @@ class CoverFetcher(QtGui.QDialog):
                               "Das Cover konnte nicht gespeichert werden.",
                               QtGui.QMessageBox.Ok,self).exec_()
         else: self.nextElement()
+        
+
+class LastFmLabel(QtGui.QLabel):
+    def __init__(self,parent):
+        QtGui.QLabel.__init__(self,parent)
+        self.setPixmap(QtGui.QPixmap(constants.IMAGES+"lastfm.gif"))
+        self.setCursor(Qt.PointingHandCursor)
+        
+    def mouseReleaseEvent(self,event):
+        webbrowser.open("http://www.lastfm.de")
+        return True
