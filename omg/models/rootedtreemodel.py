@@ -40,13 +40,17 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
     
     def hasChildren(self,index):
         if not index.isValid():
-            return self.root.hasChildren()
-        return self.data(index).hasChildren()
+            if self.root is None:
+                return False
+            else: return self.root.hasChildren()
+        else: return self.data(index).hasChildren()
         
     def rowCount(self,parent):
         if parent.column() > 0:
             return 0
         if not parent.isValid():
+            if self.root is None:
+                return 0
             return self.root.getChildrenCount()
         else: return self.data(parent).getChildrenCount()
 
