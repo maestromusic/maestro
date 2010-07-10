@@ -53,6 +53,7 @@ class Playlist(QtGui.QWidget):
         element = self.model.data(index)
         mpclient.play(element.getOffset())
 
+
 class PlaylistTreeView(QtGui.QTreeView):
     """Specialized QTreeView, which draws the currently playing track highlighted."""
     def __init__(self,parent):

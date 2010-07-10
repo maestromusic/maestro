@@ -5,18 +5,19 @@
 # it under the terms of the GNU General Public License version 3 as
 # published by the Free Software Foundation
 #
-
-from omg import constants
 from configparser import RawConfigParser
 import logging
 import os.path
+import shelve as shelveModule
+
+from omg import constants
 
 _config = RawConfigParser()
 get = _config.get
 set = _config.set
 
 def init(*config_files):
-    """Sets default options and overwrites them with the options in the given config files."""
+    """Set default options and overwrite them with the options in the given config files."""
     default_options = {
         "database": {
             # Database driver to use
@@ -55,7 +56,8 @@ def init(*config_files):
         },
         
         "browser": {
-            "artist_tags": "composer,artist"
+            "tag_sets": "[[composer,artist,performer]],[[genre],[composer,artist,performer]],"
+                       +"[[genre]],[[artist]],[[composer]],[[performer]]"
         },
         
         "gui": {
@@ -87,3 +89,21 @@ def init(*config_files):
     logging.basicConfig(level=constants.LOGLEVELS[get("misc","loglevel")], format='%(levelname)s: in Module %(name)s: %(message)s')
 
 init(constants.CONFIG)
+
+
+shelve = shelveModule.open(constants.SHELVE)
+
+def initShelve(shelve):
+    """If the shelve does not contain a value for an option, store the default value."""
+    defaultOptions = {
+        'widget_position': None, # center the window
+        'widget_width': 800,
+        'widget_height': 600,
+        
+        'browser_views': [[['composer','artist','performer']],[['genre'],['composer','artist','performer']]],
+    }
+    for key,option in defaultOptions.items():
+        if key not in shelve:
+            shelve[key] = option    
+
+initShelve(shelve)

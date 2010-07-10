@@ -9,7 +9,7 @@
 import os.path
 import webbrowser
 
-from PyQt4 import QtCore,QtGui
+from PyQt4 import QtCore,QtGui,QtNetwork
 from PyQt4.QtCore import Qt
 
 from omg import covers, config, constants, models
@@ -42,6 +42,7 @@ class CoverFetcher(QtGui.QDialog):
         self.covers = []
         self.texts = []
         self.position = None
+        self.requestId = None
         
         # Create GUI
         layout = QtGui.QHBoxLayout()
@@ -60,8 +61,9 @@ class CoverFetcher(QtGui.QDialog):
         leftLayout.addWidget(self.imageLabel)
     
         self.textLabel = QtGui.QLabel(self)
-        self.textLabel.setMaximumWidth(coverSize)
+        #self.textLabel.setMaximumWidth(coverSize)
         self.textLabel.setWordWrap(True)
+        self.textLabel.setFrameStyle(QtGui.QFrame.Box)
         leftLayout.addWidget(self.textLabel)
         
         bottomLeftLayout = QtGui.QHBoxLayout()
@@ -128,32 +130,58 @@ class CoverFetcher(QtGui.QDialog):
         image = QtGui.QPixmap(fileName)
         if image.isNull():
             QtGui.QMessageBox(QtGui.QMessageBox.Warning,"Fehler beim Öffnen der Datei",
-                              "Die Datei konnte nicht geöffnet werden.",QtGui.QMessageBox.Ok,self)\
-                                .exec_()
+                              "Die Datei konnte nicht geöffnet werden.",QtGui.QMessageBox.Ok,self).exec_()
         else:
-            self.addImage(image,"{0} - {1}x{2} Pixel".format(fileName,image.size().width(),image.size().height()))
+            self.addImage(image,fileName)
             self.setPosition(len(self.covers)-1)
     
     def _handleUrlCoverButton(self):
-        url = QtGui.QInputDialog.getText(self,"URL öffnen","Geben Sie die URL des Covers ein:")
-        #~ QUrl url("http://mydomain.com/images/image.jpg";);
-#~ http = new QHttp(this);
-#~ connect(http, SIGNAL(requestFinished(int, bool)),this, SLOT(Finished(int, 
-#~ bool)));
-#~ buffer = new QBuffer(&bytes);
-#~ buffer->open(QIODevice::WriteOnly);
-#~ http->setHost(url.host());
-#~ Request=http->get (url.path(),buffer);
+        url,ok = QtGui.QInputDialog.getText(self,"URL öffnen","Geben Sie die URL des Covers ein:")
+        if not ok:
+            return
+        url = QtCore.QUrl(url)
+        if not url.isValid():
+            QtGui.QMessageBox(QtGui.QMessageBox.Warning,"Ungültige URL",
+                              "Die eingegebene URL ist ungültig.",QtGui.QMessageBox.Ok,self).exec_()
+        else: self.loadFromURL(url,url.toString())
+        
+    def loadFromURL(self,url,text):
+        if self.requestId is not None:
+            return
+        http = QtNetwork.QHttp(self)
+        http.setHost(url.host())
+        http.requestFinished.connect(lambda id,error: self._httpRequestFinished(text,buffer,id,error),
+                                     Qt.QueuedConnection) # for some reason 
+        buffer = QtCore.QBuffer()
+        buffer.open(QtCore.QIODevice.WriteOnly)
+        self.requestId = http.get(url.path(),buffer)
 
+    def _httpRequestFinished(self,text,buffer,id,error):
+        # For some reason Qt fires this event twice, the first time with another requestId. I have no idead where that requestId comes from...
+        if id != self.requestId: 
+            return
+        
+        if not error:
+            self.requestId = None
+            image = QtGui.QPixmap()
+            if image.loadFromData(buffer.buffer()):
+                self.addImage(image,text)
+                self.setPosition(len(self.covers)-1)
+                return
+        QtGui.QMessageBox(QtGui.QMessageBox.Warning,"Laden des Covers fehlgeschlagen",
+                          "Das Laden des Covers ist fehlgeschlagen.",QtGui.QMessageBox.Ok,self).exec_()
         
     def addImage(self,image,text):
+        assert(isinstance(image,QtGui.QPixmap))
         self.covers.append(image)
-        self.texts.append(text)
+        self.texts.append("{0} - {1}x{2} Pixel".format(text,image.size().width(),image.size().height()))
         if self.position is None:
             self.setPosition(0)
             self.nextButton.setEnabled(True)
             self.prevButton.setEnabled(True)
             self.saveButton.setEnabled(True)
+        self.numberLabel.setText("{0}/{1}".format(self.position+1,len(self.covers)))
+        self.adjustSize()
         
     def setPosition(self,position):
         self.position = position
@@ -184,9 +212,12 @@ class CoverFetcher(QtGui.QDialog):
     def nextElement(self):
         if self.elementIndex < len(self.elements) - 1:
             self.elementIndex = self.elementIndex + 1
-            self.detailViewLabel.setText(formatter.HTMLFormatter(self.elements[self.elementIndex]).detailView())
+            element = self.elements[self.elementIndex]
+            self.detailViewLabel.setText(formatter.HTMLFormatter(element).detailView())
             self.skipButton.setEnabled(self.elementIndex != len(self.elements) - 1)
             self.clear()
+            if element.hasCover():
+                self.addImage(QtGui.QPixmap(covers.getCoverPath(element.id)),"Vorheriges Cover")
         else: self.close()
         
     def save(self):

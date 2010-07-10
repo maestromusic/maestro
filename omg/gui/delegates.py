@@ -69,3 +69,14 @@ class PlaylistDelegate(abstractdelegate.AbstractDelegate):
         if self.model.isPlaying(element):
             return QtGui.QBrush(QtGui.QColor(110,149,229))
         else: return None
+        
+
+class BrowserDelegate(abstractdelegate.AbstractDelegate):
+    def __init__(self,parent,model):
+        abstractdelegate.AbstractDelegate.__init__(self,parent)
+        self.model = model
+    
+    def layout(self,index):
+        node = self.model.data(index)
+        
+        self.addLine(str(node))

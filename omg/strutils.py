@@ -48,3 +48,12 @@ def formatLength(lengthInSeconds):
     else:
         hours = int(lengthInSeconds / 3600)
         return "{0:d}:{1:02d}:{2:02d}".format(hours,minutes,seconds)
+        
+def mapRecursively(f,aList):
+    """Take <aList> which may contain (recursively) further lists and apply <f> to each element in these lists (except the lists). Return a copy a <aList> with the results."""
+    result = []
+    for item in aList:
+        if isinstance(item,list):
+            result.append(mapRecursively(f,item))
+        else: result.append(f(item))
+    return result

@@ -32,7 +32,7 @@ def run():
     tags.updateIndexedTags()
     from omg import config, mpclient, search, control
     search.init()
-    from omg import browser as browserModule
+    from omg.gui import browser as browserModule
     from omg.gui import playlist as playlistModule
 
     from omg import plugins
@@ -60,13 +60,22 @@ def run():
     
     control.synchronizePlaylist(playlist.getModel())
     
-    widget.resize(800, 600)
-    screen = QtGui.QDesktopWidget().screenGeometry()
-    size =  widget.geometry()
-    widget.move((screen.width()-size.width())/2, (screen.height()-size.height())/2)
+    widget.resize(config.shelve['widget_width'],config.shelve['widget_height'])
+    if config.shelve['widget_position'] is None: # Center the widget
+        screen = QtGui.QDesktopWidget().screenGeometry()
+        size =  widget.geometry()
+        widget.move((screen.width()-size.width())/2, (screen.height()-size.height())/2)
+    else: widget.move(*config.shelve['widget_position'])
     widget.show()
-    sys.exit(app.exec_())
-
+    returnValue = app.exec_()
+    
+    # Close operations
+    config.shelve['widget_position'] = (widget.x(),widget.y())
+    config.shelve['widget_width'] = widget.width()
+    config.shelve['widget_height'] = widget.height()
+    plugins.teardown()
+    config.shelve.close()
+    sys.exit(returnValue)
 
 if __name__ == "__main__":
     run()

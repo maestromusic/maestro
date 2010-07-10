@@ -34,8 +34,6 @@ TITLE = None
 ALBUM = None
 DATE = None
 
-artistTags = None
-
 class Tag:
     """Baseclass for tags.
     
@@ -91,6 +89,19 @@ class IndexedTag(Tag):
     def __hash__(self):
         return self.id
 
+    def __str__(self):
+        nameDict = {
+            'title': "Titel",
+            'artist': "Künstler",
+            'composer': "Komponist",
+            'performer': "Performer",
+            'conductor': "Dirigent",
+            'album': "Album",
+            'genre': "Genre",
+            'date': "Datum",
+        }
+        return nameDict.get(self.name,self.name) # if self.name is not contained in the dict return the name itself
+        
     #TODO: The following comparison methods should not be used! Unfortunately PrettyPrinter sorts dictionary keys and raises exceptions if they cannot be sorted (confer issue 7429).
     def __ge__(self,other):
         return self.id >= other.id
@@ -119,7 +130,37 @@ def get(identifier):
             return _tagsByName[identifier]
         else: return OtherTag(identifier)
     else: raise Exception("Identifier's type is neither int nor string")
-
+    
+def parseIndexedTags(string):
+    try:
+        return [_tagsByName[name] for name in string.split(",")]
+    except KeyError:
+        return None
+    
+def parseIndexedTagSets(string):
+    tagSets = []
+    pos = 0 
+    while pos < len(string):
+        if string[pos] == '[':
+            end = string.find(']',pos+1)
+            if end == -1:
+                return None
+            tagSets.append(parseIndexedTags(string[pos+1:end]))
+            pos = end + 1
+        elif string[pos] == ',':
+            pos = pos +1
+        else:
+            end = string.find(',[',pos)
+            if end == -1:
+                tagSets.extend([tag] for tag in parseIndexedTags(string[pos:]))
+                break
+            else:
+                tagSets.extend([tag] for tag in parseIndexedTags(string[pos:end]))
+                pos = end + 1
+    if None in tagSets or [None] in tagSets:
+        return None
+    else: return tagSets
+    
 
 def updateIndexedTags():
     """Initialize (or update) the variables of this module based on the information of the tagids-table. At program start or after changes of that table this method must be called to ensure the module has the correct indexed tags and their IDs."""
@@ -138,9 +179,6 @@ def updateIndexedTags():
     TITLE = _tagsByName[config.get("tags","title_tag")]
     ALBUM = _tagsByName[config.get("tags","album_tag")]
     DATE = _tagsByName[config.get("tags","date_tag")]
-    
-    global artistTags
-    artistTags = tuple(_tagsByName[tagname] for tagname in config.get("browser","artist_tags").split(','))
 
 
 class Storage(defaultdict):

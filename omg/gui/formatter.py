@@ -107,11 +107,11 @@ class HTMLFormatter(Formatter):
         
         tagLines = []
         for tag in [t for t in tagOrder if t in self.element.tags and t != tags.TITLE and t != tags.ALBUM]:
-            tagLines.append('{0}: {1}'.format(cgi.escape(tag.name),cgi.escape(self.tag(tag))))
+            tagLines.append('{0}: {1}'.format(cgi.escape(str(tag)),cgi.escape(self.tag(tag))))
 
         # Ad the tags which don't appear in the tagOrder-list
         for tag in [t for t in self.element.tags if t not in tagOrder]:
-            tagLines.append('{0}: {1}'.format(cgi.escape(tag.name),cgi.escape(self.tag(tag))))
+            tagLines.append('{0}: {1}'.format(cgi.escape(str(tag)),cgi.escape(self.tag(tag))))
         
         lines.append("<br>".join(tagLines))
         lines.append('</div>')
