@@ -6,16 +6,12 @@
 # it under the terms of the GNU General Public License version 3 as
 # published by the Free Software Foundation
 #
-
-# Temporary tables used for search results (have to appear before the imports as they will be imported in some imports)
-TT_BIG_RESULT = 'tmp_browser_bigres'
-TT_SMALL_RESULT = 'tmp_browser_smallres'
-
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt,SIGNAL
 
-from omg import search, tags, config, constants, models, control, strutils
-from omg.models import rootedtreemodel
+from omg import search, tags, config, constants, models, strutils
+from omg.models import browser as browsermodel
+
 from . import delegates, browserdialog
 
 class Browser(QtGui.QWidget):
@@ -23,18 +19,10 @@ class Browser(QtGui.QWidget):
     views = None # QTreeViews
     searchBox = None
     
-    # The TreeModel used to store the nodes in this browser.
-    model = None
-    
-    # Root node
-    root = None
+    table = "containers" # The MySQL-table which contents are currently displayed
     
     def __init__(self,parent,model=None):
         QtGui.QWidget.__init__(self,parent)
-        self.model = model if model is not None else rootedtreemodel.RootedTreeModel() #forestmodel.ForestModel()
-        
-        search.createResultTempTable(TT_BIG_RESULT,True)
-        search.createResultTempTable(TT_SMALL_RESULT,True)
         
         # Layout
         layout = QtGui.QVBoxLayout(self)
@@ -71,18 +59,17 @@ class Browser(QtGui.QWidget):
     def createViews(self,layerList):
         for view in self.views:
             view.setParent(None)
-        
         self.views = []
         for layers in layerList:
-            newView = BrowserTreeView(self)
-            newView.setLayers(layers)
+            newView = BrowserTreeView(self,self.table,layers)
             self.views.append(newView)
             self.splitter.addWidget(newView)
-        
+
+
 class BrowserTreeView(QtGui.QTreeView):
-    def __init__(self,parent):
+    def __init__(self,parent,table,layers):
         QtGui.QTreeView.__init__(self,parent)
-        self.setModel(parent.model)
+        self.setModel(browsermodel.BrowserModel(table,layers))
         
         self.setHeaderHidden(True)
         self.setItemDelegate(delegates.BrowserDelegate(self,self.model()))
@@ -97,10 +84,10 @@ class BrowserTreeView(QtGui.QTreeView):
         self.setPalette(palette)
     
     def setLayers(self,layers):
-        self.layers = layers
+        self.model().setLayers(layers)
     
     def getLayers(self):
-        return self.layers
+        return self.model().getLayers()
         
     def _handleDoubleClicked(self,index):
         pass

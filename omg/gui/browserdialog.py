@@ -11,6 +11,7 @@ from PyQt4.QtCore import Qt
 
 from omg import config, tags, strutils
 
+# Layers that can be selected in BrowserDialog's comboboxes. Each item in the list is a list containing for each layer a list of the tagnames in that layer.
 selectableLayers = strutils.mapRecursively(tags.get,[
      [['composer','artist','performer']],
      [['genre'],['composer','artist','performer']],

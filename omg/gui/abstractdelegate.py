@@ -52,8 +52,8 @@ class AbstractDelegate(QtGui.QStyledItemDelegate):
         raise NotImplementedError()
 
     def getBackground(self,index):
-        """Return a QBrush which should be used to fill the background of the node with the given index, or None if the background should not be filled. This method is called by paint."""
-        raise NotImplementedError()
+        """Return a QBrush which should be used to fill the background of the node with the given index, or None if the background should not be filled. This method is called by paint. The default implementation returns None."""
+        return None
 
     # This is the implementation of QItemDelegate.paint and will be called to draw an item.
     def paint(self,painter,option,index):

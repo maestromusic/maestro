@@ -41,7 +41,20 @@ class Node:
         """Return whether this node holds a container. Note that this is in general not the opposite of isFile as e.g. rootnodes are neither."""
         return False
         
+    def getParents(self):
+        """Returns a generator yielding all parents of this node in the current tree structure, from the direct parent to the root-node."""
+        parent = self.getParent()
+        while parent is not None:
+            yield parent
+            parent = parent.getParent()
     
+    def getLevel(self):
+        """Return the level of this node in the current tree structure. The root node will have level 0."""
+        if self.getParent() is None:
+            return 0
+        else: return 1 + self.getParent().getLevel()
+
+
 # Methods to access the flat playlist: the list of files at the end of the treemodel.
 class FilelistMixin:
     def getAllFiles(self):
@@ -174,6 +187,8 @@ class Element(Node,FilelistMixin,IndexMixin):
                 """.format(table,self.id)).getSingleColumn()
         for id in result:
             self.contents.append(Element(id))
+            self.contents[-1].parent = self
+            
         if recursive:
             for element in self.contents:
                 element.loadContents(recursive,table)

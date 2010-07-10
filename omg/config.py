@@ -62,6 +62,7 @@ def init(*config_files):
         
         "gui": {
             # Size in pixels of covers
+            "browser_cover_size": 40,
             "large_cover_size": 60,
             "small_cover_size": 40,
             "detail_cover_size": 160,
