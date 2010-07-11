@@ -74,7 +74,6 @@ def cacheAll(size):
 
 def setCover(id,cover):
     assert isinstance(id,int)
-    print(COVER_DIR+"large/"+str(id))
     if not cover.save(COVER_DIR+"large/"+str(id),"png"):
         return False
     else:
