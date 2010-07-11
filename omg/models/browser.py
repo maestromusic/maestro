@@ -9,58 +9,56 @@
 from omg import models, search, database
 from omg.models import rootedtreemodel
 
-# Temporary tables used for search results (have to appear before the imports as they will be imported in some imports)
-TT_BIG_RESULT = 'tmp_browser_bigres'
-TT_SMALL_RESULT = 'tmp_browser_smallres'
-
 class BrowserModel(rootedtreemodel.RootedTreeModel):
-    def __init__(self,table,layers):
+    """Model for a BrowserTreeView."""
+    def __init__(self,table,layers,smallResult):
+        """Initialize this model. It will contain only elements from <table>, group them according to <layers> and will use <smallResult> as temporary search table (BrowserModels perform internal searches when CriterionNodes are expanded for the first time."""
         rootedtreemodel.RootedTreeModel.__init__(self,RootNode(self))
         self.table = table
         self.layers = layers
-        search.createResultTempTable(TT_BIG_RESULT,True)
-        search.createResultTempTable(TT_SMALL_RESULT,True)
+        self.smallResult = smallResult
         self._loadLayer(self.root)
             
     def setLayer(self,layers):
+        """Set the layers of the model and reset."""
         self.layers = layers
         self.reset()
     
     def getLayers(self):
+        """Return the layers of this model."""
         return self.layers
     
     def setTable(self,table):
+        """Set the table of this model. The model will only contain elements from <table>."""
         self.table = table
         self.reset()
         
     def getTable(self):
+        """Return the table in which this model's contents are contained."""
         return self.table
         
     def reset(self):
+        """Reset the model."""
         self._loadLayer(self.root)
         rootedtreemodel.RootedTreeModel.reset(self)
-            
-    def getNextTagSet(self,node):
-        level = node.getLevel()
-        if level < len(self.layers):
-            # No need to add/substract 1: list starts at 0, level (without root node) at 1 and we want the next level.
-            return self.layers[level]
-        else: return None # Next layer is a container layer
         
     def _loadLayer(self,node):
+        """Load the contents of <node>, which must be either root or a CriterionNode (The contents of Elements are loaded via Element.loadContents)."""
         assert node == self.root or isinstance(node,CriterionNode)
         
         if node == self.root:
             table = self.table
         else:
-            search.stdSearch(node._collectCriteria(),TT_SMALL_RESULT,self.table)
-            table = TT_SMALL_RESULT
+            # Collect the criteria in this node and its parents and put the search results into smallResult
+            search.stdSearch(node._collectCriteria(),self.smallResult,self.table)
+            table = self.smallResult
         
-        if self.getNextTagSet(node) is not None:
+        # Determine whether to load a tag-layer or the container-layer at the bottom of the tree.
+        if node.layerIndex+1 < len(self.layers):
             self._loadTagLayer(node,table)
             #TODO: Add code to load automatically
             #~ if (recursive or 
-                #~ db.query("SELECT COUNT(*) FROM {0}".format(TT_SMALL_RESULT)).getSingle()
+                #~ db.query("SELECT COUNT(*) FROM {0}".format(SMALL_RESULT)).getSingle()
                      #~ < self._getNextLayer().DIRECT_LOAD_LIMIT):
                 #~ for element in self.elements:
                     #~ element.update(recursive)
@@ -68,9 +66,11 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
 
 
     def _loadTagLayer(self,node,table):
+        """Load the contents of <node> into a tag-layer, using containers from <table>."""
+        tagSet = self.layers[node.layerIndex+1]
         valueNodes = []
         values = []
-        for tag in self.getNextTagSet(node):
+        for tag in tagSet:
             # Get all values and corresponding ids of the given tag appearing in at least one toplevel result.
             result = database.get().query("""
                 SELECT DISTINCT tag_{0}.id,tag_{0}.value
@@ -94,13 +94,21 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
                 FROM {0} LEFT JOIN tags ON {0}.id = tags.container_id AND tags.tag_id IN ({1})
                 WHERE tags.value_id IS NULL
                 LIMIT 1
-                """.format(table,",".join(str(tag.id) for tag in self.getNextTagSet(node))))
+                """.format(table,",".join(str(tag.id) for tag in tagSet)))
         if result.size():
-            valueNodes.append(VariousNode(node,self,self.getNextTagSet(node)))
+            valueNodes.append(VariousNode(node,self,tagSet))
             
         node.contents = valueNodes
+        
+        # Tag-layers containing only one CriterionNode are not helpful, so if this happens load the contents of the only CriterionNode and put them into node, removing the onlay CriterionNode.
+        if len(valueNodes) == 1:
+            self._loadLayer(valueNodes[0])
+            for n in valueNodes[0].contents:
+                n.parent = node
+            node.contents = valueNodes[0].contents
     
     def _loadContainerLayer(self,node,table):
+        """Load the contents of <node> into a container-layer, using containers from <table>. Note that this creates all children of <node> not only the next level of the treestructure as _loadTagLayer does."""
         result = database.get().query("SELECT id FROM {0} WHERE toplevel = 1".format(table)).getSingleColumn()
         node.contents = [models.Element(id) for id in result]
         for element in node.contents:
@@ -108,31 +116,33 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
             element.loadContents(True,table)
             element.loadTags(True)
 
+
 class CriterionNode(models.Node):
-    
+    """CriterionNode is the base class for nodes used to group containers according to a criterion (confer search.criteria) in a BrowserModel."""
     def __init__(self,parent,model,criterion):
+        """Initialize this CriterionNode with the parent-node <parent> and the given model and criterion."""
         self.parent = parent
         self.model = model
         self.criterion = criterion
+        self.layerIndex = parent.layerIndex + 1
         self.contents = None
     
-    def _collectCriteria(self,type=None):
+    def _collectCriteria(self):
+        """Return a list containing the criteria of this node and of all of its parent nodes (as long as they are of type CriterionNode)."""
         result = [self.getCriterion()]
         parent = self.getParent()
         while parent is not None:
-            if type is None or isinstance(parent,type):
-                try:
-                    if parent.getCriterion() is not None:
-                        result.append(parent.getCriterion())
-                # Current parent node seems to have no getCriterion-method...so just skip it
-                except AttributeError: pass
+            if isinstance(parent,CriterionNode):
+                result.append(parent.getCriterion())
             parent = parent.getParent()
         return result
     
     def getCriterion(self):
+        """Return the criterion of this node."""
         return self.criterion
     
     def hasChildren(self):
+        # Always return True. The contents of a CriterionNode are loaded when getChildren or getChildrenCount is called for the first time. Prior to this call hasChildren=True will tell the view that the node is expandable and make the view draw a plus-sign in front of the node.
         return True
         
     def getChildrenCount(self):
@@ -144,13 +154,12 @@ class CriterionNode(models.Node):
         if self.contents is None:
             self.model._loadLayer(self)
         return self.contents
-    
-    def getModel(self):
-        return self.model
 
 
 class ValueNode(CriterionNode):
+    """A ValueNode groups containers which have the same tag-value in one or more tags. Not that only the value must coincide, the tags need not be the same, but they must be in a given list. This enables BrowserViews display e.g. all artists and all composers in one tag-layer."""
     def __init__(self,parent,model,value,valueIds):
+        """Initialize this ValueNode with the parent-node <parent> and the given model. <valueIds> is a dict mapping tags to value-ids of the tag. This node will contain containers having at least one of the value-ids in the corresponding tag. <value> is the value of the value-ids (which should be the same for all tags) and will be displayed on the node."""
         CriterionNode.__init__(self,parent,model,None)
         self.value = value
         self.valueIds = valueIds
@@ -163,7 +172,9 @@ class ValueNode(CriterionNode):
 
 
 class VariousNode(CriterionNode):
+    """A VariousNode groups containers in a tag-layer which have no tag in any of the tags in the tag-layer's tagset."""
     def __init__(self,parent,model,tagSet):
+        """Initialize this VariousNode with the parent-node <parent>, the given model and the tag-layer's tagset <tagSet>."""
         CriterionNode.__init__(self,parent,model,search.criteria.MissingTagCriterion(tagSet))
         
     def __str__(self):
@@ -173,8 +184,10 @@ class VariousNode(CriterionNode):
 class RootNode(models.Node):
     """Rootnode of the Browser-TreeModel."""
     def __init__(self,model):
+        """Initialize this Rootnode with the given model."""
         self.contents = []
         self.model = model
+        self.layerIndex = -1
     
     def getParent(self):
         return None

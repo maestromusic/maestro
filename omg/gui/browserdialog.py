@@ -30,6 +30,7 @@ class BrowserDialog(QtGui.QDialog):
     def __init__(self,parent):
         """Initialize with the given parent, which must be the browser to configure."""
         QtGui.QDialog.__init__(self,parent)
+        self.setWindowTitle("Browser-Einstellungen")
         self.browser = parent
         
         self.viewConfigurations = []
@@ -67,7 +68,7 @@ class BrowserDialog(QtGui.QDialog):
         
         self._handleValueChanged(len(self.browser.views))
         for i in range(0,len(self.browser.views)):
-            self.viewConfigurations[i].setLayers(self.browser.views[i].getLayers())
+            self.viewConfigurations[i].setLayers(self.browser.views[i].model().getLayers())
         
     def _handleValueChanged(self,value):
         if value < len(self.viewConfigurations):

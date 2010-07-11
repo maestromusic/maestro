@@ -68,6 +68,9 @@ def init(*config_files):
             "detail_cover_size": 160,
             "cover_fetcher_cover_size": 400,
             
+            # Maximal number of views in a Browser
+            "max_browser_views": 5,
+            
             # Order in which tags will be displayed. Must contain title and album! Tags which don't appear in this list will be displayed in arbitrary order after the tags in the list.
             "tag_order": "title,album,composer,artist,performer,conductor,date,genre"
         },
