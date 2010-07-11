@@ -9,7 +9,7 @@
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt,SIGNAL
 
-from omg import search, tags, config, constants, models, strutils
+from omg import database, search, tags, config, constants, models, strutils, control
 from omg.models import browser as browsermodel
 
 from . import delegates, browserdialog, formatter
@@ -62,7 +62,7 @@ class Browser(QtGui.QWidget):
             self.table = TT_BIG_RESULT
         else:
             self.table = "containers"
-            database.get().query("TRUNCATE TABLE ?",TT_BIG_RESULT)
+            database.get().query("TRUNCATE TABLE {0}".format(TT_BIG_RESULT))
         
         for view in self.views:
             view.model().setTable(self.table)
@@ -111,9 +111,6 @@ class BrowserTreeView(QtGui.QTreeView):
         return super(BrowserTreeView,self).event(event)
         
     def _handleDoubleClicked(self,index):
-        pass
-        #~ node = self.model.data(index)
-        #~ self.getParent().nodeDoubleClicked.emit(node)
-        #~ if isinstance(node,nodes.ElementNode):
-            #~ control.playlist.insertElements(control.playlist.importElements([node]),-1)
-            #~ self.getParent().containerDoubleClicked.emit(models.Element(node.id))
+        node = self.model().data(index)
+        if isinstance(node,models.Element):
+            control.playlist.insertElements(control.playlist.importElements([node]),-1)
