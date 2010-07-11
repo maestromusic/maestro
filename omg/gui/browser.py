@@ -12,7 +12,7 @@ from PyQt4.QtCore import Qt,SIGNAL
 from omg import search, tags, config, constants, models, strutils
 from omg.models import browser as browsermodel
 
-from . import delegates, browserdialog
+from . import delegates, browserdialog, formatter
 
 # Temporary tables used for search results (have to appear before the imports as they will be imported in some imports)
 TT_BIG_RESULT = 'tmp_browser_bigres'
@@ -97,6 +97,19 @@ class BrowserTreeView(QtGui.QTreeView):
         palette.setColor(QtGui.QPalette.AlternateBase,QtGui.QColor(0xD9,0xD9,0xD9))
         self.setPalette(palette)
     
+    def event(self, event):
+        if event.type() == QtCore.QEvent.ToolTip:
+            index = self.indexAt(event.pos())
+            if index:
+                element = self.model().data(index)
+                if isinstance(element,models.Element):
+                    QtGui.QToolTip.showText(event.globalPos(),formatter.HTMLFormatter(element).detailView())
+            else:
+                QtGui.QToolTip.hideText()
+                event.ignore()
+            return True
+        return super(BrowserTreeView,self).event(event)
+        
     def _handleDoubleClicked(self,index):
         pass
         #~ node = self.model.data(index)

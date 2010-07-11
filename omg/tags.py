@@ -59,7 +59,18 @@ class Tag:
         return '"{0}"'.format(self.name)
 
     def __str__(self):
-        return self.name
+        nameDict = {
+            'title': "Titel",
+            'artist': "Künstler",
+            'composer': "Komponist",
+            'performer': "Performer",
+            'conductor': "Dirigent",
+            'album': "Album",
+            'genre': "Genre",
+            'date': "Datum",
+            'description': "Beschreibung"
+        }
+        return nameDict.get(self.name,self.name) # if self.name is not contained in the dict return the name itself
         
         
 class IndexedTag(Tag):
@@ -88,19 +99,6 @@ class IndexedTag(Tag):
 
     def __hash__(self):
         return self.id
-
-    def __str__(self):
-        nameDict = {
-            'title': "Titel",
-            'artist': "Künstler",
-            'composer': "Komponist",
-            'performer': "Performer",
-            'conductor': "Dirigent",
-            'album': "Album",
-            'genre': "Genre",
-            'date': "Datum",
-        }
-        return nameDict.get(self.name,self.name) # if self.name is not contained in the dict return the name itself
         
     #TODO: The following comparison methods should not be used! Unfortunately PrettyPrinter sorts dictionary keys and raises exceptions if they cannot be sorted (confer issue 7429).
     def __ge__(self,other):
