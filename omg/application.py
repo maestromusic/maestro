@@ -30,7 +30,7 @@ def run():
     database.connect()
     from omg import tags
     tags.updateIndexedTags()
-    from omg import config, mpclient, search, control
+    from omg import config, mpclient, search, control, constants
     search.init()
     from omg.gui import browser as browserModule
     from omg.gui import playlist as playlistModule
@@ -61,6 +61,7 @@ def run():
     control.synchronizePlaylist(playlist.getModel())
     
     widget.resize(config.shelve['widget_width'],config.shelve['widget_height'])
+    widget.setWindowTitle('OMG {0}'.format(constants.VERSION))
     if config.shelve['widget_position'] is None: # Center the widget
         screen = QtGui.QDesktopWidget().screenGeometry()
         size =  widget.geometry()

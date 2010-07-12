@@ -16,3 +16,5 @@ LOGLEVELS = {'debug': logging.DEBUG,
              }
 
 YES_ANSWERS = ["y", "Y", ""]
+
+VERSION = '0.001'

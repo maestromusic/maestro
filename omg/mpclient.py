@@ -14,7 +14,7 @@ client = mpd.MPDClient()
 client.connect(config.get("mpd","host"),config.get("mpd","port"))
 
 # Redirect methods to the client
-for name in ("play","pause","stop","next","previous","clear","seek","volume","playlist"):
+for name in ("play","pause","stop","next","previous","clear","seek","setvol","volume","playlist"):
     globals()[name] = getattr(client,name)
 
 def status():

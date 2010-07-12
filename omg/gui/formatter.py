@@ -89,6 +89,11 @@ class HTMLFormatter(Formatter):
 
     def detailView(self):
         """Return HTML-code which renders a detailed view of the element."""
+        
+        if isinstance(self.element, models.playlist.ExternalFile):
+            """TODO: read tags from file"""
+            return 'external file'
+            
         lines = []
         
         coverPath = covers.getCoverPath(self.element.id,config.get("gui","detail_cover_size"))
