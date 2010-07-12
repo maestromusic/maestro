@@ -67,7 +67,7 @@ class ControlWidget(QtGui.QWidget):
         self.volumeLabel.clicked.connect(self.toggleMute)
         self.volumeSlider = QtGui.QSlider(QtCore.Qt.Horizontal,self)
         self.volumeSlider.setRange(0,100)
-        self.volume = 50
+        self.storedVolume = 50
         self.volumeSlider.actionTriggered.connect(self._handleVolumeSliderAction)
         self.muted = False
         self.time = None
@@ -107,11 +107,18 @@ class ControlWidget(QtGui.QWidget):
                     font.setItalic(isinstance(element,playlist.ExternalFile))
                     self.titleLabel.setFont(font)
                     self.titleLabel.setText(title)
-            if not self.volumeSlider.isSliderDown():
-                self.volumeLabel.setVolume(status['volume'])
-                self.volumeSlider.setValue(status['volume'])
-                if status['volume'] == 0:
-                    self.muted = True
+            if not self.volumeSlider.isSliderDown() and status['state'] == 'play':
+                self.volumeSlider.setEnabled(True)
+                self.volumeLabel.setEnabled(True)
+                volume = status['volume']
+                self.setVolume(volume, dontUpdateMpd=True)
+#                self.volumeLabel.setVolume(volume)
+#                self.volumeSlider.setValue(volume)
+#                if volume == 0:
+#                    self.muted = True
+#                elif volume > 0:
+                if volume != 0:
+                    self.storedVolume = volume
             
                 
         else: # Currently nothing is playing
@@ -120,19 +127,27 @@ class ControlWidget(QtGui.QWidget):
             self.secondLabel.setText('')
             self.seekSlider.setValue(0)
             self.titleLabel.setText('')
+            
+        if status['state'] != 'play':
+            """mpd doesn't allow volume changes in paused or stopped state"""
+            self.volumeLabel.setEnabled(False)
+            self.volumeSlider.setEnabled(False)
     
-    def setVolume(self, volume):
-        if volume == -1 or self.time == None:
+    def setVolume(self, volume, dontUpdateMpd=False):
+        """sets volume to the given value. This updates slider, label and mpd's volume, but not the
+        storedVolume value. if dontUpdateMpd=True, don't update mpd's volume."""
+        if volume == -1:
+            logger.debug('setVolume called with -1')
             return
-        #logger.debug("setting volume to {}".format(volume))
         self.volumeLabel.setVolume(volume)
         self.volumeSlider.setValue(volume)
-        try:
-            mpclient.setvol(str(volume))
-        except mpd.CommandError as e:
-            print(e)
-            logger.warning("problem setting volume")
-            print(str(volume))
+        self.volumeSlider.setToolTip('{}/100'.format(volume))
+        if not dontUpdateMpd:
+            try: #might fail if mpd is not in playing state
+                mpclient.setvol(str(volume))
+            except mpd.CommandError as e:
+                logger.warning("problem setting volume to {}".format(volume))
+                logger.debug(str(e))
         if volume > 0:
             self.muted = False
         
@@ -140,7 +155,7 @@ class ControlWidget(QtGui.QWidget):
         """Toggles the muting state of the player."""
         if self.muted:
             self.muted = False
-            self.setVolume(self.volume)
+            self.setVolume(self.storedVolume)
         else:
             # don't call setVolume here to avoid loops
             self.muted = True
@@ -169,8 +184,8 @@ class ControlWidget(QtGui.QWidget):
         # mpclient.volume adds its parameter to the volume...so we pass the difference between new and old slider value:
         if self.time != None:
             vol = self.volumeSlider.sliderPosition()
-            mpclient.setvol(vol)
-            self.volume = vol
+            self.setVolume(vol)
+            self.storedVolume = vol
     
 
         
@@ -217,6 +232,10 @@ class VolumeLabel(QtGui.QLabel):
     def setVolume(self,volume):
         """Display the icon appropriate for the given volume."""
         range = VolumeLabel.volumeRange(volume)
+        if range == 'muted':
+            self.setToolTip('click to unmute')
+        else:
+            self.setToolTip('click to mute')
         if range != self.state:
             self.state = range
             self.setPixmap(QtGui.QPixmap(constants.IMAGES+"icons/volume_{}.png".format(range)))
