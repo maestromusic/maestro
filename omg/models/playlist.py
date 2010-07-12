@@ -341,13 +341,33 @@ class Playlist(rootedtreemodel.RootedTreeModel):
             self.endRemoveRows()
             return result
     
+    #~ def glue(self,parent,index):
+        #~ if index <= 0 or index >= len(parent.getContents())
+            #~ raise IndexError("Index {0} is out of bounds. Note that you cannot glue at index 0 and getChildrenCount().")
+            #~ 
+        #~ child1 = parent.contents[index-1]
+        #~ child2 = parent.contents[index]
+        #~ 
+        #~ if child1.id == child2.id:
+            #~ newIndex = child2.getChildrenCount()
+            #~ 
+            #~ // move all elements from child2 into child1 (update parents, beginInsertRows)
+            #~ 
+            #~ self.beginRemoveRows(self.getIndex(parent),index,index)
+            #~ 
+            #~ # Recursive call to glue the (former) contents of child2 with their new neighbors in child1
+            #~ self.glue(child1,newIndex)
+        #~ else:
+            #~ parents1 = child1.getParentIds()
+            #~ parents2 = child2.getParentIds()
+        
     def importElements(self,elements):
         return [self._importElement(element,None) for element in elements]
         
     def _importElement(self,element,parent):
         result = PlaylistElement(element.id,None)
         result.loadTags()
-        result.contents = [self._importElement(child,result) for child in element.getElements()]
+        result.contents = [self._importElement(child,result) for child in element.getChildren()]
         result.parent = parent
         return result
         
