@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # Copyright 2009 Martin Altmayer
 #
@@ -31,10 +30,7 @@ def run():
     app = QtGui.QApplication(sys.argv)
 
     # Import and initialize modules
-    from omg import database
-    database.connect()
-    from omg import tags
-    tags.updateIndexedTags()
+
     from omg import config, mpclient, search, control, constants
     search.init()
     from omg.gui import browser as browserModule

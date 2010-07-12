@@ -417,6 +417,9 @@ class ExternalFile(Node,FilelistMixin):
         if offset != 0:
             raise IndexError("Offset {0} is out of bounds".format(offset))
         return self
+    
+    def __str__(self):
+        return self.path
 
 
 class RootNode(Node,FilelistMixin,IndexMixin):
