@@ -15,7 +15,7 @@ from omg import constants
 _config = RawConfigParser()
 get = _config.get
 set = _config.set
-
+logger = logging.getLogger("config")
 def init(*config_files):
     """Set default options and overwrite them with the options in the given config files."""
     default_options = {
@@ -95,10 +95,15 @@ def init(*config_files):
 init(constants.CONFIG)
 
 
-shelve = shelveModule.open(constants.SHELVE)
+shelve = None
 
-def initShelve(shelve):
+def initShelve():
     """If the shelve does not contain a value for an option, store the default value."""
+    shelveDir = os.path.dirname(constants.SHELVE)
+    if not os.path.exists(shelveDir):
+        logger.info('creating shelve directory \'{0}\''.format(shelveDir))
+        os.makedirs(shelveDir)
+    shelve = shelveModule.open(constants.SHELVE)
     defaultOptions = {
         'widget_position': None, # center the window
         'widget_width': 800,
@@ -108,6 +113,7 @@ def initShelve(shelve):
     }
     for key,option in defaultOptions.items():
         if key not in shelve:
-            shelve[key] = option    
+            shelve[key] = option
+    return shelve 
 
-initShelve(shelve)
+shelve = initShelve()

@@ -6,7 +6,7 @@
 # it under the terms of the GNU General Public License version 3 as
 # published by the Free Software Foundation
 #
-import sys, os
+import sys, os, random
 from PyQt4 import QtCore, QtGui
 
 # Global variables. Only for debugging! Later there may be more than one browser, playlist, etc.
@@ -14,7 +14,12 @@ widget = None
 browser = None
 playlist = None
 controlWidget = None
-
+names = ['Organize Music by Groups',
+         'OMG is for Music Geeks',
+         'Overpowered Music GUI',
+         'Ordinary Musicplayers are Gay',
+         'OH -- MY -- GOD',
+         'Oh Maddin ... Grmpf' ]
 def run():
     # Switch first to the directory containing this file
     if os.path.dirname(__file__):
@@ -30,7 +35,7 @@ def run():
     database.connect()
     from omg import tags
     tags.updateIndexedTags()
-    from omg import config, mpclient, search, control
+    from omg import config, mpclient, search, control, constants
     search.init()
     from omg.gui import browser as browserModule
     from omg.gui import playlist as playlistModule
@@ -61,6 +66,7 @@ def run():
     control.synchronizePlaylist(playlist.getModel())
     
     widget.resize(config.shelve['widget_width'],config.shelve['widget_height'])
+    widget.setWindowTitle('OMG version {0} – {1}'.format(constants.VERSION, random.choice(names)))
     if config.shelve['widget_position'] is None: # Center the widget
         screen = QtGui.QDesktopWidget().screenGeometry()
         size =  widget.geometry()
