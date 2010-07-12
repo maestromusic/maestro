@@ -7,13 +7,17 @@
 # published by the Free Software Foundation
 #
 import os.path
+import urllib.request,urllib.parse,xml.dom.minidom
 import webbrowser
+import itertools
 
 from PyQt4 import QtCore,QtGui,QtNetwork
 from PyQt4.QtCore import Qt
 
-from omg import covers, config, constants, models
+from omg import covers, config, constants, models, tags
 from omg.gui import formatter, playlist
+
+LASTFM_API_KEY = 'b25b959554ed76058ac220b7b2e0a026'
 
 def enable():
     playlist.contextMenuProvider.append(getMenuEntries)
@@ -31,6 +35,16 @@ def getMenuEntries(playlist,node):
     return [action]
 
 
+class CoverData:
+    def __init__(self,cover,text):
+        coverSize = config.get("gui","cover_fetcher_cover_size")
+        self.cover = cover
+        self.text = text
+        if cover.width() > coverSize or cover.height() > coverSize:
+            self.scaled = cover.scaled(coverSize,coverSize,Qt.KeepAspectRatio,Qt.SmoothTransformation)
+        else: self.scaled = self.cover
+
+
 class CoverFetcher(QtGui.QDialog):
     def __init__(self,parent,elements):
         QtGui.QWidget.__init__(self,parent)
@@ -39,8 +53,7 @@ class CoverFetcher(QtGui.QDialog):
         assert len(elements) >= 1
         self.elements = elements
         self.elementIndex = -1 # self.nextElement will be called at the end of this constructor
-        self.covers = []
-        self.texts = []
+        self.coverData = []
         self.position = None
         self.requestId = None
         
@@ -55,15 +68,18 @@ class CoverFetcher(QtGui.QDialog):
         
         self.imageLabel = QtGui.QLabel(self)
         coverSize = config.get("gui","cover_fetcher_cover_size")
-        self.imageLabel.setMinimumSize(coverSize,coverSize)
-        self.imageLabel.setScaledContents(True)
+        self.imageLabel.setMinimumSize(coverSize+2,coverSize+2) # two pixels for the border
+        self.imageLabel.setSizePolicy(QtGui.QSizePolicy.Fixed,QtGui.QSizePolicy.Fixed)
+        self.imageLabel.setAlignment(Qt.AlignLeft|Qt.AlignTop)
         self.imageLabel.setFrameStyle(QtGui.QFrame.Box)
         leftLayout.addWidget(self.imageLabel)
     
         self.textLabel = QtGui.QLabel(self)
-        #self.textLabel.setMaximumWidth(coverSize)
+        self.textLabel.setSizePolicy(QtGui.QSizePolicy.Fixed,QtGui.QSizePolicy.Minimum)
+        self.textLabel.setMinimumWidth(coverSize+2) # two pixels for the border of self.imageLabel
+        self.textLabel.setMaximumWidth(coverSize+2)
+        self.textLabel.setTextFormat(Qt.PlainText)
         self.textLabel.setWordWrap(True)
-        self.textLabel.setFrameStyle(QtGui.QFrame.Box)
         leftLayout.addWidget(self.textLabel)
         
         bottomLeftLayout = QtGui.QHBoxLayout()
@@ -88,8 +104,9 @@ class CoverFetcher(QtGui.QDialog):
         bottomRightLayout1 = QtGui.QHBoxLayout()
         rightLayout.addLayout(bottomRightLayout1)
         
-        self.coverFetchButton = QtGui.QPushButton("Cover von Last.fm holen",self)
-        bottomRightLayout1.addWidget(self.coverFetchButton)
+        coverFetchButton = QtGui.QPushButton("Cover von Last.fm holen",self)
+        coverFetchButton.clicked.connect(self._handleLastFMCoverButton)
+        bottomRightLayout1.addWidget(coverFetchButton)
         lastfmLabel = LastFmLabel(self)
         bottomRightLayout1.addWidget(lastfmLabel)
         
@@ -143,9 +160,33 @@ class CoverFetcher(QtGui.QDialog):
         if not url.isValid():
             QtGui.QMessageBox(QtGui.QMessageBox.Warning,"Ungültige URL",
                               "Die eingegebene URL ist ungültig.",QtGui.QMessageBox.Ok,self).exec_()
-        else: self.loadFromURL(url,url.toString())
-        
-    def loadFromURL(self,url,text):
+        else: self.loadFromUrl(url,url.toString())
+    
+    def _handleLastFMCoverButton(self):
+        urls = []
+        element = self.elements[self.elementIndex]
+        for artist,album in itertools.product(element.tags[tags.get("artist")],element.tags[tags.ALBUM]):
+            lastFMUrl = 'http://ws.audioscrobbler.com/2.0/?method=album.getinfo&artist={0}&album={1}&api_key={2}'\
+                            .format(urllib.parse.quote(artist),urllib.parse.quote(album),LASTFM_API_KEY)
+            document = xml.dom.minidom.parseString(urllib.request.urlopen(lastFMUrl).read())
+            lfm = document.firstChild
+            if lfm.getAttribute('status') != 'ok':
+                continue
+            for albumNode in lfm.childNodes:
+                if isinstance(albumNode,xml.dom.minidom.Element) and albumNode.tagName == 'album':
+                    for node in albumNode.childNodes:
+                        if isinstance(node,xml.dom.minidom.Element) and node.tagName == 'image'\
+                                and node.getAttribute('size') == 'extralarge':
+                            urls.append(node.firstChild.data)
+        if len(urls) == 0:
+            QtGui.QMessageBox(QtGui.QMessageBox.Warning,"Fehler während der Coverabfrage",
+                              "Beim Abfragen des Covers ist ein Fehler aufgetreten. Vielleicht hat last.fm kein Cover"
+                            +" für dieses Album.",QtGui.QMessageBox.Ok,self).exec_()
+        else:
+            for url in urls:
+                self.loadFromUrl(QtCore.QUrl(url),"Cover von last.fm")
+
+    def loadFromUrl(self,url,text):
         if self.requestId is not None:
             return
         http = QtNetwork.QHttp(self)
@@ -170,33 +211,33 @@ class CoverFetcher(QtGui.QDialog):
                 return
         QtGui.QMessageBox(QtGui.QMessageBox.Warning,"Laden des Covers fehlgeschlagen",
                           "Das Laden des Covers ist fehlgeschlagen.",QtGui.QMessageBox.Ok,self).exec_()
-        
+    
     def addImage(self,image,text):
         assert(isinstance(image,QtGui.QPixmap))
-        self.covers.append(image)
-        self.texts.append("{0} - {1}x{2} Pixel".format(text,image.size().width(),image.size().height()))
+        text = "{0} - {1}x{2} Pixel".format(text,image.width(),image.height())
+        self.coverData.append(CoverData(image,text))
         if self.position is None:
             self.setPosition(0)
             self.nextButton.setEnabled(True)
             self.prevButton.setEnabled(True)
             self.saveButton.setEnabled(True)
-        self.numberLabel.setText("{0}/{1}".format(self.position+1,len(self.covers)))
+        self.numberLabel.setText("{0}/{1}".format(self.position+1,len(self.coverData)))
         self.adjustSize()
         
     def setPosition(self,position):
         self.position = position
         if position is not None:
-            self.imageLabel.setPixmap(self.covers[position])
-            self.textLabel.setText(self.texts[position])
-            self.numberLabel.setText("{0}/{1}".format(self.position+1,len(self.covers)))
+            self.imageLabel.setPixmap(self.coverData[position].scaled)
+            self.textLabel.setText(self.coverData[position].text)
+            self.numberLabel.setText("{0}/{1}".format(self.position+1,len(self.coverData)))
         
     def next(self):
         if self.position is not None:
-            self.setPosition((self.position + 1) % len(self.covers))
+            self.setPosition((self.position + 1) % len(self.coverData))
     
     def previous(self):
         if self.position is not None:
-            self.setPosition((self.position - 1) % len(self.covers))
+            self.setPosition((self.position - 1) % len(self.coverData))
     
     def clear(self):
         self.covers = []
@@ -221,7 +262,7 @@ class CoverFetcher(QtGui.QDialog):
         else: self.close()
         
     def save(self):
-        assert len(self.covers) > 0
+        assert len(self.coverData) > 0
         element = self.elements[self.elementIndex]
         if element.hasCover():
             if QtGui.QMessageBox(QtGui.QMessageBox.Question,"Datei überschreiben?",
@@ -229,7 +270,7 @@ class CoverFetcher(QtGui.QDialog):
                                  QtGui.QMessageBox.Yes|QtGui.QMessageBox.No,self).exec_() \
                      != QtGui.QMessageBox.Yes:
                 return
-        if not covers.setCover(element.id,self.covers[self.position]):
+        if not covers.setCover(element.id,self.coverData[self.position].cover):
             QtGui.QMessageBox(QtGui.QMessageBox.Warning,"Speichern fehlgeschlagen",
                               "Das Cover konnte nicht gespeichert werden.",
                               QtGui.QMessageBox.Ok,self).exec_()

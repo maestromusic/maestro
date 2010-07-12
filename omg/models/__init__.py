@@ -193,8 +193,13 @@ class Element(Node,FilelistMixin,IndexMixin):
             for element in self.contents:
                 element.loadContents(recursive,table)
 
+    def ensureContentsAreLoaded(self):
+        """Load contents if they are not loaded yet."""
+        if self.contents is None:
+            self.loadContents()
 
     def loadTags(self,recursive=False,tagList=None):
+        """Delete the stored indexed tags and load them from the database. If <recursive> is True, all tags from children of this node (recursively) will be loaded, too. If <tagList> is not None only tags in the given list will be loaded (e.g. only title-tags). Note that this method affects only indexed tags!"""
         self.tags = tags.Storage()
         
         if tagList is not None:
@@ -219,15 +224,22 @@ class Element(Node,FilelistMixin,IndexMixin):
                 element.loadTags(recursive,tagList)
     
     def ensureTagsAreLoaded(self):
-        """Load tags if they are not loaded yet."""
+        """Load indexed tags if they are not loaded yet."""
         if self.tags is None:
             self.loadTags()
-        
-    def ensureContentsAreLoaded(self):
-        """Load contents if they are not loaded yet."""
-        if self.contents is None:
-            self.loadContents()
     
+    def getOtherTags(self,cache=False):
+        """Load the tags which are not indexed from the database and return them. The result will be a tags.Storage mapping tag-names to lists of tag-values. If <cache> is True, the tags will be stored in this Element. Warning: Subsequent calls of this method will return the cached tags only if <cache> is again True."""
+        if cache and hasattr(self,'otherTags'):
+            return otherTags
+        result = db.query("SELECT tagname,value FROM othertags WHERE container_id = {0}".format(self.id))
+        otherTags = tags.Storage()
+        for row in result:
+            otherTags[tags.OtherTag(row[0])].append(row[1])
+        if cache:
+            self.otherTags = otherTags
+        return otherTags
+            
     def getLength(self):
         """Return the length of this element. If it is a container, return the sum of the lengths of all its contents. If the length can't be computed, None is returned. This happens for example if the contents have not been loaded yet."""
         if self.contents is None:
