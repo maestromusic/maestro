@@ -90,7 +90,7 @@ def init(*config_files):
             _config.set(section, key, value)
     
     _config.read(config_files)
-    logging.basicConfig(level=constants.LOGLEVELS[get("misc","loglevel")], format='%(levelname)s: in Module %(name)s: %(message)s')
+    #logging.basicConfig(level=constants.LOGLEVELS[get("misc","loglevel")], format='%(levelname)s: in Module %(name)s: %(message)s')
 
 init(constants.CONFIG)
 

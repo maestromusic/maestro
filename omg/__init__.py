@@ -13,7 +13,8 @@ import pickle
 import datetime
 import logging
 
-logging.basicConfig(level=constants.LOGLEVELS[config.get("misc","loglevel")], format='%(levelname)s: %(message)s')
+def initLogger():
+    logging.basicConfig(level=constants.LOGLEVELS[config.get("misc","loglevel")], format='%(levelname)s: %(message)s')
 
 class Container(dict):
     """Python representation of a Container, which is just a dictionary position->container that has an id, a name and tags."""
