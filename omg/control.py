@@ -23,7 +23,7 @@ status = None
 
 def createWidget(parent):
     """Create a ControlWidget and store a reference to it in this control.widget."""
-    from gui import control as controlwidget
+    from omg.gui import control as controlwidget
     globals()["widget"] = controlwidget.ControlWidget(parent)
     return widget
 
