@@ -107,13 +107,21 @@ class BrowserDelegate(abstractdelegate.AbstractDelegate):
                 else:
                     self.addLine(f.title(),"")
                 # Independent of the album problem above we list the artists which were not listed in parent containers.
-                self.addLine(f.tag(tags.get("composer"),True),"")
-                self.addLine(f.tag(tags.get("artist"),True),"")
+                self.addLine(f.tag(tags.get("composer"),True,self._getTags),"")
+                self.addLine(f.tag(tags.get("artist"),True,self._getTags),"")
             else:
                 coverSize = config.get("gui","browser_cover_size")
                 self.drawCover(coverSize,element)
                 
                 self.addLine(f.title(),"",BR_TITLE_STYLE)
                 self.addLine(f.album(),"",BR_ALBUM_STYLE)
-                self.addLine(f.tag(tags.get("composer"),True),"")
-                self.addLine(f.tag(tags.get("artist"),True),"")
+                self.addLine(f.tag(tags.get("composer"),True,self._getTags),"")
+                self.addLine(f.tag(tags.get("artist"),True,self._getTags),"")
+
+    def _getTags(self,node,tag):
+        """Return a list with the tag-values of the given tag of <node>. This function is submitted to Formatter.tag."""
+        if isinstance(node,models.Element):
+            return node.tags[tag]
+        elif isinstance(node,browser.ValueNode) and tag in node.valueIds:
+            return [node.value]
+        else: return []

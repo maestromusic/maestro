@@ -29,6 +29,7 @@ def getMenuEntries(playlist,node):
     """Provides an action for the playlist's context menu (confer playlist.contextMenuProvider). The action will only be enabled if at least one album is selected and in this case open a CoverFetcher-dialog for the selected albums."""
     action = QtGui.QAction("Cover holen...",playlist)
     elements = [playlist.model().data(index) for index in playlist.selectedIndexes()]
+    elements = [element for element in elements if isinstance(element,models.Element)]
     if len(elements) == 0:
         action.setEnabled(False)
     else: action.triggered.connect(lambda: CoverFetcher(QtGui.QApplication.activeWindow(),elements).open())

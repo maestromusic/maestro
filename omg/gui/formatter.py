@@ -19,13 +19,15 @@ class Formatter:
         """Create a formatter for the given element."""
         self.element = element
         
-    def tag(self,tag,removeParentTags=False):
-        """Return a string containing all values of the given tag in the element of this formatter. Depending on the tag the values will be separated either by ", " or by " - "."""
+    def tag(self,tag,removeParentTags=False,getTags=None):
+        """Return a string containing all values of the given tag in the element of this formatter. Depending on the tag the values will be separated either by ", " or by " - ". If removeParentTags is True all values of <tag> in parent containers of the current tree structure will be removed from the result. To fetch tag-values from a parent container the method <getTags> is used. The default function returns the tag-values of <tag> if the parent container is an Element and an empty list else, which is usually exactly what you want. But if your tree contains nodes not of type Element but still with tags, you must provide your own function to get those tags. <getTags> must take a node and <tag> and must return a list of tag-values."""
         if removeParentTags: # Filter away tags which appear in a parent container
-            values = self.element.tags[tag][:] # copy the list to avoid removing tags from the original container
+            if getTags is None:
+                getTags = self._getTags
+            values = list(getTags(self.element,tag)) # copy the list to avoid removing tags from the original container
             parent = self.element.getParent()
-            while isinstance(parent,models.Element):
-                for value in parent.tags[tag]:
+            while parent is not None:
+                for value in getTags(parent,tag):
                     if value in values:
                         values.remove(value)
                 parent = parent.getParent()
@@ -37,6 +39,12 @@ class Formatter:
         if tag == tags.DATE:
             return sep.join(date.strftime("%Y") for date in values)
         else: return sep.join(values)
+
+    def _getTags(self,node,tag):
+        """Help function for tag: Return the values of the given tag of <node> if <node> is an Element and an empty list otherwise."""
+        if isinstance(node,models.Element):
+            return node.tags[tag]
+        else: return []
         
     def title(self):
         """Return the title or some dummy-title if the element contains no title."""
