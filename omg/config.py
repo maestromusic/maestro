@@ -72,7 +72,10 @@ def init(*config_files):
             "max_browser_views": 5,
             
             # Order in which tags will be displayed. Must contain title and album! Tags which don't appear in this list will be displayed in arbitrary order after the tags in the list.
-            "tag_order": "title,album,composer,artist,performer,conductor,date,genre"
+            "tag_order": "title,album,composer,artist,performer,conductor,date,genre",
+            
+            # Application-specific MIME-type for drag and drop operations
+            "mime": "application/x-omgelementlist",
         },
         
         "misc": {

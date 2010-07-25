@@ -8,9 +8,11 @@
 #
 import difflib
 from PyQt4 import QtCore
+from PyQt4.QtCore import Qt
 
-from omg import database, mpclient, tags
-from . import rootedtreemodel, treebuilder, Node, Element, FilelistMixin, IndexMixin
+from omg import config, database, mpclient, tags
+from . import rootedtreemodel, treebuilder, mimedata
+from . import Node, Element, FilelistMixin, IndexMixin
 
 db = database.get()
 
@@ -71,6 +73,39 @@ class Playlist(rootedtreemodel.RootedTreeModel):
         """Stop synchronizing this playlist with MPD."""
         self.pathList = None
     
+    def flags(self,index):
+        defaultFlags = rootedtreemodel.RootedTreeModel.flags(self,index)
+        if index.isValid():
+            return defaultFlags | Qt.ItemIsDropEnabled | Qt.ItemIsDragEnabled
+        else: return defaultFlags | Qt.ItemIsDropEnabled
+    
+    def mimeTypes(self):
+        return [config.get("gui","mime")]
+    
+    def mimeData(self,indexes):
+        return mimedata.MimeData(self,indexes)
+        
+    def dropMimeData(self,mimeData,action,row,column,parentIndex):
+        if action == Qt.IgnoreAction:
+            return True
+
+        if not mimeData.hasFormat(config.get("gui","mime")) or column > 0:
+            return False
+        
+        if parentIndex.isValid():
+            parent = self.data(parentIndex)
+            if 0 <= row < parent.getChildrenCount():
+                offset = parent.getChildren()[row].getOffset()
+            else: offset = parent.getOffset()+parent.getFileCount() # at the end of parent
+        else:
+            parent = self.root
+            if 0 <= row < self.root.getChildrenCount():
+                offset = self.root.getChildren()[row].getOffset()
+            else: offset = len(self.pathList)
+        
+        self.insertElements(self.importElements(mimeData.retrieveData(config.get("gui","mime"))),offset)
+        return True
+        
     def _getFilteredOpcodes(self,a,b):
         """Helper method for synchronize: Use difflib.SequenceMatcher to retrieve a list of opCodes describing how to turn <a> into <b> and filter and improve it:
         - opCodes with 'equal'-tag are removed
@@ -98,7 +133,7 @@ class Playlist(rootedtreemodel.RootedTreeModel):
         """Synchronize with MPD: Change the playlist to match the given list of paths. <status> is the MPD-status and is used to synchronize the currently played song."""
         if self._syncLock:
             return
-            
+        
         if len(pathList) == 0 and len(self.contents) > 0:
             self.contents = []
             self.reset()
@@ -107,18 +142,20 @@ class Playlist(rootedtreemodel.RootedTreeModel):
                 if tag == 'delete':
                     del self.pathList[i1:i2]
                     self._removeFiles(self.root,i1,i2)
-                #~ elif tag == 'insert' # TODO
-                else: #TODO: This can be removed when handling of 'insert' is implemented
-                    self.pathList = pathList
-                    self.restructure() 
-                    break
+                    self.glue(self.root,i1)
+                elif tag == 'insert':
+                    self.pathList[i1:i1] = pathList[j1:j2]
+                    self._insertElements(self.root,[self._createItem(path) for path in pathList[j1:j2]],i1)
+                else: assert False # Opcodes are filtered to contain only 'delete' and 'insert'
             
             # Synchronize currently playing song
             if 'song' not in status:
                 if self.currentlyPlayingOffset is not None:
                     self.currentlyPlayingOffset = None
-                    index = self.getIndex(self.currentlyPlayingElement)
-                    self.dataChanged.emit(index,index)
+                    try:
+                        index = self.getIndex(self.currentlyPlayingElement)
+                        self.dataChanged.emit(index,index)
+                    except ValueError: pass # Probably the element was removed from the playlist
                     self.currentlyPlayingElement = None
             elif status['song'] != self.currentlyPlayingOffset:
                 oldElement = self.currentlyPlayingElement
@@ -126,8 +163,10 @@ class Playlist(rootedtreemodel.RootedTreeModel):
                 self.currentlyPlayingElement = self.root.getFileByOffset(status['song'])
                 # Update the new and the old song
                 if oldElement is not None:
-                    index = self.getIndex(oldElement)
-                    self.dataChanged.emit(index,index)
+                    try:
+                        index = self.getIndex(oldElement)
+                        self.dataChanged.emit(index,index)
+                    except ValueError: pass # Probably the element was removed from the playlist
                 index = self.getIndex(self.currentlyPlayingElement)
                 self.dataChanged.emit(index,index)
     
@@ -149,36 +188,39 @@ class Playlist(rootedtreemodel.RootedTreeModel):
         if not index.isValid():
             raise ValueError("Playlist.removeByQtIndex: Index is not valid.")
         
-        self._syncLock = True
-        element = self.data(index)
-        parentIndex = self.parent(index)
-        if parentIndex.isValid():
-            parent = self.data(parentIndex)
-            if parent.getChildrenCount() == 1:
-                # Instead of removing the only child, remove parent
-                self.removeByQtIndex(parentIndex)
-                return
-        else: parent = self.root
-                
-        # Update playlists
-        start = element.getOffset()
-        end = start+element.getFileCount()
-        mpclient.delete(start,end)
-        del self.pathList[start:end]
-        
-        # Update TreeModel
-        pos = parent.index(element)
-        self.beginRemoveRows(parentIndex,pos,pos)
-        del parent.contents[pos]
-        self.endRemoveRows()
-        self._syncLock = False
+        offset = self.data(index).getOffset()
+        self.removeFiles(offset,offset+1)
+        #~ self._syncLock = True
+        #~ element = self.data(index)
+        #~ parentIndex = self.parent(index)
+        #~ if parentIndex.isValid():
+            #~ parent = self.data(parentIndex)
+            #~ if parent.getChildrenCount() == 1:
+                #~ # Instead of removing the only child, remove parent
+                #~ self.removeByQtIndex(parentIndex)
+                #~ return
+        #~ else: parent = self.root
+                #~ 
+        #~ # Update playlists
+        #~ start = element.getOffset()
+        #~ end = start+element.getFileCount()
+        #~ mpclient.delete(start,end)
+        #~ del self.pathList[start:end]
+        #~ 
+        #~ # Update TreeModel
+        #~ pos = parent.index(element)
+        #~ self.beginRemoveRows(parentIndex,pos,pos)
+        #~ del parent.contents[pos]
+        #~ self.endRemoveRows()
+        #~ self._syncLock = False
         
     def removeFiles(self,start,end):
         """Remove the files with offsets <start>-<end> (without <end>!) from the playlist. Containers which are empty after removal are removed, too. <start> must be >= 0 and < self.root.getFileCount(), <end> must be > <start> and <= self.root.getFileCount(), or otherwise an IndexError is raised."""
         self._syncLock = True
+        self._removeFiles(self.root,start,end)
+        self.glue(self.root,start)
         mpclient.delete(start,end)
         del self.pathList[start:end]
-        self._removeFiles(self.root,start,end)
         self._syncLock = False
         
     def _removeFiles(self,element,start,end):
@@ -235,62 +277,21 @@ class Playlist(rootedtreemodel.RootedTreeModel):
             self._removeFiles(element.contents[aIndex],start-aOffset,aFileCount)
     
     def insertElements(self,elements,offset):
-        fileCount = len(self.pathList)
-        
+        assert self._syncLock == False
+
         if offset == -1:
-            offset = fileCount
-        
-        if offset < 0 or offset > fileCount:
-            raise IndexError("Offset {0} is out of bounds".format(offset))
+            offset = len(self.pathList)
+            
+        elements = elements[:]
         
         # Replace nodes with only one child by the child. This is necessary to be consistent with using the TreeBuilder with createOnlyChildren=False.
         for i in range(0,len(elements)):
             if elements[i].getChildrenCount() == 1:
                 elements[i] = elements[i].getChildren()[0]
-                
-        self._syncLock = True
         
-        if fileCount == 0:
-            leaves = elements
-            insertIndex = 0
-        elif offset == fileCount:
-            leaves = list(self.contents[-1].getAllFiles()) + elements
-            self.beginRemoveRows(QtCore.QModelIndex(),len(self.contents)-1,len(self.contents)-1)
-            del self.contents[-1]
-            self.endRemoveRows()
-            insertIndex = len(self.contents)
-        elif offset == 0:
-            leaves = elements + self.contents[0].getAllFiles()
-            insertIndex = 0
-            self.beginRemoveRows(QtCore.QModelIndex(),0,0)
-            del self.contents[0]
-            self.endRemoveRows()
-        else:
-            insertIndex,innerOffset = parent.getChildIndexAtOffset(offset)
-            child = parent.contents[insertIndex]
-            if innerOffset > 0: # We are trying to insert in the middle of an element:
-                leaves = list(child.getAllFiles())
-                leaves[innerOffset:innerOffset] = elements
-                self.beginRemoveRows(QtCore.QModelIndex(),insertIndex,insertIndex)
-                del self.contents[insertIndex]
-                self.endRemoveRows()
-            else: # We are inserting between to files
-                leaves = list(self.contents[insertIndex-1].getAllFiles())
-                leaves.extend(elements)
-                leaves.extend(self.contents[insertIndex].getAllFiles())
-                self.beginRemoveRows(QtCore.QModelIndex(),insertIndex-1,insertIndex)
-                del self.contents[insertIndex-1:insertIndex+1]
-                self.endRemoveRows()
-                insertIndex = insertIndex - 1 # The previous node was deleted
-            
-        treeBuilder = self._createTreeBuilder(leaves)
-        treeBuilder.buildParentGraph()
-        treeRoots = treeBuilder.buildTree(createOnlyChildren=False)
-        for root in treeRoots:
-            root.parent = self.root
-        self.beginInsertRows(QtCore.QModelIndex(),insertIndex,insertIndex+len(treeRoots)-1)
-        self.contents[insertIndex:insertIndex] = treeRoots
-        self.endInsertRows()
+        self._syncLock = True
+               
+        self._insertElements(self.root,elements,offset)
         
         # Update pathList
         for element in elements:
@@ -298,18 +299,82 @@ class Playlist(rootedtreemodel.RootedTreeModel):
             self.pathList[offset:offset] = pathList
             mpclient.insert(offset,pathList)
             offset = offset + len(pathList)
-        
         self._syncLock = False
+    
+    def _insertElements(self,parent,elements,offset):
+        #print("This is _insertElements for parent {0} at offset {1} and with elements {2}"
+            #.format(parent,offset,[str(element) for element in elements]))
+
+        fileCount = parent.getFileCount()
+        if offset == -1:
+            offset = fileCount
+
+        if offset < 0 or offset > fileCount:
+            raise IndexError("Offset {0} is out of bounds".format(offset))
         
+        treeBuilder = self._createTreeBuilder(elements)
+        treeBuilder.buildParentGraph()
+        treeRoots = treeBuilder.buildTree(createOnlyChildren=False)
+        
+        parent,insertIndex,insertOffset,split = self._getInsertInfo(treeBuilder,parent,offset)
+        #print("I am trying to {4}insert {0} elements at index {1}/offset {2} into {3}"
+        #         .format(len(treeRoots),insertIndex,insertOffset,parent,"split and " if split else ""))
+
+        if split:
+            if self.split(parent,insertOffset):
+                insertIndex = insertIndex + 1 # A new node has been created
+        
+        for root in treeRoots:
+            root.parent = parent
+
+        self.beginInsertRows(self.getIndex(parent),insertIndex,insertIndex+len(treeRoots)-1)
+        parent.contents[insertIndex:insertIndex] = treeRoots
+        self.endInsertRows()
+        
+        self.glue(parent,insertOffset)
+        self.glue(parent,insertOffset+sum(element.getFileCount() for element in elements))
+        
+        # Update the parent since the number of files in it will have changed
+        if parent is not self.root:
+            parentIndex = self.getIndex(parent)
+            self.dataChanged.emit(parentIndex,parentIndex)
+    
+    def _getInsertInfo(self,treeBuilder,parent,offset):
+        #print("This is _getInsertInfo for parent {0} at offset {1}".format(parent,offset))
+
+        if not parent.hasChildren():
+            return parent,0,0,False
+            
+        insertIndex,innerOffset = parent.getChildIndexAtOffset(offset)
+        if insertIndex is None: # insertOffset points to the end of parent
+            child = parent.getChildren()[-1]
+            insertIndex = parent.getChildrenCount()
+            innerOffset = child.getFileCount()
+            split = False
+        else:
+            child = parent.getChildren()[insertIndex]
+            # Don't split if offset points to the start of parent
+            split = innerOffset != 0
+        # If the elements which should be inserted fit all into child, then use child as parent
+        if treeBuilder.containsAll(child):
+            return self._getInsertInfo(treeBuilder,child,innerOffset)
+        else: return parent,insertIndex,offset,split
+            
     def split(self,element,offset):
-        """Split <element> at the given offset. This method will ensure, that element has a child starting at offset <offset>. Note that this method does not change the flat playlist, but only the tree-structure.
+        """Split <element> at the given offset. This method will ensure, that element has a child starting at offset <offset>. Note that this method does not change the flat playlist, but only the tree-structure. Split will return True if and only if a new node was created.
         
         Example: Assume <element> contains a container which contains 10 files. After splitting <element> at offset 5, <element> will contain two copys of the container, containing the files 0-4 and 5-9, respectively.
         """
+        fileCount = element.getFileCount()
+        if offset < 0 or offset > fileCount:
+            raise IndexError("Offset {0} is out of bounds.".format(offset))
+        if offset == 0 or offset == fileCount:
+            return False # Nothing to split here
+        
         index,innerOffset = element.getChildIndexAtOffset(offset)
         child = element.contents[index]
         if innerOffset == 0: # child starts at the given offset, so we there is no need to split
-            return
+            return False
         newChild = PlaylistElement(child.id,self._splitHelper(child,innerOffset),child.tags)
         for c in newChild.contents:
             c.parent = newChild
@@ -317,6 +382,7 @@ class Playlist(rootedtreemodel.RootedTreeModel):
         self.beginInsertRows(self.getIndex(element),index+1,index+1)
         element.contents.insert(index+1,newChild)
         self.endInsertRows()
+        return True
         
     def _splitHelper(self,element,offset):
         """Helper for the split-Algorithm: Crop <element> to contain only the files before the given offset and return a tree containing the remaining children. If <element> contains a child starting at <offset>, this method will remove that child and all further children from <element> and return the removed children as list. Otherwise the method will copy the child containing <offset>, crop the original and insert the removed nodes in the copy. It will return the copy together with all further children."""
@@ -341,32 +407,61 @@ class Playlist(rootedtreemodel.RootedTreeModel):
             self.endRemoveRows()
             return result
     
-    #~ def glue(self,parent,index):
-        #~ if index <= 0 or index >= len(parent.getContents())
-            #~ raise IndexError("Index {0} is out of bounds. Note that you cannot glue at index 0 and getChildrenCount().")
-            #~ 
-        #~ child1 = parent.contents[index-1]
-        #~ child2 = parent.contents[index]
-        #~ 
-        #~ if child1.id == child2.id:
-            #~ newIndex = child2.getChildrenCount()
-            #~ 
-            #~ // move all elements from child2 into child1 (update parents, beginInsertRows)
-            #~ 
-            #~ self.beginRemoveRows(self.getIndex(parent),index,index)
-            #~ 
-            #~ # Recursive call to glue the (former) contents of child2 with their new neighbors in child1
-            #~ self.glue(child1,newIndex)
-        #~ else:
-            #~ parents1 = child1.getParentIds()
-            #~ parents2 = child2.getParentIds()
+    def glue(self,parent,offset):
+        #print("This is glue for parent {0} at offset {1}".format(parent,offset))
+        fileCount = parent.getFileCount()
+        if offset < 0 or offset > fileCount:
+            raise IndexError("Offset {0} is out of bounds.".format(offset))
         
+        if offset == 0 or offset == fileCount:
+            return # There is nothing to glue at this positions
+        
+        prevIndex,prevOffset = parent.getChildIndexAtOffset(offset-1)
+        nextIndex,nextOffset = parent.getChildIndexAtOffset(offset)
+        prev = parent.getChildren()[prevIndex]
+        next = parent.getChildren()[nextIndex]
+        
+        if isinstance(prev,ExternalFile) or isinstance(next,ExternalFile):
+            return
+        if prev.isFile() and next.isFile():
+            return
+            
+        if prev is next: # Let next handle this
+            self.glue(next,nextOffset)
+        elif prev.id == next.id:
+            prevFileCount = prev.getFileCount()
+            self.beginRemoveRows(self.getIndex(parent),nextIndex,nextIndex)
+            del parent.getChildren()[nextIndex]
+            self.endRemoveRows()
+            for element in next.getChildren():
+                element.parent = prev
+            self.beginInsertRows(self.getIndex(prev),prev.getChildrenCount(),
+                                 prev.getChildrenCount()+next.getChildrenCount()-1)
+            prev.getChildren().extend(next.getChildren())
+            self.endInsertRows()
+            self.glue(prev,prevFileCount) # glue just before the files which were just copied
+        else:
+            prevParents = prev.getParentIds(True)
+            nextParents = next.getParentIds(True)
+            if prev.id in nextParents:
+                self.beginRemoveRows(self.getIndex(parent),nextIndex,nextIndex)
+                del parent.getChildren()[nextIndex]
+                self.endRemoveRows()
+                self._insertElements(prev,[next],-1)
+            elif next.id in prevParents:
+                self.beginRemoveRows(self.getIndex(parent),prevIndex,prevIndex)
+                del parent.getChildren()[prevIndex]
+                self.endRemoveRows()
+                self._insertElements(next,[prev],0)
+            else: pass # TODO: If prev and next are files with a common parent we should group them into this parent
+    
     def importElements(self,elements):
         return [self._importElement(element,None) for element in elements]
         
     def _importElement(self,element,parent):
         result = PlaylistElement(element.id,None)
         result.loadTags()
+        assert element.getChildren() is not None
         result.contents = [self._importElement(child,result) for child in element.getChildren()]
         result.parent = parent
         return result

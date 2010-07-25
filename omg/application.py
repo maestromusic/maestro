@@ -18,7 +18,8 @@ names = ['Organize Music by Groups',
          'Overpowered Music GUI',
          'Ordinary Musicplayers are Gay',
          'OH -- MY -- GOD',
-         'Oh Maddin ... Grmpf' ]
+         'Oh Maddin ... Grmpf',
+         'Oh Michael ... Grmpf'  ]
 def run():
     # Switch first to the directory containing this file
     if os.path.dirname(__file__):

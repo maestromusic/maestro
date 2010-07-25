@@ -18,9 +18,8 @@ class Formatter:
     def __init__(self,element):
         """Create a formatter for the given element."""
         self.element = element
-        
-    def tag(self,tag,removeParentTags=False,getTags=None):
-        """Return a string containing all values of the given tag in the element of this formatter. Depending on the tag the values will be separated either by ", " or by " - ". If removeParentTags is True all values of <tag> in parent containers of the current tree structure will be removed from the result. To fetch tag-values from a parent container the method <getTags> is used. The default function returns the tag-values of <tag> if the parent container is an Element and an empty list else, which is usually exactly what you want. But if your tree contains nodes not of type Element but still with tags, you must provide your own function to get those tags. <getTags> must take a node and <tag> and must return a list of tag-values."""
+    
+    def tagValues(self,tag,removeParentTags=False,getTags=None):
         if removeParentTags: # Filter away tags which appear in a parent container
             if getTags is None:
                 getTags = self._getTags
@@ -31,8 +30,12 @@ class Formatter:
                     if value in values:
                         values.remove(value)
                 parent = parent.getParent()
-        else: values = self.element.tags[tag]
-
+            return values
+        else: return self.element.tags[tag]
+        
+    def tag(self,tag,removeParentTags=False,getTags=None):
+        """Return a string containing all values of the given tag in the element of this formatter. Depending on the tag the values will be separated either by ", " or by " - ". If removeParentTags is True all values of <tag> in parent containers of the current tree structure will be removed from the result. To fetch tag-values from a parent container the method <getTags> is used. The default function returns the tag-values of <tag> if the parent container is an Element and an empty list else, which is usually exactly what you want. But if your tree contains nodes not of type Element but still with tags, you must provide your own function to get those tags. <getTags> must take a node and <tag> and must return a list of tag-values."""
+        values = self.tagValues(tag,removeParentTags,getTags)
         if tag == tags.TITLE or tag == tags.ALBUM:
             sep = " - "
         else: sep = ", "
@@ -58,7 +61,7 @@ class Formatter:
     def album(self):
         """Return a string containing the album names, but if the element is an album itself or is contained in an album, remove it from the list. If you just want the album tags, use Formatter.tag(tags.ALBUM)."""
         if tags.ALBUM in self.element.tags: # There is at least one album
-            albums = list(self.element.tags[tags.ALBUM]) # copy the list
+            albums = self.tagValues(tags.ALBUM,True)
 
             if self.element.isContainer():
                 # In the first iteration check whether the element is an album itself. Don't do this for files as it is quite common to have a song with the same name as its album.
@@ -66,7 +69,9 @@ class Formatter:
             else: parent = self.element.getParent()
             while isinstance(parent,models.Element):
                 for title in parent.tags[tags.TITLE]:
-                    albums.remove(title)
+                    try:
+                        albums.remove(title)
+                    except ValueError: pass
                 parent = parent.getParent()
             return " - ".join(albums)       
         return ""    
@@ -79,7 +84,10 @@ class Formatter:
     
     def length(self):
         """Return the formatted length of the element."""
-        return strutils.formatLength(self.element.getLength())
+        length = self.element.getLength()
+        if length is not None:
+            return strutils.formatLength(self.element.getLength())
+        else: return ""
 
     def files(self):
         """Return the formatted number of files in the element."""

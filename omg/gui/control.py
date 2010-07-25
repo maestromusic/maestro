@@ -77,10 +77,12 @@ class ControlWidget(QtGui.QWidget):
         secondLine.addWidget(self.volumeSlider)
         
         #TODO: This button just helps debugging
-        from omg import test
-        testButton = QtGui.QPushButton("Test")
-        testButton.clicked.connect(test.test)
-        secondLine.addWidget(testButton)
+        try:
+            from omg import test
+            testButton = QtGui.QPushButton("Test")
+            testButton.clicked.connect(test.test)
+            secondLine.addWidget(testButton)
+        except ImportError: pass # omg/test.py was not found
 
 
     def setStatus(self,status):

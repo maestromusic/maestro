@@ -81,7 +81,9 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
         return self.createIndex(row,column,child)
         
     def flags(self,index):
-        if not index.isValid(): # should not happen
+        # may happen during drag and drop
+        # http://doc.trolltech.com/4.4/model-view-dnd.html#enabling-drag-and-drop-for-items
+        if not index.isValid(): 
             return Qt.ItemIsEnabled;
         else: return Qt.ItemIsEnabled | Qt.ItemIsSelectable
     
