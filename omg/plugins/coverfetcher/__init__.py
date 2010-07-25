@@ -151,7 +151,7 @@ class CoverFetcher(QtGui.QDialog):
                               "Die Datei konnte nicht geöffnet werden.",QtGui.QMessageBox.Ok,self).exec_()
         else:
             self.addImage(image,fileName)
-            self.setPosition(len(self.covers)-1)
+            self.setPosition(len(self.coverData)-1)
     
     def _handleUrlCoverButton(self):
         url,ok = QtGui.QInputDialog.getText(self,"URL öffnen","Geben Sie die URL des Covers ein:")
@@ -208,7 +208,7 @@ class CoverFetcher(QtGui.QDialog):
             image = QtGui.QPixmap()
             if image.loadFromData(buffer.buffer()):
                 self.addImage(image,text)
-                self.setPosition(len(self.covers)-1)
+                self.setPosition(len(self.coverData)-1)
                 return
         QtGui.QMessageBox(QtGui.QMessageBox.Warning,"Laden des Covers fehlgeschlagen",
                           "Das Laden des Covers ist fehlgeschlagen.",QtGui.QMessageBox.Ok,self).exec_()
@@ -241,8 +241,7 @@ class CoverFetcher(QtGui.QDialog):
             self.setPosition((self.position - 1) % len(self.coverData))
     
     def clear(self):
-        self.covers = []
-        self.texts = []
+        self.coverData = []
         self.nextButton.setEnabled(False)
         self.prevButton.setEnabled(False)
         self.saveButton.setEnabled(False)
