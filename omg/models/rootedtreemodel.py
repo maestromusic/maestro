@@ -33,12 +33,12 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
         self.root = root
         self.reset()
         
-    def data(self,index,role=Qt.ItemDataRole):
+    def data(self,index,role=Qt.EditRole):
         if not index.isValid():
             return None
         if role == Qt.DisplayRole:
             return str(index.internalPointer())
-        if role == Qt.ItemDataRole:
+        if role == Qt.EditRole:
             return index.internalPointer()
         return None
     
@@ -76,7 +76,8 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
             return QtCore.QModelIndex()
         if not parent.isValid():
             parent = self.root
-        else: parent = parent.internalPointer()
+        else:
+            parent = parent.internalPointer()
         child = parent.getChildren()[row]
         return self.createIndex(row,column,child)
         
@@ -87,8 +88,7 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
     
     def createIndex(self,row,column,internalPointer):
         if not isinstance(internalPointer,Node):
-            print(internalPointer.__class__)
-            raise TypeError("Internal pointers in a RootedTreeModel must be subclasses of Node")
+            raise TypeError("Internal pointers in a RootedTreeModel must be subclasses of Node, but got {}".format(type(internalPointer)))
         return QtCore.QAbstractItemModel.createIndex(self,row,column,internalPointer)
         
     def getIndex(self,node):

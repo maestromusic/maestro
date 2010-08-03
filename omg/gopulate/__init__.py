@@ -7,12 +7,14 @@ Created on 06.07.2010
 
 import sys, os
 from PyQt4 import QtCore, QtGui
+from PyQt4.QtCore import Qt
 import omg.models
-from . import gui
+from omg.gopulate import gui
 from omg import config, realfiles
 import logging
 import omg.database.queries as queries
 from omg.models import rootedtreemodel
+from functools import reduce
 
 logger = logging.getLogger('gopulate')
 
@@ -50,6 +52,22 @@ class GopulateAlbum(omg.models.Node):
         self.contents = []
         for i in sorted(self.tracks.keys()):
             self.contents.append(self.tracks[i])
+        self.commonTags = reduce(lambda x,y: x & y, [set(tr.tags.keys()) for tr in self.contents]) - set(["tracknumber","title"])
+        self.commonTagValues = {}
+        differentTags=set()
+        for file in self.contents:
+            tags = file.tags
+            for tag in self.commonTags:
+                if tag not in self.commonTagValues:
+                    self.commonTagValues[tag] = tags[tag]
+                if self.commonTagValues[tag] != tags[tag]:
+                    differentTags.add(tag)
+        self.sameTags = self.commonTags - differentTags
+        self.tags = { tag:self.commonTagValues[tag] for tag in self.sameTags }
+    
+    # Ensure that the album has a title-tag...before changing album.name to contain artists/composers
+        self.tags['title'] = self.contents[0].tags['album'][0]
+        
             
         
 class FileSystemFile(omg.models.Element):
@@ -101,6 +119,24 @@ class GopulateTreeModel(rootedtreemodel.RootedTreeModel):
             el.parent = root
         self.setRoot(root)
         
+    def flags(self, index):
+        if not index.isValid():
+            return Qt.ItemIsEnabled
+        return rootedtreemodel.RootedTreeModel.flags(self,index) | Qt.ItemIsEditable
+    
+    def setData(self, index, value, role):
+        if index.isValid() and role == Qt.EditRole:
+            elem = index.internalPointer()
+            if type(elem) == FileSystemFile:
+                elem.tags['edit'] = value
+            elif type(elem) == GopulateAlbum:
+                elem.name = value
+            else:
+                print(type(elem))
+            self.dataChanged.emit(index,index)
+            return True
+        return False
+        
 def findNewAlbums(path):
     """Generator function which tries to find albums in the filesystem tree.
     
@@ -148,10 +184,10 @@ def findNewAlbums(path):
 
 def run(popdirs):
     # Switch first to the directory containing this file
-    if os.path.dirname(__file__):
-        os.chdir(os.path.dirname(__file__))
-    # And then one directory above
-    os.chdir("../")
+#    if os.path.dirname(__file__):
+#        os.chdir(os.path.dirname(__file__))
+#    # And then one directory above
+#    os.chdir("../../")
     
     # Some Qt-classes need a running QApplication before they can be created
     app = QtGui.QApplication(sys.argv)
