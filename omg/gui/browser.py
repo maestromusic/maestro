@@ -91,6 +91,7 @@ class BrowserTreeView(QtGui.QTreeView):
         self.doubleClicked.connect(self._handleDoubleClicked)
         self.setAlternatingRowColors(True)
         self.setSelectionMode(QtGui.QAbstractItemView.ExtendedSelection)
+        self.setDragEnabled(True)
         
         palette = QtGui.QPalette()
         palette.setColor(QtGui.QPalette.Base,QtGui.QColor(0xE9,0xE9,0xE9))
@@ -114,3 +115,5 @@ class BrowserTreeView(QtGui.QTreeView):
         node = self.model().data(index)
         if isinstance(node,models.Element):
             control.playlist.insertElements(control.playlist.importElements([node]),-1)
+        elif isinstance(node,browsermodel.CriterionNode):
+            control.playlist.insertElements(control.playlist.importElements(node.getElements()),-1)

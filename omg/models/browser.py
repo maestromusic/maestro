@@ -6,8 +6,13 @@
 # it under the terms of the GNU General Public License version 3 as
 # published by the Free Software Foundation
 #
-from omg import models, search, database
-from omg.models import rootedtreemodel
+import itertools
+
+from PyQt4 import QtCore
+from PyQt4.QtCore import Qt
+
+from omg import config, models, search, database
+from omg.models import rootedtreemodel, mimedata
 
 class BrowserModel(rootedtreemodel.RootedTreeModel):
     """Model for a BrowserTreeView."""
@@ -41,6 +46,18 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
         """Reset the model."""
         self._loadLayer(self.root)
         rootedtreemodel.RootedTreeModel.reset(self)
+    
+    def flags(self,index):
+        defaultFlags = rootedtreemodel.RootedTreeModel.flags(self,index)
+        if index.isValid():
+            return defaultFlags | Qt.ItemIsDragEnabled
+        else: return defaultFlags
+    
+    def mimeTypes(self):
+        return [config.get("gui","mime")]
+    
+    def mimeData(self,indexes):
+        return mimedata.MimeData(self,indexes)
         
     def _loadLayer(self,node):
         """Load the contents of <node>, which must be either root or a CriterionNode (The contents of Elements are loaded via Element.loadContents)."""
@@ -154,6 +171,14 @@ class CriterionNode(models.Node):
         if self.contents is None:
             self.model._loadLayer(self)
         return self.contents
+
+    def getElements(self):
+        """Return all elements (container and files) contained in this CriterionNode."""
+        if self.contents is None:
+            self.model._loadLayer(self)
+        # Add either the node or invoke getElements recursively
+        return itertools.chain(*[[node] if isinstance(node,models.Element)
+                                 else node.getElements() for node in self.contents])
 
 
 class ValueNode(CriterionNode):

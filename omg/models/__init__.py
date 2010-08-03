@@ -113,12 +113,16 @@ class FilelistMixin:
             if offset < cOffset + fileCount:
                 return i,offset-cOffset
             else: cOffset = cOffset + fileCount
+        if offset == cOffset:
+            return None,None
         raise IndexError("Offset {0} is out of bounds".format(offset))
     
     def getChildAtOffset(self,offset):
-        """Return the child containing the file with the given (relative) offset, and the offset of that file relative to the child. This is a convenience-method for getChildren()[getChildIndexAtOffset(offset)]. Confer getChildIndexAtOffset."""
+        """Return the child containing the file with the given (relative) offset, and the offset of that file relative to the child. This is a convenience-method for getChildren()[getChildIndexAtOffset(offset)[0]]. Confer getChildIndexAtOffset."""
         index,innerOffset = self.getChildIndexAtOffset(offset)
-        return self.getChildren()[index],innerOffset
+        if index is None:
+            return None,None
+        else: return self.getChildren()[index],innerOffset
 
 
 class IndexMixin:
