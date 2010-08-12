@@ -6,10 +6,14 @@
 # it under the terms of the GNU General Public License version 3 as
 # published by the Free Software Foundation
 #
-import sys, getopt
+import os, sys, getopt
 from omg import application, constants
 
 if __name__=="__main__":
+    if os.path.dirname(__file__):
+        os.chdir(os.path.dirname(__file__))
+        # And then one directory above
+        os.chdir("../")
     pop = False
     opts, args = getopt.getopt(sys.argv[1:],
         "pVv:",
@@ -23,6 +27,8 @@ if __name__=="__main__":
         elif opt in ('-p', '--populate'):
             pop = True
     if pop:
+        from omg import config
+        config.init(application.optionsOverride)
         from omg import database
         database.connect()
         from omg import tags

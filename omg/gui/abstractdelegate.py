@@ -115,7 +115,7 @@ class AbstractDelegate(QtGui.QStyledItemDelegate):
                 context.painter.translate(coverSize+self.hSpace,0)
                 context.rect = QtCore.QRect(0,0,context.rect.width()-coverSize-self.hSpace,context.rect.height())
         
-    def addLine(self,text1,text2,style1=STD_STYLE,style2=None):
+    def addLine(self,text1,text2="",style1=STD_STYLE,style2=None):
         """Add a line with one or two texts. <text1> will be aligned left, <text2> will be aligned right. Via the optional parameters <style1> and <style2> you may specify DelegateStyles which will be used for <text1> and <text2>, respectively. Note that <style1> defaults to abstractdelegate.STD_STYLE and <style2> defaults to None, which means that <style1> is used for both texts."""
         assert isinstance(text1,str) and isinstance(text2,str)
         
