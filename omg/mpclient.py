@@ -9,6 +9,10 @@
 import mpd
 from omg import database, config
 
+class CommandError(Exception):
+    def __init__(self,message):
+        self.message = message
+
 db = database.get()
 client = mpd.MPDClient()
 client.connect(config.get("mpd","host"),config.get("mpd","port"))
@@ -18,7 +22,10 @@ for name in ("play","pause","stop","next","previous","clear","seek","setvol","vo
     globals()[name] = getattr(client,name)
 
 def status():
-    status = client.status()
+    try:
+        status = client.status()
+    except mpd.CommandError as e:
+        raise CommandError(e.message)
     #~ from pprint import PrettyPrinter
     #~ pp = PrettyPrinter(indent=4)
     #~ pp.pprint(status)
@@ -29,15 +36,21 @@ def status():
 
 def insert(offset,paths):
     for path in paths:
-        client.add(path)
-        client.move(int(client.status()['playlistlength'])-1,offset)
-        offset = offset + 1
-        
+        try:
+            client.add(path)
+            client.move(int(client.status()['playlistlength'])-1,offset)
+            offset = offset + 1
+        except mpd.CommandError:
+            raise CommandError("File could not be added to MPD. Maybe it is not in MPD's database?")
+            
 def delete(start,end=None):
     if end is None:
         end = start + 1
     for i in range(start,end):
-        client.delete(start) # Always delete start since the indices will decrease
+        try:
+            client.delete(start) # Always delete start since the indices will decrease
+        except mpd.CommandError as e:
+            raise CommandError(e.message)
         
 class Time:
     """Class representing time of current song."""

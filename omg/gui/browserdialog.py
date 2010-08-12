@@ -40,8 +40,8 @@ class BrowserDialog(QtGui.QDialog):
         self.setLayout(layout)
         
         topLayout = QtGui.QHBoxLayout()
-        topLayout.addWidget(QtGui.QLabel("Anzahl der Views: ",self))
-        spinBox = QtGui.QSpinBox(self)
+        topLayout.addWidget(QtGui.QLabel("Anzahl der Views: "))
+        spinBox = QtGui.QSpinBox()
         spinBox.setRange(1,5)
         spinBox.setValue(len(self.browser.views))
         spinBox.valueChanged.connect(self._handleValueChanged)
@@ -59,10 +59,10 @@ class BrowserDialog(QtGui.QDialog):
         layout.addLayout(bottomLayout)
         
         bottomLayout.addStretch(1)
-        abortButton = QtGui.QPushButton("Abbrechen",self)
+        abortButton = QtGui.QPushButton("Abbrechen")
         abortButton.clicked.connect(self.close)
         bottomLayout.addWidget(abortButton)
-        okButton = QtGui.QPushButton("OK",self)
+        okButton = QtGui.QPushButton("OK")
         okButton.clicked.connect(self._handleOk)
         bottomLayout.addWidget(okButton)
         

@@ -10,7 +10,7 @@ import sys
 import os
 import logging
 
-logger = logging.getLogger("plugins")
+logger = logging.getLogger("omg.plugins")
 
 # Directory containing the plugins
 PLUGIN_DIR = "omg/plugins/"
@@ -40,19 +40,24 @@ def loadPlugins():
         
 def enablePlugin(pluginName):
     """Enable the plugin with the given name. If it has not yet been imported, import it."""
-    assert pluginName not in enabledPlugins
-    if pluginName not in loadedPlugins:
-        logger.info("Loading plugin '{0}'...".format(pluginName))
-        loadedPlugins[pluginName] = getattr(__import__("omg.plugins",fromlist=[pluginName]),pluginName)
-    else: logger.info("Enabling plugin '{0}'...".format(pluginName))
-    loadedPlugins[pluginName].enable()
-    enabledPlugins.append(pluginName)
+    if pluginName in enabledPlugins:
+        logger.warning("Tried to enable a plugin that was already enabled.")
+    else:
+        if pluginName not in loadedPlugins:
+            logger.info("Loading plugin '{}'...".format(pluginName))
+            loadedPlugins[pluginName] = getattr(__import__("omg.plugins",fromlist=[pluginName]),pluginName)
+        else: logger.info("Enabling plugin '{}'...".format(pluginName))
+        loadedPlugins[pluginName].enable()
+        enabledPlugins.append(pluginName)
 
 def disablePlugin(pluginName):
     """Disable the plugin with the given name."""
-    assert pluginName in enabledPlugins
-    loadedPlugins[pluginName].disable()
-    enabledPlugins.remove(pluginName)
+    if pluginName not in enabledPlugins:
+        logger.warning("Tried to disable a plugin that was not enabled.")
+    else:
+        logger.info("Disabling plugin '{}'...".format(pluginName))
+        loadedPlugins[pluginName].disable()
+        enabledPlugins.remove(pluginName)
     
 def teardown():
     """Tear down all plugins. This will invoke plugin.teardown on all currently enabled plugins that implement the teardown-method."""

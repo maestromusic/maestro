@@ -7,9 +7,7 @@
 # published by the Free Software Foundation
 #
 import sys, getopt
-import omg
-from omg import application
-from omg import config,constants # loads config from file
+from omg import application, constants
 
 if __name__=="__main__":
     pop = False
@@ -21,15 +19,14 @@ if __name__=="__main__":
             print('This is OMG version {}. Nice to meet you.'.format(constants.VERSION))
             sys.exit(0)
         elif opt in ('-v', '--loglevel'):
-            config.set('misc','loglevel',arg)
+            application.optionsOverride['log'] = {'consoleLogLevel': arg}
         elif opt in ('-p', '--populate'):
             pop = True
-    omg.initLogger()
-    from omg import database
-    database.connect()
-    from omg import tags
-    tags.updateIndexedTags()
     if pop:
+        from omg import database
+        database.connect()
+        from omg import tags
+        tags.updateIndexedTags()
         import omg.gopulate
         if args:
             popdirs = args

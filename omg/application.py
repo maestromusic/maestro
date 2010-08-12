@@ -5,7 +5,8 @@
 # it under the terms of the GNU General Public License version 3 as
 # published by the Free Software Foundation
 #
-import sys, os, random
+import sys, os, random, logging, io
+import logging.config
 from PyQt4 import QtCore, QtGui
 
 # Global variables. Only for debugging! Later there may be more than one browser, playlist, etc.
@@ -20,6 +21,9 @@ names = ['Organize Music by Groups',
          'OH -- MY -- GOD',
          'Oh Maddin ... Grmpf',
          'Oh Michael ... Grmpf'  ]
+
+optionsOverride = {}
+
 def run():
     # Switch first to the directory containing this file
     if os.path.dirname(__file__):
@@ -27,12 +31,21 @@ def run():
     # And then one directory above
     os.chdir("../")
     
+    # Initialize config and logging
+    from omg import config
+    config.init(optionsOverride)
+    
+    logging.getLogger("omg").debug("START")
+    
     # Some Qt-classes need a running QApplication before they can be created
     app = QtGui.QApplication(sys.argv)
 
     # Import and initialize modules
-
-    from omg import config, mpclient, search, control, constants
+    from omg import database
+    database.connect()
+    from omg import tags
+    tags.updateIndexedTags()
+    from omg import mpclient, search, control, constants
     search.init()
     from omg.gui import browser as browserModule
     from omg.gui import playlist as playlistModule
@@ -78,6 +91,7 @@ def run():
     config.shelve['widget_height'] = widget.height()
     plugins.teardown()
     config.shelve.close()
+    logging.shutdown()
     sys.exit(returnValue)
 
 if __name__ == "__main__":

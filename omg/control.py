@@ -6,6 +6,8 @@
 # it under the terms of the GNU General Public License version 3 as
 # published by the Free Software Foundation
 #
+import logging
+
 from PyQt4.QtCore import QTimer
 from . import config, mpclient
 
@@ -21,8 +23,10 @@ _timer = QTimer()
 # Status of MPD
 status = None
 
+logger = logging.getLogger("omg.control")
+
 def createWidget(parent):
-    """Create a ControlWidget and store a reference to it in this control.widget."""
+    """Create a ControlWidget and store a reference to it in control.widget."""
     from omg.gui import control as controlwidget
     globals()["widget"] = controlwidget.ControlWidget(parent)
     return widget
@@ -51,6 +55,11 @@ def _sync():
     global status
     if _timer.interval() >= 1000: #TODO: Remove this debugging feature
         print("Control: Syncing with MPD")
-    status = mpclient.status()
-    widget.setStatus(status)
-    playlist.synchronize(mpclient.playlist(),status)
+    try:
+        status = mpclient.status()
+        widget.setStatus(status)
+        playlist.synchronize(mpclient.playlist(),status)
+    except mpclient.CommandError as e:
+        logger.critical("Synchronization with MPD failed and was stopped. Error Message: "+e.message())
+        stopSynchronization()
+        status = None
