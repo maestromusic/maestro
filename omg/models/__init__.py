@@ -235,7 +235,7 @@ class Element(Node,FilelistMixin,IndexMixin):
     def getOtherTags(self,cache=False):
         """Load the tags which are not indexed from the database and return them. The result will be a tags.Storage mapping tag-names to lists of tag-values. If <cache> is True, the tags will be stored in this Element. Warning: Subsequent calls of this method will return the cached tags only if <cache> is again True."""
         if cache and hasattr(self,'otherTags'):
-            return otherTags
+            return self.otherTags
         result = db.query("SELECT tagname,value FROM othertags WHERE container_id = {0}".format(self.id))
         otherTags = tags.Storage()
         for row in result:

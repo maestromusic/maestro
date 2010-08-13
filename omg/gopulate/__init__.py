@@ -9,12 +9,12 @@ import sys, os
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 import omg.models
-from omg.gopulate import gui
 from omg import config, realfiles
 import logging
 import omg.database.queries as queries
 from omg.models import rootedtreemodel
 from functools import reduce
+
 
 logger = logging.getLogger('gopulate')
 
@@ -28,119 +28,14 @@ def absPath(file):
         return os.path.join(config.get("music","collection"),file)
     else:
         return file
-    
-class DirectoryNode(omg.models.Node):
-    def __init__(self, path=None, parent=None):
-        self.contents = []
-        self.parent = parent
-        self.path = path
-    
-    def __str__(self):
-        return self.path
 
-class GopulateAlbum(omg.models.Node):
-    def __init__(self, name = None, parent=None):
-        self.parent = parent
-        self.contents = []
-        self.tracks = {}
-        self.name = name
-        
-    def __str__(self):
-        return self.name
-    
-    def finalize(self):
-        self.contents = []
-        for i in sorted(self.tracks.keys()):
-            self.contents.append(self.tracks[i])
-        self.commonTags = reduce(lambda x,y: x & y, [set(tr.tags.keys()) for tr in self.contents]) - set(["tracknumber","title"])
-        self.commonTagValues = {}
-        differentTags=set()
-        for file in self.contents:
-            tags = file.tags
-            for tag in self.commonTags:
-                if tag not in self.commonTagValues:
-                    self.commonTagValues[tag] = tags[tag]
-                if self.commonTagValues[tag] != tags[tag]:
-                    differentTags.add(tag)
-        self.sameTags = self.commonTags - differentTags
-        self.tags = { tag:self.commonTagValues[tag] for tag in self.sameTags }
-    
-    # Ensure that the album has a title-tag...before changing album.name to contain artists/composers
-        self.tags['title'] = self.contents[0].tags['album'][0]
-        
-            
-        
-class FileSystemFile(omg.models.Element):
-    def __init__(self, path, tags = None, length = None, parent = None):
-        self.path = path
-        self.tags = tags
-        self.length = length
-        self.parent = parent
-        
-    def readTagsFromFilesystem(self):
-        real = realfiles.File(absPath(self.path))
-        real.read()
-        self.tags = real.tags
-        self.length = real.length
-    
-    def writeTagsToFilesystem(self):
-        real = realfiles.File(absPath(self.path))
-        real.tags = self.tags
-        real.save_tags()
-        
-    def __str__(self):
-        return str(self.tags)
-
-class GopulateTreeModel(rootedtreemodel.RootedTreeModel):
-    
-    def __init__(self, dirs):
-        rootedtreemodel.RootedTreeModel.__init__(self)
-        self.dirs = dirs
-        self.finder = None
-        
-    def nextDirectory(self):
-        logger.debug('next directory, dirs: {}'.format(self.dirs))
-        if not self.finder:
-            if len(self.dirs) == 0:
-                raise StopIteration()
-            self.finder = findNewAlbums(self.dirs[0])
-            del self.dirs[0]
-        try:
-            self._createTree(*next(self.finder))
-        except StopIteration:
-            self.finder = None
-            self.nextDirectory()
-    
-    def _createTree(self, path, albums):
-        root = DirectoryNode(path)
-        for el in albums.values():
-            print('element: {}'.format(el))
-            root.contents.append(el)
-            el.parent = root
-        self.setRoot(root)
-        
-    def flags(self, index):
-        if not index.isValid():
-            return Qt.ItemIsEnabled
-        return rootedtreemodel.RootedTreeModel.flags(self,index) | Qt.ItemIsEditable
-    
-    def setData(self, index, value, role):
-        if index.isValid() and role == Qt.EditRole:
-            elem = index.internalPointer()
-            if type(elem) == FileSystemFile:
-                elem.tags['edit'] = value
-            elif type(elem) == GopulateAlbum:
-                elem.name = value
-            else:
-                print(type(elem))
-            self.dataChanged.emit(index,index)
-            return True
-        return False
         
 def findNewAlbums(path):
     """Generator function which tries to find albums in the filesystem tree.
     
     Yields an omg.Container without any tags. The tags and the name for the album should be examined by another function."""
+    
+    from omg.gopulate.models import GopulateContainer, FileSystemFile
     for dirpath, dirnames, filenames in os.walk(path):
         albumsInThisDirectory = {}
         ignored_albums=[]
@@ -160,7 +55,7 @@ def findNewAlbums(path):
                 if album in ignored_albums:
                     continue
                 if not album in albumsInThisDirectory:
-                    albumsInThisDirectory[album] = GopulateAlbum(album)
+                    albumsInThisDirectory[album] = GopulateContainer(album)
                 file = FileSystemFile(filename, tags=t, length=realfile.length, parent=albumsInThisDirectory[album])
                 if "tracknumber" in t:
                     trkn = int(t["tracknumber"][0].split("/")[0]) # support 02/15 style
@@ -181,16 +76,21 @@ def findNewAlbums(path):
             album.finalize()
         yield dirpath,albumsInThisDirectory
 
+dirmodel = None
+gopmodel = None
+def test(current, previous):
+    gopmodel.setSearchDirectories( [dirmodel.filePath(current)] )
+    gopmodel.nextDirectory()
 
 def run(popdirs):
-    # Switch first to the directory containing this file
-#    if os.path.dirname(__file__):
-#        os.chdir(os.path.dirname(__file__))
-#    # And then one directory above
-#    os.chdir("../../")
+    
+    import omg.gopulate
+    from omg.gopulate.models import DirectoryNode, GopulateTreeModel
+    import omg.gopulate.gui
     
     # Some Qt-classes need a running QApplication before they can be created
     app = QtGui.QApplication(sys.argv)
+    app.setQuitOnLastWindowClosed(True)
 
     # Import and initialize modules
     from omg import database
@@ -200,25 +100,13 @@ def run(popdirs):
 
     from omg.models.playlist import ExternalFile, RootNode
     from omg.models import Node, Element
-    root = RootNode()
-    teste = ExternalFile("Modern/ABBA/1999 - The Complete Singles Collection [Disc 1]/01 - People Need Love.ogg", root)
-    testf = ExternalFile("/wtf/omg", root)
-    root.contents.append(teste)
-    root.contents.append(testf)
-    n = DirectoryNode(root)
-    testg = ExternalFile("aaa", n)
-    testh = ExternalFile("bbb", n)
-    n.contents.append(testg)
-    n.contents.append(testh)
-    root.contents.append(n)
-    testm = rootedtreemodel.RootedTreeModel()
-    testm.setRoot(root)
     
     gm = GopulateTreeModel(popdirs)
-    
+
     # Create GUI
-    window = QtGui.QWidget()
-    layout = QtGui.QVBoxLayout(window)
+    mdi = QtGui.QMdiArea()
+    structWidget = QtGui.QWidget()
+    layout = QtGui.QVBoxLayout(structWidget)
     widget = gui.GopulateWidget(gm)
     layout.addWidget(widget)
     
@@ -227,11 +115,26 @@ def run(popdirs):
     
     next.clicked.connect(gm.nextDirectory)
     
-    window.resize(800, 600)
+    mdi.resize(1400, 1000)
     screen = QtGui.QDesktopWidget().screenGeometry()
-    size =  window.geometry()
-    window.move((screen.width()-size.width())/2, (screen.height()-size.height())/2)
-    window.show()
+    size =  structWidget.geometry()
+    mdi.move((screen.width()-size.width())/2, (screen.height()-size.height())/2)
+    dirm = QtGui.QFileSystemModel()
+    musikindex = dirm.setRootPath("/ftp/musik")
+    omg = QtGui.QTreeView()
+    omg.setModel(dirm)
+    omg.setRootIndex(musikindex)
+    omg.setWindowTitle("wtf?")
+    global dirmodel, gopmodel
+    dirmodel = dirm
+    gopmodel = gm
+    omg.selectionModel().currentChanged.connect(test)
+    mdi.addSubWindow(structWidget).resize(800,800)
+    mdi.addSubWindow(omg).resize(600,800)
+    testw = QtGui.QLabel()
+    testw.setText("<b>hallo?</b>hallo!<img src=\"images/lastfm.gif\"></img>")
+    mdi.addSubWindow(testw)
+    mdi.show()
     sys.exit(app.exec_())
 
 
