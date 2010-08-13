@@ -34,7 +34,7 @@ class DBLayoutException(Exception):
 db = None
 
 # Logger for database warnings
-logger = logging.getLogger("database")
+logger = logging.getLogger("omg.database")
 
 def connect(driver=None):
     """Connect to the database server with information from the config file. Usually the driver specified in the config file is used, but you can use the <driver>-parameter to use another one."""
@@ -44,7 +44,7 @@ def connect(driver=None):
             driver = config.get("database","driver")
         db = sql.newConnection(driver)
         db.connect(*[config.get("database",key) for key in ("mysql_user","mysql_password","mysql_db","mysql_host","mysql_port")])
-        logger.debug("Database connection is open.")
+        logger.info("Database connection is open.")
     else: logger.warning("database.connect has been called although the database connection was already open")
     return db
 

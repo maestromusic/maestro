@@ -8,9 +8,9 @@
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt,SIGNAL
 
-from omg import mpclient
+from omg import config,mpclient
 from omg.models import playlist as playlistmodel
-from . import delegates, formatter
+from . import delegates, formatter#, tageditor
 
 # Plugins may insert functions here to insert entries in the context menu. Each function must take two parameters:
 # - the playlist where the context-menu is opened
@@ -67,6 +67,7 @@ class PlaylistTreeView(QtGui.QTreeView):
         self.setDragEnabled(True)
         self.setAcceptDrops(True)
         self.setDropIndicatorShown(True)
+        self.setDefaultDropAction(Qt.MoveAction)
         
         palette = QtGui.QPalette()
         palette.setColor(QtGui.QPalette.Base,QtGui.QColor(0xE9,0xE9,0xE9))
@@ -92,7 +93,11 @@ class PlaylistTreeView(QtGui.QTreeView):
         # would try to remove the child a second time.
         while len(self.selectedIndexes()) > 0:
             self.model().removeByQtIndex(self.selectedIndexes()[0])
-            
+    
+    def editTags(self):
+        dialog = tageditor.TagEditorWidget(self,[self.model().data(index) for index in self.selectedIndexes()])
+        dialog.exec_()
+        
     def keyReleaseEvent(self,keyEvent):
         if keyEvent.key() == Qt.Key_Delete:
             self.removeSelected()
@@ -107,10 +112,14 @@ class PlaylistTreeView(QtGui.QTreeView):
         removeAction = QtGui.QAction("Entfernen",self)
         removeAction.triggered.connect(self.removeSelected)
         menu.addAction(removeAction)
+        
+        editTagsAction = QtGui.QAction("Tags editieren...",self)
+        editTagsAction.triggered.connect(self.editTags)
+        menu.addAction(editTagsAction)
 
         node = self.model().data(self.indexAt(event.pos()))
         for provider in contextMenuProvider:
          for action in provider(self,node):
             menu.addAction(action)
 
-        menu.exec_(event.globalPos())        
+        menu.exec_(event.globalPos())

@@ -144,10 +144,11 @@ class Element(Node,FilelistMixin,IndexMixin):
     tags = None # tags.Storage to store the tags. None until they are loaded
     contents = None # list of contents. None until they are loaded; [] if this element has no contents
     
-    def __init__(self,id):
-        """Initialize this element with the given id, which must be an integer."""
+    def __init__(self,id,tags=None):
+        """Initialize this element with the given id, which must be an integer. Optionally you may specify a tags.Storage object holding the tags of this element."""
         assert isinstance(id,int)
         self.id = id
+        self.tags = tags
         
     def hasChildren(self):
         """Return whether this node has at least one child node or None if it is unknown since the contents are not loaded yet."""

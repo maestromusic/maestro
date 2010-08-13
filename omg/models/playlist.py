@@ -6,7 +6,7 @@
 # it under the terms of the GNU General Public License version 3 as
 # published by the Free Software Foundation
 #
-import difflib
+import difflib, logging
 from PyQt4 import QtCore
 from PyQt4.QtCore import Qt
 
@@ -15,6 +15,7 @@ from . import rootedtreemodel, treebuilder, mimedata
 from . import Node, Element, FilelistMixin, IndexMixin
 
 db = database.get()
+logger = logging.getLogger("omg.models.playlist")
 
 class PlaylistElement(Element):
     def __init__(self,id,contents,tags = None):
@@ -48,7 +49,7 @@ class Playlist(rootedtreemodel.RootedTreeModel):
     # Toplevel elements in the playlist
     contents = None
     
-    # Currently playing offset and element
+    # Currently playing offset and a persistent index to the element
     currentlyPlayingOffset = None
     currentlyPlayingElement = None
     
@@ -79,12 +80,16 @@ class Playlist(rootedtreemodel.RootedTreeModel):
             return defaultFlags | Qt.ItemIsDropEnabled | Qt.ItemIsDragEnabled
         else: return defaultFlags | Qt.ItemIsDropEnabled
     
+    def supportedDropActions(self):
+        return Qt.CopyAction | Qt.MoveAction
+         
     def mimeTypes(self):
         return [config.get("gui","mime")]
     
     def mimeData(self,indexes):
         return mimedata.MimeData(self,indexes)
-        
+    
+    # A note on removing and inserting rows via DND: We cannot implement insertRows because we have no way to insert empty rows without elements. Instead we overwrite dropMimeData and use self.insertElements. On the other hand we implement removeRows to remove rows at the end of internal move operations and let Qt call this method.
     def dropMimeData(self,mimeData,action,row,column,parentIndex):
         if action == Qt.IgnoreAction:
             return True
@@ -106,6 +111,14 @@ class Playlist(rootedtreemodel.RootedTreeModel):
         self.insertElements(self.importElements(mimeData.retrieveData(config.get("gui","mime"))),offset)
         return True
         
+    def removeRows(self,row,count,parentIndex):
+        parent = self.data(parentIndex) if parentIndex.isValid() else self.root
+        start = parent.getChildren()[row].getOffset()
+        lastElement = parent.getChildren()[row+count-1]
+        end = lastElement.getOffset()+lastElement.getFileCount()
+        self.removeFiles(start,end)
+        return True
+
     def _getFilteredOpcodes(self,a,b):
         """Helper method for synchronize: Use difflib.SequenceMatcher to retrieve a list of opCodes describing how to turn <a> into <b> and filter and improve it:
         - opCodes with 'equal'-tag are removed
@@ -216,10 +229,16 @@ class Playlist(rootedtreemodel.RootedTreeModel):
         
     def removeFiles(self,start,end):
         """Remove the files with offsets <start>-<end> (without <end>!) from the playlist. Containers which are empty after removal are removed, too. <start> must be >= 0 and < self.root.getFileCount(), <end> must be > <start> and <= self.root.getFileCount(), or otherwise an IndexError is raised."""
+        if self._syncLock:
+            logger.warning("removeFiles was called while syncLock was True.")
+            return
         self._syncLock = True
         self._removeFiles(self.root,start,end)
         self.glue(self.root,start)
-        mpclient.delete(start,end)
+        try:
+            mpclient.delete(start,end)
+        except mpclient.CommandError as e:
+            logger.error("Deleting files from MPD's playlist failed: "+e.message)
         del self.pathList[start:end]
         self._syncLock = False
         
@@ -228,10 +247,10 @@ class Playlist(rootedtreemodel.RootedTreeModel):
         
         Warning: This method does not update the pathlist used to synchronize with MPD, nor does it update MPD itself. Use removeFiles, to keep the model consistent.
         """
-        #print("This is _removeFiles for element {0} at start {1} and end {2}".format(element,start,end))
+        #print("This is _removeFiles for element {} at start {} and end {}".format(element,start,end))
+        logger.debug("This is _removeFiles for element {} at start {} and end {}".format(element,start,end))
         if start <0 or end <= start:
-            raise IndexError("Playlist._removeFiles: Offsets out of bounds: start is {0} and end is {0}."
-                                .format(start,end))
+            raise IndexError("Playlist._removeFiles: Offsets out of bounds: start is {} and end is {}.".format(start,end))
         # a is the first item which is removed or from which children are removed
         # b is the last item which is removed or from which children are removed
         aIndex = None
@@ -277,7 +296,10 @@ class Playlist(rootedtreemodel.RootedTreeModel):
             self._removeFiles(element.contents[aIndex],start-aOffset,aFileCount)
     
     def insertElements(self,elements,offset):
-        assert self._syncLock == False
+        if self._syncLock:
+            logger.warning("insertElements was called while _syncLock was True.")
+            return
+        self._syncLock = True
 
         if offset == -1:
             offset = len(self.pathList)
@@ -288,8 +310,6 @@ class Playlist(rootedtreemodel.RootedTreeModel):
         for i in range(0,len(elements)):
             if elements[i].getChildrenCount() == 1:
                 elements[i] = elements[i].getChildren()[0]
-        
-        self._syncLock = True
                
         self._insertElements(self.root,elements,offset)
         
@@ -297,20 +317,21 @@ class Playlist(rootedtreemodel.RootedTreeModel):
         for element in elements:
             pathList = [file.getPath() for file in element.getAllFiles()]
             self.pathList[offset:offset] = pathList
-            mpclient.insert(offset,pathList)
+            mpclient.insert(offset,pathList)  #TODO: Catch errors
             offset = offset + len(pathList)
         self._syncLock = False
     
     def _insertElements(self,parent,elements,offset):
-        #print("This is _insertElements for parent {0} at offset {1} and with elements {2}"
+        #print("This is _insertElements for parent {} at offset {} and with elements {}"
             #.format(parent,offset,[str(element) for element in elements]))
-
+        logger.debug("This is _insertElements for parent {} at offset {} and with {} elements."
+                        .format(parent,offset,len(elements)))
         fileCount = parent.getFileCount()
         if offset == -1:
             offset = fileCount
 
         if offset < 0 or offset > fileCount:
-            raise IndexError("Offset {0} is out of bounds".format(offset))
+            raise IndexError("Offset {} is out of bounds".format(offset))
         
         treeBuilder = self._createTreeBuilder(elements)
         treeBuilder.buildParentGraph()
@@ -341,7 +362,6 @@ class Playlist(rootedtreemodel.RootedTreeModel):
     
     def _getInsertInfo(self,treeBuilder,parent,offset):
         #print("This is _getInsertInfo for parent {0} at offset {1}".format(parent,offset))
-
         if not parent.hasChildren():
             return parent,0,0,False
             
@@ -365,6 +385,7 @@ class Playlist(rootedtreemodel.RootedTreeModel):
         
         Example: Assume <element> contains a container which contains 10 files. After splitting <element> at offset 5, <element> will contain two copys of the container, containing the files 0-4 and 5-9, respectively.
         """
+        logger.debug("This is split for element {} at offset {}".format(element,offset))
         fileCount = element.getFileCount()
         if offset < 0 or offset > fileCount:
             raise IndexError("Offset {0} is out of bounds.".format(offset))
@@ -408,10 +429,11 @@ class Playlist(rootedtreemodel.RootedTreeModel):
             return result
     
     def glue(self,parent,offset):
-        #print("This is glue for parent {0} at offset {1}".format(parent,offset))
+        #print("This is glue for parent {} at offset {}".format(parent,offset))
+        logger.debug("This is glue for parent {} at offset {}".format(parent,offset))
         fileCount = parent.getFileCount()
         if offset < 0 or offset > fileCount:
-            raise IndexError("Offset {0} is out of bounds.".format(offset))
+            raise IndexError("Offset {} is out of bounds.".format(offset))
         
         if offset == 0 or offset == fileCount:
             return # There is nothing to glue at this positions

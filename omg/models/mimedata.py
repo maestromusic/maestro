@@ -24,8 +24,8 @@ class MimeData(QtCore.QMimeData):
         from . import browser
         if isinstance(model,browser.BrowserModel):
             # Add either the node or invoke getElements recursively
-            self.elementList = itertools.chain(*[[node] if isinstance(node,models.Element)
-                                                 else node.getElements() for node in nodes])
+            self.elementList = itertools.chain.from_iterable(
+                            [node] if isinstance(node,models.Element) else node.getElements() for node in nodes)
         else: self.elementList = nodes
         
     def hasFormat(self,format):
