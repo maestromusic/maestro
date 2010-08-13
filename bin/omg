@@ -13,10 +13,10 @@ from omg import config,constants # loads config from file
 import os
 
 if __name__=="__main__":
-    if os.path.dirname(__file__):
-        os.chdir(os.path.dirname(__file__))
-        # And then one directory above
-        os.chdir("../")
+#    if os.path.dirname(__file__):
+#        os.chdir(os.path.dirname(__file__))
+#         #And then one directory above
+#        os.chdir("../")
     pop = False
     opts, args = getopt.getopt(sys.argv[1:],
         "pVv:",
