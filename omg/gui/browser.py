@@ -26,10 +26,10 @@ class Browser(QtGui.QWidget):
     
     table = "containers" # The MySQL-table whose contents are currently displayed
     
-    def __init__(self,parent):
+    def __init__(self,parent = None):
         """Initialize a new Browser with the given parent."""
         QtGui.QWidget.__init__(self,parent)
-        
+
         search.createResultTempTable(TT_BIG_RESULT,True)
         search.createResultTempTable(TT_SMALL_RESULT,True)
         

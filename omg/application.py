@@ -55,24 +55,46 @@ def run():
     
     # Create GUI
     global widget,browser,playlist,controlWidget
-    widget = QtGui.QWidget()
-    layout = QtGui.QVBoxLayout()
-    widget.setLayout(layout)
+    widget = QtGui.QMainWindow()
+    widget.setDockNestingEnabled(True)
 
-    controlWidget = control.createWidget(widget)
-    layout.addWidget(controlWidget,0)
+    controlWidget = control.createWidget()
+    controlDock = QtGui.QDockWidget()
+    controlDock.setWindowTitle("Playback control")
+    controlDock.setAllowedAreas(QtCore.Qt.TopDockWidgetArea | QtCore.Qt.BottomDockWidgetArea)
+    controlDock.setWidget(controlWidget)
+    widget.addDockWidget(QtCore.Qt.TopDockWidgetArea, controlDock)
     
-    splitter = QtGui.QSplitter(widget)
-    layout.addWidget(splitter,1)
     
-    browser = browserModule.Browser(widget)
-    splitter.addWidget(browser)
-    splitter.setStretchFactor(0,2)
+    browser = browserModule.Browser()
+    browserDock = QtGui.QDockWidget()
+    browserDock.setWindowTitle("Element browser")
+    browserDock.setAllowedAreas(QtCore.Qt.LeftDockWidgetArea | QtCore.Qt.RightDockWidgetArea)
+    browserDock.setWidget(browser)
+    widget.addDockWidget(QtCore.Qt.LeftDockWidgetArea, browserDock)
     
-    playlist = playlistModule.Playlist(widget)
-    splitter.addWidget(playlist)
-    splitter.setStretchFactor(1,5)
+    playlist = playlistModule.Playlist()
     
+    central = QtGui.QTabWidget()
+    central.addTab(playlist,"playlist")
+    
+    import omg.gopulate
+    import omg.gopulate.models
+    import omg.gopulate.gui
+    gm = omg.gopulate.models.GopulateTreeModel([ config.get("music","collection") ])
+    gw = omg.gopulate.gui.GopulateWidget(gm)
+    central.addTab(gw, "gopulate")
+    
+    import omg.filesystembrowser
+    fb = omg.filesystembrowser.FileSystemBrowser()
+    fbDock = QtGui.QDockWidget()
+    fbDock.setWindowTitle("File browser")
+    fbDock.setAllowedAreas(QtCore.Qt.LeftDockWidgetArea | QtCore.Qt.RightDockWidgetArea)
+    fbDock.setWidget(fb)
+    fb.currentDirectoryChanged.connect(gm.setCurrentDirectory)
+    widget.addDockWidget(QtCore.Qt.RightDockWidgetArea, fbDock)
+    
+    widget.setCentralWidget(central)
     control.synchronizePlaylist(playlist.getModel())
     
     widget.resize(config.shelve['widget_width'],config.shelve['widget_height'])

@@ -1,9 +1,10 @@
-#!/usr/bin/env python3
-'''
-Created on 06.07.2010
-
-@author: Michael Helmling
-'''
+# -*- coding: utf-8 -*-
+# Copyright 2010 Michael Helmling
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 3 as
+# published by the Free Software Foundation
+#
 
 import sys, os
 from PyQt4 import QtCore, QtGui
@@ -98,7 +99,6 @@ def run(popdirs):
     from omg import tags
     tags.updateIndexedTags()
 
-    from omg.models.playlist import ExternalFile, RootNode
     from omg.models import Node, Element
     
     gm = GopulateTreeModel(popdirs)
@@ -119,18 +119,21 @@ def run(popdirs):
     screen = QtGui.QDesktopWidget().screenGeometry()
     size =  structWidget.geometry()
     mdi.move((screen.width()-size.width())/2, (screen.height()-size.height())/2)
-    dirm = QtGui.QFileSystemModel()
-    musikindex = dirm.setRootPath("/ftp/musik")
-    omg = QtGui.QTreeView()
-    omg.setModel(dirm)
-    omg.setRootIndex(musikindex)
-    omg.setWindowTitle("wtf?")
-    global dirmodel, gopmodel
-    dirmodel = dirm
-    gopmodel = gm
-    omg.selectionModel().currentChanged.connect(test)
+#    dirm = QtGui.QFileSystemModel()
+#    musikindex = dirm.setRootPath(config.get("music","collection"))
+#    omg = QtGui.QTreeView()
+#    omg.setModel(dirm)
+#    omg.setRootIndex(musikindex)
+#    omg.setWindowTitle("wtf?")
+#    global dirmodel, gopmodel
+#    dirmodel = dirm
+#    gopmodel = gm
+#    omg.selectionModel().currentChanged.connect(test)
+    import omg.filebrowser
+    fb = omg.filebrowser.FileSystemBrowser()
+    fb.currentDirectoryChanged.connect(gm.setSearchDirectories)
     mdi.addSubWindow(structWidget).resize(800,800)
-    mdi.addSubWindow(omg).resize(600,800)
+    mdi.addSubWindow(fb).resize(600,800)
     testw = QtGui.QLabel()
     testw.setText("<b>hallo?</b>hallo!<img src=\"images/lastfm.gif\"></img>")
     mdi.addSubWindow(testw)

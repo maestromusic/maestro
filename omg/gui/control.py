@@ -28,7 +28,7 @@ class ControlWidget(QtGui.QWidget):
     def __init__(self,parent):
         """Initialize this ControlWidget with the given parent."""
         QtGui.QWidget.__init__(self,parent)
-        
+
         # Layout
         layout = QtGui.QVBoxLayout()
         self.setLayout(layout)

@@ -25,7 +25,7 @@ status = None
 
 logger = logging.getLogger("omg.control")
 
-def createWidget(parent):
+def createWidget(parent = None):
     """Create a ControlWidget and store a reference to it in control.widget."""
     from omg.gui import control as controlwidget
     globals()["widget"] = controlwidget.ControlWidget(parent)

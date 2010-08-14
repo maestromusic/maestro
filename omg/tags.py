@@ -92,7 +92,7 @@ class IndexedTag(Tag):
         else: return value
 
     def __eq__(self,other):
-        return self.id == other.id
+        return isinstance(other, IndexedTag) and self.id == other.id
     
     def __ne__(self,other):
         return self.id != other.id
@@ -194,6 +194,8 @@ class Storage(defaultdict):
         
     def addUnique(self,tag,*values):
         """Add one or more values to the list of the given tag. If a value is already contained in the list, do not add it again."""
+        if isinstance(tag, str):
+            tag = get(tag)
         for value in values:
             if value not in self[tag]:
                 self[tag].append(value)
@@ -220,3 +222,18 @@ class Storage(defaultdict):
     def __contains__(self,key):
         # Return false even if the key exists and has [] as value (which actually should not happen). If the key really does not exist, self[key] will also return [].
         return len(self[key]) > 0
+    
+    def __getitem__(self, key):
+        if isinstance(key, str):
+            key = get(key)
+        return defaultdict.__getitem__(self, key)
+    
+    def __setitem__(self, key, value):
+        if isinstance(key, str):
+            key = get(key)
+        return defaultdict.__setitem__(self, key, value)
+    
+    def __delitem__(self, key):
+        if isinstance(key, str):
+            key = get(key)
+        return defaultdict.__delitem__(self, key)
