@@ -97,6 +97,10 @@ def run():
     widget.setCentralWidget(central)
     control.synchronizePlaylist(playlist.getModel())
     
+    if 'windows' in optionsOverride:
+        if 'populate' in optionsOverride['windows']:
+            central.setCurrentWidget(gw)
+    
     widget.resize(config.shelve['widget_width'],config.shelve['widget_height'])
     widget.setWindowTitle('OMG version {0} – {1}'.format(constants.VERSION, random.choice(names)))
     if config.shelve['widget_position'] is None: # Center the widget

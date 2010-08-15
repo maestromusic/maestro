@@ -22,7 +22,11 @@ except ImportError:
 from omg import config, tags
 
 class NoTagError(Exception):
-    """This Exception occurs if you try to read tags from a file that has no tags."""
+    """This exception occurs if you try to read tags from a file that has no tags."""
+    pass
+
+class ReadTagError(Exception):
+    """This exception occurs if there was an error reading tags from a file."""
     pass
     
 class MartinIstEinSpast:
@@ -51,7 +55,7 @@ class UglyPython26PickleFile(MartinIstEinSpast):
         proc = subprocess.Popen([config.get("misc","tagmanip26_cmd"),"pickle", self.path], stdout=subprocess.PIPE)
         stdout = proc.communicate()[0]
         if proc.returncode > 0:
-            raise RuntimeError("Error calling printtags on file '{0}': {1}".format(self.path,stdout))
+            raise ReadTagError("Error calling printtags on file '{0}': {1}".format(self.path,stdout))
         data = pickle.loads(stdout)
         self.tags.merge(data["tags"])
         self.length = data["length"]

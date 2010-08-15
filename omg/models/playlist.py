@@ -528,7 +528,6 @@ class ExternalFile(gopmodels.FileSystemFile, FilelistMixin):
     def __init__(self,path,parent = None):
         """Initialize with the given path and parent."""
         gopmodels.FileSystemFile.__init__(self, path, parent = parent)
-        self.readTagsFromFilesystem()
     
     def isFile(self):
         return True

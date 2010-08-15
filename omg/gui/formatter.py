@@ -109,7 +109,7 @@ class HTMLFormatter(Formatter):
         
         
         lines = []
-        
+        self.element.ensureTagsAreLoaded()
         coverPath = None
         if isinstance(self.element, models.Element):
             coverPath = covers.getCoverPath(self.element.id,config.get("gui","detail_cover_size"))
@@ -119,7 +119,6 @@ class HTMLFormatter(Formatter):
         else:
             lines.append('external file')
         lines.append('<div style="font-size: 14px; font-weight: bold">{0}</div>'.format(cgi.escape(self.title())))
-
         if tags.ALBUM in self.element.tags:
             lines.append('<div style="font-size: 14px; font-weight: bold; font-style: italic">{0}</div>'
                             .format(cgi.escape(self.tag(tags.ALBUM))))
