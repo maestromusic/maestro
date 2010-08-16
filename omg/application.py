@@ -81,7 +81,7 @@ def run():
     import omg.gopulate
     import omg.gopulate.models
     import omg.gopulate.gui
-    gm = omg.gopulate.models.GopulateTreeModel([ config.get("music","collection") ])
+    gm = omg.gopulate.models.GopulateTreeModel(config.get("music","collection"))
     gw = omg.gopulate.gui.GopulateWidget(gm)
     central.addTab(gw, "gopulate")
     
@@ -92,6 +92,7 @@ def run():
     fbDock.setAllowedAreas(QtCore.Qt.LeftDockWidgetArea | QtCore.Qt.RightDockWidgetArea)
     fbDock.setWidget(fb)
     fb.currentDirectoryChanged.connect(gm.setCurrentDirectory)
+    fb.searchDirectoryChanged.connect(gm.setSearchDirectory)
     widget.addDockWidget(QtCore.Qt.RightDockWidgetArea, fbDock)
     
     widget.setCentralWidget(central)

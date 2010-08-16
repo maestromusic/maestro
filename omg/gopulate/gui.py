@@ -8,6 +8,7 @@
 
 from PyQt4 import QtCore, QtGui
 from omg.gui.abstractdelegate import AbstractDelegate
+from omg.gui.formatter import HTMLFormatter
 import omg.gopulate
 import omg.models
 from omg import tags
@@ -52,15 +53,13 @@ class NewGopulateDelegate(QtGui.QStyledItemDelegate):
                 for v in vs:
                     tab[-1].append(v)
         elif isinstance(elem, omg.models.Element):
-            if elem.isContainer():
-                beforeTable = "container:"
-            else:
-                beforeTable = "file:"
+            f = HTMLFormatter(elem)
+            beforeTable = f.detailView()
         # color codes
         if isinstance(elem, omg.gopulate.models.FileSystemFile) or isinstance(elem, omg.gopulate.models.GopulateContainer):
             beforeTable = '<span style="background:yellow">' + beforeTable + "</span>"
         elif isinstance(elem, omg.models.Element):
-            beforeTable = '<span style="background:green">' + beforeTable + "</span>"
+            beforeTable = '<span style="background:green">already in DB' + beforeTable + "</span>"
         lines = beforeTable
         if len(tab) > 0:
             cols = max(len(x) for x in tab)
@@ -95,37 +94,7 @@ class NewGopulateDelegate(QtGui.QStyledItemDelegate):
         self.layout(index)
         return self.doc.size().toSize()
 
-class GopulateDelegate(AbstractDelegate):
-    def __init__(self,parent = None):
-        AbstractDelegate.__init__(self,parent)
-        
-    def layout(self, index):
-        elem = index.internalPointer()
-        if (isinstance(elem,omg.gopulate.models.GopulateContainer)):
-            if "album" in elem.sameTags and "artist" in elem.sameTags:
-                titleLine = '"{}" from {}'.format(", ".join(elem.tags['album']), ", ".join(elem.tags['artist']))
-                if "date" in elem.sameTags:
-                    titleLine += " ({})".format(", ".join(elem.tags['date']))
-                self.addLine(titleLine)
-            for k in elem.sameTags:
-                if k == tags.get("album") or k == tags.get("artist") or k == tags.get("date"):
-                    continue
-                for v in elem.tags[k]:
-                    self.addLine("{}={}".format(k,v))
-        elif (isinstance(elem,omg.gopulate.models.FileSystemFile)):
-            if tags.get("title") in elem.tags:
-                firstLine = ", ".join(elem.tags['title'])
-                if "tracknumber" in elem.tags:
-                    firstLine = "{:2} - ".format(", ".join(elem.tags['tracknumber'])) + firstLine
-                self.addLine(firstLine)
-            for k,vs in elem.tags.items():
-                if k == tags.get("title") or k == tags.get("tracknumber"):
-                    continue
-                if k in elem.parent.sameTags:
-                    continue
-                for v in vs:
-                    self.addLine("{}={}".format(k,v))
-        
+
 class GopulateEditorWidget(QtGui.QLabel):
     def __init__(self, parent = None):
         QtGui.QWidget.__init__(self,parent)
@@ -153,18 +122,30 @@ class GopulatTreeWidget(QtGui.QTreeView):
         
 class GopulateWidget(QtGui.QWidget):
     
-    def __init__(self, model=None):
+    def __init__(self, model):
         QtGui.QWidget.__init__(self)
+        self.dirLabel = QtGui.QLabel()
         self.tree = GopulatTreeWidget()
-        self.editor = GopulateEditorWidget()
         self.tree.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
+        model.modelReset.connect(self._updateLabel)
+        
         self.accept = QtGui.QPushButton('accept')
+        self.accept.clicked.connect(model.commit)
+        
+        self.next = QtGui.QPushButton('next')
+        self.next.clicked.connect(model.nextDirectory)
+        
         layout = QtGui.QVBoxLayout(self)
-        midLayout = QtGui.QHBoxLayout()
-        midLayout.addWidget(self.tree)
-    #    midLayout.addWidget(self.editor)
-        layout.addLayout(midLayout)
-        layout.addWidget(self.accept)
+        layout.addWidget(self.dirLabel)
+        layout.addWidget(self.tree)
+        subLayout = QtGui.QHBoxLayout()
+        subLayout.addWidget(self.accept)
+        subLayout.addWidget(self.next)
+        layout.addLayout(subLayout)
         
         self.tree.setModel(model)
         self.tree.setHeaderHidden(True)
+        self._updateLabel()
+    
+    def _updateLabel(self):
+        self.dirLabel.setText(self.tree.model().root.path)

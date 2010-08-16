@@ -21,6 +21,7 @@ class FileSystemBrowserModel(QtGui.QFileSystemModel):
 class FileSystemBrowser(QtGui.QTreeView):
     
     currentDirectoryChanged = QtCore.pyqtSignal(['QString'])
+    searchDirectoryChanged = QtCore.pyqtSignal(['QString'])
     
     def __init__(self, rootDirectory = config.get("music","collection"), parent = None):
         QtGui.QTreeView.__init__(self, parent)
@@ -30,7 +31,10 @@ class FileSystemBrowser(QtGui.QTreeView):
         musikindex = self.model.setRootPath(rootDirectory)
         self.setRootIndex(musikindex)
         self.selectionModel().currentChanged.connect(self._handleCurrentChanged)
+        self.doubleClicked.connect(self._handleDoubleClick)
         
     def _handleCurrentChanged(self, current, previous):
         self.currentDirectoryChanged.emit(self.model.filePath(current))
     
+    def _handleDoubleClick(self, index):
+        self.searchDirectoryChanged.emit(self.model.filePath(index))

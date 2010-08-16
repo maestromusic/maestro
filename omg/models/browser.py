@@ -23,7 +23,7 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
         self.layers = layers
         self.smallResult = smallResult
         self._loadLayer(self.root)
-            
+    
     def setLayer(self,layers):
         """Set the layers of the model and reset."""
         self.layers = layers
@@ -190,7 +190,7 @@ class ValueNode(CriterionNode):
         self.valueIds = valueIds
     
     def __str__(self):
-        return "<ValueNode '{0}'>".format(self.value)
+        return "<ValueNode '{0}' ({1})>".format(self.value, ", ".join(map(str,self.valueIds)))
     
     def getCriterion(self):
         return search.criteria.TagIdCriterion(self.valueIds)

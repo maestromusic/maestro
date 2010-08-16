@@ -97,20 +97,7 @@ class BrowserTreeView(QtGui.QTreeView):
         palette.setColor(QtGui.QPalette.Base,QtGui.QColor(0xE9,0xE9,0xE9))
         palette.setColor(QtGui.QPalette.AlternateBase,QtGui.QColor(0xD9,0xD9,0xD9))
         self.setPalette(palette)
-    
-    def event(self, event):
-        if event.type() == QtCore.QEvent.ToolTip:
-            index = self.indexAt(event.pos())
-            if index:
-                element = self.model().data(index)
-                if isinstance(element,models.Element):
-                    QtGui.QToolTip.showText(event.globalPos(),formatter.HTMLFormatter(element).detailView())
-            else:
-                QtGui.QToolTip.hideText()
-                event.ignore()
-            return True
-        return super(BrowserTreeView,self).event(event)
-        
+            
     def _handleDoubleClicked(self,index):
         node = self.model().data(index)
         if isinstance(node,models.Element):

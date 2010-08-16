@@ -18,6 +18,9 @@ This module provides methods to initialize the tag lists based on the database, 
 """
 from collections import defaultdict
 from omg import config, database
+import logging
+
+logger = logging.getLogger("tags")
 
 # Module variables - Will be initialized with the first call of updateIndexedTags.
 #=================================================================================
@@ -90,7 +93,26 @@ class IndexedTag(Tag):
         if self.type == 'date':
             return database.get().getDate(value)
         else: return value
-
+    
+    def getValueId(self, value, insert=True):
+        """Retriev the id of the value of this tag with the given <value> name."""
+        
+        db = database.get()
+        tableName = "tag_" + self.name
+        if self.type=="date": #translate date into a format that MySQL likes
+            if len(value)==4: # only year is given
+                value="{0}-00-00".format(value)
+            elif len(value)==2: # year in 2-digit form
+                if value[0]==0:
+                    value="20{0}-00-00".format(value)
+                else:
+                    value="19{0}-00-00".format(value)
+        valueId = db.query("SELECT id FROM " + tableName + " WHERE value = ?", value).getSingle()
+        if insert and not valueId:
+            valueId = db.query("INSERT INTO tag_{0} (value) VALUES(?);".format(self.name), value).insertId()
+            logger.debug("creating new indexed value {} for tag {}".format(value,self.name))
+        return valueId
+    
     def __eq__(self,other):
         return isinstance(other, IndexedTag) and self.id == other.id
     

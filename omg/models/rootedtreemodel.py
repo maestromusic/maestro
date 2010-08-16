@@ -9,7 +9,8 @@
 from PyQt4 import QtCore
 from PyQt4.QtCore import Qt
 
-from . import Node
+from . import Node, Element
+from omg.gui import formatter
 
 class RootedTreeModel(QtCore.QAbstractItemModel):
     """The RootedTreeModel subclasses QAbstractItemModel to create a simple model for QTreeViews. It takes one root node which is not considered part of the data of this model (and is not displayed by QTreeViews). Nodes in a RootedTreeModel may have every type, but must implement the following methods:
@@ -29,7 +30,7 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
         self.root = root
     
     def setRoot(self,root):
-        """Set the root of this model to <root> and reset (QTreeViews using this model will be resetted, too)."""
+        """Set the root of this model to <root> and reset (QTreeViews using this model will be reset, too)."""
         self.root = root
         self.reset()
         
@@ -40,8 +41,18 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
             return str(index.internalPointer())
         if role == Qt.EditRole:
             return index.internalPointer()
+        if role == Qt.ToolTipRole:
+            return self.toolTipText(index)
         return None
     
+    def toolTipText(self, index):
+        if index:
+            element = index.internalPointer()
+            if hasattr(element, "toolTipText"):
+                return element.toolTipText()
+            else:
+                return str(element)
+            
     def hasChildren(self,index):
         if not index.isValid():
             if self.root is None:

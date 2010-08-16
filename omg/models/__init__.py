@@ -336,7 +336,11 @@ class Element(Node,FilelistMixin,IndexMixin):
         """Convenience method to get the formatted title of this element."""
         from omg.gui import formatter
         return formatter.Formatter(self).title()
-        
+    
+    def toolTipText(self):
+        from omg.gui import formatter
+        return formatter.HTMLFormatter(self).detailView()
+    
     def __str__(self):
         if self.tags is not None:
             return "<Element {0}>".format(self.getTitle())
