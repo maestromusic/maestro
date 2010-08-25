@@ -9,6 +9,7 @@
 import cgi
 
 from omg import config,covers,models,strutils,tags
+import datetime
 
 # Order in which tags will be displayed. Tags which don't appear in this list will be displayed in arbitrary order after the tags in the list.
 tagOrder = [tags.get(name) for name in config.get("gui","tag_order").split(",")]
@@ -39,7 +40,7 @@ class Formatter:
         if tag == tags.TITLE or tag == tags.ALBUM:
             sep = " - "
         else: sep = ", "
-        if tag == tags.DATE:
+        if tag == tags.DATE and isinstance(values[0], datetime.date):
             return sep.join(date.strftime("%Y") for date in values)
         else: return sep.join(values)
 
@@ -106,19 +107,18 @@ class HTMLFormatter(Formatter):
     def detailView(self):
         """Return HTML-code which renders a detailed view of the element."""
         
-        if isinstance(self.element, models.playlist.ExternalFile):
-            """TODO: read tags from file"""
-            return 'external file'
-            
-        lines = []
         
-        coverPath = covers.getCoverPath(self.element.id,config.get("gui","detail_cover_size"))
-        if coverPath is not None:
-            lines.append('<table><tr><td valign="top"><img src="{0}"></td><td valign="top">'
-                            .format(cgi.escape(coverPath)))
-                            
+        lines = []
+        self.element.ensureTagsAreLoaded()
+        coverPath = None
+        if isinstance(self.element, models.Element):
+            coverPath = covers.getCoverPath(self.element.id,config.get("gui","detail_cover_size"))
+            if coverPath is not None:
+                lines.append('<table><tr><td valign="top"><img src="{0}"></td><td valign="top">'
+                                .format(cgi.escape(coverPath)))
+        else:
+            lines.append('external file')
         lines.append('<div style="font-size: 14px; font-weight: bold">{0}</div>'.format(cgi.escape(self.title())))
-
         if tags.ALBUM in self.element.tags:
             lines.append('<div style="font-size: 14px; font-weight: bold; font-style: italic">{0}</div>'
                             .format(cgi.escape(self.tag(tags.ALBUM))))
@@ -135,9 +135,10 @@ class HTMLFormatter(Formatter):
             tagLines.append('{0}: {1}'.format(cgi.escape(str(tag)),cgi.escape(self.tag(tag))))
         
         # Add other tags
-        for tag,values in self.element.getOtherTags().items():
-            for value in values:
-                tagLines.append('{0}: {1}'.format(cgi.escape(str(tag)),cgi.escape(value)))
+        if isinstance(self.element, models.Element):
+            for tag,values in self.element.getOtherTags().items():
+                for value in values:
+                    tagLines.append('{0}: {1}'.format(cgi.escape(str(tag)),cgi.escape(value)))
             
         lines.append("<br>".join(tagLines))
         lines.append('</div>')

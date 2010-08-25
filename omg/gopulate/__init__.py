@@ -1,153 +1,53 @@
-#!/usr/bin/env python3
-'''
-Created on 06.07.2010
-
-@author: Michael Helmling
-'''
+# -*- coding: utf-8 -*-
+# Copyright 2010 Michael Helmling
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 3 as
+# published by the Free Software Foundation
+#
 
 import sys, os
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 import omg.models
-from omg.gopulate import gui
-from omg import config, realfiles
+from omg import config, realfiles, relPath, absPath
 import logging
 import omg.database.queries as queries
+import omg.database
 from omg.models import rootedtreemodel
 from functools import reduce
 
+db = omg.database.get()
 logger = logging.getLogger('gopulate')
 
-def relPath(file):
-    """Returns the relative path of a music file against the collection base path."""
-    return os.path.relpath(file,config.get("music","collection"))
 
-def absPath(file):
-    """Returns the absolute path of a music file inside the collection directory, if it is not absolute already."""
-    if not os.path.isabs(file):
-        return os.path.join(config.get("music","collection"),file)
-    else:
-        return file
-    
-class DirectoryNode(omg.models.Node):
-    def __init__(self, path=None, parent=None):
-        self.contents = []
-        self.parent = parent
-        self.path = path
-    
-    def __str__(self):
-        return self.path
-
-class GopulateAlbum(omg.models.Node):
-    def __init__(self, name = None, parent=None):
-        self.parent = parent
-        self.contents = []
-        self.tracks = {}
-        self.name = name
-        
-    def __str__(self):
-        return self.name
-    
-    def finalize(self):
-        self.contents = []
-        for i in sorted(self.tracks.keys()):
-            self.contents.append(self.tracks[i])
-        self.commonTags = reduce(lambda x,y: x & y, [set(tr.tags.keys()) for tr in self.contents]) - set(["tracknumber","title"])
-        self.commonTagValues = {}
-        differentTags=set()
-        for file in self.contents:
-            tags = file.tags
-            for tag in self.commonTags:
-                if tag not in self.commonTagValues:
-                    self.commonTagValues[tag] = tags[tag]
-                if self.commonTagValues[tag] != tags[tag]:
-                    differentTags.add(tag)
-        self.sameTags = self.commonTags - differentTags
-        self.tags = { tag:self.commonTagValues[tag] for tag in self.sameTags }
-    
-    # Ensure that the album has a title-tag...before changing album.name to contain artists/composers
-        self.tags['title'] = self.contents[0].tags['album'][0]
-        
-            
-        
-class FileSystemFile(omg.models.Element):
-    def __init__(self, path, tags = None, length = None, parent = None):
-        self.path = path
-        self.tags = tags
-        self.length = length
-        self.parent = parent
-        
-    def readTagsFromFilesystem(self):
-        real = realfiles.File(absPath(self.path))
-        real.read()
-        self.tags = real.tags
-        self.length = real.length
-    
-    def writeTagsToFilesystem(self):
-        real = realfiles.File(absPath(self.path))
-        real.tags = self.tags
-        real.save_tags()
-        
-    def __str__(self):
-        return str(self.tags)
-
-class GopulateTreeModel(rootedtreemodel.RootedTreeModel):
-    
-    def __init__(self, dirs):
-        rootedtreemodel.RootedTreeModel.__init__(self)
-        self.dirs = dirs
-        self.finder = None
-        
-    def nextDirectory(self):
-        logger.debug('next directory, dirs: {}'.format(self.dirs))
-        if not self.finder:
-            if len(self.dirs) == 0:
-                raise StopIteration()
-            self.finder = findNewAlbums(self.dirs[0])
-            del self.dirs[0]
-        try:
-            self._createTree(*next(self.finder))
-        except StopIteration:
-            self.finder = None
-            self.nextDirectory()
-    
-    def _createTree(self, path, albums):
-        root = DirectoryNode(path)
-        for el in albums.values():
-            print('element: {}'.format(el))
-            root.contents.append(el)
-            el.parent = root
-        self.setRoot(root)
-        
-    def flags(self, index):
-        if not index.isValid():
-            return Qt.ItemIsEnabled
-        return rootedtreemodel.RootedTreeModel.flags(self,index) | Qt.ItemIsEditable
-    
-    def setData(self, index, value, role):
-        if index.isValid() and role == Qt.EditRole:
-            elem = index.internalPointer()
-            if type(elem) == FileSystemFile:
-                elem.tags['edit'] = value
-            elif type(elem) == GopulateAlbum:
-                elem.name = value
-            else:
-                print(type(elem))
-            self.dataChanged.emit(index,index)
-            return True
-        return False
-        
-def findNewAlbums(path):
-    """Generator function which tries to find albums in the filesystem tree.
-    
-    Yields an omg.Container without any tags. The tags and the name for the album should be examined by another function."""
-    for dirpath, dirnames, filenames in os.walk(path):
-        albumsInThisDirectory = {}
-        ignored_albums=[]
-        for filename in (os.path.normpath(os.path.abspath(os.path.join(dirpath, f))) for f in filenames):
-            if queries.idFromFilename(relPath(filename)):
+def findAlbumsInDirectory(path, onlyNewFiles = True):
+    from omg.gopulate.models import GopulateContainer, FileSystemFile
+    ignored_albums=[]
+    newAlbumsInThisDirectory = {}
+    existingAlbumsInThisDirectory = {}
+    thingsInThisDirectory = []
+    filenames = filter(os.path.isfile, (os.path.join(path,x) for x in os.listdir(path)))
+    for filename in (os.path.normpath(os.path.abspath(os.path.join(path, f))) for f in filenames):
+        id = queries.idFromFilename(relPath(filename))
+        if id:
+            if onlyNewFiles:
                 logger.debug("Skipping file '{0}' which is already in the database.".format(filename))
                 continue
+            else:
+                elem = omg.models.Element(id)
+                elem.loadTags()
+                t = elem.tags
+                albumIds = elem.getAlbumIds()
+                for aid in albumIds:
+                    if not aid in existingAlbumsInThisDirectory:
+                        existingAlbumsInThisDirectory[aid] = omg.models.Element(aid)
+                        existingAlbumsInThisDirectory[aid].contents = []
+                    existingAlbumsInThisDirectory[aid].contents.append(elem)
+                    elem.parent = existingAlbumsInThisDirectory[aid]
+                if len(albumIds) > 0:
+                    continue
+        else:
             try:
                 realfile = realfiles.File(os.path.abspath(filename))
                 realfile.read()
@@ -155,85 +55,43 @@ def findNewAlbums(path):
                 logger.warning("Skipping file '{0}' which has no tag".format(filename))
                 continue
             t = realfile.tags
-            if "album" in t:
-                album = t["album"][0]
-                if album in ignored_albums:
-                    continue
-                if not album in albumsInThisDirectory:
-                    albumsInThisDirectory[album] = GopulateAlbum(album)
-                file = FileSystemFile(filename, tags=t, length=realfile.length, parent=albumsInThisDirectory[album])
-                if "tracknumber" in t:
-                    trkn = int(t["tracknumber"][0].split("/")[0]) # support 02/15 style
-                    albumsInThisDirectory[album].tracks[trkn] = file
-                else: # file without tracknumber, bah
-                    if 0 in albumsInThisDirectory[album].tracks:
-                        print("More than one file in this album without tracknumber, don't know what to do: \n{0}".format(filename))
-                        del albumsInThisDirectory[album]
-                        ignored_albums.append(album)
-                    else:
-                        albumsInThisDirectory[album].tracks[0] = file
-            else:
-                print("Here is a file without album, I'll skip this: {0}".format(filename))
+            elem = FileSystemFile(filename, tags=t, length=realfile.length)
+        if "album" in t:
+            album = t["album"][0]
+            if album in ignored_albums:
+                continue
+            if not album in newAlbumsInThisDirectory:
+                newAlbumsInThisDirectory[album] = GopulateContainer(album)
+            elem.parent = newAlbumsInThisDirectory[album]
+            if "tracknumber" in t:
+                trkn = int(t["tracknumber"][0].split("/")[0]) # support 02/15 style
+                newAlbumsInThisDirectory[album].tracks[trkn] = elem
+            else: # file without tracknumber, bah
+                if 0 in newAlbumsInThisDirectory[album].tracks:
+                    logger.warning("More than one file in this album without tracknumber, don't know what to do: \n{0}".format(filename))
+                    del newAlbumsInThisDirectory[album]
+                    ignored_albums.append(album)
+                else:
+                    newAlbumsInThisDirectory[album].tracks[0] = elem
+        else:
+            logger.warning("Here is a file without album, I'll skip this: {0}".format(filename))
+    for t in existingAlbumsInThisDirectory.values():
+        thingsInThisDirectory.append(t)
+    for al in newAlbumsInThisDirectory.values():
+        al.finalize()
+        thingsInThisDirectory.append(al)
+    return thingsInThisDirectory
+        
+def findNewAlbums(path):
+    """Generator function which tries to find albums in the filesystem tree.
+    
+    Yields an omg.Container without any tags. The tags and the name for the album should be examined by another function."""
+    for dirpath, dirnames, filenames in os.walk(path):
+        albumsInThisDirectory = findAlbumsInDirectory(dirpath, True)
+        
         if len(albumsInThisDirectory) == 0:
             continue
-        for name,album in albumsInThisDirectory.items():
-            logger.debug("I found an album '{0}' in directory '{1}' containing {2} files.".format(name,dirpath,len(album.contents)))
-            album.finalize()
+        for album in albumsInThisDirectory:
+            logger.debug("I found an album '{0}' in directory '{1}' containing {2} files.".format(
+                      ", ".join(album.tags["album"]),dirpath,len(album.contents)))
         yield dirpath,albumsInThisDirectory
-
-
-def run(popdirs):
-    # Switch first to the directory containing this file
-#    if os.path.dirname(__file__):
-#        os.chdir(os.path.dirname(__file__))
-#    # And then one directory above
-#    os.chdir("../../")
-    
-    # Some Qt-classes need a running QApplication before they can be created
-    app = QtGui.QApplication(sys.argv)
-
-    # Import and initialize modules
-    from omg import database
-    database.connect()
-    from omg import tags
-    tags.updateIndexedTags()
-
-    from omg.models.playlist import ExternalFile, RootNode
-    from omg.models import Node, Element
-    root = RootNode()
-    teste = ExternalFile("Modern/ABBA/1999 - The Complete Singles Collection [Disc 1]/01 - People Need Love.ogg", root)
-    testf = ExternalFile("/wtf/omg", root)
-    root.contents.append(teste)
-    root.contents.append(testf)
-    n = DirectoryNode(root)
-    testg = ExternalFile("aaa", n)
-    testh = ExternalFile("bbb", n)
-    n.contents.append(testg)
-    n.contents.append(testh)
-    root.contents.append(n)
-    testm = rootedtreemodel.RootedTreeModel()
-    testm.setRoot(root)
-    
-    gm = GopulateTreeModel(popdirs)
-    
-    # Create GUI
-    window = QtGui.QWidget()
-    layout = QtGui.QVBoxLayout(window)
-    widget = gui.GopulateWidget(gm)
-    layout.addWidget(widget)
-    
-    next = QtGui.QPushButton('next')
-    layout.addWidget(next)
-    
-    next.clicked.connect(gm.nextDirectory)
-    
-    window.resize(800, 600)
-    screen = QtGui.QDesktopWidget().screenGeometry()
-    size =  window.geometry()
-    window.move((screen.width()-size.width())/2, (screen.height()-size.height())/2)
-    window.show()
-    sys.exit(app.exec_())
-
-
-if __name__ == "__main__":
-    run()

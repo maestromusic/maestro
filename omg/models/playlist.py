@@ -11,6 +11,7 @@ from PyQt4 import QtCore
 from PyQt4.QtCore import Qt
 
 from omg import config, database, mpclient, tags
+import omg.gopulate.models as gopmodels
 from . import rootedtreemodel, treebuilder, mimedata
 from . import Node, Element, FilelistMixin, IndexMixin
 
@@ -521,13 +522,12 @@ class Playlist(rootedtreemodel.RootedTreeModel):
         return sequence[1] - sequence[0] + 1
             
     
-class ExternalFile(Node,FilelistMixin):
+class ExternalFile(gopmodels.FileSystemFile, FilelistMixin):
     """This class holds a file that appears in the playlist, but is not in the database."""
     
     def __init__(self,path,parent = None):
         """Initialize with the given path and parent."""
-        self.path = path
-        self.parent = parent
+        gopmodels.FileSystemFile.__init__(self, path, parent = parent)
     
     def isFile(self):
         return True

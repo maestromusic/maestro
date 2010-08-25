@@ -19,17 +19,21 @@ try: # we try to favor native Pyk3 stagger support over the ugly26 shit
 except ImportError:
     pass
 
-from omg import config
+from omg import config, tags
 
 class NoTagError(Exception):
-    """This Exception occurs if you try to read tags from a file that has no tags."""
+    """This exception occurs if you try to read tags from a file that has no tags."""
+    pass
+
+class ReadTagError(Exception):
+    """This exception occurs if there was an error reading tags from a file."""
     pass
     
 class MartinIstEinSpast:
     """Base class for special file types. All files have a path."""
     def __init__(self,path):
         self.path = path
-        self.tags = {}
+        self.tags = tags.Storage()
         self.length = None
     
     def read(self):
@@ -51,9 +55,9 @@ class UglyPython26PickleFile(MartinIstEinSpast):
         proc = subprocess.Popen([config.get("misc","tagmanip26_cmd"),"pickle", self.path], stdout=subprocess.PIPE)
         stdout = proc.communicate()[0]
         if proc.returncode > 0:
-            raise RuntimeError("Error calling printtags on file '{0}': {1}".format(self.path,stdout))
+            raise ReadTagError("Error calling printtags on file '{0}': {1}".format(self.path,stdout))
         data = pickle.loads(stdout)
-        self.tags = data["tags"]
+        self.tags.merge(data["tags"])
         self.length = data["length"]
     
     def save_tags(self):
@@ -135,9 +139,9 @@ class StaggerID3(MartinIstEinSpast):
         
         for key in self._stag.__dict__:
             if key=="_genre":
-                self.tags["genre"] = [ stagger.id3.genres[self._stag.__dict__[key]] ]
+                self.tags[tags.get("genre")] = [ stagger.id3.genres[self._stag.__dict__[key]] ]
             else:
-                self.tags[key] = [ self._stag.__dict__[key] ]
+                self.tags[tags.get(key)] = [ self._stag.__dict__[key] ]
         
     def read(self):
         self.ignored_tags = set()
@@ -162,40 +166,40 @@ class StaggerID3(MartinIstEinSpast):
                     if isinstance(frame, list):
                         self.bahlist = True
                         textkey = StaggerID3.text_frames[key]
-                        self.tags[textkey] = []
+                        self.tags[tags.get(textkey)] = []
                         for subframe in frame:
-                            self.tags[textkey].append(subframe.text)
+                            self.tags[tags.get(textkey)].append(subframe.text)
                     else:
                         # this should be the normal case
-                        self.tags[StaggerID3.text_frames[key]] = frame.text
+                        self.tags[tags.get(StaggerID3.text_frames[key])] = frame.text
             elif key=="TXXX":
                 # the TXXX frame is a list of description,value pairs
                 for part in self._stag["TXXX"]:
                     description = part.description
                     if description.startswith("QuodLibet::"):
                         description = description[11:] # hass auf quodlibet ...
-                    self.tags[description] = [ part.value ]
+                    self.tags[tags.get(description)] = [ part.value ]
             elif key in ("COMM", "COM"):
                 # comment tag
                 for part in self._stag[key]:
                     value = part.text
                     if part.desc=="":
-                        self.tags["comment"] = [ value ]
+                        self.tags[tags.get("comment")] = [ value ]
                     else:
-                        self.tags[part.desc] = [ value ]
+                        self.tags[tags.get(part.desc)] = [ value ]
             elif key=="WXXX":
                 # user defined url
                 for part in self._stag["WXXX"]:
                     value = part.url
                     if part.description=="":
-                        self.tags["url"] = [ value ]
+                        self.tags[tags.get("url")] = [ value ]
                     else:
-                        self.tags[part.description] = [ value ]
+                        self.tags[tags.get(part.description)] = [ value ]
             elif isinstance(self._stag[key][0], stagger.frames.URLFrame):
-                if "url" not in self.tags:
-                    self.tags["url"] = []
+                if tags.get("url") not in self.tags:
+                    self.tags[tags.get("url")] = []
                 for part in self._stag[key]:
-                    self.tags["url"].append(part.url)
+                    self.tags[tags.get("url")].append(part.url)
                     
             else:
                 print("Skipping unsupported tag {0} in id3 file '{1}'".format(key,self.path))

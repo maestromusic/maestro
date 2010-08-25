@@ -9,10 +9,6 @@
 # populate.py
 
 import omg
-from omg import constants, realfiles
-import sys
-import pprint
-import mpd
 import os
 from functools import reduce
 import re

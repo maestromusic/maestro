@@ -10,7 +10,7 @@ from PyQt4.QtCore import Qt,SIGNAL
 
 from omg import config,mpclient
 from omg.models import playlist as playlistmodel
-from . import delegates, formatter, tageditor
+from . import delegates, formatter#, tageditor
 
 # Plugins may insert functions here to insert entries in the context menu. Each function must take two parameters:
 # - the playlist where the context-menu is opened
@@ -73,19 +73,6 @@ class PlaylistTreeView(QtGui.QTreeView):
         palette.setColor(QtGui.QPalette.Base,QtGui.QColor(0xE9,0xE9,0xE9))
         palette.setColor(QtGui.QPalette.AlternateBase,QtGui.QColor(0xD9,0xD9,0xD9))
         self.setPalette(palette)
-
-    def event(self, event):
-        if event.type() == QtCore.QEvent.ToolTip:
-            index = self.indexAt(event.pos())
-            if index:
-                element = self.model().data(index)
-                if element is not None:
-                    QtGui.QToolTip.showText(event.globalPos(),formatter.HTMLFormatter(element).detailView())
-            else:
-                QtGui.QToolTip.hideText()
-                event.ignore()
-            return True
-        return super(PlaylistTreeView,self).event(event)
 
     def removeSelected(self):
         # It may happen that an element and its parent element are selected. When removing the parent, the element will also be removed and will disappear from selectedIndexes(). An easy solution like 

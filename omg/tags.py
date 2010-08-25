@@ -18,6 +18,9 @@ This module provides methods to initialize the tag lists based on the database, 
 """
 from collections import defaultdict
 from omg import config, database
+import logging
+
+logger = logging.getLogger("tags")
 
 # Module variables - Will be initialized with the first call of updateIndexedTags.
 #=================================================================================
@@ -90,9 +93,28 @@ class IndexedTag(Tag):
         if self.type == 'date':
             return database.get().getDate(value)
         else: return value
-
+    
+    def getValueId(self, value, insert=True):
+        """Retriev the id of the value of this tag with the given <value> name."""
+        
+        db = database.get()
+        tableName = "tag_" + self.name
+        if self.type=="date": #translate date into a format that MySQL likes
+            if len(value)==4: # only year is given
+                value="{0}-00-00".format(value)
+            elif len(value)==2: # year in 2-digit form
+                if value[0]==0:
+                    value="20{0}-00-00".format(value)
+                else:
+                    value="19{0}-00-00".format(value)
+        valueId = db.query("SELECT id FROM " + tableName + " WHERE value = ?", value).getSingle()
+        if insert and not valueId:
+            valueId = db.query("INSERT INTO tag_{0} (value) VALUES(?);".format(self.name), value).insertId()
+            logger.debug("creating new indexed value {} for tag {}".format(value,self.name))
+        return valueId
+    
     def __eq__(self,other):
-        return self.id == other.id
+        return isinstance(other, IndexedTag) and self.id == other.id
     
     def __ne__(self,other):
         return self.id != other.id
@@ -194,12 +216,16 @@ class Storage(defaultdict):
         
     def addUnique(self,tag,*values):
         """Add one or more values to the list of the given tag. If a value is already contained in the list, do not add it again."""
+        if not isinstance(tag,Tag):
+            tag = get(tag)
         for value in values:
             if value not in self[tag]:
                 self[tag].append(value)
                 
     def removeValues(self,tag,*values):
         """Remove one or more values from the list of the given tag. If a value is not contained in this Storage just skip it."""
+        if not isinstance(tag,Tag):
+            tag = get(tag)
         for value in values:
             try:
                 self[tag].remove(value)
@@ -222,4 +248,21 @@ class Storage(defaultdict):
         
     def __contains__(self,key):
         # Return false even if the key exists and has [] as value (which actually should not happen). If the key really does not exist, self[key] will also return [].
+        if not isinstance(key,Tag):
+            key = get(key)
         return len(self[key]) > 0
+    
+    def __getitem__(self, key):
+        if not isinstance(key,Tag):
+            key = get(key)
+        return defaultdict.__getitem__(self, key)
+    
+    def __setitem__(self, key, value):
+        if not isinstance(key,Tag):
+            key = get(key)
+        return defaultdict.__setitem__(self, key, value)
+    
+    def __delitem__(self, key):
+        if not isinstance(key,Tag):
+            key = get(key)
+        return defaultdict.__delitem__(self, key)

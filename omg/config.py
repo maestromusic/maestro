@@ -81,6 +81,14 @@ _defaultOptions = {
         
         # Application-specific MIME-type for drag and drop operations
         "mime": "application/x-omgelementlist",
+        
+        # Tab which will be shown at the beginning ('populate' or 'playlist')
+        "startTab": "playlist"
+    },
+    
+    "log": {
+        # Log-level that will be used for console output. Unless this value is None, it will overwrite the value from logging.conf
+        "consoleLogLevel": None,
     },
     
     "misc": {
@@ -124,7 +132,7 @@ def init(optionOverride):
         logConfFile = os.path.join(constants.CONFDIR,"logging.conf")
     else: logConfFile = "logging.conf"
     
-    if not _config.has_section('log') or not _config.has_option('log','consoleLogLevel'):
+    if _config.get('log','consoleLogLevel') is None:
         logging.config.fileConfig(logConfFile)
     else:
         # If we must change the configuration from logging.conf, things are ugly: We have to read the file using a ConfigParser, then change the configuration and write it into a io.StringIO-buffer which is finally passed to fileConfig.
