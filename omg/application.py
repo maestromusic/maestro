@@ -22,6 +22,7 @@ names = ['Organize Music by Groups',
          'Oh Maddin ... Grmpf',
          'Oh Michael ... Grmpf'  ]
 
+# Default options and options from the config file will be overwritten by the options in optionOverride (this is necessary for command-line arguments). The dictionary should map section names to dictionaries containing the options in the section. Remember to add a default option to config._defaultOptions for anything that may appear in optionsOverride.
 optionsOverride = {}
 
 def run():
@@ -98,9 +99,8 @@ def run():
     widget.setCentralWidget(central)
     control.synchronizePlaylist(playlist.getModel())
     
-    if 'windows' in optionsOverride:
-        if 'populate' in optionsOverride['windows']:
-            central.setCurrentWidget(gw)
+    if config.get('gui','startTab') == 'populate':
+        central.setCurrentWidget(gw)
     
     widget.resize(config.shelve['widget_width'],config.shelve['widget_height'])
     widget.setWindowTitle('OMG version {0} – {1}'.format(constants.VERSION, random.choice(names)))

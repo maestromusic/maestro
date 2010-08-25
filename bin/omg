@@ -10,10 +10,6 @@ import os, sys, getopt
 from omg import application, constants
 
 if __name__=="__main__":
-#    if os.path.dirname(__file__):
-#        os.chdir(os.path.dirname(__file__))
-#         #And then one directory above
-#        os.chdir("../")
     opts, args = getopt.getopt(sys.argv[1:],
         "pVv:",
         ['populate','version','loglevel='])
@@ -24,5 +20,5 @@ if __name__=="__main__":
         elif opt in ('-v', '--loglevel'):
             application.optionsOverride['log'] = {'consoleLogLevel': arg}
         elif opt in ('-p', '--populate'):
-            application.optionsOverride['windows'] = {'populate' : True}
+            application.optionsOverride['gui'] = {'startTab' : 'populate'}
     application.run()

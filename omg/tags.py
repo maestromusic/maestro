@@ -216,7 +216,7 @@ class Storage(defaultdict):
         
     def addUnique(self,tag,*values):
         """Add one or more values to the list of the given tag. If a value is already contained in the list, do not add it again."""
-        if isinstance(tag, str):
+        if not isinstance(tag,Tag):
             tag = get(tag)
         for value in values:
             if value not in self[tag]:
@@ -224,6 +224,8 @@ class Storage(defaultdict):
                 
     def removeValues(self,tag,*values):
         """Remove one or more values from the list of the given tag. If a value is not contained in this Storage just skip it."""
+        if not isinstance(tag,Tag):
+            tag = get(tag)
         for value in values:
             try:
                 self[tag].remove(value)
@@ -241,21 +243,26 @@ class Storage(defaultdict):
         for tag,valueList in other.items():
             self.removeValues(tag,*valueList)
     
+    def realKeys(self):
+        return (key for key in self.keys() if len(self[key]) > 0)
+        
     def __contains__(self,key):
         # Return false even if the key exists and has [] as value (which actually should not happen). If the key really does not exist, self[key] will also return [].
+        if not isinstance(key,Tag):
+            key = get(key)
         return len(self[key]) > 0
     
     def __getitem__(self, key):
-        if isinstance(key, str):
+        if not isinstance(key,Tag):
             key = get(key)
         return defaultdict.__getitem__(self, key)
     
     def __setitem__(self, key, value):
-        if isinstance(key, str):
+        if not isinstance(key,Tag):
             key = get(key)
         return defaultdict.__setitem__(self, key, value)
     
     def __delitem__(self, key):
-        if isinstance(key, str):
+        if not isinstance(key,Tag):
             key = get(key)
         return defaultdict.__delitem__(self, key)
