@@ -217,6 +217,9 @@ class Storage(defaultdict):
         for tag,valueList in other.items():
             self.removeValues(tag,*valueList)
     
+    def realKeys(self):
+        return (key for key in self.keys() if len(self[key]) > 0)
+        
     def __contains__(self,key):
         # Return false even if the key exists and has [] as value (which actually should not happen). If the key really does not exist, self[key] will also return [].
         return len(self[key]) > 0

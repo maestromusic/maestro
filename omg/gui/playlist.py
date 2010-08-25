@@ -10,7 +10,7 @@ from PyQt4.QtCore import Qt,SIGNAL
 
 from omg import config,mpclient
 from omg.models import playlist as playlistmodel
-from . import delegates, formatter#, tageditor
+from . import delegates, formatter, tageditor
 
 # Plugins may insert functions here to insert entries in the context menu. Each function must take two parameters:
 # - the playlist where the context-menu is opened
