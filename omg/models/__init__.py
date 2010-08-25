@@ -10,6 +10,7 @@ import logging
 from PyQt4 import QtCore
 
 from omg import tags, database, covers, config
+from omg.database import queries
 db = database.get()
 
 logger = logging.getLogger(name="omg")
@@ -209,7 +210,10 @@ class Element(Node,FilelistMixin,IndexMixin):
         
         if tagList is not None:
             additionalWhereClause = " AND tag_id IN ({0})".format(",".join(str(tag.id) for tag in tagList))
-        else: additionalWhereClause = ''
+            otherAdditionalWhereClause = " AND tagname IN ({0})".format(",".join(str(tag.name for tag in tagList)))
+        else:
+            additionalWhereClause = ''
+            otherAdditionalWhereClause = ''
         
         result = db.query("""
             SELECT tag_id,value_id 
@@ -223,6 +227,17 @@ class Element(Node,FilelistMixin,IndexMixin):
                 logger.warning("Database is corrupt: Container {0} has a {1}-tag with id {2} but "
                               +"this id does not exist in tag_{1}.".format(self.id,tag.name,row[1]))
                 continue
+            self.tags[tag].append(value)
+        
+        # load othertags
+        result = db.query("""
+            SELECT tagname,value
+            FROM othertags
+            WHERE container_id = {0} {1}
+            """.format(self.id,otherAdditionalWhereClause))
+        for row in result:
+            tag = tags.get(row[0])
+            value = row[1]
             self.tags[tag].append(value)
         if recursive:
             for element in self.contents:
@@ -329,7 +344,13 @@ class Element(Node,FilelistMixin,IndexMixin):
             self._covers[size] = cover
         return cover
         
-        
+    def delete(self):
+        """Deletes the element from the database."""
+        if self.isFile():
+            queries.delFile(id = self.id)
+        else:
+            queries.delContainer(self.id)
+            
     # Misc
     #====================================================
     def getTitle(self):

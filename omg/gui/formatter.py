@@ -138,7 +138,7 @@ class HTMLFormatter(Formatter):
         if isinstance(self.element, models.Element):
             for tag,values in self.element.getOtherTags().items():
                 for value in values:
-                    tagLines.append('{0}: {1}'.format(cgi.escape(str(tag)),cgi.escape(value)))
+                    tagLines.append('*{0}: {1}'.format(cgi.escape(str(tag)),cgi.escape(value)))
             
         lines.append("<br>".join(tagLines))
         lines.append('</div>')

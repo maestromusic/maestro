@@ -97,6 +97,10 @@ class BrowserTreeView(QtGui.QTreeView):
         palette.setColor(QtGui.QPalette.Base,QtGui.QColor(0xE9,0xE9,0xE9))
         palette.setColor(QtGui.QPalette.AlternateBase,QtGui.QColor(0xD9,0xD9,0xD9))
         self.setPalette(palette)
+        
+        self.delAction = QtGui.QAction("delete", self)
+        self.addAction(self.delAction)
+        self.delAction.triggered.connect(self._deleteSelected)
             
     def _handleDoubleClicked(self,index):
         node = self.model().data(index)
@@ -104,3 +108,14 @@ class BrowserTreeView(QtGui.QTreeView):
             control.playlist.insertElements(control.playlist.importElements([node]),-1)
         elif isinstance(node,browsermodel.CriterionNode):
             control.playlist.insertElements(control.playlist.importElements(node.getElements()),-1)
+    
+    def _deleteSelected(self):
+        for index in self.selectionModel().selectedIndexes():
+            if isinstance(index.internalPointer(), models.Element):
+                index.internalPointer().delete()
+        self.model().reset()
+        
+    def contextMenuEvent(self, event):
+        menu = QtGui.QMenu(self)
+        menu.addAction(self.delAction)
+        menu.popup(event.globalPos())

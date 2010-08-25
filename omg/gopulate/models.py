@@ -44,6 +44,7 @@ class GopulateContainer(omg.models.Node):
         self.contents = []
         self.tracks = {}
         self.name = name
+        self.existingContainer = None
         
     def __str__(self):
         return self.name
@@ -52,6 +53,7 @@ class GopulateContainer(omg.models.Node):
         self.contents = []
         for i in sorted(self.tracks.keys()):
             self.contents.append(self.tracks[i])
+            self.tracks[i].parent = self
         del self.tracks
         self.updateSameTags()
         self.tags['title'] = self.contents[0].tags['album']
@@ -72,9 +74,20 @@ class GopulateContainer(omg.models.Node):
         for tag in self.sameTags:
             self.tags[tag] = self.commonTagValues[tag]
     
-    def commit(self):
+    def mergeWithExisting(self, element):
+        self.existingContainer = element
+        for i in range(len(element.contents)):
+            if tags.get("tracknumber") in element.contents[i].tags:
+                self.tracks[int(element.contents[i].tags["tracknumber"][0].split("/")[0])] = element.contents[i] 
+            else:
+                self.tracks[i] = element.contents[i]
+    
+    def commit(self, toplevel = False):
         logger.debug("commiting container {}".format(self.name))
-        myId = database.queries.addContainer(self.name, self.tags, len(self.contents))
+        if self.existingContainer:
+            myId = self.existingContainer.id
+        else:
+            myId = database.queries.addContainer(self.name, self.tags, len(self.contents), toplevel = toplevel)
         for i in range(len(self.contents)):
             elem = self.contents[i]
             if isinstance(elem, GopulateContainer) or isinstance(elem, FileSystemFile):
@@ -83,7 +96,10 @@ class GopulateContainer(omg.models.Node):
         return myId
     
     def toolTipText(self):
-        return "Non-DB container {} ({} elements)".format(self.name, len(self.contents))
+        if self.existingContainer:
+            return "DB-container '{}' with some non-DB elements".format(self.name)
+        else:
+            return "Non-DB container '{}' ({} elements)".format(self.name, len(self.contents))
             
         
 class FileSystemFile(omg.models.Node):
@@ -182,7 +198,7 @@ class GopulateTreeModel(rootedtreemodel.RootedTreeModel):
         for item in self.root.contents:
             logger.debug("item of type {}".format(type(item)))
             if isinstance(item, GopulateContainer) or isinstance(item, FileSystemFile):
-                item.commit()
+                item.commit(toplevel=True)
         self.setCurrentDirectory(self.current)
     
     def flags(self, index):

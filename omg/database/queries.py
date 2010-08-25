@@ -23,6 +23,16 @@ def idFromFilename(filename):
         return database.get().query("SELECT container_id FROM files WHERE path=?;", filename).getSingle()
     except omg.database.sql.DBException:
         return None
+
+def idFromHash(hash):
+    """Retrieves the containerId of a file from its hash, or None if it is not found."""
+    result =  database.db.query("SELECT container_id FROM files WHERE hash=?;", hash)
+    if len(result)==1:
+        return result.getSingle()
+    elif len(result)==0:
+        return None
+    else:
+        raise RuntimeError("Hash not unique upon filenames!")
     
 def addContent(containerId, i, contentId):
     """Adds new content to a container in the database.
@@ -62,10 +72,38 @@ def setTags(cid, tags, append=False):
         for value in tags[tag]:
             addTag(cid, tag, value)
  
-def addContainer(name, tags = None, elements = 0):
+def addContainer(name, tags = None, elements = 0, toplevel = False):
     """Adds a container to the database, which can have tags and a number of elements."""
-    result = database.get().query("INSERT INTO containers (name,elements) VALUES(?,?);", name,elements)
+    
+    if toplevel:
+        top = '1'
+    else:
+        top = '0'
+    result = database.get().query("INSERT INTO containers (name,elements,toplevel) VALUES(?,?,?);", name,elements,top)
     newid = result.insertId() # the new container's ID
     if tags:
         setTags(newid, tags)
     return newid
+
+def delContainer(cid):
+    """Removes a container together with all of its content and tag references from the database.
+    
+    If the content is a file, also deletes its entry from the files table."""
+    db = database.get()
+    db.query("DELETE FROM tags WHERE container_id=?;", cid) # delete tag references
+    db.query("DELETE FROM othertags WHERE container_id=?;",cid) # delete othertag references
+    db.query("DELETE FROM contents WHERE container_id=? OR element_id=?;",cid,cid) # delete content relations
+    db.query("DELETE FROM files WHERE container_id=?;",cid) # delete file entry, if present
+    db.query("DELETE FROM containers WHERE id=?;",cid) # remove container itself
+
+def delFile(path=None,hash=None,id=None):
+    """Deletes a file from the database, either by path, hash or id."""
+    
+    if id:
+        return delContainer(id)
+    elif path:
+        return delContainer(idFromFilename(path))
+    elif hash:
+        return delContainer(idFromHash(path))
+    else:
+        raise ValueError("One of the arguments must be set.")

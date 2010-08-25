@@ -57,7 +57,10 @@ class NewGopulateDelegate(QtGui.QStyledItemDelegate):
             beforeTable = f.detailView()
         # color codes
         if isinstance(elem, omg.gopulate.models.FileSystemFile) or isinstance(elem, omg.gopulate.models.GopulateContainer):
-            beforeTable = '<span style="background:yellow">' + beforeTable + "</span>"
+            if isinstance(elem, omg.gopulate.models.GopulateContainer) and elem.existingContainer:
+                beforeTable = '<span style="background:pink">' + beforeTable + "</span>"
+            else:
+                beforeTable = '<span style="background:yellow">' + beforeTable + "</span>"
         elif isinstance(elem, omg.models.Element):
             beforeTable = '<span style="background:green">already in DB' + beforeTable + "</span>"
         lines = beforeTable
@@ -122,6 +125,8 @@ class GopulatTreeWidget(QtGui.QTreeView):
         
 class GopulateWidget(QtGui.QWidget):
     
+    dbChanged = QtCore.pyqtSignal()
+    
     def __init__(self, model):
         QtGui.QWidget.__init__(self)
         self.dirLabel = QtGui.QLabel()
@@ -134,6 +139,7 @@ class GopulateWidget(QtGui.QWidget):
         
         self.next = QtGui.QPushButton('next')
         self.next.clicked.connect(model.nextDirectory)
+        self.next.clicked.connect(self.dbChanged.emit)
         
         layout = QtGui.QVBoxLayout(self)
         layout.addWidget(self.dirLabel)

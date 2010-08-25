@@ -15,13 +15,14 @@ Options:
 -h: Display this help message and exit."""
 
 import sys
-from omg import database
+from omg import database,config
+import logging.config
 
 if __name__ == "__main__":
     if "-h" in sys.argv or "--help" in sys.argv:
         print(__doc__)
         sys.exit()
-        
+    config.init({})        
     db=database.connect()
 
     checkMethods = database.getCheckMethods()

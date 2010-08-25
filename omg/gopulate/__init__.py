@@ -10,7 +10,7 @@ import sys, os
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 import omg.models
-from omg import config, realfiles, relPath, absPath
+from omg import config, realfiles, relPath, absPath, tags
 import logging
 import omg.database.queries as queries
 import omg.database
@@ -43,6 +43,7 @@ def findAlbumsInDirectory(path, onlyNewFiles = True):
                     if not aid in existingAlbumsInThisDirectory:
                         existingAlbumsInThisDirectory[aid] = omg.models.Element(aid)
                         existingAlbumsInThisDirectory[aid].contents = []
+                        existingAlbumsInThisDirectory[aid].loadTags()
                     existingAlbumsInThisDirectory[aid].contents.append(elem)
                     elem.parent = existingAlbumsInThisDirectory[aid]
                 if len(albumIds) > 0:
@@ -67,6 +68,7 @@ def findAlbumsInDirectory(path, onlyNewFiles = True):
                 trkn = int(t["tracknumber"][0].split("/")[0]) # support 02/15 style
                 newAlbumsInThisDirectory[album].tracks[trkn] = elem
             else: # file without tracknumber, bah
+                print(t)
                 if 0 in newAlbumsInThisDirectory[album].tracks:
                     logger.warning("More than one file in this album without tracknumber, don't know what to do: \n{0}".format(filename))
                     del newAlbumsInThisDirectory[album]
@@ -76,7 +78,11 @@ def findAlbumsInDirectory(path, onlyNewFiles = True):
         else:
             logger.warning("Here is a file without album, I'll skip this: {0}".format(filename))
     for t in existingAlbumsInThisDirectory.values():
-        thingsInThisDirectory.append(t)
+        if tags.get("title") in t.tags and t.tags["title"][0] in newAlbumsInThisDirectory:
+            album = t.tags['title'][0]
+            newAlbumsInThisDirectory[album].mergeWithExisting(t)
+        else:
+            thingsInThisDirectory.append(t)
     for al in newAlbumsInThisDirectory.values():
         al.finalize()
         thingsInThisDirectory.append(al)
