@@ -30,7 +30,7 @@ class TextCriterion:
             # Build a query to search in all tags...or to be exact: In all tags if the search-value is a number. Otherwise exclude date-tags.
             try:
                 number = int(self.value)
-                tagsToSearch = tags.tagList()
+                tagsToSearch = tags.tagList
             except ValueError:
                 tagsToSearch = (tag for tag in tags.tagList if tag.type != 'date')
         return " UNION ".join(("({0})".format(_buildSelectForSingleTag(tag,self.value,fromTable,columns))\
