@@ -19,31 +19,7 @@ from . import Node, Element, FilelistMixin, IndexMixin
 db = database.get()
 logger = logging.getLogger("omg.models.playlist")
 
-class PlaylistElement(Element):
-    def __init__(self,id,contents,tags = None):
-        Element.__init__(self,id)
-        self.length = None
-        self.position = None
-        self.contents = contents
-        if tags is not None:
-            self.tags = tags
-        else: self.loadTags()
-    
-    def getPosition(self):
-        if self.parent is None or isinstance(self.parent,RootNode): # Without parent, there can't be a position
-            return None
-        if self.position is None:
-            self.position = db.query("SELECT position FROM contents WHERE container_id = ? AND element_id = ?", 
-                                     self.parent.id,self.id).getSingle()
-        return self.position
-    
-    def getLength(self):
-        """Cache the length, which is not done by Element."""
-        if self.length is None:
-            self.length = Element.getLength(self)
-        return self.length
 
-        
 class Playlist(rootedtreemodel.RootedTreeModel):
     # List of all paths of songs in the playlist. Used for fast synchronization with MPD.
     pathList = None
@@ -111,7 +87,7 @@ class Playlist(rootedtreemodel.RootedTreeModel):
             else: offset = len(self.pathList)
             
         if mimeData.hasFormat(config.get("gui","mime")):
-            self.insertElements(self.importElements(mimeData.retrieveData(config.get("gui","mime"))),offset)
+            self.insertElements([node.copy() for node in mimeData.retrieveData(config.get("gui","mime"))],offset)
             return True
         elif mimeData.hasFormat("text/uri-list"):
             
@@ -406,10 +382,7 @@ class Playlist(rootedtreemodel.RootedTreeModel):
         child = element.contents[index]
         if innerOffset == 0: # child starts at the given offset, so we there is no need to split
             return False
-        newChild = PlaylistElement(child.id,self._splitHelper(child,innerOffset),child.tags)
-        for c in newChild.contents:
-            c.parent = newChild
-        newChild.parent = element
+        newChild = child.copy(self._splitHelper(child,innerOffset))
         self.beginInsertRows(self.getIndex(element),index+1,index+1)
         element.contents.insert(index+1,newChild)
         self.endInsertRows()
@@ -429,9 +402,7 @@ class Playlist(rootedtreemodel.RootedTreeModel):
             return result
         else:
             # Otherwise we have to create a copy of child containing the files starting at offset. Here we use _splitHelper recursively.
-            newChild = PlaylistElement(child.id,self._splitHelper(child,innerOffset),child.tags)
-            for c in newChild.contents:
-                c.parent = newChild
+            newChild = child.copy(contents=self._splitHelper(child,innerOffset))
             result = [newChild].extend(element.contents[index+1:])
             self.beginRemoveRows(self.getIndex(element),index+1,len(element.contents)-1)
             del element.contents[index+1:]
@@ -493,25 +464,25 @@ class Playlist(rootedtreemodel.RootedTreeModel):
         filePaths = [relPath(path) for path in self._collectFiles(absPath(p) for p in paths)]
         return [self._createItem(path) for path in filePaths]
         
-    def importElements(self,elements):
-        """Return a list of copies of <elements> which may be inserted into the playlist."""
-        return [self._importElement(element,None) for element in elements]
-        
-    def _importElement(self,element,parent):
-        """Return a copy of <element> which may be inserted into the playlist. This method won't change <element> but it will set the copy's parent to <parent>, ensure that the copy's tags are loaded and recursively import all child elements."""
-        if isinstance(element,ExternalFile):
-            return ExternalFile(element.path,parent)
-        elif isinstance(element,Element):
-            newElement = PlaylistElement(element.id,[])
-            newElement.parent = parent
-            newElement.tags = element.tags
-            newElement.ensureTagsAreLoaded()
-            assert element.getChildren() is not None
-            newElement.contents = [self._importElement(child,newElement) for child in element.getChildren()]
-            return newElement
-        else: raise ValueError("element must be of type ExternalFile or Element, I got {} of type {}"
-                                    .format(element,type(element)))
-    
+    #~ def importElements(self,elements):
+        #~ """Return a list of copies of <elements> which may be inserted into the playlist."""
+        #~ return [self._importElement(element,None) for element in elements]
+        #~ 
+    #~ def _importElement(self,element,parent):
+        #~ """Return a copy of <element> which may be inserted into the playlist. This method won't change <element> but it will set the copy's parent to <parent>, ensure that the copy's tags are loaded and recursively import all child elements."""
+        #~ if isinstance(element,ExternalFile):
+            #~ return ExternalFile(element.path,parent)
+        #~ elif isinstance(element,Element):
+            #~ newElement = PlaylistElement(element.id,[])
+            #~ newElement.parent = parent
+            #~ newElement.tags = element.tags
+            #~ newElement.ensureTagsAreLoaded()
+            #~ assert element.getChildren() is not None
+            #~ newElement.contents = [self._importElement(child,newElement) for child in element.getChildren()]
+            #~ return newElement
+        #~ else: raise ValueError("element must be of type ExternalFile or Element, I got {} of type {}"
+                                    #~ .format(element,type(element)))
+
     def _collectFiles(self,paths): # TODO: Sort?
         """Return a list of absolute paths to all files in the given paths (which must be absolute, too). That is, if a path in <paths> is a file, it will be contained in the resulting list, whereas if it is a directory, all files within (recursively) will be contained in the result."""
         filePaths = []
@@ -521,21 +492,21 @@ class Playlist(rootedtreemodel.RootedTreeModel):
             elif os.path.isdir(path):
                 filePaths.extend(self._collectFiles(os.path.join(path,p) for p in os.listdir(path)))
         return filePaths
-        
-    def _createTreeBuilder(self,items):
-        """Create a TreeBuilder to create container-trees over the given list of elements."""
-        return treebuilder.TreeBuilder(items,self._getId,self._getParentIds,self._createNode)
    
     def _createItem(self,path,parent=None):
-        """Create a playlist-item for the given path. If the path is in the database, an instance of PlaylistElement is created, otherwise an instance of ExternalFile. The parent of the new element is set to <parent> (even then this is None)."""
+        """Create a playlist-item for the given path. If the path is in the database, an instance of Element is created, otherwise an instance of ExternalFile. The parent of the new element is set to <parent> (even when this is None)."""
         id = db.query("SELECT element_id FROM files WHERE path = ?",path).getSingle()
         if id is None:
             result = ExternalFile(path)
-        else: result = PlaylistElement(id,[])
+        else: result = Element(id)
         if not isinstance(result,ExternalFile): #TODO remove this line
             result.loadTags()
         result.parent = parent
         return result
+        
+    def _createTreeBuilder(self,items):
+        """Create a TreeBuilder to create container-trees over the given list of elements."""
+        return treebuilder.TreeBuilder(items,self._getId,self._getParentIds,self._createNode)
     
     def _getId(self,item):
         """Return the id of item or None if it is an ExternalFile. This is a helper method for the TreeBuilder-algorithm."""
@@ -548,10 +519,11 @@ class Playlist(rootedtreemodel.RootedTreeModel):
         return [id for id in db.query("SELECT container_id FROM contents WHERE element_id = ?",id).getSingleColumn()]
                
     def _createNode(self,id,contents):
-        """Create a PlaylistElement for a container with the given id and contents. This is a helper method for the TreeBuilder-algorithm."""
-        newElement = PlaylistElement(id,contents)
+        """Create a Element-instance for an element with the given id and contents. This is a helper method for the TreeBuilder-algorithm."""
+        newElement = Element(id,contents=contents)
         for element in contents:
             element.parent = newElement
+        #TODO
         return newElement
         
     def _seqLen(self,sequence):

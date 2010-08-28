@@ -36,6 +36,8 @@ def status():
 
 def insert(offset,paths):
     for path in paths:
+        if not isinstance(path,str):
+            raise ValueError("Each path must be a string.")
         try:
             client.add(path)
             client.move(int(client.status()['playlistlength'])-1,offset)
