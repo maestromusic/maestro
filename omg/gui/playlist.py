@@ -5,12 +5,16 @@
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 3 as
 #
+import logging
+
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt,SIGNAL
 
 from omg import config,mpclient
 from omg.models import playlist as playlistmodel
 from . import delegates, formatter#, tageditor
+
+logger = logging.getLogger("omg.gui.playlist")
 
 # Plugins may insert functions here to insert entries in the context menu. Each function must take two parameters:
 # - the playlist where the context-menu is opened
@@ -110,3 +114,8 @@ class PlaylistTreeView(QtGui.QTreeView):
             menu.addAction(action)
 
         menu.exec_(event.globalPos())
+    
+    def dropEvent(self,event):
+        if event.source() is None:
+            logger.debug("Drop from external source.")
+        QtGui.QTreeView.dropEvent(event)

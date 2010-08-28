@@ -113,7 +113,7 @@ get = _config.get
 set = _config.set
 
 
-def init(optionOverride):
+def init(optionOverride = {}):
     """Initialize the config-module, i.e. perform the following steps:
     - Store the default options
     - Overwrite them with the options from the config-file

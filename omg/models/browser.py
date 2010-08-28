@@ -57,7 +57,7 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
         return [config.get("gui","mime")]
     
     def mimeData(self,indexes):
-        return mimedata.MimeData(self,indexes)
+        return mimedata.createFromIndexes(self,indexes)
         
     def _loadLayer(self,node):
         """Load the contents of <node>, which must be either root or a CriterionNode (The contents of Elements are loaded via Element.loadContents)."""

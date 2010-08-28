@@ -7,7 +7,9 @@
 #
 import sys, os, random, logging, io
 import logging.config
+
 from PyQt4 import QtCore, QtGui
+from PyQt4.QtCore import Qt
 
 # Global variables. Only for debugging! Later there may be more than one browser, playlist, etc.
 widget = None
@@ -62,17 +64,16 @@ def run():
     controlWidget = control.createWidget()
     controlDock = QtGui.QDockWidget()
     controlDock.setWindowTitle("Playback control")
-    controlDock.setAllowedAreas(QtCore.Qt.TopDockWidgetArea | QtCore.Qt.BottomDockWidgetArea)
+    controlDock.setAllowedAreas(Qt.TopDockWidgetArea | Qt.BottomDockWidgetArea)
     controlDock.setWidget(controlWidget)
-    widget.addDockWidget(QtCore.Qt.TopDockWidgetArea, controlDock)
-    
+    widget.addDockWidget(Qt.TopDockWidgetArea, controlDock)
     
     browser = browserModule.Browser()
     browserDock = QtGui.QDockWidget()
     browserDock.setWindowTitle("Element browser")
-    browserDock.setAllowedAreas(QtCore.Qt.LeftDockWidgetArea | QtCore.Qt.RightDockWidgetArea)
+    browserDock.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
     browserDock.setWidget(browser)
-    widget.addDockWidget(QtCore.Qt.LeftDockWidgetArea, browserDock)
+    widget.addDockWidget(Qt.LeftDockWidgetArea, browserDock)
     
     playlist = playlistModule.Playlist()
     
@@ -90,11 +91,11 @@ def run():
     fb = omg.filesystembrowser.FileSystemBrowser()
     fbDock = QtGui.QDockWidget()
     fbDock.setWindowTitle("File browser")
-    fbDock.setAllowedAreas(QtCore.Qt.LeftDockWidgetArea | QtCore.Qt.RightDockWidgetArea)
+    fbDock.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
     fbDock.setWidget(fb)
     fb.currentDirectoryChanged.connect(gm.setCurrentDirectory)
     fb.searchDirectoryChanged.connect(gm.setSearchDirectory)
-    widget.addDockWidget(QtCore.Qt.RightDockWidgetArea, fbDock)
+    widget.addDockWidget(Qt.RightDockWidgetArea, fbDock)
     
     widget.setCentralWidget(central)
     control.synchronizePlaylist(playlist.getModel())

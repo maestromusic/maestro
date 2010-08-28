@@ -14,7 +14,6 @@ class FileSystemBrowserModel(QtGui.QFileSystemModel):
         QtGui.QFileSystemModel.__init__(self, parent)
         self.setFilter(QtCore.QDir.AllDirs | QtCore.QDir.NoDotAndDotDot)
 
-    
     def columnCount(self, index):
         return 1
         
@@ -32,6 +31,7 @@ class FileSystemBrowser(QtGui.QTreeView):
         self.setRootIndex(musikindex)
         self.selectionModel().currentChanged.connect(self._handleCurrentChanged)
         self.doubleClicked.connect(self._handleDoubleClick)
+        self.setDragDropMode(QtGui.QAbstractItemView.DragOnly)
         
     def _handleCurrentChanged(self, current, previous):
         self.currentDirectoryChanged.emit(self.model.filePath(current))

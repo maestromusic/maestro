@@ -6,11 +6,12 @@
 # it under the terms of the GNU General Public License version 3 as
 # published by the Free Software Foundation
 #
-import difflib, logging
+import difflib, logging, os
+
 from PyQt4 import QtCore
 from PyQt4.QtCore import Qt
 
-from omg import config, database, mpclient, tags
+from omg import config, database, mpclient, tags, absPath, relPath
 import omg.gopulate.models as gopmodels
 from . import rootedtreemodel, treebuilder, mimedata
 from . import Node, Element, FilelistMixin, IndexMixin
@@ -85,19 +86,20 @@ class Playlist(rootedtreemodel.RootedTreeModel):
         return Qt.CopyAction | Qt.MoveAction
          
     def mimeTypes(self):
-        return [config.get("gui","mime")]
+        return [config.get("gui","mime"),"text/uri-list"]
     
     def mimeData(self,indexes):
-        return mimedata.MimeData(self,indexes)
+        return mimedata.createFromIndexes(self,indexes)
     
     # A note on removing and inserting rows via DND: We cannot implement insertRows because we have no way to insert empty rows without elements. Instead we overwrite dropMimeData and use self.insertElements. On the other hand we implement removeRows to remove rows at the end of internal move operations and let Qt call this method.
     def dropMimeData(self,mimeData,action,row,column,parentIndex):
+        logger.debug("
         if action == Qt.IgnoreAction:
             return True
 
-        if not mimeData.hasFormat(config.get("gui","mime")) or column > 0:
+        if column > 0:
             return False
-        
+            
         if parentIndex.isValid():
             parent = self.data(parentIndex)
             if 0 <= row < parent.getChildrenCount():
@@ -108,9 +110,15 @@ class Playlist(rootedtreemodel.RootedTreeModel):
             if 0 <= row < self.root.getChildrenCount():
                 offset = self.root.getChildren()[row].getOffset()
             else: offset = len(self.pathList)
-        
-        self.insertElements(self.importElements(mimeData.retrieveData(config.get("gui","mime"))),offset)
-        return True
+            
+        if mimeData.hasFormat(config.get("gui","mime")):
+            self.insertElements(self.importElements(mimeData.retrieveData(config.get("gui","mime"))),offset)
+            return True
+        elif mimeData.hasFormat("text/uri-list"):
+            
+            self.insertElements(self.importPaths(relPath(url.path()) for url in mimeData.urls()),offset)
+            return True
+        else: return False
         
     def removeRows(self,row,count,parentIndex):
         parent = self.data(parentIndex) if parentIndex.isValid() else self.root
@@ -139,7 +147,7 @@ class Playlist(rootedtreemodel.RootedTreeModel):
             elif tag == 'replace':
                 yield ('delete',i1+offset,i2+offset,-1,-1)
                 offset = offset - i2 + i1
-                yield (tag,i1+offset,i2+offset,j1,j2)
+                yield ('insert',i1+offset,i2+offset,j1,j2)
                 offset == offset + j2 - j1
             else: raise ValueError("Opcode tag {0} is not supported.".format(tag))
                         
@@ -160,7 +168,9 @@ class Playlist(rootedtreemodel.RootedTreeModel):
                 elif tag == 'insert':
                     self.pathList[i1:i1] = pathList[j1:j2]
                     self._insertElements(self.root,[self._createItem(path) for path in pathList[j1:j2]],i1)
-                else: assert False # Opcodes are filtered to contain only 'delete' and 'insert'
+                else:
+                    # Opcodes are filtered to contain only 'delete' and 'insert'
+                    logger.debug("Got an unknown opcode: '{}',{},{},{},{}".format(tag,i1,i2,j1,j2))
             
             # Synchronize currently playing song
             if 'song' not in status:
@@ -478,27 +488,55 @@ class Playlist(rootedtreemodel.RootedTreeModel):
                 self._insertElements(next,[prev],0)
             else: pass # TODO: If prev and next are files with a common parent we should group them into this parent
     
+    def importPaths(self,paths):
+        """Return a list of elements from the given (relative) paths which may be inserted into the playlist."""
+        # _collectFiles works with absolute paths, so we need to convert paths before and after _collectFiles
+        filePaths = [relPath(path) for path in self._collectFiles(absPath(p) for p in paths)]
+        return [self._createItem(path) for path in filePaths]
+        
     def importElements(self,elements):
+        """Return a list of copies of <elements> which may be inserted into the playlist."""
         return [self._importElement(element,None) for element in elements]
         
     def _importElement(self,element,parent):
-        result = PlaylistElement(element.id,None)
-        result.loadTags()
-        assert element.getChildren() is not None
-        result.contents = [self._importElement(child,result) for child in element.getChildren()]
-        result.parent = parent
-        return result
+        """Return a copy of <element> which may be inserted into the playlist. This method won't change <element> but it will set the copy's parent to <parent>, ensure that the copy's tags are loaded and recursively import all child elements."""
+        if isinstance(element,ExternalFile):
+            return ExternalFile(element.path,parent)
+        elif isinstance(element,Element):
+            newElement = PlaylistElement(element.id,[])
+            newElement.parent = parent
+            newElement.tags = element.tags
+            newElement.ensureTagsAreLoaded()
+            assert element.getChildren() is not None
+            newElement.contents = [self._importElement(child,newElement) for child in element.getChildren()]
+            return newElement
+        else: raise ValueError("element must be of type ExternalFile or Element, I got {} of type {}"
+                                    .format(element,type(element)))
+    
+    def _collectFiles(self,paths): # TODO: Sort?
+        """Return a list of absolute paths to all files in the given paths (which must be absolute, too). That is, if a path in <paths> is a file, it will be contained in the resulting list, whereas if it is a directory, all files within (recursively) will be contained in the result."""
+        filePaths = []
+        for path in paths:
+            if os.path.isfile(path):
+                filePaths.append(path)
+            elif os.path.isdir(path):
+                filePaths.extend(self._collectFiles(os.path.join(path,p) for p in os.listdir(path)))
+        return filePaths
         
     def _createTreeBuilder(self,items):
         """Create a TreeBuilder to create container-trees over the given list of elements."""
         return treebuilder.TreeBuilder(items,self._getId,self._getParentIds,self._createNode)
    
-    def _createItem(self,path):
-        """Create a playlist-item for the given path. If the path is in the database, an instance of PlaylistElement is created, otherwise an instance of ExternalFile. This method is used to create items based on the MPD-playlist."""
+    def _createItem(self,path,parent=None):
+        """Create a playlist-item for the given path. If the path is in the database, an instance of PlaylistElement is created, otherwise an instance of ExternalFile. The parent of the new element is set to <parent> (even then this is None)."""
         id = db.query("SELECT container_id FROM files WHERE path = ?",path).getSingle()
         if id is None:
-            return ExternalFile(path)
-        else: return PlaylistElement(id,[])
+            result = ExternalFile(path)
+        else: result = PlaylistElement(id,[])
+        if not isinstance(result,ExternalFile): #TODO remove this line
+            result.loadTags()
+        result.parent = parent
+        return result
     
     def _getId(self,item):
         """Return the id of item or None if it is an ExternalFile. This is a helper method for the TreeBuilder-algorithm."""
@@ -555,6 +593,9 @@ class ExternalFile(gopmodels.FileSystemFile, FilelistMixin):
             raise IndexError("Offset {0} is out of bounds".format(offset))
         return self
     
+    def loadTags(self):
+        self.readTagsFromFilesystem()
+        
     def __str__(self):
         return self.path
 
