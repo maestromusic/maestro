@@ -45,31 +45,31 @@ def createResultTempTable(tableName,dropIfExists):
         """.format(tableName))
 
 
-def stdTextSearch(searchString,resultTable,fromTable='containers',logicalMode=CONJUNCTION):
+def stdTextSearch(searchString,resultTable,fromTable='elements',logicalMode=CONJUNCTION):
     stdSearch(searchparser.parseSearchString(searchString),resultTable,fromTable,logicalMode)
 
 
-def stdSearch(criteria,resultTable,fromTable='containers',logicalMode=CONJUNCTION):
+def stdSearch(criteria,resultTable,fromTable='elements',logicalMode=CONJUNCTION):
     search(criteria,resultTable,fromTable,logicalMode)
     addChildren(resultTable)
     addFilledParents(resultTable)
     setTopLevelFlag(resultTable)
 
 
-def textSearch(searchString,resultTable,fromTable='containers',logicalMode=CONJUNCTION):
+def textSearch(searchString,resultTable,fromTable='elements',logicalMode=CONJUNCTION):
     """Parse the given search string to TextCriteria and submit them together with all other arguments to the search-method."""
     search(searchparser.parseSearchString(searchString),resultTable,fromTable,logicalMode)
 
 
-def search(criteria,resultTable,fromTable='containers',logicalMode=CONJUNCTION):
+def search(criteria,resultTable,fromTable='elements',logicalMode=CONJUNCTION):
     """Search the database and store the result in a table.
     
     This method finds all direct results fulfilling all or at least one of the given criteria and writes them into <resultTable>.
     
     Detailed parameter description:
-    - <criteria> is a list of criteria (confer the criteria-module). Depending on <logicalMode> only containers fulfilling all or at least one of the criteria will be found.
+    - <criteria> is a list of criteria (confer the criteria-module). Depending on <logicalMode> only elements fulfilling all or at least one of the criteria will be found.
     - The id of each container found by the search is stored in the 'id'-column of <resultTable>. This table should be created with the createResultTempTable-method (or has to contain at least the columns created by that method and default values for all other columns. This table will be truncated before the search is performed!
-    - This method will find only containers with records in <fromTable>. Since <fromTable> defaults to 'containers' usually all containers are searched. <fromTable> must contain an 'id'-column holding container-ids.
+    - This method will find only elements with records in <fromTable>. Since <fromTable> defaults to 'elements' usually all elements are searched. <fromTable> must contain an 'id'-column holding container-ids.
     - <logicalMode> specifies if a container must fulfill all criteria (CONJUNCTION) or only at least one criterion (DISJUNCTION) to be found.
     """
     assert(logicalMode == CONJUNCTION) #TODO: Support DISJUNCTION
@@ -92,21 +92,21 @@ def search(criteria,resultTable,fromTable='containers',logicalMode=CONJUNCTION):
         db.query("DELETE FROM {0} WHERE id NOT IN (SELECT id FROM {1})".format(resultTable,TT_HELP))
 
 
-def addChildren(resultTable,fromTable="containers"):
+def addChildren(resultTable,fromTable="elements"):
     while True:
         db.query("TRUNCATE TABLE {0}".format(TT_HELP))
         # First store all direct results which have children in TT_HELP
         result = db.query("""
             INSERT INTO {0} (id)
                 SELECT {1}.id
-                FROM {1} JOIN containers ON {1}.id = containers.id
-                WHERE {1}.new = 1 AND containers.elements > 0
+                FROM {1} JOIN elements ON {1}.id = elements.id
+                WHERE {1}.new = 1 AND elements.elements > 0
             """.format(TT_HELP,resultTable))
         if result.affectedRows() == 0:
             break
         db.query("UPDATE {0} SET new = 0".format(resultTable))
-        # If fromTable is not containers this query part will ensure that only elements in fromTable will be added.
-        if fromTable != 'containers':
+        # If fromTable is not elements this query part will ensure that only elements in fromTable will be added.
+        if fromTable != 'elements':
             restrictToFromTablePart = "JOIN {0} ON {0}.id = contents.element_id".format(fromTable)
         else: restrictToFromTablePart = ''
         db.query("""
@@ -117,12 +117,12 @@ def addChildren(resultTable,fromTable="containers"):
                 """.format(resultTable,TT_HELP,restrictToFromTablePart))
 
 
-def addFilledParents(resultTable,fromTable="containers"):
+def addFilledParents(resultTable,fromTable="elements"):
     db.query("TRUNCATE TABLE {0}".format(TT_HELP))
     db.query("UPDATE {0} SET new = 1".format(resultTable))
     while True:
-         # If fromTable is not containers this query part will ensure that only elements in fromTable will be added.
-        if fromTable != 'containers':
+         # If fromTable is not elements this query part will ensure that only elements in fromTable will be added.
+        if fromTable != 'elements':
             restrictToFromTablePart = "JOIN {0} ON {0}.id = contents.element_id".format(fromTable)
         else: restrictToFromTablePart = ''
         result = db.query("""
@@ -138,14 +138,14 @@ def addFilledParents(resultTable,fromTable="containers"):
         db.query("""
             INSERT IGNORE INTO {0} (id,new)
                 SELECT {1}.id,1
-                FROM {1} JOIN containers ON {1}.id = containers.id
-                WHERE containers.elements = {1}.value
+                FROM {1} JOIN elements ON {1}.id = elements.id
+                WHERE elements.elements = {1}.value
                 """.format(resultTable,TT_HELP))
 
 
 def setTopLevelFlag(table):
     db.query("TRUNCATE TABLE {0}".format(TT_HELP))
-    if table != "containers":
+    if table != "elements":
         restrictToTablePart = "JOIN {0} ON contents.element_id = {0}.id".format(table)
     else: restrictToTablePart = ''
     db.query("""
@@ -159,8 +159,8 @@ def setTopLevelFlag(table):
     
 def printResultTable(table):
     result = db.query("""
-        SELECT res.id,res.toplevel,res.new,containers.name
-        FROM {0} as res JOIN containers ON res.id = containers.id
+        SELECT res.id,res.toplevel,res.new,elements.name
+        FROM {0} as res JOIN elements ON res.id = elements.id
         """.format(table))
     print("Printing result table "+table)
     for row in result:

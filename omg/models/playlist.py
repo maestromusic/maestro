@@ -93,7 +93,6 @@ class Playlist(rootedtreemodel.RootedTreeModel):
     
     # A note on removing and inserting rows via DND: We cannot implement insertRows because we have no way to insert empty rows without elements. Instead we overwrite dropMimeData and use self.insertElements. On the other hand we implement removeRows to remove rows at the end of internal move operations and let Qt call this method.
     def dropMimeData(self,mimeData,action,row,column,parentIndex):
-        logger.debug("
         if action == Qt.IgnoreAction:
             return True
 
@@ -529,7 +528,7 @@ class Playlist(rootedtreemodel.RootedTreeModel):
    
     def _createItem(self,path,parent=None):
         """Create a playlist-item for the given path. If the path is in the database, an instance of PlaylistElement is created, otherwise an instance of ExternalFile. The parent of the new element is set to <parent> (even then this is None)."""
-        id = db.query("SELECT container_id FROM files WHERE path = ?",path).getSingle()
+        id = db.query("SELECT element_id FROM files WHERE path = ?",path).getSingle()
         if id is None:
             result = ExternalFile(path)
         else: result = PlaylistElement(id,[])

@@ -118,4 +118,4 @@ class PlaylistTreeView(QtGui.QTreeView):
     def dropEvent(self,event):
         if event.source() is None:
             logger.debug("Drop from external source.")
-        QtGui.QTreeView.dropEvent(event)
+        QtGui.QTreeView.dropEvent(self,event)

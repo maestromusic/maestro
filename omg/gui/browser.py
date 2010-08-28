@@ -19,12 +19,12 @@ TT_BIG_RESULT = 'tmp_browser_bigres'
 TT_SMALL_RESULT = 'tmp_browser_smallres'
 
 class Browser(QtGui.QWidget):
-    """Browser-widget to search the music collection. The browser contains a searchbox, a button to open the configuration-dialog and one or more views. Depending on whether a search value is entered or not, the browser displayes results from TT_BIG_RESULT or 'containers' (self.table). Each view has a list of tag-sets ('layers') and will group the contents of self.table according to the layers."""
+    """Browser-widget to search the music collection. The browser contains a searchbox, a button to open the configuration-dialog and one or more views. Depending on whether a search value is entered or not, the browser displayes results from TT_BIG_RESULT or 'elements' (the correct table is stored in self.table). Each view has a list of tag-sets ('layers') and will group the contents of self.table according to the layers."""
     
     views = None # List of BrowserTreeViews
     searchBox = None
     
-    table = "containers" # The MySQL-table whose contents are currently displayed
+    table = "elements" # The MySQL-table whose contents are currently displayed
     
     def __init__(self,parent = None):
         """Initialize a new Browser with the given parent."""
@@ -61,7 +61,7 @@ class Browser(QtGui.QWidget):
             search.stdTextSearch(self.searchBox.text(),TT_BIG_RESULT)
             self.table = TT_BIG_RESULT
         else:
-            self.table = "containers"
+            self.table = "elements"
             database.get().query("TRUNCATE TABLE {0}".format(TT_BIG_RESULT))
         
         for view in self.views:

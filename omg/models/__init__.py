@@ -178,12 +178,12 @@ class Element(Node,FilelistMixin,IndexMixin):
         try:
             return self.path
         except AttributeError:
-            self.path = db.query("SELECT path FROM files WHERE container_id = {0}".format(self.id)).getSingle()
+            self.path = db.query("SELECT path FROM files WHERE element_id = {0}".format(self.id)).getSingle()
             if self.path is None:
                 raise ValueError("The element with id {0} has no path. Maybe it is a container.".format(self.id))
             return self.path
         
-    def loadContents(self,recursive=False,table="containers"):
+    def loadContents(self,recursive=False,table="elements"):
         """Delete the stored contents-list and fetch the contents from the database. You may use the <table>-parameter to restrict the child elements to a specific table: The table with name <table> must contain a column 'id' and this method will only fetch elements which appear in that column. If <recursive> is true loadContents will be called recursively for all child elements."""
         self.contents = []
         result = db.query("""
@@ -218,7 +218,7 @@ class Element(Node,FilelistMixin,IndexMixin):
         result = db.query("""
             SELECT tag_id,value_id 
             FROM tags
-            WHERE container_id = {0} {1}
+            WHERE element_id = {0} {1}
             """.format(self.id,additionalWhereClause))
         for row in result:
             tag = tags.get(row[0])
@@ -233,7 +233,7 @@ class Element(Node,FilelistMixin,IndexMixin):
         result = db.query("""
             SELECT tagname,value
             FROM othertags
-            WHERE container_id = {0} {1}
+            WHERE element_id = {0} {1}
             """.format(self.id,otherAdditionalWhereClause))
         for row in result:
             tag = tags.get(row[0])
@@ -252,7 +252,7 @@ class Element(Node,FilelistMixin,IndexMixin):
         """Load the tags which are not indexed from the database and return them. The result will be a tags.Storage mapping tag-names to lists of tag-values. If <cache> is True, the tags will be stored in this Element. Warning: Subsequent calls of this method will return the cached tags only if <cache> is again True."""
         if cache and hasattr(self,'otherTags'):
             return self.otherTags
-        result = db.query("SELECT tagname,value FROM othertags WHERE container_id = {0}".format(self.id))
+        result = db.query("SELECT tagname,value FROM othertags WHERE element_id = {0}".format(self.id))
         otherTags = tags.Storage()
         for row in result:
             otherTags[tags.OtherTag(row[0])].append(row[1])
@@ -265,7 +265,7 @@ class Element(Node,FilelistMixin,IndexMixin):
         if self.contents is None:
             return None
         if len(self.contents) == 0:
-            return db.query("SELECT length FROM files WHERE container_id = {0}".format(self.id)).getSingle()
+            return db.query("SELECT length FROM files WHERE element_id = {0}".format(self.id)).getSingle()
         else:
             try:
                 return sum(element.getLength() for element in self.contents)
@@ -318,7 +318,7 @@ class Element(Node,FilelistMixin,IndexMixin):
                 titles = db.query("""
                     SELECT tag_{0}.value
                     FROM tags JOIN tag_{0} ON tags.value_id = tag_{0}.id
-                    WHERE tags.container_id = {1} AND tags.tag_id = {2}
+                    WHERE tags.element_id = {1} AND tags.tag_id = {2}
                     """.format(tags.TITLE.name,id,tags.TITLE.id)).getSingleColumn()
                 for title in titles:
                     if title in albumTitles:

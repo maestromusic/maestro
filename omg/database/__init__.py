@@ -69,24 +69,24 @@ def getCheckMethods():
     return {k:v for k,v in module.__dict__.items() if type(v) is types.FunctionType and k.startswith("check")}
 
 def checkElementCounters(fix=False):
-    """Search containers.elements for wrong entries and corrects them if fix is true. Return the number of wrong entries."""
-    if "containers" not in listTables():
+    """Search elements.elements for wrong entries and corrects them if fix is true. Return the number of wrong entries."""
+    if "elements" not in listTables():
         return 0
         
     if fix:
-        return db.query("UPDATE containers \
+        return db.query("UPDATE elements \
                          SET elements = (SELECT COUNT(*) FROM contents WHERE container_id = id)").affectedRows()
-    else: return db.query("SELECT COUNT(*) FROM containers \
+    else: return db.query("SELECT COUNT(*) FROM elements \
                            WHERE elements != (SELECT COUNT(*) FROM contents WHERE container_id = id)").getSingle()
 
 def checkTopLevelFlags(fix=False):
-    """Search containers.toplevel for wrong entries and corrects them if fix is true. Return the number of wrong entries."""
-    if "containers" not in listTables():
+    """Search elements.toplevel for wrong entries and corrects them if fix is true. Return the number of wrong entries."""
+    if "elements" not in listTables():
         return 0
     
     if fix:
-        return db.query("UPDATE containers SET toplevel = (NOT id IN (SELECT element_id FROM contents))").affectedRows()
-    else: return db.query("SELECT COUNT(*) FROM containers \
+        return db.query("UPDATE elements SET toplevel = (NOT id IN (SELECT element_id FROM contents))").affectedRows()
+    else: return db.query("SELECT COUNT(*) FROM elements \
                            WHERE toplevel != (NOT id IN (SELECT element_id FROM contents))").getSingle()
 
 def checkTagIds(fix=False):
@@ -136,15 +136,15 @@ def _checkForeignKey(fix,table,key,refTable,refKey,additionalWhereClause = None)
 def checkForeignKeys(fix=False):
     """Check foreign key constraints in the database.
     
-     As the current MySQL doesn't support foreign key constraints by itself (at least not in MyISAM), this method checks manually all such constraints. A foreign key is a column which values must be contained in another column in another table (the referenced table). For example: Every container_id-value in the contents-table must have a corresponding entry in the container-table. This method returns a dictionary mapping (tablename,keycolumn) to the number of broken entries (e.g. (contents,container_id):4 to indicate that 4 rows of contents.container_id are not in the container-table)."""
+     As the current MySQL doesn't support foreign key constraints by itself (at least not in MyISAM), this method checks manually all such constraints. A foreign key is a column which values must be contained in another column in another table (the referenced table). For example: Every container_id-value in the contents-table must have a corresponding entry in the elements-table. This method returns a dictionary mapping (tablename,keycolumn) to the number of broken entries (e.g. (contents,container_id):4 to indicate that 4 rows of contents.container_id are not in the elements-table)."""
     tables = listTables()
     # In a first step we check all foreign keys except for tag_id in the tags-tables.
     # Argument sets to use with _checkForeignKey
-    foreignKeys = [("contents","container_id","containers","id"),
-                   ("contents","element_id","containers","id"),
-                   ("files","container_id","containers","id"),
-                   ("othertags","container_id","containers","id"),
-                   ("tags","container_id","containers","id"),
+    foreignKeys = [("contents","container_id","elements","id"),
+                   ("contents","element_id","elements","id"),
+                   ("files","element_id","elements","id"),
+                   ("othertags","element_id","elements","id"),
+                   ("tags","element_id","elements","id"),
                    ("tags","tag_id","tagids","id")
                   ]
     # Remove entries where table or refTable does not exist
@@ -168,15 +168,15 @@ def checkForeignKeys(fix=False):
 
 
 def checkEmptyContainers(fix=False):
-    """Return the number of empty containers which are NOT files and delete them if fix is true. These are usually there because of a crash in populate. This method uses containers.elements so you might have to use checkElementCounters before using it."""
+    """Return the number of empty elements which are NOT files and delete them if fix is true. These are usually there because of a crash in populate. This method uses elements.elements so you might have to use checkElementCounters before using it."""
     tables = list(db.query("SHOW TABLES").getSingleColumn())
-    if "containers" not in listTables() or "files" not in listTables():
+    if "elements" not in listTables() or "files" not in listTables():
         return 0
     if fix:
-        return db.query("DELETE FROM containers WHERE elements=0 \
-                         AND NOT id IN (SELECT container_id FROM files)").affectedRows()
-    else: return db.query("SELECT COUNT(*) FROM containers WHERE elements=0 \
-                           AND NOT id IN (SELECT container_id FROM files)").getSingle()
+        return db.query("DELETE FROM elements WHERE elements=0 \
+                         AND NOT id IN (SELECT element_id FROM files)").affectedRows()
+    else: return db.query("SELECT COUNT(*) FROM elements WHERE elements=0 \
+                           AND NOT id IN (SELECT element_id FROM files)").getSingle()
 
 def checkSuperfluousTags(fix=False):
     """Search the tag_*-tables for values that are never used in the tags-table. If fix is true delete these entries. Return a dictionary mapping tagnames to the number of superfluous tags with this name (but only where this number is positive)."""

@@ -51,7 +51,7 @@ class SQLTable:
 # Later this dictionary will be enlarged by the tag-tables (which depend on the config-file).
 # Take the following commands, save them in an SQLTable object and save it with its name as key in a dictionary.
 tables = {table.name:table for table in (SQLTable(createQuery) for createQuery in (
-"""CREATE TABLE containers (
+"""CREATE TABLE elements (
         id MEDIUMINT UNSIGNED NOT NULL AUTO_INCREMENT,
         name VARCHAR(255) NOT NULL,
         toplevel TINYINT(1) NOT NULL,
@@ -69,23 +69,23 @@ tables = {table.name:table for table in (SQLTable(createQuery) for createQuery i
     );
 """,
 """CREATE TABLE files (
-        container_id MEDIUMINT UNSIGNED NOT NULL,
+        element_id MEDIUMINT UNSIGNED NOT NULL,
         path VARCHAR(511),
         hash VARCHAR(63),
         verified TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         length MEDIUMINT UNSIGNED NOT NULL,
-        PRIMARY KEY(container_id),
+        PRIMARY KEY(element_id),
         UNIQUE INDEX path_idx(path),
         INDEX hash_idx(hash),
         INDEX length_idx(length)
     );
 """,
 """CREATE TABLE tags (
-        container_id MEDIUMINT UNSIGNED NOT NULL,
+        element_id MEDIUMINT UNSIGNED NOT NULL,
         tag_id SMALLINT UNSIGNED NOT NULL,
         value_id MEDIUMINT UNSIGNED NOT NULL,
         INDEX tag_value_idx(tag_id,value_id),
-        INDEX container_idx(container_id)
+        INDEX element_idx(element_id)
     );
 """,
 """CREATE TABLE tagids (
@@ -97,10 +97,10 @@ tables = {table.name:table for table in (SQLTable(createQuery) for createQuery i
     );
 """,
 """CREATE TABLE othertags (
-        container_id MEDIUMINT UNSIGNED NOT NULL,
+        element_id MEDIUMINT UNSIGNED NOT NULL,
         tagname VARCHAR(63),
         value VARCHAR(255),
-        INDEX container_id_idx(container_id)
+        INDEX element_id_idx(element_id)
     );
 """)
 )}

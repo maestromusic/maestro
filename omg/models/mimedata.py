@@ -18,7 +18,6 @@ class MimeData(QtCore.QMimeData):
     def __init__(self,elementList):
         QtCore.QMimeData.__init__(self)
         self.elementList = elementList
-        print(elementList)
         
     def hasFormat(self,format):
         return format in self.formats()
@@ -27,7 +26,6 @@ class MimeData(QtCore.QMimeData):
         return [config.get("gui","mime"),"text/uri-list"]
     
     def hasUrls(self):
-        print("hasUrls")
         return True
         
     def retrieveData(self,mimeType,type=None):
