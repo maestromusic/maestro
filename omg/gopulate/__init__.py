@@ -35,13 +35,13 @@ def findAlbumsInDirectory(path, onlyNewFiles = True):
                 logger.debug("Skipping file '{0}' which is already in the database.".format(filename))
                 continue
             else:
-                elem = omg.models.Element(id)
+                elem = omg.models.DBFile(id)
                 elem.loadTags()
                 t = elem.tags
                 albumIds = elem.getAlbumIds()
                 for aid in albumIds:
                     if not aid in existingAlbumsInThisDirectory:
-                        existingAlbumsInThisDirectory[aid] = omg.models.Element(aid)
+                        existingAlbumsInThisDirectory[aid] = omg.models.Container(aid)
                         existingAlbumsInThisDirectory[aid].contents = []
                         existingAlbumsInThisDirectory[aid].loadTags()
                     existingAlbumsInThisDirectory[aid].contents.append(elem)

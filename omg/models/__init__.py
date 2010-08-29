@@ -54,12 +54,14 @@ class Node:
         newNode = copy.copy(self)
         if contents == -1:
             if hasattr(self,'contents'):
-                newNode.contents = [node.copy(True) for node in self.contents]
+                newNode.contents = [node.copy() for node in self.contents]
+                for node in newNode.contents:
+                    node.setParent(newNode)
         else:
             assert isinstance(contents,list)
             newNode.contents = contents
-        for node in newNode.contents:
-            node.setParent(newNode)
+            for node in newNode.contents:
+                node.setParent(newNode)
         return newNode
     
     def getParents(self):
@@ -103,7 +105,6 @@ class Node:
                         
     def getFileCount(self):
         """Return the number of files contained in this element or in child-elements of it."""
-        assert self.getChildren() is not None
         if self.isFile():
             return 1
         else: return sum(element.getFileCount() for element in self.getChildren())
@@ -120,6 +121,15 @@ class Node:
                 else: offset = offset + child.getFileCount()
             raise ValueError("Node.getOffset: Node {0} is not contained in its parent {1}."
                                 .format(self,self.getParent()))
+    
+    def getChildOffset(self,childIndex):
+        """Return the offset of the child with index <childIndex> in this node."""
+        if childIndex < 0 or childIndex >= self.getChildrenCount():
+            raise IndexError("childIndex {} is out of bounds.".format(childIndex))
+        offset = 0
+        for node in self.getChildren()[:childIndex]:
+            offset = offset + node.getFileCount()
+        return offset
         
     def getFileAtOffset(self,offset):
         """Get the file at the given <offset>. Note that <offset> is relative to this element, not to the whole playlist (unless the element is the rootnode)."""
@@ -137,7 +147,6 @@ class Node:
         """Return a tuple: the index of the child C that contains the file F with the given offset (relative to this element) and the offset of F relative to C ("inner offset").
         For example: If this element is the rootnode and the playlist contains an album with 13 songs and one with 12 songs, then getChildIndexAtOffset(17) will return (1,3), since the 18th file if the playlist (i.e. with offset 17), is contained in the second album (i.e with index 1) and it is the 4th song on that album (i.e. it has offset 3 relative to the album).
         """
-        assert self.getChildren() is not None
         offset = int(offset)
         if offset < 0:
             raise IndexError("Offset {0} is out of bounds".format(offset))
@@ -170,79 +179,19 @@ class RootNode(Node):
     def setParent(self):
         raise RuntimeError("Cannot set the parent of a RootNode.")
 
-
 class Element(Node):
-    """Base class for elements (files or containers) in playlists, browser, etc.. Contains methods to load tags and contents from the database and to get the path, cover, length etc.."""
+    """Abstract base class for elements (files or containers) in playlists, browser, etc.. Contains methods to load tags and contents from the database."""
     tags = None # tags.Storage to store the tags. None until they are loaded
-    contents = None # list of contents. None until they are loaded; [] if this element has no contents
     
-    def __init__(self,id,tags=None,contents=None):
-        """Initialize this element with the given id, which must be an integer. Optionally you may specify a tags.Storage object holding the tags of this element."""
-        assert isinstance(id,int)
-        self.id = id
-        self.tags = tags
-        self.contents = contents
+    def __init__(self):
+        raise RuntimeError(
+                "Cannot instantiate abstract base class Element. Use Container, DBFile or models.createElement.")
     
     def copy(self,contents=-1):
         """Reimplementation of Node.copy: In addition to contents the tags are also not copied by reference. Instead the copy will contain a copy of this node's tags.Storage-instance."""
         newNode = Node.copy(self,contents)
         newNode.tags = self.tags.copy()
         return newNode
-        
-    def hasChildren(self):
-        """Return whether this node has at least one child node or None if it is unknown since the contents are not loaded yet."""
-        return self.contents is not None and len(self.contents) > 0
-    
-    def getChildrenCount(self):
-        """Return the number of children or None if it is unknown since the contents are not loaded yet."""
-        if self.contents is None:
-            return 0
-        else: return len(self.contents)
-        
-    def isFile(self):
-        """Return whether this Element holds a file or None if it is unknown since the contents are not loaded yet."""
-        if self.contents is None:
-            return None
-        else: return len(self.contents) == 0
-    
-    def isContainer(self):
-        """Return whether this Element holds a container or None if it is unknown since the contents are not loaded yet."""
-        if self.contents is None:
-            return None
-        else: return len(self.contents) > 0
-        
-    def getPath(self,refresh=True):
-        """Return the path of this Element and cache it for subsequent calls.  If <refresh> is True the cached value must be recomputed. If the element has no path (e.g. containers), a ValueError is raised."""
-        if refresh or not hasattr(self,'path'):
-            path = db.query("SELECT path FROM files WHERE element_id = {0}".format(self.id)).getSingle()
-            if path is None:
-                raise ValueError("The element with id {0} has no path. Maybe it is a container.".format(self.id))
-            self.path = path
-        return self.path
-        
-    def loadContents(self,recursive=False,table="elements"):
-        """Delete the stored contents-list and fetch the contents from the database. You may use the <table>-parameter to restrict the child elements to a specific table: The table with name <table> must contain a column 'id' and this method will only fetch elements which appear in that column. If <recursive> is true loadContents will be called recursively for all child elements."""
-        self.contents = []
-        result = db.query("""
-                SELECT contents.element_id
-                FROM contents JOIN {0} ON contents.container_id = {1} AND contents.element_id = {0}.id
-                ORDER BY contents.position
-                """.format(table,self.id)).getSingleColumn()
-        for id in result:
-            self.contents.append(Element(id))
-            self.contents[-1].parent = self
-            
-        if recursive:
-            for element in self.contents:
-                element.loadContents(recursive,table)
-
-    def ensureContentsAreLoaded(self,recursive=False):
-        """Load contents if they are not loaded yet."""
-        if self.contents is None:
-            self.loadContents()
-        if recursive:
-            for element in self.contents:
-                element.loadContents(recursive=True)
 
     def loadTags(self,recursive=False,tagList=None):
         """Delete the stored indexed tags and load them from the database. If <recursive> is True, all tags from children of this node (recursively) will be loaded, too. If <tagList> is not None only tags in the given list will be loaded (e.g. only title-tags). Note that this method affects only indexed tags!"""
@@ -280,7 +229,7 @@ class Element(Node):
             value = row[1]
             self.tags[tag].append(value)
         if recursive:
-            for element in self.contents:
+            for element in self.getChildren():
                 element.loadTags(recursive,tagList)
     
     def ensureTagsAreLoaded(self,recursive=False):
@@ -288,7 +237,7 @@ class Element(Node):
         if self.tags is None:
             self.loadTags()
         if recursive:
-            for element in self.contents:
+            for element in self.getChildren():
                 element.ensureTagsAreLoaded()
                 
     def getOtherTags(self,cache=False):
@@ -302,20 +251,6 @@ class Element(Node):
         if cache:
             self.otherTags = otherTags
         return otherTags
-            
-    def getLength(self,refresh=False):
-        """Return the length of this element. If it is a file, the length will be cached for subsequent calls. If <refresh> is True the cached value must be recomputed. If the element is a container, return the sum of the lengths of all its contents.  If the length can't be computed, None is returned. This happens for example if the contents have not yet been loaded."""
-        if self.contents is None:
-            return None
-        if len(self.contents) == 0:
-            if refresh or not hasattr(self,'lenght'):
-                self.length = db.query("SELECT length FROM files WHERE element_id = {0}".format(self.id)).getSingle()
-            return self.length
-        else:
-            try:
-                return sum(element.getLength() for element in self.contents)
-            except TypeError: # At least one element does not know its length
-                return None
     
     def getPosition(self,refresh=False):
         """Return the position of this element in its current parent and cache it for subsequent calls. Note that position is the number from the contents-table, not the index of this element in the parent's list of children. To get the latter, use parent.index(self). If <refresh> is True the cached value must be recomputed. Return None if the element has no parent or the parent is not of type Element."""
@@ -385,7 +320,7 @@ class Element(Node):
         return covers.hasCover(self.id)
         
     def getCover(self,size=None,cache=True):
-        """Get this container's cover with <size>x<size> pixels or the large version if <size> is None. If <cache> is True, this method will store the cover in this Element-instance. Warning: Subsequent calls of this method will return the stored cover only if <cache> is again True."""
+        """Get this elements's cover with <size>x<size> pixels or the large version if <size> is None. If <cache> is True, this method will store the cover in this Element-instance. Warning: Subsequent calls of this method will return the stored cover only if <cache> is again True."""
         if cache:
             try:
                 return self._covers[size]
@@ -419,5 +354,120 @@ class Element(Node):
     
     def __str__(self):
         if self.tags is not None:
-            return "<Element {0}>".format(self.getTitle())
-        else: return "<Element {0}>".format(self.id)
+            return "<{} {}>".format(type(self).__name__,self.getTitle())
+        else: return "<{} {}>".format(type(self).__name__,self.id)
+    
+
+class Container(Element):
+    contents = None # list of contents. None until they are loaded; [] if this element has no contents
+    
+    def __init__(self,id,tags=None,contents=None):
+        """Initialize this element with the given id, which must be an integer. Optionally you may specify a tags.Storage object holding the tags of this element and/or a list of contents. Note that the list won't be copied but the parents will be set to this container."""
+        assert isinstance(id,int)
+        self.id = id
+        self.tags = tags
+        self.setContents(contents)
+    
+    def setContents(self,contents):
+        """Set the list of contents of this container to <contents>. Note that the list won't be copied but the parents will be set to this container."""
+        self.contents = contents
+        if contents is not None:
+            for element in self.contents:
+                element.setParent(self)
+    
+    def hasChildren(self):
+        return self.contents is not None and len(self.contents) > 0
+    
+    def getChildrenCount(self):
+        if self.contents is None:
+            return None
+        else: return len(self.contents)
+        
+    def isFile(self):
+        return False
+    
+    def isContainer(self):
+        return True
+    
+    def loadContents(self,recursive=False,table="elements"):
+        """Delete the stored contents-list and fetch the contents from the database. You may use the <table>-parameter to restrict the child elements to a specific table: The table with name <table> must contain a column 'id' and this method will only fetch elements which appear in that column. If <recursive> is true loadContents will be called recursively for all child elements."""
+        self.contents = []
+        additionalJoin = "JOIN elements ON elements.id = {}.id".format(table) if table != 'elements' else ''
+        result = db.query("""
+                SELECT contents.element_id,elements.file
+                FROM contents JOIN {0} ON contents.container_id = {1} AND contents.element_id = {0}.id {2}
+                ORDER BY contents.position
+                """.format(table,self.id,additionalJoin))
+        self.setContents([createElement(id,file=file) for id,file in result])
+            
+        if recursive:
+            for element in self.contents:
+                if element.isContainer():
+                    element.loadContents(recursive,table)
+
+    def ensureContentsAreLoaded(self,recursive=False):
+        """Load contents if they are not loaded yet."""
+        if self.contents is None:
+            self.loadContents()
+        if recursive:
+            for element in self.contents:
+                if element.isContainer():
+                    element.loadContents(recursive=True)
+                
+    def getLength(self,refresh=False):
+        """Return the length of this element, i.e. the sum of the lengths of all contents or None if contents is None or the sum cannot be computed (for example if contents is None in some subcontainer)."""
+        if self.contents is None:
+            return None
+        try:
+            return sum(element.getLength(refresh) for element in self.contents)
+        except TypeError: # At least one element does not know its length
+            return None
+
+
+class DBFile(Element):
+    def __init__(self,id,tags=None):
+        """Initialize this element with the given id, which must be an integer. Optionally you may specify a tags.Storage object holding the tags of this element."""
+        assert isinstance(id,int)
+        self.id = id
+        self.tags = tags
+    
+    def hasChildren(self):
+        return False
+    
+    def getChildren(self):
+        return []
+
+    def getChildrenCount(self):
+        return 0
+        
+    def isFile(self):
+        return True
+    
+    def isContainer(self):
+        return False
+        
+    def getPath(self,refresh=True):
+        """Return the path of this Element and cache it for subsequent calls.  If <refresh> is True the cached value must be recomputed. If the element has no path (e.g. containers), a ValueError is raised."""
+        if refresh or not hasattr(self,'path'):
+            path = db.query("SELECT path FROM files WHERE element_id = {0}".format(self.id)).getSingle()
+            if path is None:
+                raise ValueError("The element with id {0} has no path. Maybe it is a container.".format(self.id))
+            self.path = path
+        return self.path
+    
+    def getLength(self,refresh=False):
+        """Return the length of this element and cache it for subsequent calls."""
+        if refresh or not hasattr(self,'length'):
+            self.length = db.query("SELECT length FROM files WHERE element_id = {0}".format(self.id)).getSingle()
+        return self.length
+        
+
+def createElement(id,tags=None,contents=None,file=None):
+    """Create an element with the given id, tags and contents. Depending on file an instance of Container or of DBFile will be created. If file is None, the file-flag (elements.file) will be read from the database. Note that contents will be ignored if a DBFile is created."""
+    if file is None:
+        file = db.query("SELECT file FROM elements WHERE id=?",id).getSingle()
+        if file is None:
+            raise ValueError("There is no element with id {}".format(id))
+    if file:
+        return DBFile(id,tags=tags)
+    else: return Container(id,tags=tags,contents=contents)

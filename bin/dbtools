@@ -36,6 +36,7 @@ if __name__ == "__main__":
     "checkMissingTables": "I found some missing tables: {0}",
     "checkSuperfluousTables": "I found some superfluous tables: {0}",
     "checkTopLevelFlags": "I found {0} broken toplevel flags.",
+    "checkFileFlags": "I found {0} broken file flags.",
     "checkSuperfluousTags": "I found some superfluous tags in the tags_*-tables: {0}"
     }
 

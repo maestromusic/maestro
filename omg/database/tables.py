@@ -54,6 +54,7 @@ tables = {table.name:table for table in (SQLTable(createQuery) for createQuery i
 """CREATE TABLE elements (
         id MEDIUMINT UNSIGNED NOT NULL AUTO_INCREMENT,
         name VARCHAR(255) NOT NULL,
+        file TINYINT(1) NOT NULL,
         toplevel TINYINT(1) NOT NULL,
         elements SMALLINT UNSIGNED NOT NULL DEFAULT 0,
         INDEX name_idx(name(10)),

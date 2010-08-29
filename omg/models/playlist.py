@@ -14,7 +14,7 @@ from PyQt4.QtCore import Qt
 from omg import config, database, mpclient, tags, absPath, relPath
 import omg.gopulate.models as gopmodels
 from . import rootedtreemodel, treebuilder, mimedata
-from . import Node, Element, RootNode
+from . import Node, DBFile, Container, RootNode
 
 db = database.get()
 logger = logging.getLogger("omg.models.playlist")
@@ -333,7 +333,7 @@ class Playlist(rootedtreemodel.RootedTreeModel):
         
         for root in treeRoots:
             root.parent = parent
-
+            
         self.beginInsertRows(self.getIndex(parent),insertIndex,insertIndex+len(treeRoots)-1)
         parent.contents[insertIndex:insertIndex] = treeRoots
         self.endInsertRows()
@@ -494,11 +494,11 @@ class Playlist(rootedtreemodel.RootedTreeModel):
         return filePaths
    
     def _createItem(self,path,parent=None):
-        """Create a playlist-item for the given path. If the path is in the database, an instance of Element is created, otherwise an instance of ExternalFile. The parent of the new element is set to <parent> (even when this is None)."""
+        """Create a playlist-item for the given path. If the path is in the database, an instance of DBFile is created, otherwise an instance of ExternalFile. The parent of the new element is set to <parent> (even when this is None)."""
         id = db.query("SELECT element_id FROM files WHERE path = ?",path).getSingle()
         if id is None:
             result = ExternalFile(path)
-        else: result = Element(id)
+        else: result = DBFile(id)
         if not isinstance(result,ExternalFile): #TODO remove this line
             result.loadTags()
         result.parent = parent
@@ -519,12 +519,12 @@ class Playlist(rootedtreemodel.RootedTreeModel):
         return [id for id in db.query("SELECT container_id FROM contents WHERE element_id = ?",id).getSingleColumn()]
                
     def _createNode(self,id,contents):
-        """Create a Element-instance for an element with the given id and contents. This is a helper method for the TreeBuilder-algorithm."""
-        newElement = Element(id,contents=contents)
-        for element in contents:
-            element.parent = newElement
-        #TODO
-        return newElement
+        """If contents is not empty, create an Container-instance for the given id containing <contents>. Otherwise create an instance of DBFile with the given id. This is a helper method for the TreeBuilder-algorithm."""
+        if len(contents) > 0:
+            newNode = Container(id,contents=contents)
+        else: newNode = DBFile(id)
+        newNode.loadTags()
+        return newNode
         
     def _seqLen(self,sequence):
         """Return the length of an item-sequence."""

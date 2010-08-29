@@ -20,7 +20,7 @@ class TextCriterion:
         self.value = value
         
     def getQuery(self,fromTable,columns=None):
-        """Return a SELECT-query fetching the rows of <fromTable> which fulfill this criterion. <fromTable> must contain an 'id'-column holding container-ids. By default only the id-column of <fromTable> is selected, but you can specify a list of columns in the <column>-parameter.
+        """Return a SELECT-query fetching the rows of <fromTable> which fulfill this criterion. <fromTable> must contain an 'id'-column holding container-ids and a 'file'-column with the corresponding file-flags. By default only the id- and file-columns of <fromTable> are selected, but you can specify a list of columns in the <column>-parameter.
         """
         if self.tag is not None:
             if self.tag in tags.tagList: # TODO: currently only indexed tags may be searched
@@ -46,7 +46,7 @@ class TagIdCriterion:
         self.valueIds = valueIds
         
     def getQuery(self,fromTable,columns=None):
-        """Return a SELECT-query fetching the rows of <fromTable> which fulfill this criterion. <fromTable> must contain an 'id'-column holding container-ids. By default only the id-column of <fromTable> is selected, but you can specify a list of columns in the <column>-parameter.
+        """Return a SELECT-query fetching the rows of <fromTable> which fulfill this criterion. <fromTable> must contain an 'id'-column holding container-ids and a 'file'-column with the corresponding file-flags. By default only the id- and file-columns of <fromTable> are selected, but you can specify a list of columns in the <column>-parameter.
         """
         whereExpression = " OR ".join("(tags.tag_id = {0} AND tags.value_id = {1})".format(tag.id,valueId)
                                          for tag,valueId in self.valueIds.items())
@@ -78,7 +78,7 @@ class MissingTagCriterion:
         return self.tags
     
     def getQuery(self,fromTable,columns=None):
-        """Return a SELECT-query fetching the rows of <fromTable> which fulfill this criterion. <fromTable> must contain an 'id'-column holding container-ids. By default only the id-column of <fromTable> is selected, but you can specify a list of columns in the <column>-parameter.
+        """Return a SELECT-query fetching the rows of <fromTable> which fulfill this criterion. <fromTable> must contain an 'id'-column holding element-ids and a 'file'-column with the corresponding file-flags. By default only the id- and file-column of <fromTable> are selected, but you can specify a list of columns in the <column>-parameter.
         """
         return """
             SELECT {0}
@@ -90,7 +90,7 @@ class MissingTagCriterion:
 def _buildSelectForSingleTag(tag,value,fromTable,columns=None):
     """Build a select query that will select all elements matching a given tag-value.
     
-    fromTable must be the name of a database-table containing an 'id'-column which holds container-ids. The query returned by this function will select all those elements which have a tag of the sort <tag> matching <value> (i.e. if <tag>.type is date, the tag-value must equal <value>, otherwise <value> must be contained in the tag-value). By default only the id-column of <fromTable> is selected, but you can specify a list of columns in the <column>-parameter.
+    fromTable must be the name of a database-table containing an 'id'-column which holds element-ids and a 'file'-column with the corresponding file-flags. The query returned by this function will select all those elements which have a tag of the sort <tag> matching <value> (i.e. if <tag>.type is date, the tag-value must equal <value>, otherwise <value> must be contained in the tag-value). By default only the id- and file-columns of <fromTable> are selected, but you can specify a list of columns in the <column>-parameter.
     """
     if tag.type == 'date':
         whereExpression = " = {0}".format(value)
@@ -107,7 +107,7 @@ def _buildSelectForSingleTag(tag,value,fromTable,columns=None):
 def _formatColumns(columns,fromTable):
     """Generate a string which can be used after SELECT and will select the given columns from the given table. A possible result would be "elements.id,elements.position,elements.elements"."""
     if columns is None:
-        columns = ('id',)
+        columns = ('id','file')
     return ",".join("{0}.{1}".format(fromTable,column) for column in columns)
     
 

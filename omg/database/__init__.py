@@ -79,8 +79,16 @@ def checkElementCounters(fix=False):
     else: return db.query("SELECT COUNT(*) FROM elements \
                            WHERE elements != (SELECT COUNT(*) FROM contents WHERE container_id = id)").getSingle()
 
+def checkFileFlags(fix=False):
+    """Return the number of wrong entries in elements.files and correct them if <fix> is True."""
+    if "elements" not in listTables():
+        return 0
+    if fix:
+        return db.query("UPDATE elements SET file = (id IN (SELECT element_id FROM files))").affectedRows()
+    else: return db.query("SELECT COUNT(*) FROM elements WHERE file != (id IN (SELECT element_id FROM files))").getSingle()
+    
 def checkTopLevelFlags(fix=False):
-    """Search elements.toplevel for wrong entries and corrects them if fix is true. Return the number of wrong entries."""
+    """Search elements.toplevel for wrong entries and corrects them if <fix> is True. Return the number of wrong entries."""
     if "elements" not in listTables():
         return 0
     
