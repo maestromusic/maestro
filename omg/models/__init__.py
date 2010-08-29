@@ -16,26 +16,29 @@ db = database.get()
 logger = logging.getLogger(name="omg")
 
 class Node:
-    """(Abstract) base class for elements in a RootedTreeModel...that is almost everything in playlists, browser etc.. Node implements the methods required by RootedTreeModel using self.contents as the list of children and self.parent as parent, but does not create these variables. Subclasses must either self.contents and self.parent or overwrite the methods."""
+    """(Abstract) base class for elements in a RootedTreeModel...that is almost everything in playlists, browser etc.. Node implements the methods required by RootedTreeModel as well as some basic tree-structure methods. To implement getParent, setParent and getChildren, it uses self.parent as parent and self.contents as the list of children, but does not create these variables. Subclasses must either create self.contents and self.parent or overwrite the methods."""
     
     def hasChildren(self):
-        """Return whether this node has at least one child node or None if it is unknown."""
-        return len(self.contents) > 0
+        """Return whether this node has at least one child node."""
+        return len(self.getChildren()) > 0
         
     def getChildren(self):
         """Return the list of children."""
+        # This is a default implementation and does not mean that every node has a contents-attribute
         return self.contents
     
     def getChildrenCount(self):
         """Return the number of children or None if it is unknown."""
-        return len(self.contents)
+        return len(self.getChildren())
     
     def getParent(self):
         """Return the parent of this element."""
+        # This is a default implementation and does not mean that every node has a parent-attribute
         return self.parent
     
     def setParent(self,parent):
         """Set the parent of this node."""
+        # This is a default implementation and does not mean that every node has a parent-attribute
         self.parent = parent
         
     def isFile(self):
@@ -45,7 +48,20 @@ class Node:
     def isContainer(self):
         """Return whether this node holds a container. Note that this is in general not the opposite of isFile as e.g. rootnodes are neither."""
         return False
-        
+
+    def copy(self,contents=-1): # In subclasses like Element None is a legal value for contents.
+        """Return a copy of this node. All attributes will be copied by reference, with the exception of the list of contents: If this instance contains a content-attribute, the new node will contain a deep copy of it. Note that a shallow copy makes no sense, because the parent-attributes have to be adjusted. If you do not want this behaviour, you may specify the parameter <contents> and the contents will be set to that parameter. The parents of all elements of <contents> will be adjusted in this case, too."""
+        newNode = copy.copy(self)
+        if contents == -1:
+            if hasattr(self,'contents'):
+                newNode.contents = [node.copy(True) for node in self.contents]
+        else:
+            assert isinstance(contents,list)
+            newNode.contents = contents
+        for node in newNode.contents:
+            node.setParent(newNode)
+        return newNode
+    
     def getParents(self):
         """Returns a generator yielding all parents of this node in the current tree structure, from the direct parent to the root-node."""
         parent = self.getParent()
@@ -58,53 +74,42 @@ class Node:
         if self.getParent() is None:
             return 0
         else: return 1 + self.getParent().getLevel()
-
-    def copy(self,contents=-1): # None is a legal value for contents
-        """Return a copy of this node. All attributes will be copied by reference, with the exception of the list of contents. The new node will contain a deep copy of the list of contents. Note that a shallow copy makes no sense, because the parent-attributes have to be adjusted. If you do not want this behaviour, you may specify the parameter <contents> and the contents will be set to that parameter. The parents of all elements of <contents> will be adjusted in this case, too."""
-        newNode = copy.copy(self)
-        if contents == -1:
-            newNode.contents = [node.copy(True) for node in self.contents]
-        else:
-            assert isinstance(contents,list)
-            newNode.contents = contents
-        for node in newNode.contents:
-            node.setParent(newNode)
-        return newNode
-
-
-# Methods to access the flat playlist: the list of files at the end of the treemodel.
-class FilelistMixin:
+        
+    def index(self,node):
+        """Return the index of <node> in this node's contents or raise a ValueError if the node is not found. See also find."""
+        contents = self.getChildren()
+        for i in range(0,len(contents)):
+            if contents[i] == node:
+                return i
+        raise ValueError("Node.index: Node {0} is not contained in element {1}.".format(node,self))
+        
+    def find(self,node):
+        """Return the index of <node> in this node's contents or -1 if the node is not found. See also index."""
+        contents = self.getChildren()
+        for i in range(0,len(contents)):
+            if contents[i] == node:
+                return i
+        return -1
+        
     def getAllFiles(self):
         """Generator which will return all files contained in this element or in child-elements of it."""
-        assert self.contents is not None
+        assert self.getChildren() is not None
         if self.isFile():
             yield self
         else:
-            for element in self.contents:
+            for element in self.getChildren():
                 for file in element.getAllFiles():
                     yield file
                         
     def getFileCount(self):
         """Return the number of files contained in this element or in child-elements of it."""
-        assert self.contents is not None
+        assert self.getChildren() is not None
         if self.isFile():
             return 1
-        else: return sum(element.getFileCount() for element in self.contents)
+        else: return sum(element.getFileCount() for element in self.getChildren())
         
-    def getFileByOffset(self,offset):
-        """Get the file at the given <offset>. Note that <offset> is relative to this element, not to the whole playlist (unless the element is the rootnode)."""
-        assert self.contents is not None
-        offset = int(offset)
-        if offset == 0 and self.isFile():
-            return self
-        else: 
-            child,innerOffset = self.getChildAtOffset(offset)
-            if child.isFile():
-                return child
-            else: return child.getFileByOffset(innerOffset)
-    
     def getOffset(self):
-        """Get the offset of this element in the playlist."""
+        """Get the offset of this element in the current tree structure."""
         if self.getParent() is None:
             return 0
         else:
@@ -113,19 +118,31 @@ class FilelistMixin:
                 if child == self:
                     return offset
                 else: offset = offset + child.getFileCount()
-            raise ValueError("FilelistMixin.getOffset: Node {0} is not contained in its parent {1}."
+            raise ValueError("Node.getOffset: Node {0} is not contained in its parent {1}."
                                 .format(self,self.getParent()))
+        
+    def getFileAtOffset(self,offset):
+        """Get the file at the given <offset>. Note that <offset> is relative to this element, not to the whole playlist (unless the element is the rootnode)."""
+        assert self.getChildren() is not None
+        offset = int(offset)
+        if offset == 0 and self.isFile():
+            return self
+        else: 
+            child,innerOffset = self.getChildAtOffset(offset)
+            if child.isFile():
+                return child
+            else: return child.getFileAtOffset(innerOffset)
         
     def getChildIndexAtOffset(self,offset):
         """Return a tuple: the index of the child C that contains the file F with the given offset (relative to this element) and the offset of F relative to C ("inner offset").
         For example: If this element is the rootnode and the playlist contains an album with 13 songs and one with 12 songs, then getChildIndexAtOffset(17) will return (1,3), since the 18th file if the playlist (i.e. with offset 17), is contained in the second album (i.e with index 1) and it is the 4th song on that album (i.e. it has offset 3 relative to the album).
         """
-        assert self.contents is not None
+        assert self.getChildren() is not None
         offset = int(offset)
         if offset < 0:
             raise IndexError("Offset {0} is out of bounds".format(offset))
         cOffset = 0
-        for i in range(0,len(self.contents)):
+        for i in range(0,self.getChildrenCount()):
             fileCount = self.getChildren()[i].getFileCount()
             if offset < cOffset + fileCount:
                 return i,offset-cOffset
@@ -142,21 +159,19 @@ class FilelistMixin:
         else: return self.getChildren()[index],innerOffset
 
 
-class IndexMixin:
-    def index(self,node):
-        for i in range(0,len(self.contents)):
-            if self.contents[i] == node:
-                return i
-        raise ValueError("IndexMixin.index: Node {0} is not contained in element {1}.".format(node,self))
-        
-    def find(self,node):
-        for i in range(0,len(self.contents)):
-            if self.contents[i] == node:
-                return i
-        return -1
+class RootNode(Node):
+    """Rootnode at the top of a RootedTreeModel."""
+    def __init__(self):
+        self.contents = []
+    
+    def getParent(self):
+        return None
+    
+    def setParent(self):
+        raise RuntimeError("Cannot set the parent of a RootNode.")
 
-        
-class Element(Node,FilelistMixin,IndexMixin):
+
+class Element(Node):
     """Base class for elements (files or containers) in playlists, browser, etc.. Contains methods to load tags and contents from the database and to get the path, cover, length etc.."""
     tags = None # tags.Storage to store the tags. None until they are loaded
     contents = None # list of contents. None until they are loaded; [] if this element has no contents
@@ -303,7 +318,7 @@ class Element(Node,FilelistMixin,IndexMixin):
                 return None
     
     def getPosition(self,refresh=False):
-        """Return the position of this element in its current parent (that is the number from the contents-table, not the index of this element in the parent's list of children) and cache it for subsequent calls. If <refresh> is True the cached value must be recomputed. Return None if the element has no parent."""
+        """Return the position of this element in its current parent and cache it for subsequent calls. Note that position is the number from the contents-table, not the index of this element in the parent's list of children. To get the latter, use parent.index(self). If <refresh> is True the cached value must be recomputed. Return None if the element has no parent or the parent is not of type Element."""
         if self.parent is None or not isinstance(self.parent,Element): # Without parent, there can't be a position
             return None
         if refresh or not hasattr(self,'position'):
@@ -398,6 +413,7 @@ class Element(Node,FilelistMixin,IndexMixin):
         return formatter.Formatter(self).title()
     
     def toolTipText(self):
+        """Return a HTML-text which may be used in tooltips for this element."""
         from omg.gui import formatter
         return formatter.HTMLFormatter(self).detailView()
     

@@ -14,7 +14,7 @@ from PyQt4.QtCore import Qt
 from omg import config, database, mpclient, tags, absPath, relPath
 import omg.gopulate.models as gopmodels
 from . import rootedtreemodel, treebuilder, mimedata
-from . import Node, Element, FilelistMixin, IndexMixin
+from . import Node, Element, RootNode
 
 db = database.get()
 logger = logging.getLogger("omg.models.playlist")
@@ -159,7 +159,7 @@ class Playlist(rootedtreemodel.RootedTreeModel):
             elif status['song'] != self.currentlyPlayingOffset:
                 oldElement = self.currentlyPlayingElement
                 self.currentlyPlayingOffset = status['song']
-                self.currentlyPlayingElement = self.root.getFileByOffset(status['song'])
+                self.currentlyPlayingElement = self.root.getFileAtOffset(status['song'])
                 # Update the new and the old song
                 if oldElement is not None:
                     try:
@@ -531,7 +531,7 @@ class Playlist(rootedtreemodel.RootedTreeModel):
         return sequence[1] - sequence[0] + 1
             
     
-class ExternalFile(gopmodels.FileSystemFile, FilelistMixin):
+class ExternalFile(gopmodels.FileSystemFile):
     """This class holds a file that appears in the playlist, but is not in the database."""
     
     def __init__(self,path,parent = None):
@@ -544,22 +544,25 @@ class ExternalFile(gopmodels.FileSystemFile, FilelistMixin):
     def isContainer(self):
         return False
         
-    def getParent(self):
-        return self.parent
-        
     def getPath(self):
         return self.path
     
     def hasChildren(self):
         return False
 
+    def getChildren(self):
+        return []
+        
+    def getChildrenCount(self):
+        return 0
+        
     def getAllFiles(self):
         return (self,)
     
     def getFileCount(self):
         return 1
         
-    def getFileByOffset(self,offset):
+    def getFileAtOffset(self,offset):
         if offset != 0:
             raise IndexError("Offset {0} is out of bounds".format(offset))
         return self
@@ -569,12 +572,3 @@ class ExternalFile(gopmodels.FileSystemFile, FilelistMixin):
         
     def __str__(self):
         return self.path
-
-
-class RootNode(Node,FilelistMixin,IndexMixin):
-    """Rootnode of the Playlist-TreeModel."""
-    def __init__(self):
-        self.contents = []
-    
-    def getParent(self):
-        return None

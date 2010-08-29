@@ -206,13 +206,10 @@ class VariousNode(CriterionNode):
         return "<VariousNode>"
 
 
-class RootNode(models.Node):
+class RootNode(models.RootNode):
     """Rootnode of the Browser-TreeModel."""
     def __init__(self,model):
         """Initialize this Rootnode with the given model."""
-        self.contents = []
+        models.RootNode.__init__(self)
         self.model = model
         self.layerIndex = -1
-    
-    def getParent(self):
-        return None
