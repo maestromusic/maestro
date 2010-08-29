@@ -49,10 +49,10 @@ class Node:
         """Return whether this node holds a container. Note that this is in general not the opposite of isFile as e.g. rootnodes are neither."""
         return False
 
-    def copy(self,contents=-1): # In subclasses like Element None is a legal value for contents.
+    def copy(self,contents=None):
         """Return a copy of this node. All attributes will be copied by reference, with the exception of the list of contents: If this instance contains a content-attribute, the new node will contain a deep copy of it. Note that a shallow copy makes no sense, because the parent-attributes have to be adjusted. If you do not want this behaviour, you may specify the parameter <contents> and the contents will be set to that parameter. The parents of all elements of <contents> will be adjusted in this case, too."""
         newNode = copy.copy(self)
-        if contents == -1:
+        if contents is None:
             if hasattr(self,'contents'):
                 newNode.contents = [node.copy() for node in self.contents]
                 for node in newNode.contents:
@@ -179,6 +179,7 @@ class RootNode(Node):
     def setParent(self):
         raise RuntimeError("Cannot set the parent of a RootNode.")
 
+
 class Element(Node):
     """Abstract base class for elements (files or containers) in playlists, browser, etc.. Contains methods to load tags and contents from the database."""
     tags = None # tags.Storage to store the tags. None until they are loaded
@@ -187,7 +188,7 @@ class Element(Node):
         raise RuntimeError(
                 "Cannot instantiate abstract base class Element. Use Container, DBFile or models.createElement.")
     
-    def copy(self,contents=-1):
+    def copy(self,contents=None):
         """Reimplementation of Node.copy: In addition to contents the tags are also not copied by reference. Instead the copy will contain a copy of this node's tags.Storage-instance."""
         newNode = Node.copy(self,contents)
         newNode.tags = self.tags.copy()
@@ -359,29 +360,22 @@ class Element(Node):
     
 
 class Container(Element):
-    contents = None # list of contents. None until they are loaded; [] if this element has no contents
-    
+    """Element-subclass for containers."""
     def __init__(self,id,tags=None,contents=None):
         """Initialize this element with the given id, which must be an integer. Optionally you may specify a tags.Storage object holding the tags of this element and/or a list of contents. Note that the list won't be copied but the parents will be set to this container."""
         assert isinstance(id,int)
         self.id = id
         self.tags = tags
-        self.setContents(contents)
+        if contents is None:
+            self.contents = []
+        else: self.setContents(contents)
     
     def setContents(self,contents):
         """Set the list of contents of this container to <contents>. Note that the list won't be copied but the parents will be set to this container."""
+        assert isinstance(contents,list)
         self.contents = contents
-        if contents is not None:
-            for element in self.contents:
-                element.setParent(self)
-    
-    def hasChildren(self):
-        return self.contents is not None and len(self.contents) > 0
-    
-    def getChildrenCount(self):
-        if self.contents is None:
-            return None
-        else: return len(self.contents)
+        for element in self.contents:
+            element.setParent(self)
         
     def isFile(self):
         return False
@@ -391,7 +385,6 @@ class Container(Element):
     
     def loadContents(self,recursive=False,table="elements"):
         """Delete the stored contents-list and fetch the contents from the database. You may use the <table>-parameter to restrict the child elements to a specific table: The table with name <table> must contain a column 'id' and this method will only fetch elements which appear in that column. If <recursive> is true loadContents will be called recursively for all child elements."""
-        self.contents = []
         additionalJoin = "JOIN elements ON elements.id = {}.id".format(table) if table != 'elements' else ''
         result = db.query("""
                 SELECT contents.element_id,elements.file
@@ -404,24 +397,10 @@ class Container(Element):
             for element in self.contents:
                 if element.isContainer():
                     element.loadContents(recursive,table)
-
-    def ensureContentsAreLoaded(self,recursive=False):
-        """Load contents if they are not loaded yet."""
-        if self.contents is None:
-            self.loadContents()
-        if recursive:
-            for element in self.contents:
-                if element.isContainer():
-                    element.loadContents(recursive=True)
                 
     def getLength(self,refresh=False):
-        """Return the length of this element, i.e. the sum of the lengths of all contents or None if contents is None or the sum cannot be computed (for example if contents is None in some subcontainer)."""
-        if self.contents is None:
-            return None
-        try:
-            return sum(element.getLength(refresh) for element in self.contents)
-        except TypeError: # At least one element does not know its length
-            return None
+        """Return the length of this element, i.e. the sum of the lengths of all contents."""
+        return sum(element.getLength(refresh) for element in self.contents)
 
 
 class DBFile(Element):

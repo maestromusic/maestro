@@ -89,7 +89,7 @@ def search(criteria,resultTable,fromTable='elements',logicalMode=CONJUNCTION):
     # ...and afterwards delete those entries which do not match the other queries
     for criterion in criteria[1:]:
         db.query("TRUNCATE TABLE {0}".format(TT_HELP))
-        db.query("INSERT INTO {0} (id) {1}".format(TT_HELP,criterion.getQuery(resultTable)))
+        db.query("INSERT INTO {0} (id) {1}".format(TT_HELP,criterion.getQuery(resultTable,('id',))))
         db.query("DELETE FROM {0} WHERE id NOT IN (SELECT id FROM {1})".format(resultTable,TT_HELP))
 
 
