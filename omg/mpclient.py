@@ -36,12 +36,14 @@ def status():
 
 def insert(offset,paths):
     for path in paths:
+        if not isinstance(path,str):
+            raise ValueError("Each path must be a string.")
         try:
             client.add(path)
             client.move(int(client.status()['playlistlength'])-1,offset)
             offset = offset + 1
         except mpd.CommandError:
-            raise CommandError("File could not be added to MPD. Maybe it is not in MPD's database?")
+            raise CommandError("File '{}' could not be added to MPD. Maybe it is not in MPD's database?".format(path))
             
 def delete(start,end=None):
     if end is None:

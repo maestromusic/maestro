@@ -6,7 +6,7 @@
 # it under the terms of the GNU General Public License version 3 as
 # published by the Free Software Foundation
 #
-import logging
+import logging, copy
 from PyQt4 import QtCore
 
 from omg import tags, database, covers, config
@@ -35,6 +35,10 @@ class Node:
         """Return the parent of this element."""
         return self.parent
     
+    def setParent(self,parent):
+        """Set the parent of this node."""
+        self.parent = parent
+        
     def isFile(self):
         """Return whether this node holds a file. Note that this is in general not the opposite of isContainer as e.g. rootnodes are neither."""
         return False
@@ -55,6 +59,20 @@ class Node:
         if self.getParent() is None:
             return 0
         else: return 1 + self.getParent().getLevel()
+
+
+    def copy(self,contents=-1): # None is a legal value for contents
+        """Return a copy of this node. All attributes will be copied by reference, with the exception of the list of contents. The new node will contain a deep copy of the list of contents. Note that a shallow copy makes no sense, because the parent-attributes have to be adjusted. If you do not want this behaviour, you may specify the parameter <contents> and the contents will be set to that parameter. The parents of all elements of <contents> will be adjusted in this case, too."""
+        newNode = copy.copy(self)
+        if contents == -1:
+            newNode.contents = [node.copy() for node in self.contents]
+        else:
+            print(type(contents))
+            assert isinstance(contents,list)
+            newNode.contents = contents
+        for node in newNode.contents:
+            node.setParent(newNode)
+        return newNode
 
 class RootNode(Node):
     """This class represents a node that is the root of a tree model."""
@@ -154,13 +172,18 @@ class Element(Node,FilelistMixin,IndexMixin):
     tags = None # tags.Storage to store the tags. None until they are loaded
     contents = None # list of contents. None until they are loaded; [] if this element has no contents
     
-    def __init__(self,id,tags=None):
+    def __init__(self,id,tags=None,contents=None):
         """Initialize this element with the given id, which must be an integer. Optionally you may specify a tags.Storage object holding the tags of this element."""
         assert isinstance(id,int)
         self.id = id
         self.tags = tags
-        self.length = None
-        self.position = None
+        self.contents = contents
+    
+    def copy(self,contents=-1):
+        """Reimplementation of Node.copy: In addition to contents the tags are also not copied by reference. Instead the copy will contain a copy of this node's tags.Storage-instance."""
+        newNode = Node.copy(self,contents)
+        newNode.tags = self.tags.copy()
+        return newNode
         
     def hasChildren(self):
         """Return whether this node has at least one child node or None if it is unknown since the contents are not loaded yet."""
@@ -184,17 +207,16 @@ class Element(Node,FilelistMixin,IndexMixin):
             return None
         else: return len(self.contents) > 0
         
-    def getPath(self):
-        """Return the path of this Element and cache it for subsequent calls. If the element has no path (e.g. containers), a ValueError is raised."""
-        try:
-            return self.path
-        except AttributeError:
-            self.path = db.query("SELECT path FROM files WHERE container_id = {0}".format(self.id)).getSingle()
-            if self.path is None:
+    def getPath(self,refresh=True):
+        """Return the path of this Element and cache it for subsequent calls.  If <refresh> is True the cached value must be recomputed. If the element has no path (e.g. containers), a ValueError is raised."""
+        if refresh or not hasattr(self,'path'):
+            path = db.query("SELECT path FROM files WHERE element_id = {0}".format(self.id)).getSingle()
+            if path is None:
                 raise ValueError("The element with id {0} has no path. Maybe it is a container.".format(self.id))
-            return self.path
+            self.path = path
+        return self.path
         
-    def loadContents(self,recursive=False,table="containers"):
+    def loadContents(self,recursive=False,table="elements"):
         """Delete the stored contents-list and fetch the contents from the database. You may use the <table>-parameter to restrict the child elements to a specific table: The table with name <table> must contain a column 'id' and this method will only fetch elements which appear in that column. If <recursive> is true loadContents will be called recursively for all child elements."""
         self.contents = []
         result = db.query("""
@@ -210,10 +232,13 @@ class Element(Node,FilelistMixin,IndexMixin):
             for element in self.contents:
                 element.loadContents(recursive,table)
 
-    def ensureContentsAreLoaded(self):
+    def ensureContentsAreLoaded(self,recursive=False):
         """Load contents if they are not loaded yet."""
         if self.contents is None:
             self.loadContents()
+        if recursive:
+            for element in self.contents:
+                element.loadContents(recursive=True)
 
     def loadTags(self,recursive=False,tagList=None):
         """Delete the stored indexed tags and load them from the database. If <recursive> is True, all tags from children of this node (recursively) will be loaded, too. If <tagList> is not None only tags in the given list will be loaded (e.g. only title-tags). Note that this method affects only indexed tags!"""
@@ -229,13 +254,13 @@ class Element(Node,FilelistMixin,IndexMixin):
         result = db.query("""
             SELECT tag_id,value_id 
             FROM tags
-            WHERE container_id = {0} {1}
+            WHERE element_id = {0} {1}
             """.format(self.id,additionalWhereClause))
         for row in result:
             tag = tags.get(row[0])
             value = tag.getValue(row[1])
             if value is None:
-                logger.warning("Database is corrupt: Container {0} has a {1}-tag with id {2} but "
+                logger.warning("Database is corrupt: Element {0} has a {1}-tag with id {2} but "
                               +"this id does not exist in tag_{1}.".format(self.id,tag.name,row[1]))
                 continue
             self.tags[tag].append(value)
@@ -244,7 +269,7 @@ class Element(Node,FilelistMixin,IndexMixin):
         result = db.query("""
             SELECT tagname,value
             FROM othertags
-            WHERE container_id = {0} {1}
+            WHERE element_id = {0} {1}
             """.format(self.id,otherAdditionalWhereClause))
         for row in result:
             tag = tags.get(row[0])
@@ -254,24 +279,49 @@ class Element(Node,FilelistMixin,IndexMixin):
             for element in self.contents:
                 element.loadTags(recursive,tagList)
     
-    def ensureTagsAreLoaded(self):
+    def ensureTagsAreLoaded(self,recursive=False):
         """Load indexed tags if they are not loaded yet."""
         if self.tags is None:
             self.loadTags()
-    
+        if recursive:
+            for element in self.contents:
+                element.ensureTagsAreLoaded()
+                
     def getOtherTags(self,cache=False):
         """Load the tags which are not indexed from the database and return them. The result will be a tags.Storage mapping tag-names to lists of tag-values. If <cache> is True, the tags will be stored in this Element. Warning: Subsequent calls of this method will return the cached tags only if <cache> is again True."""
         if cache and hasattr(self,'otherTags'):
             return self.otherTags
-        result = db.query("SELECT tagname,value FROM othertags WHERE container_id = {0}".format(self.id))
+        result = db.query("SELECT tagname,value FROM othertags WHERE element_id = {0}".format(self.id))
         otherTags = tags.Storage()
         for row in result:
             otherTags[tags.OtherTag(row[0])].append(row[1])
         if cache:
             self.otherTags = otherTags
         return otherTags
-
+            
+    def getLength(self,refresh=False):
+        """Return the length of this element. If it is a file, the length will be cached for subsequent calls. If <refresh> is True the cached value must be recomputed. If the element is a container, return the sum of the lengths of all its contents.  If the length can't be computed, None is returned. This happens for example if the contents have not yet been loaded."""
+        if self.contents is None:
+            return None
+        if len(self.contents) == 0:
+            if refresh or not hasattr(self,'length'):
+                self.length = db.query("SELECT length FROM files WHERE element_id = {0}".format(self.id)).getSingle()
+            return self.length
+        else:
+            try:
+                return sum(element.getLength() for element in self.contents)
+            except TypeError: # At least one element does not know its length
+                return None
     
+    def getPosition(self,refresh=False):
+        """Return the position of this element in its current parent (that is the number from the contents-table, not the index of this element in the parent's list of children) and cache it for subsequent calls. If <refresh> is True the cached value must be recomputed. Return None if the element has no parent."""
+        if self.parent is None or not isinstance(self.parent,Element): # Without parent, there can't be a position
+            return None
+        if refresh or not hasattr(self,'position'):
+            self.position = db.query("SELECT position FROM contents WHERE container_id = ? AND element_id = ?", 
+                                 self.parent.id,self.id).getSingle()
+        return self.position
+        
     def getParentIds(self,recursive):
         """Return a list containing the ids of all parents of this element from the database. If <recursive> is True all ancestors will be added recursively."""
         newList = list(db.query("SELECT container_id FROM contents WHERE element_id = ?",self.id).getSingleColumn())
@@ -318,36 +368,13 @@ class Element(Node,FilelistMixin,IndexMixin):
                 titles = db.query("""
                     SELECT tag_{0}.value
                     FROM tags JOIN tag_{0} ON tags.value_id = tag_{0}.id
-                    WHERE tags.container_id = {1} AND tags.tag_id = {2}
+                    WHERE tags.element_id = {1} AND tags.tag_id = {2}
                     """.format(tags.TITLE.name,id,tags.TITLE.id)).getSingleColumn()
                 for title in titles:
                     if title in albumTitles:
                         albums.append(id)
             return albums
         else: return []
-        
-    def getPosition(self):
-        import omg.models.playlist as playlistmodels
-        if self.parent is None or isinstance(self.parent,playlistmodels.RootNode): # Without parent, there can't be a position
-            return None
-        if self.position is None:
-            self.position = db.query("SELECT position FROM contents WHERE container_id = ? AND element_id = ?", 
-                                     self.parent.id,self.id).getSingle()
-        return self.position
-    
-    def getLength(self):
-        """Return the length of this element. If it is a container, return the sum of the lengths of all its contents. If the length can't be computed, None is returned. This happens for example if the contents have not been loaded yet."""
-        if self.length is None:
-            if self.contents is None:
-                self.length = None
-            if len(self.contents) == 0:
-                self.length = db.query("SELECT length FROM files WHERE container_id = {0}".format(self.id)).getSingle()
-            else:
-                try:
-                    self.length = sum(element.getLength() for element in self.contents)
-                except TypeError: # At least one element does not know its length
-                    self.legnth = None
-        return self.length    
     
     def hasCover(self):
         """Return whether this container has a cover."""

@@ -38,7 +38,7 @@ class TextCriterion:
 
 
 class TagIdCriterion:
-    """A TagIdCriterion contains a dictionary mapping tags to value-ids. It will be fulfilled for all containers having at least one of the tags with the corresponding value. For example {<genre-tag>: 1,<artist-tag>:2} will match all containers which have either the value of id 1 (in table tag_genre) as a genre-tag or the value of id 2 (in table tag_artist) as an artist-tag or both. TagIdCriterion works only with indexed tags.
+    """A TagIdCriterion contains a dictionary mapping tags to value-ids. It will be fulfilled for all elements having at least one of the tags with the corresponding value. For example {<genre-tag>: 1,<artist-tag>:2} will match all elements which have either the value of id 1 (in table tag_genre) as a genre-tag or the value of id 2 (in table tag_artist) as an artist-tag or both. TagIdCriterion works only with indexed tags.
     """
     def __init__(self,valueIds):
         """Initialize a new TagIdCriterion with the given dictionary mapping tags to value-ids."""
@@ -52,7 +52,7 @@ class TagIdCriterion:
                                          for tag,valueId in self.valueIds.items())
         return """
             SELECT {0}
-            FROM {1} JOIN tags ON {1}.id = tags.container_id
+            FROM {1} JOIN tags ON {1}.id = tags.element_id
             WHERE {2}
             GROUP BY {1}.id
             """.format(_formatColumns(columns,fromTable),fromTable,whereExpression)
@@ -82,22 +82,22 @@ class MissingTagCriterion:
         """
         return """
             SELECT {0}
-            FROM {1} LEFT JOIN tags ON {1}.id = tags.container_id AND tags.tag_id IN ({2})
+            FROM {1} LEFT JOIN tags ON {1}.id = tags.element_id AND tags.tag_id IN ({2})
             WHERE tags.value_id IS NULL
             """.format(_formatColumns(columns,fromTable),fromTable,",".join([str(tag.id) for tag in self.tags]))
             
 
 def _buildSelectForSingleTag(tag,value,fromTable,columns=None):
-    """Build a select query that will select all containers matching a given tag-value.
+    """Build a select query that will select all elements matching a given tag-value.
     
-    fromTable must be the name of a database-table containing an 'id'-column which holds container-ids. The query returned by this function will select all those containers which have a tag of the sort <tag> matching <value> (i.e. if <tag>.type is date, the tag-value must equal <value>, otherwise <value> must be contained in the tag-value). By default only the id-column of <fromTable> is selected, but you can specify a list of columns in the <column>-parameter.
+    fromTable must be the name of a database-table containing an 'id'-column which holds container-ids. The query returned by this function will select all those elements which have a tag of the sort <tag> matching <value> (i.e. if <tag>.type is date, the tag-value must equal <value>, otherwise <value> must be contained in the tag-value). By default only the id-column of <fromTable> is selected, but you can specify a list of columns in the <column>-parameter.
     """
     if tag.type == 'date':
         whereExpression = " = {0}".format(value)
     else: whereExpression = " LIKE '%{0}%'".format(database.get().escapeString(value,likeStatement=True))
     return """
         SELECT {4}
-        FROM {0} JOIN tags ON {0}.id = tags.container_id
+        FROM {0} JOIN tags ON {0}.id = tags.element_id
                  JOIN tag_{1} ON tags.value_id = tag_{1}.id
         WHERE tags.tag_id = {2} AND tag_{1}.value {3}
         GROUP BY {0}.id
@@ -105,7 +105,7 @@ def _buildSelectForSingleTag(tag,value,fromTable,columns=None):
 
 
 def _formatColumns(columns,fromTable):
-    """Generate a string which can be used after SELECT and will select the given columns from the given table. A possible result would be "containers.id,containers.position,containers.elements"."""
+    """Generate a string which can be used after SELECT and will select the given columns from the given table. A possible result would be "elements.id,elements.position,elements.elements"."""
     if columns is None:
         columns = ('id',)
     return ",".join("{0}.{1}".format(fromTable,column) for column in columns)

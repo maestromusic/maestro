@@ -18,7 +18,8 @@ if __name__=="__main__":
             print('This is OMG version {}. Nice to meet you.'.format(constants.VERSION))
             sys.exit(0)
         elif opt in ('-v', '--loglevel'):
-            application.optionsOverride['log'] = {'consoleLogLevel': arg}
+            # Python log-levels must be uppercase
+            application.optionsOverride['log'] = {'consoleLogLevel': arg.upper()}
         elif opt in ('-p', '--populate'):
             application.optionsOverride['gui'] = {'startTab' : 'populate'}
     application.run()

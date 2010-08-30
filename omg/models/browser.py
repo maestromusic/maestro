@@ -57,7 +57,7 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
         return [config.get("gui","mime")]
     
     def mimeData(self,indexes):
-        return mimedata.MimeData(self,indexes)
+        return mimedata.createFromIndexes(self,indexes)
         
     def _loadLayer(self,node):
         """Load the contents of <node>, which must be either root or a CriterionNode (The contents of Elements are loaded via Element.loadContents)."""
@@ -83,7 +83,7 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
 
 
     def _loadTagLayer(self,node,table):
-        """Load the contents of <node> into a tag-layer, using containers from <table>."""
+        """Load the contents of <node> into a tag-layer, using elements from <table>."""
         tagSet = self.layers[node.layerIndex+1]
         valueNodes = []
         values = []
@@ -91,7 +91,7 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
             # Get all values and corresponding ids of the given tag appearing in at least one toplevel result.
             result = database.get().query("""
                 SELECT DISTINCT tag_{0}.id,tag_{0}.value
-                FROM {1} JOIN tags ON {1}.id = tags.container_id AND tags.tag_id = {2}
+                FROM {1} JOIN tags ON {1}.id = tags.element_id AND tags.tag_id = {2}
                          JOIN tag_{0} ON tags.value_id = tag_{0}.id
                 WHERE {1}.toplevel = 1
                 """.format(tag.name,table,tag.id))
@@ -108,7 +108,7 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
         # Check whether a VariousNode is necessary
         result = database.get().query("""
                 SELECT {0}.id
-                FROM {0} LEFT JOIN tags ON {0}.id = tags.container_id AND tags.tag_id IN ({1})
+                FROM {0} LEFT JOIN tags ON {0}.id = tags.element_id AND tags.tag_id IN ({1})
                 WHERE tags.value_id IS NULL
                 LIMIT 1
                 """.format(table,",".join(str(tag.id) for tag in tagSet)))
@@ -125,7 +125,7 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
             node.contents = valueNodes[0].contents
     
     def _loadContainerLayer(self,node,table):
-        """Load the contents of <node> into a container-layer, using containers from <table>. Note that this creates all children of <node> not only the next level of the treestructure as _loadTagLayer does."""
+        """Load the contents of <node> into a container-layer, using elements from <table>. Note that this creates all children of <node> not only the next level of the treestructure as _loadTagLayer does."""
         result = database.get().query("SELECT id FROM {0} WHERE toplevel = 1".format(table)).getSingleColumn()
         node.contents = [models.Element(id) for id in result]
         for element in node.contents:
@@ -135,7 +135,7 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
 
 
 class CriterionNode(models.Node):
-    """CriterionNode is the base class for nodes used to group containers according to a criterion (confer search.criteria) in a BrowserModel."""
+    """CriterionNode is the base class for nodes used to group elements according to a criterion (confer search.criteria) in a BrowserModel."""
     def __init__(self,parent,model,criterion):
         """Initialize this CriterionNode with the parent-node <parent> and the given model and criterion."""
         self.parent = parent
@@ -182,9 +182,9 @@ class CriterionNode(models.Node):
 
 
 class ValueNode(CriterionNode):
-    """A ValueNode groups containers which have the same tag-value in one or more tags. Not that only the value must coincide, the tags need not be the same, but they must be in a given list. This enables BrowserViews display e.g. all artists and all composers in one tag-layer."""
+    """A ValueNode groups elements which have the same tag-value in one or more tags. Not that only the value must coincide, the tags need not be the same, but they must be in a given list. This enables BrowserViews display e.g. all artists and all composers in one tag-layer."""
     def __init__(self,parent,model,value,valueIds):
-        """Initialize this ValueNode with the parent-node <parent> and the given model. <valueIds> is a dict mapping tags to value-ids of the tag. This node will contain containers having at least one of the value-ids in the corresponding tag. <value> is the value of the value-ids (which should be the same for all tags) and will be displayed on the node."""
+        """Initialize this ValueNode with the parent-node <parent> and the given model. <valueIds> is a dict mapping tags to value-ids of the tag. This node will contain elements having at least one of the value-ids in the corresponding tag. <value> is the value of the value-ids (which should be the same for all tags) and will be displayed on the node."""
         CriterionNode.__init__(self,parent,model,None)
         self.value = value
         self.valueIds = valueIds
@@ -197,7 +197,7 @@ class ValueNode(CriterionNode):
 
 
 class VariousNode(CriterionNode):
-    """A VariousNode groups containers in a tag-layer which have no tag in any of the tags in the tag-layer's tagset."""
+    """A VariousNode groups elements in a tag-layer which have no tag in any of the tags in the tag-layer's tagset."""
     def __init__(self,parent,model,tagSet):
         """Initialize this VariousNode with the parent-node <parent>, the given model and the tag-layer's tagset <tagSet>."""
         CriterionNode.__init__(self,parent,model,search.criteria.MissingTagCriterion(tagSet))

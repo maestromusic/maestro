@@ -18,15 +18,15 @@ logger = logging.getLogger("database.queries")
 
 
 def idFromFilename(filename):
-    """Retrieves the container_id of a file from the given path, or None if it is not found."""
+    """Retrieves the element_id of a file from the given path, or None if it is not found."""
     try:
-        return database.get().query("SELECT container_id FROM files WHERE path=?;", filename).getSingle()
+        return database.get().query("SELECT element_id FROM files WHERE path=?;", filename).getSingle()
     except omg.database.sql.DBException:
         return None
 
 def idFromHash(hash):
-    """Retrieves the containerId of a file from its hash, or None if it is not found."""
-    result =  database.db.query("SELECT container_id FROM files WHERE hash=?;", hash)
+    """Retrieves the element_id of a file from its hash, or None if it is not found."""
+    result =  database.db.query("SELECT element_id FROM files WHERE hash=?;", hash)
     if len(result)==1:
         return result.getSingle()
     elif len(result)==0:
@@ -57,16 +57,16 @@ def setTags(cid, tags, append=False):
     given ones will be added. This function will not check for duplicates in that case."""
     
     db = database.get()
-    existingTags = db.query("SELECT * FROM tags WHERE 'container_id'=?;", cid)
+    existingTags = db.query("SELECT * FROM tags WHERE 'element_id'=?;", cid)
     
     if len(existingTags) > 0 and not append:
         logger.warning("Deleting existing indexed tags from container {0}".format(cid))
-        db.query("DELETE FROM tags WHERE 'container_id'=?;", cid)
+        db.query("DELETE FROM tags WHERE 'element_id'=?;", cid)
         
-    existing_othertags = db.query("SELECT * FROM othertags WHERE 'container_id'=?;",cid)
+    existing_othertags = db.query("SELECT * FROM othertags WHERE 'element_id'=?;",cid)
     if len(existing_othertags) > 0 and not append:
         logger.warning("Deleting existing othertags from container {0}".format(cid))
-        database.db.query("DELETE FROM othertags WHERE 'container_id'=?;", cid)
+        database.db.query("DELETE FROM othertags WHERE 'element_id'=?;", cid)
     
     for tag in tags.keys():
         for value in tags[tag]:
@@ -79,7 +79,7 @@ def addContainer(name, tags = None, elements = 0, toplevel = False):
         top = '1'
     else:
         top = '0'
-    result = database.get().query("INSERT INTO containers (name,elements,toplevel) VALUES(?,?,?);", name,elements,top)
+    result = database.get().query("INSERT INTO elements (name,elements,toplevel) VALUES(?,?,?);", name,elements,top)
     newid = result.insertId() # the new container's ID
     if tags:
         setTags(newid, tags)
@@ -90,11 +90,11 @@ def delContainer(cid):
     
     If the content is a file, also deletes its entry from the files table."""
     db = database.get()
-    db.query("DELETE FROM tags WHERE container_id=?;", cid) # delete tag references
-    db.query("DELETE FROM othertags WHERE container_id=?;",cid) # delete othertag references
+    db.query("DELETE FROM tags WHERE element_id=?;", cid) # delete tag references
+    db.query("DELETE FROM othertags WHERE element_id=?;",cid) # delete othertag references
     db.query("DELETE FROM contents WHERE container_id=? OR element_id=?;",cid,cid) # delete content relations
-    db.query("DELETE FROM files WHERE container_id=?;",cid) # delete file entry, if present
-    db.query("DELETE FROM containers WHERE id=?;",cid) # remove container itself
+    db.query("DELETE FROM files WHERE element_id=?;",cid) # delete file entry, if present
+    db.query("DELETE FROM elements WHERE id=?;",cid) # remove container itself
 
 def delFile(path=None,hash=None,id=None):
     """Deletes a file from the database, either by path, hash or id."""

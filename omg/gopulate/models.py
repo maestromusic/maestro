@@ -155,7 +155,7 @@ class FileSystemFile(omg.models.Node):
     def commit(self):
         logger.debug("commiting file {}".format(self.path))
         fileId = database.queries.addContainer(os.path.basename(self.path), self.tags, elements=0)
-        querytext = "INSERT INTO files (container_id,path,hash,length) VALUES(?,?,?,?);"
+        querytext = "INSERT INTO files (element_id,path,hash,length) VALUES(?,?,?,?);"
         if self.length is None:
             self.length = 0
         if not self.hash:
