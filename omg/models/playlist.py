@@ -13,7 +13,7 @@ from PyQt4.QtCore import Qt
 from omg import config, database, mpclient, tags
 import omg.gopulate.models as gopmodels
 from . import rootedtreemodel, treebuilder, mimedata
-from . import Node, Element, FilelistMixin, IndexMixin
+from . import RootNode, Element, FilelistMixin, IndexMixin
 
 db = database.get()
 logger = logging.getLogger("omg.models.playlist")
@@ -21,26 +21,12 @@ logger = logging.getLogger("omg.models.playlist")
 class PlaylistElement(Element):
     def __init__(self,id,contents,tags = None):
         Element.__init__(self,id)
-        self.length = None
-        self.position = None
         self.contents = contents
         if tags is not None:
             self.tags = tags
         else: self.loadTags()
     
-    def getPosition(self):
-        if self.parent is None or isinstance(self.parent,RootNode): # Without parent, there can't be a position
-            return None
-        if self.position is None:
-            self.position = db.query("SELECT position FROM contents WHERE container_id = ? AND element_id = ?", 
-                                     self.parent.id,self.id).getSingle()
-        return self.position
-    
-    def getLength(self):
-        """Cache the length, which is not done by Element."""
-        if self.length is None:
-            self.length = Element.getLength(self)
-        return self.length
+
 
         
 class Playlist(rootedtreemodel.RootedTreeModel):
@@ -59,7 +45,7 @@ class Playlist(rootedtreemodel.RootedTreeModel):
     
     def __init__(self):
         """Initialize with an empty playlist."""
-        rootedtreemodel.RootedTreeModel.__init__(self,RootNode())
+        rootedtreemodel.RootedTreeModel.__init__(self,PlaylistRootNode())
         self.setContents([])
     
     def setContents(self,contents):
@@ -559,10 +545,6 @@ class ExternalFile(gopmodels.FileSystemFile, FilelistMixin):
         return self.path
 
 
-class RootNode(Node,FilelistMixin,IndexMixin):
+class PlaylistRootNode(RootNode,FilelistMixin,IndexMixin):
     """Rootnode of the Playlist-TreeModel."""
-    def __init__(self):
-        self.contents = []
-    
-    def getParent(self):
-        return None
+    pass

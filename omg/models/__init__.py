@@ -11,6 +11,7 @@ from PyQt4 import QtCore
 
 from omg import tags, database, covers, config
 from omg.database import queries
+#import omg.models.playlist as playlistmodels
 db = database.get()
 
 logger = logging.getLogger(name="omg")
@@ -54,6 +55,14 @@ class Node:
         if self.getParent() is None:
             return 0
         else: return 1 + self.getParent().getLevel()
+
+class RootNode(Node):
+    """This class represents a node that is the root of a tree model."""
+    def __init__(self):
+        self.contents = []
+    
+    def getParent(self):
+        return None
 
 
 # Methods to access the flat playlist: the list of files at the end of the treemodel.
@@ -150,6 +159,8 @@ class Element(Node,FilelistMixin,IndexMixin):
         assert isinstance(id,int)
         self.id = id
         self.tags = tags
+        self.length = None
+        self.position = None
         
     def hasChildren(self):
         """Return whether this node has at least one child node or None if it is unknown since the contents are not loaded yet."""
@@ -259,18 +270,7 @@ class Element(Node,FilelistMixin,IndexMixin):
         if cache:
             self.otherTags = otherTags
         return otherTags
-            
-    def getLength(self):
-        """Return the length of this element. If it is a container, return the sum of the lengths of all its contents. If the length can't be computed, None is returned. This happens for example if the contents have not been loaded yet."""
-        if self.contents is None:
-            return None
-        if len(self.contents) == 0:
-            return db.query("SELECT length FROM files WHERE container_id = {0}".format(self.id)).getSingle()
-        else:
-            try:
-                return sum(element.getLength() for element in self.contents)
-            except TypeError: # At least one element does not know its length
-                return None
+
     
     def getParentIds(self,recursive):
         """Return a list containing the ids of all parents of this element from the database. If <recursive> is True all ancestors will be added recursively."""
@@ -326,6 +326,29 @@ class Element(Node,FilelistMixin,IndexMixin):
             return albums
         else: return []
         
+    def getPosition(self):
+        import omg.models.playlist as playlistmodels
+        if self.parent is None or isinstance(self.parent,playlistmodels.RootNode): # Without parent, there can't be a position
+            return None
+        if self.position is None:
+            self.position = db.query("SELECT position FROM contents WHERE container_id = ? AND element_id = ?", 
+                                     self.parent.id,self.id).getSingle()
+        return self.position
+    
+    def getLength(self):
+        """Return the length of this element. If it is a container, return the sum of the lengths of all its contents. If the length can't be computed, None is returned. This happens for example if the contents have not been loaded yet."""
+        if self.length is None:
+            if self.contents is None:
+                self.length = None
+            if len(self.contents) == 0:
+                self.length = db.query("SELECT length FROM files WHERE container_id = {0}".format(self.id)).getSingle()
+            else:
+                try:
+                    self.length = sum(element.getLength() for element in self.contents)
+                except TypeError: # At least one element does not know its length
+                    self.legnth = None
+        return self.length    
+    
     def hasCover(self):
         """Return whether this container has a cover."""
         return covers.hasCover(self.id)

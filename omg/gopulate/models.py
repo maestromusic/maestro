@@ -6,7 +6,7 @@
 # published by the Free Software Foundation
 #
 
-from PyQt4 import QtCore
+from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 import os.path
 
@@ -26,11 +26,10 @@ import logging
 logger = logging.getLogger("gopulate.models")
 db = database.get()
 
-class DirectoryNode(omg.models.Node):
+class DirectoryNode(omg.models.RootNode):
     """Represents a directory in the filesystem, which is not a container."""
-    def __init__(self, path=None, parent=None):
-        self.contents = []
-        self.parent = parent
+    def __init__(self, path=None):
+        omg.models.RootNode.__init__(self)
         self.path = path
     
     def __str__(self):
@@ -88,11 +87,10 @@ class GopulateContainer(omg.models.Node):
             myId = self.existingContainer.id
         else:
             myId = database.queries.addContainer(self.name, self.tags, len(self.contents), toplevel = toplevel)
-        for i in range(len(self.contents)):
-            elem = self.contents[i]
+        for elem in self.contents:
             if isinstance(elem, GopulateContainer) or isinstance(elem, FileSystemFile):
                 elemId = elem.commit()
-                database.queries.addContent(myId, i, elemId)
+                database.queries.addContent(myId, elem.getPosition(), elemId)
         return myId
     
     def toolTipText(self):
@@ -110,6 +108,7 @@ class FileSystemFile(omg.models.Node):
         self.parent = parent
         self.hash = None
         self.contents = []
+        self.position = 0
     
     def ensureTagsAreLoaded(self):
         if self.tags == None:
@@ -144,6 +143,12 @@ class FileSystemFile(omg.models.Node):
         handle.close()
         os.remove(tmpfile)
     
+    def getPosition(self):
+        return self.position
+    
+    def getLength(self):
+        return self.length
+    
     def toolTipText(self):
         return formatter.HTMLFormatter(self).detailView()
     
@@ -159,7 +164,7 @@ class FileSystemFile(omg.models.Node):
         return fileId
         
     def __str__(self):
-        return str(self.tags)
+        return "FileSystemFile " + str(self.tags)
 
 class GopulateTreeModel(rootedtreemodel.RootedTreeModel):
     
@@ -190,6 +195,24 @@ class GopulateTreeModel(rootedtreemodel.RootedTreeModel):
             el.parent = root
         self.setRoot(root)
         self.current = path
+        
+    def merge(self, items, name):
+        if len(items) > 0:
+            posItem = items[0]
+            parent = posItem.parent().internalPointer()
+            newContainer = GopulateContainer(name="new container", parent = parent)
+            parent.contents.insert(posItem.row(), newContainer)
+            i = 1
+            for item in items:
+                item.internalPointer().parent = newContainer
+                item.internalPointer().position = i
+                newContainer.contents.append(item.internalPointer())
+                parent.contents.remove(item.internalPointer())
+                i = i + 1
+            newContainer.updateSameTags()
+            newContainer.tags["album"] = [ name ]
+        self.reset()
+                
         
     def commit(self):
         """Commits all the containers and files in the current model into the database."""
