@@ -8,11 +8,13 @@
 #
 from omg import database, tags
 
-# When deciding which criterion should be performed first, TextCriteria where tag is not None, are favored by this factor since they tend to give less results than searches in all indexed tags.
+# When deciding which criterion should be performed first, TextCriteria where tag is not None, are favored by this factor since they tend to give less results than searches in all tags.
 SINGLE_TAG_MULTIPLIER = 3
 
+searchTags = None
+
 class TextCriterion:
-    """A TextCriterion contains a tag t and a tag-value v. If t is not None the criterion is fulfilled for a container if the container has a t-tag matching v (i.e. with value equal to v if t.type is date or containing the string v otherwise). If tag is None, the TextCriterion tries all indexed tags and is fulfilled if it at least one tag matches v.
+    """A TextCriterion contains a tag t and a tag-value v. If t is not None the criterion is fulfilled for a container if the container has a t-tag matching v (i.e. with value equal to v if t.type is date or containing the string v otherwise). If tag is None, the TextCriterion tries all tags contained in the config-variable tags->search_tags and is fulfilled if it at least one tag matches v.
     """
     def __init__(self,tag,value):
         """Initialize this TextCriterion with the given value in the given tag. If tag is None the criterion is fulfilled if at least one tag matches the value."""
@@ -23,16 +25,14 @@ class TextCriterion:
         """Return a SELECT-query fetching the rows of <fromTable> which fulfill this criterion. <fromTable> must contain an 'id'-column holding container-ids and a 'file'-column with the corresponding file-flags. By default only the id- and file-columns of <fromTable> are selected, but you can specify a list of columns in the <column>-parameter.
         """
         if self.tag is not None:
-            if self.tag in tags.tagList: # TODO: currently only indexed tags may be searched
-                return _buildSelectForSingleTag(self.tag,self.value,fromTable,columns)
-            else: raise Exception("Currently only indexed tags may be searched.")
+            return _buildSelectForSingleTag(self.tag,self.value,fromTable,columns)
         else:
-            # Build a query to search in all tags...or to be exact: In all tags if the search-value is a number. Otherwise exclude date-tags.
+            # Build a query to search in all tags contained in the config-variable tags->search_tags...or to be exact: In all of those tags if the search-value is a number; otherwise exclude date-tags.
             try:
                 number = int(self.value)
-                tagsToSearch = tags.tagList
+                tagsToSearch = searchTags
             except ValueError:
-                tagsToSearch = (tag for tag in tags.tagList if tag.type != 'date')
+                tagsToSearch = (tag for tag in searchTags if tag.type != 'date')
         return " UNION ".join(("({0})".format(_buildSelectForSingleTag(tag,self.value,fromTable,columns))\
                                  for tag in tagsToSearch))
 
@@ -115,7 +115,6 @@ def sortKey(criterion):
     """Compute a "complexity" value for a criterion.
     
     This function is used to sort the complicated criteria in the front hoping that we get right from the beginning only a few results. In the current implementation complexity means basically the length of the search value. This makes sense also for a second reason: MySQLs Turbo-Boyer-Moore-algorithm for queries containing "LIKE '%<search value>%' is faster for longer search values."""
-    return 1 # TODO: For debugging reasons I killed the sort comparison so that criteria are performed in the given order
     if isinstance(criterion,TagIdCriterion):
         return 1000 # Just a high value to sort TagIdCriteria to the front
     else: # TextCriterion

@@ -47,7 +47,7 @@ def run():
     from omg import database
     database.connect()
     from omg import tags
-    tags.updateIndexedTags()
+    tags.init()
     from omg import mpclient, search, control, constants
     search.init()
     from omg.gui import browser as browserModule
@@ -80,12 +80,12 @@ def run():
     central = QtGui.QTabWidget()
     central.addTab(playlist,"playlist")
     
-    import omg.gopulate
-    import omg.gopulate.models
-    import omg.gopulate.gui
-    gm = omg.gopulate.models.GopulateTreeModel(config.get("music","collection"))
-    gw = omg.gopulate.gui.GopulateWidget(gm)
-    central.addTab(gw, "gopulate")
+    #~ import omg.gopulate
+    #~ import omg.gopulate.models
+    #~ import omg.gopulate.gui
+    #~ gm = omg.gopulate.models.GopulateTreeModel(config.get("music","collection"))
+    #~ gw = omg.gopulate.gui.GopulateWidget(gm)
+    #~ central.addTab(gw, "gopulate")
     
     import omg.filesystembrowser
     fb = omg.filesystembrowser.FileSystemBrowser()
@@ -93,8 +93,8 @@ def run():
     fbDock.setWindowTitle("File browser")
     fbDock.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
     fbDock.setWidget(fb)
-    fb.currentDirectoryChanged.connect(gm.setCurrentDirectory)
-    fb.searchDirectoryChanged.connect(gm.setSearchDirectory)
+    #~ fb.currentDirectoryChanged.connect(gm.setCurrentDirectory)
+    #~ fb.searchDirectoryChanged.connect(gm.setSearchDirectory)
     widget.addDockWidget(Qt.RightDockWidgetArea, fbDock)
     
     widget.setCentralWidget(central)

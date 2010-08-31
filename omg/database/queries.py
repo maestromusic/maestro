@@ -42,16 +42,11 @@ def addContent(containerId, i, contentId):
     database.get().query('INSERT INTO contents VALUES(?,?,?);', containerId, i, contentId)
     
 def addTag(cid, tag, value):
-    """Add an entry 'tag=value' into the tags or othertags table (depending of the type of tag)"""
-    
-    db = database.get()
-    if isinstance(tag, tags.IndexedTag):
-        db.query("INSERT INTO tags VALUES(?,?,?);", cid, tag.id, tag.getValueId(value, insert=True))
-    elif isinstance(tag, tags.OtherTag):
-        db.query("INSERT INTO othertags VALUES(?,?,?);", cid, tag.name, value)
+    """Add an entry 'tag=value' into the tags-table."""
+    database.get().query("INSERT INTO tags VALUES(?,?,?);", cid, tag.id, tag.getValueId(value, insert=True))
        
 def setTags(cid, tags, append=False):
-    """Sets the tags of container with id <cid> to the supplied tags, which is a tags.Storage object.
+    """Set the tags of container with id <cid> to the supplied tags, which is a tags.Storage object.
     
     If the optional parameter append is set to True, existing tags won't be touched, instead the 
     given ones will be added. This function will not check for duplicates in that case."""
@@ -60,13 +55,8 @@ def setTags(cid, tags, append=False):
     existingTags = db.query("SELECT * FROM tags WHERE 'element_id'=?;", cid)
     
     if len(existingTags) > 0 and not append:
-        logger.warning("Deleting existing indexed tags from container {0}".format(cid))
+        logger.warning("Deleting existing tags from container {0}".format(cid))
         db.query("DELETE FROM tags WHERE 'element_id'=?;", cid)
-        
-    existing_othertags = db.query("SELECT * FROM othertags WHERE 'element_id'=?;",cid)
-    if len(existing_othertags) > 0 and not append:
-        logger.warning("Deleting existing othertags from container {0}".format(cid))
-        database.db.query("DELETE FROM othertags WHERE 'element_id'=?;", cid)
     
     for tag in tags.keys():
         for value in tags[tag]:
@@ -91,7 +81,6 @@ def delContainer(cid):
     If the content is a file, also deletes its entry from the files table."""
     db = database.get()
     db.query("DELETE FROM tags WHERE element_id=?;", cid) # delete tag references
-    db.query("DELETE FROM othertags WHERE element_id=?;",cid) # delete othertag references
     db.query("DELETE FROM contents WHERE container_id=? OR element_id=?;",cid,cid) # delete content relations
     db.query("DELETE FROM files WHERE element_id=?;",cid) # delete file entry, if present
     db.query("DELETE FROM elements WHERE id=?;",cid) # remove container itself

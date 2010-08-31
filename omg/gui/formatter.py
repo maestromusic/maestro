@@ -11,9 +11,6 @@ import cgi
 from omg import config,covers,models,strutils,tags
 import datetime
 
-# Order in which tags will be displayed. Tags which don't appear in this list will be displayed in arbitrary order after the tags in the list.
-tagOrder = [tags.get(name) for name in config.get("gui","tag_order").split(",")]
-
 class Formatter:
     """A Formatter takes an element and offers several functions to get formatted output from the tags, length, title etc. of the element."""
     def __init__(self,element):
@@ -106,8 +103,6 @@ class HTMLFormatter(Formatter):
 
     def detailView(self):
         """Return HTML-code which renders a detailed view of the element."""
-        
-        
         lines = []
         self.element.ensureTagsAreLoaded()
         coverPath = None
@@ -127,19 +122,9 @@ class HTMLFormatter(Formatter):
         lines.append('<div style="font-size: 12px">')
         
         tagLines = []
-        for tag in [t for t in tagOrder if t in self.element.tags and t != tags.TITLE and t != tags.ALBUM]:
+        for tag in [t for t in tags.tagList if t in self.element.tags and t != tags.TITLE and t != tags.ALBUM]:
             tagLines.append('{0}: {1}'.format(cgi.escape(str(tag)),cgi.escape(self.tag(tag))))
 
-        # Add the tags which don't appear in the tagOrder-list
-        for tag in [t for t in self.element.tags if t not in tagOrder]:
-            tagLines.append('{0}: {1}'.format(cgi.escape(str(tag)),cgi.escape(self.tag(tag))))
-        
-        # Add other tags
-        if isinstance(self.element, models.Element):
-            for tag,values in self.element.getOtherTags().items():
-                for value in values:
-                    tagLines.append('*{0}: {1}'.format(cgi.escape(str(tag)),cgi.escape(value)))
-            
         lines.append("<br>".join(tagLines))
         lines.append('</div>')
         if coverPath is not None:

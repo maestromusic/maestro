@@ -11,7 +11,6 @@ from PyQt4 import QtCore
 
 from omg import tags, database, covers, config
 from omg.database import queries
-#import omg.models.playlist as playlistmodels
 db = database.get()
 
 logger = logging.getLogger(name="omg")
@@ -77,7 +76,7 @@ class Node:
         if self.getParent() is None:
             return 0
         else: return 1 + self.getParent().getLevel()
- 
+        
     def index(self,node):
         """Return the index of <node> in this node's contents or raise a ValueError if the node is not found. See also find."""
         contents = self.getChildren()
@@ -93,7 +92,7 @@ class Node:
             if contents[i] == node:
                 return i
         return -1
-
+        
     def getAllFiles(self):
         """Generator which will return all files contained in this element or in child-elements of it."""
         assert self.getChildren() is not None
@@ -196,15 +195,13 @@ class Element(Node):
         return newNode
 
     def loadTags(self,recursive=False,tagList=None):
-        """Delete the stored indexed tags and load them from the database. If <recursive> is True, all tags from children of this node (recursively) will be loaded, too. If <tagList> is not None only tags in the given list will be loaded (e.g. only title-tags). Note that this method affects only indexed tags!"""
+        """Delete the stored tags and load them from the database. If <recursive> is True, all tags from children of this node (recursively) will be loaded, too. If <tagList> is not None only tags in the given list will be loaded (e.g. only title-tags)."""
         self.tags = tags.Storage()
         
         if tagList is not None:
             additionalWhereClause = " AND tag_id IN ({0})".format(",".join(str(tag.id) for tag in tagList))
-            otherAdditionalWhereClause = " AND tagname IN ({0})".format(",".join(str(tag.name for tag in tagList)))
         else:
             additionalWhereClause = ''
-            otherAdditionalWhereClause = ''
         
         result = db.query("""
             SELECT tag_id,value_id 
@@ -220,39 +217,17 @@ class Element(Node):
                 continue
             self.tags[tag].append(value)
         
-        # load othertags
-        result = db.query("""
-            SELECT tagname,value
-            FROM othertags
-            WHERE element_id = {0} {1}
-            """.format(self.id,otherAdditionalWhereClause))
-        for row in result:
-            tag = tags.get(row[0])
-            value = row[1]
-            self.tags[tag].append(value)
         if recursive:
             for element in self.getChildren():
                 element.loadTags(recursive,tagList)
     
     def ensureTagsAreLoaded(self,recursive=False):
-        """Load indexed tags if they are not loaded yet."""
+        """Load tags if they are not loaded yet."""
         if self.tags is None:
             self.loadTags()
         if recursive:
             for element in self.getChildren():
                 element.ensureTagsAreLoaded()
-                
-    def getOtherTags(self,cache=False):
-        """Load the tags which are not indexed from the database and return them. The result will be a tags.Storage mapping tag-names to lists of tag-values. If <cache> is True, the tags will be stored in this Element. Warning: Subsequent calls of this method will return the cached tags only if <cache> is again True."""
-        if cache and hasattr(self,'otherTags'):
-            return self.otherTags
-        result = db.query("SELECT tagname,value FROM othertags WHERE element_id = {0}".format(self.id))
-        otherTags = tags.Storage()
-        for row in result:
-            otherTags[tags.OtherTag(row[0])].append(row[1])
-        if cache:
-            self.otherTags = otherTags
-        return otherTags
     
     def getPosition(self,refresh=False):
         """Return the position of this element in its current parent and cache it for subsequent calls. Note that position is the number from the contents-table, not the index of this element in the parent's list of children. To get the latter, use parent.index(self). If <refresh> is True the cached value must be recomputed. Return None if the element has no parent or the parent is not of type Element."""
@@ -316,7 +291,7 @@ class Element(Node):
                         albums.append(id)
             return albums
         else: return []
-    
+        
     def hasCover(self):
         """Return whether this container has a cover."""
         return covers.hasCover(self.id)
@@ -451,3 +426,47 @@ def createElement(id,tags=None,contents=None,file=None):
     if file:
         return DBFile(id,tags=tags)
     else: return Container(id,tags=tags,contents=contents)
+
+
+class ExternalFile(Node):
+    """This class holds a file that appears in the playlist, but is not in the database."""
+    
+    def __init__(self,path,parent = None):
+        """Initialize with the given path and parent."""
+        self.path = path
+        self.parent = parent
+    
+    def isFile(self):
+        return True
+    
+    def isContainer(self):
+        return False
+        
+    def getPath(self):
+        return self.path
+    
+    def hasChildren(self):
+        return False
+
+    def getChildren(self):
+        return []
+        
+    def getChildrenCount(self):
+        return 0
+        
+    def getAllFiles(self):
+        return (self,)
+    
+    def getFileCount(self):
+        return 1
+        
+    def getFileAtOffset(self,offset):
+        if offset != 0:
+            raise IndexError("Offset {} is out of bounds".format(offset))
+        return self
+    
+    def loadTags(self):
+        self.readTagsFromFilesystem()
+        
+    def __str__(self):
+        return self.path

@@ -96,15 +96,8 @@ tables = {table.name:table for table in (SQLTable(createQuery) for createQuery i
         PRIMARY KEY(id),
         UNIQUE INDEX(tagname)
     );
-""",
-"""CREATE TABLE othertags (
-        element_id MEDIUMINT UNSIGNED NOT NULL,
-        tagname VARCHAR(63),
-        value VARCHAR(255),
-        INDEX element_id_idx(element_id)
-    );
-""")
-)}
+"""
+))}
 
 # Tag tables
 #========================
@@ -141,6 +134,11 @@ class TagTable(SQLTable):
         );"""
     }
 
-for tagname,tagtype in database._parseIndexedTags().items():
-    newTable = TagTable(tagname,tagtype)
-    tables[newTable.name] = newTable
+def allTables():
+    """Return a dictionary mapping the table-names to SQLTable-instances and containing all tables which should be in the database (according to the information in tagids)."""
+    result = dict(tables)
+    if 'tagids' in tables:
+        tagTables = {"tag_"+tagname:TagTable(tagname,tagtype)
+                        for tagname,tagtype in database.get().query("SELECT tagname,tagtype FROM tagids")}
+        result.update(tagTables)
+    return result

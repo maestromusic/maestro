@@ -6,7 +6,7 @@
 # it under the terms of the GNU General Public License version 3 as
 # published by the Free Software Foundation
 #
-from omg import database, tags
+from omg import database, tags, config
 from . import searchparser
 from . import criteria as criteriaModule
 
@@ -23,6 +23,7 @@ db = None
 def init():
     """Initialize the search-module."""
     global db
+    criteria.searchTags = tags.parse(config.get("tags","search_tags"))
     db = database.get()
     db.query("DROP TABLE IF EXISTS {0}".format(TT_HELP))
     db.query("""
