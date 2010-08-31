@@ -11,10 +11,10 @@ import difflib, logging, os
 from PyQt4 import QtCore
 from PyQt4.QtCore import Qt
 
-from omg import config, database, mpclient, tags, absPath, relPath
+from omg import config, database, mpclient, tags, absPath, relPath, models
 import omg.gopulate.models as gopmodels
 from . import rootedtreemodel, treebuilder, mimedata
-from . import Node, DBFile, Container, RootNode
+from . import Node, DBFile, Container
 
 db = database.get()
 logger = logging.getLogger("omg.models.playlist")
@@ -36,7 +36,7 @@ class Playlist(rootedtreemodel.RootedTreeModel):
     
     def __init__(self):
         """Initialize with an empty playlist."""
-        rootedtreemodel.RootedTreeModel.__init__(self,RootNode())
+        rootedtreemodel.RootedTreeModel.__init__(self,models.RootNode())
         self.setContents([])
     
     def setContents(self,contents):
@@ -90,7 +90,6 @@ class Playlist(rootedtreemodel.RootedTreeModel):
             self.insertElements([node.copy() for node in mimeData.retrieveData(config.get("gui","mime"))],offset)
             return True
         elif mimeData.hasFormat("text/uri-list"):
-            
             self.insertElements(self.importPaths(relPath(url.path()) for url in mimeData.urls()),offset)
             return True
         else: return False

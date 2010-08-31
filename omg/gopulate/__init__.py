@@ -67,6 +67,7 @@ def findAlbumsInDirectory(path, onlyNewFiles = True):
             if "tracknumber" in t:
                 trkn = int(t["tracknumber"][0].split("/")[0]) # support 02/15 style
                 newAlbumsInThisDirectory[album].tracks[trkn] = elem
+                elem.position=trkn
             else: # file without tracknumber, bah
                 print(t)
                 if 0 in newAlbumsInThisDirectory[album].tracks:
@@ -82,6 +83,7 @@ def findAlbumsInDirectory(path, onlyNewFiles = True):
             album = t.tags['title'][0]
             newAlbumsInThisDirectory[album].mergeWithExisting(t)
         else:
+            t.contents.sort(key=lambda x : x.getPosition())
             thingsInThisDirectory.append(t)
     for al in newAlbumsInThisDirectory.values():
         al.finalize()

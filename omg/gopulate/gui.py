@@ -15,6 +15,8 @@ from omg import tags
 from PyQt4.QtCore import Qt
 
 class NewGopulateDelegate(QtGui.QStyledItemDelegate):
+    """Draws Elements in the Gopulate view."""
+    
     def __init__(self, parent = None):
         QtGui.QAbstractItemDelegate.__init__(self, parent)
         self.doc = QtGui.QTextDocument()
@@ -27,7 +29,7 @@ class NewGopulateDelegate(QtGui.QStyledItemDelegate):
         #self.doc.setHtml("<h2>spaaast</h2><img src=\"images/lastfm.gif\"></img>")
         #self.doc.adjustSize()
         tab = []
-        beforeTable = ""
+        beforeTable = ''
         if isinstance(elem,omg.gopulate.models.GopulateContainer):
             if tags.get("album") in elem.sameTags and tags.get("artist") in elem.sameTags:
                 beforeTable += ", ".join(elem.tags['artist']) + " – " +  ", ".join(elem.tags['album'])
@@ -42,8 +44,7 @@ class NewGopulateDelegate(QtGui.QStyledItemDelegate):
         elif isinstance(elem,omg.gopulate.models.FileSystemFile):
             if tags.get("title") in elem.tags:
                 beforeTable = ", ".join(elem.tags['title'])
-                if "tracknumber" in elem.tags:
-                    beforeTable = "<b>{:2}: </b>".format(", ".join(elem.tags['tracknumber'])) + beforeTable
+                beforeTable = "<b>{:2}: </b>".format(elem.getPosition()) + beforeTable
             for k,vs in elem.tags.items():
                 if k == tags.get("title") or k == tags.get("tracknumber"):
                     continue
@@ -54,7 +55,8 @@ class NewGopulateDelegate(QtGui.QStyledItemDelegate):
                     tab[-1].append(v)
         elif isinstance(elem, omg.models.Element):
             f = HTMLFormatter(elem)
-            beforeTable = f.detailView()
+            beforeTable = "<b>{:2}: </b>".format(elem.getPosition())
+            beforeTable = beforeTable + f.detailView()
         # color codes
         if isinstance(elem, omg.gopulate.models.FileSystemFile) or isinstance(elem, omg.gopulate.models.GopulateContainer):
             if isinstance(elem, omg.gopulate.models.GopulateContainer) and elem.existingContainer:
@@ -98,16 +100,8 @@ class NewGopulateDelegate(QtGui.QStyledItemDelegate):
         return self.doc.size().toSize()
 
 
-class GopulateEditorWidget(QtGui.QLabel):
-    def __init__(self, parent = None):
-        QtGui.QWidget.__init__(self,parent)
-        self.setText('<p> omgwtf? </p><br /><p><b>OMGWTF!?</b></p>')
-        
-    def setElement(self, cur, prev):
-        self.element = cur.internalPointer()
-        self.setText("\n".join("{}={}".format(k,v) for k,v in self.element.tags.items()))
-
 class GopulatTreeWidget(QtGui.QTreeView):
+    """Suitable to display a GopulateTreeModel"""
     
     def __init__(self, parent = None):
         QtGui.QTreeView.__init__(self, parent)
@@ -115,15 +109,27 @@ class GopulatTreeWidget(QtGui.QTreeView):
         self.setAlternatingRowColors(True)
         self.setContextMenuPolicy(Qt.DefaultContextMenu)
         self.setSelectionMode(self.ExtendedSelection)
+        
+        self.mergeAction = QtGui.QAction("merge", self)
+        self.mergeAction.triggered.connect(self._handleMerge)
 
     def contextMenuEvent(self, event):
-        print("context!")
-        ac = QtGui.QAction("test",self)
         menu = QtGui.QMenu(self)
-        menu.addAction(ac)
+        menu.addAction(self.mergeAction)
         menu.popup(event.globalPos())
+    
+    def setModel(self, model):
+        QtGui.QTreeView.setModel(self, model)
+        model.modelReset.connect(self.expandAll)
+        self.expandAll()
+    
+    def _handleMerge(self):
+        title,flag = QtGui.QInputDialog.getText(self, "merge elements", "Name of new subcontainer:")
+        if flag:
+            self.model().merge(self.selectionModel().selectedIndexes(), title)
         
 class GopulateWidget(QtGui.QWidget):
+    """GopulateWidget consists of a GopulateTreeModel and buttons to control the populate process."""
     
     dbChanged = QtCore.pyqtSignal()
     
@@ -135,9 +141,13 @@ class GopulateWidget(QtGui.QWidget):
         model.modelReset.connect(self._updateLabel)
         
         self.accept = QtGui.QPushButton('accept')
+        self.accept.pressed.connect(self._handleAcceptPressed)
+        self.accept.released.connect(self._handleAcceptReleased)
         self.accept.clicked.connect(model.commit)
         
         self.next = QtGui.QPushButton('next')
+        self.next.pressed.connect(self._handleNextPressed)
+        self.next.released.connect(self._handleNextReleased)
         self.next.clicked.connect(model.nextDirectory)
         self.next.clicked.connect(self.dbChanged.emit)
         
@@ -152,6 +162,17 @@ class GopulateWidget(QtGui.QWidget):
         self.tree.setModel(model)
         self.tree.setHeaderHidden(True)
         self._updateLabel()
-    
     def _updateLabel(self):
         self.dirLabel.setText(self.tree.model().root.path)
+    
+    def _handleAcceptPressed(self):
+        self.accept.setText("calculating audio hashes...")
+    
+    def _handleAcceptReleased(self):
+        self.accept.setText("accept")
+        
+    def _handleNextPressed(self):
+        self.next.setText("searching for new files...")
+    
+    def _handleNextReleased(self):
+        self.next.setText("next")

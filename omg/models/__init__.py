@@ -11,6 +11,7 @@ from PyQt4 import QtCore
 
 from omg import tags, database, covers, config
 from omg.database import queries
+#import omg.models.playlist as playlistmodels
 db = database.get()
 
 logger = logging.getLogger(name="omg")
@@ -76,7 +77,7 @@ class Node:
         if self.getParent() is None:
             return 0
         else: return 1 + self.getParent().getLevel()
-        
+ 
     def index(self,node):
         """Return the index of <node> in this node's contents or raise a ValueError if the node is not found. See also find."""
         contents = self.getChildren()
@@ -92,7 +93,7 @@ class Node:
             if contents[i] == node:
                 return i
         return -1
-        
+
     def getAllFiles(self):
         """Generator which will return all files contained in this element or in child-elements of it."""
         assert self.getChildren() is not None
@@ -315,7 +316,7 @@ class Element(Node):
                         albums.append(id)
             return albums
         else: return []
-        
+    
     def hasCover(self):
         """Return whether this container has a cover."""
         return covers.hasCover(self.id)
