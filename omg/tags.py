@@ -13,8 +13,8 @@ This module provides methods to initialize the tag lists based on the database, 
 
 - The easiest way is the get-method which takes a tag-id or an tag-name as parameter.
 - For some tags which have a special meaning to the program and cannot always be treated generically (e.g. the title-tag) where exist constants (e.g. TITLE). This allows to use tags.TITLE instead of tags.get(config.get("tags","title_tag")) as the user may decide to use another tagname than "title" for his titles.
-- To iterate over all tags use tagList.
-- You may create tags simply via the constructor. But the get-method translates automatically from tag-ids to tagnames and vice versa and it doesn't create new instances, so usually you are better off 
+- To iterate over all indexed tags use tagList.
+- You may create tags simply via the constructors of IndexedTag or OtherTag. But in case of indexed tags the get-method translates automatically from tag-ids to tag-names and vice versa and it doesn't create new instances and in the other case it does just the same job as the OtherTag-constructor, so you are usually better off using that method.
 """
 from collections import defaultdict
 from omg import config, database
@@ -24,11 +24,11 @@ logger = logging.getLogger("tags")
 
 # Module variables - Will be initialized with the first call of init.
 #=================================================================================
-# Dictionaries of all tags. From outside the module use the get-method instead of these private variables.
+# Dictionaries of all indexed tags. From outside the module use the get-method instead of these private variables.
 _tagsById = None
 _tagsByName = None
 
-# List of all tags in the order specified by the config-variable tags->tag_order (tags which are not contained in that list will appear in arbitrary order at the end of tagList). Us this to iterate over all tags.
+# List of all indexed tags in the order specified by the config-variable tags->tag_order (tags which are not contained in that list will appear in arbitrary order at the end of tagList). Us this to iterate over all tags.
 tagList = None
 
 # Tags which have a special meaning for the application and cannot always be treated generically.
@@ -39,24 +39,28 @@ DATE = None
 
 
 class Tag:
-    """Class for tags. Tags have three public attributes: id, name and type, where type must be one of the keys in database.tables.TagTable._tagQueries. Tags may compare equal if and only if the ids match and may be used as dictionary keys. In most cases you won't instantiate this class but use tags.get to get the already existing instances.
+    """Baseclass for tags.
+    
+    Tags contain a tagname and compare equal if and only this tagname is equal. Tags may be used as dictionary keys. The only public attribute is name.
     """
-    def __init__(self,id,name,type):
-        self.id = id
-        self.name = name
-        self.type = type
+    def __init__(self):
+        raise RuntimeError("Cannot instantiate abstract base class Tag.")
+    
+    def isIndexed(self):
+        """Return whether this tag is indexed (i.e. of type IndexedTag)."""
+        return isinstance(self,IndexedTag)
         
     def __eq__(self,other):
-        return isinstance(other,Tag) and self.id == other.id
+        return self.name == other.name
         
     def __ne__(self,other):
-        return not isinstance(other,Tag) or self.id != other.id
+        return self.name != other.name
 
     def __hash__(self):
-        return self.id
+        return self.name.__hash__()
 
     def __repr__(self):
-        return '"{}"'.format(self.name)
+        return '"{0}"'.format(self.name)
 
     def __str__(self):
         # TODO: Store the translations somewhere else
@@ -72,6 +76,17 @@ class Tag:
             'description': "Beschreibung"
         }
         return nameDict.get(self.name,self.name) # if self.name is not contained in the dict return the name itself
+        
+        
+class IndexedTag(Tag):
+    """Subclass for all indexed tags.
+    
+    Indexed tags contain in addition to their name an id and compare equal if and only if this id is equal. In most cases you won't instantiate this class but use tags.get to get the already existing instances. Indexed tags have three public attributes: id, name and type where type must be one of the keys in database.tables.TagTable._tagQueries.
+    """
+    def __init__(self,id,name,type):
+        self.id = id
+        self.name = name
+        self.type = type
     
     def getValue(self,valueId):
         """Retrieve the value of this tag with the given <valueId> from the corresponding tag-table."""
@@ -82,7 +97,7 @@ class Tag:
         else: return value
     
     def getValueId(self, value, insert=True):
-        """Retriev the id of the value of this tag with the given <value> name."""
+        """Retrieve the id of the value of this tag with the given <value> name."""
         
         db = database.get()
         tableName = "tag_" + self.name
@@ -99,6 +114,15 @@ class Tag:
             valueId = db.query("INSERT INTO tag_{0} (value) VALUES(?);".format(self.name), value).insertId()
             logger.debug("creating new value {} for tag {}".format(value,self.name))
         return valueId
+    
+    def __eq__(self,other):
+        return isinstance(other, IndexedTag) and self.id == other.id
+    
+    def __ne__(self,other):
+        return self.id != other.id
+
+    def __hash__(self):
+        return self.id
         
     #TODO: The following comparison methods should not be used! Unfortunately PrettyPrinter sorts dictionary keys and raises exceptions if they cannot be sorted (confer issue 7429).
     def __ge__(self,other):
@@ -112,6 +136,11 @@ class Tag:
     
     def __lt__(self,other):
         return self.id < other.id
+        
+
+class OtherTag(Tag):
+    """Special class for tags which are not indexed."""
+    pass
 
 
 def get(identifier):
@@ -121,7 +150,7 @@ def get(identifier):
     elif isinstance(identifier,str):
         if identifier in _tagsByName:
             return _tagsByName[identifier]
-        else: raise IndexError("There is no tag with name {}".format(identifier))
+        else: return OtherTag(identifier)
     else: raise Exception("Identifier's type is neither int nor string: {} of type {}".format(identifier,type(identifier)))
     
 
@@ -136,7 +165,7 @@ def init():
     _tagsByName = {}
     db = database.get()
     for row in db.query("SELECT id,tagname,tagtype FROM tagids"):
-        newTag = Tag(*row)
+        newTag = IndexedTag(*row)
         _tagsById[row[0]] = newTag
         _tagsByName[row[1]] = newTag
     
