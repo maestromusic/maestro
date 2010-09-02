@@ -37,13 +37,13 @@ class SQLTable:
         """Create this table by executing its createQuery."""
         if self.exists():
             raise DBLayoutException("Table '{0}' does already exist.".format(self.name))
-        return db.query(self.createQuery)
+        db.query(self.createQuery)
     
     def reset(self):
         """Drop this table and create it without data again. All table rows will be lost!"""
         if self.exists():
             db.query("DROP table {0}".format(self.name))
-        return self.create()
+        self.create()
 
 
 # Static tables
