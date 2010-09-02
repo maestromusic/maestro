@@ -28,6 +28,9 @@ logger = logging.getLogger("tags")
 _tagsById = None
 _tagsByName = None
 
+# list of all tags that are ignored by config file
+_ignored = None
+
 # List of all indexed tags in the order specified by the config-variable tags->tag_order (tags which are not contained in that list will appear in arbitrary order at the end of tagList). Us this to iterate over all tags.
 tagList = None
 
@@ -37,6 +40,7 @@ TITLE = None
 ALBUM = None
 DATE = None
 
+TOTALLY_IGNORED_TAGS = ("tracknumber", "discnumber", "omgwtfthisisnotag")
 
 class Tag:
     """Baseclass for tags.
@@ -49,7 +53,11 @@ class Tag:
     def isIndexed(self):
         """Return whether this tag is indexed (i.e. of type IndexedTag)."""
         return isinstance(self,IndexedTag)
-        
+    
+    def isIgnored(self):
+        """Return if the tag is ignored."""
+        return self.name in TOTALLY_IGNORED_TAGS or self.name in _ignored
+    
     def __eq__(self,other):
         return self.name == other.name
         
@@ -140,7 +148,8 @@ class IndexedTag(Tag):
 
 class OtherTag(Tag):
     """Special class for tags which are not indexed."""
-    pass
+    def __init__(self, name):
+        self.name = name
 
 
 def get(identifier):
@@ -151,16 +160,29 @@ def get(identifier):
         if identifier in _tagsByName:
             return _tagsByName[identifier]
         else: return OtherTag(identifier)
-    else: raise Exception("Identifier's type is neither int nor string: {} of type {}".format(identifier,type(identifier)))
+    elif isinstance(identifier, Tag):
+        return identifier
+    else: raise RuntimeError("Identifier's type is neither int nor string: {} of type {}".format(identifier,type(identifier)))
     
 
 def parse(string,sep=','):
     """Parse a string containing tag-names (by default comma-separated, but you may specify a different separator) and return a list of corresponding tags. If <string> contains a substring that is not a tag name, it is simply ignored."""
     return [_tagsByName[name] for name in string.split(sep) if name in _tagsByName]
-    
+
+def addIndexedTag(identifier, type):
+    if identifier in _tagsByName.keys():
+        raise RuntimeError("requested creation of tag {} which is already there".format(identifier))
+    from omg.database import tables
+    db = database.get()
+    tagtab = tables.TagTable(identifier, type)
+    tagtab.create()
+    id = db.query("INSERT INTO tagids (tagname,tagtype) VALUES (?,?)",identifier, type).insertId()
+    init()
+    return get(id)
+
 def init():
     """Initialize the variables of this module based on the information of the tagids-table and config-file. At program start or after changes of that table this method must be called to ensure the module has the correct tags and their IDs."""
-    global _tagsById,_tagsByName,tagList
+    global _tagsById,_tagsByName,tagList, _ignored
     _tagsById = {}
     _tagsByName = {}
     db = database.get()
@@ -174,6 +196,7 @@ def init():
     # ...and then all remaining tags in arbitrary order
     tagList.extend(set(_tagsByName.values()) - set(tagList))
     
+    _ignored = config.get("tags", "ignored_tags").split(",")
     global TITLE,ALBUM,DATE
     TITLE = _tagsByName[config.get("tags","title_tag")]
     ALBUM = _tagsByName[config.get("tags","album_tag")]

@@ -162,8 +162,10 @@ class GopulateWidget(QtGui.QWidget):
         self.tree.setModel(model)
         self.tree.setHeaderHidden(True)
         self._updateLabel()
+        
     def _updateLabel(self):
-        self.dirLabel.setText(self.tree.model().root.path)
+        if self.tree.model().root:
+            self.dirLabel.setText(self.tree.model().root.path)
     
     def _handleAcceptPressed(self):
         self.accept.setText("calculating audio hashes...")

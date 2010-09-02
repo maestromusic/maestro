@@ -52,7 +52,7 @@ _defaultOptions = {
         # Tags that will be searched, if you type a text without prefix in a searchbox. Use prefixes to search for other tags.
         "search_tags":"album,performer,conductor,title,lyricist,composer,date,artist",
         # Tags which will be totally ignored by this application.
-        "ignored_tags":"encodedby,tracktotal,disctotal,tracknumber,discnumber",
+        "ignored_tags":"tracktotal,disctotal,tracknumber,discnumber",
         
         # Order in which tags will be displayed. Must contain title and album! Tags which don't appear in this list will be displayed in arbitrary order after the tags in the list.
         "tag_order": "title,album,composer,artist,performer,conductor,date,genre",

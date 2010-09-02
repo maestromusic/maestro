@@ -31,7 +31,7 @@ enabledPlugins = []
 
 # Plugins that will be loaded on startup
 #TODO: This should be editable from within the application
-pluginsToLoad = ["coverfetcher"]
+pluginsToLoad = ["coverfetcher", "dbinfo"]
 
 def loadPlugins():
     """Import all plugins which should be loaded and enable them."""

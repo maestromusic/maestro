@@ -15,7 +15,7 @@ if input("Really? (y,n)") != "y":
     quit()
     
 defaultTags = "album,artist,composer,date(date),genre,performer,title"
-tags = input("What text do you want to use? [{}]".format(defaultTags))
+tags = input("What tags do you want to use? [{}]".format(defaultTags))
 
 if tags.strip() == '':
     tags = defaultTags

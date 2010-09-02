@@ -37,13 +37,13 @@ class SQLTable:
         """Create this table by executing its createQuery."""
         if self.exists():
             raise DBLayoutException("Table '{0}' does already exist.".format(self.name))
-        db.query(self.createQuery)
+        return db.query(self.createQuery)
     
     def reset(self):
         """Drop this table and create it without data again. All table rows will be lost!"""
         if self.exists():
             db.query("DROP table {0}".format(self.name))
-        self.create()
+        return self.create()
 
 
 # Static tables
@@ -99,13 +99,14 @@ tables = {table.name:table for table in (SQLTable(createQuery) for createQuery i
 """
 ))}
 
+validTagTypes = ("varchar", "date", "text")
 # Tag tables
 #========================
 class TagTable(SQLTable):
     """Class for tables which hold all values of a certain tag. Because these tables are created by common queries only depending on tagname and tagtype there is a special class for them."""
     def __init__(self,tagname,tagtype):
         """Initialise this table-object with the given tagname and tagtype."""
-        if tagtype not in self._tagQueries:
+        if tagtype not in validTagTypes:
             raise Exception("Unknown tag type '{0}'".format(tagtype))
         SQLTable.__init__(self,self._tagQueries[tagtype].format("tag_"+tagname))
 
