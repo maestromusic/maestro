@@ -466,7 +466,8 @@ class ExternalFile(Node):
         return self
     
     def loadTags(self):
-        self.readTagsFromFilesystem()
+        #self.readTagsFromFilesystem() #TODO
+        pass
         
     def __str__(self):
         return self.path

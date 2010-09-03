@@ -28,7 +28,7 @@ class PlaylistDelegate(abstractdelegate.AbstractDelegate):
     
     def layout(self,index):
         element = self.model.data(index)
-        if isinstance(element,playlist.ExternalFile):
+        if isinstance(element,models.ExternalFile):
             self.addLine(element.getPath(),"",PL_EXTERNAL_FILE_STYLE)
             return
           

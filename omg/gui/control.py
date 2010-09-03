@@ -6,13 +6,14 @@
 # it under the terms of the GNU General Public License version 3 as
 # published by the Free Software Foundation
 #
-from PyQt4 import QtGui, QtCore
-from PyQt4.QtCore import SIGNAL
-from omg import constants, mpclient, strutils
-from omg import control as controlModule
-from omg.models import playlist
 import mpd
 import logging
+
+from PyQt4 import QtGui, QtCore
+from PyQt4.QtCore import SIGNAL
+
+from omg import constants, mpclient, strutils, models
+from omg import control as controlModule
 
 logger = logging.getLogger("gui.control")
 
@@ -97,16 +98,16 @@ class ControlWidget(QtGui.QWidget):
                 if not self.seekSlider.isSliderDown():
                     self.seekSlider.setValue(int(self.SEEK_SLIDER_MAX * self.time.getRatio()))
             
-            element = controlModule.playlist.currentlyPlayingElement
+            element = controlModule.playlist.currentlyPlaying()
             if element is not None: # This may happen when the playlist has not been synchronized already.
-                if isinstance(element,playlist.ExternalFile):
+                if isinstance(element,models.ExternalFile):
                     title = element.getPath()
                 else: title = element.getTitle()
                 if self.titleLabel.text() != title:
                     font = self.titleLabel.font()
                     font.setPixelSize(14)
                     font.setBold(True)
-                    font.setItalic(isinstance(element,playlist.ExternalFile))
+                    font.setItalic(isinstance(element,models.ExternalFile))
                     self.titleLabel.setFont(font)
                     self.titleLabel.setText(title)
             if not self.volumeSlider.isSliderDown() and status['state'] == 'play':

@@ -37,8 +37,8 @@ class Formatter:
         if tag == tags.TITLE or tag == tags.ALBUM:
             sep = " - "
         else: sep = ", "
-        if tag == tags.DATE and isinstance(values[0], datetime.date):
-            return sep.join(date.strftime("%Y") for date in values)
+        if tag == tags.DATE:
+            return sep.join(date.strftime("%Y") if isinstance(date,datetime.date) else str(date) for date in values)
         else: return sep.join(values)
 
     def _getTags(self,node,tag):

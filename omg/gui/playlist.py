@@ -31,7 +31,7 @@ class Playlist(QtGui.QWidget):
         
         if model is not None:
             self.model = model
-        else: self.model = playlistmodel.Playlist()
+        else: self.model = playlistmodel.SynchronizablePlaylist()
         
         # Create Gui
         layout = QtGui.QVBoxLayout()
