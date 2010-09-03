@@ -99,13 +99,14 @@ tables = {table.name:table for table in (SQLTable(createQuery) for createQuery i
 """
 ))}
 
+validTagTypes = ("varchar", "date", "text")
 # Tag tables
 #========================
 class TagTable(SQLTable):
     """Class for tables which hold all values of a certain tag. Because these tables are created by common queries only depending on tagname and tagtype there is a special class for them."""
     def __init__(self,tagname,tagtype):
         """Initialise this table-object with the given tagname and tagtype."""
-        if tagtype not in self._tagQueries:
+        if tagtype not in validTagTypes:
             raise Exception("Unknown tag type '{0}'".format(tagtype))
         SQLTable.__init__(self,self._tagQueries[tagtype].format("tag_"+tagname))
 

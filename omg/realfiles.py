@@ -13,13 +13,17 @@ import subprocess
 import pickle
 import sys
 import os
+import logging
 try: # we try to favor native Pyk3 stagger support over the ugly26 shit
     import stagger
     from stagger.id3 import * #frame definitions
 except ImportError:
     pass
 
+
 from omg import config, tags
+
+logger = logging.getLogger("realfiles")
 
 class NoTagError(Exception):
     """This exception occurs if you try to read tags from a file that has no tags."""
@@ -57,7 +61,20 @@ class UglyPython26PickleFile(MartinIstEinSpast):
         if proc.returncode > 0:
             raise ReadTagError("Error calling printtags on file '{0}': {1}".format(self.path,stdout))
         data = pickle.loads(stdout)
-        self.tags.merge(data["tags"])
+        rtags = data["tags"]
+        for key in rtags:
+            tag = tags.get(key)
+            if isinstance(tag, tags.OtherTag) and not tag.isIgnored():
+                import omg.gui.dialogs as dialogs
+                logger.debug("new tag: {}".format(key))
+                tagtype = dialogs.NewTagDialog.queryTagType(key)
+                if tagtype:
+                    tags.addIndexedTag(key, tagtype)
+                else:
+                    tags._ignored.append(key)
+                logger.debug("omgomgomgo")
+                
+        self.tags.merge({tags.get(a):b for a,b in data["tags"].items()})
         self.length = data["length"]
     
     def save_tags(self):

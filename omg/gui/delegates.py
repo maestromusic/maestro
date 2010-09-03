@@ -34,7 +34,6 @@ class PlaylistDelegate(abstractdelegate.AbstractDelegate):
           
         f = formatter.Formatter(element)
         if element.isFile():
-            
             # First find out whether the file has a cover (usually not...)
             if element.hasCover():
                 self.drawCover(config.get("gui","small_cover_size"),element)

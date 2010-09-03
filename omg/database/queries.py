@@ -59,17 +59,22 @@ def setTags(cid, tags, append=False):
         db.query("DELETE FROM tags WHERE 'element_id'=?;", cid)
     
     for tag in tags.keys():
-        for value in tags[tag]:
-            addTag(cid, tag, value)
+        if tag.isIndexed():
+            for value in tags[tag]:
+                addTag(cid, tag, value)
  
-def addContainer(name, tags = None, elements = 0, toplevel = False):
+def addContainer(name, tags = None, file = False, elements = 0, toplevel = False):
     """Adds a container to the database, which can have tags and a number of elements."""
     
     if toplevel:
         top = '1'
     else:
         top = '0'
-    result = database.get().query("INSERT INTO elements (name,elements,toplevel) VALUES(?,?,?);", name,elements,top)
+    if file:
+        file = '1'
+    else:
+        file = '0'
+    result = database.get().query("INSERT INTO elements (name,file,toplevel,elements) VALUES(?,?,?,?);", name, file, top, elements)
     newid = result.insertId() # the new container's ID
     if tags:
         setTags(newid, tags)
