@@ -16,50 +16,51 @@ from PyQt4.QtCore import Qt
 COVER_DIR = os.path.expanduser("~/.omg/cover/")
 
 
-def hasCover(containerId):
-    """Return whether the container with the given id has a cover."""
-    assert isinstance(containerId,int)
-    return os.path.exists(COVER_DIR+"large/"+str(containerId))
+def hasCover(elementId):
+    """Return whether the element with the given id has a cover."""
+    assert isinstance(elementId,int)
+    return os.path.exists(COVER_DIR+"large/"+str(elementId))
 
-def getCoverPath(containerId,size=None):
-    assert isinstance(containerId,int)
+def getCoverPath(elementId,size=None):
+    """Return the path to the cover of the element with id <elementId> in size <size>x<size> pixel or in original size, if <size> is None."""
+    assert isinstance(elementId,int)
     if size is None:
         dir = COVER_DIR+"large/"
     else: dir = COVER_DIR+"cache_{0}/".format(size)
     
-    if not os.path.exists(dir+str(containerId)):
+    if not os.path.exists(dir+str(elementId)):
         try:
-            cacheCover(containerId,size)
+            cacheCover(elementId,size)
         except IOError:
             return None
     
-    return dir+str(containerId)
+    return dir+str(elementId)
     
-def getCover(containerId,size=None):
-    """Return the cover of the given container as QImage. If no cover is found or Qt was not able to load the image, return None. If <size> is None, the large cover will be returned. Otherwise the cover will be scaled to size x size pixels and cached in the appropriate folder."""
-    assert isinstance(containerId,int)
-    path = getCoverPath(containerId,size)
+def getCover(elementId,size=None):
+    """Return the cover of the given element as QImage. If no cover is found or Qt was not able to load the image, return None. If <size> is None, the large cover will be returned. Otherwise the cover will be scaled to size x size pixels and cached in the appropriate folder."""
+    assert isinstance(elementId,int)
+    path = getCoverPath(elementId,size)
     if path is not None:
         cover = QtGui.QImage(path)
         if not cover.isNull(): # Loading succeeded
             return cover
     return None
     
-def cacheCover(containerId,size):
-    """Create a thumbnail of the cover of the container with the given id with <size>x<size> pixels and cache it in the appropriate cache-folder."""
-    assert isinstance(containerId,int)
+def cacheCover(elementId,size):
+    """Create a thumbnail of the cover of the element with the given id with <size>x<size> pixels and cache it in the appropriate cache-folder."""
+    assert isinstance(elementId,int)
     assert isinstance(size,int)
-    largeCover = QtGui.QImage(COVER_DIR+"large/"+str(containerId))
+    largeCover = QtGui.QImage(COVER_DIR+"large/"+str(elementId))
     if largeCover.isNull():
-        raise IOError("Cover of container {0} could not be loaded.".format(containerId))
+        raise IOError("Cover of element {0} could not be loaded.".format(elementId))
     smallCover = largeCover.scaled(QtCore.QSize(size,size),Qt.KeepAspectRatio,Qt.SmoothTransformation)
     
     dir = COVER_DIR+"cache_{0}/".format(size)
     if not os.path.isdir(dir):
         os.mkdir(dir)
     
-    if not smallCover.save(dir+str(containerId),"png"):
-        raise IOError("File {0} could not be saved.".format(dir+str(containerId)))
+    if not smallCover.save(dir+str(elementId),"png"):
+        raise IOError("File {0} could not be saved.".format(dir+str(elementId)))
 
 
 def cacheAll(size):
