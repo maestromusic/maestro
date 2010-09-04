@@ -9,7 +9,7 @@
 import logging, copy
 from PyQt4 import QtCore
 
-from omg import tags, database, covers, config
+from omg import tags, database, covers, config, realfiles, absPath
 from omg.database import queries
 db = database.get()
 
@@ -465,9 +465,29 @@ class ExternalFile(Node):
             raise IndexError("Offset {} is out of bounds".format(offset))
         return self
     
-    def loadTags(self):
-        #self.readTagsFromFilesystem() #TODO
-        pass
+    def loadTags(self,recursive=False,tagList=None): #TODO: Support tagList
+        # This is a file so <recursive> doesn't have any meaning
+        self.readTagsFromFilesystem()
+    
+    def ensureTagsAreLoaded(self,recursive=False):
+        """Load tags if they are not loaded yet."""
+        if self.tags is None:
+            self.loadTags()
+        # This is a file so <recursive> doesn't have any meaning
+        
+    def readTagsFromFilesystem(self):
+        real = realfiles.File(absPath(self.path))
+        try:
+            real.read()
+        except realfiles.ReadTagError as e:
+            logger.warning("Failed to read tags from file {}: {}".format(self.path, str(e)))
+        self.tags = real.tags
+        self.length = real.length
+    
+    def toolTipText(self):
+        """Return a HTML-text which may be used in tooltips for this external file."""
+        from omg.gui import formatter
+        return formatter.HTMLFormatter(self).detailView()
         
     def __str__(self):
         return self.path

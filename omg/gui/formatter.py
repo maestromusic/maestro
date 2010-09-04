@@ -52,7 +52,7 @@ class Formatter:
         if tags.TITLE in self.element.tags:
             result = " - ".join(self.element.tags[tags.TITLE])
         else: result = "<Kein Titel>"
-        if config.get("misc","show_ids"):
+        if isinstance(self.element,models.Element) and config.get("misc","show_ids"):
             return "[{0}] {1}".format(self.element.id,result)
         else: return result
 
@@ -112,7 +112,7 @@ class HTMLFormatter(Formatter):
                 lines.append('<table><tr><td valign="top"><img src="{0}"></td><td valign="top">'
                                 .format(cgi.escape(coverPath)))
         else:
-            lines.append('external file')
+            lines.append('<i>External file</i>')
         lines.append('<div style="font-size: 14px; font-weight: bold">{0}</div>'.format(cgi.escape(self.title())))
         if tags.ALBUM in self.element.tags:
             lines.append('<div style="font-size: 14px; font-weight: bold; font-style: italic">{0}</div>'
