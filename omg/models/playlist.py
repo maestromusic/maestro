@@ -150,6 +150,15 @@ class BasicPlaylist(rootedtreemodel.RootedTreeModel):
 class ManagedPlaylist(BasicPlaylist):
     """A ManagedPlaylist organizes the tree-structure over the "flat playlist" (just the files) in a nice way. In contrast to BasicPlaylist, ManagedPlaylist uses mainly offsets to address files, as the tree-structure may change during most operations. Additionally offset-based insert- and remove-functions are needed for synchronization with MPD (confer SynchronizablePlaylist). Of course, there are also functions to insert and remove using a reference to the parent-container, but they internally just call the offset-based functions."""
     
+    def restructure(self):
+        """Restructure the whole container tree in this model. This method does not change the flat playlist, but it uses treebuilder to create an optimal container structure over the MPD playlist."""
+        treeBuilder = self._createTreeBuilder([self._createItem(path) for path in self.pathList])
+        treeBuilder.buildParentGraph()
+        self.setContents(treeBuilder.buildTree(createOnlyChildren=False))
+        for element in self.contents:
+            element.parent = self.root
+        self.reset()
+        
     def removeContents(self,parent,start,end):
         # Reimplemented from BasicPlaylist
         startOffset = parent.getChildren()[start].getOffset()
