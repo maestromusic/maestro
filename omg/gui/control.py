@@ -100,14 +100,12 @@ class ControlWidget(QtGui.QWidget):
             
             element = controlModule.playlist.currentlyPlaying()
             if element is not None: # This may happen when the playlist has not been synchronized already.
-                if isinstance(element,models.ExternalFile):
-                    title = element.getPath()
-                else: title = element.getTitle()
+                title = element.getTitle()
                 if self.titleLabel.text() != title:
                     font = self.titleLabel.font()
                     font.setPixelSize(14)
                     font.setBold(True)
-                    font.setItalic(isinstance(element,models.ExternalFile))
+                    font.setItalic(not element.isInDB())
                     self.titleLabel.setFont(font)
                     self.titleLabel.setText(title)
             if not self.volumeSlider.isSliderDown() and status['state'] == 'play':

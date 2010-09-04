@@ -35,7 +35,7 @@ def findAlbumsInDirectory(path, onlyNewFiles = True):
                 logger.debug("Skipping file '{0}' which is already in the database.".format(filename))
                 continue
             else:
-                elem = omg.models.DBFile(id)
+                elem = omg.models.File(id)
                 elem.loadTags()
                 t = elem.tags
                 albumIds = elem.getAlbumIds()

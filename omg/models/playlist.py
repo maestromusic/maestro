@@ -137,11 +137,9 @@ class BasicPlaylist(rootedtreemodel.RootedTreeModel):
         return filePaths
    
     def _createItem(self,path,parent=None):
-        """Create a playlist-item for the given path. If the path is in the database, an instance of DBFile is created, otherwise an instance of ExternalFile. The parent of the new element is set to <parent> (even when this is None)."""
-        id = db.query("SELECT element_id FROM files WHERE path = ?",path).getSingle()
-        if id is None:
-            result = models.ExternalFile(path)
-        else: result = models.DBFile(id)
+        """Create a playlist-item for the given path. The parent of the new element is set to <parent> (even when this is None)."""
+        id = db.query("SELECT element_id FROM files WHERE path = ?",path).getSingle() # may be None
+        result = models.File(id,path=path)
         result.loadTags()
         result.parent = parent
         return result
@@ -366,9 +364,9 @@ class ManagedPlaylist(BasicPlaylist):
         prev = parent.getChildren()[prevIndex]
         next = parent.getChildren()[nextIndex]
         
-        if isinstance(prev,models.ExternalFile) or isinstance(next,models.ExternalFile):
+        if not prev.isInDB() or not next.isInDB(): # I cannot glue external stuff
             return
-        if prev.isFile() and next.isFile():
+        if prev.isFile() and next.isFile(): #TODO: glue should be able to glue two files that have a common parent
             return
             
         if prev is next: # Let next handle this
@@ -404,21 +402,21 @@ class ManagedPlaylist(BasicPlaylist):
         """Create a TreeBuilder to create container-trees over the given list of elements."""
         return treebuilder.TreeBuilder(items,self._getId,self._getParentIds,self._createNode)
     
-    def _getId(self,item):
-        """Return the id of item or None if it is an ExternalFile. This is a helper method for the TreeBuilder-algorithm."""
-        if isinstance(item,models.ExternalFile):
-            return None
-        else: return item.id
+    def _getId(self,element):
+        """Return the id of <element> or None if it is not contained in the DB. This is a helper method for the TreeBuilder-algorithm."""
+        if element.isInDB():
+            return element.id
+        else: return None
         
     def _getParentIds(self,id):
         """Return a list containing the ids of all parents of the given id. This is a helper method for the TreeBuilder-algorithm."""
         return [id for id in db.query("SELECT container_id FROM contents WHERE element_id = ?",id).getSingleColumn()]
                
     def _createNode(self,id,contents):
-        """If contents is not empty, create an Container-instance for the given id containing <contents>. Otherwise create an instance of DBFile with the given id. This is a helper method for the TreeBuilder-algorithm."""
+        """If contents is not empty, create an Container-instance for the given id containing <contents>. Otherwise create an instance of File with the given id. This is a helper method for the TreeBuilder-algorithm."""
         if len(contents) > 0:
             newNode = models.Container(id,contents=contents)
-        else: newNode = models.DBFile(id)
+        else: newNode = models.File(id)
         newNode.loadTags()
         return newNode
         
@@ -560,8 +558,10 @@ class SynchronizablePlaylist(ManagedPlaylist):
                 if self.currentlyPlayingOffset is not None:
                     self.currentlyPlayingOffset = None
                     try:
-                        index = self.getIndex(self.currentlyPlaying())
-                        self.dataChanged.emit(index,index)
+                        currentlyPlaying = self.currentlyPlaying()
+                        if currentlyPlaying is not None:
+                            index = self.getIndex(currentlyPlaying)
+                            self.dataChanged.emit(index,index)
                     except ValueError: pass # Probably the element was removed from the playlist
             elif int(status['song']) != self.currentlyPlayingOffset:
                 if self.currentlyPlayingOffset is not None:

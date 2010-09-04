@@ -48,11 +48,15 @@ class Formatter:
         else: return []
         
     def title(self):
-        """Return the title or some dummy-title if the element contains no title."""
+        """Return the title or the path or the path if the element contains no title or some dummy-title if it even doesn't contain a path."""
         if tags.TITLE in self.element.tags:
             result = " - ".join(self.element.tags[tags.TITLE])
-        else: result = "<Kein Titel>"
-        if isinstance(self.element,models.Element) and config.get("misc","show_ids"):
+        else:
+            path = self.element.getPath()
+            if path is not None:
+                result = path
+            else: result = "<Kein Titel>"
+        if isinstance(self.element,models.Element) and self.element.isInDB() and config.get("misc","show_ids"):
             return "[{0}] {1}".format(self.element.id,result)
         else: return result
 
@@ -106,13 +110,12 @@ class HTMLFormatter(Formatter):
         lines = []
         self.element.ensureTagsAreLoaded()
         coverPath = None
-        if isinstance(self.element, models.Element):
+        if self.element.isInDB():
             coverPath = covers.getCoverPath(self.element.id,config.get("gui","detail_cover_size"))
             if coverPath is not None:
                 lines.append('<table><tr><td valign="top"><img src="{0}"></td><td valign="top">'
                                 .format(cgi.escape(coverPath)))
-        else:
-            lines.append('<i>External file</i>')
+        else: lines.append('<i>External element</i>')
         lines.append('<div style="font-size: 14px; font-weight: bold">{0}</div>'.format(cgi.escape(self.title())))
         if tags.ALBUM in self.element.tags:
             lines.append('<div style="font-size: 14px; font-weight: bold; font-style: italic">{0}</div>'

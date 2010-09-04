@@ -28,9 +28,6 @@ class PlaylistDelegate(abstractdelegate.AbstractDelegate):
     
     def layout(self,index):
         element = self.model.data(index)
-        if isinstance(element,models.ExternalFile):
-            self.addLine(element.getPath(),"",PL_EXTERNAL_FILE_STYLE)
-            return
           
         f = formatter.Formatter(element)
         if element.isFile():
@@ -40,7 +37,7 @@ class PlaylistDelegate(abstractdelegate.AbstractDelegate):
             
             if tags.ALBUM in element.tags and not element.isContainedInAlbum():
                 # This is the complicated version: The element has an album but is not displayed within the album. So draw an album cover and display the album tags.
-                if not element.hasCover(): # Do not draw a second cover (see above)
+                if element.isInDB() and not element.hasCover(): # Do not draw a second cover (see above)
                     albumIds = element.getAlbumIds()
                     for albumId in albumIds:
                         cover = covers.getCover(albumId,config.get("gui","small_cover_size"))
