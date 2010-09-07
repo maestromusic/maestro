@@ -38,3 +38,6 @@ class FileSystemBrowser(QtGui.QTreeView):
     
     def _handleDoubleClick(self, index):
         self.searchDirectoryChanged.emit(self.model.filePath(index))
+        
+
+#class FileListView(QtGui.QTableView):

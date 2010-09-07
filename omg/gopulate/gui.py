@@ -33,7 +33,7 @@ class NewGopulateDelegate(QtGui.QStyledItemDelegate):
         if isinstance(elem,omg.gopulate.models.GopulateContainer):
             if tags.get("album") in elem.sameTags and tags.get("artist") in elem.sameTags:
                 beforeTable += ", ".join(elem.tags['artist']) + " – " +  ", ".join(elem.tags['album'])
-                if "date" in elem.sameTags:
+                if tags.get("date") in elem.sameTags:
                     beforeTable += " ({})".format(", ".join(elem.tags['date']))
             for k in elem.sameTags:
                 if k == tags.get("album") or k == tags.get("artist") or k == tags.get("date"):

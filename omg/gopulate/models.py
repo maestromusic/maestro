@@ -123,11 +123,13 @@ class FileSystemFile(omg.models.Node):
         self.tags = real.tags
         self.length = real.length
 
-    
+    #MIGRATED
     def writeTagsToFilesystem(self):
         real = realfiles.File(absPath(self.path))
         real.tags = self.tags
         real.save_tags()
+    
+    # MIGRATED    
     def computeHash(self):
         """Computes the hash of the audio stream."""
     
@@ -143,15 +145,18 @@ class FileSystemFile(omg.models.Node):
         handle.close()
         os.remove(tmpfile)
     
+    # MIGRATED
     def getPosition(self):
         return self.position
     
+    #MIGRATED
     def getLength(self):
         return self.length
     
     def toolTipText(self):
         return formatter.HTMLFormatter(self).detailView()
     
+    #MIGRATED
     def commit(self):
         logger.debug("commiting file {}".format(self.path))
         fileId = database.queries.addContainer(os.path.basename(self.path), tags = self.tags, file = True, elements = 0)

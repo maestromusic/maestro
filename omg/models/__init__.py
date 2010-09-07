@@ -6,10 +6,10 @@
 # it under the terms of the GNU General Public License version 3 as
 # published by the Free Software Foundation
 #
-import logging, copy
+import logging, copy, os
 from PyQt4 import QtCore
 
-from omg import tags, database, covers, config, realfiles, absPath
+from omg import tags, database, covers, config, realfiles, absPath, relPath
 from omg.database import queries
 db = database.get()
 
@@ -183,6 +183,8 @@ class RootNode(Node):
 class Element(Node):
     """Abstract base class for elements (files or containers) in playlists, browser, etc.. Contains methods to load tags and contents from the database or from files."""
     tags = None # tags.Storage to store the tags. None until they are loaded
+    position = None
+    length = None
     
     def __init__(self):
         raise RuntimeError(
@@ -235,20 +237,19 @@ class Element(Node):
                 element.ensureTagsAreLoaded()
     
     def getPosition(self,refresh=False):
-        """Return the position of this element. For elements in the database this is the number from the contents-table, not the index of this element in the parent's list of children! To get the latter, use parent.index(self). The value will be cached and will be only recomputed if <refresh> is True. This method returns None if the element has no parent or the parent is not of type Element or not contained in the DB.
-        For elements outside of the DB this method returns self.position (or None if that attribute doesn't exist)."""
-        if hasattr(self,'position') and not (refresh and self.isInDB()):
+        """Return the position of this element. For elements in the database this is the number from the contents-table, not the index of this element in the parent's list of children! To get the latter, use parent.index(self). The value will be cached and will be only recomputed if <refresh> is True. This method returns None if the element has no parent or the parent is not of type Element.
+           For elements outside the DB, you have to take care of self.position directly."""
+        if not self.isInDB():
+            return self.position
+        if self.position and not refresh:
             return self.position
         else:
-            if self.isInDB():
-                # Without parent, there can't be a position
-                if self.parent is None or not isinstance(self.parent,Element) or not self.parent.isInDB():
-                    return None
-                if refresh or not hasattr(self,'position'):
-                    self.position = db.query("SELECT position FROM contents WHERE container_id = ? AND element_id = ?", 
-                                         self.parent.id,self.id).getSingle()
-                return self.position
-            else: return None
+            # Without parent, there can't be a position
+            if self.parent is None or not isinstance(self.parent,Element) or not self.parent.isInDB():
+                return None
+            self.position = db.query("SELECT position FROM contents WHERE container_id = ? AND element_id = ?", 
+                                 self.parent.id,self.id).getSingle()
+            return self.position
         
     def getParentIds(self,recursive):
         """Return a list containing the ids of all parents of this element from the database. If <recursive> is True all ancestors will be added recursively."""
@@ -400,14 +401,25 @@ class Container(Element):
         """Return the length of this element, i.e. the sum of the lengths of all contents."""
         return sum(element.getLength(refresh) for element in self.contents)
 
+    def commit(self, toplevel = False):
+        """Commit this into the database"""
+        logger.debug("commiting container {}".format(self.name))
+        if not self.isInDB():
+            self.id = database.queries.addContainer(
+                            self.name, tags = self.tags, file = False, elements = len(self.contents), toplevel = toplevel)
+        for elem in self.contents:
+            if not elem.isInDB():
+                elem.commit()
+                database.queries.addContent(self.id, elem.getPosition(), elem.id)
 
 class File(Element):
-    def __init__(self,id=None,tags=None,path=None):
+    def __init__(self, id = None, tags = None, length = None, path = None):
         """Initialize this element with the given id, which must be an integer or None (for external files). Optionally you may specify a tags.Storage object holding the tags of this element and/or a file path."""
         if id is not None and not isinstance(id,int):
             raise ValueError("id must be either None or an integer. I got {}".format(id))
         self.id = id
         self.tags = tags
+        self.length = length
         if path is not None and not isinstance(path,str):
             raise ValueError("path must be either None or a string. I got {}".format(id))
         self.path = path
@@ -437,7 +449,12 @@ class File(Element):
             logger.warning("Failed to read tags from file {}: {}".format(self.path, str(e)))
         self.tags = real.tags
         self.length = real.length
-        
+    
+    def writeTagsToFilesystem(self):
+        real = realfiles.File(absPath(self.path))
+        real.tags = self.tags
+        real.save_tags()
+            
     def getPath(self,refresh=True):
         """Return the path of this file. If the file is in the DB and no path is stored yet or <refresh> is True, the path will be fetched from the database and cached for subsequent calls."""
         if self.isInDB():
@@ -454,15 +471,34 @@ class File(Element):
     
     def getLength(self,refresh=False):
         """Return the length of this file. If the file is in the DB and no length is stored yet or <refresh> is True, the length will be fetched from the database and cached for subsequent calls."""
-        if self.isInDB():
-            if refresh or not hasattr(self,'length'):
-                self.length = db.query("SELECT length FROM files WHERE element_id = {0}".format(self.id)).getSingle()
-            return self.length
-        else:
-            if hasattr(self,'length'):
-                return self.length
-            else: return None
+        if self.isInDB() and (refresh or not self.length):
+            self.length = db.query("SELECT length FROM files WHERE element_id = {0}".format(self.id)).getSingle()
+        return self.length
+    
+    def computeHash(self):
+        """Computes the hash of the audio stream."""
+    
+        import hashlib,tempfile,subprocess
+        handle, tmpfile = tempfile.mkstemp()
+        subprocess.check_call(
+            ["mplayer", "-dumpfile", tmpfile, "-dumpaudio", absPath(self.path)], #TODO: konfigurierbar machen
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE)
+        # wtf ? for some reason handle is int instead of file handle, as said in documentation
+        with open(tmpfile,"br") as handle:
+            self.hash = hashlib.sha1(handle.read()).hexdigest()
+        os.remove(tmpfile)
         
+    def commit(self):
+        """Save this file into the database. After that, the object has an id attribute"""
+        logger.debug("commiting file {}".format(self.path))
+        self.id = database.queries.addContainer(os.path.basename(self.path), tags = self.tags, file = True, elements = 0)
+        querytext = "INSERT INTO files (element_id,path,hash,length) VALUES(?,?,?,?);"
+        if self.length is None:
+            self.length = 0
+        if not hasattr(self, "hash"):
+            self.computeHash()
+        db.query(querytext, id, relPath(self.path), self.hash, int(self.length))
 
 def createElement(id,tags=None,contents=None,file=None):
     """Create an element with the given id, tags and contents. Depending on <file> an instance of Container or of File will be created. If <file> is None, the file-flag (elements.file) will be read from the database. Note that contents will be ignored if a File-instance is created."""
