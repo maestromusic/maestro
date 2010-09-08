@@ -20,13 +20,17 @@ from functools import reduce
 db = omg.database.get()
 logger = logging.getLogger('gopulate')
 
+def finalize(album):
+    if album.isFile():
+        return
+    album.contents.sort(key=lambda x : x.getPosition())
+    album.updateSameTags()
+    album.tags['title'] = album.contents[0].tags['album']
 
 def findAlbumsInDirectory(path, onlyNewFiles = True):
-    from omg.gopulate.models import GopulateContainer, FileSystemFile
     ignored_albums=[]
-    newAlbumsInThisDirectory = {}
-    existingAlbumsInThisDirectory = {}
-    thingsInThisDirectory = []
+    albumsInThisDirectory = {} # name->container map
+    existingAlbumsInThisDirectory = {} #id->container map
     filenames = filter(os.path.isfile, (os.path.join(path,x) for x in os.listdir(path)))
     for filename in (os.path.normpath(os.path.abspath(os.path.join(path, f))) for f in filenames):
         id = queries.idFromFilename(relPath(filename))
@@ -42,10 +46,16 @@ def findAlbumsInDirectory(path, onlyNewFiles = True):
                 for aid in albumIds:
                     if not aid in existingAlbumsInThisDirectory:
                         existingAlbumsInThisDirectory[aid] = omg.models.Container(aid)
-                        existingAlbumsInThisDirectory[aid].contents = []
                         existingAlbumsInThisDirectory[aid].loadTags()
-                    existingAlbumsInThisDirectory[aid].contents.append(elem)
-                    elem.parent = existingAlbumsInThisDirectory[aid]
+                    exAlb = existingAlbumsInThisDirectory[aid]
+                    exAlbName = exAlb.tags[tags.get('album')][0]
+                    if not exAlbName in albumsInThisDirectory:
+                        albumsInThisDirectory[exAlbName] = exAlb
+                    
+                    elem.parent = exAlb
+                    elem.getPosition()
+                    elem.parent = albumsInThisDirectory[exAlbName]
+                    albumsInThisDirectory[exAlbName].contents.append(elem)
                 if len(albumIds) > 0:
                     continue
         else:
@@ -56,39 +66,29 @@ def findAlbumsInDirectory(path, onlyNewFiles = True):
                 logger.warning("Skipping file '{0}' which has no tag".format(filename))
                 continue
             t = realfile.tags
-            elem = FileSystemFile(filename, tags=t, length=realfile.length)
+            elem = omg.models.File(id = None, path = filename, tags=t, length=realfile.length)
         if "album" in t:
             album = t["album"][0]
-            if album in ignored_albums:
-                continue
-            if not album in newAlbumsInThisDirectory:
-                newAlbumsInThisDirectory[album] = GopulateContainer(album)
-            elem.parent = newAlbumsInThisDirectory[album]
+            if not album in albumsInThisDirectory:
+                albumsInThisDirectory[album] = omg.models.Container(id = None)
+            elem.parent = albumsInThisDirectory[album]
+            albumsInThisDirectory[album].contents.append(elem)
             if "tracknumber" in t:
                 trkn = int(t["tracknumber"][0].split("/")[0]) # support 02/15 style
-                newAlbumsInThisDirectory[album].tracks[trkn] = elem
                 elem.position=trkn
-            else: # file without tracknumber, bah
-                print(t)
-                if 0 in newAlbumsInThisDirectory[album].tracks:
-                    logger.warning("More than one file in this album without tracknumber, don't know what to do: \n{0}".format(filename))
-                    del newAlbumsInThisDirectory[album]
-                    ignored_albums.append(album)
-                else:
-                    newAlbumsInThisDirectory[album].tracks[0] = elem
+            else:
+                elem.position=0
+        elif "title" in t:
+            album = t["title"][0]
+            albumsInThisDirectory[album] = elem
         else:
-            logger.warning("Here is a file without album, I'll skip this: {0}".format(filename))
-    for t in existingAlbumsInThisDirectory.values():
-        if tags.get("title") in t.tags and t.tags["title"][0] in newAlbumsInThisDirectory:
-            album = t.tags['title'][0]
-            newAlbumsInThisDirectory[album].mergeWithExisting(t)
-        else:
-            t.contents.sort(key=lambda x : x.getPosition())
-            thingsInThisDirectory.append(t)
-    for al in newAlbumsInThisDirectory.values():
-        al.finalize()
-        thingsInThisDirectory.append(al)
-    return thingsInThisDirectory
+            album = filename
+            albumsInThisDirectory[album] = elem
+        
+    
+    for al in albumsInThisDirectory.values():
+        finalize(al)
+    return albumsInThisDirectory.values()
         
 def findNewAlbums(path):
     """Generator function which tries to find albums in the filesystem tree.

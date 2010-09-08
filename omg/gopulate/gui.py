@@ -30,7 +30,7 @@ class NewGopulateDelegate(QtGui.QStyledItemDelegate):
         #self.doc.adjustSize()
         tab = []
         beforeTable = ''
-        if isinstance(elem,omg.gopulate.models.GopulateContainer):
+        if elem.isContainer() and elem.id == None:
             if tags.get("album") in elem.sameTags and tags.get("artist") in elem.sameTags:
                 beforeTable += ", ".join(elem.tags['artist']) + " – " +  ", ".join(elem.tags['album'])
                 if tags.get("date") in elem.sameTags:
@@ -41,29 +41,26 @@ class NewGopulateDelegate(QtGui.QStyledItemDelegate):
                 tab.append( [str(k)])
                 for v in elem.tags[k]:
                     tab[-1].append(v)
-        elif isinstance(elem,omg.gopulate.models.FileSystemFile):
+        elif elem.isFile() and elem.id == None:
             if tags.get("title") in elem.tags:
                 beforeTable = ", ".join(elem.tags['title'])
                 beforeTable = "<b>{:2}: </b>".format(elem.getPosition()) + beforeTable
             for k,vs in elem.tags.items():
                 if k == tags.get("title") or k == tags.get("tracknumber"):
                     continue
-                if k in elem.parent.sameTags:
+                if isinstance(elem.parent, omg.models.Container) and k in elem.parent.sameTags:
                     continue
                 tab.append( [str(k)] )
                 for v in vs:
                     tab[-1].append(v)
-        elif isinstance(elem, omg.models.Element):
+        else:
             f = HTMLFormatter(elem)
             beforeTable = "<b>{:2}: </b>".format(elem.getPosition())
             beforeTable = beforeTable + f.detailView()
         # color codes
-        if isinstance(elem, omg.gopulate.models.FileSystemFile) or isinstance(elem, omg.gopulate.models.GopulateContainer):
-            if isinstance(elem, omg.gopulate.models.GopulateContainer) and elem.existingContainer:
-                beforeTable = '<span style="background:pink">' + beforeTable + "</span>"
-            else:
-                beforeTable = '<span style="background:yellow">' + beforeTable + "</span>"
-        elif isinstance(elem, omg.models.Element):
+        if not elem.isInDB():
+            beforeTable = '<span style="background:yellow">' + beforeTable + "</span>"
+        else:
             beforeTable = '<span style="background:green">already in DB' + beforeTable + "</span>"
         lines = beforeTable
         if len(tab) > 0:

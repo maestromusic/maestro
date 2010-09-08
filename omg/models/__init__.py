@@ -11,6 +11,7 @@ from PyQt4 import QtCore
 
 from omg import tags, database, covers, config, realfiles, absPath, relPath
 from omg.database import queries
+from functools import reduce
 db = database.get()
 
 logger = logging.getLogger(name="omg")
@@ -402,16 +403,35 @@ class Container(Element):
         return sum(element.getLength(refresh) for element in self.contents)
 
     def commit(self, toplevel = False):
-        """Commit this into the database"""
-        logger.debug("commiting container {}".format(self.name))
+        """Commit this container into the database"""
+        logger.debug("commiting container {}".format(self))
         if not self.isInDB():
             self.id = database.queries.addContainer(
-                            self.name, tags = self.tags, file = False, elements = len(self.contents), toplevel = toplevel)
+                            "spast", tags = self.tags, file = False, elements = len(self.contents), toplevel = toplevel)
         for elem in self.contents:
-            if not elem.isInDB():
-                elem.commit()
+            wasInDB = elem.isInDB()
+            elem.commit()
+            if not wasInDB:
                 database.queries.addContent(self.id, elem.getPosition(), elem.id)
 
+    
+    def updateSameTags(self):
+        """Sets the tags of this element to be exactly those which are the same for all contents."""
+        self.commonTags = set(x for x in reduce(lambda x,y: x & y, [set(tr.tags.keys()) for tr in self.contents]) if x.name not in tags.TOTALLY_IGNORED_TAGS)
+        self.commonTagValues = {}
+        differentTags=set()
+        for file in self.contents:
+            t = file.tags
+            for tag in self.commonTags:
+                if tag not in self.commonTagValues:
+                    self.commonTagValues[tag] = t[tag]
+                if self.commonTagValues[tag] != t[tag]:
+                    differentTags.add(tag)
+        self.sameTags = self.commonTags - differentTags
+        self.tags = tags.Storage()
+        for tag in self.sameTags:
+            self.tags[tag] = self.commonTagValues[tag]
+            
 class File(Element):
     def __init__(self, id = None, tags = None, length = None, path = None):
         """Initialize this element with the given id, which must be an integer or None (for external files). Optionally you may specify a tags.Storage object holding the tags of this element and/or a file path."""
@@ -489,16 +509,23 @@ class File(Element):
             self.hash = hashlib.sha1(handle.read()).hexdigest()
         os.remove(tmpfile)
         
-    def commit(self):
+    def commit(self, toplevel = False):
         """Save this file into the database. After that, the object has an id attribute"""
+        if self.isInDB(): #TODO: tags commiten
+            return
         logger.debug("commiting file {}".format(self.path))
-        self.id = database.queries.addContainer(os.path.basename(self.path), tags = self.tags, file = True, elements = 0)
+        self.id = database.queries.addContainer(
+                                        os.path.basename(self.path),
+                                        tags = self.tags,
+                                        file = True,
+                                        elements = 0,
+                                        toplevel = toplevel)
         querytext = "INSERT INTO files (element_id,path,hash,length) VALUES(?,?,?,?);"
         if self.length is None:
             self.length = 0
         if not hasattr(self, "hash"):
             self.computeHash()
-        db.query(querytext, id, relPath(self.path), self.hash, int(self.length))
+        db.query(querytext, self.id, relPath(self.path), self.hash, int(self.length))
 
 def createElement(id,tags=None,contents=None,file=None):
     """Create an element with the given id, tags and contents. Depending on <file> an instance of Container or of File will be created. If <file> is None, the file-flag (elements.file) will be read from the database. Note that contents will be ignored if a File-instance is created."""
