@@ -54,6 +54,7 @@ tables = {table.name:table for table in (SQLTable(createQuery) for createQuery i
 """CREATE TABLE elements (
         id MEDIUMINT UNSIGNED NOT NULL AUTO_INCREMENT,
         name VARCHAR(255) NOT NULL,
+        file TINYINT(1) NOT NULL,
         toplevel TINYINT(1) NOT NULL,
         elements SMALLINT UNSIGNED NOT NULL DEFAULT 0,
         INDEX name_idx(name(10)),
@@ -95,23 +96,17 @@ tables = {table.name:table for table in (SQLTable(createQuery) for createQuery i
         PRIMARY KEY(id),
         UNIQUE INDEX(tagname)
     );
-""",
-"""CREATE TABLE othertags (
-        element_id MEDIUMINT UNSIGNED NOT NULL,
-        tagname VARCHAR(63),
-        value VARCHAR(255),
-        INDEX element_id_idx(element_id)
-    );
-""")
-)}
+"""
+))}
 
+validTagTypes = ("varchar", "date", "text")
 # Tag tables
 #========================
 class TagTable(SQLTable):
     """Class for tables which hold all values of a certain tag. Because these tables are created by common queries only depending on tagname and tagtype there is a special class for them."""
     def __init__(self,tagname,tagtype):
         """Initialise this table-object with the given tagname and tagtype."""
-        if tagtype not in self._tagQueries:
+        if tagtype not in validTagTypes:
             raise Exception("Unknown tag type '{0}'".format(tagtype))
         SQLTable.__init__(self,self._tagQueries[tagtype].format("tag_"+tagname))
 
@@ -140,6 +135,11 @@ class TagTable(SQLTable):
         );"""
     }
 
-for tagname,tagtype in database._parseIndexedTags().items():
-    newTable = TagTable(tagname,tagtype)
-    tables[newTable.name] = newTable
+def allTables():
+    """Return a dictionary mapping the table-names to SQLTable-instances and containing all tables which should be in the database (according to the information in tagids)."""
+    result = dict(tables)
+    if 'tagids' in tables:
+        tagTables = {"tag_"+tagname:TagTable(tagname,tagtype)
+                        for tagname,tagtype in database.get().query("SELECT tagname,tagtype FROM tagids")}
+        result.update(tagTables)
+    return result

@@ -86,7 +86,7 @@ class GopulateContainer(omg.models.Node):
         if self.existingContainer:
             myId = self.existingContainer.id
         else:
-            myId = database.queries.addContainer(self.name, self.tags, len(self.contents), toplevel = toplevel)
+            myId = database.queries.addContainer(self.name, tags = self.tags, file = False, elements = len(self.contents), toplevel = toplevel)
         for elem in self.contents:
             if isinstance(elem, GopulateContainer) or isinstance(elem, FileSystemFile):
                 elemId = elem.commit()
@@ -123,11 +123,13 @@ class FileSystemFile(omg.models.Node):
         self.tags = real.tags
         self.length = real.length
 
-    
+    #MIGRATED
     def writeTagsToFilesystem(self):
         real = realfiles.File(absPath(self.path))
         real.tags = self.tags
         real.save_tags()
+    
+    # MIGRATED    
     def computeHash(self):
         """Computes the hash of the audio stream."""
     
@@ -143,21 +145,26 @@ class FileSystemFile(omg.models.Node):
         handle.close()
         os.remove(tmpfile)
     
+    # MIGRATED
     def getPosition(self):
         return self.position
     
+
     def setPosition(self, position):
         self.position = position
         
+
+    #MIGRATED
     def getLength(self):
         return self.length
     
     def toolTipText(self):
         return formatter.HTMLFormatter(self).detailView()
     
+    #MIGRATED
     def commit(self):
         logger.debug("commiting file {}".format(self.path))
-        fileId = database.queries.addContainer(os.path.basename(self.path), self.tags, elements=0)
+        fileId = database.queries.addContainer(os.path.basename(self.path), tags = self.tags, file = True, elements = 0)
         querytext = "INSERT INTO files (element_id,path,hash,length) VALUES(?,?,?,?);"
         if self.length is None:
             self.length = 0
@@ -174,21 +181,25 @@ class GopulateTreeModel(rootedtreemodel.RootedTreeModel):
     currentDirectoryChanged = QtCore.pyqtSignal(['QString'])
     def __init__(self, searchdirs):
         rootedtreemodel.RootedTreeModel.__init__(self)
+        self.current = None
+        self.searchdir = None
         self.setSearchDirectory(searchdirs)
     
     def setCurrentDirectory(self, dir):
+        logger.debug('current directory set: {}'.format(self.searchdir))
         self.current = dir
         self._createTree(dir, omg.gopulate.findAlbumsInDirectory(dir, False))
         
     def setSearchDirectory(self, dir):
-        self.searchdirs = dir
+        logger.debug('search directory set: {}'.format(self.searchdir))
+        self.searchdir = dir
         self.finder = None
-        self.nextDirectory()
+        #self.nextDirectory()
         
     def nextDirectory(self):
-        logger.debug('next directory, searchdirs: {}'.format(self.searchdirs))
+        logger.debug('next directory, searchdir: {}'.format(self.searchdir))
         if self.finder == None:
-            self.finder = omg.gopulate.findNewAlbums(self.searchdirs)
+            self.finder = omg.gopulate.findNewAlbums(self.searchdir)
         self._createTree(*next(self.finder))
         
     def _createTree(self, path, albums):
@@ -204,6 +215,8 @@ class GopulateTreeModel(rootedtreemodel.RootedTreeModel):
         if amount > 0:
             posItem = items[0]
             parent = posItem.parent().internalPointer()
+            if not parent:
+                parent = self.root
             newContainer = GopulateContainer(name="new container", parent = parent)
             parent.contents.insert(posItem.row(), newContainer)
             i = 1
@@ -233,7 +246,7 @@ class GopulateTreeModel(rootedtreemodel.RootedTreeModel):
     def flags(self, index):
         if not index.isValid():
             return Qt.ItemIsEnabled
-        return rootedtreemodel.RootedTreeModel.flags(self,index) | Qt.ItemIsEditable
+        return rootedtreemodel.RootedTreeModel.flags(self,index)
     
     def setData(self, index, value, role):
         if index.isValid() and role == Qt.EditRole:

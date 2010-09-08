@@ -52,11 +52,20 @@ def get():
     """Return the database connection object or None if the connection has not yet been opened."""
     return db
 
-def resetDatabase():
-    """Drop all tables and create them without data again. All table rows will be lost!"""
+def resetDatabase(tagConfiguration):
+    """Drop all tables and create them without data again. All table rows will be lost! To determine which tag tables have to be created the string <tagConfiguration> is used. For its syntax confer _parseTagConfiguration."""
     from . import tables
-    for table in tables.tables.values():
-        table.reset()
+    
+    # First we have to reset the tagids-table...
+    tables.tables['tagids'].reset()
+    for tagname,tagtype in _parseTagConfiguration(tagConfiguration).items():
+        db.query("INSERT INTO tagids (tagname,tagtype) VALUES (?,?)",tagname,tagtype)
+    # ...which is necessary to compute the list of all tables
+    for name,table in tables.allTables().items():
+        if name != 'tagids':
+            table.reset()
+    # Finally remove superfluous tables
+    checkSuperfluousTables(True)
 
 def listTables():
     """Return a list of all tables in the database."""
@@ -79,8 +88,16 @@ def checkElementCounters(fix=False):
     else: return db.query("SELECT COUNT(*) FROM elements \
                            WHERE elements != (SELECT COUNT(*) FROM contents WHERE container_id = id)").getSingle()
 
+def checkFileFlags(fix=False):
+    """Return the number of wrong entries in elements.files and correct them if <fix> is True."""
+    if "elements" not in listTables():
+        return 0
+    if fix:
+        return db.query("UPDATE elements SET file = (id IN (SELECT element_id FROM files))").affectedRows()
+    else: return db.query("SELECT COUNT(*) FROM elements WHERE file != (id IN (SELECT element_id FROM files))").getSingle()
+    
 def checkTopLevelFlags(fix=False):
-    """Search elements.toplevel for wrong entries and corrects them if fix is true. Return the number of wrong entries."""
+    """Search elements.toplevel for wrong entries and corrects them if <fix> is True. Return the number of wrong entries."""
     if "elements" not in listTables():
         return 0
     
@@ -89,35 +106,19 @@ def checkTopLevelFlags(fix=False):
     else: return db.query("SELECT COUNT(*) FROM elements \
                            WHERE toplevel != (NOT id IN (SELECT element_id FROM contents))").getSingle()
 
-def checkTagIds(fix=False):
-    """Compare the tagids-table with the 'indexed-tags'-option from the config-file and return a tuple with two lists. The first list contains the tags which are in only the config-file, the second one contains the tags which are only in the tagids-table. If fix is true the tagids-table is corrected to contain exactly the tags from the config-file."""
-    if "tagids" not in listTables():
-        return tuple()
-    tags = _parseIndexedTags()
-    existingTags = set(db.query("SELECT tagname FROM tagids").getSingleColumn())
-    necessaryTags = set(tags.keys())
-    missingTags = necessaryTags - existingTags
-    superfluousTags = existingTags - necessaryTags
-    if fix:
-        for tag in superfluousTags:
-            db.query("DELETE FROM tagids WHERE tagname = ?",tag)
-        for tag in missingTags:
-            db.query("INSERT INTO tagids(tagname,tagtype) VALUES(?,?)",tag,tags[tag])
-    return (missingTags,superfluousTags)
-    
 def checkMissingTables(fix=False):
     """Search the database for missing tables and create them if fix is true. Return a list of the missing tables."""
     from . import tables
-    missingTables = filter(lambda t: not t.exists(),tables.tables.values())
+    missingTables = filter(lambda t: not t.exists(),tables.allTables().values())
     if fix:
         for table in missingTables:
             table.create()
     return [table.name for table in missingTables]
     
 def checkSuperfluousTables(fix=False):
-    """Search the database for tables which are not used by this program (this depends on the config-file option 'indexed_tags' and on the installed plugins) and return them as a list. If fix is true delete these tables. All table rows will be lost!"""
+    """Search the database for tables which are not used by this program (this may depend on the installed plugins) and return them as a list. If fix is true delete these tables. All table rows will be lost!"""
     from . import tables
-    superfluousTables = filter(lambda t: t not in tables.tables.keys(),listTables())
+    superfluousTables = filter(lambda t: t not in tables.allTables().keys(),listTables())
     if fix:
         for table in superfluousTables:
             db.query("DROP TABLE {0}".format(table))
@@ -143,7 +144,6 @@ def checkForeignKeys(fix=False):
     foreignKeys = [("contents","container_id","elements","id"),
                    ("contents","element_id","elements","id"),
                    ("files","element_id","elements","id"),
-                   ("othertags","element_id","elements","id"),
                    ("tags","element_id","elements","id"),
                    ("tags","tag_id","tagids","id")
                   ]
@@ -165,7 +165,6 @@ def checkForeignKeys(fix=False):
                                                                 "tag_id={0}".format(tagid))
     # Remove tables where zero broken entries were found
     return {k:v for k,v in brokenEntries.items() if v != 0}
-
 
 def checkEmptyContainers(fix=False):
     """Return the number of empty elements which are NOT files and delete them if fix is true. These are usually there because of a crash in populate. This method uses elements.elements so you might have to use checkElementCounters before using it."""
@@ -197,17 +196,16 @@ def checkSuperfluousTags(fix=False):
                                         .format(tablename),tagid).getSingle()
     return {k:v for k,v in result.items() if v > 0}
     
-def _parseIndexedTags():
-    """Parse the "indexed_tags"-option of the config-file. This option should contain a comma-separated list of strings of the form tagname(tagtype) where the part in brackets is optional and defaults to 'varchar'. Check whether the syntax is correct and return a dictionary {tagname : tagtype}. Otherwise raise an exception."""
+def _parseTagConfiguration(config):
+    """Parse a string to configure tags and their types. This string should contain a comma-separated list of strings of the form tagname(tagtype) where the part in brackets is optional and defaults to 'varchar'. Check whether the syntax is correct and return a dictionary {tagname : tagtype}. Otherwise raise an exception."""
     import re
-    string = config.get("tags","indexed_tags")
     # Matches strings like "   tagname (   tagtype   )   " (the part in brackets is optional) and stores the interesting parts in the first and third group.
     prog = re.compile('\s*(\w+)\s*(\(\s*(\w*)\s*\))?\s*$')
     tags = {}
-    for tagstring in string.split(","):
+    for tagstring in config.split(","):
         result = prog.match(tagstring)
         if result is None:
-            raise Exception("Invalid syntax in the indexed_tags-option of the config-file ('{0}').".format(tagstring))
+            raise Exception("Invalid syntax in the tag configuration ('{0}').".format(tagstring))
         tagname = result.groups()[0]
         tagtype = result.groups()[2]
         if not tagtype:

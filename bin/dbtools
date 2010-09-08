@@ -32,10 +32,10 @@ if __name__ == "__main__":
     "checkElementCounters": "I found {0} broken element counters.",
     "checkForeignKeys": "I found broken foreign keys in some tables: {0}",
     "checkEmptyContainers": "I found {0} empty containers which are not files.",
-    "checkTagIds": "I found missing and/or superfluous tag-IDs: {0}",
     "checkMissingTables": "I found some missing tables: {0}",
     "checkSuperfluousTables": "I found some superfluous tables: {0}",
     "checkTopLevelFlags": "I found {0} broken toplevel flags.",
+    "checkFileFlags": "I found {0} broken file flags.",
     "checkSuperfluousTags": "I found some superfluous tags in the tags_*-tables: {0}"
     }
 
@@ -48,7 +48,7 @@ if __name__ == "__main__":
     def performCheck(checkMethodName):
         print("Performing {0}...".format(checkMethodName),end="")
         result = checkMethods[checkMethodName](False)
-        if not result or (checkMethodName == "checkTagIds" and not result[0] and not result[1]):
+        if not result:
             print("ok")
         else:
             print("") # Just a linebreak

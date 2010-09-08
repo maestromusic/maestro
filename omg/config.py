@@ -18,6 +18,7 @@ Use config.get and config.set to access config-variables. Use config.shelve to a
 """
 
 import configparser, logging, io
+import logging.config
 import os.path
 import shelve as shelveModule
 
@@ -48,21 +49,19 @@ _defaultOptions = {
     },
 
     "tags": {
-        # Tags which will be indexed in their own database tables. Indexed tags have a type which defaults to varchar and may be specified in parentheses after the tagname (e.g. date(date)).
-        "indexed_tags":"album,artist,composer,date(date),genre,performer,title",
+        # Tags that will be searched, if you type a text without prefix in a searchbox. Use prefixes to search for other tags.
+        "search_tags":"album,performer,conductor,title,lyricist,composer,date,artist",
         # Tags which will be totally ignored by this application.
-        "ignored_tags":"encodedby,tracktotal,disctotal,tracknumber,discnumber",
+        "ignored_tags":"tracktotal,disctotal,tracknumber,discnumber",
+        
+        # Order in which tags will be displayed. Must contain title and album! Tags which don't appear in this list will be displayed in arbitrary order after the tags in the list.
+        "tag_order": "title,album,composer,artist,performer,conductor,date,genre",
         
         # Names of the tags which have a special meaning for the application and cannot always be treated generically.
         # This allows to use other strings for the title-tag for example.
         "title_tag": "title",
         "album_tag": "album",
         "date_tag": "date",
-    },
-    
-    "browser": {
-        "tag_sets": "[[composer,artist,performer]],[[genre],[composer,artist,performer]],"
-                   +"[[genre]],[[artist]],[[composer]],[[performer]]"
     },
     
     "gui": {
@@ -75,9 +74,6 @@ _defaultOptions = {
         
         # Maximal number of views in a Browser
         "max_browser_views": 5,
-        
-        # Order in which tags will be displayed. Must contain title and album! Tags which don't appear in this list will be displayed in arbitrary order after the tags in the list.
-        "tag_order": "title,album,composer,artist,performer,conductor,date,genre",
         
         # Application-specific MIME-type for drag and drop operations
         "mime": "application/x-omgelementlist",

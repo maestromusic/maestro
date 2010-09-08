@@ -6,7 +6,7 @@
 # it under the terms of the GNU General Public License version 3 as
 # published by the Free Software Foundation
 #
-from omg import database, tags
+from omg import database, tags, config
 from . import searchparser
 from . import criteria as criteriaModule
 
@@ -23,6 +23,7 @@ db = None
 def init():
     """Initialize the search-module."""
     global db
+    criteria.searchTags = tags.parse(config.get("tags","search_tags"))
     db = database.get()
     db.query("DROP TABLE IF EXISTS {0}".format(TT_HELP))
     db.query("""
@@ -39,6 +40,7 @@ def createResultTempTable(tableName,dropIfExists):
     db.query("""
         CREATE TABLE IF NOT EXISTS {0} (
             id MEDIUMINT UNSIGNED,
+            file TINYINT UNSIGNED,
             toplevel TINYINT UNSIGNED DEFAULT 0,
             new TINYINT UNSIGNED DEFAULT 1,
             PRIMARY KEY(id))
@@ -84,11 +86,11 @@ def search(criteria,resultTable,fromTable='elements',logicalMode=CONJUNCTION):
     db.query("TRUNCATE TABLE {0}".format(resultTable))
     
     # We firstly search for the direct results of the first query... 
-    db.query("INSERT INTO {0} (id) {1}".format(resultTable,criteria[0].getQuery(fromTable)))
+    db.query("INSERT INTO {0} (id,file) {1}".format(resultTable,criteria[0].getQuery(fromTable)))
     # ...and afterwards delete those entries which do not match the other queries
     for criterion in criteria[1:]:
         db.query("TRUNCATE TABLE {0}".format(TT_HELP))
-        db.query("INSERT INTO {0} (id) {1}".format(TT_HELP,criterion.getQuery(resultTable)))
+        db.query("INSERT INTO {0} (id) {1}".format(TT_HELP,criterion.getQuery(resultTable,('id',))))
         db.query("DELETE FROM {0} WHERE id NOT IN (SELECT id FROM {1})".format(resultTable,TT_HELP))
 
 
@@ -105,16 +107,13 @@ def addChildren(resultTable,fromTable="elements"):
         if result.affectedRows() == 0:
             break
         db.query("UPDATE {0} SET new = 0".format(resultTable))
-        # If fromTable is not elements this query part will ensure that only elements in fromTable will be added.
-        if fromTable != 'elements':
-            restrictToFromTablePart = "JOIN {0} ON {0}.id = contents.element_id".format(fromTable)
-        else: restrictToFromTablePart = ''
         db.query("""
-            INSERT IGNORE INTO {0} (id,new)
-                SELECT contents.element_id,1
-                FROM {1} AS parents JOIN contents ON parents.id = contents.container_id {2}
+            INSERT IGNORE INTO {0} (id,file,new)
+                SELECT contents.element_id,{2}.file,1
+                FROM {1} AS parents JOIN contents ON parents.id = contents.container_id
+                                    JOIN {2} ON {2}.id = contents.element_id
                 GROUP BY contents.element_id
-                """.format(resultTable,TT_HELP,restrictToFromTablePart))
+                """.format(resultTable,TT_HELP,fromTable))
 
 
 def addFilledParents(resultTable,fromTable="elements"):
@@ -136,8 +135,8 @@ def addFilledParents(resultTable,fromTable="elements"):
             break
         db.query("UPDATE {0} SET new = 0".format(resultTable))
         db.query("""
-            INSERT IGNORE INTO {0} (id,new)
-                SELECT {1}.id,1
+            INSERT IGNORE INTO {0} (id,file,new)
+                SELECT {1}.id,0,1
                 FROM {1} JOIN elements ON {1}.id = elements.id
                 WHERE elements.elements = {1}.value
                 """.format(resultTable,TT_HELP))
@@ -159,9 +158,9 @@ def setTopLevelFlag(table):
     
 def printResultTable(table):
     result = db.query("""
-        SELECT res.id,res.toplevel,res.new,elements.name
+        SELECT res.id,res.file,res.toplevel,res.new,elements.name
         FROM {0} as res JOIN elements ON res.id = elements.id
         """.format(table))
     print("Printing result table "+table)
     for row in result:
-        print("{0} '{3}' Toplevel: {1} New: {2}".format(*row))
+        print("{0} '{4}' File: {1} Toplevel: {2} New: {3}".format(*row))

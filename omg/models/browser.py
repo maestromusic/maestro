@@ -125,12 +125,13 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
             node.contents = valueNodes[0].contents
     
     def _loadContainerLayer(self,node,table):
-        """Load the contents of <node> into a container-layer, using elements from <table>. Note that this creates all children of <node> not only the next level of the treestructure as _loadTagLayer does."""
-        result = database.get().query("SELECT id FROM {0} WHERE toplevel = 1".format(table)).getSingleColumn()
-        node.contents = [models.Element(id) for id in result]
+        """Load the contents of <node> into a container-layer, using elements from <table>. Note that this creates all children of <node> not only the next level of the tree-structure as _loadTagLayer does."""
+        result = database.get().query("SELECT id,file FROM {0} WHERE toplevel = 1".format(table))
+        node.contents = [models.createElement(id,file=file) for id,file in result]
         for element in node.contents:
             element.parent = node
-            element.loadContents(True,table)
+            if element.isContainer():
+                element.loadContents(True,table)
             element.loadTags(True)
 
 
@@ -206,13 +207,10 @@ class VariousNode(CriterionNode):
         return "<VariousNode>"
 
 
-class RootNode(models.Node):
+class RootNode(models.RootNode):
     """Rootnode of the Browser-TreeModel."""
     def __init__(self,model):
         """Initialize this Rootnode with the given model."""
-        self.contents = []
+        models.RootNode.__init__(self)
         self.model = model
         self.layerIndex = -1
-    
-    def getParent(self):
-        return None

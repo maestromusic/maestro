@@ -71,7 +71,7 @@ class AbstractDelegate(QtGui.QStyledItemDelegate):
         # Paint background
         background = self.getBackground(index)
         if background is not None:
-            painter.fillRect(option.rect,background)
+            option.backgroundBrush = background
         QtGui.QApplication.style().drawControl(QtGui.QStyle.CE_ItemViewItem,option,painter)
         
         # Paint data

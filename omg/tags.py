@@ -9,12 +9,12 @@
 
 """Module for tag handling.
 
-This module provides methods to initialize the tag lists based on the database, to convert tag-ids to tagnames and vice versa, to store tags, etc.. Call updateIndexedTags at program start to initialize and use one of the following ways to get tags:
+This module provides methods to initialize the tag lists based on the database, to convert tag-ids to tagnames and vice versa, to store tags, etc.. Call init at program start to initialize and use one of the following ways to get tags:
 
 - The easiest way is the get-method which takes a tag-id or an tag-name as parameter.
 - For some tags which have a special meaning to the program and cannot always be treated generically (e.g. the title-tag) where exist constants (e.g. TITLE). This allows to use tags.TITLE instead of tags.get(config.get("tags","title_tag")) as the user may decide to use another tagname than "title" for his titles.
 - To iterate over all indexed tags use tagList.
-- You may create tags simply via the constructors of IndexedTag or OtherTag. But in case of indexed tags the get-method translates automatically from tag-ids to tagnames and vice versa and it doesn't create new instances and in the other case it does just the same job as the OtherTag-constructor, so it is usually better to use that method.
+- You may create tags simply via the constructors of IndexedTag or OtherTag. But in case of indexed tags the get-method translates automatically from tag-ids to tag-names and vice versa and it doesn't create new instances and in the other case it does just the same job as the OtherTag-constructor, so you are usually better off using that method.
 """
 from collections import defaultdict
 from omg import config, database
@@ -22,33 +22,42 @@ import logging
 
 logger = logging.getLogger("tags")
 
-# Module variables - Will be initialized with the first call of updateIndexedTags.
+# Module variables - Will be initialized with the first call of init.
 #=================================================================================
-# Dictionaries of all indexed Tags. From outside the module use the get-method instead of these private variables.
+# Dictionaries of all indexed tags. From outside the module use the get-method instead of these private variables.
 _tagsById = None
 _tagsByName = None
 
-# List of all indexed tags in unspecified order. Use this to iterate over all indexed tags.
+# list of all tags that are ignored by config file
+_ignored = None
+
+# List of all indexed tags in the order specified by the config-variable tags->tag_order (tags which are not contained in that list will appear in arbitrary order at the end of tagList). Us this to iterate over all tags.
 tagList = None
 
 # Tags which have a special meaning for the application and cannot always be treated generically.
-# Will be initialized with the first call of updateIndexedTags, so remember to change also that function whenever changing the following lines.
+# Will be initialized with the first call of init, so remember to change also that function whenever changing the following lines.
 TITLE = None
 ALBUM = None
 DATE = None
+
+TOTALLY_IGNORED_TAGS = ("tracknumber", "discnumber", "omgwtfthisisnotag")
 
 class Tag:
     """Baseclass for tags.
     
     Tags contain a tagname and compare equal if and only this tagname is equal. Tags may be used as dictionary keys. The only public attribute is name.
     """
-    def __init__(self,name):
-        self.name = name
+    def __init__(self):
+        raise RuntimeError("Cannot instantiate abstract base class Tag.")
     
     def isIndexed(self):
         """Return whether this tag is indexed (i.e. of type IndexedTag)."""
         return isinstance(self,IndexedTag)
-        
+    
+    def isIgnored(self):
+        """Return if the tag is ignored."""
+        return self.name in TOTALLY_IGNORED_TAGS or self.name in _ignored
+    
     def __eq__(self,other):
         return self.name == other.name
         
@@ -62,6 +71,7 @@ class Tag:
         return '"{0}"'.format(self.name)
 
     def __str__(self):
+        # TODO: Store the translations somewhere else
         nameDict = {
             'title': "Titel",
             'artist': "Künstler",
@@ -95,7 +105,7 @@ class IndexedTag(Tag):
         else: return value
     
     def getValueId(self, value, insert=True):
-        """Retriev the id of the value of this tag with the given <value> name."""
+        """Retrieve the id of the value of this tag with the given <value> name."""
         
         db = database.get()
         tableName = "tag_" + self.name
@@ -110,7 +120,7 @@ class IndexedTag(Tag):
         valueId = db.query("SELECT id FROM " + tableName + " WHERE value = ?", value).getSingle()
         if insert and not valueId:
             valueId = db.query("INSERT INTO tag_{0} (value) VALUES(?);".format(self.name), value).insertId()
-            logger.debug("creating new indexed value {} for tag {}".format(value,self.name))
+            logger.debug("creating new value {} for tag {}".format(value,self.name))
         return valueId
     
     def __eq__(self,other):
@@ -138,53 +148,41 @@ class IndexedTag(Tag):
 
 class OtherTag(Tag):
     """Special class for tags which are not indexed."""
-    pass
+    def __init__(self, name):
+        self.name = name
 
 
 def get(identifier):
-    """Return the tag identified by <identifier>. If <identifier> is an integer return the indexed tag with this id. If <identifier> is a string return the tag with this name (of type IndexedTag if there is an indexed tag of this name, otherwise OtherTag). In the case of indexed tags this method does not create new instances of the tags but returns always the same instance."""
+    """Return the tag identified by <identifier>. If <identifier> is an integer return the tag with this id. If <identifier> is a string return the tag with this name. This method does not create new instances of the tags but returns always the same instance."""
     if isinstance(identifier,int):
         return _tagsById[identifier]
     elif isinstance(identifier,str):
         if identifier in _tagsByName:
             return _tagsByName[identifier]
         else: return OtherTag(identifier)
-    else: raise Exception("Identifier's type is neither int nor string")
-    
-def parseIndexedTags(string):
-    try:
-        return [_tagsByName[name] for name in string.split(",")]
-    except KeyError:
-        return None
-    
-def parseIndexedTagSets(string):
-    tagSets = []
-    pos = 0 
-    while pos < len(string):
-        if string[pos] == '[':
-            end = string.find(']',pos+1)
-            if end == -1:
-                return None
-            tagSets.append(parseIndexedTags(string[pos+1:end]))
-            pos = end + 1
-        elif string[pos] == ',':
-            pos = pos +1
-        else:
-            end = string.find(',[',pos)
-            if end == -1:
-                tagSets.extend([tag] for tag in parseIndexedTags(string[pos:]))
-                break
-            else:
-                tagSets.extend([tag] for tag in parseIndexedTags(string[pos:end]))
-                pos = end + 1
-    if None in tagSets or [None] in tagSets:
-        return None
-    else: return tagSets
+    elif isinstance(identifier, Tag):
+        return identifier
+    else: raise RuntimeError("Identifier's type is neither int nor string: {} of type {}".format(identifier,type(identifier)))
     
 
-def updateIndexedTags():
-    """Initialize (or update) the variables of this module based on the information of the tagids-table. At program start or after changes of that table this method must be called to ensure the module has the correct indexed tags and their IDs."""
-    global _tagsById,_tagsByName,tagList
+def parse(string,sep=','):
+    """Parse a string containing tag-names (by default comma-separated, but you may specify a different separator) and return a list of corresponding tags. If <string> contains a substring that is not a tag name, it is simply ignored."""
+    return [_tagsByName[name] for name in string.split(sep) if name in _tagsByName]
+
+def addIndexedTag(identifier, type):
+    if identifier in _tagsByName.keys():
+        raise RuntimeError("requested creation of tag {} which is already there".format(identifier))
+    from omg.database import tables
+    db = database.get()
+    tagtab = tables.TagTable(identifier, type)
+    tagtab.create()
+    id = db.query("INSERT INTO tagids (tagname,tagtype) VALUES (?,?)",identifier, type).insertId()
+    init()
+    return get(id)
+
+def init():
+    """Initialize the variables of this module based on the information of the tagids-table and config-file. At program start or after changes of that table this method must be called to ensure the module has the correct tags and their IDs."""
+    global _tagsById,_tagsByName,tagList, _ignored
     _tagsById = {}
     _tagsByName = {}
     db = database.get()
@@ -193,8 +191,12 @@ def updateIndexedTags():
         _tagsById[row[0]] = newTag
         _tagsByName[row[1]] = newTag
     
-    tagList = _tagsById.values()
+    # tagList contains the tags in the order specified by tags->tag_order...
+    tagList = parse(config.get("tags","tag_order"))
+    # ...and then all remaining tags in arbitrary order
+    tagList.extend(set(_tagsByName.values()) - set(tagList))
     
+    _ignored = config.get("tags", "ignored_tags").split(",")
     global TITLE,ALBUM,DATE
     TITLE = _tagsByName[config.get("tags","title_tag")]
     ALBUM = _tagsByName[config.get("tags","album_tag")]

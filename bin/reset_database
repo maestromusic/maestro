@@ -7,16 +7,21 @@
 # published by the Free Software Foundation
 #
 
-"""Convenience script to reset the database (drop all tables and create them again) and fill the tagids-table according to the indexed_tags-option of the config-file."""
+"""Convenience script to reset the database (drop all tables and create them again). The script will ask you which tags you want to use."""
 
 from omg import database,config
-import logging.config
 
 if input("Really? (y,n)") != "y":
     quit()
+    
+defaultTags = "album,artist,composer,date(date),genre,performer,title"
+tags = input("What tags do you want to use? [{}]".format(defaultTags))
+
+if tags.strip() == '':
+    tags = defaultTags
+
 config.init({})    
 database.connect()
 print("Resetting database...")
-database.resetDatabase()
-database.checkTagIds(True)
+database.resetDatabase(tags.strip())
 print("...done")
