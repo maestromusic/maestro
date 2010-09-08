@@ -146,6 +146,9 @@ class FileSystemFile(omg.models.Node):
     def getPosition(self):
         return self.position
     
+    def setPosition(self, position):
+        self.position = position
+        
     def getLength(self):
         return self.length
     
@@ -197,7 +200,8 @@ class GopulateTreeModel(rootedtreemodel.RootedTreeModel):
         self.current = path
         
     def merge(self, items, name):
-        if len(items) > 0:
+        amount = len(items)
+        if amount > 0:
             posItem = items[0]
             parent = posItem.parent().internalPointer()
             newContainer = GopulateContainer(name="new container", parent = parent)
@@ -209,6 +213,8 @@ class GopulateTreeModel(rootedtreemodel.RootedTreeModel):
                 newContainer.contents.append(item.internalPointer())
                 parent.contents.remove(item.internalPointer())
                 i = i + 1
+            for oldItem in parent.contents[posItem.row()+1:]:
+                oldItem.setPosition(oldItem.getPosition() - amount + 1)
             newContainer.updateSameTags()
             newContainer.tags["album"] = [ name ]
         self.reset()
