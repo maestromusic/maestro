@@ -12,7 +12,6 @@ from PyQt4 import QtCore
 from PyQt4.QtCore import Qt
 
 from omg import config, database, models, mpclient, tags, absPath, relPath
-import omg.gopulate.models as gopmodels
 from . import rootedtreemodel, treebuilder, mimedata
 
 db = database.get()
@@ -20,7 +19,7 @@ logger = logging.getLogger("omg.models.playlist")
 
 
 class BasicPlaylist(rootedtreemodel.RootedTreeModel):
-    """Basic model for playlists. A BasicPlaylists contains a list of nodes and supports insertion and removal of nodes as well as drag and drop of the omg's own mimetype (config-variable gui->mime) and "text/uri-list"."""
+    """Basic model for playlists. A BasicPlaylists contains a list of nodes and supports insertion and removal of nodes as well as drag and drop of omg's own mimetype (config-variable gui->mime) and "text/uri-list"."""
     # Toplevel elements in the playlist
     contents = None
     
@@ -96,7 +95,7 @@ class BasicPlaylist(rootedtreemodel.RootedTreeModel):
         
     def removeContents(self,parent,start,end):
         """Remove the nodes with indices <start>-<end> (without <end>!) from <parent>'s children."""
-        self.beginRemoveRows(self.getIndex(parent),row,end-1)
+        self.beginRemoveRows(self.getIndex(parent),start,end-1)
         del parent.getChildren()[start:end]
         self.endRemoveRows()
     

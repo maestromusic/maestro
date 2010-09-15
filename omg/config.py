@@ -72,6 +72,8 @@ _defaultOptions = {
         "detail_cover_size": 160,
         "cover_fetcher_cover_size": 400,
         
+        # size of icons to display
+        "iconsize" : 16,
         # Maximal number of views in a Browser
         "max_browser_views": 5,
         

@@ -7,94 +7,120 @@
 #
 
 from PyQt4 import QtCore, QtGui
-from omg.gui.abstractdelegate import AbstractDelegate
-from omg.gui.formatter import HTMLFormatter
-import omg.gopulate
-import omg.models
-from omg import tags
 from PyQt4.QtCore import Qt
+import os.path
+import omg.models
+from omg import tags, constants, config
 
-class NewGopulateDelegate(QtGui.QStyledItemDelegate):
-    """Draws Elements in the Gopulate view."""
+def tagIcon(tag):
+    path = os.path.join(constants.IMAGES, "icons", "tag_{}.png".format(tag.name))
+    if os.path.exists(path):
+            return path
+    return None
+
+class SuperNewDelegate(QtGui.QStyledItemDelegate):
+    hMargin = 2
+    vMargin = 1
     
     def __init__(self, parent = None):
-        QtGui.QAbstractItemDelegate.__init__(self, parent)
-        self.doc = QtGui.QTextDocument()
-      #  self.doc.setPageSize(QtCore.QSizeF(200,40))
-      #  self.doc.setTextWidth(200)
-        self.doc.setDefaultStyleSheet("td { padding-right: 5px }")
+        QtGui.QStyledItemDelegate.__init__(self,parent)
+        self.iconSize = int(config.get("gui", "iconsize"))
+        self.iconRect = QtCore.QRect(0, 0, self.iconSize, self.iconSize)
+        self.font = QtGui.QFont()
+    
+    def formatTagValues(self, values):
+        return ";;".join((str(x) for x in values))
+    
+    def paint(self,painter,option,index):
+        if not isinstance(index.internalPointer(), omg.models.Element):
+            return QtGui.QStyledItemDelegate.paint(self, painter, option, index)
+        else:
+            return self.layout(painter, option, index)
         
-    def layout(self, index):
+    def layout(self, painter, option, index):
+        # Initialize
+
+        
+        if painter:
+            painter.save()
+            QtGui.QApplication.style().drawControl(QtGui.QStyle.CE_ItemViewItem,option,painter)
+            option = QtGui.QStyleOptionViewItemV4(option)
+            rect = QtCore.QRect(0,0,option.rect.width()-2*self.hMargin,option.rect.height()-2*self.vMargin)
+            # Paint data
+            painter.translate(option.rect.left()+self.hMargin,option.rect.top()+self.vMargin)
+        else:
+                width = 0
+                height = 0
         elem = index.internalPointer()
-        #self.doc.setHtml("<h2>spaaast</h2><img src=\"images/lastfm.gif\"></img>")
-        #self.doc.adjustSize()
-        tab = []
-        beforeTable = ''
-        if elem.isContainer() and elem.id == None:
-            if tags.get("album") in elem.sameTags and tags.get("artist") in elem.sameTags:
-                beforeTable += ", ".join(elem.tags['artist']) + " – " +  ", ".join(elem.tags['album'])
-                if tags.get("date") in elem.sameTags:
-                    beforeTable += " ({})".format(", ".join(elem.tags['date']))
-            for k in elem.sameTags:
-                if k == tags.get("album") or k == tags.get("artist") or k == tags.get("date"):
-                    continue
-                tab.append( [str(k)])
-                for v in elem.tags[k]:
-                    tab[-1].append(v)
-        elif elem.isFile() and elem.id == None:
-            if tags.get("title") in elem.tags:
-                beforeTable = ", ".join(elem.tags['title'])
-                beforeTable = "<b>{:2}: </b>".format(elem.getPosition()) + beforeTable
-            for k,vs in elem.tags.items():
-                if k == tags.get("title") or k == tags.get("tracknumber"):
-                    continue
-                if isinstance(elem.parent, omg.models.Container) and k in elem.parent.sameTags:
-                    continue
-                tab.append( [str(k)] )
-                for v in vs:
-                    tab[-1].append(v)
-        else:
-            f = HTMLFormatter(elem)
-            beforeTable = "<b>{:2}: </b>".format(elem.getPosition())
-            beforeTable = beforeTable + f.detailView()
-        # color codes
-        if not elem.isInDB():
-            beforeTable = '<span style="background:yellow">' + beforeTable + "</span>"
-        else:
-            beforeTable = '<span style="background:green">already in DB' + beforeTable + "</span>"
-        lines = beforeTable
-        if len(tab) > 0:
-            cols = max(len(x) for x in tab)
-            lines += '<table><tr>'
-            lines += "</tr><tr>".join(self._layoutRow(row, cols) for row in tab)
-            lines += "</tr>"
-            lines += "</table>"
-        self.doc.setHtml(lines)
+        if elem.getPosition():
+            positionSize = QtGui.QFontMetrics(self.font).size(Qt.TextSingleLine, str(elem.getPosition()))
+            tagRenderStartX = positionSize.width() + 6
+        else: # no space for position needed if it is None
+            tagRenderStartX = 0
         
-    def _layoutRow(self, row, cols):
-        lines = ""
-        if len(row) > 1:
-            lines += "<td><i>{}</i></td>".format(row[0])
-            for elem in row[1:-1]:
-                    lines += '<td align="left">{}</td>'.format(elem)
-        if len(row) < cols:
-            lines += '<td align="left" colspan="{}">{}</td>'.format(1 + cols - len(row), row[-1])
+        if painter:
+            rect.setLeft(rect.left() + tagRenderStartX)
+        if tags.TITLE in elem.tags:
+            self.font.setBold(True)
+            self.font.setItalic(True)
+            if painter:
+                painter.setFont(self.font)
+                boundingRect = painter.drawText(rect, Qt.TextSingleLine, self.formatTagValues(elem.tags[tags.TITLE]))
+                rect.translate(0, boundingRect.height())
+            else:
+                fSize = QtGui.QFontMetrics(self.font).size(Qt.TextSingleLine, self.formatTagValues(elem.tags[tags.TITLE]))
+                width = max(width, fSize.width())
+                height += fSize.height()
+            
+            self.font.setBold(False)
+            self.font.setItalic(False)
+            if painter:
+                painter.setFont(self.font)
+        for t,data in elem.tags.items():
+            if data == [] or t.isIgnored() or t==tags.TITLE:
+                continue
+            if isinstance(elem.parent, omg.models.Element) and t in elem.parent.tags and data == elem.parent.tags[t]:
+                continue
+            
+
+            iconPath = tagIcon(t)
+            if iconPath:
+                if painter:
+                    img = QtGui.QImage(iconPath)
+                    painter.drawImage(rect.topLeft(), img.scaled(self.iconRect.size()))
+                    rect.setLeft(rect.left()+ self.iconSize)
+                else:
+                    widthSoFar = self.iconSize
+            else:
+                if painter:
+                    boundingRect = painter.drawText(rect, Qt.TextSingleLine, "{}: ".format(t.name))
+                    rect.setLeft(rect.left() + boundingRect.width())
+                else:
+                    fSize = QtGui.QFontMetrics(self.font).size(Qt.TextSingleLine, "{}: ".format(t.name))
+                    widthSoFar = fSize.width()
+            if painter:
+                painter.drawText(rect, Qt.TextSingleLine, self.formatTagValues(data))
+                rect.translate(0, self.iconSize)
+                rect.setLeft(tagRenderStartX)
+            else:
+                fSize = QtGui.QFontMetrics(self.font).size(Qt.TextSingleLine, self.formatTagValues(data))
+                width = max(width, fSize.width()+widthSoFar)
+                height += self.iconSize
+                
+        if painter:
+            if elem.getPosition():
+                rect.setLeft(0)
+                rect.setTop(0)
+                painter.drawText(rect, Qt.TextSingleLine, str(elem.getPosition()))
+            painter.restore()
         else:
-            lines += "<td>{}</td>".format(row[-1])
-        return lines
-        
-    def paint(self, painter, option, index):
-        self.layout(index)
-        option = QtGui.QStyleOptionViewItemV4(option)
-        QtGui.QApplication.style().drawControl(QtGui.QStyle.CE_ItemViewItem,option,painter)
-        painter.save()
-        painter.translate(option.rect.x(), option.rect.y())
-        self.doc.drawContents(painter) #, QtCore.QRectF(option.rect))
-        painter.restore()
+            return QtCore.QSize(width + tagRenderStartX, height)
     
     def sizeHint(self, option, index):
-        self.layout(index)
-        return self.doc.size().toSize()
+        if not isinstance(index.internalPointer(), omg.models.Element):
+            return QtGui.QStyledItemDelegate.sizeHint(self, option, index)
+        else:
+            return self.layout(None, option, index)
 
 
 class GopulatTreeWidget(QtGui.QTreeView):
@@ -102,11 +128,14 @@ class GopulatTreeWidget(QtGui.QTreeView):
     
     def __init__(self, parent = None):
         QtGui.QTreeView.__init__(self, parent)
-        self.setItemDelegate(NewGopulateDelegate())
+        self.setItemDelegate(SuperNewDelegate())
         self.setAlternatingRowColors(True)
         self.setContextMenuPolicy(Qt.DefaultContextMenu)
         self.setSelectionMode(self.ExtendedSelection)
-        
+        self.setDragEnabled(True)
+        self.setAcceptDrops(True)
+        self.setDropIndicatorShown(True)
+        self.setDefaultDropAction(Qt.MoveAction)
         self.mergeAction = QtGui.QAction("merge", self)
         self.mergeAction.triggered.connect(self._handleMerge)
 
@@ -121,7 +150,7 @@ class GopulatTreeWidget(QtGui.QTreeView):
         self.expandAll()
     
     def _handleMerge(self):
-        title,flag = QtGui.QInputDialog.getText(self, "merge elements", "Name of new subcontainer:")
+        title,flag = QtGui.QInputDialog.getText(self, "merge elements", "Name of new subcontainer:", text= "omgomg")
         if flag:
             self.model().merge(self.selectionModel().selectedIndexes(), title)
         

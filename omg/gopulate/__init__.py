@@ -16,6 +16,7 @@ import omg.database.queries as queries
 import omg.database
 from omg.models import rootedtreemodel
 from functools import reduce
+from difflib import SequenceMatcher
 
 db = omg.database.get()
 logger = logging.getLogger('gopulate')
@@ -103,3 +104,12 @@ def findNewAlbums(path):
             logger.debug("I found an album '{0}' in directory '{1}' containing {2} files.".format(
                       ", ".join(album.tags["album"]),dirpath,len(album.contents)))
         yield dirpath,albumsInThisDirectory
+
+def longestSubstring(a, b):
+    sm = SequenceMatcher(a, b)
+    result = sm.find_longest_match(0, len(a), 0, len(b))
+    return a[result[0]:result[0]+result[2]]
+    
+def calculateMergeHint(indices):
+    titles = [ ind.internalPointer().tags[tags.get("title")] for ind in indices]
+    

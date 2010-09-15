@@ -86,7 +86,7 @@ class AbstractDelegate(QtGui.QStyledItemDelegate):
         if self.context is not None:
             # Confer self.paint
             import sys
-            sys.exit("Fatal error: AbstractDelegate.paint was called during painting.")
+            sys.exit("Fatal error: AbstractDelegate.sizeHint was called during painting.")
         self.context = DelegateContext(None,option)
         self.layout(index)
         if self.context.coverSize is None:

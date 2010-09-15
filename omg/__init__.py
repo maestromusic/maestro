@@ -23,3 +23,6 @@ def absPath(file):
         return os.path.join(config.get("music","collection"),file)
     else:
         return file
+
+def getIcon(name):
+    return os.path.join(constants.IMAGES, "icons", name)

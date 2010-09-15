@@ -51,11 +51,10 @@ class Formatter:
         """Return the title or the path or the path if the element contains no title or some dummy-title if it even doesn't contain a path."""
         if tags.TITLE in self.element.tags:
             result = " - ".join(self.element.tags[tags.TITLE])
+        elif isinstance(self.element, omg.models.File):
+            result = self.element.getPath()
         else:
-            path = self.element.getPath()
-            if path is not None:
-                result = path
-            else: result = "<Kein Titel>"
+            result = "<Kein Titel>"
         if isinstance(self.element,models.Element) and self.element.isInDB() and config.get("misc","show_ids"):
             return "[{0}] {1}".format(self.element.id,result)
         else: return result

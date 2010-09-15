@@ -12,6 +12,7 @@ from PyQt4.QtCore import Qt
 from omg.models import rootedtreemodel
 import omg.models
 import omg.database as database
+from omg.models.playlist import BasicPlaylist
 
 import omg.gopulate
 absPath = omg.gopulate.absPath
@@ -29,9 +30,10 @@ class DirectoryNode(omg.models.RootNode):
     def __str__(self):
         return self.path
 
-class GopulateTreeModel(rootedtreemodel.RootedTreeModel):
+class GopulateTreeModel(BasicPlaylist):
     
-    currentDirectoryChanged = QtCore.pyqtSignal(['QString'])
+    #currentDirectoryChanged = QtCore.pyqtSignal(['QString'])
+    
     def __init__(self, searchdirs):
         rootedtreemodel.RootedTreeModel.__init__(self)
         self.current = None
@@ -72,6 +74,7 @@ class GopulateTreeModel(rootedtreemodel.RootedTreeModel):
                 parent = self.root
             newContainer = omg.models.Container(id = None)
             newContainer.parent = parent
+            newContainer.position = posItem.internalPointer().getPosition()
             parent.contents.insert(posItem.row(), newContainer)
             i = 1
             for item in items:
@@ -81,9 +84,9 @@ class GopulateTreeModel(rootedtreemodel.RootedTreeModel):
                 parent.contents.remove(item.internalPointer())
                 i = i + 1
             for oldItem in parent.contents[posItem.row()+1:]:
-                oldItem.setPosition(oldItem.getPosition() - amount + 1)
+                oldItem.position = oldItem.getPosition() - amount + 1
             newContainer.updateSameTags()
-            newContainer.tags["album"] = [ name ]
+            newContainer.tags["title"] = [ name ]
         self.reset()
                 
         
@@ -95,8 +98,3 @@ class GopulateTreeModel(rootedtreemodel.RootedTreeModel):
             logger.debug("item of type {}".format(type(item)))
             item.commit(toplevel=True)
         self.setCurrentDirectory(self.current)
-    
-    def flags(self, index):
-        if not index.isValid():
-            return Qt.ItemIsEnabled
-        return rootedtreemodel.RootedTreeModel.flags(self,index)

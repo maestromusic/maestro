@@ -17,8 +17,9 @@ This module provides methods to initialize the tag lists based on the database, 
 - You may create tags simply via the constructors of IndexedTag or OtherTag. But in case of indexed tags the get-method translates automatically from tag-ids to tag-names and vice versa and it doesn't create new instances and in the other case it does just the same job as the OtherTag-constructor, so you are usually better off using that method.
 """
 from collections import defaultdict
-from omg import config, database
+from omg import config, database, constants
 import logging
+import os.path
 
 logger = logging.getLogger("tags")
 
@@ -40,7 +41,7 @@ TITLE = None
 ALBUM = None
 DATE = None
 
-TOTALLY_IGNORED_TAGS = ("tracknumber", "discnumber", "omgwtfthisisnotag")
+TOTALLY_IGNORED_TAGS = ("tracknumber", "discnumber")
 
 class Tag:
     """Baseclass for tags.
@@ -245,6 +246,7 @@ class Storage(defaultdict):
         for tag,valueList in other.items():
             self.removeValues(tag,*valueList)
     
+    #TODO: das ist sehr bugfördernd, müssen wir uns was klügeres überlegen
     def realKeys(self):
         return (key for key in self.keys() if len(self[key]) > 0)
         
