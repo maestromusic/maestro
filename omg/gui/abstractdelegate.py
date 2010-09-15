@@ -141,7 +141,7 @@ class AbstractDelegate(QtGui.QStyledItemDelegate):
             if text1 != "":
                 self._configurePainter(style1)
                 boundingRect1 = context.painter.drawText(context.rect,Qt.TextSingleLine,text1)
-            else: boundingRect1 = QtCore.QRect(context.rect.left,context.rect.top,0,0)
+            else: boundingRect1 = QtCore.QRect(context.rect.left(),context.rect.top(),0,0)
             
             if text2 != "":
                 self._configurePainter(style2)

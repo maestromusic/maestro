@@ -49,7 +49,7 @@ def findAlbumsInDirectory(path, onlyNewFiles = True):
                         existingAlbumsInThisDirectory[aid] = omg.models.Container(aid)
                         existingAlbumsInThisDirectory[aid].loadTags()
                     exAlb = existingAlbumsInThisDirectory[aid]
-                    exAlbName = exAlb.tags[tags.get('album')][0]
+                    exAlbName = exAlb.tags.getFormatted(tags.get('title'))
                     if not exAlbName in albumsInThisDirectory:
                         albumsInThisDirectory[exAlbName] = exAlb
                     
@@ -106,10 +106,10 @@ def findNewAlbums(path):
         yield dirpath,albumsInThisDirectory
 
 def longestSubstring(a, b):
-    sm = SequenceMatcher(a, b)
+    sm = SequenceMatcher(None, a, b)
     result = sm.find_longest_match(0, len(a), 0, len(b))
     return a[result[0]:result[0]+result[2]]
     
 def calculateMergeHint(indices):
-    titles = [ ind.internalPointer().tags[tags.get("title")] for ind in indices]
+    return reduce(longestSubstring, ( ind.internalPointer().tags.getFormatted(tags.get("title")) for ind in indices )).strip(":- ")
     

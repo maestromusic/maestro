@@ -59,7 +59,7 @@ tables = {table.name:table for table in (SQLTable(createQuery) for createQuery i
         elements SMALLINT UNSIGNED NOT NULL DEFAULT 0,
         INDEX name_idx(name(10)),
         PRIMARY KEY(id)
-    );
+    ) CHARACTER SET 'utf8';
 """,
 """CREATE TABLE contents (
         container_id MEDIUMINT UNSIGNED NOT NULL,
@@ -76,10 +76,10 @@ tables = {table.name:table for table in (SQLTable(createQuery) for createQuery i
         verified TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         length MEDIUMINT UNSIGNED NOT NULL,
         PRIMARY KEY(element_id),
-        UNIQUE INDEX path_idx(path),
+        UNIQUE INDEX path_idx(path(333)),
         INDEX hash_idx(hash),
         INDEX length_idx(length)
-    );
+    ) CHARACTER SET 'utf8';
 """,
 """CREATE TABLE tags (
         element_id MEDIUMINT UNSIGNED NOT NULL,
@@ -117,7 +117,7 @@ class TagTable(SQLTable):
             id MEDIUMINT UNSIGNED NOT NULL AUTO_INCREMENT,
             value VARCHAR(255) NOT NULL,
             PRIMARY KEY(id)
-        );""",
+        ) CHARACTER SET 'utf8';""",
 
         "date" : """
         CREATE TABLE {0} (
@@ -132,7 +132,7 @@ class TagTable(SQLTable):
             id MEDIUMINT UNSIGNED NOT NULL AUTO_INCREMENT,
             value TEXT NOT NULL,
             PRIMARY KEY(id)
-        );"""
+        ) CHARACTER SET 'utf8';"""
     }
 
 def allTables():

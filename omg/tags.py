@@ -246,6 +246,11 @@ class Storage(defaultdict):
         for tag,valueList in other.items():
             self.removeValues(tag,*valueList)
     
+    def getFormatted(self, tag):
+        if not isinstance(tag, Tag):
+            tag = get(tag)
+        return ", ".join(self[tag])
+    
     #TODO: das ist sehr bugfördernd, müssen wir uns was klügeres überlegen
     def realKeys(self):
         return (key for key in self.keys() if len(self[key]) > 0)

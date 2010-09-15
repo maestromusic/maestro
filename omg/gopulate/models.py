@@ -65,10 +65,10 @@ class GopulateTreeModel(BasicPlaylist):
         self.setRoot(root)
         self.current = path
         
-    def merge(self, items, name):
-        amount = len(items)
+    def merge(self, indices, name):
+        amount = len(indices)
         if amount > 0:
-            posItem = items[0]
+            posItem = indices[0]
             parent = posItem.parent().internalPointer()
             if not parent:
                 parent = self.root
@@ -77,11 +77,14 @@ class GopulateTreeModel(BasicPlaylist):
             newContainer.position = posItem.internalPointer().getPosition()
             parent.contents.insert(posItem.row(), newContainer)
             i = 1
-            for item in items:
-                item.internalPointer().parent = newContainer
-                item.internalPointer().position = i
-                newContainer.contents.append(item.internalPointer())
-                parent.contents.remove(item.internalPointer())
+            for index in indices:
+                item = index.internalPointer()
+                item.parent = newContainer
+                item.position = i
+                newContainer.contents.append(item)
+                parent.contents.remove(item)
+                for i in range(len(item.tags["title"])):
+                    item.tags["title"][i] = item.tags["title"][i].replace(name, "").strip()
                 i = i + 1
             for oldItem in parent.contents[posItem.row()+1:]:
                 oldItem.position = oldItem.getPosition() - amount + 1

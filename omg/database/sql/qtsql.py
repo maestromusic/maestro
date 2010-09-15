@@ -21,6 +21,7 @@ class Sql(AbstractSql):
         ok = self._db.open(username,password)
         if not ok:
             raise DBException("DB-connection failed: {0}".format(self._db.lastError().databaseText()))
+      #  self.query("SET NAMES 'utf8';")
 
     def query(self,queryString,*args):
         return self._query(queryString,False,*args)

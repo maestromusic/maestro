@@ -11,6 +11,7 @@ from PyQt4.QtCore import Qt
 import os.path
 import omg.models
 from omg import tags, constants, config
+from . import calculateMergeHint
 
 def tagIcon(tag):
     path = os.path.join(constants.IMAGES, "icons", "tag_{}.png".format(tag.name))
@@ -21,6 +22,8 @@ def tagIcon(tag):
 class SuperNewDelegate(QtGui.QStyledItemDelegate):
     hMargin = 2
     vMargin = 1
+    vItemSpace = 4
+    hItemSpace = 4
     
     def __init__(self, parent = None):
         QtGui.QStyledItemDelegate.__init__(self,parent)
@@ -53,31 +56,34 @@ class SuperNewDelegate(QtGui.QStyledItemDelegate):
                 height = 0
         elem = index.internalPointer()
         if elem.getPosition():
+            self.font.setBold(True)
             positionSize = QtGui.QFontMetrics(self.font).size(Qt.TextSingleLine, str(elem.getPosition()))
-            tagRenderStartX = positionSize.width() + 6
+            tagRenderStartX = positionSize.width() + 2*self.hItemSpace
+            self.font.setBold(False)
         else: # no space for position needed if it is None
             tagRenderStartX = 0
         
         if painter:
             rect.setLeft(rect.left() + tagRenderStartX)
         if tags.TITLE in elem.tags:
-            self.font.setBold(True)
+            if elem.isContainer():
+                self.font.setBold(True)
             self.font.setItalic(True)
             if painter:
                 painter.setFont(self.font)
                 boundingRect = painter.drawText(rect, Qt.TextSingleLine, self.formatTagValues(elem.tags[tags.TITLE]))
-                rect.translate(0, boundingRect.height())
+                rect.translate(0, boundingRect.height() + self.vItemSpace)
             else:
                 fSize = QtGui.QFontMetrics(self.font).size(Qt.TextSingleLine, self.formatTagValues(elem.tags[tags.TITLE]))
                 width = max(width, fSize.width())
-                height += fSize.height()
+                height += fSize.height() + self.hItemSpace
             
             self.font.setBold(False)
             self.font.setItalic(False)
             if painter:
                 painter.setFont(self.font)
         for t,data in elem.tags.items():
-            if data == [] or t.isIgnored() or t==tags.TITLE:
+            if data == [] or t.isIgnored() or t==tags.TITLE or (t==tags.ALBUM and elem.isAlbum()):
                 continue
             if isinstance(elem.parent, omg.models.Element) and t in elem.parent.tags and data == elem.parent.tags[t]:
                 continue
@@ -88,30 +94,35 @@ class SuperNewDelegate(QtGui.QStyledItemDelegate):
                 if painter:
                     img = QtGui.QImage(iconPath)
                     painter.drawImage(rect.topLeft(), img.scaled(self.iconRect.size()))
-                    rect.setLeft(rect.left()+ self.iconSize)
+                    rect.setLeft(rect.left()+ self.iconSize + self.vItemSpace)
                 else:
-                    widthSoFar = self.iconSize
+                    widthSoFar = self.iconSize + self.hItemSpace
             else:
                 if painter:
                     boundingRect = painter.drawText(rect, Qt.TextSingleLine, "{}: ".format(t.name))
-                    rect.setLeft(rect.left() + boundingRect.width())
+                    rect.setLeft(rect.left() + boundingRect.width() + self.hItemSpace)
                 else:
                     fSize = QtGui.QFontMetrics(self.font).size(Qt.TextSingleLine, "{}: ".format(t.name))
-                    widthSoFar = fSize.width()
+                    widthSoFar = fSize.width() + self.hItemSpace
             if painter:
                 painter.drawText(rect, Qt.TextSingleLine, self.formatTagValues(data))
-                rect.translate(0, self.iconSize)
+                rect.translate(0, self.iconSize + self.vItemSpace)
                 rect.setLeft(tagRenderStartX)
             else:
                 fSize = QtGui.QFontMetrics(self.font).size(Qt.TextSingleLine, self.formatTagValues(data))
-                width = max(width, fSize.width()+widthSoFar)
-                height += self.iconSize
-                
+                width = max(width, fSize.width() + widthSoFar)
+                height += self.iconSize + self.vItemSpace
+        
+        # paint the element position (~tracknumber) at the beginning of the line
         if painter:
             if elem.getPosition():
-                rect.setLeft(0)
-                rect.setTop(0)
+                self.font.setBold(True)
+                painter.setFont(self.font)
+                rect.setLeft(int((tagRenderStartX-positionSize.width())/2))
+                rect.setTop(int((rect.height() -positionSize.height())/2))
                 painter.drawText(rect, Qt.TextSingleLine, str(elem.getPosition()))
+                self.font.setBold(False)
+                painter.setFont(self.font)
             painter.restore()
         else:
             return QtCore.QSize(width + tagRenderStartX, height)
@@ -120,7 +131,9 @@ class SuperNewDelegate(QtGui.QStyledItemDelegate):
         if not isinstance(index.internalPointer(), omg.models.Element):
             return QtGui.QStyledItemDelegate.sizeHint(self, option, index)
         else:
-            return self.layout(None, option, index)
+            size = self.layout(None, option, index)
+            print(size)
+            return size
 
 
 class GopulatTreeWidget(QtGui.QTreeView):
@@ -140,9 +153,12 @@ class GopulatTreeWidget(QtGui.QTreeView):
         self.mergeAction.triggered.connect(self._handleMerge)
 
     def contextMenuEvent(self, event):
-        menu = QtGui.QMenu(self)
-        menu.addAction(self.mergeAction)
-        menu.popup(event.globalPos())
+        if self.selectionModel().hasSelection():
+            menu = QtGui.QMenu(self)
+            menu.addAction(self.mergeAction)
+            menu.popup(event.globalPos())
+        print(self.size())
+        
     
     def setModel(self, model):
         QtGui.QTreeView.setModel(self, model)
@@ -150,7 +166,9 @@ class GopulatTreeWidget(QtGui.QTreeView):
         self.expandAll()
     
     def _handleMerge(self):
-        title,flag = QtGui.QInputDialog.getText(self, "merge elements", "Name of new subcontainer:", text= "omgomg")
+        indices = self.selectionModel().selectedIndexes()
+        hint = calculateMergeHint(indices)
+        title,flag = QtGui.QInputDialog.getText(self, "merge elements", "Name of new subcontainer:", text = hint)
         if flag:
             self.model().merge(self.selectionModel().selectedIndexes(), title)
         
