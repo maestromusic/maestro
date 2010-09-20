@@ -17,9 +17,8 @@ This module provides methods to initialize the tag lists based on the database, 
 - You may create tags simply via the constructors of IndexedTag or OtherTag. But in case of indexed tags the get-method translates automatically from tag-ids to tag-names and vice versa and it doesn't create new instances and in the other case it does just the same job as the OtherTag-constructor, so you are usually better off using that method.
 """
 from collections import defaultdict
-from omg import config, database, constants
-import logging
-import os.path
+from omg import database, config, FlexiDate
+import logging, datetime
 
 logger = logging.getLogger("tags")
 
@@ -100,10 +99,14 @@ class IndexedTag(Tag):
     def getValue(self,valueId):
         """Retrieve the value of this tag with the given <valueId> from the corresponding tag-table."""
         tableName = "tag_"+self.name
-        value = database.get().query("SELECT value FROM "+tableName+" WHERE id = ?",valueId).getSingle()
+        
         if self.type == 'date':
-            return database.get().getDate(value)
-        else: return value
+            value = FlexiDate.strptime(database.get().query(
+                    "SELECT DATE_FORMAT(value, '%Y-%m-%d') FROM " + tableName + " WHERE id = ?", valueId
+                ).getSingle())
+        else:
+            value = database.get().query("SELECT value FROM "+tableName+" WHERE id = ?",valueId).getSingle()
+        return value
     
     def getValueId(self, value, insert=True):
         """Retrieve the id of the value of this tag with the given <value> name."""
@@ -114,7 +117,7 @@ class IndexedTag(Tag):
             if len(value)==4: # only year is given
                 value="{0}-00-00".format(value)
             elif len(value)==2: # year in 2-digit form
-                if value[0]==0:
+                if value[0] < 7:
                     value="20{0}-00-00".format(value)
                 else:
                     value="19{0}-00-00".format(value)

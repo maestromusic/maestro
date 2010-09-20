@@ -32,18 +32,24 @@ class SuperNewDelegate(QtGui.QStyledItemDelegate):
         self.font = QtGui.QFont()
     
     def formatTagValues(self, values):
-        return ";;".join((str(x) for x in values))
+        return " • ".join((str(x) for x in values))
     
     def paint(self,painter,option,index):
+        """Reimplemented function from QStyledItemDelegate"""
         if not isinstance(index.internalPointer(), omg.models.Element):
             return QtGui.QStyledItemDelegate.paint(self, painter, option, index)
         else:
             return self.layout(painter, option, index)
         
     def layout(self, painter, option, index):
-        # Initialize
-
+        """This is the central function of the delegate for painting and size calculation.
         
+        If painter is None, only the size hint is calculated and returned. Otherwise, everything
+        is painted with the given painter object."""
+        
+        elem = index.internalPointer()
+        
+        # —————— initialize painter ——————
         if painter:
             painter.save()
             QtGui.QApplication.style().drawControl(QtGui.QStyle.CE_ItemViewItem,option,painter)
@@ -51,20 +57,26 @@ class SuperNewDelegate(QtGui.QStyledItemDelegate):
             rect = QtCore.QRect(0,0,option.rect.width()-2*self.hMargin,option.rect.height()-2*self.vMargin)
             # Paint data
             painter.translate(option.rect.left()+self.hMargin,option.rect.top()+self.vMargin)
+            
+            if not elem.isInDB():
+                painter.setOpacity(0.75) # visualize non-db items by transparency
+            
         else:
                 width = 0
                 height = 0
-        elem = index.internalPointer()
+
+        # ——————— calculate space for position number and color marker ———————
         if elem.getPosition():
             self.font.setBold(True)
             positionSize = QtGui.QFontMetrics(self.font).size(Qt.TextSingleLine, str(elem.getPosition()))
             tagRenderStartX = positionSize.width() + 2*self.hItemSpace
             self.font.setBold(False)
-        else: # no space for position needed if it is None
-            tagRenderStartX = 0
-        
+        else: # no space for position needed if it is None, only a small margin for the color indicator
+            tagRenderStartX = 2*self.hItemSpace
         if painter:
             rect.setLeft(rect.left() + tagRenderStartX)
+
+        # ——————— paint/calculate the title ———————            
         if tags.TITLE in elem.tags:
             if elem.isContainer():
                 self.font.setBold(True)
@@ -82,13 +94,16 @@ class SuperNewDelegate(QtGui.QStyledItemDelegate):
             self.font.setItalic(False)
             if painter:
                 painter.setFont(self.font)
-        for t,data in elem.tags.items():
-            if data == [] or t.isIgnored() or t==tags.TITLE or (t==tags.ALBUM and elem.isAlbum()):
+        
+        # ——————— now, paint/calculate all other tags ———————
+        tagorder = [t for t in tags.tagList if t in elem.tags]
+        for t in tagorder:
+            data = elem.tags[t]
+            if t == tags.TITLE or (t == tags.ALBUM and elem.isAlbum()):
                 continue
             if isinstance(elem.parent, omg.models.Element) and t in elem.parent.tags and data == elem.parent.tags[t]:
                 continue
             
-
             iconPath = tagIcon(t)
             if iconPath:
                 if painter:
@@ -113,8 +128,12 @@ class SuperNewDelegate(QtGui.QStyledItemDelegate):
                 width = max(width, fSize.width() + widthSoFar)
                 height += self.iconSize + self.vItemSpace
         
-        # paint the element position (~tracknumber) at the beginning of the line
+        # ——————— paint the element position and color marker ————————
         if painter:
+            if elem.isAlbum():
+                painter.fillRect(0, 0, tagRenderStartX, rect.height(), Qt.cyan)
+            elif not elem.isFile():
+                painter.fillRect(0, 0, tagRenderStartX, rect.height(), Qt.magenta)
             if elem.getPosition():
                 self.font.setBold(True)
                 painter.setFont(self.font)
@@ -128,11 +147,12 @@ class SuperNewDelegate(QtGui.QStyledItemDelegate):
             return QtCore.QSize(width + tagRenderStartX, height)
     
     def sizeHint(self, option, index):
+        """Reimplemented function from QStyledItemDelegate"""
+        
         if not isinstance(index.internalPointer(), omg.models.Element):
             return QtGui.QStyledItemDelegate.sizeHint(self, option, index)
         else:
             size = self.layout(None, option, index)
-            print(size)
             return size
 
 

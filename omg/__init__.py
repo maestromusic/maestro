@@ -7,7 +7,7 @@
 # published by the Free Software Foundation
 #
 
-from omg import realfiles, database, constants, config
+from omg import database, constants, config
 import os
 import pickle
 import datetime
@@ -26,3 +26,35 @@ def absPath(file):
 
 def getIcon(name):
     return os.path.join(constants.IMAGES, "icons", name)
+
+
+class FlexiDate:
+    
+    def __init__(self, year, month = None, day = None):
+        self.year = year
+        if month == 0:
+            self.month = None
+        else:
+            self.month = month
+        if day == 0:
+            self.day = None
+        else:
+            self.day = day
+    
+    @staticmethod
+    def strptime(string):
+        return FlexiDate(*map(int,string.split("-")))
+    
+    def strftime(self, format = ["{Y:04d}-{m:02d}-{d:02d}", "{Y:04d}-{m:02d}", "{Y:04d}"]):
+        if self.month:
+            if self.day:
+                format = format[0]
+            else:
+                format = format[1]
+        else:
+            format = format[2]
+        return format.format(Y=self.year, m=self.month, d=self.day)
+    
+    def __str__(self):
+        return self.strftime()
+        

@@ -55,7 +55,7 @@ _defaultOptions = {
         "ignored_tags":"tracktotal,disctotal,tracknumber,discnumber",
         
         # Order in which tags will be displayed. Must contain title and album! Tags which don't appear in this list will be displayed in arbitrary order after the tags in the list.
-        "tag_order": "title,album,composer,artist,performer,conductor,date,genre",
+        "tag_order": "title,artist,album,composer,date,genre,performer,conductor,",
         
         # Names of the tags which have a special meaning for the application and cannot always be treated generically.
         # This allows to use other strings for the title-tag for example.

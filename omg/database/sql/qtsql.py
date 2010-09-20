@@ -42,7 +42,7 @@ class Sql(AbstractSql):
             raise DBException(message)
         return SqlResult(query,useDict)
     
-    def getDate(self,qdate):
+    def getDate(self,qdate):    
         try:
             return datetime.date(qdate.year(),qdate.month(),qdate.day())
         except ValueError:

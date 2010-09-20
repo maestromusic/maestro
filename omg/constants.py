@@ -17,4 +17,4 @@ LOGLEVELS = {'debug': logging.DEBUG,
 
 YES_ANSWERS = ["y", "Y", ""]
 
-VERSION = '0.03alpha'
+VERSION = '0.1alpha'
