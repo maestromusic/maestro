@@ -6,29 +6,36 @@
 # published by the Free Software Foundation
 #
 
-import sys, os
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import Qt
-import omg.models
-from omg import config, realfiles, relPath, absPath, tags
-import logging
-import omg.database.queries as queries
-import omg.database
-from omg.models import rootedtreemodel
+import sys, os, re, logging
 from functools import reduce
 from difflib import SequenceMatcher
+
+from PyQt4 import QtCore, QtGui
+from PyQt4.QtCore import Qt
+
+import omg.models
+from omg import config, realfiles, relPath, absPath, tags, constants, database
+
+import omg.database.queries as queries
+from omg.models import rootedtreemodel
+
 
 db = omg.database.get()
 logger = logging.getLogger('gopulate')
 
-def finalize(album):
+FIND_DISC_RE=r" ?[([]?(?:cd|disc|part|teil|disk|vol)\.? ?([iI0-9]+)[)\]]?"
+
+def finalize(album, metaContainer = False):
     if album.isFile():
         return
     album.contents.sort(key=lambda x : x.getPosition())
-    album.updateSameTags()
-    album.tags['title'] = album.contents[0].tags['album']
+    album.updateSameTags(metaContainer)
+    if not metaContainer:
+        album.tags[tags.TITLE] = album.contents[0].tags[tags.ALBUM]
 
 def findAlbumsInDirectory(path, onlyNewFiles = True):
+    if not path:
+        return []
     ignored_albums=[]
     albumsInThisDirectory = {} # name->container map
     existingAlbumsInThisDirectory = {} #id->container map
@@ -68,28 +75,73 @@ def findAlbumsInDirectory(path, onlyNewFiles = True):
                 continue
             t = realfile.tags
             elem = omg.models.File(id = None, path = filename, tags=t, length=realfile.length)
-        if "album" in t:
-            album = t["album"][0]
+        if tags.ALBUM in t:
+            album = t[tags.ALBUM][0]
+            if "discnumber" in t:
+                album += "####••••{}".format(t["discnumber"][0])
             if not album in albumsInThisDirectory:
                 albumsInThisDirectory[album] = omg.models.Container(id = None)
             elem.parent = albumsInThisDirectory[album]
             albumsInThisDirectory[album].contents.append(elem)
             if "tracknumber" in t:
                 trkn = int(t["tracknumber"][0].split("/")[0]) # support 02/15 style
-                elem.position=trkn
+                elem.setPosition(trkn)
             else:
-                elem.position=0
-        elif "title" in t:
-            album = t["title"][0]
+                elem.setPosition(0)
+        elif tags.TITLE in t:
+            album = t[tags.TITLE][0]
             albumsInThisDirectory[album] = elem
         else:
             album = filename
             albumsInThisDirectory[album] = elem
         
     
-    for al in albumsInThisDirectory.values():
-        finalize(al)
-    return albumsInThisDirectory.values()
+    for album in albumsInThisDirectory.values():
+        finalize(album)
+    
+    finalDictionary = {}
+    for name, album in albumsInThisDirectory.items():
+        discnumber = None
+        crazySplit = name.split("####••••")
+        if len(crazySplit) == 2:
+            discnumber = int(crazySplit[1].split("/")[0])
+        discstring = re.findall(FIND_DISC_RE,album.tags["album"][0],flags=re.IGNORECASE)
+        if len(discstring) > 0 and discnumber==None:
+            discnumber = discstring[0]
+            if discnumber.lower().startswith("i"): #roman number, support I-III :)
+                discnumber = len(discnumber)
+        if discnumber!= None:
+            album.tags["discnumber"] = [ discnumber ]
+            print("Part of Multi-Disc container:")
+            discname_reduced = re.sub(FIND_DISC_RE,"",album.tags["title"][0],flags=re.IGNORECASE)
+            if discname_reduced in finalDictionary:
+                metaContainer = finalDictionary[discname_reduced]
+            else:
+                discname_id = tags.TITLE.getValueId(discname_reduced, insert = False)
+                if discname_id is not None:
+                    album_id = database.get().query('SELECT element_id FROM tags WHERE tag_id=? and value_id= ?',
+                                                    tags.TITLE.id, discname_id).getSingle()
+                else:
+                    album_id = None
+                metaContainer = omg.models.Container(id = album_id)
+                if metaContainer.isInDB():
+                    print("existing found {}".format(metaContainer))
+                finalDictionary[discname_reduced] = metaContainer
+                metaContainer.loadTags()
+                print(metaContainer.tags)
+                if not metaContainer.isInDB():
+                    metaContainer.tags[tags.TITLE] = [discname_reduced]
+                    metaContainer.tags[tags.ALBUM] = [discname_reduced]
+            metaContainer.contents.append(album)
+            album.setParent(metaContainer)
+            album.setPosition(discnumber)
+        else:
+            finalDictionary[name] = album
+    
+    for album in set(finalDictionary.values()) - set(albumsInThisDirectory.values()):
+        finalize(album, True)
+        
+    return finalDictionary.values()
         
 def findNewAlbums(path):
     """Generator function which tries to find albums in the filesystem tree.
@@ -111,5 +163,7 @@ def longestSubstring(a, b):
     return a[result[0]:result[0]+result[2]]
     
 def calculateMergeHint(indices):
-    return reduce(longestSubstring, ( ind.internalPointer().tags.getFormatted(tags.get("title")) for ind in indices )).strip(":- ")
+    return reduce(longestSubstring,
+                   ( ind.internalPointer().tags.getFormatted(tags.get("title")) for ind in indices )
+                 ).strip(constants.FILL_CHARACTERS)
     

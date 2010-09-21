@@ -186,6 +186,7 @@ class Element(Node):
     tags = None # tags.Storage to store the tags. None until they are loaded
     position = None
     length = None
+    changesPending = False #if changes were made to the element that have not yet been commited (valid only for DB-elements)
     
     def __init__(self):
         raise RuntimeError(
@@ -224,6 +225,8 @@ class Element(Node):
                 self.tags[tag].append(value)
         elif self.isFile():
             self.readTagsFromFilesystem()
+        else:
+            self.tags = tags.Storage()
             
         if recursive:
             for element in self.getChildren():
@@ -242,7 +245,7 @@ class Element(Node):
            For elements outside the DB, you have to take care of self.position directly."""
         if not self.isInDB():
             return self.position
-        if self.position and not refresh:
+        if (self.position != None) and not refresh:
             return self.position
         else:
             # Without parent, there can't be a position
@@ -251,6 +254,11 @@ class Element(Node):
             self.position = db.query("SELECT position FROM contents WHERE container_id = ? AND element_id = ?", 
                                  self.parent.id,self.id).getSingle()
             return self.position
+    
+    def setPosition(self, position):
+        if position != self.position:
+            self.position = position
+            self.changesPending = True
         
     def getParentIds(self,recursive):
         """Return a list containing the ids of all parents of this element from the database. If <recursive> is True all ancestors will be added recursively."""
@@ -337,6 +345,10 @@ class Element(Node):
             queries.delFile(id = self.id)
         else:
             queries.delContainer(self.id)
+        if isinstance(self.parent, Element):
+            self.parent.changesPending = True
+        self.parent.contents.remove(self)
+        self.id = None
             
     # Misc
     #====================================================
@@ -357,6 +369,9 @@ class Element(Node):
     
 
 class Container(Element):
+    
+    contents = None
+    
     """Element-subclass for containers."""
     def __init__(self,id=None,tags=None,contents=None):
         """Initialize this element with the given id, which must be an integer or None (for external containers). Optionally you may specify a tags.Storage object holding the tags of this element and/or a list of contents. Note that the list won't be copied but the parents will be changed to this container."""
@@ -405,19 +420,26 @@ class Container(Element):
     def commit(self, toplevel = False):
         """Commit this container into the database"""
         logger.debug("commiting container {}".format(self))
-        if not self.isInDB():
+        wasInDB = self.isInDB()
+        if not wasInDB:
             self.id = database.queries.addContainer(
                             "spast", tags = self.tags, file = False, elements = len(self.contents), toplevel = toplevel)
+        else:
+            database.queries.delContents(self.id)
         for elem in self.contents:
-            wasInDB = elem.isInDB()
             elem.commit()
-            if not wasInDB:
-                database.queries.addContent(self.id, elem.getPosition(), elem.id)
+            database.queries.addContent(self.id, elem.getPosition(), elem.id)
+        if wasInDB:
+            database.queries.updateElementCounter(self.id)
+        self.changesPending = False
 
     
-    def updateSameTags(self):
+    def updateSameTags(self, metaContainer = False):
         """Sets the tags of this element to be exactly those which are the same for all contents."""
-        self.commonTags = set(x for x in reduce(lambda x,y: x & y, [set(tr.tags.keys()) for tr in self.contents]) if x.name not in tags.TOTALLY_IGNORED_TAGS)
+        self.commonTags = set(x for x in reduce(lambda x,y: x & y, [set(tr.tags.keys()) for tr in self.contents]) \
+                              if (x.name not in tags.TOTALLY_IGNORED_TAGS))
+        if metaContainer:
+            self.commonTags = self.commonTags - {tags.TITLE, tags.ALBUM}
         self.commonTagValues = {}
         differentTags=set()
         for file in self.contents:
@@ -428,9 +450,13 @@ class Container(Element):
                 if self.commonTagValues[tag] != t[tag]:
                     differentTags.add(tag)
         self.sameTags = self.commonTags - differentTags
-        self.tags = tags.Storage()
+        newTags = tags.Storage()
         for tag in self.sameTags:
-            self.tags[tag] = self.commonTagValues[tag]
+            newTags[tag] = self.commonTagValues[tag]
+        if self.tags:
+            self.tags.merge(newTags)
+        else:
+            self.tags = newTags
             
 class File(Element):
     def __init__(self, id = None, tags = None, length = None, path = None):
@@ -467,6 +493,8 @@ class File(Element):
             real.read()
         except realfiles.ReadTagError as e:
             logger.warning("Failed to read tags from file {}: {}".format(self.path, str(e)))
+        if self.tags != real.tags:
+            self.changesPending = True
         self.tags = real.tags
         self.length = real.length
     
@@ -526,6 +554,7 @@ class File(Element):
         if not hasattr(self, "hash"):
             self.computeHash()
         db.query(querytext, self.id, relPath(self.path), self.hash, int(self.length))
+        self.changesPending = False
 
 def createElement(id,tags=None,contents=None,file=None):
     """Create an element with the given id, tags and contents. Depending on <file> an instance of Container or of File will be created. If <file> is None, the file-flag (elements.file) will be read from the database. Note that contents will be ignored if a File-instance is created."""

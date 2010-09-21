@@ -64,7 +64,7 @@ class BasicPlaylist(rootedtreemodel.RootedTreeModel):
 
         if column > 0:
             return False
-            
+        
         # Get the contents out of MimeData
         if mimeData.hasFormat(config.get("gui","mime")):
             contents = [node.copy() for node in mimeData.retrieveData(config.get("gui","mime"))]

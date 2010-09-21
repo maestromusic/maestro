@@ -40,6 +40,10 @@ def addContent(containerId, i, contentId):
     The file with given contentId will be the i-th element of the container with containerId. May throw
     an exception if this container already has an element with the given fileId."""
     database.get().query('INSERT INTO contents VALUES(?,?,?);', containerId, i, contentId)
+
+def delContents(containerId):
+    """Deletes all contents relations where containerId is the parent."""
+    database.get().query("DELETE FROM contents WHERE container_id=?;", containerId) 
     
 def addTag(cid, tag, value):
     """Add an entry 'tag=value' into the tags-table."""
@@ -52,11 +56,11 @@ def setTags(cid, tags, append=False):
     given ones will be added. This function will not check for duplicates in that case."""
     
     db = database.get()
-    existingTags = db.query("SELECT * FROM tags WHERE 'element_id'=?;", cid)
+    existingTags = db.query("SELECT * FROM tags WHERE element_id=?;", cid)
     
     if len(existingTags) > 0 and not append:
         logger.warning("Deleting existing tags from container {0}".format(cid))
-        db.query("DELETE FROM tags WHERE 'element_id'=?;", cid)
+        db.query("DELETE FROM tags WHERE element_id=?;", cid)
     
     for tag in tags.keys():
         if tag.isIndexed():
@@ -101,3 +105,7 @@ def delFile(path=None,hash=None,id=None):
         return delContainer(idFromHash(path))
     else:
         raise ValueError("One of the arguments must be set.")
+
+def updateElementCounter(containerId):
+    """Sets the element conuter of given containerId to the correct number."""
+    database.get().query('UPDATE elements SET elements = (SELECT COUNT(*) FROM contents WHERE container_id = ?)', containerId)

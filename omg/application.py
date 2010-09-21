@@ -86,6 +86,14 @@ class OmgMainWindow(QtGui.QMainWindow):
         fb.searchDirectoryChanged.connect(gm.setSearchDirectory)
         self.addDockWidget(Qt.RightDockWidgetArea, fbDock)
         
+        depotModel = omg.gopulate.models.GopulateTreeModel(None)
+        depotWidget = omg.gopulate.gui.GopulateTreeWidget()
+        depotWidget.setModel(depotModel)
+        depotDock = QtGui.QDockWidget()
+        depotDock.setWindowTitle("container depot")
+        depotDock.setWidget(depotWidget)
+        self.addDockWidget(Qt.BottomDockWidgetArea, depotDock) 
+        
         self.setCentralWidget(central)
         control.synchronizePlaylist(playlist.getModel())
         

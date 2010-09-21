@@ -113,14 +113,8 @@ class IndexedTag(Tag):
         
         db = database.get()
         tableName = "tag_" + self.name
-        if self.type=="date": #translate date into a format that MySQL likes
-            if len(value)==4: # only year is given
-                value="{0}-00-00".format(value)
-            elif len(value)==2: # year in 2-digit form
-                if value[0] < 7:
-                    value="20{0}-00-00".format(value)
-                else:
-                    value="19{0}-00-00".format(value)
+        if self.type == "date":
+            value = value.SQLformat()
         valueId = db.query("SELECT id FROM " + tableName + " WHERE value = ?", value).getSingle()
         if insert and not valueId:
             valueId = db.query("INSERT INTO tag_{0} (value) VALUES(?);".format(self.name), value).insertId()

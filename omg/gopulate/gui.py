@@ -8,160 +8,20 @@
 
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
-import os.path
-import omg.models
-from omg import tags, constants, config
+import logging
+
 from . import calculateMergeHint
+from omg.gui.delegates import GopulateDelegate
+from omg.models import Element
 
-def tagIcon(tag):
-    path = os.path.join(constants.IMAGES, "icons", "tag_{}.png".format(tag.name))
-    if os.path.exists(path):
-            return path
-    return None
+logger = logging.getLogger("gopulate.gui")
 
-class SuperNewDelegate(QtGui.QStyledItemDelegate):
-    hMargin = 2
-    vMargin = 1
-    vItemSpace = 4
-    hItemSpace = 4
-    
-    def __init__(self, parent = None):
-        QtGui.QStyledItemDelegate.__init__(self,parent)
-        self.iconSize = int(config.get("gui", "iconsize"))
-        self.iconRect = QtCore.QRect(0, 0, self.iconSize, self.iconSize)
-        self.font = QtGui.QFont()
-    
-    def formatTagValues(self, values):
-        return " • ".join((str(x) for x in values))
-    
-    def paint(self,painter,option,index):
-        """Reimplemented function from QStyledItemDelegate"""
-        if not isinstance(index.internalPointer(), omg.models.Element):
-            return QtGui.QStyledItemDelegate.paint(self, painter, option, index)
-        else:
-            return self.layout(painter, option, index)
-        
-    def layout(self, painter, option, index):
-        """This is the central function of the delegate for painting and size calculation.
-        
-        If painter is None, only the size hint is calculated and returned. Otherwise, everything
-        is painted with the given painter object."""
-        
-        elem = index.internalPointer()
-        
-        # —————— initialize painter ——————
-        if painter:
-            painter.save()
-            QtGui.QApplication.style().drawControl(QtGui.QStyle.CE_ItemViewItem,option,painter)
-            option = QtGui.QStyleOptionViewItemV4(option)
-            rect = QtCore.QRect(0,0,option.rect.width()-2*self.hMargin,option.rect.height()-2*self.vMargin)
-            # Paint data
-            painter.translate(option.rect.left()+self.hMargin,option.rect.top()+self.vMargin)
-            
-            if not elem.isInDB():
-                painter.setOpacity(0.75) # visualize non-db items by transparency
-            
-        else:
-                width = 0
-                height = 0
-
-        # ——————— calculate space for position number and color marker ———————
-        if elem.getPosition():
-            self.font.setBold(True)
-            positionSize = QtGui.QFontMetrics(self.font).size(Qt.TextSingleLine, str(elem.getPosition()))
-            tagRenderStartX = positionSize.width() + 2*self.hItemSpace
-            self.font.setBold(False)
-        else: # no space for position needed if it is None, only a small margin for the color indicator
-            tagRenderStartX = 2*self.hItemSpace
-        if painter:
-            rect.setLeft(rect.left() + tagRenderStartX)
-
-        # ——————— paint/calculate the title ———————            
-        if tags.TITLE in elem.tags:
-            if elem.isContainer():
-                self.font.setBold(True)
-            self.font.setItalic(True)
-            if painter:
-                painter.setFont(self.font)
-                boundingRect = painter.drawText(rect, Qt.TextSingleLine, self.formatTagValues(elem.tags[tags.TITLE]))
-                rect.translate(0, boundingRect.height() + self.vItemSpace)
-            else:
-                fSize = QtGui.QFontMetrics(self.font).size(Qt.TextSingleLine, self.formatTagValues(elem.tags[tags.TITLE]))
-                width = max(width, fSize.width())
-                height += fSize.height() + self.hItemSpace
-            
-            self.font.setBold(False)
-            self.font.setItalic(False)
-            if painter:
-                painter.setFont(self.font)
-        
-        # ——————— now, paint/calculate all other tags ———————
-        tagorder = [t for t in tags.tagList if t in elem.tags]
-        for t in tagorder:
-            data = elem.tags[t]
-            if t == tags.TITLE or (t == tags.ALBUM and elem.isAlbum()):
-                continue
-            if isinstance(elem.parent, omg.models.Element) and t in elem.parent.tags and data == elem.parent.tags[t]:
-                continue
-            
-            iconPath = tagIcon(t)
-            if iconPath:
-                if painter:
-                    img = QtGui.QImage(iconPath)
-                    painter.drawImage(rect.topLeft(), img.scaled(self.iconRect.size()))
-                    rect.setLeft(rect.left()+ self.iconSize + self.vItemSpace)
-                else:
-                    widthSoFar = self.iconSize + self.hItemSpace
-            else:
-                if painter:
-                    boundingRect = painter.drawText(rect, Qt.TextSingleLine, "{}: ".format(t.name))
-                    rect.setLeft(rect.left() + boundingRect.width() + self.hItemSpace)
-                else:
-                    fSize = QtGui.QFontMetrics(self.font).size(Qt.TextSingleLine, "{}: ".format(t.name))
-                    widthSoFar = fSize.width() + self.hItemSpace
-            if painter:
-                painter.drawText(rect, Qt.TextSingleLine, self.formatTagValues(data))
-                rect.translate(0, self.iconSize + self.vItemSpace)
-                rect.setLeft(tagRenderStartX)
-            else:
-                fSize = QtGui.QFontMetrics(self.font).size(Qt.TextSingleLine, self.formatTagValues(data))
-                width = max(width, fSize.width() + widthSoFar)
-                height += self.iconSize + self.vItemSpace
-        
-        # ——————— paint the element position and color marker ————————
-        if painter:
-            if elem.isAlbum():
-                painter.fillRect(0, 0, tagRenderStartX, rect.height(), Qt.cyan)
-            elif not elem.isFile():
-                painter.fillRect(0, 0, tagRenderStartX, rect.height(), Qt.magenta)
-            if elem.getPosition():
-                self.font.setBold(True)
-                painter.setFont(self.font)
-                rect.setLeft(int((tagRenderStartX-positionSize.width())/2))
-                rect.setTop(int((rect.height() -positionSize.height())/2))
-                painter.drawText(rect, Qt.TextSingleLine, str(elem.getPosition()))
-                self.font.setBold(False)
-                painter.setFont(self.font)
-            painter.restore()
-        else:
-            return QtCore.QSize(width + tagRenderStartX, height)
-    
-    def sizeHint(self, option, index):
-        """Reimplemented function from QStyledItemDelegate"""
-        
-        if not isinstance(index.internalPointer(), omg.models.Element):
-            return QtGui.QStyledItemDelegate.sizeHint(self, option, index)
-        else:
-            size = self.layout(None, option, index)
-            return size
-
-
-class GopulatTreeWidget(QtGui.QTreeView):
+class GopulateTreeWidget(QtGui.QTreeView):
     """Suitable to display a GopulateTreeModel"""
     
     def __init__(self, parent = None):
         QtGui.QTreeView.__init__(self, parent)
-        self.setItemDelegate(SuperNewDelegate())
+        self.setItemDelegate(GopulateDelegate())
         self.setAlternatingRowColors(True)
         self.setContextMenuPolicy(Qt.DefaultContextMenu)
         self.setSelectionMode(self.ExtendedSelection)
@@ -170,27 +30,77 @@ class GopulatTreeWidget(QtGui.QTreeView):
         self.setDropIndicatorShown(True)
         self.setDefaultDropAction(Qt.MoveAction)
         self.mergeAction = QtGui.QAction("merge", self)
-        self.mergeAction.triggered.connect(self._handleMerge)
+        self.mergeAction.triggered.connect(self._mergeSelected)
+        
+        self.commitAction = QtGui.QAction("commit", self)
+        self.commitAction.triggered.connect(self._commitSelected)
+        
+        self.deleteAction = QtGui.QAction("delete from DB", self)
+        self.deleteAction.triggered.connect(self._deleteSelected)
 
     def contextMenuEvent(self, event):
         if self.selectionModel().hasSelection():
             menu = QtGui.QMenu(self)
-            menu.addAction(self.mergeAction)
-            menu.popup(event.globalPos())
-        print(self.size())
+            if len(set(i.parent() for i in self.selectedIndexes())) == 1: # merge only valid if all indices share the same parent
+                menu.addAction(self.mergeAction)
+                menu.addAction(self.commitAction)
+            if any((i.internalPointer().isInDB() for i in self.selectedIndexes())):
+                menu.addAction(self.deleteAction)
+            
+            if not menu.isEmpty(): 
+                menu.popup(event.globalPos())
+            else:
+                del menu
+    
+    def removeSelected(self):
+        while len(self.selectedIndexes()) > 0:
+            self.model().removeByQtIndex(self.selectedIndexes()[0])       
         
+    def keyReleaseEvent(self,keyEvent):
+        if keyEvent.key() == Qt.Key_Delete:
+            self.removeSelected()
+    
+    def wheelEvent(self, wheelEvent):
+        if QtGui.QApplication.keyboardModifiers() & Qt.AltModifier:
+            index = self.indexAt(wheelEvent.pos())
+            elem = index.internalPointer()
+            if elem.getPosition():
+                if wheelEvent.delta() > 0:
+                    elem.setPosition(elem.getPosition()+1)
+                elif elem.getPosition() > 1:
+                    elem.setPosition(elem.getPosition()-1)
+            self.model().dataChanged.emit(index, index)
+            
+            wheelEvent.accept()
+        else:
+            QtGui.QTreeView.wheelEvent(self, wheelEvent) 
     
     def setModel(self, model):
         QtGui.QTreeView.setModel(self, model)
         model.modelReset.connect(self.expandAll)
         self.expandAll()
     
-    def _handleMerge(self):
+    def _mergeSelected(self):
         indices = self.selectionModel().selectedIndexes()
         hint = calculateMergeHint(indices)
         title,flag = QtGui.QInputDialog.getText(self, "merge elements", "Name of new subcontainer:", text = hint)
         if flag:
             self.model().merge(self.selectionModel().selectedIndexes(), title)
+    
+    def _commitSelected(self):
+        for i in self.selectionModel().selectedIndexes():
+            i.internalPointer().commit(toplevel = not isinstance(i.parent().internalPointer(), Element))
+    
+    def _deleteSelected(self):
+        indices = self.selectedIndexes()
+        indicesToDelete = set()
+        implicitlyDeleted = set()
+        for ind in indices:
+            if ind.internalPointer().isInDB() and not ind.parent() in indices:
+                indicesToDelete.add(ind)
+        for i in indicesToDelete:
+            i.internalPointer().delete()
+        self.model().reset()
         
 class GopulateWidget(QtGui.QWidget):
     """GopulateWidget consists of a GopulateTreeModel and buttons to control the populate process."""
@@ -200,9 +110,9 @@ class GopulateWidget(QtGui.QWidget):
     def __init__(self, model):
         QtGui.QWidget.__init__(self)
         self.dirLabel = QtGui.QLabel()
-        self.tree = GopulatTreeWidget()
+        self.tree = GopulateTreeWidget()
         self.tree.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
-        model.modelReset.connect(self._updateLabel)
+        model.searchDirectoryChanged.connect(self.dirLabel.setText)
         
         self.accept = QtGui.QPushButton('accept')
         self.accept.pressed.connect(self._handleAcceptPressed)
@@ -225,11 +135,7 @@ class GopulateWidget(QtGui.QWidget):
         
         self.tree.setModel(model)
         self.tree.setHeaderHidden(True)
-        self._updateLabel()
-        
-    def _updateLabel(self):
-        if self.tree.model().root:
-            self.dirLabel.setText(self.tree.model().root.path)
+        self.dirLabel.setText(model.searchdir)
     
     def _handleAcceptPressed(self):
         self.accept.setText("calculating audio hashes...")

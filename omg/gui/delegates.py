@@ -7,8 +7,10 @@
 # published by the Free Software Foundation
 #
 from PyQt4 import QtCore,QtGui
+from PyQt4.QtCore import Qt
+import os.path
 
-from omg import strutils, tags, config, covers, models
+from omg import strutils, tags, config, covers, models, constants
 from omg.models import playlist,browser
 from . import abstractdelegate, formatter
 
@@ -121,3 +123,162 @@ class BrowserDelegate(abstractdelegate.AbstractDelegate):
         elif isinstance(node,browser.ValueNode) and tag in node.valueIds:
             return [node.value]
         else: return []
+        
+
+def tagIcon(tag):
+    """Given a tag, return the path of an appropriate icon, or None if none exists."""
+    
+    path = os.path.join(constants.IMAGES, "icons", "tag_{}.png".format(tag.name))
+    if os.path.exists(path):
+            return path
+    return None
+
+  
+class GopulateDelegate(QtGui.QStyledItemDelegate):
+    """A delegate useful for databaes manipulation. Shows lots of information."""
+    
+    hMargin = 2
+    vMargin = 1
+    vItemSpace = 4
+    hItemSpace = 4
+    
+    def __init__(self, parent = None):
+        QtGui.QStyledItemDelegate.__init__(self,parent)
+        self.iconSize = int(config.get("gui", "iconsize"))
+        self.iconRect = QtCore.QRect(0, 0, self.iconSize, self.iconSize)
+        self.font = QtGui.QFont()
+    
+    def formatTagValues(self, values):
+        return " • ".join((str(x) for x in values))
+    
+    def paint(self,painter,option,index):
+        """Reimplemented function from QStyledItemDelegate"""
+        if not isinstance(index.internalPointer(), models.Element):
+            return QtGui.QStyledItemDelegate.paint(self, painter, option, index)
+        else:
+            return self.layout(painter, option, index)
+        
+    def layout(self, painter, option, index):
+        """This is the central function of the delegate for painting and size calculation.
+        
+        If painter is None, only the size hint is calculated and returned. Otherwise, everything
+        is painted with the given painter object."""
+        
+        elem = index.internalPointer()
+        
+        # —————— initialize painter ——————
+        if painter:
+            painter.save()
+            QtGui.QApplication.style().drawControl(QtGui.QStyle.CE_ItemViewItem,option,painter)
+            option = QtGui.QStyleOptionViewItemV4(option)
+            rect = QtCore.QRect(0,0,option.rect.width()-2*self.hMargin,option.rect.height()-2*self.vMargin)
+            # Paint data
+            painter.translate(option.rect.left()+self.hMargin,option.rect.top()+self.vMargin)
+            
+            if not elem.isInDB():
+                painter.setOpacity(0.6) # visualize non-db items by transparency
+            
+        else:
+                width = 0
+                height = 0
+
+        # ——————— calculate space for position number and color marker ———————
+        if elem.getPosition():
+            self.font.setBold(True)
+            positionSize = QtGui.QFontMetrics(self.font).size(Qt.TextSingleLine, str(elem.getPosition()))
+            tagRenderStartX = positionSize.width() + 2*self.hItemSpace
+            self.font.setBold(False)
+        else: # no space for position needed if it is None, only a small margin for the color indicator
+            tagRenderStartX = 2*self.hItemSpace
+        if painter:
+            rect.setLeft(rect.left() + tagRenderStartX)
+
+        # ——————— paint/calculate the title ———————            
+        if elem.isContainer():
+            self.font.setBold(True)
+        self.font.setItalic(True)
+        if tags.TITLE in elem.tags:
+            titleToDraw = self.formatTagValues(elem.tags[tags.TITLE])
+        else:
+            titleToDraw = "<notitle>"
+        if elem.isInDB():
+            titleToDraw += " [{}]".format(elem.id)
+        if painter:
+            painter.setFont(self.font)
+            boundingRect = painter.drawText(rect, Qt.TextSingleLine, titleToDraw)
+            rect.translate(0, boundingRect.height() + self.vItemSpace)
+        else:
+            fSize = QtGui.QFontMetrics(self.font).size(Qt.TextSingleLine, titleToDraw)
+            width = max(width, fSize.width())
+            height += fSize.height() + self.hItemSpace
+            
+            self.font.setBold(False)
+            self.font.setItalic(False)
+            if painter:
+                painter.setFont(self.font)
+        
+        # ——————— now, paint/calculate all other tags ———————
+        tagorder = [t for t in tags.tagList if t in elem.tags]
+        for t in tagorder:
+            data = elem.tags[t]
+            if t == tags.TITLE or (t == tags.ALBUM and elem.isAlbum()):
+                continue
+            if isinstance(elem.parent, models.Element) and t in elem.parent.tags and data == elem.parent.tags[t]:
+                continue
+            
+            iconPath = tagIcon(t)
+            if iconPath:
+                if painter:
+                    img = QtGui.QImage(iconPath)
+                    painter.drawImage(rect.topLeft(), img.scaled(self.iconRect.size()))
+                    rect.setLeft(rect.left()+ self.iconSize + self.vItemSpace)
+                else:
+                    widthSoFar = self.iconSize + self.hItemSpace
+            else:
+                if painter:
+                    boundingRect = painter.drawText(rect, Qt.TextSingleLine, "{}: ".format(t.name))
+                    rect.setLeft(rect.left() + boundingRect.width() + self.hItemSpace)
+                else:
+                    fSize = QtGui.QFontMetrics(self.font).size(Qt.TextSingleLine, "{}: ".format(t.name))
+                    widthSoFar = fSize.width() + self.hItemSpace
+            if painter:
+                painter.drawText(rect, Qt.TextSingleLine, self.formatTagValues(data))
+                rect.translate(0, self.iconSize + self.vItemSpace)
+                rect.setLeft(tagRenderStartX)
+            else:
+                fSize = QtGui.QFontMetrics(self.font).size(Qt.TextSingleLine, self.formatTagValues(data))
+                width = max(width, fSize.width() + widthSoFar)
+                height += self.iconSize + self.vItemSpace
+        
+        # ——————— paint the element position and color marker ————————
+        if painter:
+            if elem.changesPending and elem.isInDB():
+                painter.setPen(Qt.red)
+            if elem.isAlbum():
+                painter.fillRect(0, 0, tagRenderStartX, rect.height(), Qt.cyan)
+            elif not elem.isFile():
+                painter.fillRect(0, 0, tagRenderStartX, rect.height(), Qt.magenta)
+            if elem.getPosition():
+                self.font.setBold(True)
+                painter.setFont(self.font)
+                rect.setLeft(int((tagRenderStartX-positionSize.width())/2))
+                rect.setTop(int((rect.height() -positionSize.height())/2))        
+                painter.drawText(rect, Qt.TextSingleLine, str(elem.getPosition()))
+                self.font.setBold(False)
+                painter.setFont(self.font)
+            else:
+                if elem.changesPending and elem.isInDB():
+                    painter.fillRect(0, 0, tagRenderStartX, rect.height()//4, Qt.red)
+            painter.setPen(Qt.black)
+            painter.restore()
+        else:
+            return QtCore.QSize(width + tagRenderStartX, height)
+    
+    def sizeHint(self, option, index):
+        """Reimplemented function from QStyledItemDelegate"""
+        
+        if not isinstance(index.internalPointer(), models.Element):
+            return QtGui.QStyledItemDelegate.sizeHint(self, option, index)
+        else:
+            size = self.layout(None, option, index)
+            return size

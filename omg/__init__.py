@@ -29,8 +29,10 @@ def getIcon(name):
 
 
 class FlexiDate:
-    
+    """A FlexiDate is a date which may be only a year, or a year and a month, or a year+month+day."""
+     
     def __init__(self, year, month = None, day = None):
+        """For unspecified month or day, you may pass None or 0, which will be converted to None.""" 
         self.year = year
         if month == 0:
             self.month = None
@@ -43,9 +45,14 @@ class FlexiDate:
     
     @staticmethod
     def strptime(string):
+        """Parse FlexiDates from Strings like YYYY-mm-dd or YYYY-mm or YYYY."""
         return FlexiDate(*map(int,string.split("-")))
     
-    def strftime(self, format = ["{Y:04d}-{m:02d}-{d:02d}", "{Y:04d}-{m:02d}", "{Y:04d}"]):
+    def strftime(self, format = ("{Y:04d}-{m:02d}-{d:02d}", "{Y:04d}-{m:02d}", "{Y:04d}")):
+        """Format the FlexiDate according to the given format. Format must be a 3-tuple of
+        format strings, where the first one if used if year, month and day are specified,
+        the second one is used if only the day misses, and the third one is used if there
+        is only a year. The format strings are python format strings, where Y=year, m=month, d=day."""
         if self.month:
             if self.day:
                 format = format[0]
@@ -55,6 +62,12 @@ class FlexiDate:
             format = format[2]
         return format.format(Y=self.year, m=self.month, d=self.day)
     
+    def SQLformat(self):
+        """Format the FlexiDate in a way that is suitable for MySQL."""
+        return "{}-{}-{}".format(self.year, self.month or 0, self.day or 0)
     def __str__(self):
         return self.strftime()
+    
+    def __eq__(self, other):
+        return self.year == other.year and self.month == other.month and self.day == other.day
         
