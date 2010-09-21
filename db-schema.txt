@@ -6,7 +6,7 @@ elements  | SMALLINT UNSIGNED NOT NULL DEFAULT(0)      | anzahl elemente (bei da
 ------------------------------------------------------------------------------------
 Semantik: Jeder container (datei \in {container}) erhält eine eind. ID, evt. einen
 Namen und die gecachte Anzahl der Elemente
-CREATE TABLE containers (
+CREATE TABLE elements (
     id MEDIUMINT UNSIGNED NOT NULL AUTO_INCREMENT,
     name VARCHAR(256) NOT NULL,
     elements SMALLINT UNSIGNED NOT NULL DEFAULT 0,
