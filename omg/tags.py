@@ -16,7 +16,7 @@ This module provides methods to initialize the tag lists based on the database, 
 - To iterate over all indexed tags use tagList.
 - You may create tags simply via the constructors of IndexedTag or OtherTag. But in case of indexed tags the get-method translates automatically from tag-ids to tag-names and vice versa and it doesn't create new instances and in the other case it does just the same job as the OtherTag-constructor, so you are usually better off using that method.
 """
-from collections import defaultdict
+from collections import Sequence
 from omg import database, config, FlexiDate
 import logging, datetime
 
@@ -207,23 +207,54 @@ def init():
     DATE = _tagsByName[config.get("tags","date_tag")]
 
 
-class Storage(defaultdict):
-    """Dictionary subclass used to store tags. As a container may have several values for the same tag, Storage maps tags to lists of values. Storage adds a few useful functions to deal with such datastructures and modifies dict in two ways:
-    - Storage will not raise a KeyError if it does not contain a tag but return an empty list instead. This is useful as in most cases the functions dealing with tag lists will just skip an empty list.
-    - 'tag in storage' will return true if and only if 'storage[tag]' will return a list of at least one element.
-    """
-    def __init__(self,*args):
-        """Initialize a Storage-instance from the given arguments (confer the constructor of dict)."""
-        defaultdict.__init__(self,list,*args)
+class TagValueList(list):
+    """List to store tags in a Storage-object. The only difference to a usual python list is that a TagValueList stores a reference to the Storage-object and will notify the storage if the list is empty. The storage will then remove the list."""
+    def __init__(self,storage,aList=None):
+        list.__init__(self,aList if aList is not None else [])
+        self.storage = storage
     
-    # Since the constructor's signature differs from the one in the baseclass, we have to overwrite copy (see Modules/_collectionsmodule.c in the Python source.)
-    def copy(self):
-        return Storage(self)
+    def __setitem__(self,key):
+        list.__setitem__(self,key)
         
+    def __delitem__(self,key):
+        list.__delitem__(self,key)
+        if len(self) == 0:
+            self.storage._removeList(self)
+
+
+class Storage(dict):
+    """"Dictionary subclass used to store tags. As an element may have several values for the same tag, Storage maps tags to lists of tag-values. The class ensures that an instance never contains an empty list and adds a few useful functions to deal with such datastructures."""
+    def __init__(self,*args):
+        dict.__init__(self,*args)
+    
+    def __setitem__(self,key,value):
+        assert isinstance(value,Sequence) and not isinstance(value,str)
+        if len(value) == 0:
+            if key in self:
+                del self[key]
+            else: pass # I won't save an empty list
+        else: dict.__setitem__(self,key,TagValueList(self,value))
+    
+    def _removeList(self,list):
+        for key,value in self.items():
+            if value == list:
+                del self[key]
+                return
+                
+    def add(self,tag,*values):
+        """Add one or more values to the list of the given tag."""
+        if not isinstance(tag,Tag):
+            tag = get(tag)
+        if tag not in self:
+            self[tag] = values
+        else: self[tag].extend(values)
+
     def addUnique(self,tag,*values):
         """Add one or more values to the list of the given tag. If a value is already contained in the list, do not add it again."""
         if not isinstance(tag,Tag):
             tag = get(tag)
+        if tag not in self:
+            self[tag] = []
         for value in values:
             if value not in self[tag]:
                 self[tag].append(value)
@@ -248,33 +279,3 @@ class Storage(defaultdict):
         """Remove all values from <other> from this Storage. <other> may be another Storage-instance or a dict mapping tags to value-lists. If <other> contains tags and values which are not contained in this Storage, just skip them."""
         for tag,valueList in other.items():
             self.removeValues(tag,*valueList)
-    
-    def getFormatted(self, tag):
-        if not isinstance(tag, Tag):
-            tag = get(tag)
-        return ", ".join(self[tag])
-    
-    #TODO: das ist sehr bugfördernd, müssen wir uns was klügeres überlegen
-    def realKeys(self):
-        return (key for key in self.keys() if len(self[key]) > 0)
-        
-    def __contains__(self,key):
-        # Return false even if the key exists and has [] as value (which actually should not happen). If the key really does not exist, self[key] will also return [].
-        if not isinstance(key,Tag):
-            key = get(key)
-        return len(self[key]) > 0
-    
-    def __getitem__(self, key):
-        if not isinstance(key,Tag):
-            key = get(key)
-        return defaultdict.__getitem__(self, key)
-    
-    def __setitem__(self, key, value):
-        if not isinstance(key,Tag):
-            key = get(key)
-        return defaultdict.__setitem__(self, key, value)
-    
-    def __delitem__(self, key):
-        if not isinstance(key,Tag):
-            key = get(key)
-        return defaultdict.__delitem__(self, key)
