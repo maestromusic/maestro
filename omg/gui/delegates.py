@@ -165,6 +165,7 @@ class GopulateDelegate(QtGui.QStyledItemDelegate):
         is painted with the given painter object."""
         
         elem = index.internalPointer()
+        self.elem = elem
         
         # —————— initialize painter ——————
         if painter:
@@ -175,8 +176,8 @@ class GopulateDelegate(QtGui.QStyledItemDelegate):
             # Paint data
             painter.translate(option.rect.left()+self.hMargin,option.rect.top()+self.vMargin)
             
-            if not elem.isInDB():
-                painter.setOpacity(0.6) # visualize non-db items by transparency
+#            if not elem.isInDB():
+#                painter.setOpacity(0.6) # visualize non-db items by transparency
             
         else:
                 width = 0
@@ -254,10 +255,8 @@ class GopulateDelegate(QtGui.QStyledItemDelegate):
         if painter:
             if elem.changesPending and elem.isInDB():
                 painter.setPen(Qt.red)
-            if elem.isAlbum():
-                painter.fillRect(0, 0, tagRenderStartX, rect.height(), Qt.cyan)
-            elif not elem.isFile():
-                painter.fillRect(0, 0, tagRenderStartX, rect.height(), Qt.magenta)
+            if not elem.isInDB():
+                painter.fillRect(0, 0, tagRenderStartX, rect.height(), Qt.yellow)
             if elem.getPosition():
                 self.font.setBold(True)
                 painter.setFont(self.font)

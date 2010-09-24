@@ -128,6 +128,8 @@ class HTMLFormatter(Formatter):
             tagLines.append('{0}: {1}'.format(cgi.escape(str(tag)),cgi.escape(self.tag(tag))))
 
         lines.append("<br>".join(tagLines))
+        if self.element.isFile():
+            lines.append("<br>{}".format(self.element.getPath()))
         lines.append('</div>')
         if coverPath is not None:
             lines.append('</td></tr></table>')

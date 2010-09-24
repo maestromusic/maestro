@@ -192,9 +192,13 @@ class Element(Node):
         raise RuntimeError(
                 "Cannot instantiate abstract base class Element. Use Container, File or models.createElement.")
     
-    def isInDB(self):
-        """Return whether this element is contained in the database."""
-        return self.id is not None
+    def isInDB(self, recursive = False):
+        """Return whether this element is contained in the database. If recursive is True, only return True if
+        this element and all of its recursive children are in the database."""
+        if not recursive:
+            return self.id is not None
+        else:
+            return self.isInDB(False) and (self.isFile() or all((e.isInDB(True) for e in self.contents)))
         
     def copy(self,contents=None):
         """Reimplementation of Node.copy: In addition to contents the tags are also not copied by reference. Instead the copy will contain a copy of this node's tags.Storage-instance."""
@@ -373,12 +377,13 @@ class Container(Element):
     contents = None
     
     """Element-subclass for containers."""
-    def __init__(self,id=None,tags=None,contents=None):
+    def __init__(self,id=None,tags=None,contents=None, position = None):
         """Initialize this element with the given id, which must be an integer or None (for external containers). Optionally you may specify a tags.Storage object holding the tags of this element and/or a list of contents. Note that the list won't be copied but the parents will be changed to this container."""
         if id is not None and not isinstance(id,int):
             raise ValueError("id must be either None or an integer. I got {}".format(id))
         self.id = id
         self.tags = tags
+        self.position = position
         if contents is None:
             self.contents = []
         else: self.setContents(contents)
@@ -402,11 +407,11 @@ class Container(Element):
         if self.isInDB():
             additionalJoin = "JOIN elements ON elements.id = {}.id".format(table) if table != 'elements' else ''
             result = db.query("""
-                    SELECT contents.element_id,elements.file
+                    SELECT contents.element_id,contents.position,elements.file
                     FROM contents JOIN {0} ON contents.container_id = {1} AND contents.element_id = {0}.id {2}
                     ORDER BY contents.position
                     """.format(table,self.id,additionalJoin))
-            self.setContents([createElement(id,file=file) for id,file in result])
+            self.setContents([createElement(id,file=file,position=pos) for id,pos,file in result])
             
         if recursive:
             for element in self.contents:
@@ -428,7 +433,13 @@ class Container(Element):
             database.queries.delContents(self.id)
         for elem in self.contents:
             elem.commit()
-            database.queries.addContent(self.id, elem.getPosition(), elem.id)
+            try:
+                database.queries.addContent(self.id, elem.getPosition(), elem.id)
+            except database.sql.DBException as exc:
+                print(self.id)
+                print(elem.getPosition())
+                print(elem.id)
+                print(self.tags['title'])
         if wasInDB:
             database.queries.updateElementCounter(self.id)
         self.changesPending = False
@@ -459,13 +470,14 @@ class Container(Element):
             self.tags = newTags
             
 class File(Element):
-    def __init__(self, id = None, tags = None, length = None, path = None):
+    def __init__(self, id = None, tags = None, length = None, path = None, position = None):
         """Initialize this element with the given id, which must be an integer or None (for external files). Optionally you may specify a tags.Storage object holding the tags of this element and/or a file path."""
         if id is not None and not isinstance(id,int):
             raise ValueError("id must be either None or an integer. I got {}".format(id))
         self.id = id
         self.tags = tags
         self.length = length
+        self.position = position
         if path is not None and not isinstance(path,str):
             raise ValueError("path must be either None or a string. I got {}".format(id))
         self.path = path
@@ -556,12 +568,12 @@ class File(Element):
         db.query(querytext, self.id, relPath(self.path), self.hash, int(self.length))
         self.changesPending = False
 
-def createElement(id,tags=None,contents=None,file=None):
+def createElement(id,tags=None,contents=None,file=None, position=None):
     """Create an element with the given id, tags and contents. Depending on <file> an instance of Container or of File will be created. If <file> is None, the file-flag (elements.file) will be read from the database. Note that contents will be ignored if a File-instance is created."""
     if file is None:
         file = db.query("SELECT file FROM elements WHERE id=?",id).getSingle()
         if file is None:
             raise ValueError("There is no element with id {}".format(id))
     if file:
-        return File(id,tags=tags)
-    else: return Container(id,tags=tags,contents=contents)
+        return File(id,tags=tags, position = position)
+    else: return Container(id,tags=tags,contents=contents, position = position)

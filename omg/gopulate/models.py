@@ -25,6 +25,7 @@ db = database.get()
 class GopulateTreeModel(BasicPlaylist):
     
     searchDirectoryChanged = QtCore.pyqtSignal(str)
+    treeCreated = QtCore.pyqtSignal()
     #currentDirectoryChanged = QtCore.pyqtSignal(['QString'])
     
     def __init__(self, searchdirs):
@@ -59,6 +60,7 @@ class GopulateTreeModel(BasicPlaylist):
             el.parent = root
         self.setRoot(root)
         self.current = path
+        self.treeCreated.emit()
         
     def merge(self, indices, name):
         amount = len(indices)
@@ -82,7 +84,7 @@ class GopulateTreeModel(BasicPlaylist):
                 for i in range(len(item.tags["title"])):
                     item.tags["title"][i] = item.tags["title"][i].replace(name, "").\
                         strip(constants.FILL_CHARACTERS).\
-                        strip("0123456789").\
+                        lstrip("0123456789").\
                         strip(constants.FILL_CHARACTERS)
                 j = j + 1
             for oldItem in parent.contents[posItem.row()+1:]:

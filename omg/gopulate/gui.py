@@ -28,7 +28,7 @@ class GopulateTreeWidget(QtGui.QTreeView):
         self.setDragEnabled(True)
         self.setAcceptDrops(True)
         self.setDropIndicatorShown(True)
-        self.setDefaultDropAction(Qt.MoveAction)
+        #self.setDefaultDropAction(Qt.MoveAction)
         self.mergeAction = QtGui.QAction("merge", self)
         self.mergeAction.triggered.connect(self._mergeSelected)
         
@@ -75,10 +75,21 @@ class GopulateTreeWidget(QtGui.QTreeView):
         else:
             QtGui.QTreeView.wheelEvent(self, wheelEvent) 
     
+    def expandNotInDB(self, index = QtCore.QModelIndex()):
+        """expands all tree items that are not in the database, or contain children that ar not in the databaes. Collapse all other items."""
+        num = self.model().rowCount(index)
+        if index.isValid():
+            if index.internalPointer().isInDB(recursive = True):
+                self.collapse(index)
+            else:
+                self.expand(index)
+        for i in range(num):
+            self.expandNotInDB(self.model().index(i, 0, index))
+                
     def setModel(self, model):
         QtGui.QTreeView.setModel(self, model)
-        model.modelReset.connect(self.expandAll)
-        self.expandAll()
+        model.modelReset.connect(self.expandNotInDB)
+        self.expandNotInDB()
     
     def _mergeSelected(self):
         indices = self.selectionModel().selectedIndexes()

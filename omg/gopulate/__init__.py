@@ -105,15 +105,15 @@ def findAlbumsInDirectory(path, onlyNewFiles = True):
         crazySplit = name.split("####••••")
         if len(crazySplit) == 2:
             discnumber = int(crazySplit[1].split("/")[0])
-        discstring = re.findall(FIND_DISC_RE,album.tags["album"][0],flags=re.IGNORECASE)
+        discstring = re.findall(FIND_DISC_RE,album.tags[tags.ALBUM][0],flags=re.IGNORECASE)
         if len(discstring) > 0 and discnumber==None:
             discnumber = discstring[0]
             if discnumber.lower().startswith("i"): #roman number, support I-III :)
                 discnumber = len(discnumber)
         if discnumber!= None:
             album.tags["discnumber"] = [ discnumber ]
-            print("Part of Multi-Disc container:")
-            discname_reduced = re.sub(FIND_DISC_RE,"",album.tags["title"][0],flags=re.IGNORECASE)
+            logger.info("detected part of a multi-disc container '{}'".format(album.tags[tags.TITLE][0]))
+            discname_reduced = re.sub(FIND_DISC_RE,"",album.tags[tags.TITLE][0],flags=re.IGNORECASE)
             if discname_reduced in finalDictionary:
                 metaContainer = finalDictionary[discname_reduced]
             else:
@@ -127,14 +127,16 @@ def findAlbumsInDirectory(path, onlyNewFiles = True):
                 if metaContainer.isInDB():
                     print("existing found {}".format(metaContainer))
                 finalDictionary[discname_reduced] = metaContainer
-                metaContainer.loadTags()
+                
+                metaContainer.loadContents(recursive=True)
+                metaContainer.loadTags(recursive=True)
                 print(metaContainer.tags)
                 if not metaContainer.isInDB():
                     metaContainer.tags[tags.TITLE] = [discname_reduced]
                     metaContainer.tags[tags.ALBUM] = [discname_reduced]
             metaContainer.contents.append(album)
             album.setParent(metaContainer)
-            album.setPosition(discnumber)
+            album.setPosition(int(discnumber))
         else:
             finalDictionary[name] = album
     
@@ -164,6 +166,6 @@ def longestSubstring(a, b):
     
 def calculateMergeHint(indices):
     return reduce(longestSubstring,
-                   ( ind.internalPointer().tags.getFormatted(tags.get("title")) for ind in indices )
+                   ( ind.internalPointer().tags.getFormatted(tags.TITLE) for ind in indices )
                  ).strip(constants.FILL_CHARACTERS)
     
