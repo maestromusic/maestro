@@ -91,7 +91,77 @@ class Config:
             sect = self.sections[section] = ConfigSection(section)
         sect.addOption(type, default)
         
+omgOptions = {
+    "database": [
+        # Database driver to use
+        ("driver", str, "qtsql"),
+        # Database access information
+        ("mysql_user", str, ""),
+        ("mysql_password", str, ""),
+        ("mysql_host", str, "localhost"),
+        ("mysql_port", int, 3306),
+        # Name of the database
+        ("mysql_db", str, "omg"),
+    ],
+    
+    "control": [
+        # Interval of the control timer syncing with mpd in milliseconds.
+        ("timer_interval", int, 300)
+    ],
+    
+    "mpd": [
+        # Host and port where MPD is running
+        ("host", str, "localhost"),
+        ("port", int, 6600),
+    ],
 
-c = Config()
+    "tags": [
+        # Tags that will be searched, if you type a text without prefix in a searchbox. Use prefixes to search for other tags.
+        ("search_tags", list, ["album","performer","conductor","title","lyricist","composer","date","artist"]),
+        # Tags which will be totally ignored by this application.
+        ("ignored_tags", list, ["tracktotal","disctotal","tracknumber","discnumber"]),
+        
+        # Order in which tags will be displayed. Must contain title and album! Tags which don't appear in this list will be displayed in arbitrary order after the tags in the list.
+        ("tag_order", list,  ["title","artist","album","composer","date","genre","performer","conductor"]),
+        
+        # Names of the tags which have a special meaning for the application and cannot always be treated generically.
+        # This allows to use other strings for the title-tag for example.
+        ("title_tag", str, "title"),
+        ("album_tag", str, "album"),
+        ("date_tag", str, "date"),
+    ],
+    
+    "gui": [
+        # Size in pixels of covers
+        ("browser_cover_size", int, 40),
+        ("large_cover_size", int, 60),
+        ("small_cover_size", int, 40),
+        ("detail_cover_size", int, 160),
+        ("cover_fetcher_cover_size", int, 400)
+        
+        # size of icons to display
+        ("iconsize", int, 16),
+        # Maximal number of views in a Browser
+        ("max_browser_views", int, 5),
+        
+        # Application-specific MIME-type for drag and drop operations
+        ("mime", str, "application/x-omgelementlist"),
+        
+        # Tab which will be shown at the beginning ('populate' or 'playlist')
+        ("startTab", str, "playlist")
+    ],
+    
+    "log": [
+        # Log-level that will be used for console output. Unless this value is None, it will overwrite the value from logging.conf
+        ("consoleLogLevel", str, None),
+    ],
+    
+    "misc": [
+        ("printtags_cmd", str, "./printtags.py"),
+        ("tagmanip26_cmd", str, os.path.abspath(os.path.join(os.path.split(os.path.split(__file__)[0])[0],"tagmanip26.py"))), # assume tagmanip26.py lives in the same directory as this module
+        ("show_ids", bool, False),
+    ]
+}
+options = Config()
 def init():
-    c.readFromFile(constants.CONFIG)
+    options.readFromFile(constants.CONFIG)
