@@ -221,7 +221,7 @@ class Element(Node):
                     logger.warning("Database is corrupt: Element {0} has a {1}-tag with id {2} but "
                                   +"this id does not exist in tag_{1}.".format(self.id,tag.name,row[1]))
                     continue
-                self.tags[tag].append(value)
+                self.tags.add(tag,value)
         elif self.isFile():
             self.readTagsFromFilesystem()
             

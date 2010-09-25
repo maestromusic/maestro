@@ -227,6 +227,10 @@ class Storage(dict):
     def __init__(self,*args):
         dict.__init__(self,*args)
     
+    def copy(self):
+        """Return a copy of this storage-object containing copies of the original tag-value-lists."""
+        return Storage({tag: list(l) for tag,l in self.items()})
+        
     def __setitem__(self,key,value):
         assert isinstance(value,Sequence) and not isinstance(value,str)
         if len(value) == 0:

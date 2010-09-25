@@ -8,11 +8,11 @@
 import logging
 
 from PyQt4 import QtGui, QtCore
-from PyQt4.QtCore import Qt,SIGNAL
+from PyQt4.QtCore import Qt
 
 from omg import config,mpclient
 from omg.models import playlist as playlistmodel
-from . import delegates, formatter#, tageditor
+from . import delegates, formatter, tageditor
 
 logger = logging.getLogger("omg.gui.playlist")
 
@@ -92,7 +92,7 @@ class PlaylistTreeView(QtGui.QTreeView):
     def keyReleaseEvent(self,keyEvent):
         if keyEvent.key() == Qt.Key_Delete:
             self.removeSelected()
-    
+
     def contextMenuEvent(self,event):
         menu = QtGui.QMenu(self)
          

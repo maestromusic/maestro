@@ -7,7 +7,7 @@
 # published by the Free Software Foundation
 #
 from PyQt4 import QtGui, QtCore
-from PyQt4.QtCore import Qt,SIGNAL
+from PyQt4.QtCore import Qt
 
 from omg import database, search, tags, config, constants, models, strutils, control
 from omg.models import browser as browsermodel

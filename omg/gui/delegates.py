@@ -117,7 +117,7 @@ class BrowserDelegate(abstractdelegate.AbstractDelegate):
     def _getTags(self,node,tag):
         """Return a list with the tag-values of the given tag of <node>. This function is submitted to Formatter.tag."""
         if isinstance(node,models.Element):
-            return node.tags[tag]
+            return node.tags[tag] if tag in node.tags else []
         elif isinstance(node,browser.ValueNode) and tag in node.valueIds:
             return [node.value]
         else: return []

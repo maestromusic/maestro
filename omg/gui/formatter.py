@@ -43,7 +43,7 @@ class Formatter:
 
     def _getTags(self,node,tag):
         """Help function for tag: Return the values of the given tag of <node> if <node> is an Element and an empty list otherwise."""
-        if isinstance(node,models.Element):
+        if isinstance(node,models.Element) and tag in node.tags:
             return node.tags[tag]
         else: return []
         
@@ -51,7 +51,7 @@ class Formatter:
         """Return the title or the path or the path if the element contains no title or some dummy-title if it even doesn't contain a path."""
         if tags.TITLE in self.element.tags:
             result = " - ".join(self.element.tags[tags.TITLE])
-        elif isinstance(self.element, omg.models.File):
+        elif isinstance(self.element,models.File):
             result = self.element.getPath()
         else:
             result = "<Kein Titel>"
