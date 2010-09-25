@@ -10,9 +10,9 @@ import mpd
 import logging
 
 from PyQt4 import QtGui, QtCore
-from PyQt4.QtCore import SIGNAL
+from PyQt4.QtCore import Qt
 
-from omg import constants, mpclient, strutils, models
+from omg import constants, mpclient, strutils, models, getIcon
 from omg import control as controlModule
 
 logger = logging.getLogger("gui.control")
@@ -46,7 +46,7 @@ class ControlWidget(QtGui.QWidget):
         self.firstLabel = QtGui.QLabel(self)
         self.secondLabel = QtGui.QLabel(self)
         
-        self.seekSlider = QtGui.QSlider(QtCore.Qt.Horizontal,self)
+        self.seekSlider = QtGui.QSlider(Qt.Horizontal,self)
         self.seekSlider.setRange(0,self.SEEK_SLIDER_MAX)
         self.seekSlider.setTracking(False)
         self.seekSlider.actionTriggered.connect(self._handleSeekSliderAction)
@@ -66,7 +66,7 @@ class ControlWidget(QtGui.QWidget):
         self.titleLabel = QtGui.QLabel(self)
         self.volumeLabel = VolumeLabel(self)
         self.volumeLabel.clicked.connect(self.toggleMute)
-        self.volumeSlider = QtGui.QSlider(QtCore.Qt.Horizontal,self)
+        self.volumeSlider = QtGui.QSlider(Qt.Horizontal,self)
         self.volumeSlider.setRange(0,100)
         self.storedVolume = 50
         self.volumeSlider.actionTriggered.connect(self._handleVolumeSliderAction)
@@ -196,8 +196,8 @@ class PPButton(QtGui.QPushButton):
     # Signals and icons used for the two states
     play = QtCore.pyqtSignal()
     pause = QtCore.pyqtSignal()
-    playIcon = QtGui.QIcon(constants.IMAGES+"icons/play.png")
-    pauseIcon = QtGui.QIcon(constants.IMAGES+"icons/pause.png")
+    playIcon = QtGui.QIcon(getIcon("play.png"))
+    pauseIcon = QtGui.QIcon(getIcon("pause.png"))
     
     def __init__(self,parent):
         """Initialize this button with the given parent. The button will be in pause-state."""
@@ -228,7 +228,7 @@ class VolumeLabel(QtGui.QLabel):
         """Initialize this label with the given parent."""
         QtGui.QLabel.__init__(self,parent)
         self.state = 'muted'
-        self.setPixmap(QtGui.QPixmap(constants.IMAGES+"icons/volume_muted.png"))
+        self.setPixmap(QtGui.QPixmap(getIcon("volume_muted.png")))
     
     def setVolume(self,volume):
         """Display the icon appropriate for the given volume."""
@@ -239,7 +239,7 @@ class VolumeLabel(QtGui.QLabel):
             self.setToolTip('click to mute')
         if range != self.state:
             self.state = range
-            self.setPixmap(QtGui.QPixmap(constants.IMAGES+"icons/volume_{}.png".format(range)))
+            self.setPixmap(QtGui.QPixmap(getIcon("volume_{}.png".format(range))))
 
     @staticmethod
     def volumeRange(volume):
@@ -255,4 +255,3 @@ class VolumeLabel(QtGui.QLabel):
         
     def mousePressEvent(self, event):
         self.clicked.emit()
-        

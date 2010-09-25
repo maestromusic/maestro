@@ -30,6 +30,7 @@ def init():
         CREATE TABLE IF NOT EXISTS {0} (
             id MEDIUMINT UNSIGNED NOT NULL,
             value MEDIUMINT UNSIGNED NULL)
+            CHARACTER SET 'utf8';
         """.format(TT_HELP))
 
 
@@ -44,6 +45,7 @@ def createResultTempTable(tableName,dropIfExists):
             toplevel TINYINT UNSIGNED DEFAULT 0,
             new TINYINT UNSIGNED DEFAULT 1,
             PRIMARY KEY(id))
+            CHARACTER SET 'utf8';
         """.format(tableName))
 
 
