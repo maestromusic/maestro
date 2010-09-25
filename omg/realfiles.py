@@ -22,7 +22,8 @@ except ImportError:
     pass
 
 
-from omg import config, tags
+from omg import tags
+from omg.config import options
 
 logger = logging.getLogger("realfiles")
 
@@ -69,7 +70,7 @@ class UglyPython26PickleFile(MartinIstEinSpast):
         MartinIstEinSpast.__init__(self,path)
     
     def read(self):
-        proc = subprocess.Popen([config.get("misc","tagmanip26_cmd"),"pickle", self.path], stdout=subprocess.PIPE)
+        proc = subprocess.Popen([options.misc.tagmanip26_cmd,"pickle", self.path], stdout=subprocess.PIPE)
         stdout = proc.communicate()[0]
         if proc.returncode > 0:
             raise ReadTagError("Error calling printtags on file '{0}': {1}".format(self.path,stdout))
@@ -91,7 +92,7 @@ class UglyPython26PickleFile(MartinIstEinSpast):
         self.length = data["length"]
     
     def save_tags(self):
-        proc = subprocess.Popen([config.get("misc","tagmanip26_cmd"),"store", self.path], stdin=subprocess.PIPE)
+        proc = subprocess.Popen([options.misc.tagmanip26_cmd,"store", self.path], stdin=subprocess.PIPE)
         out = { "tags":self.tags }
         pickle.dump(out, proc.stdin,protocol=2)
         proc.stdin.flush()

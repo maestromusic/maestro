@@ -7,7 +7,8 @@
 # published by the Free Software Foundation
 #
 import mpd
-from omg import database, config
+from omg import database
+from omg.config import options
 
 class CommandError(Exception):
     """Error that is thrown when a command send to MPD did not succeed."""
@@ -17,7 +18,7 @@ class CommandError(Exception):
 
 db = database.get()
 client = mpd.MPDClient()
-client.connect(config.get("mpd","host"),config.get("mpd","port"))
+client.connect(options.mpd.host, options.mpd.port)
 
 # Redirect methods to the client
 for name in ("play","pause","stop","next","previous","clear","seek","setvol","volume","playlist"):

@@ -17,7 +17,8 @@ This module provides methods to initialize the tag lists based on the database, 
 - You may create tags simply via the constructors of IndexedTag or OtherTag. But in case of indexed tags the get-method translates automatically from tag-ids to tag-names and vice versa and it doesn't create new instances and in the other case it does just the same job as the OtherTag-constructor, so you are usually better off using that method.
 """
 from collections import defaultdict
-from omg import database, config, FlexiDate
+from omg import database, FlexiDate
+from omg.config import options
 import logging, datetime
 
 logger = logging.getLogger("tags")
@@ -190,15 +191,15 @@ def init():
         _tagsByName[row[1]] = newTag
     
     # tagList contains the tags in the order specified by tags->tag_order...
-    tagList = parse(config.get("tags","tag_order"))
+    tagList = [ _tagsByName[name] for name in options.tags.tag_order if name in _tagsByName ]
     # ...and then all remaining tags in arbitrary order
     tagList.extend(set(_tagsByName.values()) - set(tagList))
     
-    _ignored = config.get("tags", "ignored_tags").split(",")
+    _ignored = options.tags.ignored_tags
     global TITLE,ALBUM,DATE
-    TITLE = _tagsByName[config.get("tags","title_tag")]
-    ALBUM = _tagsByName[config.get("tags","album_tag")]
-    DATE = _tagsByName[config.get("tags","date_tag")]
+    TITLE = _tagsByName[options.tags.title_tag]
+    ALBUM = _tagsByName[options.tags.album_tag]
+    DATE = _tagsByName[options.tags.date_tag]
 
 
 class Storage(defaultdict):

@@ -13,13 +13,13 @@ if __name__=="__main__":
     opts, args = getopt.getopt(sys.argv[1:],
         "pVv:",
         ['populate','version','loglevel='])
+    restOpts = []
     for opt,arg in opts:
         if opt in ('-V', '--version'):
             print('This is OMG version {}. Nice to meet you.'.format(constants.VERSION))
             sys.exit(0)
-        elif opt in ('-v', '--loglevel'):
-            # Python log-levels must be uppercase
-            application.optionsOverride['log'] = {'consoleLogLevel': arg.upper()}
         elif opt in ('-p', '--populate'):
             application.optionsOverride['gui'] = {'startTab' : 'populate'}
-    application.run()
+        else:
+            restOpts.append((opt,arg))
+    application.run(restOpts, args)

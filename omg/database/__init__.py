@@ -23,7 +23,8 @@ db.query(...)
 """
 
 import logging
-from omg import config, strutils
+from omg import strutils
+from omg.config import options
 from . import sql
 
 
@@ -41,9 +42,9 @@ def connect(driver=None):
     global db
     if db is None:
         if driver is None:
-            driver = config.get("database","driver")
+            driver = options.database.driver
         db = sql.newConnection(driver)
-        db.connect(*[config.get("database",key) for key in ("mysql_user","mysql_password","mysql_db","mysql_host","mysql_port")])
+        db.connect(*[options.database.__getattr__(key) for key in ("mysql_user","mysql_password","mysql_db","mysql_host","mysql_port")])
         logger.info("Database connection is open.")
     else: logger.warning("database.connect has been called although the database connection was already open")
     return db

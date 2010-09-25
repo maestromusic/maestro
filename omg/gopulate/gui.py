@@ -37,7 +37,15 @@ class GopulateTreeWidget(QtGui.QTreeView):
         
         self.deleteAction = QtGui.QAction("delete from DB", self)
         self.deleteAction.triggered.connect(self._deleteSelected)
-
+    
+    def dataChanged(self, ind1, ind2):
+        QtGui.QTreeView.dataChanged(self, ind1, ind2)
+        self.setCorrectWidth()
+  
+    def reset(self):
+        QtGui.QTreeView.reset(self)
+        self.setCorrectWidth()
+        
     def contextMenuEvent(self, event):
         if self.selectionModel().hasSelection():
             menu = QtGui.QMenu(self)
@@ -51,6 +59,9 @@ class GopulateTreeWidget(QtGui.QTreeView):
                 menu.popup(event.globalPos())
             else:
                 del menu
+            event.accept()
+        else:
+            event.ignore()
     
     def removeSelected(self):
         while len(self.selectedIndexes()) > 0:
@@ -59,17 +70,28 @@ class GopulateTreeWidget(QtGui.QTreeView):
     def keyReleaseEvent(self,keyEvent):
         if keyEvent.key() == Qt.Key_Delete:
             self.removeSelected()
+            keyEvent.accept()
+        else:
+            QtGui.QTreeView.keyReleaseEvent(self, keyEvent)
     
     def wheelEvent(self, wheelEvent):
         if QtGui.QApplication.keyboardModifiers() & Qt.AltModifier:
             index = self.indexAt(wheelEvent.pos())
             elem = index.internalPointer()
-            if elem.getPosition():
+            if not index.isValid() or not isinstance(elem.parent, Element):
+                wheelEvent.ignore()
+                return
+            if elem.getPosition() is not None:
                 if wheelEvent.delta() > 0:
                     elem.setPosition(elem.getPosition()+1)
                 elif elem.getPosition() > 1:
                     elem.setPosition(elem.getPosition()-1)
+                else:
+                    elem.setPosition(None)
+            else:
+                elem.setPosition(1)
             self.model().dataChanged.emit(index, index)
+            self.model().dataChanged.emit(index.parent(), index.parent())
             
             wheelEvent.accept()
         else:
@@ -113,6 +135,9 @@ class GopulateTreeWidget(QtGui.QTreeView):
             i.internalPointer().delete()
         self.model().reset()
         
+    def setCorrectWidth(self):
+        self.resizeColumnToContents(0)
+        
 class GopulateWidget(QtGui.QWidget):
     """GopulateWidget consists of a GopulateTreeModel and buttons to control the populate process."""
     
@@ -122,7 +147,6 @@ class GopulateWidget(QtGui.QWidget):
         QtGui.QWidget.__init__(self)
         self.dirLabel = QtGui.QLabel()
         self.tree = GopulateTreeWidget()
-        self.tree.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
         model.searchDirectoryChanged.connect(self.dirLabel.setText)
         
         self.accept = QtGui.QPushButton('accept')

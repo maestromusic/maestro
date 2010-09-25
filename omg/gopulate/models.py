@@ -15,8 +15,8 @@ from omg import database
 from omg.models.playlist import BasicPlaylist, ManagedPlaylist
 from omg import constants
 
-import omg.gopulate
-absPath = omg.gopulate.absPath
+from . import GopulateGuesser, findNewAlbums
+absPath = omg.absPath
 
 import logging
 logger = logging.getLogger("gopulate.models")
@@ -28,20 +28,21 @@ class GopulateTreeModel(BasicPlaylist):
     treeCreated = QtCore.pyqtSignal()
     #currentDirectoryChanged = QtCore.pyqtSignal(['QString'])
     
-    def __init__(self, searchdirs):
+    def __init__(self, searchdir):
         rootedtreemodel.RootedTreeModel.__init__(self)
         self.current = None
-        self.searchdir = None
+        self.guesser = GopulateGuesser()
         self.setRoot(RootNode())
-        self.setSearchDirectory(searchdirs)
+        self.setSearchDirectory(searchdir)
     
-    def setCurrentDirectory(self, dir):
-        logger.debug('current directory set: {}'.format(self.searchdir))
-        self.current = dir
-        self._createTree(dir, omg.gopulate.findAlbumsInDirectory(dir, False))
+    def setCurrentDirectories(self, dirs, recursive = False):
+        logger.debug('current directories set: {}'.format(dirs))
+        self.current = dirs
+        self.guesser.findFiles(dirs, recursive)
+        self._createTree(self.guesser.guessTree(False))
         
     def setSearchDirectory(self, dir):
-        logger.debug('search directory set: {}'.format(self.searchdir))
+        logger.debug('search directory set: {}'.format(dir))
         self.searchdir = dir
         self.finder = None
         self.searchDirectoryChanged.emit(dir)
@@ -50,18 +51,17 @@ class GopulateTreeModel(BasicPlaylist):
     def nextDirectory(self):
         logger.debug('next directory, searchdir: {}'.format(self.searchdir))
         if self.finder == None:
-            self.finder = omg.gopulate.findNewAlbums(self.searchdir)
-        self._createTree(*next(self.finder))
+            self.finder = findNewAlbums(self.searchdir)
+        self._createTree(next(self.finder))
         
-    def _createTree(self, path, albums):
+    def _createTree(self, albums):
         root = RootNode()
         for el in albums:
             root.contents.append(el)
             el.parent = root
         self.setRoot(root)
-        self.current = path
         self.treeCreated.emit()
-        
+          
     def merge(self, indices, name):
         amount = len(indices)
         if amount > 0:
@@ -88,10 +88,10 @@ class GopulateTreeModel(BasicPlaylist):
                         strip(constants.FILL_CHARACTERS)
                 j = j + 1
             for oldItem in parent.contents[posItem.row()+1:]:
-                oldItem.setPosition(oldItem.getPosition() - amount + 1)
+                if oldItem.getPosition():
+                    oldItem.setPosition(oldItem.getPosition() - amount + 1)
             newContainer.updateSameTags()
             newContainer.tags["title"] = [ name ]
-            self.reset()
                 
         
     def commit(self):
@@ -102,4 +102,4 @@ class GopulateTreeModel(BasicPlaylist):
             print(item)
             logger.debug("item of type {}".format(type(item)))
             item.commit(toplevel=True)
-        self.setCurrentDirectory(self.current)
+        self._createTree(self.guesser.guessTree(False))

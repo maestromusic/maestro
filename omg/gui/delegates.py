@@ -10,8 +10,9 @@ from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 import os.path
 
-from omg import strutils, tags, config, covers, models, constants
+from omg import strutils, tags, covers, models, constants, relPath
 from omg.models import playlist,browser
+from omg.config import options
 from . import abstractdelegate, formatter
 
 # Styles used in the delegates
@@ -35,16 +36,16 @@ class PlaylistDelegate(abstractdelegate.AbstractDelegate):
         if element.isFile():
             # First find out whether the file has a cover (usually not...)
             if element.hasCover():
-                self.drawCover(config.get("gui","small_cover_size"),element)
+                self.drawCover(options.gui.small_cover_size,element)
             
             if tags.ALBUM in element.tags and not element.isContainedInAlbum():
                 # This is the complicated version: The element has an album but is not displayed within the album. So draw an album cover and display the album tags.
                 if element.isInDB() and not element.hasCover(): # Do not draw a second cover (see above)
                     albumIds = element.getAlbumIds()
                     for albumId in albumIds:
-                        cover = covers.getCover(albumId,config.get("gui","small_cover_size"))
+                        cover = covers.getCover(albumId, options.gui.small_cover_size)
                         if cover is not None:
-                            self.drawCover(config.get("gui","small_cover_size"),None,cover)
+                            self.drawCover(options.gui.mall_cover_size,None,cover)
                             break # Draw only one cover even if there are several albums
                 self.addLine(f.titleWithPos(),f.length(),PL_TITLE_STYLE,STD_STYLE)
                 self.addLine(f.album(),"",PL_ALBUM_STYLE)
@@ -54,7 +55,7 @@ class PlaylistDelegate(abstractdelegate.AbstractDelegate):
             self.addLine(f.tag(tags.get("composer"),True),f.tag(tags.get("conductor"),True))
             self.addLine(f.tag(tags.get("artist"),True),f.tag(tags.get("performer"),True))
         else:
-            coverSize = config.get("gui","large_cover_size")
+            coverSize = options.gui.large_cover_size
             self.drawCover(coverSize,element)
             
             self.addLine(f.title(),"",PL_TITLE_STYLE)
@@ -89,16 +90,16 @@ class BrowserDelegate(abstractdelegate.AbstractDelegate):
             if element.isFile():
                 # First find out whether the file has a cover (usually not...)
                 if element.hasCover():
-                    self.drawCover(config.get("gui","browser_cover_size"),element)
+                    self.drawCover(options.gui.browser_cover_size,element)
                 
                 if tags.ALBUM in element.tags and not element.isContainedInAlbum():
                     # This is the complicated version: The element has an album but is not displayed within the album. So draw an album cover and display the album tags.
                     if not element.hasCover(): # Do not draw a second cover (see above)
                         albumIds = element.getAlbumIds()
                         for albumId in albumIds:
-                            cover = covers.getCover(albumId,config.get("gui","browser_cover_size"))
+                            cover = covers.getCover(albumId, options.gui.browser_cover_size)
                             if cover is not None:
-                                self.drawCover(config.get("gui","browser_cover_size"),None,cover)
+                                self.drawCover(options.gui.browser_cover_size, None, cover)
                                 break # Draw only one cover even if there are several albums
                     self.addLine(f.title(),"",BR_TITLE_STYLE)
                     self.addLine(f.album(),"",BR_ALBUM_STYLE)
@@ -108,7 +109,7 @@ class BrowserDelegate(abstractdelegate.AbstractDelegate):
                 self.addLine(f.tag(tags.get("composer"),True,self._getTags),"")
                 self.addLine(f.tag(tags.get("artist"),True,self._getTags),"")
             else:
-                coverSize = config.get("gui","browser_cover_size")
+                coverSize = options.gui.browser_cover_size
                 self.drawCover(coverSize,element)
                 
                 self.addLine(f.title(),"",BR_TITLE_STYLE)
@@ -144,9 +145,21 @@ class GopulateDelegate(QtGui.QStyledItemDelegate):
     
     def __init__(self, parent = None):
         QtGui.QStyledItemDelegate.__init__(self,parent)
-        self.iconSize = int(config.get("gui", "iconsize"))
+        self.iconSize = options.gui.iconsize
         self.iconRect = QtCore.QRect(0, 0, self.iconSize, self.iconSize)
         self.font = QtGui.QFont()
+        self.fileNameFont = QtGui.QFont()
+        self.fileNameFont.setPointSize(7)
+        
+        self.titleFont = QtGui.QFont()
+        self.titleFont.setItalic(True)
+        
+        self.albumFont = QtGui.QFont()
+        self.albumFont.setBold(True)
+        self.albumFont.setItalic(True)
+        
+        self.positionFont = QtGui.QFont()
+        self.positionFont.setBold(True)
     
     def formatTagValues(self, values):
         return " • ".join((str(x) for x in values))
@@ -184,43 +197,39 @@ class GopulateDelegate(QtGui.QStyledItemDelegate):
                 height = 0
 
         # ——————— calculate space for position number and color marker ———————
-        if elem.getPosition():
-            self.font.setBold(True)
-            positionSize = QtGui.QFontMetrics(self.font).size(Qt.TextSingleLine, str(elem.getPosition()))
+        if elem.getPosition() is not None:
+            positionSize = QtGui.QFontMetrics(self.positionFont).size(Qt.TextSingleLine, str(elem.getPosition()))
             tagRenderStartX = positionSize.width() + 2*self.hItemSpace
-            self.font.setBold(False)
         else: # no space for position needed if it is None, only a small margin for the color indicator
             tagRenderStartX = 2*self.hItemSpace
         if painter:
             rect.setLeft(rect.left() + tagRenderStartX)
 
-        # ——————— paint/calculate the title ———————            
-        if elem.isContainer():
-            self.font.setBold(True)
-        self.font.setItalic(True)
+        # ——————— paint/calculate the title ———————
+
         if tags.TITLE in elem.tags:
             titleToDraw = self.formatTagValues(elem.tags[tags.TITLE])
         else:
             titleToDraw = "<notitle>"
-        if elem.isInDB():
-            titleToDraw += " [{}]".format(elem.id)
+        if elem.isInDB() and options.misc.show_ids:
+            titleToDraw += " [{}]".format(elem.id) # print container ID for debugging purposes
+        
+        if elem.isContainer():
+            font = self.albumFont
+        else:
+            font = self.titleFont
         if painter:
-            painter.setFont(self.font)
+            painter.setFont(font)
             boundingRect = painter.drawText(rect, Qt.TextSingleLine, titleToDraw)
             rect.translate(0, boundingRect.height() + self.vItemSpace)
+            painter.setFont(self.font)
         else:
-            fSize = QtGui.QFontMetrics(self.font).size(Qt.TextSingleLine, titleToDraw)
+            fSize = QtGui.QFontMetrics(font).size(Qt.TextSingleLine, titleToDraw)
             width = max(width, fSize.width())
-            height += fSize.height() + self.hItemSpace
-            
-            self.font.setBold(False)
-            self.font.setItalic(False)
-            if painter:
-                painter.setFont(self.font)
+            height += fSize.height() + self.vItemSpace
         
         # ——————— now, paint/calculate all other tags ———————
-        tagorder = [t for t in tags.tagList if t in elem.tags]
-        for t in tagorder:
+        for t in (t for t in tags.tagList if t in elem.tags):
             data = elem.tags[t]
             if t == tags.TITLE or (t == tags.ALBUM and elem.isAlbum()):
                 continue
@@ -248,30 +257,37 @@ class GopulateDelegate(QtGui.QStyledItemDelegate):
                 rect.setLeft(tagRenderStartX)
             else:
                 fSize = QtGui.QFontMetrics(self.font).size(Qt.TextSingleLine, self.formatTagValues(data))
-                width = max(width, fSize.width() + widthSoFar)
+                width = max(width, fSize.width() + widthSoFar + self.hItemSpace)
                 height += self.iconSize + self.vItemSpace
         
+        # ——————— paint filename, if file ———————
+        if elem.isFile():
+            if painter:
+                painter.setFont(self.fileNameFont)
+                boundingRect = painter.drawText(rect, Qt.TextSingleLine, relPath(elem.getPath()))
+                rect.translate(0, boundingRect.height() + self.vItemSpace)
+            else:
+                fSize = QtGui.QFontMetrics(self.font).size(Qt.TextSingleLine, relPath(elem.getPath()))
+                width = max(width, fSize.width())
+                height += fSize.height()
         # ——————— paint the element position and color marker ————————
         if painter:
             if elem.changesPending and elem.isInDB():
                 painter.setPen(Qt.red)
             if not elem.isInDB():
                 painter.fillRect(0, 0, tagRenderStartX, rect.height(), Qt.yellow)
-            if elem.getPosition():
-                self.font.setBold(True)
-                painter.setFont(self.font)
+            if elem.getPosition() is not None:
+                painter.setFont(self.positionFont)
                 rect.setLeft(int((tagRenderStartX-positionSize.width())/2))
                 rect.setTop(int((rect.height() -positionSize.height())/2))        
                 painter.drawText(rect, Qt.TextSingleLine, str(elem.getPosition()))
-                self.font.setBold(False)
-                painter.setFont(self.font)
             else:
                 if elem.changesPending and elem.isInDB():
                     painter.fillRect(0, 0, tagRenderStartX, rect.height()//4, Qt.red)
             painter.setPen(Qt.black)
             painter.restore()
         else:
-            return QtCore.QSize(width + tagRenderStartX, height)
+            return QtCore.QSize(width + tagRenderStartX + 2*self.hMargin, height+2*self.vMargin)
     
     def sizeHint(self, option, index):
         """Reimplemented function from QStyledItemDelegate"""

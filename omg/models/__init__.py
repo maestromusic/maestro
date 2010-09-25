@@ -9,8 +9,9 @@
 import logging, copy, os
 from PyQt4 import QtCore
 
-from omg import tags, database, covers, config, realfiles, absPath, relPath
+from omg import tags, database, covers, realfiles, absPath, relPath
 from omg.database import queries
+from omg.config import options
 from functools import reduce
 db = database.get()
 
@@ -262,7 +263,7 @@ class Element(Node):
     def setPosition(self, position):
         if position != self.position:
             self.position = position
-            self.changesPending = True
+            self.parent.changesPending = True
         
     def getParentIds(self,recursive):
         """Return a list containing the ids of all parents of this element from the database. If <recursive> is True all ancestors will be added recursively."""
@@ -545,8 +546,8 @@ class File(Element):
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE)
         # wtf ? for some reason handle is int instead of file handle, as said in documentation
-        with open(tmpfile,"br") as handle:
-            self.hash = hashlib.sha1(handle.read()).hexdigest()
+        with open(handle,"br") as hdl:
+            self.hash = hashlib.sha1(hdl.read()).hexdigest()
         os.remove(tmpfile)
         
     def commit(self, toplevel = False):

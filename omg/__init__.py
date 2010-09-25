@@ -7,26 +7,29 @@
 # published by the Free Software Foundation
 #
 
-from omg import database, constants, config
+from omg import database, constants
+from omg.config import options
 import os
 import pickle
 import datetime
 import logging
 
+
+distributor = None # the database distributor object
+
 def relPath(file):
     """Returns the relative path of a music file against the collection base path."""
-    return os.path.relpath(file,config.get("music","collection"))
+    return os.path.relpath(file, options.music.collection)
 
 def absPath(file):
     """Returns the absolute path of a music file inside the collection directory, if it is not absolute already."""
     if not os.path.isabs(file):
-        return os.path.join(config.get("music","collection"),file)
+        return os.path.join(options.music.collection, file)
     else:
         return file
 
 def getIcon(name):
     return os.path.join(constants.IMAGES, "icons", name)
-
 
 class FlexiDate:
     """A FlexiDate is a date which may be only a year, or a year and a month, or a year+month+day."""

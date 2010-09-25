@@ -87,7 +87,7 @@ def addContainer(name, tags = None, file = False, elements = 0, toplevel = False
 def delContainer(cid):
     """Removes a container together with all of its content and tag references from the database.
     
-    If the content is a file, also deletes its entry from the files table."""
+    If the container is a file, also deletes its entry from the files table."""
     db = database.get()
     db.query("DELETE FROM tags WHERE element_id=?;", cid) # delete tag references
     db.query("DELETE FROM contents WHERE container_id=? OR element_id=?;",cid,cid) # delete content relations

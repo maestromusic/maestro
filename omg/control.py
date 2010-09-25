@@ -9,7 +9,8 @@
 import logging
 
 from PyQt4.QtCore import QTimer
-from . import config, mpclient
+from . import mpclient
+from omg.config import options
 
 # A reference to the ControlWidget
 widget = None
@@ -40,7 +41,7 @@ def synchronizePlaylist(playlist):
         oldPlaylist.stopSynchronization()
     else: # Start Timer for the first time
         _timer.timeout.connect(_sync)
-        _timer.start(int(config.get("control","timer_interval")))
+        _timer.start(options.control.timer_interval)
         
     _sync() # Synchronize right away. In particular this is useful when the timer-interval is large for debugging.
 
