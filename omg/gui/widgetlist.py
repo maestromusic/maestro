@@ -20,6 +20,9 @@ class WidgetList(QtGui.QWidget):
     
     def setDirection(self,direction):
         self.layout().setDirection(direction)
+    
+    def getWidgets(self):
+        return self.children
         
     def insertWidget(self,index,widget):
         self.children[index:index] = [widget]
@@ -27,3 +30,6 @@ class WidgetList(QtGui.QWidget):
     
     def addWidget(self,widget):
         self.insertWidget(len(self.children),widget)
+    
+    def removeWidget(self,widget):
+        self.layout().removeWidget(widget)

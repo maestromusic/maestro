@@ -22,7 +22,9 @@ class SingleTagEditor(QtGui.QWidget):
         QtGui.QWidget.__init__(self,parent)
         self.tag = tag
         self.model = model
+        model.recordAdded.connect(self._handleRecordAdded)
         model.recordChanged.connect(self._handleRecordChanged)
+        model.recordRemoved.connect(self._handleRecordRemoved)
         self.setLayout(QtGui.QHBoxLayout())
         self.layout().setSpacing(0)
         self.layout().setMargin(0)
@@ -50,11 +52,29 @@ class SingleTagEditor(QtGui.QWidget):
         
         # Fill the widget list
         for record in model.getRecords(tag):
-            self.widgetList.addWidget(TagValueEditor(record,model))
-    
+            self.widgetList.addWidget(TagValueEditor(record,self.model))
+
+    def _handleRecordAdded(self,record):
+        if record.tag == self.tag:
+            self.widgetList.addWidget(TagValueEditor(record,self.model))
+            
+    def _handleRecordRemoved(self,record):
+        if record.tag == self.tag:
+            for valueEditor in self.widgetList.getWidgets():
+                if valueEditor.getRecord() == record:
+                    self.widgetList.removeWidget(valueEditor)
+                    return
+            
     def _handleRecordChanged(self,oldRecord,newRecord):
         if self.tag == oldRecord.tag == newRecord.tag:
-            pass #TODO hier gehts weiter
+            for valueEditor in self.widgetList.getWidgets():
+                if valueEditor.getRecord() == oldRecord:
+                    valueEditor.setRecord(newRecord)
+                    return
+        elif self.tag == oldRecord.tag:
+            self._handleRecordRemoved(oldRecord)
+        elif self.tag == newRecord.tag:
+            self._handleRecordAdded(newRecord)
 
 
 class TagValueEditor(QtGui.QWidget):
@@ -87,6 +107,9 @@ class TagValueEditor(QtGui.QWidget):
         firstLineLayout.addWidget(self.expandButton)
         
         self.setRecord(record)
+    
+    def getRecord(self,record):
+        return self.record
         
     def setRecord(self,record):
         self.record = record
@@ -157,15 +180,17 @@ class TagValueEditor(QtGui.QWidget):
         if not self.isEditing():
             self.setEditing(True)
     
-    def keyReleasedEvent(self,event):
+    def keyPressEvent(self,event):
         if event.key() == Qt.Key_Escape:
             self.editor.setText(self._formatValue(self.record.value)) # reset
             self.setEditing(False)
             event.accept()
-        elif event.key() == Qt.Key_Enter:
+        elif event.key() == Qt.Key_Return:
+            self.setEditing(False)
             newRecord = self.record.copy()
             newRecord.value = self.editor.text()
             self.model.changeRecord(self.record,newRecord)
+            event.accept()
 
 
 class TagLineEdit(QtGui.QLineEdit):
@@ -175,6 +200,7 @@ class TagLineEdit(QtGui.QLineEdit):
     def focusOutEvent(self,focusEvent):
         QtGui.QLineEdit.focusOutEvent(self,focusEvent)
         self.parent().setEditing(False)
+
         
 class ExpandButton(QtGui.QPushButton):
     expandIcon = QtGui.QIcon(getIcon("expand.png"))

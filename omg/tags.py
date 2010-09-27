@@ -258,10 +258,16 @@ class Storage(dict):
         if not isinstance(tag,Tag):
             tag = get(tag)
         if tag not in self:
-            self[tag] = []
-        for value in values:
-            if value not in self[tag]:
-                self[tag].append(value)
+            # Values may contain repetitions, so we need to filter them away. Remember that self[tag] = [] won't work
+            newList = []
+            for value in values:
+                if value not in newList:
+                    newList.append(value)
+            self[tag] = newList
+        else:
+            for value in values:
+                if value not in self[tag]:
+                    self[tag].append(value)
                 
     def removeValues(self,tag,*values):
         """Remove one or more values from the list of the given tag. If a value is not contained in this Storage just skip it."""

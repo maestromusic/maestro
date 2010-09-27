@@ -22,6 +22,9 @@ class TagEditorWidget(QtGui.QDialog):
         
         self.originalElements = elements
         self.model = tageditormodel.TagEditorModel(elements)
+        self.model.recordAdded.connect(self._handleRecordAdded)
+        self.model.recordChanged.connect(self._handleRecordChanged)
+        self.model.recordRemoved.connect(self._handleRecordRemoved)
         
         self.setLayout(QtGui.QVBoxLayout())
         self.tagEditorLayout = QtGui.QFormLayout()
@@ -40,8 +43,13 @@ class TagEditorWidget(QtGui.QDialog):
         saveButton = QtGui.QPushButton("Speichern")
         buttonBarLayout.addWidget(saveButton)
 
+        self.singleTagEditors = {}
         for tag in self.model.getTags():
-            self.tagEditorLayout.addRow("{0}:".format(str(tag)),singletageditor.SingleTagEditor(tag,self.model))
+            self._addSingleTagEditor(tag)
+    
+    def _addSingleTagEditor(self,tag):
+        self.singleTagEditors[tag] = singletageditor.SingleTagEditor(tag,self.model)
+        self.tagEditorLayout.addRow("{0}:".format(str(tag)),self.singleTagEditors[tag])
 
     def _handleAddButton(self):
         dialog = TagDialog(self,self.model.elements)
@@ -49,7 +57,24 @@ class TagEditorWidget(QtGui.QDialog):
             self.model.addRecords(dialog.getRecords())
             self.updateGeometry()
 
-
+    # Note that the following _handle-functions only add new SingleTagEditors or remove SingleTagEditors which have become empty. Unless they are newly created or removed, the editors are updated in their own _handle-functions.
+    def _handleRecordAdded(self,record):
+        if record.tag not in self.singleTagEditors:
+            self._addSingleTagEditor(tag)
+        else: pass # The already existing SingleTagEditor will deal with it
+    
+    def _handleRecordChanged(self,oldRecord,newRecord):
+        if oldRecord.tag != newRecord.tag:
+            self._handleRecordRemoved(oldRecord)
+            self._handleRecordAdded(newRecord)
+        else: pass # The SingleTagEditor will deal with it
+        
+    def _handleRecordRemoved(self,record):
+        if record.tag not in self.model.getTags():
+            pass #TODO: Remove from self.singleTagEditors and self.tagEditorLayout
+        else: pass # The SingleTagEditor will deal with it
+        
+        
 class TagDialog(QtGui.QDialog):
     def __init__(self,parent,elements):
         QtGui.QDialog.__init__(self,parent)
@@ -105,4 +130,4 @@ class TagTypeBox(QtGui.QComboBox):
                 self.setCurrentIndex(self.count()-1)
                 
     def getTag(self):
-        return tags.get("album") # TODO: Didn't know how the function to get the text is called
+        return tags.get(self.currentText())
