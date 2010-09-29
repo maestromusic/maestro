@@ -17,4 +17,8 @@ LOGLEVELS = {'debug': logging.DEBUG,
 
 YES_ANSWERS = ["y", "Y", ""]
 
+FILL_CHARACTERS = "-–—•.,:;/ "
+
 VERSION = '0.1alpha'
+
+TAG_VARCHAR_LENGTH = 255

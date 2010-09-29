@@ -54,13 +54,13 @@ class TagEditorWidget(QtGui.QDialog):
     def _handleAddButton(self):
         dialog = TagDialog(self,self.model.elements)
         if dialog.exec_() == QtGui.QDialog.Accepted:
-            self.model.addRecords(dialog.getRecords())
+            self.model.addRecord(dialog.getRecord())
             self.updateGeometry()
 
     # Note that the following _handle-functions only add new SingleTagEditors or remove SingleTagEditors which have become empty. Unless they are newly created or removed, the editors are updated in their own _handle-functions.
     def _handleRecordAdded(self,record):
         if record.tag not in self.singleTagEditors:
-            self._addSingleTagEditor(tag)
+            self._addSingleTagEditor(record.tag)
         else: pass # The already existing SingleTagEditor will deal with it
     
     def _handleRecordChanged(self,oldRecord,newRecord):
@@ -79,6 +79,7 @@ class TagDialog(QtGui.QDialog):
     def __init__(self,parent,elements):
         QtGui.QDialog.__init__(self,parent)
         self.setWindowTitle("Tag-Wert hinzufügen")
+        assert len(elements) > 0
         
         self.typeEditor = TagTypeBox(self)
         self.valueEditor = QtGui.QLineEdit(self)
@@ -91,7 +92,7 @@ class TagDialog(QtGui.QDialog):
         abortButton = QtGui.QPushButton("Abbrechen",self)
         abortButton.clicked.connect(self.reject)
         okButton = QtGui.QPushButton("OK",self)
-        okButton.clicked.connect(self.accept)
+        okButton.clicked.connect(self._handleOkButton)
         
         layout = QtGui.QVBoxLayout()
         self.setLayout(layout)
@@ -111,10 +112,25 @@ class TagDialog(QtGui.QDialog):
         lastLineLayout.addWidget(abortButton,0)
         lastLineLayout.addWidget(okButton,0)
         layout.addLayout(lastLineLayout)
+    
+    def _handleOkButton(self):
+        if self.elementsBox.selectionModel().hasSelection():
+            try:
+                tag = self.typeEditor.getTag()
+            except ValueError:
+                QtGui.QMessageBox.warning(self,"Ungültiger Tagname.",
+                                          "Ungültiger Tagname. Tagnamen dürfen nur Zahlen und Buchstaben enthalten.")
+            else:
+                if tag.isValid(self.valueEditor.text()):
+                    self.accept()
+                else: QtGui.QMessageBox.warning(self,"Ungültiger Wert","Der eingegebene Wert ist ungültig.")
+        else: QtGui.QMessageBox.warning(self,"Kein Stück ausgewählt.","Du musst mindestens ein Stück auswählen.")
         
-    def getRecords(self):
-        # TODO: Don't ignore the selection in self.elementsBox
-        return [tageditormodel.Record(self.typeEditor.getTag(),self.valueEditor.text(),self.elementsBox.model().getItems(),self.elementsBox.model().getItems())]
+    def getRecord(self):
+        allElements = self.elementsBox.model().getItems()
+        selectedElements = [allElements[i] for i in range(len(allElements))
+                                if self.elementsBox.selectionModel().isRowSelected(i,QtCore.QModelIndex())]
+        return tageditormodel.Record(self.typeEditor.getTag(),self.valueEditor.text(),allElements,selectedElements)
                             
 
 class TagTypeBox(QtGui.QComboBox):
@@ -130,4 +146,7 @@ class TagTypeBox(QtGui.QComboBox):
                 self.setCurrentIndex(self.count()-1)
                 
     def getTag(self):
-        return tags.get(self.currentText())
+        text = self.currentText().strip()
+        if text[0] == text[-1] and text[0] in ['"',"'"]: # Don't translate if the text is quoted
+            return tags.get(text[1:-1])
+        else: return tags.fromTranslation(text)

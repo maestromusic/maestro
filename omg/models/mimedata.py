@@ -23,13 +23,13 @@ class MimeData(QtCore.QMimeData):
         return format in self.formats()
     
     def formats(self):
-        return [config.get("gui","mime"),"text/uri-list"]
+        return [config.options.gui.mime,"text/uri-list"]
     
     def hasUrls(self):
         return True
         
     def retrieveData(self,mimeType,type=None):
-        if mimeType == config.get("gui","mime"):
+        if mimeType == config.options.gui.mime:
             return self.elementList
         elif mimeType == "text/uri-list":
             return self.urls()

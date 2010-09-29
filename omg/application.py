@@ -7,8 +7,12 @@
 #
 import sys, os, random, logging, io
 from omg import constants
+import omg
+from omg.config import options
+import omg.config
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
+from _abcoll import Iterable
 
 # Global variables. Only for debugging! Later there may be more than one browser, playlist, etc.
 widget = None
@@ -24,8 +28,39 @@ names = ['Organize Music by Groups',
          'Oh Michael ... Grmpf'  ]
 
 # Default options and options from the config file will be overwritten by the options in optionOverride (this is necessary for command-line arguments). The dictionary should map section names to dictionaries containing the options in the section. Remember to add a default option to config._defaultOptions for anything that may appear in optionsOverride.
-optionsOverride = {}
 
+
+
+class DatabaseChangeNotice():
+    
+    tags = True # indicate if tags of element have changed
+    contents = True # indicate if contents of element have changed
+    deleted = False # indicate if element was deleted
+    created = False # indicate if element has been newly created
+    ids = None # the affected element_ids
+    recursive = True # changes also affect subcontainers
+    
+    def __init__(self, ids, tags = True, contents = True, recursive = True, deleted = False, created = False):
+        self.ids = ids
+        self.tags = tags
+        self.contents = contents
+        self.recursive = recursive
+        self.deleted = deleted
+        self.created = created
+        
+    @staticmethod
+    def deleteNotice(ids, recursive = False):
+        """Convenience function."""
+        return DatabaseChangeNotice(ids, tags = False, contents = False, recursive = recursive, deleted = True, created = False)
+        
+class DBUpdateDistributor(QtCore.QObject):
+    
+    indicesChanged = QtCore.pyqtSignal(DatabaseChangeNotice)
+    
+    def __init__(self):
+        QtCore.QObject.__init__(self)
+        
+        
 class OmgMainWindow(QtGui.QMainWindow):
     
     def initMenus(self):
@@ -47,6 +82,7 @@ class OmgMainWindow(QtGui.QMainWindow):
         from omg.gui import browser as browserModule
         from omg.gui import playlist as playlistModule
         from omg import control, config
+        import omg
 
         global browser,playlist,controlWidget
     
@@ -59,6 +95,9 @@ class OmgMainWindow(QtGui.QMainWindow):
         self.addDockWidget(Qt.TopDockWidgetArea, controlDock)
         
         browser = browserModule.Browser()
+        omg.distributor.indicesChanged.connect(browser.handleIndicesChanged)
+        browser.indicesChanged.connect(omg.distributor.indicesChanged)
+        
         browserDock = QtGui.QDockWidget()
         browserDock.setWindowTitle("Element browser")
         browserDock.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
@@ -72,7 +111,7 @@ class OmgMainWindow(QtGui.QMainWindow):
         
         import omg.gopulate.models
         import omg.gopulate.gui
-        gm = omg.gopulate.models.GopulateTreeModel(config.get("music","collection"))
+        gm = omg.gopulate.models.GopulateTreeModel(options.music.collection)
         gw = omg.gopulate.gui.GopulateWidget(gm)
         central.addTab(gw, "gopulate")
         
@@ -82,14 +121,24 @@ class OmgMainWindow(QtGui.QMainWindow):
         fbDock.setWindowTitle("File browser")
         fbDock.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
         fbDock.setWidget(fb)
-        fb.currentDirectoryChanged.connect(gm.setCurrentDirectory)
+        fb.currentDirectoriesChanged.connect(gm.setCurrentDirectories)
         fb.searchDirectoryChanged.connect(gm.setSearchDirectory)
         self.addDockWidget(Qt.RightDockWidgetArea, fbDock)
+        
+        depotModel = omg.gopulate.models.GopulateTreeModel(None)
+        depotWidget = omg.gopulate.gui.GopulateTreeWidget()
+        depotWidget.setModel(depotModel)
+        depotDock = QtGui.QDockWidget()
+        depotDock.setWindowTitle("container depot")
+        depotDock.setWidget(depotWidget)
+        self.addDockWidget(Qt.BottomDockWidgetArea, depotDock) 
         
         self.setCentralWidget(central)
         control.synchronizePlaylist(playlist.getModel())
         
-        if config.get('gui','startTab') == 'populate':
+        self.statusBar()
+        
+        if options.gui.startTab == 'populate':
             central.setCurrentWidget(gw)
         
         self.resize(config.shelve['widget_width'],config.shelve['widget_height'])
@@ -106,7 +155,7 @@ class OmgMainWindow(QtGui.QMainWindow):
                                       'OMG',
                                       'This is OMG version {0}\n{1}'.format(constants.VERSION, random.choice(names)),
                                       )
-def initModules():
+def initModules(opts = None, args = None):
     # Switch first to the directory containing this file
     if os.path.dirname(__file__):
         os.chdir(os.path.dirname(__file__))
@@ -115,7 +164,7 @@ def initModules():
     
     # Initialize config and logging
     from omg import config
-    config.init(optionsOverride)
+    config.init(opts)
     
     logging.getLogger("omg").debug("START")
     from omg import database
@@ -127,15 +176,17 @@ def initModules():
 
     
     
-def run():
+def run(opts, args):
     
     # Some Qt-classes need a running QApplication before they can be created
     app = QtGui.QApplication(sys.argv)
+    
     # Import and initialize modules    
-    initModules()
+    initModules(opts, args)
     
     # Create GUI
     global widget
+    omg.distributor = DBUpdateDistributor()
     widget = OmgMainWindow()
     from omg import plugins
     plugins.loadPlugins()

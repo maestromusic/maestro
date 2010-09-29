@@ -52,7 +52,7 @@ class BasicPlaylist(rootedtreemodel.RootedTreeModel):
         return Qt.CopyAction | Qt.MoveAction
          
     def mimeTypes(self):
-        return [config.get("gui","mime"),"text/uri-list"]
+        return [config.options.gui.mime,"text/uri-list"]
     
     def mimeData(self,indexes):
         return mimedata.createFromIndexes(self,indexes)
@@ -64,10 +64,10 @@ class BasicPlaylist(rootedtreemodel.RootedTreeModel):
 
         if column > 0:
             return False
-            
+        
         # Get the contents out of MimeData
-        if mimeData.hasFormat(config.get("gui","mime")):
-            contents = [node.copy() for node in mimeData.retrieveData(config.get("gui","mime"))]
+        if mimeData.hasFormat(config.options.gui.mime):
+            contents = [node.copy() for node in mimeData.retrieveData(config.options.gui.mime)]
         elif mimeData.hasFormat("text/uri-list"):
             contents = self.importPaths(relPath(url.path()) for url in mimeData.urls())
         else: return False

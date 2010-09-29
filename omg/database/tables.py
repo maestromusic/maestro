@@ -10,7 +10,7 @@
 """Module to manage the database tables used by omg."""
 
 import re
-from omg import config, database
+from omg import config, database, constants
 from . import db, DBLayoutException
 
 class SQLTable:
@@ -100,6 +100,7 @@ tables = {table.name:table for table in (SQLTable(createQuery) for createQuery i
 ))}
 
 validTagTypes = ("varchar", "date", "text")
+
 # Tag tables
 #========================
 class TagTable(SQLTable):
@@ -115,9 +116,9 @@ class TagTable(SQLTable):
         "varchar" : """
         CREATE TABLE {0} (
             id MEDIUMINT UNSIGNED NOT NULL AUTO_INCREMENT,
-            value VARCHAR(255) NOT NULL,
+            value VARCHAR({}) NOT NULL,
             PRIMARY KEY(id)
-        ) CHARACTER SET 'utf8';""",
+        ) CHARACTER SET 'utf8';""".format(constants.TAG_VARCHAR_LENGTH),
 
         "date" : """
         CREATE TABLE {0} (

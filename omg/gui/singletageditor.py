@@ -108,7 +108,7 @@ class TagValueEditor(QtGui.QWidget):
         
         self.setRecord(record)
     
-    def getRecord(self,record):
+    def getRecord(self):
         return self.record
         
     def setRecord(self,record):
@@ -155,6 +155,7 @@ class TagValueEditor(QtGui.QWidget):
         if editing != self.editing:
             self.editing = editing
             if editing:
+                self.editor.setText(self._formatValue(self.record.value))
                 self.stackedLayout.setCurrentIndex(1)
                 self.editor.setFocus(Qt.MouseFocusReason)
                 self.editor.selectAll()
@@ -179,17 +180,21 @@ class TagValueEditor(QtGui.QWidget):
     def mousePressEvent(self,mouseEvent):
         if not self.isEditing():
             self.setEditing(True)
-    
+        mouseEvent.accept()
+        QtGui.QWidget.mousePressEvent(self,mouseEvent)
+
     def keyPressEvent(self,event):
         if event.key() == Qt.Key_Escape:
             self.editor.setText(self._formatValue(self.record.value)) # reset
             self.setEditing(False)
             event.accept()
         elif event.key() == Qt.Key_Return:
-            self.setEditing(False)
-            newRecord = self.record.copy()
-            newRecord.value = self.editor.text()
-            self.model.changeRecord(self.record,newRecord)
+            if self.record.tag.isValid(self.editor.text()):
+                self.setEditing(False)
+                newRecord = self.record.copy()
+                newRecord.value = self.editor.text()
+                self.model.changeRecord(self.record,newRecord)
+            else: QtGui.QMessageBox.warning(self,"Ungültiger Wert","Der eingegebene Wert ist ungültig.")
             event.accept()
 
 

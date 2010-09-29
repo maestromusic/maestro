@@ -83,15 +83,15 @@ class TagEditorModel(QtCore.QObject):
             
     def changeRecord(self,oldRecord,newRecord):
         for element in oldRecord.elementsWithValue:
-            element.tags.removeValues(record.tag,oldRecord.value)
+            element.tags.removeValues(oldRecord.tag,oldRecord.value)
         for element in newRecord.elementsWithValue:
-            element.tags.addUnique(record.tag,newRecord.value)
-        recordChanged.emit(oldRecord,newRecord)
+            element.tags.addUnique(newRecord.tag,newRecord.value)
+        self.recordChanged.emit(oldRecord,newRecord)
             
     def removeRecord(self,record):
         for element in record.elementsWithValue:
             element.tags.removeValues(record.tag,record.value)
-        recordRemoved.emit(record)
+        self.recordRemoved.emit(record)
                 
 
 class TagListModel(simplelistmodel.SimpleListModel):

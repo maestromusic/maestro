@@ -14,7 +14,7 @@ class WidgetList(QtGui.QWidget):
         QtGui.QWidget.__init__(self,parent)
         self.setLayout(QtGui.QBoxLayout(direction))
         self.children = []
-        self.selectedIndex = None
+        self.selectedChild = None
         self.layout().setSpacing(0)
         self.layout().setMargin(0)
     
@@ -33,3 +33,19 @@ class WidgetList(QtGui.QWidget):
     
     def removeWidget(self,widget):
         self.layout().removeWidget(widget)
+    
+    def mousePressEvent(self,event):
+        for child in self.children:
+            if child.underMouse():
+                if child == self.selectedChild:
+                    self.selectedChild = None
+                else: self.selectedChild = child
+                self.update(child.x(),child.y(),child.width(),child.height())
+        QtGui.QWidget.mousePressEvent(self,event)
+        
+    def paintEvent(self,event):
+        if self.selectedChild is not None:
+            painter = QtGui.QPainter(self)
+            c = self.selectedChild
+            painter.fillRect(c.x(),c.y(),c.width(),c.height(),QtGui.QColor.fromRgb(89,166,230))
+        QtGui.QWidget.paintEvent(self,event)

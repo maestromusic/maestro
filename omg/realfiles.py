@@ -14,6 +14,7 @@ import pickle
 import sys
 import os
 import logging
+from omg import FlexiDate
 try: # we try to favor native Pyk3 stagger support over the ugly26 shit
     import stagger
     from stagger.id3 import * #frame definitions
@@ -21,7 +22,8 @@ except ImportError:
     pass
 
 
-from omg import config, tags
+from omg import tags
+from omg.config import options
 
 logger = logging.getLogger("realfiles")
 
@@ -48,7 +50,19 @@ class MartinIstEinSpast:
         """Stores the tags that are currently present in the tags attribute in the file."""
         raise NotImplementedError
     
+
+def prepare(tagstorage):
+    """Prepare the tag values for omg, i.e. convert to the correct type.
+    Since at the moment the only non-string value type is date, only this
+    case is handled."""
+    for t in tagstorage:
+        if isinstance(t, tags.IndexedTag) and t.type == 'date':
+            for val in tagstorage[t]:
+                if type(val) == str:
+                    convVal = FlexiDate.strptime(val)
+                    tagstorage[t][tagstorage[t].index(val)] = convVal
     
+        
 
 class UglyPython26PickleFile(MartinIstEinSpast):
     """This file uses the tagmanip26.py-script so store and load data"""
@@ -56,7 +70,7 @@ class UglyPython26PickleFile(MartinIstEinSpast):
         MartinIstEinSpast.__init__(self,path)
     
     def read(self):
-        proc = subprocess.Popen([config.get("misc","tagmanip26_cmd"),"pickle", self.path], stdout=subprocess.PIPE)
+        proc = subprocess.Popen([options.misc.tagmanip26_cmd,"pickle", self.path], stdout=subprocess.PIPE)
         stdout = proc.communicate()[0]
         if proc.returncode > 0:
             raise ReadTagError("Error calling printtags on file '{0}': {1}".format(self.path,stdout))
@@ -72,13 +86,13 @@ class UglyPython26PickleFile(MartinIstEinSpast):
                     tags.addIndexedTag(key, tagtype)
                 else:
                     tags._ignored.append(key)
-                logger.debug("omgomgomgo")
                 
         self.tags.merge({tags.get(a):b for a,b in data["tags"].items()})
+        prepare(self.tags)
         self.length = data["length"]
     
     def save_tags(self):
-        proc = subprocess.Popen([config.get("misc","tagmanip26_cmd"),"store", self.path], stdin=subprocess.PIPE)
+        proc = subprocess.Popen([options.misc.tagmanip26_cmd,"store", self.path], stdin=subprocess.PIPE)
         out = { "tags":self.tags }
         pickle.dump(out, proc.stdin,protocol=2)
         proc.stdin.flush()

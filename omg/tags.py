@@ -12,12 +12,13 @@
 This module provides methods to initialize the tag lists based on the database, to convert tag-ids to tagnames and vice versa, to store tags, etc.. Call init at program start to initialize and use one of the following ways to get tags:
 
 - The easiest way is the get-method which takes a tag-id or an tag-name as parameter.
-- For some tags which have a special meaning to the program and cannot always be treated generically (e.g. the title-tag) where exist constants (e.g. TITLE). This allows to use tags.TITLE instead of tags.get(config.get("tags","title_tag")) as the user may decide to use another tagname than "title" for his titles.
+- For some tags which have a special meaning to the program and cannot always be treated generically (e.g. the title-tag) where exist constants (e.g. TITLE). This allows to use tags.TITLE instead of tags.get(config.options.tags.title_tag) as the user may decide to use another tagname than "title" for his titles.
 - To iterate over all indexed tags use tagList.
 - You may create tags simply via the constructors of IndexedTag or OtherTag. But in case of indexed tags the get-method translates automatically from tag-ids to tag-names and vice versa and it doesn't create new instances and in the other case it does just the same job as the OtherTag-constructor, so you are usually better off using that method.
 """
 from collections import Sequence
-from omg import database, config, FlexiDate
+from omg import constants, database, FlexiDate
+from omg.config import options
 import logging, datetime
 
 logger = logging.getLogger("tags")
@@ -58,6 +59,10 @@ class Tag:
         """Return if the tag is ignored."""
         return self.name in TOTALLY_IGNORED_TAGS or self.name in _ignored
     
+    def isValid(self,value):
+        """Return whether the given value is could be a tag-value for this tag."""
+        return True
+        
     def __eq__(self,other):
         return self.name == other.name
         
@@ -71,6 +76,10 @@ class Tag:
         return '"{0}"'.format(self.name)
 
     def __str__(self):
+        return self.translated()
+        
+    def translated(self):
+        """Return the translation of this tag in the user's language. In most cases you will want to display this string rather than tag.name."""
         # TODO: Store the translations somewhere else
         nameDict = {
             'title': "Titel",
@@ -113,20 +122,32 @@ class IndexedTag(Tag):
         
         db = database.get()
         tableName = "tag_" + self.name
-        if self.type=="date": #translate date into a format that MySQL likes
-            if len(value)==4: # only year is given
-                value="{0}-00-00".format(value)
-            elif len(value)==2: # year in 2-digit form
-                if value[0] < 7:
-                    value="20{0}-00-00".format(value)
-                else:
-                    value="19{0}-00-00".format(value)
+        if self.type == "date":
+            value = value.SQLformat()
         valueId = db.query("SELECT id FROM " + tableName + " WHERE value = ?", value).getSingle()
         if insert and not valueId:
             valueId = db.query("INSERT INTO tag_{0} (value) VALUES(?);".format(self.name), value).insertId()
             logger.debug("creating new value {} for tag {}".format(value,self.name))
         return valueId
     
+    def isValid(self,value):
+        if self.type == 'varchar':
+            return isinstance(value,str) and len(value) <= constants.TAG_VARCHAR_LENGTH
+        elif self.type == 'text':
+            return isinstance(value,str)
+        elif self.type == 'date':
+            if isinstance(value,FlexiDate):
+                return True
+            else:
+                try: 
+                    FlexiDate.strptime(value)
+                except TypeError:
+                    return False
+                except ValueError:
+                    return False
+                else: return True
+        else: assert False # should never happen
+        
     def __eq__(self,other):
         return isinstance(other, IndexedTag) and self.id == other.id
     
@@ -153,6 +174,8 @@ class IndexedTag(Tag):
 class OtherTag(Tag):
     """Special class for tags which are not indexed."""
     def __init__(self, name):
+        if not name.isalnum():
+            raise ValueError("Tag name must be alpha-numeric and contain at least one character.")
         self.name = name
 
 
@@ -161,6 +184,7 @@ def get(identifier):
     if isinstance(identifier,int):
         return _tagsById[identifier]
     elif isinstance(identifier,str):
+        identifier = identifier.lower()
         if identifier in _tagsByName:
             return _tagsByName[identifier]
         else: return OtherTag(identifier)
@@ -168,6 +192,13 @@ def get(identifier):
         return identifier
     else: raise RuntimeError("Identifier's type is neither int nor string: {} of type {}".format(identifier,type(identifier)))
     
+def fromTranslation(translation):
+    """Return the tag whose translation is <translation>. If no such tag exists, invoke get to return a tag. Use this method to get a tag from user input, especially when using combo-boxes with predefined values containing translated tags."""
+    translation = translation.lower()
+    for tag in tagList:
+        if translation == tag.translated().lower():
+            return tag
+    return get(translation)
 
 def parse(string,sep=','):
     """Parse a string containing tag-names (by default comma-separated, but you may specify a different separator) and return a list of corresponding tags. If <string> contains a substring that is not a tag name, it is simply ignored."""
@@ -196,15 +227,15 @@ def init():
         _tagsByName[row[1]] = newTag
     
     # tagList contains the tags in the order specified by tags->tag_order...
-    tagList = parse(config.get("tags","tag_order"))
+    tagList = [ _tagsByName[name] for name in options.tags.tag_order if name in _tagsByName ]
     # ...and then all remaining tags in arbitrary order
     tagList.extend(set(_tagsByName.values()) - set(tagList))
     
-    _ignored = config.get("tags", "ignored_tags").split(",")
+    _ignored = options.tags.ignored_tags
     global TITLE,ALBUM,DATE
-    TITLE = _tagsByName[config.get("tags","title_tag")]
-    ALBUM = _tagsByName[config.get("tags","album_tag")]
-    DATE = _tagsByName[config.get("tags","date_tag")]
+    TITLE = _tagsByName[options.tags.title_tag]
+    ALBUM = _tagsByName[options.tags.album_tag]
+    DATE = _tagsByName[options.tags.date_tag]
 
 
 class TagValueList(list):

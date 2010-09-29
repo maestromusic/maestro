@@ -38,7 +38,7 @@ def getMenuEntries(playlist,node):
 
 class CoverData:
     def __init__(self,cover,text):
-        coverSize = config.get("gui","cover_fetcher_cover_size")
+        coverSize = config.options.gui.cover_fetcher_cover_size
         self.cover = cover
         self.text = text
         if cover.width() > coverSize or cover.height() > coverSize:
@@ -68,7 +68,7 @@ class CoverFetcher(QtGui.QDialog):
         layout.addLayout(rightLayout)
         
         self.imageLabel = QtGui.QLabel(self)
-        coverSize = config.get("gui","cover_fetcher_cover_size")
+        coverSize = config.options.gui.cover_fetcher_cover_size
         self.imageLabel.setMinimumSize(coverSize+2,coverSize+2) # two pixels for the border
         self.imageLabel.setSizePolicy(QtGui.QSizePolicy.Fixed,QtGui.QSizePolicy.Fixed)
         self.imageLabel.setAlignment(Qt.AlignLeft|Qt.AlignTop)

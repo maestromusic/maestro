@@ -9,8 +9,9 @@
 import logging, copy, os
 from PyQt4 import QtCore
 
-from omg import tags, database, covers, config, realfiles, absPath, relPath
+from omg import tags, database, covers, realfiles, absPath, relPath
 from omg.database import queries
+from omg.config import options
 from functools import reduce
 db = database.get()
 
@@ -186,14 +187,19 @@ class Element(Node):
     tags = None # tags.Storage to store the tags. None until they are loaded
     position = None
     length = None
+    changesPending = False #if changes were made to the element that have not yet been commited (valid only for DB-elements)
     
     def __init__(self):
         raise RuntimeError(
                 "Cannot instantiate abstract base class Element. Use Container, File or models.createElement.")
     
-    def isInDB(self):
-        """Return whether this element is contained in the database."""
-        return self.id is not None
+    def isInDB(self, recursive = False):
+        """Return whether this element is contained in the database. If recursive is True, only return True if
+        this element and all of its recursive children are in the database."""
+        if not recursive:
+            return self.id is not None
+        else:
+            return self.isInDB(False) and (self.isFile() or all((e.isInDB(True) for e in self.contents)))
         
     def copy(self,contents=None):
         """Reimplementation of Node.copy: In addition to contents the tags are also not copied by reference. Instead the copy will contain a copy of this node's tags.Storage-instance."""
@@ -224,6 +230,8 @@ class Element(Node):
                 self.tags.add(tag,value)
         elif self.isFile():
             self.readTagsFromFilesystem()
+        else:
+            self.tags = tags.Storage()
             
         if recursive:
             for element in self.getChildren():
@@ -242,7 +250,7 @@ class Element(Node):
            For elements outside the DB, you have to take care of self.position directly."""
         if not self.isInDB():
             return self.position
-        if self.position and not refresh:
+        if (self.position != None) and not refresh:
             return self.position
         else:
             # Without parent, there can't be a position
@@ -251,6 +259,11 @@ class Element(Node):
             self.position = db.query("SELECT position FROM contents WHERE container_id = ? AND element_id = ?", 
                                  self.parent.id,self.id).getSingle()
             return self.position
+    
+    def setPosition(self, position):
+        if position != self.position:
+            self.position = position
+            self.parent.changesPending = True
         
     def getParentIds(self,recursive):
         """Return a list containing the ids of all parents of this element from the database. If <recursive> is True all ancestors will be added recursively."""
@@ -337,6 +350,10 @@ class Element(Node):
             queries.delFile(id = self.id)
         else:
             queries.delContainer(self.id)
+        if isinstance(self.parent, Element):
+            self.parent.changesPending = True
+        self.parent.contents.remove(self)
+        self.id = None
             
     # Misc
     #====================================================
@@ -357,13 +374,17 @@ class Element(Node):
     
 
 class Container(Element):
+    
+    contents = None
+    
     """Element-subclass for containers."""
-    def __init__(self,id=None,tags=None,contents=None):
+    def __init__(self,id=None,tags=None,contents=None, position = None):
         """Initialize this element with the given id, which must be an integer or None (for external containers). Optionally you may specify a tags.Storage object holding the tags of this element and/or a list of contents. Note that the list won't be copied but the parents will be changed to this container."""
         if id is not None and not isinstance(id,int):
             raise ValueError("id must be either None or an integer. I got {}".format(id))
         self.id = id
         self.tags = tags
+        self.position = position
         if contents is None:
             self.contents = []
         else: self.setContents(contents)
@@ -387,11 +408,11 @@ class Container(Element):
         if self.isInDB():
             additionalJoin = "JOIN elements ON elements.id = {}.id".format(table) if table != 'elements' else ''
             result = db.query("""
-                    SELECT contents.element_id,elements.file
+                    SELECT contents.element_id,contents.position,elements.file
                     FROM contents JOIN {0} ON contents.container_id = {1} AND contents.element_id = {0}.id {2}
                     ORDER BY contents.position
                     """.format(table,self.id,additionalJoin))
-            self.setContents([createElement(id,file=file) for id,file in result])
+            self.setContents([createElement(id,file=file,position=pos) for id,pos,file in result])
             
         if recursive:
             for element in self.contents:
@@ -405,19 +426,32 @@ class Container(Element):
     def commit(self, toplevel = False):
         """Commit this container into the database"""
         logger.debug("commiting container {}".format(self))
-        if not self.isInDB():
+        wasInDB = self.isInDB()
+        if not wasInDB:
             self.id = database.queries.addContainer(
                             "spast", tags = self.tags, file = False, elements = len(self.contents), toplevel = toplevel)
+        else:
+            database.queries.delContents(self.id)
         for elem in self.contents:
-            wasInDB = elem.isInDB()
             elem.commit()
-            if not wasInDB:
+            try:
                 database.queries.addContent(self.id, elem.getPosition(), elem.id)
+            except database.sql.DBException as exc:
+                print(self.id)
+                print(elem.getPosition())
+                print(elem.id)
+                print(self.tags['title'])
+        if wasInDB:
+            database.queries.updateElementCounter(self.id)
+        self.changesPending = False
 
     
-    def updateSameTags(self):
+    def updateSameTags(self, metaContainer = False):
         """Sets the tags of this element to be exactly those which are the same for all contents."""
-        self.commonTags = set(x for x in reduce(lambda x,y: x & y, [set(tr.tags.keys()) for tr in self.contents]) if x.name not in tags.TOTALLY_IGNORED_TAGS)
+        self.commonTags = set(x for x in reduce(lambda x,y: x & y, [set(tr.tags.keys()) for tr in self.contents]) \
+                              if (x.name not in tags.TOTALLY_IGNORED_TAGS))
+        if metaContainer:
+            self.commonTags = self.commonTags - {tags.TITLE, tags.ALBUM}
         self.commonTagValues = {}
         differentTags=set()
         for file in self.contents:
@@ -428,18 +462,23 @@ class Container(Element):
                 if self.commonTagValues[tag] != t[tag]:
                     differentTags.add(tag)
         self.sameTags = self.commonTags - differentTags
-        self.tags = tags.Storage()
+        newTags = tags.Storage()
         for tag in self.sameTags:
-            self.tags[tag] = self.commonTagValues[tag]
+            newTags[tag] = self.commonTagValues[tag]
+        if self.tags:
+            self.tags.merge(newTags)
+        else:
+            self.tags = newTags
             
 class File(Element):
-    def __init__(self, id = None, tags = None, length = None, path = None):
+    def __init__(self, id = None, tags = None, length = None, path = None, position = None):
         """Initialize this element with the given id, which must be an integer or None (for external files). Optionally you may specify a tags.Storage object holding the tags of this element and/or a file path."""
         if id is not None and not isinstance(id,int):
             raise ValueError("id must be either None or an integer. I got {}".format(id))
         self.id = id
         self.tags = tags
         self.length = length
+        self.position = position
         if path is not None and not isinstance(path,str):
             raise ValueError("path must be either None or a string. I got {}".format(id))
         self.path = path
@@ -467,6 +506,8 @@ class File(Element):
             real.read()
         except realfiles.ReadTagError as e:
             logger.warning("Failed to read tags from file {}: {}".format(self.path, str(e)))
+        if self.tags != real.tags:
+            self.changesPending = True
         self.tags = real.tags
         self.length = real.length
     
@@ -505,8 +546,8 @@ class File(Element):
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE)
         # wtf ? for some reason handle is int instead of file handle, as said in documentation
-        with open(tmpfile,"br") as handle:
-            self.hash = hashlib.sha1(handle.read()).hexdigest()
+        with open(handle,"br") as hdl:
+            self.hash = hashlib.sha1(hdl.read()).hexdigest()
         os.remove(tmpfile)
         
     def commit(self, toplevel = False):
@@ -526,13 +567,14 @@ class File(Element):
         if not hasattr(self, "hash"):
             self.computeHash()
         db.query(querytext, self.id, relPath(self.path), self.hash, int(self.length))
+        self.changesPending = False
 
-def createElement(id,tags=None,contents=None,file=None):
+def createElement(id,tags=None,contents=None,file=None, position=None):
     """Create an element with the given id, tags and contents. Depending on <file> an instance of Container or of File will be created. If <file> is None, the file-flag (elements.file) will be read from the database. Note that contents will be ignored if a File-instance is created."""
     if file is None:
         file = db.query("SELECT file FROM elements WHERE id=?",id).getSingle()
         if file is None:
             raise ValueError("There is no element with id {}".format(id))
     if file:
-        return File(id,tags=tags)
-    else: return Container(id,tags=tags,contents=contents)
+        return File(id,tags=tags, position = position)
+    else: return Container(id,tags=tags,contents=contents, position = position)

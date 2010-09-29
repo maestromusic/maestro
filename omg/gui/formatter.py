@@ -55,7 +55,7 @@ class Formatter:
             result = self.element.getPath()
         else:
             result = "<Kein Titel>"
-        if isinstance(self.element,models.Element) and self.element.isInDB() and config.get("misc","show_ids"):
+        if isinstance(self.element,models.Element) and self.element.isInDB() and config.options.misc.show_ids:
             return "[{0}] {1}".format(self.element.id,result)
         else: return result
 
@@ -110,7 +110,7 @@ class HTMLFormatter(Formatter):
         self.element.ensureTagsAreLoaded()
         coverPath = None
         if self.element.isInDB():
-            coverPath = covers.getCoverPath(self.element.id,config.get("gui","detail_cover_size"))
+            coverPath = covers.getCoverPath(self.element.id,config.options.gui.detail_cover_size)
             if coverPath is not None:
                 lines.append('<table><tr><td valign="top"><img src="{0}"></td><td valign="top">'
                                 .format(cgi.escape(coverPath)))
