@@ -29,7 +29,7 @@ class Formatter:
                         values.remove(value)
                 parent = parent.getParent()
             return values
-        else: return self.element.tags[tag]
+        else: return self.element.tags[tag] if tag in self.element.tags else []
         
     def tag(self,tag,removeParentTags=False,getTags=None):
         """Return a string containing all values of the given tag in the element of this formatter. Depending on the tag the values will be separated either by ", " or by " - ". If removeParentTags is True all values of <tag> in parent containers of the current tree structure will be removed from the result. To fetch tag-values from a parent container the method <getTags> is used. The default function returns the tag-values of <tag> if the parent container is an Element and an empty list else, which is usually exactly what you want. But if your tree contains nodes not of type Element but still with tags, you must provide your own function to get those tags. <getTags> must take a node and <tag> and must return a list of tag-values."""

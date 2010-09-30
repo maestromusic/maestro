@@ -16,8 +16,9 @@ This module provides methods to initialize the tag lists based on the database, 
 - To iterate over all indexed tags use tagList.
 - You may create tags simply via the constructors of IndexedTag or OtherTag. But in case of indexed tags the get-method translates automatically from tag-ids to tag-names and vice versa and it doesn't create new instances and in the other case it does just the same job as the OtherTag-constructor, so you are usually better off using that method.
 """
+import os.path
 from collections import Sequence
-from omg import constants, database, FlexiDate
+from omg import constants, database, FlexiDate, getIcon
 from omg.config import options
 import logging, datetime
 
@@ -93,7 +94,10 @@ class Tag:
             'description': "Beschreibung"
         }
         return nameDict.get(self.name,self.name) # if self.name is not contained in the dict return the name itself
-        
+    
+    def iconPath(self):
+        path = getIcon("tag_{}.png".format(self.name))
+        return path if os.path.isfile(path) else None
         
 class IndexedTag(Tag):
     """Subclass for all indexed tags.
@@ -102,7 +106,7 @@ class IndexedTag(Tag):
     """
     def __init__(self,id,name,type):
         self.id = id
-        self.name = name
+        self.name = name.lower()
         self.type = type
     
     def getValue(self,valueId):
@@ -132,7 +136,7 @@ class IndexedTag(Tag):
     
     def isValid(self,value):
         if self.type == 'varchar':
-            return isinstance(value,str) and len(value) <= constants.TAG_VARCHAR_LENGTH
+            return isinstance(value,str) and len(value.encode()) <= constants.TAG_VARCHAR_LENGTH
         elif self.type == 'text':
             return isinstance(value,str)
         elif self.type == 'date':
