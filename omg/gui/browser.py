@@ -11,7 +11,6 @@ from PyQt4.QtCore import Qt,SIGNAL
 
 from omg import database, search, tags, config, constants, models, strutils, control
 from omg.models import browser as browsermodel
-from omg.application import DatabaseChangeNotice
 
 from . import delegates, browserdialog, formatter
 
@@ -26,8 +25,6 @@ class Browser(QtGui.QWidget):
     searchBox = None
     
     table = "elements" # The MySQL-table whose contents are currently displayed
-    
-    indicesChanged = QtCore.pyqtSignal(DatabaseChangeNotice)
     
     def __init__(self,parent = None):
         """Initialize a new Browser with the given parent."""
@@ -58,11 +55,6 @@ class Browser(QtGui.QWidget):
         self.views = []
         self.createViews(strutils.mapRecursively(tags.get,config.shelve['browser_views']))
     
-    def handleIndicesChanged(self, notice):
-        print("Database change notice: {}".format(notice.ids))
-        #TODO: Maddiiiin, tu was! :)
-        pass
-    
     def search(self):
         """Search for the value in the search-box. If it is empty, display all values."""
         if self.searchBox.text():
@@ -82,7 +74,6 @@ class Browser(QtGui.QWidget):
         self.views = []
         for layers in layersList:
             newView = BrowserTreeView(self,layers)
-            newView.indicesChanged.connect(self.indicesChanged)
             self.views.append(newView)
             self.splitter.addWidget(newView)
 
@@ -90,7 +81,6 @@ class Browser(QtGui.QWidget):
 class BrowserTreeView(QtGui.QTreeView):
     """TreeView for the Browser."""
     
-    indicesChanged = QtCore.pyqtSignal(DatabaseChangeNotice)
     def __init__(self,parent,layers):
         """Initialize this TreeView with the given parent (which must be the browser-widget) and the given layers. This also will create a BrowserModel for this treeview (Note that each view of the browser uses its own model). <layers> must be a list of tag-lists. For each entry in <layers> a tag-layer using the entry's tags is created. A BrowserTreeView initialized with [[tags.get('genre')],[tags.get('artist'),tags.get('composer')]] will group result first into differen genres and then into different artist/composer-values, before finally displaying the elements itself."""
         QtGui.QTreeView.__init__(self,parent)
@@ -121,14 +111,17 @@ class BrowserTreeView(QtGui.QTreeView):
             control.playlist.insertElements(control.playlist.importElements(node.getElements()),-1)
     
     def _deleteSelected(self):
+        """Non-recursively deletes the selected elements from the database."""
         affectedIDs = []
-        for index in self.selectionModel().selectedIndexes():
-            if isinstance(index.internalPointer(), models.Element):
-                affectedIDs.append(index.internalPointer().id)
-                index.internalPointer().delete()
-        self.indicesChanged.emit(DatabaseChangeNotice.deleteNotice(ids = affectedIDs))
+        indices = [index for index in self.selectionModel().selectedIndexes() if isinstance(index.internalPointer(), models.Element)]
+        for index in indices:
+            self.model().beginRemoveRows(index.parent(), index.row(), index.row())
+            affectedIDs.append(index.internalPointer().id)
+            index.internalPointer().delete()
+            self.model().endRemoveRows()
         
     def contextMenuEvent(self, event):
         menu = QtGui.QMenu(self)
         menu.addAction(self.delAction)
         menu.popup(event.globalPos())
+        event.accept()

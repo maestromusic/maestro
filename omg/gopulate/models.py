@@ -11,9 +11,8 @@ from PyQt4.QtCore import Qt
 
 from omg.models import rootedtreemodel, RootNode
 import omg.models
-from omg import database
+from omg import database, tags, constants
 from omg.models.playlist import BasicPlaylist, ManagedPlaylist
-from omg import constants
 
 from . import GopulateGuesser, findNewAlbums
 absPath = omg.absPath
@@ -61,6 +60,15 @@ class GopulateTreeModel(BasicPlaylist):
             el.parent = root
         self.setRoot(root)
         self.treeCreated.emit()
+    
+    def data(self, index, role = Qt.EditRole):
+        if index.isValid() and role == Qt.StatusTipRole:
+            if index.internalPointer().isInDB():
+                return "I'm a database element"
+            else:
+                return "I'm a new element"
+        else:
+            return BasicPlaylist.data(self, index, role)
           
     def merge(self, indices, name):
         amount = len(indices)
@@ -81,8 +89,8 @@ class GopulateTreeModel(BasicPlaylist):
                 newContainer.contents.append(item)
                 parent.contents.remove(item)
                 parent.changesPending = True
-                for i in range(len(item.tags["title"])):
-                    item.tags["title"][i] = item.tags["title"][i].replace(name, "").\
+                for i in range(len(item.tags[tags.TITLE])):
+                    item.tags[tags.TITLE][i] = item.tags[tags.TITLE][i].replace(name, "").\
                         strip(constants.FILL_CHARACTERS).\
                         lstrip("0123456789").\
                         strip(constants.FILL_CHARACTERS)
@@ -92,6 +100,7 @@ class GopulateTreeModel(BasicPlaylist):
                     oldItem.setPosition(oldItem.getPosition() - amount + 1)
             newContainer.updateSameTags()
             newContainer.tags["title"] = [ name ]
+            self.layoutChanged.emit()
                 
         
     def commit(self):
@@ -99,7 +108,6 @@ class GopulateTreeModel(BasicPlaylist):
         
         logger.debug("commit called")
         for item in self.root.contents:
-            print(item)
             logger.debug("item of type {}".format(type(item)))
             item.commit(toplevel=True)
         self._createTree(self.guesser.guessTree(False))

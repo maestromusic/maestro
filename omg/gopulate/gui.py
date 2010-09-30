@@ -37,7 +37,9 @@ class GopulateTreeWidget(QtGui.QTreeView):
         
         self.deleteAction = QtGui.QAction("delete from DB", self)
         self.deleteAction.triggered.connect(self._deleteSelected)
-    
+        
+        self.viewport().setMouseTracking(True)
+        
     def dataChanged(self, ind1, ind2):
         QtGui.QTreeView.dataChanged(self, ind1, ind2)
         self.setCorrectWidth()

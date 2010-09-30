@@ -11,7 +11,8 @@ import itertools
 from PyQt4 import QtCore
 from PyQt4.QtCore import Qt
 
-from omg import config, models, absPath
+from omg import models, absPath
+from omg.config import options
 
 class MimeData(QtCore.QMimeData):
     """Subclass of QMimeData specialized to transport a tree of elements. It supports two MimeTypes: The first one is used internally by omg and stores the tree-structure. Its name is stored in the config variable "gui->mime". The second one is "text/uri-list" and contains a list of URLs to all files in the tree. This type is used by applications like Amarok and Dolphin."""
@@ -23,13 +24,13 @@ class MimeData(QtCore.QMimeData):
         return format in self.formats()
     
     def formats(self):
-        return [config.get("gui","mime"),"text/uri-list"]
+        return [options.gui.mime,"text/uri-list"]
     
     def hasUrls(self):
         return True
         
     def retrieveData(self,mimeType,type=None):
-        if mimeType == config.get("gui","mime"):
+        if mimeType == options.gui.mime:
             return self.elementList
         elif mimeType == "text/uri-list":
             return self.urls()

@@ -94,10 +94,7 @@ class OmgMainWindow(QtGui.QMainWindow):
         controlDock.setWidget(controlWidget)
         self.addDockWidget(Qt.TopDockWidgetArea, controlDock)
         
-        browser = browserModule.Browser()
-        omg.distributor.indicesChanged.connect(browser.handleIndicesChanged)
-        browser.indicesChanged.connect(omg.distributor.indicesChanged)
-        
+        browser = browserModule.Browser()        
         browserDock = QtGui.QDockWidget()
         browserDock.setWindowTitle("Element browser")
         browserDock.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
@@ -125,13 +122,13 @@ class OmgMainWindow(QtGui.QMainWindow):
         fb.searchDirectoryChanged.connect(gm.setSearchDirectory)
         self.addDockWidget(Qt.RightDockWidgetArea, fbDock)
         
-        depotModel = omg.gopulate.models.GopulateTreeModel(None)
-        depotWidget = omg.gopulate.gui.GopulateTreeWidget()
-        depotWidget.setModel(depotModel)
-        depotDock = QtGui.QDockWidget()
-        depotDock.setWindowTitle("container depot")
-        depotDock.setWidget(depotWidget)
-        self.addDockWidget(Qt.BottomDockWidgetArea, depotDock) 
+#        depotModel = omg.gopulate.models.GopulateTreeModel(None)
+#        depotWidget = omg.gopulate.gui.GopulateTreeWidget()
+#        depotWidget.setModel(depotModel)
+#        depotDock = QtGui.QDockWidget()
+#        depotDock.setWindowTitle("container depot")
+#        depotDock.setWidget(depotWidget)
+#        self.addDockWidget(Qt.BottomDockWidgetArea, depotDock) 
         
         self.setCentralWidget(central)
         control.synchronizePlaylist(playlist.getModel())
@@ -185,7 +182,7 @@ def run(opts, args):
     
     # Create GUI
     global widget
-    omg.distributor = DBUpdateDistributor()
+    #omg.distributor = DBUpdateDistributor()
     widget = OmgMainWindow()
     from omg import plugins
     plugins.loadPlugins()

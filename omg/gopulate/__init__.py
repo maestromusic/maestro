@@ -146,8 +146,6 @@ class GopulateGuesser:
                     else:
                         album_id = None
                     metaContainer = omg.models.Container(id = album_id)
-                    if metaContainer.isInDB():
-                        print("existing found {}".format(metaContainer))
                     finalDictionary[discname_reduced] = metaContainer
                     
                     metaContainer.loadContents(recursive=True)
