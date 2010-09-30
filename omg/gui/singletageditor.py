@@ -13,7 +13,7 @@ from PyQt4.QtCore import Qt
 from omg import models, constants, FlexiDate, getIcon
 from omg.models import simplelistmodel, tageditormodel
 from omg.gui import formatter
-from . import widgetlist, listview
+from omg.gui.misc import editorwidget, listview, widgetlist
 
 EXPAND_LIMIT = 2
 
@@ -94,13 +94,16 @@ class TagValueEditor(QtGui.QWidget):
         firstLineLayout = QtGui.QHBoxLayout()
         self.layout().addLayout(firstLineLayout)
         
-        # Stack-layout to display and edit the value
-        self.stackedLayout = QtGui.QStackedLayout()
+        # Create and fill the EditorWidget
+        self.editorWidget = editorwidget.EditorWidget()
         self.valueLabel = QtGui.QLabel()
-        self.stackedLayout.addWidget(self.valueLabel)
-        self.editor = TagLineEdit(self._formatValue(record.value),self)
-        self.stackedLayout.addWidget(self.editor)
-        firstLineLayout.addLayout(self.stackedLayout)
+        self.editorWidget.setLabel(self.valueLabel)
+        self.editor = TagLineEdit()
+        self.editorWidget.setEditor(self.editor)
+        # The following connection resets the editor when it looses focus
+        self.editorWidget.editorClosed.connect(self._updateEditorWidget)
+        firstLineLayout.addWidget(self.editorWidget)
+        
         self.elementsLabel = QtGui.QLabel()
         firstLineLayout.addWidget(self.elementsLabel)
         self.expandButton = ExpandButton(self)
@@ -113,7 +116,7 @@ class TagValueEditor(QtGui.QWidget):
         
     def setRecord(self,record):
         self.record = record
-        self.valueLabel.setText(self._formatValue(record.value))
+        self._updateEditorWidget()
         self._updateElementsLabel()
         if record.isCommon():
             self.expandButton.setVisible(False)
@@ -135,6 +138,13 @@ class TagValueEditor(QtGui.QWidget):
                 self.listView.setModel(simplelistmodel.SimpleListModel(elements,models.Element.getTitle))
                 self.setExpanded(len(elements) <= EXPAND_LIMIT)
     
+    def _updateEditorWidget(self):
+        if isinstance(self.record.value,FlexiDate):
+            value = self.record.value.strftime()
+        else: value = self.record.value
+        self.valueLabel.setText(value)
+        self.editor.setText(value)
+        
     def _updateElementsLabel(self):
         if self.record.isCommon():
             self.elementsLabel.clear()
@@ -147,19 +157,6 @@ class TagValueEditor(QtGui.QWidget):
             else:
                 self.elementsLabel.setText(" {} {}/{} Stücken{}".format(
                         preposition,len(elements),len(self.record.allElements),':' if self.isExpanded() else ''))
-            
-    def isEditing(self):
-        return self.editing
-    
-    def setEditing(self,editing):
-        if editing != self.editing:
-            self.editing = editing
-            if editing:
-                self.editor.setText(self._formatValue(self.record.value))
-                self.stackedLayout.setCurrentIndex(1)
-                self.editor.setFocus(Qt.MouseFocusReason)
-                self.editor.selectAll()
-            else: self.stackedLayout.setCurrentIndex(0)
         
     def isExpanded(self):
         return self.expanded
@@ -171,42 +168,26 @@ class TagValueEditor(QtGui.QWidget):
             self._updateElementsLabel()
             if self.listView is not None:
                 self.listView.setVisible(expanded)
-        
-    def _formatValue(self,value):
-        if isinstance(value,FlexiDate):
-            return value.strftime()
-        else: return value
-    
-    def mousePressEvent(self,mouseEvent):
-        if not self.isEditing():
-            self.setEditing(True)
-        mouseEvent.accept()
-        QtGui.QWidget.mousePressEvent(self,mouseEvent)
 
     def keyPressEvent(self,event):
         if event.key() == Qt.Key_Escape:
-            self.editor.setText(self._formatValue(self.record.value)) # reset
-            self.setEditing(False)
+            self.editorWidget.showLabel()
             event.accept()
         elif event.key() == Qt.Key_Return:
             if self.record.tag.isValid(self.editor.text()):
-                self.setEditing(False)
                 newRecord = self.record.copy()
                 newRecord.value = self.editor.text()
                 self.model.changeRecord(self.record,newRecord)
+                self.editorWidget.showLabel()
             else: QtGui.QMessageBox.warning(self,"Ungültiger Wert","Der eingegebene Wert ist ungültig.")
             event.accept()
 
 
 class TagLineEdit(QtGui.QLineEdit):
-    def __init__(self,text,parent=None):
-        QtGui.QLineEdit.__init__(self,text,parent)
-        
-    def focusOutEvent(self,focusEvent):
-        QtGui.QLineEdit.focusOutEvent(self,focusEvent)
-        self.parent().setEditing(False)
+    def __init__(self,parent=None):
+        QtGui.QLineEdit.__init__(self,parent)
 
-        
+
 class ExpandButton(QtGui.QPushButton):
     expandIcon = QtGui.QIcon(getIcon("expand.png"))
     collapseIcon = QtGui.QIcon(getIcon("collapse.png"))

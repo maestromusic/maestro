@@ -13,7 +13,8 @@ from PyQt4.QtCore import Qt
 
 from omg import constants, tags
 from omg.models import tageditormodel, simplelistmodel
-from . import formatter, singletageditor
+from omg.gui import formatter, singletageditor
+from omg.gui.misc import widgetlist
 
 class TagEditorWidget(QtGui.QDialog):
     def __init__(self,parent,elements):
@@ -25,6 +26,8 @@ class TagEditorWidget(QtGui.QDialog):
         self.model.recordAdded.connect(self._handleRecordAdded)
         self.model.recordChanged.connect(self._handleRecordChanged)
         self.model.recordRemoved.connect(self._handleRecordRemoved)
+        
+        self.selectionManager = widgetlist.SelectionManager()
         
         self.setLayout(QtGui.QVBoxLayout())
         self.tagEditorLayout = QtGui.QFormLayout()
@@ -49,6 +52,7 @@ class TagEditorWidget(QtGui.QDialog):
     
     def _addSingleTagEditor(self,tag):
         self.singleTagEditors[tag] = singletageditor.SingleTagEditor(tag,self.model)
+        self.singleTagEditors[tag].widgetList.setSelectionManager(self.selectionManager)
         self.tagEditorLayout.addRow("{0}:".format(str(tag)),self.singleTagEditors[tag])
 
     def _handleAddButton(self):
@@ -71,7 +75,7 @@ class TagEditorWidget(QtGui.QDialog):
         
     def _handleRecordRemoved(self,record):
         if record.tag not in self.model.getTags():
-            pass #TODO: Remove from self.singleTagEditors and self.tagEditorLayout
+            pass #TODO: Remove from self.singleTagEditors and self.tagEditorLayout and self.selectionManager
         else: pass # The SingleTagEditor will deal with it
         
         
@@ -131,17 +135,20 @@ class TagDialog(QtGui.QDialog):
         selectedElements = [allElements[i] for i in range(len(allElements))
                                 if self.elementsBox.selectionModel().isRowSelected(i,QtCore.QModelIndex())]
         return tageditormodel.Record(self.typeEditor.getTag(),self.valueEditor.text(),allElements,selectedElements)
-                            
+
 
 class TagTypeBox(QtGui.QComboBox):
     def __init__(self,defaultTag = None,parent=None):
         QtGui.QComboBox.__init__(self,parent)
         self.setEditable(True)
+        self.setInsertPolicy(QtGui.QComboBox.NoInsert)
         if defaultTag is None:
             self.setEditText('')
         
         for tag in tags.tagList:
-            self.addItem(str(tag))
+            if tag.iconPath() is not None:
+                self.addItem(QtGui.QIcon(tag.iconPath()),tag.translated())
+            else: self.addItem(tag.translated())
             if tag == defaultTag:
                 self.setCurrentIndex(self.count()-1)
                 
@@ -150,3 +157,4 @@ class TagTypeBox(QtGui.QComboBox):
         if text[0] == text[-1] and text[0] in ['"',"'"]: # Don't translate if the text is quoted
             return tags.get(text[1:-1])
         else: return tags.fromTranslation(text)
+        
