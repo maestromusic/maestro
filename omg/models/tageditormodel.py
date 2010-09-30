@@ -46,11 +46,17 @@ class TagEditorModel(QtCore.QObject):
     recordRemoved = QtCore.pyqtSignal(Record)
     recordChanged = QtCore.pyqtSignal(Record,Record)
     tagRemoved = QtCore.pyqtSignal(tags.Tag)
+    resetted = QtCore.pyqtSignal()
     
     def __init__(self,elements):
         QtCore.QObject.__init__(self)
         self.elements = [element.copy() for element in elements]
+        self.oldElements = elements
     
+    def reset(self):
+        self.elements = [element.copy() for element in self.oldElements]
+        self.resetted.emit()
+        
     def getTags(self):
         tags = []
         for tag in itertools.chain.from_iterable(element.tags.keys() for element in self.elements):

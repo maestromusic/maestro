@@ -96,9 +96,11 @@ class Tag:
         return nameDict.get(self.name,self.name) # if self.name is not contained in the dict return the name itself
     
     def iconPath(self):
+        """Return the path to the icon of this tag or None if there is no such icon."""
         path = getIcon("tag_{}.png".format(self.name))
         return path if os.path.isfile(path) else None
-        
+
+
 class IndexedTag(Tag):
     """Subclass for all indexed tags.
     
@@ -135,10 +137,11 @@ class IndexedTag(Tag):
         return valueId
     
     def isValid(self,value):
+        """Return whether the given value is a valid value for this tag (this depends only on the tag-type)."""
         if self.type == 'varchar':
-            return isinstance(value,str) and len(value.encode()) <= constants.TAG_VARCHAR_LENGTH
+            return isinstance(value,str) and 0 < len(value.encode()) <= constants.TAG_VARCHAR_LENGTH
         elif self.type == 'text':
-            return isinstance(value,str)
+            return isinstance(value,str) and len(value) > 0
         elif self.type == 'date':
             if isinstance(value,FlexiDate):
                 return True

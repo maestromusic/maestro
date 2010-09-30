@@ -13,10 +13,16 @@ from PyQt4.QtCore import Qt
 logger = logging.getLogger("gui")
 
 class WidgetList(QtGui.QWidget):
+    """A WidgetList sort of a list-view for widgets: It is a widget containing a list of child-widgets, which are either laid out horizontically or vertically. Using a SelectionManager a WidgetList can have a selection and will highlight selected children."""
+    
+    # This signal is emitted when a widget is inserted into this WidgetList and contains the WidgetList and the position of the inserted widget as parameters.
     widgetInserted = QtCore.pyqtSignal(QtGui.QWidget,int) # Actually the first parameter is a WidgetList
+    
+    # This signal is emitted when a widget isremoved from this WidgetList and contains the WidgetList, the position of the removed widget and that widget itself as parameters.
     widgetRemoved = QtCore.pyqtSignal(QtGui.QWidget,int,QtGui.QWidget)  #   "
     
     def __init__(self,direction,parent=None):
+        """Create a new WidgetList laying out children in the specified direction (confer the QBoxLayout::Direction-enum) and using the given parent."""
         QtGui.QWidget.__init__(self,parent)
         self.setLayout(QtGui.QBoxLayout(direction))
         self.children = []
@@ -24,10 +30,16 @@ class WidgetList(QtGui.QWidget):
         self.layout().setSpacing(0)
         self.layout().setMargin(0)
     
+    def getDirection(self):
+        """Set the direction in which the children of this WidgetList are laid out (confer the QBoxLayout::Direction-enum)."""
+        return self.layout().direction()
+
     def setDirection(self,direction):
+        """Return the direction in which the children of this WidgetList are laid out (confer the QBoxLayout::Direction-enum)."""
         self.layout().setDirection(direction)
     
     def index(self,widget):
+        """Return the index of <widget> among this WidgetList's children. Raise an IndexError if the widget cannot be found."""
         return self.children.index(widget)
     
     def __len__(self):
@@ -46,24 +58,30 @@ class WidgetList(QtGui.QWidget):
         raise NotImpelementedError() # Use removeWidget
     
     def insertWidget(self,index,widget):
+        """Insert <widget> into this WidgetList's children at position <index>."""
         self.children[index:index] = [widget]
         self.layout().insertWidget(index,widget)
         self.widgetInserted.emit(self,index)
     
     def addWidget(self,widget):
+        """Add <widget> to the end of this WidgetList's children."""
         index = len(self.children)
         self.insertWidget(index,widget)
         self.widgetInserted.emit(self,index)
     
     def removeWidget(self,widget):
+        """Remove <widget> from this WidgetList's children."""
         index = self.children.index(widget)
         self.layout().removeWidget(widget)
+        widget.setParent(None)
         self.widgetRemoved.emit(self,index,widget)
     
     def getSelectionManager(self):
+        """Return the SelectionManager in charge of this WidgetList or None if there is no such SelectionManager."""
         return self.selectionManager
     
     def setSelectionManager(self,selectionManager):
+        """Set the SelectionManager in charge of this WidgetList. The previous SelectionManager (if any) is removed. If <selectionManager> is None, this WidgetList won't be able to have a selection afterwards."""
         if self.selectionManager is not None:
             self.selectionManager.removeWidgetList(self)
             self.update() # Repaint as no widgets are selected anymore
@@ -89,20 +107,25 @@ class WidgetList(QtGui.QWidget):
 
 
 class SelectionManager(QtCore.QObject):
+    """A SelectionManager handles the selection of one or more WidgetLists. Using a common SelectionManager for several WidgetLists makes it possible to have one selection for all those WidgetLists (that is, a click on one widget will clear the selection in all WidgetLists and select only this widget.). Usually there is no need to use any method of SelectionManager directly, with the exception of the constructor: Create a SelectionManager and pass the WidgetLists to the constructor or use WidgetList.setSelectionManager."""
     def __init__(self,widgetLists=None):
+        """Creates a SelectionManager and optionally sets the WidgetList on which this SelectionManager operates."""
         QtCore.QObject.__init__(self)
         self.widgetLists = []
         self.selected = []
+        self.anchor = None
         if widgetLists is not None:
             self.setWidgetLists(widgetLists)
     
     def setWidgetLists(self,widgetLists):
+        """Set the WidgetList on which this SelectionManager operates. Usually you won't call this method directly, but use WidgetList.setSelectionManager."""
         for widgetList in self.widgetLists:
             self.removeWidgetList(widgetList)
         for widgetList in widgetLists:
             self.addWidgetList(widgetList)
         
     def addWidgetList(self,widgetList):
+        """Add a WidgetList to the lists of this SelectionManager. Usually you won't call this method directly, but use WidgetList.setSelectionManager."""
         self.widgetLists.append(widgetList)
         self.selected.append([False] * len(widgetList))
         widgetList.widgetInserted.connect(self._handleWidgetInserted)
@@ -111,35 +134,60 @@ class SelectionManager(QtCore.QObject):
             widget.installEventFilter(self)
         
     def removeWidgetList(self,widgetList):
+        """Remove a WidgetList from the lists of this SelectionManager. Usually you won't call this method directly, but use WidgetList.setSelectionManager."""
         index = self.widgetLists.index(widgetList)
         for widget in widgetList:
             widget.removeEventFilter(self)
-        #TODO: deconnect widgetInserted and widgetRemoved
+        widgetList.widgetInserted.disconnect(self._handleWidgetInserted)
+        widgetList.widgetRemoved.disconnect(self._handleWidgetRemoved)
         del self.selected[index]
         del self.widgetLists[index]
     
+    def hasSelection(self):
+        """Return whether at least one widget is selected currently."""
+        return any(any(s) for s in self.selected)
+
+    def getSelectedWidgets(self):
+        """Return a list of all currently selected widgets in the WidgetLists whose selection is managed by this SelectionManager."""
+        result = []
+        for i in range(len(self.widgetLists)):
+            for j in range(len(self.widgetLists[i])):
+                if self.selected[i][j]:
+                    result.append(self.widgetLists[i][j])
+        return result
+
     def getSelectionStatus(self,widgetList):
+        """Return a list of booleans to encode the selection of <widgetList>: The i-th booleans stores whether the i-th widget of <widgetList> is selected."""
         return self.selected[self.widgetLists.index(widgetList)]
         
     def clear(self):
+        """Clear the selection."""
         for i in range(len(self.widgetLists)):
             for j in range(len(self.widgetLists[i])):
                 if self.selected[i][j]:
                     self.selected[i][j] = False
                     self.widgetLists[i].selectionChanged(j)
-            
+    
     def eventFilter(self,object,event):
         if event.type() == QtCore.QEvent.MouseButtonPress:
             widgetList = object.parent()
             #~ try:
             listIndex = self.widgetLists.index(widgetList)
             widgetIndex = widgetList.index(object)
-            if Qt.ControlModifier & event.modifiers():
+            if Qt.ShiftModifier & event.modifiers() and self.anchor is not None:
+                if self.anchor[0] == listIndex:
+                    for i in range(min(widgetIndex,self.anchor[1]),max(widgetIndex,self.anchor[1])+1):
+                        if not self.selected[listIndex][i]:
+                            self.selected[listIndex][i] = True
+                            widgetList.selectionChanged(i)
+            elif Qt.ControlModifier & event.modifiers():
                 self.selected[listIndex][widgetIndex] = not self.selected[listIndex][widgetIndex]
+                self.anchor = (listIndex,widgetIndex)
                 widgetList.selectionChanged(widgetIndex)
-            else:
+            else: # Clear and select a single widget
                 self.clear()
                 self.selected[listIndex][widgetIndex] = True
+                self.anchor = (listIndex,widgetIndex)
                 widgetList.selectionChanged(widgetIndex)
             #~ except IndexError as e:
                 #~ logger.warning("Something's wrong with the SelectionManager's indices: {} {}".format(listIndex,widgetIndex))
@@ -147,11 +195,13 @@ class SelectionManager(QtCore.QObject):
         return False # Don't stop the event
         
     def _handleWidgetInserted(self,widgetList,index):
+        """Handle widgetInserted-signal from <widgetList>. <index> is the position of the inserted widget."""
         listIndex = self.widgetLists.index(widgetList)
         widgetList[index].installEventFilter(self)
         self.selected[listIndex].insert(index,False) # Newly inserted widgets are not selected
         
     def _handleWidgetRemoved(self,widgetList,index,widget):
+        """Handle widgetRemoved-signal from <widgetList>. <index> is the position of the removed widget, <widget> is that widget itself."""
         listIndex = self.widgetLists.index(widgetList)
         widget.removeEventFilter(self)
         del self.selected[listIndex][index]

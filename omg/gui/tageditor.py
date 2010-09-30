@@ -21,27 +21,30 @@ class TagEditorWidget(QtGui.QDialog):
         QtGui.QDialog.__init__(self,parent)
         self.setWindowTitle("Tags editieren")
         
-        self.originalElements = elements
         self.model = tageditormodel.TagEditorModel(elements)
         self.model.recordAdded.connect(self._handleRecordAdded)
         self.model.recordChanged.connect(self._handleRecordChanged)
         self.model.recordRemoved.connect(self._handleRecordRemoved)
+        self.model.resetted.connect(self._handleReset)
         
         self.selectionManager = widgetlist.SelectionManager()
         
         self.setLayout(QtGui.QVBoxLayout())
-        self.tagEditorLayout = QtGui.QFormLayout()
-        self.layout().addLayout(self.tagEditorLayout,1)
+        self.tagEditorLayout = QtGui.QGridLayout()
+        self.layout().addLayout(self.tagEditorLayout)
+        self.layout().addStretch(1)
         buttonBarLayout = QtGui.QHBoxLayout()
         self.layout().addLayout(buttonBarLayout,0)
         
         addButton = QtGui.QPushButton("Tag hinzufügen")
         addButton.clicked.connect(self._handleAddButton)
         buttonBarLayout.addWidget(addButton)
-        removeButton = QtGui.QPushButton("Tag entfernen")
+        removeButton = QtGui.QPushButton("Ausgewählte entfernen")
+        removeButton.clicked.connect(self._handleRemoveButton)
         buttonBarLayout.addWidget(removeButton)
         buttonBarLayout.addStretch(1)
         resetButton = QtGui.QPushButton("Zurücksetzen")
+        resetButton.clicked.connect(self.model.reset)
         buttonBarLayout.addWidget(resetButton)
         saveButton = QtGui.QPushButton("Speichern")
         buttonBarLayout.addWidget(saveButton)
@@ -53,14 +56,37 @@ class TagEditorWidget(QtGui.QDialog):
     def _addSingleTagEditor(self,tag):
         self.singleTagEditors[tag] = singletageditor.SingleTagEditor(tag,self.model)
         self.singleTagEditors[tag].widgetList.setSelectionManager(self.selectionManager)
-        self.tagEditorLayout.addRow("{0}:".format(str(tag)),self.singleTagEditors[tag])
+        row = len(self.singleTagEditors)
+        self.tagEditorLayout.addWidget(QtGui.QLabel("{0}:".format(str(tag))),row,0)
+        self.tagEditorLayout.addWidget(self.singleTagEditors[tag],row,1)
 
+    def _removeSingleTagEditor(self,tag):
+        tagEditor = self.singleTagEditors[tag]
+        row = self.tagEditorLayout.getItemPosition(self.tagEditorLayout.indexOf(tagEditor))[0]
+        label = self.tagEditorLayout.itemAtPosition(row,0).widget()
+        self.tagEditorLayout.removeWidget(label)
+        label.setParent(None)
+        self.tagEditorLayout.removeWidget(tagEditor)
+        tagEditor.widgetList.setSelectionManager(None)
+        tagEditor.setParent(None)
+        del self.singleTagEditors[tag]
+
+    def _handleReset(self):
+        for tag in list(self.singleTagEditors.keys()): # dict will change
+            self._removeSingleTagEditor(tag)
+        for tag in self.model.getTags():
+            self._addSingleTagEditor(tag)
+        
     def _handleAddButton(self):
         dialog = TagDialog(self,self.model.elements)
         if dialog.exec_() == QtGui.QDialog.Accepted:
             self.model.addRecord(dialog.getRecord())
             self.updateGeometry()
 
+    def _handleRemoveButton(self):
+        for tagValueEditor in self.selectionManager.getSelectedWidgets():
+            self.model.removeRecord(tagValueEditor.getRecord())
+        
     # Note that the following _handle-functions only add new SingleTagEditors or remove SingleTagEditors which have become empty. Unless they are newly created or removed, the editors are updated in their own _handle-functions.
     def _handleRecordAdded(self,record):
         if record.tag not in self.singleTagEditors:
@@ -75,7 +101,7 @@ class TagEditorWidget(QtGui.QDialog):
         
     def _handleRecordRemoved(self,record):
         if record.tag not in self.model.getTags():
-            pass #TODO: Remove from self.singleTagEditors and self.tagEditorLayout and self.selectionManager
+            self._removeSingleTagEditor(record.tag)
         else: pass # The SingleTagEditor will deal with it
         
         

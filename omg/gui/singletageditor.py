@@ -60,14 +60,14 @@ class SingleTagEditor(QtGui.QWidget):
             
     def _handleRecordRemoved(self,record):
         if record.tag == self.tag:
-            for valueEditor in self.widgetList.getWidgets():
+            for valueEditor in self.widgetList:
                 if valueEditor.getRecord() == record:
                     self.widgetList.removeWidget(valueEditor)
                     return
             
     def _handleRecordChanged(self,oldRecord,newRecord):
         if self.tag == oldRecord.tag == newRecord.tag:
-            for valueEditor in self.widgetList.getWidgets():
+            for valueEditor in self.widgetList:
                 if valueEditor.getRecord() == oldRecord:
                     valueEditor.setRecord(newRecord)
                     return
@@ -75,7 +75,7 @@ class SingleTagEditor(QtGui.QWidget):
             self._handleRecordRemoved(oldRecord)
         elif self.tag == newRecord.tag:
             self._handleRecordAdded(newRecord)
-
+    
 
 class TagValueEditor(QtGui.QWidget):
     def __init__(self,record,model,parent=None):
