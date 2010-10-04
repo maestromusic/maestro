@@ -540,7 +540,7 @@ class File(Element):
             real.read()
         except realfiles.ReadTagError as e:
             logger.warning("Failed to read tags from file {}: {}".format(self.path, str(e)))
-        if not equalsExceptIgnored(self.tags, real.tags):
+        if self.tags is not None and not equalsExceptIgnored(self.tags, real.tags):
             self._syncState["tags"] = True
         self.tags = real.tags
         self.fileTags = real.tags.copy()

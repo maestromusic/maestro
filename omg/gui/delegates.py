@@ -58,7 +58,7 @@ class PlaylistDelegate(abstractdelegate.AbstractDelegate):
             coverSize = options.gui.large_cover_size
             self.drawCover(coverSize,element)
             
-            self.addLine(f.title(),"",PL_TITLE_STYLE)
+            self.addLine(f.titleWithPos(),"",PL_TITLE_STYLE)
             self.addLine(f.album(),"",PL_ALBUM_STYLE)
             self.addLine(f.tag(tags.get("composer"),True),f.tag(tags.get("conductor"),True))
             self.addLine(f.tag(tags.get("artist"),True),f.tag(tags.get("performer"),True))
