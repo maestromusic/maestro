@@ -12,6 +12,9 @@ import shutil
 from PyQt4 import QtGui,QtCore
 from PyQt4.QtCore import Qt
 
+import omg
+from omg import application
+
 # Path to cover directory
 COVER_DIR = os.path.expanduser("~/.omg/cover/")
 
@@ -76,11 +79,11 @@ def cacheAll(size):
 def setCover(id,cover):
     assert isinstance(id,int)
     path = os.path.join(COVER_DIR, "large", str(id))
-    print(path)
     if not cover.save(path ,"png"):
         return False
     else:
         # Remove cached files
+        omg.distributor.indicesChanged.emit(application.DatabaseChangeNotice(id, tags = False, contents = False, cover = True, recursive = False))
         for path in os.listdir(COVER_DIR):
             if path[0:6] == "cache_" and os.path.isfile(COVER_DIR+path+"/"+str(id)):
                 os.remove(COVER_DIR+path+"/"+str(id))

@@ -275,7 +275,8 @@ class CoverFetcher(QtGui.QDialog):
             QtGui.QMessageBox(QtGui.QMessageBox.Warning,"Speichern fehlgeschlagen",
                               "Das Cover konnte nicht gespeichert werden.",
                               QtGui.QMessageBox.Ok,self).exec_()
-        else: self.nextElement()
+        else:
+            self.nextElement()
         
 
 class LastFmLabel(QtGui.QLabel):

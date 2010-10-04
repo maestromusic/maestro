@@ -272,7 +272,7 @@ class GopulateDelegate(QtGui.QStyledItemDelegate):
                 height += fSize.height()
         # ——————— paint the element position and color marker ————————
         if painter:
-            if elem.changesPending and elem.isInDB():
+            if elem.outOfSync():
                 painter.setPen(Qt.red)
             if not elem.isInDB():
                 painter.fillRect(0, 0, tagRenderStartX, rect.height(), Qt.yellow)
@@ -282,7 +282,7 @@ class GopulateDelegate(QtGui.QStyledItemDelegate):
                 rect.setTop(int((rect.height() -positionSize.height())/2))        
                 painter.drawText(rect, Qt.TextSingleLine, str(elem.getPosition()))
             else:
-                if elem.changesPending and elem.isInDB():
+                if elem.outOfSync():
                     painter.fillRect(0, 0, tagRenderStartX, rect.height()//4, Qt.red)
             painter.setPen(Qt.black)
             painter.restore()

@@ -6,14 +6,13 @@
 # published by the Free Software Foundation
 #
 import sys, os, random, logging, io
+
 from omg import constants
-import omg
 from omg.config import options
 import omg.config
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 from _abcoll import Iterable
-
 # Global variables. Only for debugging! Later there may be more than one browser, playlist, etc.
 widget = None
 browser = None
@@ -40,18 +39,19 @@ class DatabaseChangeNotice():
     ids = None # the affected element_ids
     recursive = True # changes also affect subcontainers
     
-    def __init__(self, ids, tags = True, contents = True, recursive = True, deleted = False, created = False):
+    def __init__(self, ids, tags = True, contents = True, cover = False, recursive = True, deleted = False, created = False):
         self.ids = ids
         self.tags = tags
         self.contents = contents
         self.recursive = recursive
         self.deleted = deleted
         self.created = created
+        self.cover = cover
         
     @staticmethod
     def deleteNotice(ids, recursive = False):
         """Convenience function."""
-        return DatabaseChangeNotice(ids, tags = False, contents = False, recursive = recursive, deleted = True, created = False)
+        return DatabaseChangeNotice(ids, tags = False, contents = False, cover = False, recursive = recursive, deleted = True, created = False)
         
 class DBUpdateDistributor(QtCore.QObject):
     
@@ -182,7 +182,8 @@ def run(opts, args):
     
     # Create GUI
     global widget
-    #omg.distributor = DBUpdateDistributor()
+    import omg
+    omg.distributor = DBUpdateDistributor()
     widget = OmgMainWindow()
     from omg import plugins
     plugins.loadPlugins()

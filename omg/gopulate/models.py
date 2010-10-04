@@ -64,10 +64,14 @@ class GopulateTreeModel(BasicPlaylist):
     
     def data(self, index, role = Qt.EditRole):
         if index.isValid() and role == Qt.StatusTipRole:
-            if index.internalPointer().isInDB():
-                return "I'm a database element"
+            elem = index.internalPointer()
+            if elem.outOfSync():
+                return ",".join(key for key, value in elem._syncState.items() if value) + " are out of sync"
+                    
+            elif elem.isInDB():
+                return "I'm a synced DB element"
             else:
-                return "I'm a new element"
+                return "I'm a happy new element, waiting for commit."
         else:
             return BasicPlaylist.data(self, index, role)
           
@@ -96,7 +100,6 @@ class GopulateTreeModel(BasicPlaylist):
                 item.setPosition(j)
                 newContainer.contents.append(item)
                 parent.contents.remove(item)
-                parent.changesPending = True
                 for i in range(len(item.tags[tags.TITLE])):
                     item.tags[tags.TITLE][i] = item.tags[tags.TITLE][i].replace(name, "").\
                         strip(constants.FILL_CHARACTERS).\
@@ -105,6 +108,7 @@ class GopulateTreeModel(BasicPlaylist):
                     if item.tags[tags.TITLE][i] == "":
                         item.tags[tags.TITLE][i] = "Part {}".format(i+1)
                 j = j + 1
+            parent._syncState["contents"] = True
             self.endRemoveRows()
             self.beginInsertRows(parentIndex, insertPosition, insertPosition)
             parent.contents.insert(insertPosition, newContainer)

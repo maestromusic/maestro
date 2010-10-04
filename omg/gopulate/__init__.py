@@ -89,8 +89,10 @@ class GopulateGuesser:
                     continue
                 elem = omg.models.File(id)
                 elem.loadTags()
+                elem.readTagsFromFilesystem()
                 t = elem.tags
-                albumIds = elem.getAlbumIds()
+                
+                albumIds = elem.getParentIds(recursive = False)
                 for aid in albumIds:
                     if not aid in albumsFoundByID:
                         albumsFoundByID[aid] = omg.models.Container(aid)
@@ -142,6 +144,7 @@ class GopulateGuesser:
         
         finalDictionary = {}
         for name, album in albumsFoundByName.items():
+            # search for meta containers
             discnumber = None
             crazySplit = name.split("####••••")
             if len(crazySplit) == 2:
@@ -163,6 +166,11 @@ class GopulateGuesser:
                     if discname_id is not None:
                         album_id = database.get().query('SELECT element_id FROM tags WHERE tag_id=? and value_id= ?',
                                                         tags.TITLE.id, discname_id).getSingle()
+                        file = database.get().query('SELECT file FROM elements WHERE id = ?', album_id).getSingle()
+                        print("OMGWTF {}".format(file))
+                        if file == True:
+                            
+                            album_id = None
                     else:
                         album_id = None
                     metaContainer = omg.models.Container(id = album_id)

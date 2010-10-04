@@ -112,13 +112,18 @@ class BrowserTreeView(QtGui.QTreeView):
     
     def _deleteSelected(self):
         """Non-recursively deletes the selected elements from the database."""
-        affectedIDs = []
-        indices = [index for index in self.selectionModel().selectedIndexes() if isinstance(index.internalPointer(), models.Element)]
-        for index in indices:
-            self.model().beginRemoveRows(index.parent(), index.row(), index.row())
-            affectedIDs.append(index.internalPointer().id)
-            index.internalPointer().delete()
+        sel = self.selectionModel().selection()
+        for i in sel:
+            parentIndex = i.topLeft().parent()
+            parentElem = parentIndex.internalPointer()
+            print(i.topLeft().internalPointer(), "-", i.bottomRight().internalPointer())
+            self.model().beginRemoveRows(parentIndex, i.topLeft().row(), i.bottomRight().row())
+            elems = (index.internalPointer() for index in i.indexes() if isinstance(index.internalPointer(), models.Element))
+            for elem in elems:
+                elem.delete(recursive = True)
             self.model().endRemoveRows()
+            if isinstance(parentElem, models.Container):
+                parentElem.updateElementCounter()
         
     def contextMenuEvent(self, event):
         menu = QtGui.QMenu(self)

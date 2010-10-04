@@ -15,7 +15,7 @@ from omg.config import options
 from functools import reduce
 db = database.get()
 
-logger = logging.getLogger(name="omg")
+logger = logging.getLogger(name="models")
 
 class Node:
     """(Abstract) base class for elements in a RootedTreeModel...that is almost everything in playlists, browser etc.. Node implements the methods required by RootedTreeModel as well as some basic tree-structure methods. To implement getParent, setParent and getChildren, it uses self.parent as parent and self.contents as the list of children, but does not create these variables. Subclasses must either create self.contents and self.parent or overwrite the methods."""
@@ -187,7 +187,6 @@ class Element(Node):
     tags = None # tags.Storage to store the tags. None until they are loaded
     position = None
     length = None
-    changesPending = set()
     
     def __init__(self):
         raise RuntimeError(
@@ -200,6 +199,9 @@ class Element(Node):
             return self.id is not None
         else:
             return self.isInDB(False) and (self.isFile() or all((e.isInDB(True) for e in self.contents)))
+    
+    def outOfSync(self):
+        return self.isInDB() and any(self._syncState.values())
         
     def copy(self,contents=None):
         """Reimplementation of Node.copy: In addition to contents the tags are also not copied by reference. Instead the copy will contain a copy of this node's tags.Storage-instance."""
@@ -207,9 +209,15 @@ class Element(Node):
         newNode.tags = self.tags.copy()
         return newNode
 
-    def loadTags(self,recursive=False,tagList=None):
-        """Delete the stored tags and load them again. If this element is contained in the DB, tags will be loaded from there. Otherwise if this is a file, tags will be loaded from that file or no tags will be loaded if this is a container. If <recursive> is True, all tags from children of this node (recursively) will be loaded, too. If <tagList> is not None only tags in the given list will be loaded (e.g. only title-tags)."""
-        if self.isInDB():
+    def loadTags(self,recursive=False,tagList=None, fromFS=False):
+        """Delete the stored tags and load them again. If this element is contained in the DB, tags will be loaded from there.
+        Otherwise if this is a file, tags will be loaded from that file or no tags will be loaded if this is a container.
+        If <recursive> is True, all tags from children of this node (recursively) will be loaded, too.
+        If <tagList> is not None only tags in the given list will be loaded (e.g. only title-tags).
+        If <fromFS> is True, then tags are read form the file even if this element is in the DB (and is a file)."""
+        if fromFS and self.isInDB() and self.isFile():
+            self.readTagsFromFilesystem()
+        elif self.isInDB():
             self.tags = tags.Storage()
             # Prepare a where clause to select only the tags in tagList
             if tagList is not None:
@@ -235,7 +243,7 @@ class Element(Node):
             
         if recursive:
             for element in self.getChildren():
-                element.loadTags(recursive,tagList)
+                element.loadTags(recursive, tagList, fromFS)
     
     def ensureTagsAreLoaded(self,recursive=False):
         """Load tags if they are not loaded yet."""
@@ -263,9 +271,14 @@ class Element(Node):
     def setPosition(self, position):
         if position != self.position:
             self.position = position
-            self.parent.changesPending = True
+            if self.isInDB() and self.parent.isInDB():
+                dbPosition = db.query("SELECT position FROM contents WHERE container_id = ? AND element_id = ?", 
+                                 self.parent.id,self.id).getSingle()
+                if dbPosition != position:
+                    logger.debug("out of sync contents at id {} ({} {})".format(self.id, dbPosition, position))
+                    self.parent._syncState["contents"] = True
         
-    def getParentIds(self,recursive):
+    def getParentIds(self,recursive = False):
         """Return a list containing the ids of all parents of this element from the database. If <recursive> is True all ancestors will be added recursively."""
         if not self.isInDB():
             raise RuntimeError("getParentIds can only be used on elements contained in the database.")
@@ -342,7 +355,7 @@ class Element(Node):
             self._covers[size] = cover
         return cover
         
-    def delete(self):
+    def delete(self, recursive = False):
         """Deletes the element from the database."""
         if not self.isInDB():
             raise RuntimeError("delete can only be used on elements contained in the database.")
@@ -350,8 +363,12 @@ class Element(Node):
             queries.delFile(id = self.id)
         else:
             queries.delContainer(self.id)
+
+        if recursive and hasattr(self, "contents"):
+            for elem in self.contents[:]:
+                elem.delete(True)
         if isinstance(self.parent, Element):
-            self.parent.changesPending = True
+            self.parent._syncState["contents"] = True
         self.parent.contents.remove(self)
         self.id = None
             
@@ -388,6 +405,7 @@ class Container(Element):
         if contents is None:
             self.contents = []
         else: self.setContents(contents)
+        self._syncState = {}
     
     def setContents(self,contents):
         """Set the list of contents of this container to <contents>. Note that the list won't be copied but the parents will be set to this container."""
@@ -443,7 +461,7 @@ class Container(Element):
                 print(self.tags['title'])
         if wasInDB:
             database.queries.updateElementCounter(self.id)
-        self.changesPending = False
+        self.syncState = {}
 
     
     def updateSameTags(self, metaContainer = False):
@@ -469,7 +487,21 @@ class Container(Element):
             self.tags.merge(newTags)
         else:
             self.tags = newTags
-            
+    
+    def updateElementCounter(self):
+        database.queries.updateElementCounter(self.id)
+
+def equalsExceptIgnored(tags1, tags2):
+    """Checks if two tags are equal, but ignores all ignored tags for this check."""
+    set1 = set(k for k in tags1.keys() if not k.isIgnored() )
+    set2 = set(k for k in tags2.keys() if not k.isIgnored() )
+    if set1 != set2:
+        return False
+    for tag in set1:
+        if tags1[tag] != tags2[tag]:
+            return False
+    return True
+
 class File(Element):
     def __init__(self, id = None, tags = None, length = None, path = None, position = None):
         """Initialize this element with the given id, which must be an integer or None (for external files). Optionally you may specify a tags.Storage object holding the tags of this element and/or a file path."""
@@ -482,6 +514,7 @@ class File(Element):
         if path is not None and not isinstance(path,str):
             raise ValueError("path must be either None or a string. I got {}".format(id))
         self.path = path
+        self._syncState = {}
     
     def hasChildren(self):
         return False
@@ -499,16 +532,18 @@ class File(Element):
         return False
     
     def readTagsFromFilesystem(self):
-        if self.path is None:
+        if self.getPath() is None:
             raise RuntimeError("I need a path to read tags from the filesystem.")
-        real = realfiles.File(absPath(self.path))
+        logger.debug("readTagsFromFileSystem called on {}".format(self.path))
+        real = realfiles.File(absPath(self.getPath()))
         try:
             real.read()
         except realfiles.ReadTagError as e:
             logger.warning("Failed to read tags from file {}: {}".format(self.path, str(e)))
-        if self.tags != real.tags:
-            self.changesPending = True
+        if not equalsExceptIgnored(self.tags, real.tags):
+            self._syncState["tags"] = True
         self.tags = real.tags
+        self.fileTags = real.tags.copy()
         self.length = real.length
     
     def writeTagsToFilesystem(self):
@@ -567,7 +602,7 @@ class File(Element):
         if not hasattr(self, "hash"):
             self.computeHash()
         db.query(querytext, self.id, relPath(self.path), self.hash, int(self.length))
-        self.changesPending = False
+        self._syncState = {}
 
 def createElement(id,tags=None,contents=None,file=None, position=None):
     """Create an element with the given id, tags and contents. Depending on <file> an instance of Container or of File will be created. If <file> is None, the file-flag (elements.file) will be read from the database. Note that contents will be ignored if a File-instance is created."""

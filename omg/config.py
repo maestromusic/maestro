@@ -25,11 +25,12 @@ class ConfigError(Exception):
         
 class ConfigOption:
     
-    def __init__(self, type, default):
+    def __init__(self, type, default, description):
         self.type = type
         self.default = default
         self.value = None
         self.fileValue = None
+        self.description = description
     
     def getValue(self):
         if self.value is not None:
@@ -64,8 +65,8 @@ class ConfigSection:
         else:
             raise AttributeError("Section {} has no option {}".format(self.name, attr))
     
-    def addOption(self, name, type, default):
-        self.options[name] = ConfigOption(type, default)
+    def addOption(self, name, type, default, description = None):
+        self.options[name] = ConfigOption(type, default, description)
         return self.options[name]
     
     def __str__(self):
@@ -120,91 +121,71 @@ class Config:
             raise ConfigError("Section {} has no option {}".format(section, name))
         section.options[name].updateValue(value, updateFileValue)
         
-    def addOption(self, section, name, type, default, shorts = None):
+    def addOption(self, section, name, type, default, shorts = None, description = None):
         if section in self.sections:
             sect = self.sections[section]
         else:
             sect = self.sections[section] = ConfigSection(section)
-        newOpt = sect.addOption(name, type, default)
+        newOpt = sect.addOption(name, type, default, description = description)
         if shorts is not None:
             for s in shorts:
                 self.shorts[s] = newOpt
-        
-omgOptions = {
-    "database": [
-        # Database driver to use
-        ("driver", str, "qtsql"),
-        # Database access information
-        ("mysql_user", str, ""),
-        ("mysql_password", str, ""),
-        ("mysql_host", str, "localhost"),
-        ("mysql_port", int, 3306),
-        # Name of the database
-        ("mysql_db", str, "omg"),
-    ],
+                
+def initOmgOptions(options):
     
-    "music": [
-        ("collection", str, ".")
-    ],
+    options.addOption("database",   "driver",           str,    "qtsql"         )
+    options.addOption("database",   "mysql_user",       str,    ""              )
+    options.addOption("database",   "mysql_password",   str,    ""              )
+    options.addOption("database",   "mysql_host",       str,    "localhost"     )
+    options.addOption("database",   "mysql_port",       int,    3306            )
+    options.addOption("database",   "mysql_db",         str,    "omg"           )
     
-    "control": [
-        # Interval of the control timer syncing with mpd in milliseconds.
-        ("timer_interval", int, 300)
-    ],
     
-    "mpd": [
-        # Host and port where MPD is running
-        ("host", str, "localhost"),
-        ("port", int, 6600),
-    ],
-
-    "tags": [
-        # Tags that will be searched, if you type a text without prefix in a searchbox. Use prefixes to search for other tags.
-        ("search_tags", list, ["album","performer","conductor","title","lyricist","composer","date","artist"]),
-        # Tags which will be totally ignored by this application.
-        ("ignored_tags", list, ["tracktotal","disctotal","tracknumber","discnumber"]),
-        
-        # Order in which tags will be displayed. Must contain title and album! Tags which don't appear in this list will be displayed in arbitrary order after the tags in the list.
-        ("tag_order", list,  ["title","artist","album","composer","date","genre","performer","conductor"]),
-        
-        # Names of the tags which have a special meaning for the application and cannot always be treated generically.
-        # This allows to use other strings for the title-tag for example.
-        ("title_tag", str, "title"),
-        ("album_tag", str, "album"),
-        ("date_tag", str, "date"),
-    ],
+    options.addOption("music",      "collection",       str,    "."             , description="Collection base directory")
     
-    "gui": [
-        # Size in pixels of covers
-        ("browser_cover_size", int, 40),
-        ("large_cover_size", int, 60),
-        ("small_cover_size", int, 40),
-        ("detail_cover_size", int, 160),
-        ("cover_fetcher_cover_size", int, 400),
-        
-        # size of icons to display
-        ("iconsize", int, 16),
-        # Maximal number of views in a Browser
-        ("max_browser_views", int, 5),
-        
-        # Application-specific MIME-type for drag and drop operations
-        ("mime", str, "application/x-omgelementlist"),
-        
-        # Tab which will be shown at the beginning ('populate' or 'playlist')
-        ("startTab", str, "playlist")
-    ],
+    options.addOption("control",    "timer_interval",   int,    300             , description="Interval of mpd synchronization")
     
-    "log": [
-        # Log-level that will be used for console output. Unless this value is None, it will overwrite the value from logging.conf
-        ("consoleLogLevel", str, None, ("-v", "--loglevel")),
-    ],
+    options.addOption("mpd",        "host",             str,    "localhost"     )
+    options.addOption("mpd",        "port",             int,    6600            )
     
-    "misc": [
-        ("printtags_cmd", str, "./printtags.py"),
-        ("tagmanip26_cmd", str, os.path.abspath(os.path.join(os.path.split(os.path.split(__file__)[0])[0],"tagmanip26.py"))), # assume tagmanip26.py lives in the same directory as this module
-        ("show_ids", bool, False),
-    ]
-}
+    options.addOption("tags",       "search_tags",      list,   ["album",
+                                                                 "performer",
+                                                                 "conductor",
+                                                                 "title",
+                                                                 "lyricist",
+                                                                 "composer",
+                                                                 "date",
+                                                                 "artist"]      , description="Tags that will be searched, if you type a text without prefix in a searchbox. Use prefixes to search for other tags.")
+    options.addOption("tags",       "ignored_tags",     list,   ["tracktotal",
+                                                                 "disctotal",
+                                                                 "tracknumber",
+                                                                 "discnumber"]  )
+    options.addOption("tags",       "tag_order",        list,   ["title",
+                                                                 "artist",
+                                                                 "album",
+                                                                 "composer",
+                                                                 "date",
+                                                                 "genre",
+                                                                 "peformer",
+                                                                 "conductor"]   , description="Order in which tags will be displayed. Must contain title and album! Tags which don't appear in this list will be displayed in arbitrary order after the tags in the list.")
+    options.addOption("tags",       "title_tag",        str,    "title"         )
+    options.addOption("tags",       "album_tag",        str,    "album"         )
+    options.addOption("tags",       "date_tag",         str,    "date"          )
+    
+    options.addOption("gui",        "browser_cover_size",int,   40              )
+    options.addOption("gui",        "small_cover_size", int,    40              )
+    options.addOption("gui",        "detail_cover_size",int,    160             )
+    options.addOption("gui",        "large_cover_size", int,    60              )
+    options.addOption("gui",        "cover_fetcher_cover_size",int,400          )
+    options.addOption("gui",        "iconsize",         int,    16              )
+    options.addOption("gui",        "max_browser_views",int,    5               )
+    options.addOption("gui",        "mime",             str,    "application/x-omgelementlist")
+    options.addOption("gui",        "startTab",         str,    "playlist"      )
+    
+    options.addOption("log",        "consoleLogLevel",  str,    None,           shorts=("-v", "--loglevel"))
+    
+    options.addOption("misc",       "tagmanip26_cmd",   str,    os.path.abspath(os.path.join(os.path.split(os.path.split(__file__)[0])[0],"tagmanip26.py")))
+    options.addOption("misc",       "show_ids",         bool,   False           )
 
 _defaultShelveContents = {
     'widget_position': None, # center the window
@@ -216,9 +197,7 @@ _defaultShelveContents = {
 options = Config()
 
 def init(copts):
-    for sect, opts in omgOptions.items():
-        for opt in opts:
-            options.addOption(sect, *opt)
+    initOmgOptions(options)
     options.readFromFile(constants.CONFIG)
     options.readConsoleParameters(copts)
     
