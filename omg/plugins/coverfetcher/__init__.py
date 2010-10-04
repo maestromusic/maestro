@@ -14,7 +14,8 @@ import itertools
 from PyQt4 import QtCore,QtGui,QtNetwork
 from PyQt4.QtCore import Qt
 
-from omg import covers, config, constants, models, tags
+from omg import covers, constants, models, tags
+from omg.config import options
 from omg.gui import formatter, playlist
 
 LASTFM_API_KEY = 'b25b959554ed76058ac220b7b2e0a026'
@@ -38,7 +39,7 @@ def getMenuEntries(playlist,node):
 
 class CoverData:
     def __init__(self,cover,text):
-        coverSize = config.get("gui","cover_fetcher_cover_size")
+        coverSize = options.gui.cover_fetcher_cover_size
         self.cover = cover
         self.text = text
         if cover.width() > coverSize or cover.height() > coverSize:
@@ -68,7 +69,7 @@ class CoverFetcher(QtGui.QDialog):
         layout.addLayout(rightLayout)
         
         self.imageLabel = QtGui.QLabel(self)
-        coverSize = config.get("gui","cover_fetcher_cover_size")
+        coverSize = options.gui.cover_fetcher_cover_size
         self.imageLabel.setMinimumSize(coverSize+2,coverSize+2) # two pixels for the border
         self.imageLabel.setSizePolicy(QtGui.QSizePolicy.Fixed,QtGui.QSizePolicy.Fixed)
         self.imageLabel.setAlignment(Qt.AlignLeft|Qt.AlignTop)

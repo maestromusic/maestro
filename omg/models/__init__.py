@@ -187,7 +187,7 @@ class Element(Node):
     tags = None # tags.Storage to store the tags. None until they are loaded
     position = None
     length = None
-    changesPending = False #if changes were made to the element that have not yet been commited (valid only for DB-elements)
+    changesPending = set()
     
     def __init__(self):
         raise RuntimeError(

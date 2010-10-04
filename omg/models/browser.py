@@ -11,7 +11,8 @@ import itertools
 from PyQt4 import QtCore
 from PyQt4.QtCore import Qt
 
-from omg import config, models, search, database
+from omg import config, models, search, database, tags
+import omg
 from omg.models import rootedtreemodel, mimedata
 
 class BrowserModel(rootedtreemodel.RootedTreeModel):
@@ -133,6 +134,7 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
             if element.isContainer():
                 element.loadContents(True,table)
             element.loadTags(True)
+        node.contents.sort(key = lambda elem: elem.tags[tags.DATE] if tags.DATE in elem.tags else omg.FlexiDate(900))
 
 
 class CriterionNode(models.Node):

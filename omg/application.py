@@ -191,10 +191,12 @@ def run(opts, args):
     
     # Close operations
     from omg import config, plugins
+    import omg.gopulate
     
     config.shelve['widget_position'] = (widget.x(),widget.y())
     config.shelve['widget_width'] = widget.width()
     config.shelve['widget_height'] = widget.height()
+    omg.gopulate.terminate()
     plugins.teardown()
     config.shelve.close()
     logging.shutdown()

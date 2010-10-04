@@ -76,6 +76,15 @@ class GopulateTreeWidget(QtGui.QTreeView):
         else:
             QtGui.QTreeView.keyReleaseEvent(self, keyEvent)
     
+    def dragMoveEvent(self, event):
+        if event.keyboardModifiers() & Qt.ShiftModifier:
+            event.setDropAction(Qt.MoveAction)
+        elif event.keyboardModifiers() & Qt.ControlModifier:
+            event.setDropAction(Qt.CopyAction)
+        else:
+            event.setDropAction(event.proposedAction())
+        QtGui.QTreeView.dragMoveEvent(self, event)
+        
     def wheelEvent(self, wheelEvent):
         if QtGui.QApplication.keyboardModifiers() & Qt.AltModifier:
             index = self.indexAt(wheelEvent.pos())

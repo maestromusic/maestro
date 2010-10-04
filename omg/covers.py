@@ -75,7 +75,9 @@ def cacheAll(size):
 
 def setCover(id,cover):
     assert isinstance(id,int)
-    if not cover.save(COVER_DIR+"large/"+str(id),"png"):
+    path = os.path.join(COVER_DIR, "large", str(id))
+    print(path)
+    if not cover.save(path ,"png"):
         return False
     else:
         # Remove cached files

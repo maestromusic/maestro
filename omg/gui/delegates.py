@@ -112,7 +112,7 @@ class BrowserDelegate(abstractdelegate.AbstractDelegate):
                 coverSize = options.gui.browser_cover_size
                 self.drawCover(coverSize,element)
                 
-                self.addLine(f.title(),"",BR_TITLE_STYLE)
+                self.addLine(f.title(),f.tag(tags.get("date")),BR_TITLE_STYLE)
                 self.addLine(f.album(),"",BR_ALBUM_STYLE)
                 self.addLine(f.tag(tags.get("composer"),True,self._getTags),"")
                 self.addLine(f.tag(tags.get("artist"),True,self._getTags),"")

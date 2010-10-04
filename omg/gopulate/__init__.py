@@ -6,7 +6,7 @@
 # published by the Free Software Foundation
 #
 
-import sys, os, re, logging
+import sys, os, re, logging, threading, queue
 from functools import reduce
 from difflib import SequenceMatcher
 
@@ -26,6 +26,26 @@ logger = logging.getLogger('gopulate')
 
 FIND_DISC_RE=r" ?[([]?(?:cd|disc|part|teil|disk|vol)\.? ?([iI0-9]+)[)\]]?"
 
+commitQueue = queue.Queue()
+def commiter():
+    """Run function for the commit thread."""
+    while True:
+        fun, args, kwargs = commitQueue.get()
+        fun(*args, **kwargs)
+        commitQueue.task_done()
+        logger.debug("task done")
+        
+commitThread = threading.Thread(target = commiter)
+commitThread.daemon = True
+commitThread.start()
+
+
+def terminate():
+    """Terminates this module; waits for all threads to complete."""
+    
+    commitQueue.join() # wait until all tasks in the commit queue are done
+    
+    
 class GopulateGuesser:
     """This class is used to 'guess' the correct container structure of files that are not yet contained in the database."""
     
