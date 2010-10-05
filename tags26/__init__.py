@@ -84,7 +84,8 @@ ID3_IGNORE = [
         ]
 
 APE_MAPPING = {
-    "Track":"tracknumber"
+    "Track":"tracknumber",
+    "Year":"date"
     }
 MP4_MAPPING = {
     "\xa9nam": "title",
