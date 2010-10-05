@@ -24,26 +24,27 @@ from omg.config import options
 db = omg.database.get()
 logger = logging.getLogger('gopulate')
 
+# regular expression to find discnumber indicators in the album string
 FIND_DISC_RE=r" ?[([]?(?:cd|disc|part|teil|disk|vol)\.? ?([iI0-9]+)[)\]]?"
 
-commitQueue = queue.Queue()
-def commiter():
+hashQueue = queue.Queue()
+def hasher():
     """Run function for the commit thread."""
     while True:
-        fun, args, kwargs = commitQueue.get()
+        fun, args, kwargs = hashQueue.get()
         fun(*args, **kwargs)
-        commitQueue.task_done()
+        hashQueue.task_done()
         logger.debug("task done")
         
-commitThread = threading.Thread(target = commiter)
-commitThread.daemon = True
-commitThread.start()
+hashThread = threading.Thread(target = hasher)
+hashThread.daemon = True
+hashThread.start()
 
 
 def terminate():
     """Terminates this module; waits for all threads to complete."""
     
-    commitQueue.join() # wait until all tasks in the commit queue are done
+    hashQueue.join() # wait until all tasks in the commit queue are done
     
     
 class GopulateGuesser:
@@ -110,11 +111,12 @@ class GopulateGuesser:
                     continue
             else:
                 try:
-                    realfile = realfiles.File(os.path.abspath(filename))
-                    realfile.read()
-                    t = realfile.tags
-                    elem = omg.models.File(id = None, path = filename, tags=t, length=realfile.length)
-                    del realfile
+#                    realfile = realfiles.File(os.path.abspath(filename))
+#                    realfile.read()
+#                    t = realfile.tags
+                    elem = omg.models.File(id = None, path = filename)
+                    elem.readTagsFromFilesystem()
+                    t = elem.tags
                 except realfiles.NoTagError:
                     logger.warning("Skipping file '{0}' which has no tag".format(filename))
                     continue
@@ -166,11 +168,10 @@ class GopulateGuesser:
                     if discname_id is not None:
                         album_id = database.get().query('SELECT element_id FROM tags WHERE tag_id=? and value_id= ?',
                                                         tags.TITLE.id, discname_id).getSingle()
-                        file = database.get().query('SELECT file FROM elements WHERE id = ?', album_id).getSingle()
-                        print("OMGWTF {}".format(file))
-                        if file == True:
-                            
-                            album_id = None
+                        if album_id is not None:
+                            file = database.get().query('SELECT file FROM elements WHERE id = ?', album_id).getSingle()
+                            if file == True:
+                                album_id = None
                     else:
                         album_id = None
                     metaContainer = omg.models.Container(id = album_id)

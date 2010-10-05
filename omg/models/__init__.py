@@ -534,7 +534,6 @@ class File(Element):
     def readTagsFromFilesystem(self):
         if self.getPath() is None:
             raise RuntimeError("I need a path to read tags from the filesystem.")
-        logger.debug("readTagsFromFileSystem called on {}".format(self.path))
         real = realfiles.File(absPath(self.getPath()))
         try:
             real.read()
@@ -554,7 +553,7 @@ class File(Element):
     def getPath(self,refresh=True):
         """Return the path of this file. If the file is in the DB and no path is stored yet or <refresh> is True, the path will be fetched from the database and cached for subsequent calls."""
         if self.isInDB():
-            if refresh or not hasattr(self,'path'):
+            if refresh or self.path == None:
                 path = db.query("SELECT path FROM files WHERE element_id = {0}".format(self.id)).getSingle()
                 if path is None:
                     raise ValueError("The element with id {0} has no path. Maybe it is a container.".format(self.id))
@@ -572,7 +571,9 @@ class File(Element):
         return self.length
     
     def computeHash(self):
-        """Computes the hash of the audio stream."""
+        """Computes the hash of the audio stream. If delayed is set True, the computation will run in a seperate
+        thread; after completion, the hash will be stored into the database, which requires that the element
+        has been added to the DB."""
     
         import hashlib,tempfile,subprocess
         handle, tmpfile = tempfile.mkstemp()
@@ -584,11 +585,18 @@ class File(Element):
         with open(handle,"br") as hdl:
             self.hash = hashlib.sha1(hdl.read()).hexdigest()
         os.remove(tmpfile)
+    
+    def computeAndStoreHash(self):
+        self.computeHash()
+        db.query("UPDATE files SET hash = ? WHERE element_id = ?;", self.hash, self.id)
+        logger.debug("hash of file {} has been computed and set".format(self.path))
         
     def commit(self, toplevel = False):
         """Save this file into the database. After that, the object has an id attribute"""
         if self.isInDB(): #TODO: tags commiten
             return
+        
+        import omg.gopulate
         logger.debug("commiting file {}".format(self.path))
         self.id = database.queries.addContainer(
                                         os.path.basename(self.path),
@@ -599,9 +607,13 @@ class File(Element):
         querytext = "INSERT INTO files (element_id,path,hash,length) VALUES(?,?,?,?);"
         if self.length is None:
             self.length = 0
-        if not hasattr(self, "hash"):
-            self.computeHash()
-        db.query(querytext, self.id, relPath(self.path), self.hash, int(self.length))
+        if hasattr(self, "hash"):
+            hash = self.hash
+        else:
+            hash = 'pending'            
+        db.query(querytext, self.id, relPath(self.path), hash, int(self.length))
+        if hash == 'pending':
+            omg.gopulate.hashQueue.put((self.computeAndStoreHash, [], {}))
         self._syncState = {}
 
 def createElement(id,tags=None,contents=None,file=None, position=None):

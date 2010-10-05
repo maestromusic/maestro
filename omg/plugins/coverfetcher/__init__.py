@@ -178,7 +178,7 @@ class CoverFetcher(QtGui.QDialog):
                 if isinstance(albumNode,xml.dom.minidom.Element) and albumNode.tagName == 'album':
                     for node in albumNode.childNodes:
                         if isinstance(node,xml.dom.minidom.Element) and node.tagName == 'image'\
-                                and node.getAttribute('size') == 'extralarge':
+                                and node.getAttribute('size') == 'extralarge' and node.firstChild != None:
                             urls.append(node.firstChild.data)
         if len(urls) == 0:
             QtGui.QMessageBox(QtGui.QMessageBox.Warning,"Fehler während der Coverabfrage",

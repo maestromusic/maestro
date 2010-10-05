@@ -127,5 +127,5 @@ class GopulateTreeModel(BasicPlaylist):
         
         logger.debug("commit called")
         for item in self.root.contents:
-            omg.gopulate.commitQueue.put((item.commit, [], {"toplevel":True}))
+            item.commit(toplevel = True)
         self.setRoot(RootNode())
