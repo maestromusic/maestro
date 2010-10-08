@@ -56,7 +56,7 @@ class SingleTagEditor(QtGui.QWidget):
 
     def _handleRecordAdded(self,record):
         if record.tag == self.tag:
-            self.widgetList.addWidget(TagValueEditor(record,self.model))
+            self.widgetList.insertWidget(self.model.getRecords(self.tag).index(record),TagValueEditor(record,self.model))
             
     def _handleRecordRemoved(self,record):
         if record.tag == self.tag:
@@ -181,6 +181,8 @@ class TagValueEditor(QtGui.QWidget):
                 self.editorWidget.showLabel()
             else: QtGui.QMessageBox.warning(self,"Ungültiger Wert","Der eingegebene Wert ist ungültig.")
             event.accept()
+            
+
 
 
 class TagLineEdit(QtGui.QLineEdit):
