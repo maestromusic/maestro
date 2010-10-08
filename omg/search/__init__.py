@@ -24,7 +24,7 @@ db = None
 def init():
     """Initialize the search-module."""
     global db
-    criteria.searchTags = options.tags.search_tags
+    criteria.searchTags = [tags.get(tag) for tag in options.tags.search_tags]
     db = database.get()
     db.query("DROP TABLE IF EXISTS {0}".format(TT_HELP))
     db.query("""
