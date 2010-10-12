@@ -371,7 +371,24 @@ class Element(Node):
             self.parent._syncState["contents"] = True
         self.parent.contents.remove(self)
         self.id = None
-            
+    
+    def maxDepth(self, loadFromDB = False):
+        """Returns the maximum depth of elements below this element (0 if it is a File, 1 if all contents are files, ...)"""
+        if self.isFile():
+            return 0
+        else:
+            if loadFromDB:
+                raise NotImplementedError()
+            return 1 + max((c.maxDepth(loadFromDB) for c in self.contents))
+    
+    def depthFirstGenerator(self):
+        """Returns a generator over all files below this element in depth-first manner."""
+        for con in self.contents:
+            if con.isFile():
+                yield con
+            else:
+                for subsub in con.depthFirstGenerator():
+                    yield subsub
     # Misc
     #====================================================
     def getTitle(self):
@@ -490,6 +507,15 @@ class Container(Element):
     
     def updateElementCounter(self):
         database.queries.updateElementCounter(self.id)
+        
+    def flatten(self):
+        newContents = list(self.depthFirstGenerator())
+        i = 1
+        for elem in newContents:
+            elem.parent = self
+            elem.position = i
+            i += 1
+        self.contents = newContents
 
 def equalsExceptIgnored(tags1, tags2):
     """Checks if two tags are equal, but ignores all ignored tags for this check."""
@@ -501,6 +527,7 @@ def equalsExceptIgnored(tags1, tags2):
         if tags1[tag] != tags2[tag]:
             return False
     return True
+
 
 class File(Element):
     def __init__(self, id = None, tags = None, length = None, path = None, position = None):
@@ -615,6 +642,9 @@ class File(Element):
         if hash == 'pending':
             omg.gopulate.hashQueue.put((self.computeAndStoreHash, [], {}))
         self._syncState = {}
+         
+    def __repr__(self):
+        return "File {}".format(self.path)
 
 def createElement(id,tags=None,contents=None,file=None, position=None):
     """Create an element with the given id, tags and contents. Depending on <file> an instance of Container or of File will be created. If <file> is None, the file-flag (elements.file) will be read from the database. Note that contents will be ignored if a File-instance is created."""

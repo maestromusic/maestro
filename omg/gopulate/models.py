@@ -120,7 +120,19 @@ class GopulateTreeModel(BasicPlaylist):
             newContainer.updateSameTags()
             newContainer.tags["title"] = [ name ]
             self.dataChanged.emit(self.index(insertPosition, 0, parentIndex), self.index(self.rowCount(parentIndex)-1, 0, parentIndex))
-            self.dataChanged.emit(parentIndex, parentIndex)              
+            self.dataChanged.emit(parentIndex, parentIndex)
+            
+    def flatten(self, index):
+        """Set all files below this container as direct children, enumerate them in ascending order, and forget about all
+        intermediate subcontainers."""
+        
+        self.beginRemoveRows(index, 0, self.rowCount(index)-1)
+        self.endRemoveRows()
+        index.internalPointer().flatten()
+        self.beginInsertRows(index, 0, len(index.internalPointer().contents)-1)
+        self.endInsertRows()
+        
+        
         
     def commit(self):
         """Commits all the containers and files in the current model into the database."""
