@@ -84,8 +84,8 @@ ID3_IGNORE = [
         ]
 
 APE_MAPPING = {
-    "Track":"tracknumber",
-    "Year":"date"
+    "track":"tracknumber",
+    "year":"date",
     }
 MP4_MAPPING = {
     "\xa9nam": "title",
@@ -224,8 +224,8 @@ class ApeFile(TagFile):
         f = self.mutagen_file
         for tag in f.tags:
             value = f.tags[tag].value.decode("utf-8")
-            if tag in APE_MAPPING:
-                tag = APE_MAPPING[tag]
+            if tag.lower() in APE_MAPPING:
+                tag = APE_MAPPING[tag.lower()]
             if not tag.lower() in self.tags:
                 self.tags[tag.lower()] = []
             self.tags[tag.lower()].append(value)
