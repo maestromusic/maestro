@@ -14,7 +14,7 @@ from PyQt4.QtCore import Qt
 from omg import constants, tags
 from omg.models import tageditormodel, simplelistmodel
 from omg.gui import formatter, singletageditor
-from omg.gui.misc import widgetlist
+from omg.gui.misc import widgetlist, editorwidget
 
 class TagEditorWidget(QtGui.QDialog):
     def __init__(self,parent,elements):
@@ -56,23 +56,34 @@ class TagEditorWidget(QtGui.QDialog):
         buttonBarLayout.addWidget(saveButton)
         
         self.singleTagEditors = {}
+        self.editorWidgets = {}
         for tag in self.model.getTags():
             self._addSingleTagEditor(tag)
     
     def _addSingleTagEditor(self,tag):
         row = self.tagEditorLayout.rowCount() # Count the empty rows, too (confer _removeSingleTagEditor)
+        
+        # Create the label (and the TagTypeBox beneath)
+        # Create and fill the EditorWidget
+        self.editorWidgets[tag] = editorwidget.EditorWidget()
+        tagTypeLabel = QtGui.QLabel(tag.name)
+        self.editorWidgets[tag].setLabel(tagTypeLabel)
+        tagTypeBox = TagTypeBox(tag)
+        self.editorWidgets[tag].setEditor(tagTypeBox)
+        
+        # Create the Tag-Editor
         self.singleTagEditors[tag] = singletageditor.SingleTagEditor(tag,self.model)
         self.singleTagEditors[tag].widgetList.setSelectionManager(self.selectionManager)
-        self.tagEditorLayout.addWidget(QtGui.QLabel("{0}:".format(str(tag))),row,0)
+        self.tagEditorLayout.addWidget(self.editorWidgets[tag],row,0)
         self.tagEditorLayout.addWidget(self.singleTagEditors[tag],row,1)
 
     def _removeSingleTagEditor(self,tag):
         # Warning: Removing items from a QGridLayout does not move the other items. Thus, after this method there is an empty row in the layout.
+        editorWidget = self.editorWidgets[tag]
+        self.tagEditorLayout.removeWidget(editorWidget)
+        editorWidget.setParent(None)
+        del self.editorWidgets[tag]
         tagEditor = self.singleTagEditors[tag]
-        row = self.tagEditorLayout.getItemPosition(self.tagEditorLayout.indexOf(tagEditor))[0]
-        label = self.tagEditorLayout.itemAtPosition(row,0).widget()
-        self.tagEditorLayout.removeWidget(label)
-        label.setParent(None)
         self.tagEditorLayout.removeWidget(tagEditor)
         tagEditor.widgetList.setSelectionManager(None)
         tagEditor.setParent(None)

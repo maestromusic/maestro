@@ -36,20 +36,6 @@ class SingleTagEditor(QtGui.QWidget):
         self.widgetList = widgetlist.WidgetList(QtGui.QBoxLayout.TopToBottom)
         self.layout().addWidget(self.widgetList,1)
         
-        self.buttonBarLayout = QtGui.QHBoxLayout()
-        self.layout().addLayout(self.buttonBarLayout)
-        
-        # Create buttons
-        #~ addButton = QtGui.QPushButton(QtGui.QIcon(getIcon("add.png")),"")
-        #~ self.buttonBarLayout.addWidget(addButton)
-        #~ removeButton = QtGui.QPushButton(QtGui.QIcon(getIcon("remove.png")),"")
-        #~ self.buttonBarLayout.addWidget(removeButton)
-        #~ editButton = QtGui.QPushButton(QtGui.QIcon(getIcon("edit.png")),"Edit")
-        #~ self.buttonBarLayout.addWidget(editButton)
-        #~ self.hideDiverseButton = QtGui.QPushButton(QtGui.QIcon(getIcon("foldin.png")),"")
-        #~ self.hideDiverseButton.setVisible(False)
-        #~ self.buttonBarLayout.addWidget(self.hideDiverseButton)
-        
         # Fill the widget list
         for record in model.getRecords(tag):
             self.widgetList.addWidget(TagValueEditor(record,self.model))
@@ -100,7 +86,7 @@ class TagValueEditor(QtGui.QWidget):
         self.editorWidget.setLabel(self.valueLabel)
         self.editor = TagLineEdit()
         self.editorWidget.setEditor(self.editor)
-        # The following connection resets the editor when it looses focus
+        # The next connection resets the editor when it looses focus
         self.editorWidget.editorClosed.connect(self._updateEditorWidget)
         firstLineLayout.addWidget(self.editorWidget)
         

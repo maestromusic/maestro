@@ -48,7 +48,8 @@ class EditorWidget(QtGui.QStackedWidget):
         if self.editor is not None:
             self.setCurrentWidget(self.editor)
             self.setFocusProxy(self.editor)
-            self.editor.selectAll()
+            if hasattr(self.editor,'selectAll'):
+                self.editor.selectAll()
 
     def focusInEvent(self,focusEvent):
         if self.currentWidget() == self.label:
