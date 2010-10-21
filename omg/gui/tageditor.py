@@ -65,11 +65,12 @@ class TagEditorWidget(QtGui.QDialog):
         
         # Create the label (and the TagTypeBox beneath)
         # Create and fill the EditorWidget
-        self.editorWidgets[tag] = editorwidget.EditorWidget()
-        tagTypeLabel = QtGui.QLabel(tag.name)
-        self.editorWidgets[tag].setLabel(tagTypeLabel)
-        tagTypeBox = TagTypeBox(tag)
-        self.editorWidgets[tag].setEditor(tagTypeBox)
+        self.editorWidgets[tag] = QtGui.QLabel(tag.name)  #TODO use a TagTypeBox
+        #self.editorWidgets[tag] = editorwidget.EditorWidget()
+        #tagTypeLabel = QtGui.QLabel(tag.name)
+        #self.editorWidgets[tag].setLabel(tagTypeLabel)
+        #tagTypeBox = TagTypeBox(tag)
+        #self.editorWidgets[tag].setEditor(tagTypeBox)
         
         # Create the Tag-Editor
         self.singleTagEditors[tag] = singletageditor.SingleTagEditor(tag,self.model)

@@ -67,12 +67,12 @@ class WidgetList(QtGui.QWidget):
         """Add <widget> to the end of this WidgetList's children."""
         index = len(self.children)
         self.insertWidget(index,widget)
-        self.widgetInserted.emit(self,index)
     
     def removeWidget(self,widget):
         """Remove <widget> from this WidgetList's children."""
         index = self.children.index(widget)
         self.layout().removeWidget(widget)
+        del self.children[index]
         widget.setParent(None)
         self.widgetRemoved.emit(self,index,widget)
     
@@ -108,21 +108,19 @@ class WidgetList(QtGui.QWidget):
 
 class SelectionManager(QtCore.QObject):
     """A SelectionManager handles the selection of one or more WidgetLists. Using a common SelectionManager for several WidgetLists makes it possible to have one selection for all those WidgetLists (that is, a click on one widget will clear the selection in all WidgetLists and select only this widget.). Usually there is no need to use any method of SelectionManager directly, with the exception of the constructor: Create a SelectionManager and pass the WidgetLists to the constructor or use WidgetList.setSelectionManager."""
-    def __init__(self,widgetLists=None):
-        """Creates a SelectionManager and optionally sets the WidgetList on which this SelectionManager operates."""
+    def __init__(self):
+        """Creates a SelectionManager."""
         QtCore.QObject.__init__(self)
         self.widgetLists = []
         self.selected = []
         self.anchor = None
-        if widgetLists is not None:
-            self.setWidgetLists(widgetLists)
     
-    def setWidgetLists(self,widgetLists):
-        """Set the WidgetList on which this SelectionManager operates. Usually you won't call this method directly, but use WidgetList.setSelectionManager."""
-        for widgetList in self.widgetLists:
-            self.removeWidgetList(widgetList)
-        for widgetList in widgetLists:
-            self.addWidgetList(widgetList)
+    #~ def setWidgetLists(self,widgetLists):
+        #~ """Set the WidgetList on which this SelectionManager operates. Usually you won't call this method directly, but use WidgetList.setSelectionManager."""
+        #~ for widgetList in self.widgetLists:
+            #~ self.removeWidgetList(widgetList)
+        #~ for widgetList in widgetLists:
+            #~ self.addWidgetList(widgetList)
         
     def addWidgetList(self,widgetList):
         """Add a WidgetList to the lists of this SelectionManager. Usually you won't call this method directly, but use WidgetList.setSelectionManager."""
@@ -167,9 +165,9 @@ class SelectionManager(QtCore.QObject):
                 if self.selected[i][j]:
                     self.selected[i][j] = False
                     self.widgetLists[i].selectionChanged(j)
-    
+            
     def eventFilter(self,object,event):
-        if event.type() == QtCore.QEvent.MouseButtonPress:
+        if event.type() == QtCore.QEvent.MouseButtonPress and event.button() == Qt.LeftButton:
             widgetList = object.parent()
             #~ try:
             listIndex = self.widgetLists.index(widgetList)

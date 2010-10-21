@@ -176,7 +176,7 @@ class TagEditorModel(QtCore.QObject):
     
     def getPossibleSeparators(self,records):
         # Collect all separators appearing in the first record
-        if len(records) == 0:
+        if len(records) == 0 or any(record.tag.type == 'date' for record in records):
             return []
         result = [s for s in SEPARATORS if s in records[0].value]
         for record in records[1:]:
