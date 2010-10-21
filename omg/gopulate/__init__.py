@@ -76,7 +76,7 @@ class GopulateGuesser:
                         albumsFoundByID[aid] = omg.models.Container(aid)
                         albumsFoundByID[aid].loadTags()
                     exAlb = albumsFoundByID[aid]
-                    exAlbName = exAlb.tags.getFormatted(tags.get('title'))
+                    exAlbName = ", ".join(exAlb.tags[tags.get('title')])
                     if not exAlbName in albumsFoundByName:
                         albumsFoundByName[exAlbName] = exAlb
                     
@@ -98,14 +98,14 @@ class GopulateGuesser:
                     continue
             if tags.ALBUM in t:
                 album = t[tags.ALBUM][0] # we don't support multiple album tags
-                if "discnumber" in t:
-                    album += "####••••{}".format(t["discnumber"][0])
+                if tags.get("discnumber") in t:
+                    album += "####••••{}".format(t[tags.get("discnumber")][0])
                 if not album in albumsFoundByName:
                     albumsFoundByName[album] = omg.models.Container(id = None)
                 elem.parent = albumsFoundByName[album]
                 albumsFoundByName[album].contents.append(elem)
-                if "tracknumber" in t:
-                    trkn = int(t["tracknumber"][0].split("/")[0]) # support 02/15 style
+                if tags.get("tracknumber") in t:
+                    trkn = int(t[tags.get("tracknumber")][0].split("/")[0]) # support 02/15 style
                     elem.setPosition(trkn)
                 else:
                     elem.setPosition(0)
@@ -133,7 +133,7 @@ class GopulateGuesser:
                     if discnumber.lower().startswith("i"): #roman number, support I-III :)
                         discnumber = len(discnumber)
             if discnumber!= None:
-                album.tags["discnumber"] = [ discnumber ]
+                album.tags[tags.get("discnumber")] = [ discnumber ]
                 logger.info("detected part of a multi-disc container '{}'".format(album.tags[tags.TITLE][0]))
                 discname_reduced = re.sub(FIND_DISC_RE,"",album.tags[tags.TITLE][0],flags=re.IGNORECASE)
                 if discname_reduced in finalDictionary:
@@ -204,6 +204,6 @@ def longestSubstring(a, b):
     
 def calculateMergeHint(indices):
     return reduce(longestSubstring,
-                   ( ind.internalPointer().tags.getFormatted(tags.TITLE) for ind in indices )
+                   ( ", ".join(ind.internalPointer().tags[tags.TITLE]) for ind in indices )
                  ).strip(constants.FILL_CHARACTERS)
     

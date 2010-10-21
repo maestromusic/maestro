@@ -114,11 +114,11 @@ class TagTable(SQLTable):
     #queries to create the tag tables. Replace the placeholder with the tagname before use...
     _tagQueries = {
         "varchar" : """
-        CREATE TABLE {0} (
+        CREATE TABLE {} (
             id MEDIUMINT UNSIGNED NOT NULL AUTO_INCREMENT,
             value VARCHAR({}) NOT NULL,
             PRIMARY KEY(id)
-        ) CHARACTER SET 'utf8';""".format(constants.TAG_VARCHAR_LENGTH),
+        ) CHARACTER SET 'utf8';""".format("{0}",constants.TAG_VARCHAR_LENGTH),
 
         "date" : """
         CREATE TABLE {0} (

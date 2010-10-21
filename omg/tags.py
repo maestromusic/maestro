@@ -251,8 +251,8 @@ class TagValueList(list):
         list.__init__(self,aList if aList is not None else [])
         self.storage = storage
     
-    def __setitem__(self,key):
-        list.__setitem__(self,key)
+    def __setitem__(self,key,value):
+        list.__setitem__(self,key,value)
         
     def __delitem__(self,key):
         list.__delitem__(self,key)
@@ -270,6 +270,7 @@ class Storage(dict):
         return Storage({tag: list(l) for tag,l in self.items()})
         
     def __setitem__(self,key,value):
+        assert isinstance(key,Tag)
         assert isinstance(value,Sequence) and not isinstance(value,str)
         if len(value) == 0:
             if key in self:

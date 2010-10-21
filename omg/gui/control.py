@@ -96,7 +96,7 @@ class ControlWidget(QtGui.QWidget):
                 self.secondLabel.setText("-"+strutils.formatLength(self.time.getRemaining()))
                 # Don't move the slider, if the user presses it down to move it personally.
                 if not self.seekSlider.isSliderDown():
-                    self.seekSlider.setValue(int(self.SEEK_SLIDER_MAX * self.time.getRatio()))
+                    self.seekSlider.setValue(int(round(self.SEEK_SLIDER_MAX * self.time.getRatio())))
             
             element = controlModule.playlist.currentlyPlaying()
             if element is not None: # This may happen when the playlist has not been synchronized already.
@@ -135,7 +135,7 @@ class ControlWidget(QtGui.QWidget):
             self.volumeSlider.setEnabled(False)
     
     def setVolume(self, volume, dontUpdateMpd=False):
-        """sets volume to the given value. This updates slider, label and mpd's volume, but not the
+        """Set volume to the given value. This updates slider, label and mpd's volume, but not the
         storedVolume value. if dontUpdateMpd=True, don't update mpd's volume."""
         if volume == -1:
             logger.debug('setVolume called with -1')

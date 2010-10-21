@@ -13,7 +13,7 @@ from omg.models import rootedtreemodel, RootNode
 import omg.models
 from omg import database
 from omg.models.playlist import BasicPlaylist, ManagedPlaylist
-from omg import constants
+from omg import constants, tags
 
 from . import GopulateGuesser, findNewAlbums
 absPath = omg.absPath
@@ -81,8 +81,8 @@ class GopulateTreeModel(BasicPlaylist):
                 newContainer.contents.append(item)
                 parent.contents.remove(item)
                 parent.changesPending = True
-                for i in range(len(item.tags["title"])):
-                    item.tags["title"][i] = item.tags["title"][i].replace(name, "").\
+                for i in range(len(item.tags[tags.TITLE])):
+                    item.tags[tags.TITLE][i] = item.tags[tags.TITLE][i].replace(name, "").\
                         strip(constants.FILL_CHARACTERS).\
                         lstrip("0123456789").\
                         strip(constants.FILL_CHARACTERS)
@@ -91,7 +91,7 @@ class GopulateTreeModel(BasicPlaylist):
                 if oldItem.getPosition():
                     oldItem.setPosition(oldItem.getPosition() - amount + 1)
             newContainer.updateSameTags()
-            newContainer.tags["title"] = [ name ]
+            newContainer.tags[tags.TITLE] = [ name ]
                 
         
     def commit(self):
