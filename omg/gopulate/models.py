@@ -11,11 +11,11 @@ from PyQt4.QtCore import Qt
 
 from omg.models import rootedtreemodel, RootNode
 import omg.models
-from omg import database
+from omg import database, tags, constants
 from omg.models.playlist import BasicPlaylist, ManagedPlaylist
-from omg import constants, tags
 
 from . import GopulateGuesser, findNewAlbums
+import omg.gopulate
 absPath = omg.absPath
 
 import logging
@@ -61,18 +61,38 @@ class GopulateTreeModel(BasicPlaylist):
             el.parent = root
         self.setRoot(root)
         self.treeCreated.emit()
+    
+    def data(self, index, role = Qt.EditRole):
+        if index.isValid() and role == Qt.StatusTipRole:
+            elem = index.internalPointer()
+            if elem.outOfSync():
+                return ",".join(key for key, value in elem._syncState.items() if value) + " are out of sync"
+                    
+            elif elem.isInDB():
+                return "I'm a synced DB element"
+            else:
+                return "I'm a happy new element, waiting for commit."
+        else:
+            return BasicPlaylist.data(self, index, role)
           
     def merge(self, indices, name):
         amount = len(indices)
+        indices.sort(key = lambda ind: ind.internalPointer().position)
         if amount > 0:
-            posItem = indices[0]
-            parent = posItem.parent().internalPointer()
+            posIndex = indices[0]
+            posItem = posIndex.internalPointer()
+            parentIndex = posIndex.parent()
+            parent = parentIndex.internalPointer()
             if not parent:
                 parent = self.root
+            insertPosition = parent.contents.index(posItem)
+            self.beginRemoveRows(parentIndex, insertPosition, self.rowCount(parentIndex)-1)    
+            
             newContainer = omg.models.Container(id = None)
             newContainer.parent = parent
-            newContainer.position = posItem.internalPointer().getPosition()
-            parent.contents.insert(posItem.row(), newContainer)
+            newContainer.position = posIndex.internalPointer().getPosition()
+            newContainer.loadTags()
+      
             j = 1
             for index in indices:
                 item = index.internalPointer()
@@ -80,26 +100,44 @@ class GopulateTreeModel(BasicPlaylist):
                 item.setPosition(j)
                 newContainer.contents.append(item)
                 parent.contents.remove(item)
-                parent.changesPending = True
+
                 for i in range(len(item.tags[tags.TITLE])):
                     item.tags[tags.TITLE][i] = item.tags[tags.TITLE][i].replace(name, "").\
                         strip(constants.FILL_CHARACTERS).\
                         lstrip("0123456789").\
                         strip(constants.FILL_CHARACTERS)
+                    if item.tags[tags.TITLE][i] == "":
+                        item.tags[tags.TITLE][i] = "Part {}".format(i+1)
                 j = j + 1
-            for oldItem in parent.contents[posItem.row()+1:]:
+            parent._syncState["contents"] = True
+            self.endRemoveRows()
+            self.beginInsertRows(parentIndex, insertPosition, insertPosition)
+            parent.contents.insert(insertPosition, newContainer)
+            self.endInsertRows()
+            
+            for oldItem in parent.contents[insertPosition + 1:]:
                 if oldItem.getPosition():
                     oldItem.setPosition(oldItem.getPosition() - amount + 1)
             newContainer.updateSameTags()
             newContainer.tags[tags.TITLE] = [ name ]
-                
+            self.dataChanged.emit(self.index(insertPosition, 0, parentIndex), self.index(self.rowCount(parentIndex)-1, 0, parentIndex))
+            self.dataChanged.emit(parentIndex, parentIndex)
+            
+    def flatten(self, index):
+        """Set all files below this container as direct children, enumerate them in ascending order, and forget about all
+        intermediate subcontainers."""
+        
+        self.beginRemoveRows(index, 0, self.rowCount(index)-1)
+        self.endRemoveRows()
+        index.internalPointer().flatten()
+        self.beginInsertRows(index, 0, len(index.internalPointer().contents)-1)
+        self.endInsertRows()
+        
         
     def commit(self):
         """Commits all the containers and files in the current model into the database."""
         
         logger.debug("commit called")
         for item in self.root.contents:
-            print(item)
-            logger.debug("item of type {}".format(type(item)))
-            item.commit(toplevel=True)
-        self._createTree(self.guesser.guessTree(False))
+            item.commit(toplevel = True)
+        self.setRoot(RootNode())

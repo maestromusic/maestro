@@ -86,7 +86,8 @@ def checkElementCounters(fix=False):
     if fix:
         return db.query("UPDATE elements \
                          SET elements = (SELECT COUNT(*) FROM contents WHERE container_id = id)").affectedRows()
-    else: return db.query("SELECT COUNT(*) FROM elements \
+    else:
+        return db.query("SELECT COUNT(*) FROM elements \
                            WHERE elements != (SELECT COUNT(*) FROM contents WHERE container_id = id)").getSingle()
 
 def checkFileFlags(fix=False):

@@ -58,7 +58,7 @@ class PlaylistDelegate(abstractdelegate.AbstractDelegate):
             coverSize = options.gui.large_cover_size
             self.drawCover(coverSize,element)
             
-            self.addLine(f.title(),"",PL_TITLE_STYLE)
+            self.addLine(f.titleWithPos(),"",PL_TITLE_STYLE)
             self.addLine(f.album(),"",PL_ALBUM_STYLE)
             self.addLine(f.tag(tags.get("composer"),True),f.tag(tags.get("conductor"),True))
             self.addLine(f.tag(tags.get("artist"),True),f.tag(tags.get("performer"),True))
@@ -112,7 +112,7 @@ class BrowserDelegate(abstractdelegate.AbstractDelegate):
                 coverSize = options.gui.browser_cover_size
                 self.drawCover(coverSize,element)
                 
-                self.addLine(f.title(),"",BR_TITLE_STYLE)
+                self.addLine(f.title(),f.tag(tags.get("date")),BR_TITLE_STYLE)
                 self.addLine(f.album(),"",BR_ALBUM_STYLE)
                 self.addLine(f.tag(tags.get("composer"),True,self._getTags),"")
                 self.addLine(f.tag(tags.get("artist"),True,self._getTags),"")
@@ -272,7 +272,7 @@ class GopulateDelegate(QtGui.QStyledItemDelegate):
                 height += fSize.height()
         # ——————— paint the element position and color marker ————————
         if painter:
-            if elem.changesPending and elem.isInDB():
+            if elem.outOfSync():
                 painter.setPen(Qt.red)
             if not elem.isInDB():
                 painter.fillRect(0, 0, tagRenderStartX, rect.height(), Qt.yellow)
@@ -282,7 +282,7 @@ class GopulateDelegate(QtGui.QStyledItemDelegate):
                 rect.setTop(int((rect.height() -positionSize.height())/2))        
                 painter.drawText(rect, Qt.TextSingleLine, str(elem.getPosition()))
             else:
-                if elem.changesPending and elem.isInDB():
+                if elem.outOfSync():
                     painter.fillRect(0, 0, tagRenderStartX, rect.height()//4, Qt.red)
             painter.setPen(Qt.black)
             painter.restore()

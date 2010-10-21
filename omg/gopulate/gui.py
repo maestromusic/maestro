@@ -37,7 +37,12 @@ class GopulateTreeWidget(QtGui.QTreeView):
         
         self.deleteAction = QtGui.QAction("delete from DB", self)
         self.deleteAction.triggered.connect(self._deleteSelected)
-    
+        
+        self.flattenAction = QtGui.QAction("flatten", self)
+        self.flattenAction.triggered.connect(self._flattenSelected)
+        
+        self.viewport().setMouseTracking(True)
+        
     def dataChanged(self, ind1, ind2):
         QtGui.QTreeView.dataChanged(self, ind1, ind2)
         self.setCorrectWidth()
@@ -54,6 +59,8 @@ class GopulateTreeWidget(QtGui.QTreeView):
                 menu.addAction(self.commitAction)
             if any((i.internalPointer().isInDB() for i in self.selectedIndexes())):
                 menu.addAction(self.deleteAction)
+            if self.currentIndex().internalPointer().isContainer():
+                menu.addAction(self.flattenAction)
             
             if not menu.isEmpty(): 
                 menu.popup(event.globalPos())
@@ -74,6 +81,15 @@ class GopulateTreeWidget(QtGui.QTreeView):
         else:
             QtGui.QTreeView.keyReleaseEvent(self, keyEvent)
     
+    def dragMoveEvent(self, event):
+        if event.keyboardModifiers() & Qt.ShiftModifier:
+            event.setDropAction(Qt.MoveAction)
+        elif event.keyboardModifiers() & Qt.ControlModifier:
+            event.setDropAction(Qt.CopyAction)
+        else:
+            event.setDropAction(event.proposedAction())
+        QtGui.QTreeView.dragMoveEvent(self, event)
+        
     def wheelEvent(self, wheelEvent):
         if QtGui.QApplication.keyboardModifiers() & Qt.AltModifier:
             index = self.indexAt(wheelEvent.pos())
@@ -134,6 +150,9 @@ class GopulateTreeWidget(QtGui.QTreeView):
         for i in indicesToDelete:
             i.internalPointer().delete()
         self.model().reset()
+        
+    def _flattenSelected(self):
+        self.model().flatten(self.currentIndex())
         
     def setCorrectWidth(self):
         self.resizeColumnToContents(0)

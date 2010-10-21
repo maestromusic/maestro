@@ -11,7 +11,8 @@ import difflib, logging, os, itertools
 from PyQt4 import QtCore
 from PyQt4.QtCore import Qt
 
-from omg import config, database, models, mpclient, tags, absPath, relPath
+from omg import database, models, mpclient, tags, absPath, relPath
+from omg.config import options
 from . import rootedtreemodel, treebuilder, mimedata
 
 db = database.get()
@@ -52,7 +53,7 @@ class BasicPlaylist(rootedtreemodel.RootedTreeModel):
         return Qt.CopyAction | Qt.MoveAction
          
     def mimeTypes(self):
-        return [config.options.gui.mime,"text/uri-list"]
+        return [options.gui.mime,"text/uri-list"]
     
     def mimeData(self,indexes):
         return mimedata.createFromIndexes(self,indexes)
@@ -66,8 +67,8 @@ class BasicPlaylist(rootedtreemodel.RootedTreeModel):
             return False
         
         # Get the contents out of MimeData
-        if mimeData.hasFormat(config.options.gui.mime):
-            contents = [node.copy() for node in mimeData.retrieveData(config.options.gui.mime)]
+        if mimeData.hasFormat(options.gui.mime):
+            contents = [node.copy() for node in mimeData.retrieveData(options.gui.mime)]
         elif mimeData.hasFormat("text/uri-list"):
             contents = self.importPaths(relPath(url.path()) for url in mimeData.urls())
         else: return False

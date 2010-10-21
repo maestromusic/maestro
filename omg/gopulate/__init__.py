@@ -6,7 +6,7 @@
 # published by the Free Software Foundation
 #
 
-import sys, os, re, logging
+import sys, os, re, logging, threading, queue
 from functools import reduce
 from difflib import SequenceMatcher
 
@@ -24,8 +24,29 @@ from omg.config import options
 db = omg.database.get()
 logger = logging.getLogger('gopulate')
 
+# regular expression to find discnumber indicators in the album string
 FIND_DISC_RE=r" ?[([]?(?:cd|disc|part|teil|disk|vol)\.? ?([iI0-9]+)[)\]]?"
 
+hashQueue = queue.Queue()
+def hasher():
+    """Run function for the commit thread."""
+    while True:
+        fun, args, kwargs = hashQueue.get()
+        fun(*args, **kwargs)
+        hashQueue.task_done()
+        logger.debug("task done")
+        
+hashThread = threading.Thread(target = hasher)
+hashThread.daemon = True
+hashThread.start()
+
+
+def terminate():
+    """Terminates this module; waits for all threads to complete."""
+    
+    hashQueue.join() # wait until all tasks in the commit queue are done
+    
+    
 class GopulateGuesser:
     """This class is used to 'guess' the correct container structure of files that are not yet contained in the database."""
     
@@ -69,8 +90,10 @@ class GopulateGuesser:
                     continue
                 elem = omg.models.File(id)
                 elem.loadTags()
+                elem.readTagsFromFilesystem()
                 t = elem.tags
-                albumIds = elem.getAlbumIds()
+                
+                albumIds = elem.getParentIds(recursive = False)
                 for aid in albumIds:
                     if not aid in albumsFoundByID:
                         albumsFoundByID[aid] = omg.models.Container(aid)
@@ -88,11 +111,12 @@ class GopulateGuesser:
                     continue
             else:
                 try:
-                    realfile = realfiles.File(os.path.abspath(filename))
-                    realfile.read()
-                    t = realfile.tags
-                    elem = omg.models.File(id = None, path = filename, tags=t, length=realfile.length)
-                    del realfile
+#                    realfile = realfiles.File(os.path.abspath(filename))
+#                    realfile.read()
+#                    t = realfile.tags
+                    elem = omg.models.File(id = None, path = filename)
+                    elem.readTagsFromFilesystem()
+                    t = elem.tags
                 except realfiles.NoTagError:
                     logger.warning("Skipping file '{0}' which has no tag".format(filename))
                     continue
@@ -122,6 +146,7 @@ class GopulateGuesser:
         
         finalDictionary = {}
         for name, album in albumsFoundByName.items():
+            # search for meta containers
             discnumber = None
             crazySplit = name.split("####••••")
             if len(crazySplit) == 2:
@@ -143,11 +168,13 @@ class GopulateGuesser:
                     if discname_id is not None:
                         album_id = database.get().query('SELECT element_id FROM tags WHERE tag_id=? and value_id= ?',
                                                         tags.TITLE.id, discname_id).getSingle()
+                        if album_id is not None:
+                            file = database.get().query('SELECT file FROM elements WHERE id = ?', album_id).getSingle()
+                            if file == True:
+                                album_id = None
                     else:
                         album_id = None
                     metaContainer = omg.models.Container(id = album_id)
-                    if metaContainer.isInDB():
-                        print("existing found {}".format(metaContainer))
                     finalDictionary[discname_reduced] = metaContainer
                     
                     metaContainer.loadContents(recursive=True)

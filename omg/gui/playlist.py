@@ -113,7 +113,7 @@ class PlaylistTreeView(QtGui.QTreeView):
          for action in provider(self,node):
             menu.addAction(action)
 
-        menu.exec_(event.globalPos())
+        menu.exec_(event.globalPos() + QtCore.QPoint(2,2))
     
     def dropEvent(self,event):
         if event.source() is None:

@@ -8,12 +8,13 @@
 #
 from PyQt4 import QtSql
 from . import DBException, _replaceQueryArgs, AbstractSql, AbstractSqlResult
-import datetime
+import datetime, threading
+
 
 class Sql(AbstractSql):
     def __init__(self):
         self._db = QtSql.QSqlDatabase("QMYSQL")
-
+                
     def connect(self,username,password,database,host="localhost",port=3306):
         self._db.setHostName(host)
         self._db.setPort(int(port))
@@ -21,26 +22,28 @@ class Sql(AbstractSql):
         ok = self._db.open(username,password)
         if not ok:
             raise DBException("DB-connection failed: {0}".format(self._db.lastError().databaseText()))
+        self.lock = threading.Lock()
       #  self.query("SET NAMES 'utf8';")
 
     def query(self,queryString,*args):
-        return self._query(queryString,False,*args)
+        return self._query(queryString, False, *args)
     
     def queryDict(self,queryString,*args):
-        return self._query(queryString,True,*args)
+        return self._query(queryString, True, *args)
         
     def _query(self,queryString,useDict,*args):
-        query = QtSql.QSqlQuery(self._db)
-        
-        if args:
-            queryString = _replaceQueryArgs(queryString,*args)
+        with self.lock:
+            query = QtSql.QSqlQuery(self._db)
             
-        if not query.exec_(queryString):
-            if self._db.lastError() is not None:
-                message = "Query failed: {0} | Query: {1}".format(self._db.lastError().text(),queryString)
-            else: message = "Query failed {0}".format(queryString)
-            raise DBException(message)
-        return SqlResult(query,useDict)
+            if args:
+                queryString = _replaceQueryArgs(queryString,*args)
+                
+            if not query.exec_(queryString):
+                if self._db.lastError() is not None:
+                    message = "Query failed: {0} | Query: {1}".format(self._db.lastError().text(),queryString)
+                else: message = "Query failed {0}".format(queryString)
+                raise DBException(message)
+            return SqlResult(query,useDict)
     
     def getDate(self,qdate):    
         try:

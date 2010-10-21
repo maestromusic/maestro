@@ -79,13 +79,41 @@ class FlexiDate:
     def __str__(self):
         return self.strftime()
     
+    def __lt__(self, other):
+        if self.year < other.year:
+            return True
+        elif self.year > other.year:
+            return False
+        elif self.month == None:
+            return other.month != None
+        else: # self.month != None, year equals
+            if other.month == None:
+                return False
+            elif self.month < other.month:
+                return True
+            elif self.month > other.month:
+                return False
+            else:
+                if self.day == None:
+                    return other.day != None
+                else:
+                    if other.day == None:
+                        return False
+                    else:
+                        return self.day < other.day
+    def __gt__(self, other):
+        return other.__lt__(self)
+    
+    def __le__(self, other):
+        return self == other or self.__lt__(other)
+    
+    def __ge__(self, other):
+        return self == other or self.__gt__(other)
+        
     def __eq__(self, other):
         return isinstance(other,FlexiDate) and\
             self.year == other.year and self.month == other.month and self.day == other.day
         
-    def __neq__(self,other):
+    def __ne__(self,other):
         return not isinstance(other,FlexiDate) or\
-            self.year != other.year or self.month != other.mongth or self.day != other.day
-        
-    def __hash__(self):
-        return hash((self.year,self.month,self.day))
+            self.year != other.year or self.month != other.month or self.day != other.day

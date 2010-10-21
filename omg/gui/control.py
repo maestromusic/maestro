@@ -64,12 +64,13 @@ class ControlWidget(QtGui.QWidget):
         
         # Controls in the second line
         self.titleLabel = QtGui.QLabel(self)
-        self.volumeLabel = VolumeLabel(self)
-        self.volumeLabel.clicked.connect(self.toggleMute)
-        self.volumeSlider = QtGui.QSlider(Qt.Horizontal,self)
+        self.volumeSlider = QtGui.QSlider(QtCore.Qt.Horizontal,self)
         self.volumeSlider.setRange(0,100)
-        self.storedVolume = 50
         self.volumeSlider.actionTriggered.connect(self._handleVolumeSliderAction)
+        self.volumeLabel = VolumeLabel(self, self.volumeSlider)
+        self.volumeLabel.clicked.connect(self.toggleMute)
+        
+        self.storedVolume = 50
         self.muted = False
         self.time = None
         
@@ -224,11 +225,12 @@ class VolumeLabel(QtGui.QLabel):
     
     clicked = QtCore.pyqtSignal()
     
-    def __init__(self,parent):
+    def __init__(self,parent, slider):
         """Initialize this label with the given parent."""
         QtGui.QLabel.__init__(self,parent)
         self.state = 'muted'
         self.setPixmap(QtGui.QPixmap(getIcon("volume_muted.png")))
+        self.slider = slider
     
     def setVolume(self,volume):
         """Display the icon appropriate for the given volume."""
@@ -255,3 +257,7 @@ class VolumeLabel(QtGui.QLabel):
         
     def mousePressEvent(self, event):
         self.clicked.emit()
+
+    def wheelEvent(self, event):
+        """Scrolling the wheel over the volume label should change the volume and slider as well."""
+        self.slider.wheelEvent(event)

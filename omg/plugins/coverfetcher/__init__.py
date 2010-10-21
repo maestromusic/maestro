@@ -14,7 +14,8 @@ import itertools
 from PyQt4 import QtCore,QtGui,QtNetwork
 from PyQt4.QtCore import Qt
 
-from omg import covers, config, constants, models, tags
+from omg import covers, constants, models, tags
+from omg.config import options
 from omg.gui import formatter, playlist
 
 LASTFM_API_KEY = 'b25b959554ed76058ac220b7b2e0a026'
@@ -38,7 +39,7 @@ def getMenuEntries(playlist,node):
 
 class CoverData:
     def __init__(self,cover,text):
-        coverSize = config.options.gui.cover_fetcher_cover_size
+        coverSize = options.gui.cover_fetcher_cover_size
         self.cover = cover
         self.text = text
         if cover.width() > coverSize or cover.height() > coverSize:
@@ -68,7 +69,7 @@ class CoverFetcher(QtGui.QDialog):
         layout.addLayout(rightLayout)
         
         self.imageLabel = QtGui.QLabel(self)
-        coverSize = config.options.gui.cover_fetcher_cover_size
+        coverSize = options.gui.cover_fetcher_cover_size
         self.imageLabel.setMinimumSize(coverSize+2,coverSize+2) # two pixels for the border
         self.imageLabel.setSizePolicy(QtGui.QSizePolicy.Fixed,QtGui.QSizePolicy.Fixed)
         self.imageLabel.setAlignment(Qt.AlignLeft|Qt.AlignTop)
@@ -177,7 +178,7 @@ class CoverFetcher(QtGui.QDialog):
                 if isinstance(albumNode,xml.dom.minidom.Element) and albumNode.tagName == 'album':
                     for node in albumNode.childNodes:
                         if isinstance(node,xml.dom.minidom.Element) and node.tagName == 'image'\
-                                and node.getAttribute('size') == 'extralarge':
+                                and node.getAttribute('size') == 'extralarge' and node.firstChild != None:
                             urls.append(node.firstChild.data)
         if len(urls) == 0:
             QtGui.QMessageBox(QtGui.QMessageBox.Warning,"Fehler während der Coverabfrage",
@@ -274,7 +275,8 @@ class CoverFetcher(QtGui.QDialog):
             QtGui.QMessageBox(QtGui.QMessageBox.Warning,"Speichern fehlgeschlagen",
                               "Das Cover konnte nicht gespeichert werden.",
                               QtGui.QMessageBox.Ok,self).exec_()
-        else: self.nextElement()
+        else:
+            self.nextElement()
         
 
 class LastFmLabel(QtGui.QLabel):

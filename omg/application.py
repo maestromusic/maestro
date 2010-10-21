@@ -6,14 +6,13 @@
 # published by the Free Software Foundation
 #
 import sys, os, random, logging, io
+
 from omg import constants
-import omg
 from omg.config import options
 import omg.config
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 from _abcoll import Iterable
-
 # Global variables. Only for debugging! Later there may be more than one browser, playlist, etc.
 widget = None
 browser = None
@@ -40,18 +39,19 @@ class DatabaseChangeNotice():
     ids = None # the affected element_ids
     recursive = True # changes also affect subcontainers
     
-    def __init__(self, ids, tags = True, contents = True, recursive = True, deleted = False, created = False):
+    def __init__(self, ids, tags = True, contents = True, cover = False, recursive = True, deleted = False, created = False):
         self.ids = ids
         self.tags = tags
         self.contents = contents
         self.recursive = recursive
         self.deleted = deleted
         self.created = created
+        self.cover = cover
         
     @staticmethod
     def deleteNotice(ids, recursive = False):
         """Convenience function."""
-        return DatabaseChangeNotice(ids, tags = False, contents = False, recursive = recursive, deleted = True, created = False)
+        return DatabaseChangeNotice(ids, tags = False, contents = False, cover = False, recursive = recursive, deleted = True, created = False)
         
 class DBUpdateDistributor(QtCore.QObject):
     
@@ -94,10 +94,7 @@ class OmgMainWindow(QtGui.QMainWindow):
         controlDock.setWidget(controlWidget)
         self.addDockWidget(Qt.TopDockWidgetArea, controlDock)
         
-        browser = browserModule.Browser()
-        omg.distributor.indicesChanged.connect(browser.handleIndicesChanged)
-        browser.indicesChanged.connect(omg.distributor.indicesChanged)
-        
+        browser = browserModule.Browser()        
         browserDock = QtGui.QDockWidget()
         browserDock.setWindowTitle("Element browser")
         browserDock.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
@@ -125,13 +122,13 @@ class OmgMainWindow(QtGui.QMainWindow):
         fb.searchDirectoryChanged.connect(gm.setSearchDirectory)
         self.addDockWidget(Qt.RightDockWidgetArea, fbDock)
         
-        depotModel = omg.gopulate.models.GopulateTreeModel(None)
-        depotWidget = omg.gopulate.gui.GopulateTreeWidget()
-        depotWidget.setModel(depotModel)
-        depotDock = QtGui.QDockWidget()
-        depotDock.setWindowTitle("container depot")
-        depotDock.setWidget(depotWidget)
-        self.addDockWidget(Qt.BottomDockWidgetArea, depotDock) 
+#        depotModel = omg.gopulate.models.GopulateTreeModel(None)
+#        depotWidget = omg.gopulate.gui.GopulateTreeWidget()
+#        depotWidget.setModel(depotModel)
+#        depotDock = QtGui.QDockWidget()
+#        depotDock.setWindowTitle("container depot")
+#        depotDock.setWidget(depotWidget)
+#        self.addDockWidget(Qt.BottomDockWidgetArea, depotDock) 
         
         self.setCentralWidget(central)
         control.synchronizePlaylist(playlist.getModel())
@@ -186,6 +183,7 @@ def run(opts, args):
     
     # Create GUI
     global widget
+    import omg
     omg.distributor = DBUpdateDistributor()
     widget = OmgMainWindow()
     from omg import plugins
@@ -195,10 +193,12 @@ def run(opts, args):
     
     # Close operations
     from omg import config, plugins
+    import omg.gopulate
     
     config.shelve['widget_position'] = (widget.x(),widget.y())
     config.shelve['widget_width'] = widget.width()
     config.shelve['widget_height'] = widget.height()
+    omg.gopulate.terminate()
     plugins.teardown()
     config.shelve.close()
     logging.shutdown()

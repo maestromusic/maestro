@@ -108,4 +108,4 @@ def delFile(path=None,hash=None,id=None):
 
 def updateElementCounter(containerId):
     """Sets the element conuter of given containerId to the correct number."""
-    database.get().query('UPDATE elements SET elements = (SELECT COUNT(*) FROM contents WHERE container_id = ?)', containerId)
+    database.get().query('UPDATE elements SET elements = (SELECT COUNT(*) FROM contents WHERE container_id = ?) WHERE id = ?', containerId, containerId)

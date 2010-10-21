@@ -76,7 +76,7 @@ tables = {table.name:table for table in (SQLTable(createQuery) for createQuery i
         verified TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         length MEDIUMINT UNSIGNED NOT NULL,
         PRIMARY KEY(element_id),
-        UNIQUE INDEX path_idx(path(333)),
+        INDEX path_idx(path(333)),
         INDEX hash_idx(hash),
         INDEX length_idx(length)
     ) CHARACTER SET 'utf8';
