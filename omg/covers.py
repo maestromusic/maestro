@@ -22,19 +22,22 @@ def hasCover(elementId):
     return os.path.exists(COVER_DIR+"large/"+str(elementId))
 
 def getCoverPath(elementId,size=None):
-    """Return the path to the cover of the element with id <elementId> in size <size>x<size> pixel or in original size, if <size> is None."""
+    """Return the path to the cover of the element with id <elementId> in size <size>x<size> pixel or in original size, if <size> is None. Return None if the element has no cover."""
     assert isinstance(elementId,int)
     if size is None:
         dir = COVER_DIR+"large/"
     else: dir = COVER_DIR+"cache_{0}/".format(size)
     
     if not os.path.exists(dir+str(elementId)):
-        try:
-            cacheCover(elementId,size)
-        except IOError:
-            return None
-    
-    return dir+str(elementId)
+        if size is None:
+            return None # Element does not have a cover
+        else:
+            try:
+                cacheCover(elementId,size)
+                return dir+str(elementId)
+            except IOError:
+                return None
+    else: return dir+str(elementId)
     
 def getCover(elementId,size=None):
     """Return the cover of the given element as QImage. If no cover is found or Qt was not able to load the image, return None. If <size> is None, the large cover will be returned. Otherwise the cover will be scaled to size x size pixels and cached in the appropriate folder."""
@@ -75,6 +78,10 @@ def cacheAll(size):
 
 def setCover(id,cover):
     assert isinstance(id,int)
+    if not os.path.exists(COVER_DIR):
+        os.mkdir(dir)
+    if not os.path.exists(COVER_DIR+"large/"):
+        os.mkdir(COVER_DIR+"large/")
     if not cover.save(COVER_DIR+"large/"+str(id),"png"):
         return False
     else:
