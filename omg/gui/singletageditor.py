@@ -82,12 +82,9 @@ class TagValueEditor(QtGui.QWidget):
         
         # Create and fill the EditorWidget
         self.editorWidget = editorwidget.EditorWidget()
-        self.valueLabel = QtGui.QLabel()
-        self.editorWidget.setLabel(self.valueLabel)
-        self.editor = TagLineEdit()
-        self.editorWidget.setEditor(self.editor)
-        # The next connection resets the editor when it looses focus
-        self.editorWidget.editorClosed.connect(self._updateEditorWidget)
+        #~ self.editor = TagLineEdit()
+        #~ self.editorWidget.setEditor(self.editor)
+        self.editorWidget.valueChanged.connect(self._handleValueChanged)
         firstLineLayout.addWidget(self.editorWidget)
         
         self.elementsLabel = QtGui.QLabel()
@@ -123,13 +120,11 @@ class TagValueEditor(QtGui.QWidget):
                     self.layout().addWidget(self.listView)
                 self.listView.setModel(simplelistmodel.SimpleListModel(elements,models.Element.getTitle))
                 self.setExpanded(len(elements) <= EXPAND_LIMIT)
-    
+
     def _updateEditorWidget(self):
         if isinstance(self.record.value,FlexiDate):
-            value = self.record.value.strftime()
-        else: value = self.record.value
-        self.valueLabel.setText(value)
-        self.editor.setText(value)
+            self.editorWidget.setValue(self.record.value.strftime())
+        else: self.editorWidget.setValue(self.record.value)
         
     def _updateElementsLabel(self):
         if self.record.isCommon():
@@ -155,22 +150,18 @@ class TagValueEditor(QtGui.QWidget):
             if self.listView is not None:
                 self.listView.setVisible(expanded)
 
-    def keyPressEvent(self,event):
-        if event.key() == Qt.Key_Escape:
-            self.editorWidget.showLabel()
-            event.accept()
-        elif event.key() == Qt.Key_Return:
-            if self.record.tag.isValid(self.editor.text()):
-                newRecord = self.record.copy()
-                newRecord.value = self.editor.text()
-                self.model.changeRecord(self.record,newRecord)
-                self.editorWidget.showLabel()
-            else: QtGui.QMessageBox.warning(self,"Ungültiger Wert","Der eingegebene Wert ist ungültig.")
-            event.accept()
-            
+    def _handleValueChanged(self,value):
+        if self.record.tag.isValid(value):
+            if self.record.tag.type == 'date':
+                value = FlexiDate(value)
+            newRecord = self.record.copy()
+            newRecord.value = value
+            self.model.changeRecord(self.record,newRecord)
+        else:
+            self._updateEditorWidget() # Reset the editor
+            QtGui.QMessageBox.warning(self,"Ungültiger Wert","Der eingegebene Wert ist ungültig.")
 
-
-
+    
 class TagLineEdit(QtGui.QLineEdit):
     def __init__(self,parent=None):
         QtGui.QLineEdit.__init__(self,parent)

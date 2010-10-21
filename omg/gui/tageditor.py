@@ -35,12 +35,17 @@ class TagEditorWidget(QtGui.QDialog):
         self.removeSelectedAction = QtGui.QAction("Ausgewählte entfernen",self)
         self.removeSelectedAction.triggered.connect(self._handleRemoveSelected)
         
+        self.recursiveBox = QtGui.QCheckBox("Tags rekursiv für alle Unterelemente ändern")
+        self.recursiveBox.setChecked(True)
+        
         self.setLayout(QtGui.QVBoxLayout())
+        self.layout().addWidget(self.recursiveBox)
         self.tagEditorLayout = QtGui.QGridLayout()
         self.layout().addLayout(self.tagEditorLayout)
         self.layout().addStretch(1)
         buttonBarLayout = QtGui.QHBoxLayout()
         self.layout().addLayout(buttonBarLayout,0)
+
         
         addButton = QtGui.QPushButton("Tag hinzufügen")
         addButton.clicked.connect(self._handleAddRecord)
@@ -53,6 +58,7 @@ class TagEditorWidget(QtGui.QDialog):
         resetButton.clicked.connect(self.model.reset)
         buttonBarLayout.addWidget(resetButton)
         saveButton = QtGui.QPushButton("Speichern")
+        saveButton.clicked.connect(self._handleSave)
         buttonBarLayout.addWidget(saveButton)
         
         self.singleTagEditors = {}
@@ -125,7 +131,11 @@ class TagEditorWidget(QtGui.QDialog):
         if record.tag not in self.model.getTags():
             self._removeSingleTagEditor(record.tag)
         else: pass # The SingleTagEditor will deal with it
-            
+
+    def _handleSave(self):
+        self.model.save(self.recursiveBox.isChecked())
+        self.accept()
+        
     def contextMenuEvent(self, event):
         menu = QtGui.QMenu(self)
         menu.addAction(self.addRecordAction)

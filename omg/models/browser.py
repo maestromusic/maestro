@@ -134,7 +134,7 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
             if element.isContainer():
                 element.loadContents(True,table)
             element.loadTags(True)
-        node.contents.sort(key = lambda elem: elem.tags[tags.DATE] if tags.DATE in elem.tags else omg.FlexiDate(900))
+        node.contents.sort(key = lambda elem: elem.tags[tags.DATE][0] if tags.DATE in elem.tags else omg.FlexiDate(900))
 
 
 class CriterionNode(models.Node):

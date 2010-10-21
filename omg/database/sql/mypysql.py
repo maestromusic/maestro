@@ -36,9 +36,6 @@ class Sql(AbstractSql):
         self._db.use_dict = False
         return result
 
-    def getDate(self,date):
-        return date
-
 
 class SqlResult(AbstractSqlResult):
     def __init__(self,cursor):

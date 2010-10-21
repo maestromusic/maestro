@@ -36,16 +36,16 @@ class FlexiDate:
     """A FlexiDate is a date which may be only a year, or a year and a month, or a year+month+day."""
      
     def __init__(self, year, month = None, day = None):
-        """For unspecified month or day, you may pass None or 0, which will be converted to None.""" 
-        self.year = year
-        if month == 0:
+        """For unspecified month or day, you may pass None or 0, which will be converted to None."""
+        self.year = int(year)
+        if month == 0 or month is None: # cannot pass None to int(), so we have to check for it here
             self.month = None
         else:
-            self.month = month
-        if day == 0:
+            self.month = int(month)
+        if day == 0 or day is None:
             self.day = None
         else:
-            self.day = day
+            self.day = int(day)
     
     @staticmethod
     def strptime(string):

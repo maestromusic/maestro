@@ -44,12 +44,6 @@ class Sql(AbstractSql):
                 else: message = "Query failed {0}".format(queryString)
                 raise DBException(message)
             return SqlResult(query,useDict)
-    
-    def getDate(self,qdate):    
-        try:
-            return datetime.date(qdate.year(),qdate.month(),qdate.day())
-        except ValueError:
-            return datetime.date(1988,12,2) #TODO: of course this is stupid...but at least on my computer QtSql delivers always the same wrong and invalid date and I cannot create a datetime.date from it.
         
         
 class SqlResult(AbstractSqlResult):

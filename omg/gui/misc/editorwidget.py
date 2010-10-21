@@ -10,14 +10,17 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 class EditorWidget(QtGui.QStackedWidget):
-    editorOpened = QtCore.pyqtSignal()
-    editorClosed = QtCore.pyqtSignal()
+    valueChanged = QtCore.pyqtSignal(str)
+
+    label = None
+    editor = None
     
-    def __init__(self,parent=None):
+    def __init__(self,label=None,editor=None,parent=None):
         QtGui.QStackedWidget.__init__(self,parent)
-        self.label = None
-        self.editor = None
+        self.setLabel(label)
+        self.setEditor(editor)
         self.setFocusPolicy(Qt.StrongFocus)
+        self.popup = None
     
     def getLabel(self):
         return self.label
@@ -25,8 +28,10 @@ class EditorWidget(QtGui.QStackedWidget):
     def setLabel(self,label):
         if self.label is not None:
             self.removeWidget(self.label)
-        self.label = label
-        self.insertWidget(0,label)
+            self.label.removeEventFilter(self)
+        self.label = label if label is not None else QtGui.QLabel()
+        self.label.installEventFilter(self)
+        self.insertWidget(0,self.label)
             
     def getEditor(self):
         return self.editor
@@ -35,9 +40,9 @@ class EditorWidget(QtGui.QStackedWidget):
         if self.editor is not None:
             self.removeWidget(self.editor)
             self.editor.removeEventFilter(self)
-        self.editor = editor
-        editor.installEventFilter(self)
-        self.insertWidget(0 if self.label is None else 1,editor)
+        self.editor = editor if editor is not None else QtGui.QLineEdit()
+        self.editor.installEventFilter(self)
+        self.insertWidget(1,self.editor)
         
     def showLabel(self):
         if self.label is not None:
@@ -51,15 +56,46 @@ class EditorWidget(QtGui.QStackedWidget):
             if hasattr(self.editor,'selectAll'):
                 self.editor.selectAll()
 
+    def getValue(self):
+        return self.label.text()
+
+    def setValue(self,value):
+        if value != self.editor.text():
+            self.editor.setText(value)
+        if value != self.label.text():
+            self.label.setText(value)
+            self.valueChanged.emit(value)
+        
     def focusInEvent(self,focusEvent):
         if self.currentWidget() == self.label:
             self.showEditor()
-            self.editor.setFocus(Qt.MouseFocusReason)
-            self.editorOpened.emit()
+            self.editor.setFocus(focusEvent.reason())
         QtGui.QStackedWidget.focusInEvent(self,focusEvent)
     
     def eventFilter(self,object,event):
-        if object == self.editor and event.type() == QtCore.QEvent.FocusOut:
-            self.showLabel()
-            self.editorClosed.emit()
+        #~ if object == self.label:
+            #~ if event.type() == QtCore.QEvent.MouseButtonPress and event.button() == Qt.LeftButton:
+                #~ self.showEditor()
+                #~ return True # consume event
+        if object == self.editor:
+            if event.type() == QtCore.QEvent.FocusOut:
+                if self.popup is None:
+                    self.showLabel()
+                    self.setValue(self.editor.text())
+                    return False
+                return False
+            elif event.type() == QtCore.QEvent.ContextMenu:
+                self.popup = self.editor.createStandardContextMenu()
+                action = self.popup.exec_(self.editor.mapToGlobal(event.pos()))
+                self.popup = None
+                return True
+            elif event.type() == QtCore.QEvent.KeyPress:
+                if event.key() == Qt.Key_Return or event.key() == Qt.Key_Enter:
+                    self.setValue(self.editor.text())
+                    self.showLabel()
+                    return True
+                elif event.key() == Qt.Key_Escape:
+                    self.setValue(self.label.text())
+                    self.showLabel()
+                    return True
         return False # don't stop the event

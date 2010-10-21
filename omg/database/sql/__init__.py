@@ -78,9 +78,6 @@ class AbstractSql:
         
         Execute the query queryString and return an SqlResult object which yields the result's rows in dictionaries with the column names as keys. The queryString may contain ? as placeholders which are replaced by the args-parameters in the given order. Those parameters must be either string or integer and strings are escaped before replacing. In particular you must not use quotation marks around string parameters: "SELECT id FROM table WHERE name = ?" works fine. A drawback is that you cannot use placeholders to select a table: "SELECT id FROM ?" will not work.
         """
-
-    def getDate(self,date):
-        """Convert a date value retrieved from the database to a Python date-object. This function must be used since the QtSql database-driver returns QDate-objects from date-columns."""
         
     def escapeString(self,string,likeStatement=False):
         """Escape a string for insertion in MySql queries.

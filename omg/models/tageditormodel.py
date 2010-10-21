@@ -10,7 +10,7 @@ import itertools
 from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
-from omg import models, tags
+from omg import models, tags, FlexiDate
 from . import simplelistmodel
 
 RATIO = 0.75
@@ -173,7 +173,11 @@ class TagEditorModel(QtCore.QObject):
                 else: self.recordRemoved.emit(record)
                 return
         raise ValueError("There is no record with tag {} and value '{}'".format(record.tag,record.value))
-    
+
+    def save(self,recursive):
+        pass #TODO hier gehts weiter
+                
+        
     def getPossibleSeparators(self,records):
         # Collect all separators appearing in the first record
         if len(records) == 0 or any(record.tag.type == 'date' for record in records):
