@@ -7,12 +7,12 @@
 #
 import sys, os, random, logging, io
 
-from omg import constants
-from omg.config import options
-import omg.config
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
-from _abcoll import Iterable
+
+from omg import constants
+from omg.config import options
+
 # Global variables. Only for debugging! Later there may be more than one browser, playlist, etc.
 widget = None
 browser = None
@@ -152,34 +152,29 @@ class OmgMainWindow(QtGui.QMainWindow):
                                       'OMG',
                                       'This is OMG version {0}\n{1}'.format(constants.VERSION, random.choice(names)),
                                       )
-def initModules(opts = None, args = None):
+    
+    
+def run(opts, args):
+    # Some Qt-classes need a running QApplication before they can be created
+    app = QtGui.QApplication(sys.argv)
+
     # Switch first to the directory containing this file
     if os.path.dirname(__file__):
         os.chdir(os.path.dirname(__file__))
     # And then one directory above
     os.chdir("../")
     
-    # Initialize config and logging
-    from omg import config
+    # Import and initialize modules
+    from omg import config # Initialize config and logging
     config.init(opts)
-    
     logging.getLogger("omg").debug("START")
+    
     from omg import database
     database.connect()
     from omg import tags
     tags.init()
     from omg import search
     search.init()
-
-    
-    
-def run(opts, args):
-    
-    # Some Qt-classes need a running QApplication before they can be created
-    app = QtGui.QApplication(sys.argv)
-    
-    # Import and initialize modules    
-    initModules(opts, args)
     
     # Create GUI
     global widget
@@ -188,7 +183,8 @@ def run(opts, args):
     widget = OmgMainWindow()
     from omg import plugins
     plugins.loadPlugins()
-    # launch application
+
+    # Launch application
     returnValue = app.exec_()
     
     # Close operations

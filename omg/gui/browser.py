@@ -106,7 +106,7 @@ class BrowserTreeView(QtGui.QTreeView):
     def _handleDoubleClicked(self,index):
         node = self.model().data(index)
         if isinstance(node,models.Element):
-            control.playlist.insertElements(control.playlist.importElements([node]),-1)
+            control.playlist.insertElements([node],-1)
         elif isinstance(node,browsermodel.CriterionNode):
             control.playlist.insertElements(control.playlist.importElements(node.getElements()),-1)
     

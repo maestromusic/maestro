@@ -9,11 +9,10 @@
 import logging, copy, os
 from PyQt4 import QtCore
 
-from omg import tags, database, covers, realfiles, absPath, relPath
-from omg.database import queries
+from omg import tags, db, covers, realfiles, absPath, relPath
+from omg.database import queries,sql
 from omg.config import options
 from functools import reduce
-db = database.get()
 
 logger = logging.getLogger(name="models")
 
@@ -193,12 +192,11 @@ class Element(Node):
                 "Cannot instantiate abstract base class Element. Use Container, File or models.createElement.")
     
     def isInDB(self, recursive = False):
-        """Return whether this element is contained in the database. If recursive is True, only return True if
-        this element and all of its recursive children are in the database."""
+        """Return whether this element is contained in the database, that is whether it has an id. If recursive is True, only return True if this element and all of its recursive children are in the database."""
         if not recursive:
             return self.id is not None
         else:
-            return self.isInDB(False) and (self.isFile() or all((e.isInDB(True) for e in self.contents)))
+            return self.id is not None and (self.isFile() or all(e.isInDB(True) for e in self.contents))
     
     def outOfSync(self):
         return self.isInDB() and any(self._syncState.values())
@@ -210,37 +208,19 @@ class Element(Node):
         return newNode
 
     def loadTags(self,recursive=False,tagList=None, fromFS=False):
-        """Delete the stored tags and load them again. If this element is contained in the DB, tags will be loaded from there.
-        Otherwise if this is a file, tags will be loaded from that file or no tags will be loaded if this is a container.
+        """Delete the stored tags and load them again. If this element is contained in the DB, tags will be loaded from there. Otherwise if this is a file, tags will be loaded from that file or no tags will be loaded if this is a container.
         If <recursive> is True, all tags from children of this node (recursively) will be loaded, too.
         If <tagList> is not None only tags in the given list will be loaded (e.g. only title-tags).
-        If <fromFS> is True, then tags are read form the file even if this element is in the DB (and is a file)."""
-        if fromFS and self.isInDB() and self.isFile():
-            self.readTagsFromFilesystem()
-        elif self.isInDB():
-            self.tags = tags.Storage()
-            # Prepare a where clause to select only the tags in tagList
-            if tagList is not None:
-                additionalWhereClause = " AND tag_id IN ({0})".format(",".join(str(tag.id) for tag in tagList))
-            else: additionalWhereClause = ''
-            result = db.query("""
-                SELECT tag_id,value_id 
-                FROM tags
-                WHERE element_id = {0} {1}
-                """.format(self.id,additionalWhereClause))
-            for row in result:
-                tag = tags.get(row[0])
-                value = tag.getValue(row[1])
-                if value is None:
-                    logger.warning("Database is corrupt: Element {0} has a {1}-tag with id {2} but "
-                                  +"this id does not exist in tag_{1}.".format(self.id,tag.name,row[1]))
-                    continue
-                self.tags.add(tag,value)
-        elif self.isFile():
-            self.readTagsFromFilesystem()
+        If <fromFS> is True, then tags are read from the file even if this element is in the DB (and is a file)."""
+        if fromFS or not self.isInDB():
+            if self.isFile():
+                self.readTagsFromFilesystem()
+            else: self.tags = tags.Storage()
         else:
             self.tags = tags.Storage()
-            
+            for tag,value in db.tags(self.id,tagList):
+                self.tags.add(tag,value)
+
         if recursive:
             for element in self.getChildren():
                 element.loadTags(recursive, tagList, fromFS)
@@ -258,15 +238,13 @@ class Element(Node):
            For elements outside the DB, you have to take care of self.position directly."""
         if not self.isInDB():
             return self.position
-        if (self.position != None) and not refresh:
+        if self.position is not None and not refresh:
             return self.position
         else:
             # Without parent, there can't be a position
             if self.parent is None or not isinstance(self.parent,Element) or not self.parent.isInDB():
                 return None
-            self.position = db.query("SELECT position FROM contents WHERE container_id = ? AND element_id = ?", 
-                                 self.parent.id,self.id).getSingle()
-            return self.position
+            return db.position(self.parent.id,self.id)
     
     def setPosition(self, position):
         if position != self.position:
@@ -282,19 +260,7 @@ class Element(Node):
         """Return a list containing the ids of all parents of this element from the database. If <recursive> is True all ancestors will be added recursively."""
         if not self.isInDB():
             raise RuntimeError("getParentIds can only be used on elements contained in the database.")
-        newList = list(db.query("SELECT container_id FROM contents WHERE element_id = ?",self.id).getSingleColumn())
-        if not recursive:
-            return newList
-        resultList = newList
-        while len(newList) > 0:
-            newList = list(db.query("""
-                    SELECT container_id
-                    FROM contents
-                    WHERE element_id IN ({0})
-                    """.format(",".join(str(n) for n in newList))).getSingleColumn())
-            newList = [id for id in newList if id not in resultList] # Do not add twice
-            resultList.extend(newList)
-        return resultList
+        return db.parents(self.id,recursive)
     
     def isAlbum(self):
         """Return whether this element is an album (that is, whether it is a container and has a album-tag matching a title-tag.)"""
@@ -326,14 +292,10 @@ class Element(Node):
         if len(albumTitles) > 0:
             albums = []
             for id in parentIds:
-                titles = db.query("""
-                    SELECT tag_{0}.value
-                    FROM tags JOIN tag_{0} ON tags.value_id = tag_{0}.id
-                    WHERE tags.element_id = {1} AND tags.tag_id = {2}
-                    """.format(tags.TITLE.name,id,tags.TITLE.id)).getSingleColumn()
-                for title in titles:
+                for title in db.tagValues(id,tags.TITLE):
                     if title in albumTitles:
                         albums.append(id)
+                        break
             return albums
         else: return []
         
@@ -425,7 +387,7 @@ class Container(Element):
         self._syncState = {}
     
     def setContents(self,contents):
-        """Set the list of contents of this container to <contents>. Note that the list won't be copied but the parents will be set to this container."""
+        """Set the list of contents of this container to <contents>. Note that the list won't be copied and in fact altered: the parents will be set to this container."""
         assert isinstance(contents,list)
         self.contents = contents
         for element in self.contents:
@@ -463,21 +425,21 @@ class Container(Element):
         logger.debug("commiting container {}".format(self))
         wasInDB = self.isInDB()
         if not wasInDB:
-            self.id = database.queries.addContainer(
+            self.id = queries.addContainer(
                             "spast", tags = self.tags, file = False, elements = len(self.contents), toplevel = toplevel)
         else:
-            database.queries.delContents(self.id)
+            queries.delContents(self.id)
         for elem in self.contents:
             elem.commit()
             try:
-                database.queries.addContent(self.id, elem.getPosition(), elem.id)
-            except database.sql.DBException as exc:
+                queries.addContent(self.id, elem.getPosition(), elem.id)
+            except sql.DBException as exc:
                 print(self.id)
                 print(elem.getPosition())
                 print(elem.id)
                 print(self.tags['title'])
         if wasInDB:
-            database.queries.updateElementCounter(self.id)
+            queries.updateElementCounter(self.id)
         self.syncState = {}
 
     
@@ -506,7 +468,7 @@ class Container(Element):
             self.tags = newTags
     
     def updateElementCounter(self):
-        database.queries.updateElementCounter(self.id)
+        queries.updateElementCounter(self.id)
         
     def flatten(self):
         newContents = list(self.depthFirstGenerator())
@@ -625,7 +587,7 @@ class File(Element):
         
         import omg.gopulate
         logger.debug("commiting file {}".format(self.path))
-        self.id = database.queries.addContainer(
+        self.id = queries.addContainer(
                                         os.path.basename(self.path),
                                         tags = self.tags,
                                         file = True,

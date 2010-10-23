@@ -201,6 +201,7 @@ def checkSuperfluousTags(fix=False):
 def _parseTagConfiguration(config):
     """Parse a string to configure tags and their types. This string should contain a comma-separated list of strings of the form tagname(tagtype) where the part in brackets is optional and defaults to 'varchar'. Check whether the syntax is correct and return a dictionary {tagname : tagtype}. Otherwise raise an exception."""
     import re
+    from omg import tags as tagsModule
     # Matches strings like "   tagname (   tagtype   )   " (the part in brackets is optional) and stores the interesting parts in the first and third group.
     prog = re.compile('\s*(\w+)\s*(\(\s*(\w*)\s*\))?\s*$')
     tags = {}
@@ -212,5 +213,7 @@ def _parseTagConfiguration(config):
         tagtype = result.groups()[2]
         if not tagtype:
             tagtype = "varchar"
+        if tagsModule.Type.byName(tagtype) is None:
+            raise Exception("Unknown tag type: '{}'".format(tagtype))
         tags[tagname] = tagtype
     return tags

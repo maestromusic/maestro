@@ -10,7 +10,7 @@
 """Module to manage the database tables used by omg."""
 
 import re
-from omg import config, database, constants
+from omg import config, database, constants, tags
 from . import db, DBLayoutException
 
 class SQLTable:
@@ -99,7 +99,6 @@ tables = {table.name:table for table in (SQLTable(createQuery) for createQuery i
 """
 ))}
 
-validTagTypes = ("varchar", "date", "text")
 
 # Tag tables
 #========================
@@ -107,20 +106,18 @@ class TagTable(SQLTable):
     """Class for tables which hold all values of a certain tag. Because these tables are created by common queries only depending on tagname and tagtype there is a special class for them."""
     def __init__(self,tagname,tagtype):
         """Initialise this table-object with the given tagname and tagtype."""
-        if tagtype not in validTagTypes:
-            raise Exception("Unknown tag type '{0}'".format(tagtype))
         SQLTable.__init__(self,self._tagQueries[tagtype].format("tag_"+tagname))
 
     #queries to create the tag tables. Replace the placeholder with the tagname before use...
     _tagQueries = {
-        "varchar" : """
-        CREATE TABLE {} (
+        tags.TYPE_VARCHAR: """
+        CREATE TABLE {0} (
             id MEDIUMINT UNSIGNED NOT NULL AUTO_INCREMENT,
-            value VARCHAR({}) NOT NULL,
+            value VARCHAR({1}) NOT NULL,
             PRIMARY KEY(id)
         ) CHARACTER SET 'utf8';""".format("{0}",constants.TAG_VARCHAR_LENGTH),
 
-        "date" : """
+        tags.TYPE_DATE: """
         CREATE TABLE {0} (
             id MEDIUMINT UNSIGNED NOT NULL AUTO_INCREMENT,
             value DATE NOT NULL,
@@ -128,7 +125,7 @@ class TagTable(SQLTable):
             UNIQUE INDEX value_idx(value)
         );""",
 
-        "text" : """
+        tags.TYPE_TEXT: """
         CREATE TABLE {0} (
             id MEDIUMINT UNSIGNED NOT NULL AUTO_INCREMENT,
             value TEXT NOT NULL,
@@ -140,7 +137,7 @@ def allTables():
     """Return a dictionary mapping the table-names to SQLTable-instances and containing all tables which should be in the database (according to the information in tagids)."""
     result = dict(tables)
     if 'tagids' in tables:
-        tagTables = {"tag_"+tagname:TagTable(tagname,tagtype)
+        tagTables = {"tag_"+tagname:TagTable(tagname,tags.Type.byName(tagtype))
                         for tagname,tagtype in database.get().query("SELECT tagname,tagtype FROM tagids")}
         result.update(tagTables)
     return result

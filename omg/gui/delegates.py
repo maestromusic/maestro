@@ -45,7 +45,7 @@ class PlaylistDelegate(abstractdelegate.AbstractDelegate):
                     for albumId in albumIds:
                         cover = covers.getCover(albumId, options.gui.small_cover_size)
                         if cover is not None:
-                            self.drawCover(options.gui.mall_cover_size,None,cover)
+                            self.drawCover(options.gui.small_cover_size,None,cover)
                             break # Draw only one cover even if there are several albums
                 self.addLine(f.titleWithPos(),f.length(),PL_TITLE_STYLE,STD_STYLE)
                 self.addLine(f.album(),"",PL_ALBUM_STYLE)

@@ -114,9 +114,9 @@ def _formatColumns(columns,fromTable):
 def sortKey(criterion):
     """Compute a "complexity" value for a criterion.
     
-    This function is used to sort the complicated criteria in the front hoping that we get right from the beginning only a few results. In the current implementation complexity means basically the length of the search value. This makes sense also for a second reason: MySQLs Turbo-Boyer-Moore-algorithm for queries containing "LIKE '%<search value>%' is faster for longer search values."""
-    if isinstance(criterion,TagIdCriterion):
-        return 1000 # Just a high value to sort TagIdCriteria to the front
+    This function is used to sort the complicated criteria to the front hoping that we get right from the beginning only a few results. In the current implementation complexity means basically the length of the search value. This makes sense also for a second reason: MySQLs Turbo-Boyer-Moore-algorithm for queries containing "LIKE '%<search value>%' is faster for longer search values."""
+    if not isinstance(criterion,TextCriterion):
+        return 1000 # Just a high value to sort these criteria to the front
     else: # TextCriterion
         if criterion.tag is None:
             return len(criterion.value)

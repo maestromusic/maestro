@@ -14,14 +14,12 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 import omg.models
-from omg import realfiles, relPath, absPath, tags, constants, database
+from omg import realfiles, relPath, absPath, tags, constants, db
 
-import omg.database.queries as queries
+from omg.database import queries
 from omg.models import rootedtreemodel
 from omg.config import options
 
-
-db = omg.database.get()
 logger = logging.getLogger('gopulate')
 
 # regular expression to find discnumber indicators in the album string
@@ -83,8 +81,8 @@ class GopulateGuesser:
         albumsFoundByID = {} #id->container map
         
         for filename in self.files:
-            id = queries.idFromFilename(relPath(filename))
-            if id:
+            id = db.idFromPath(relPath(filename))
+            if id is not None:
                 if onlyNewFiles:
                     logger.debug("Skipping file '{0}' which is already in the database.".format(filename))
                     continue
@@ -164,7 +162,7 @@ class GopulateGuesser:
                 if discname_reduced in finalDictionary:
                     metaContainer = finalDictionary[discname_reduced]
                 else:
-                    discname_id = tags.TITLE.getValueId(discname_reduced, insert = False)
+                    discname_id =  db.idFromValue(tags.TITLE,discname_reduced)
                     if discname_id is not None:
                         album_id = database.get().query('SELECT element_id FROM tags WHERE tag_id=? and value_id= ?',
                                                         tags.TITLE.id, discname_id).getSingle()

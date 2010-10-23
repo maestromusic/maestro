@@ -18,7 +18,7 @@ This module provides methods to initialize the tag lists based on the database, 
 """
 import os.path
 from collections import Sequence
-from omg import constants, database, FlexiDate, getIcon
+from omg import constants, FlexiDate, getIcon
 from omg.config import options
 import logging, datetime
 
@@ -33,6 +33,9 @@ _tagsByName = None
 # list of all tags that are ignored by config file
 _ignored = None
 
+# Local reference to the database, will be created in init
+db = None
+
 # List of all indexed tags in the order specified by the config-variable tags->tag_order (tags which are not contained in that list will appear in arbitrary order at the end of tagList). Us this to iterate over all tags.
 tagList = None
 
@@ -43,6 +46,61 @@ ALBUM = None
 DATE = None
 
 TOTALLY_IGNORED_TAGS = ("tracknumber", "discnumber")
+
+class Type:
+    """Class for the type of tags. Currently only three types are possible: varchar, date and text. For each of them there is an instance (e.g. tags.TYPE_VARCHAR) and you can get all of them via tags.TYPES. You should never create your own instances."""
+    def __init__(self,name):
+        """Creates a new TagType-instance with given name. Do not use outside of this module."""
+        self.name = name
+
+    def __eq__(self,other):
+        return isinstance(other,Type) and self.name == other.name
+
+    def __ne__(self,other):
+        return not isinstance(other,Type) or self.name != other.name
+        
+    def __hash__(self):
+        return hash(self.name)
+        
+    def isValid(self,value):
+        """Return whether the given value is a valid tag-value for tags of this type."""
+        if self.type == 'varchar':
+            return isinstance(value,str) and 0 < len(value.encode()) <= constants.TAG_VARCHAR_LENGTH
+        elif self.type == 'text':
+            return isinstance(value,str) and len(value) > 0
+        elif self.type == 'date':
+            if isinstance(value,FlexiDate):
+                return True
+            else:
+                try: 
+                    FlexiDate.strptime(value)
+                except TypeError:
+                    return False
+                except ValueError:
+                    return False
+                else: return True
+        else: assert False # should never happen
+    
+
+    def sqlFormat(self,value):
+        if self.name == 'date':
+            if isinstance(value,FlexiDate):
+                return value.sqlFormat()
+            else: return FlexiDate.strptime(value).sqlFormat()
+        else: return value
+
+    @staticmethod
+    def byName(name):
+        for type in TYPES:
+            if type.name == name:
+                return type
+        else: raise IndexError("There is no tag-type with name '{}'.".format(name))
+
+TYPE_VARCHAR = Type('varchar')
+TYPE_TEXT = Type('text')
+TYPE_DATE = Type('date')
+TYPES = {TYPE_VARCHAR,TYPE_TEXT,TYPE_DATE}
+
 
 class Tag:
     """Baseclass for tags.
@@ -63,7 +121,7 @@ class Tag:
     def isValid(self,value):
         """Return whether the given value is could be a tag-value for this tag."""
         return True
-        
+
     def __eq__(self,other):
         return self.name == other.name
         
@@ -107,53 +165,17 @@ class IndexedTag(Tag):
     Indexed tags contain in addition to their name an id and compare equal if and only if this id is equal. In most cases you won't instantiate this class but use tags.get to get the already existing instances. Indexed tags have three public attributes: id, name and type where type must be one of the keys in database.tables.TagTable._tagQueries.
     """
     def __init__(self,id,name,type):
+        assert isinstance(id,int) and isinstance(name,str) and isinstance(type,Type)
         self.id = id
         self.name = name.lower()
         self.type = type
     
-    def getValue(self,valueId):
-        """Retrieve the value of this tag with the given <valueId> from the corresponding tag-table."""
-        tableName = "tag_"+self.name
-        
-        if self.type == 'date':
-            value = FlexiDate.strptime(database.get().query(
-                    "SELECT DATE_FORMAT(value, '%Y-%m-%d') FROM " + tableName + " WHERE id = ?", valueId
-                ).getSingle())
-        else:
-            value = database.get().query("SELECT value FROM "+tableName+" WHERE id = ?",valueId).getSingle()
-        return value
-    
-    def getValueId(self, value, insert=True):
-        """Retrieve the id of the value of this tag with the given <value> name."""
-        
-        db = database.get()
-        tableName = "tag_" + self.name
-        if self.type == "date":
-            value = value.SQLformat()
-        valueId = db.query("SELECT id FROM " + tableName + " WHERE value = ?", value).getSingle()
-        if insert and not valueId:
-            valueId = db.query("INSERT INTO tag_{0} (value) VALUES(?);".format(self.name), value).insertId()
-            logger.debug("creating new value {} for tag {}".format(value,self.name))
-        return valueId
-    
     def isValid(self,value):
-        """Return whether the given value is a valid value for this tag (this depends only on the tag-type)."""
-        if self.type == 'varchar':
-            return isinstance(value,str) and 0 < len(value.encode()) <= constants.TAG_VARCHAR_LENGTH
-        elif self.type == 'text':
-            return isinstance(value,str) and len(value) > 0
-        elif self.type == 'date':
-            if isinstance(value,FlexiDate):
-                return True
-            else:
-                try: 
-                    FlexiDate.strptime(value)
-                except TypeError:
-                    return False
-                except ValueError:
-                    return False
-                else: return True
-        else: assert False # should never happen
+        """Return whether the given value is a valid tag-value for this tag (this depends only on the tag-type)."""
+        return self.type.isValid(value)
+        
+    def sqlFormat(self,value):
+        return self.type.sqlFormat(value)
         
     def __eq__(self,other):
         return isinstance(other, IndexedTag) and self.id == other.id
@@ -197,7 +219,7 @@ def get(identifier):
         else: return OtherTag(identifier)
     elif isinstance(identifier, Tag):
         return identifier
-    else: raise RuntimeError("Identifier's type is neither int nor string: {} of type {}".format(identifier,type(identifier)))
+    else: raise RuntimeError("Identifier's type is neither int nor string nor tag: {} of type {}".format(identifier,type(identifier)))
     
 def fromTranslation(translation):
     """Return the tag whose translation is <translation>. If no such tag exists, invoke get to return a tag. Use this method to get a tag from user input, especially when using combo-boxes with predefined values containing translated tags."""
@@ -224,12 +246,13 @@ def addIndexedTag(identifier, type):
 
 def init():
     """Initialize the variables of this module based on the information of the tagids-table and config-file. At program start or after changes of that table this method must be called to ensure the module has the correct tags and their IDs."""
-    global _tagsById,_tagsByName,tagList, _ignored
+    global _tagsById,_tagsByName,tagList, _ignored, db
+    from omg import db as dbModule
+    db = dbModule
     _tagsById = {}
     _tagsByName = {}
-    db = database.get()
     for row in db.query("SELECT id,tagname,tagtype FROM tagids"):
-        newTag = IndexedTag(*row)
+        newTag = IndexedTag(row[0],row[1],Type.byName(row[2]))
         _tagsById[row[0]] = newTag
         _tagsByName[row[1]] = newTag
     

@@ -7,7 +7,7 @@
 # published by the Free Software Foundation
 #
 
-from omg import database, constants
+from omg import constants
 from omg.config import options
 import os
 import pickle

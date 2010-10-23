@@ -480,6 +480,9 @@ class SynchronizablePlaylist(ManagedPlaylist):
             logger.warning("insertElements was called while syncLock was True.")
             return
         self._syncLock = True
+        if offset == -1:
+            offset = len(self.pathList)
+            
         if copy:
             elements = [node.copy() for node in elements]
         
@@ -493,6 +496,7 @@ class SynchronizablePlaylist(ManagedPlaylist):
     
     def _insertFilesToMPD(self,offset,elements):
         """Insert the files contained in the tree <elements> into MPD at the given offset. If insertion of a certain file fails, the file is removed from <elements> (so this parameter is changed by the method!)"""
+        assert offset >= 0
         startOffset = offset
         i = 0
         while i < len(elements):
