@@ -7,7 +7,7 @@
 
 from PyQt4 import QtGui, QtCore
 
-from omg.database import tables
+from omg import tags
 
 class NewTagDialog(QtGui.QDialog):
 
@@ -16,7 +16,7 @@ class NewTagDialog(QtGui.QDialog):
         self.setWindowModality(QtCore.Qt.WindowModal)
         label = QtGui.QLabel("The tag '{}' occured for the first time. Please enter its type:".format(tagname))
         self.combo = QtGui.QComboBox(self)
-        self.combo.addItems(tables.validTagTypes)
+        self.combo.addItems([type.name for type in tags.TYPES])
         
         self.ignoreButton = QtGui.QPushButton("ignore this tag")
         self.okButton = QtGui.QPushButton("ok")
@@ -34,7 +34,7 @@ class NewTagDialog(QtGui.QDialog):
         self.okButton.clicked.connect(self.accept)
         
     def selectedType(self):
-        return self.combo.currentText()
+        return tags.Type.byName(self.combo.currentText())
     
     @staticmethod
     def queryTagType(name, parent = None):

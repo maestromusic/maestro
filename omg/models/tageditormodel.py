@@ -10,7 +10,7 @@ import itertools
 from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
-from omg import models, tags, FlexiDate
+from omg import models, tags, FlexiDate, db
 from . import simplelistmodel
 
 RATIO = 0.75
@@ -120,9 +120,10 @@ class TagEditorModel(QtCore.QObject):
         self.tagRemoved.emit(tag)
     
     def getRecord(self,tag,value):
-        for record in self.tags[tag]:
-            if record.value == value:
-                return record
+        if tag in self.tags:
+            for record in self.tags[tag]:
+                if record.value == value:
+                    return record
         return None
     
     def addRecord(self,record):
@@ -175,9 +176,29 @@ class TagEditorModel(QtCore.QObject):
         raise ValueError("There is no record with tag {} and value '{}'".format(record.tag,record.value))
 
     def save(self,recursive):
-        pass #TODO hier gehts weiter
-                
-        
+        # First remove values contained in the database, but not in self.tags from the database.
+        # AND remove values which are already contained in the database and in self.tags (that is, those tag-values where nothing has changed) from self.tags so that they won't be added to the db later. 
+        for tag in tags.tagList:
+            for element in self.elements:
+                if tag not in element.tags:
+                    continue
+                for value in db.tagValues(element.id,tag):
+                    record = self.getRecord(tag,value)
+                    if record is None or element not in record.elementsWithValue:
+                        # The value is contained in the db, but not in self.tags => remove it
+                        db.removeTag(element.id,tag,value)
+                    else:
+                        # This value is already in the database, so there is no need to add it
+                        record.elementsWithValue.remove(element)
+                        
+        # In the second step add the tags which remained in self.tags to the database.
+        for tag in self.tags:
+            # Ensure that the tag exists
+            if not tag.isIndexed():
+                tag = tags.addIndexedTag(tag.name,tag.type)
+            for record in self.tags[tag]:
+                db.addTag([element.id for element in record.elementsWithValue],tag,record.value)
+
     def getPossibleSeparators(self,records):
         # Collect all separators appearing in the first record
         if len(records) == 0 or any(record.tag.type == 'date' for record in records):

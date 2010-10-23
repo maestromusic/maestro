@@ -64,11 +64,11 @@ class Type:
         
     def isValid(self,value):
         """Return whether the given value is a valid tag-value for tags of this type."""
-        if self.type == 'varchar':
+        if self.name == 'varchar':
             return isinstance(value,str) and 0 < len(value.encode()) <= constants.TAG_VARCHAR_LENGTH
-        elif self.type == 'text':
+        elif self.name == 'text':
             return isinstance(value,str) and len(value) > 0
-        elif self.type == 'date':
+        elif self.name == 'date':
             if isinstance(value,FlexiDate):
                 return True
             else:
@@ -99,7 +99,7 @@ class Type:
 TYPE_VARCHAR = Type('varchar')
 TYPE_TEXT = Type('text')
 TYPE_DATE = Type('date')
-TYPES = {TYPE_VARCHAR,TYPE_TEXT,TYPE_DATE}
+TYPES = [TYPE_VARCHAR,TYPE_TEXT,TYPE_DATE]
 
 
 class Tag:
@@ -233,28 +233,31 @@ def parse(string,sep=','):
     """Parse a string containing tag-names (by default comma-separated, but you may specify a different separator) and return a list of corresponding tags. If <string> contains a substring that is not a tag name, it is simply ignored."""
     return [_tagsByName[name] for name in string.split(sep) if name in _tagsByName]
 
-def addIndexedTag(identifier, type):
-    if identifier in _tagsByName.keys():
-        raise RuntimeError("requested creation of tag {} which is already there".format(identifier))
+def addIndexedTag(name, type):
+    if name in _tagsByName:
+        raise RuntimeError("requested creation of tag {} which is already there".format(name))
+    from omg import database
     from omg.database import tables
-    db = database.get()
-    tagtab = tables.TagTable(identifier, type)
+    tagtab = tables.TagTable(name,type)
     tagtab.create()
-    id = db.query("INSERT INTO tagids (tagname,tagtype) VALUES (?,?)",identifier, type).insertId()
-    init()
-    return get(id)
+    id = database.get().query("INSERT INTO tagids (tagname,tagtype) VALUES (?,?)",name,type.name).insertId()
+    newTag = IndexedTag(id,name,type)
+    _tagsByName[name] = newTag
+    _tagsById[id] = newTag
+    tagList.append(newTag)
+    #TODO: Popularize the new tag
+    return newTag
 
 def init():
     """Initialize the variables of this module based on the information of the tagids-table and config-file. At program start or after changes of that table this method must be called to ensure the module has the correct tags and their IDs."""
-    global _tagsById,_tagsByName,tagList, _ignored, db
-    from omg import db as dbModule
-    db = dbModule
+    global _tagsById,_tagsByName,tagList, _ignored
+    from omg import database
     _tagsById = {}
     _tagsByName = {}
-    for row in db.query("SELECT id,tagname,tagtype FROM tagids"):
+    for row in database.get().query("SELECT id,tagname,tagtype FROM tagids"):
         newTag = IndexedTag(row[0],row[1],Type.byName(row[2]))
-        _tagsById[row[0]] = newTag
-        _tagsByName[row[1]] = newTag
+        _tagsById[newTag.id] = newTag
+        _tagsByName[newTag.name] = newTag
     
     # tagList contains the tags in the order specified by tags->tag_order...
     tagList = [ _tagsByName[name] for name in options.tags.tag_order if name in _tagsByName ]
