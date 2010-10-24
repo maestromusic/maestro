@@ -35,7 +35,7 @@ class TagEditorWidget(QtGui.QDialog):
         self.removeSelectedAction = QtGui.QAction("Ausgewählte entfernen",self)
         self.removeSelectedAction.triggered.connect(self._handleRemoveSelected)
         
-        self.recursiveBox = QtGui.QCheckBox("Tags rekursiv für alle Unterelemente ändern")
+        self.recursiveBox = QtGui.QCheckBox("Änderungen rekursive auf Unterelemente anwenden")
         self.recursiveBox.setChecked(True)
         
         self.setLayout(QtGui.QVBoxLayout())

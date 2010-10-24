@@ -32,7 +32,7 @@ class TextCriterion:
                 number = int(self.value)
                 tagsToSearch = searchTags
             except ValueError:
-                tagsToSearch = (tag for tag in searchTags if tag.type != 'date')
+                tagsToSearch = (tag for tag in searchTags if tag.type != tags.TYPE_DATE)
         return " UNION ".join(("({0})".format(_buildSelectForSingleTag(tag,self.value,fromTable,columns))\
                                  for tag in tagsToSearch))
 
@@ -92,7 +92,7 @@ def _buildSelectForSingleTag(tag,value,fromTable,columns=None):
     
     fromTable must be the name of a database-table containing an 'id'-column which holds element-ids and a 'file'-column with the corresponding file-flags. The query returned by this function will select all those elements which have a tag of the sort <tag> matching <value> (i.e. if <tag>.type is date, the tag-value must equal <value>, otherwise <value> must be contained in the tag-value). By default only the id- and file-columns of <fromTable> are selected, but you can specify a list of columns in the <column>-parameter.
     """
-    if tag.type == 'date':
+    if tag.type == tags.TYPE_DATE:
         whereExpression = " = {0}".format(value)
     else: whereExpression = " LIKE '%{0}%'".format(database.get().escapeString(value,likeStatement=True))
     return """

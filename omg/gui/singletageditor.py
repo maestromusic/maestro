@@ -10,7 +10,7 @@ import os, datetime
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from omg import models, constants, FlexiDate, getIcon
+from omg import models, constants, FlexiDate, getIcon, tags
 from omg.models import simplelistmodel, tageditormodel
 from omg.gui import formatter
 from omg.gui.misc import editorwidget, listview, widgetlist
@@ -152,7 +152,7 @@ class TagValueEditor(QtGui.QWidget):
 
     def _handleValueChanged(self,value):
         if self.record.tag.isValid(value):
-            if self.record.tag.type == 'date':
+            if self.record.tag.type == tags.TYPE_DATE:
                 value = FlexiDate(value)
             newRecord = self.record.copy()
             newRecord.value = value

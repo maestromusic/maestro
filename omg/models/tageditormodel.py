@@ -187,7 +187,7 @@ class TagEditorModel(QtCore.QObject):
                     record = self.getRecord(tag,value)
                     if record is None or element not in record.elementsWithValue:
                         # The value is contained in the db, but not in self.tags => remove it
-                        db.removeTag(element.id,tag,value)
+                        db.removeTag(element.id,tag,value,recursive)
                     else:
                         # This value is already in the database, so there is no need to add it
                         record.elementsWithValue.remove(element)
@@ -197,14 +197,15 @@ class TagEditorModel(QtCore.QObject):
             if not tag.isIndexed():
                 tag = tags.addIndexedTag(tag.name,tag.type)
             for record in self.tags[tag]:
-                db.addTag([element.id for element in record.elementsWithValue],tag,record.value)
+                if len(record.elementsWithValue) > 0: # For unchanged tags this is []
+                    db.addTag([element.id for element in record.elementsWithValue],tag,record.value,recursive)
 
         changedIds = [element.id for element in self.elements] #TODO: This is not very accurate...
-        distributor.indicesChanged.emit(distributor.DatabaseChangeNotice(changedIds,tags=True))
+        distributor.indicesChanged.emit(distributor.DatabaseChangeNotice(changedIds,tags=True,recursive=recursive))
 
     def getPossibleSeparators(self,records):
         # Collect all separators appearing in the first record
-        if len(records) == 0 or any(record.tag.type == 'date' for record in records):
+        if len(records) == 0 or any(record.tag.type == tags.TYPE_DATE for record in records):
             return []
         result = [s for s in SEPARATORS if s in records[0].value]
         for record in records[1:]:

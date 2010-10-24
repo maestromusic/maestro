@@ -17,7 +17,20 @@ logger = logging.getLogger()
 query = db.query
 
 
-#def contentIds(elid)
+def contents(elid,recursive=False):
+    newList = list(query("SELECT element_id FROM contents WHERE container_id = ?",elid).getSingleColumn())
+    if not recursive:
+        return newList
+    resultList = newList
+    while len(newList) > 0:
+        newList = list(query("""
+                SELECT element_id
+                FROM contents
+                WHERE container_id IN ({0})
+                """.format(",".join(str(n) for n in newList))).getSingleColumn())
+        newList = [id for id in newList if id not in resultList] # Do not add twice
+        resultList.extend(newList)
+    return resultList
 
 def parents(elid,recursive = False):
     """Return a list containing the ids of all parents of the element with id <elid>. If <recursive> is True all ancestors will be added recursively."""
@@ -38,6 +51,7 @@ def parents(elid,recursive = False):
 def position(parentId,elementId):
     return query("SELECT position FROM contents WHERE container_id = ? AND element_id = ?",
                     parentId,elementId).getSingle()
+
 
 # Elements-Table
 #===============================================
@@ -157,24 +171,45 @@ def tags(elid,tagList=None):
 def tagValues(elid,tagList):
     return [value for tag,value in tags(elid,tagList)] # return only the second tuple part
         
-def addTag(elids,tagSpec,value):
+def addTag(elids,tagSpec,value,recursive=False):
     """Add an entry 'tag=value' into the tags-table. If necessary the value is inserted into the correct tagvalue-table."""
-    addTagById(elids,tagSpec,idFromValue(tagSpec,value,insert=True))
-
-def addTagById(elids,tagSpec,valueId):
+    addTagById(elids,tagSpec,idFromValue(tagSpec,value,insert=True),recursive)
+    
+def addTagById(elids,tagSpec,valueId,recursive=False):
     tag = tagsModule.get(tagSpec)
+    logger.debug("I will {}add value-id {} in tag {} to: {}"
+                    .format("recursively " if recursive else "",valueId,tag.name,elids))
     if isinstance(elids,int): # Just one element
         elids = (elids,)
-    for elid in elids:
-        query("INSERT INTO tags(element_id,tag_id,value_id) VALUES (?,?,?)",elid,tag.id,valueId)
+    elif len(elids) == 0:
+        return
+        
+    function = lambda id: query("INSERT IGNORE INTO tags(element_id,tag_id,value_id) VALUES (?,?,?)",id,tag.id,valueId)
+    if recursive:
+        _mapRecursively(elids,function,[])
+    else:
+        for id in elids:
+            function(id)
 
-def removeTag(elid,tagSpec,value):
-    removeTagById(elid,tagSpec,idFromValue(tagSpec,value))
+def removeTag(elids,tagSpec,value,recursive=False):
+    removeTagById(elids,tagSpec,idFromValue(tagSpec,value),recursive)
     
-def removeTagById(elid,tagSpec,valueId):
+def removeTagById(elids,tagSpec,valueId,recursive=False):
     tag = tagsModule.get(tagSpec)
-    result = query("DELETE FROM tags WHERE element_id=? AND tag_id=? AND value_id=?",elid,tag.id,valueId)
-    return result.affectedRows()
+    logger.debug("I will {}remove value-id {} in tag {} from: {}"
+                    .format("recursively " if recursive else "",valueId,tag.name,elids))
+    if isinstance(elids,int): # Just one element
+        elids = (elids,)
+    elif len(elids) == 0:
+        return
+        
+    function = lambda id: query("DELETE FROM tags WHERE element_id=? AND tag_id=? AND value_id=?",id,tag.id,valueId)
+    if recursive:
+        _mapRecursively(elids,function,[])
+    else:
+        for id in elids:
+            function(id)
+        
 
 # Help methods
 #=================================================
@@ -184,3 +219,10 @@ def _encodeValue(tagType,value):
     elif isinstance(value,FlexiDate):
         return value.SQLformat()
     else: return FlexiDate.strptime(value).SQLformat()
+
+def _mapRecursively(ids,function,seenIds):
+    for id in ids:
+        if id not in seenIds:
+            function(id)
+            seenIds.append(id)
+            _mapRecursively(contents(id),function,seenIds)

@@ -14,7 +14,7 @@ import pickle
 import sys
 import os
 import logging
-from omg import FlexiDate
+from omg import FlexiDate, tags
 try: # we try to favor native Pyk3 stagger support over the ugly26 shit
     import stagger
     from stagger.id3 import * #frame definitions
@@ -56,7 +56,7 @@ def prepare(tagstorage):
     Since at the moment the only non-string value type is date, only this
     case is handled."""
     for t in tagstorage:
-        if isinstance(t, tags.IndexedTag) and t.type == 'date':
+        if isinstance(t, tags.IndexedTag) and t.type == tags.TYPE_DATE:
             for val in tagstorage[t]:
                 if type(val) == str:
                     convVal = FlexiDate.strptime(val)

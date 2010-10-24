@@ -9,6 +9,8 @@
 
 from PyQt4 import QtCore
 
+from omg import db
+
 indicesChanged = None
 _instance = None
 
@@ -21,7 +23,8 @@ class DatabaseChangeNotice():
     ids = None # the affected element_ids
     recursive = True # changes also affect subcontainers
     
-    def __init__(self, ids, tags = False, contents = False, cover = False, recursive = True, deleted = False, created = False):
+    def __init__(self, ids, tags = False, contents = False, cover = False,
+                 recursive = True, deleted = False, created = False):
         if isinstance(ids,int):
             self.ids = [ids]
         else: self.ids = ids
@@ -31,6 +34,15 @@ class DatabaseChangeNotice():
         self.deleted = deleted
         self.created = created
         self.cover = cover
+
+    def getAllIds(self):
+        if not self.recursive:
+            return self.ids
+        else:
+            result = list(self.ids)
+            for id in self.ids:
+                result.extend(db.contents(id,recursive=True))
+            return result
         
     @staticmethod
     def deleteNotice(ids, recursive = False):

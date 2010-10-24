@@ -18,4 +18,4 @@ def disable():
     distributor.indicesChanged.disconnect(handleSignal)
     
 def handleSignal(notice):
-    logger.debug("DB update notice for ids {}".format(notice.ids))
+    logger.debug("{}DB update notice for ids {}".format("Recursive " if notice.recursive else '',notice.ids))

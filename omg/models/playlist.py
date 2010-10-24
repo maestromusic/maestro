@@ -146,14 +146,15 @@ class BasicPlaylist(rootedtreemodel.RootedTreeModel):
         return result
 
     def _handleIndicesChanged(self,event):
+        allIds = event.getAllIds()
         for element in self.getAllNodes():
-            if element.id in event.ids:
+            if element.id in allIds:
                 index = self.getIndex(element)
                 dataChanged = False
                 if event.cover:
                     element.deleteCoverCache()
                     dataChanged = True
-                elif event.tags:
+                if event.tags:
                     element.loadTags()
                     dataChanged = True
                 if dataChanged:
