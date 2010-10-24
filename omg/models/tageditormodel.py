@@ -10,7 +10,7 @@ import itertools
 from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
-from omg import models, tags, FlexiDate, db
+from omg import models, tags, FlexiDate, db, distributor
 from . import simplelistmodel
 
 RATIO = 0.75
@@ -177,7 +177,8 @@ class TagEditorModel(QtCore.QObject):
 
     def save(self,recursive):
         # First remove values contained in the database, but not in self.tags from the database.
-        # AND remove values which are already contained in the database and in self.tags (that is, those tag-values where nothing has changed) from self.tags so that they won't be added to the db later. 
+        # AND remove values which are already contained in the database and in self.tags (that is, those tag-values where nothing has changed) from self.tags so that they won't be added to the db later.
+        changedElementIds = []
         for tag in tags.tagList:
             for element in self.elements:
                 if tag not in element.tags:
@@ -190,7 +191,6 @@ class TagEditorModel(QtCore.QObject):
                     else:
                         # This value is already in the database, so there is no need to add it
                         record.elementsWithValue.remove(element)
-                        
         # In the second step add the tags which remained in self.tags to the database.
         for tag in self.tags:
             # Ensure that the tag exists
@@ -198,6 +198,9 @@ class TagEditorModel(QtCore.QObject):
                 tag = tags.addIndexedTag(tag.name,tag.type)
             for record in self.tags[tag]:
                 db.addTag([element.id for element in record.elementsWithValue],tag,record.value)
+
+        changedIds = [element.id for element in self.elements] #TODO: This is not very accurate...
+        distributor.indicesChanged.emit(distributor.DatabaseChangeNotice(changedIds,tags=True))
 
     def getPossibleSeparators(self,records):
         # Collect all separators appearing in the first record

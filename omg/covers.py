@@ -92,5 +92,5 @@ def setCover(id,cover):
             if path[0:6] == "cache_" and os.path.isfile(COVER_DIR+path+"/"+str(id)):
                 os.remove(COVER_DIR+path+"/"+str(id))
         # Distribute the change
-        distributor.indicesChanged.emit(distributor.DatabaseChangeNotice(id, tags = False, contents = False, cover = True, recursive = False))
+        distributor.indicesChanged.emit(distributor.DatabaseChangeNotice(id,cover=True))
         return True

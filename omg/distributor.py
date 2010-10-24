@@ -21,7 +21,7 @@ class DatabaseChangeNotice():
     ids = None # the affected element_ids
     recursive = True # changes also affect subcontainers
     
-    def __init__(self, ids, tags = True, contents = True, cover = False, recursive = True, deleted = False, created = False):
+    def __init__(self, ids, tags = False, contents = False, cover = False, recursive = True, deleted = False, created = False):
         if isinstance(ids,int):
             self.ids = [ids]
         else: self.ids = ids
@@ -46,7 +46,7 @@ class DBUpdateDistributor(QtCore.QObject):
         
 
 def init():
-    assert _instance is None
     global _instance,indicesChanged
+    assert _instance is None
     _instance = DBUpdateDistributor()
     indicesChanged = _instance.indicesChanged
