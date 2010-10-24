@@ -93,9 +93,17 @@ class Node:
             if contents[i] == node:
                 return i
         return -1
+
+    def getAllNodes(self):
+        """Generator which will return all nodes contained in this node or in children of it (including the node itself)."""
+        assert self.getChildren() is not None
+        yield self
+        for element in self.getChildren():
+            for file in element.getAllFiles():
+                yield file
         
     def getAllFiles(self):
-        """Generator which will return all files contained in this element or in child-elements of it."""
+        """Generator which will return all files contained in this node or in children of it (possibly including the node itself)."""
         assert self.getChildren() is not None
         if self.isFile():
             yield self
@@ -303,19 +311,23 @@ class Element(Node):
         """Return whether this element has a cover."""
         return self.isInDB() and covers.hasCover(self.id)
         
-    def getCover(self,size=None,cache=True):
-        """Get this elements's cover with <size>x<size> pixels or the large version if <size> is None. If <cache> is True, this method will store the cover in this Element-instance. Warning: Subsequent calls of this method will return the stored cover only if <cache> is again True."""
-        if cache:
+    def getCover(self,size=None,fromFS=False):
+        """Get this elements's cover with <size>x<size> pixels or the large version if <size> is None. The cover will be cached and returned from the cache in subsequent calls. Set <fromFS> to True to enforce that the cover is read from the filesystem and not from cache."""
+        if not fromFS:
             try:
                 return self._covers[size]
             except AttributeError: pass
             except KeyError: pass
         cover = covers.getCover(self.id,size)
-        if cache:
-            if not hasattr(self,"_covers"):
-                self._covers = {}
-            self._covers[size] = cover
+        # Cache the cover
+        if not hasattr(self,"_covers"):
+            self._covers = {}
+        self._covers[size] = cover
         return cover
+
+    def deleteCoverCache(self):
+        """Delete all covers from the built-in cover cache."""
+        del self._covers
         
     def delete(self, recursive = False):
         """Deletes the element from the database."""
@@ -343,14 +355,16 @@ class Element(Node):
                 raise NotImplementedError()
             return 1 + max((c.maxDepth(loadFromDB) for c in self.contents))
     
-    def depthFirstGenerator(self):
-        """Returns a generator over all files below this element in depth-first manner."""
-        for con in self.contents:
-            if con.isFile():
-                yield con
+    def depthFirstGenerator(self,includeContainers=False):
+        """Return a generator over all files below this element in depth-first manner. If <includeContainers> is True, the generator will return all elements below this element."""
+        for element in self.contents:
+            if element.isFile():
+                yield element
             else:
-                for subsub in con.depthFirstGenerator():
-                    yield subsub
+                if includeContainers:
+                    yield element
+                for sub in element.depthFirstGenerator(includeContainers):
+                    yield sub
     # Misc
     #====================================================
     def getTitle(self):

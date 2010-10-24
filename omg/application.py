@@ -26,41 +26,7 @@ names = ['Organize Music by Groups',
          'Oh Maddin ... Grmpf',
          'Oh Michael ... Grmpf'  ]
 
-# Default options and options from the config file will be overwritten by the options in optionOverride (this is necessary for command-line arguments). The dictionary should map section names to dictionaries containing the options in the section. Remember to add a default option to config._defaultOptions for anything that may appear in optionsOverride.
 
-
-
-class DatabaseChangeNotice():
-    
-    tags = True # indicate if tags of element have changed
-    contents = True # indicate if contents of element have changed
-    deleted = False # indicate if element was deleted
-    created = False # indicate if element has been newly created
-    ids = None # the affected element_ids
-    recursive = True # changes also affect subcontainers
-    
-    def __init__(self, ids, tags = True, contents = True, cover = False, recursive = True, deleted = False, created = False):
-        self.ids = ids
-        self.tags = tags
-        self.contents = contents
-        self.recursive = recursive
-        self.deleted = deleted
-        self.created = created
-        self.cover = cover
-        
-    @staticmethod
-    def deleteNotice(ids, recursive = False):
-        """Convenience function."""
-        return DatabaseChangeNotice(ids, tags = False, contents = False, cover = False, recursive = recursive, deleted = True, created = False)
-        
-class DBUpdateDistributor(QtCore.QObject):
-    
-    indicesChanged = QtCore.pyqtSignal(DatabaseChangeNotice)
-    
-    def __init__(self):
-        QtCore.QObject.__init__(self)
-        
-        
 class OmgMainWindow(QtGui.QMainWindow):
     
     def initMenus(self):
@@ -173,17 +139,17 @@ def run(opts, args):
     database.connect()
     from omg import tags
     tags.init()
+    from omg import distributor
+    distributor.init()
     from omg import search
     search.init()
     
     # Create GUI
     global widget
-    import omg
-    omg.distributor = DBUpdateDistributor()
     widget = OmgMainWindow()
     from omg import plugins
     plugins.loadPlugins()
-
+    
     # Launch application
     returnValue = app.exec_()
     

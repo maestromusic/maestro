@@ -107,7 +107,7 @@ class AbstractDelegate(QtGui.QStyledItemDelegate):
             if cover is None:
                 if element is None:
                     raise ValueError("Either element or cover must be given")
-                cover = element.getCover(coverSize,cache=True) # is None if element has no cover
+                cover = element.getCover(coverSize) # is None if element has no cover
             if cover is not None:
                 imageRect = QtCore.QRect(0,0,min(context.option.rect.width(),coverSize),
                                          min(context.option.rect.height(),coverSize))

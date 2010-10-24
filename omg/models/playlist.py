@@ -11,7 +11,7 @@ import difflib, logging, os, itertools
 from PyQt4 import QtCore
 from PyQt4.QtCore import Qt
 
-from omg import database, models, mpclient, tags, absPath, relPath
+from omg import database, models, mpclient, tags, absPath, relPath, distributor
 from omg.config import options
 from . import rootedtreemodel, treebuilder, mimedata
 
@@ -28,6 +28,7 @@ class BasicPlaylist(rootedtreemodel.RootedTreeModel):
         """Initialize with an empty playlist."""
         rootedtreemodel.RootedTreeModel.__init__(self,models.RootNode())
         self.setContents([])
+        distributor.indicesChanged.connect(self._handleIndicesChanged)
     
     def setRoot(self,root):
         """Set the root-node of this playlist which must be of type models.RootNode. All views using this model will be reset."""
@@ -144,6 +145,14 @@ class BasicPlaylist(rootedtreemodel.RootedTreeModel):
         result.parent = parent
         return result
 
+    def _handleIndicesChanged(self,event):
+        for element in self.getAllNodes():
+            if element.id in event.ids:
+                index = self.getIndex(element)
+                if event.cover:
+                    element.deleteCoverCache()
+                    self.dataChanged.emit(index,index)
+        
 
 class ManagedPlaylist(BasicPlaylist):
     """A ManagedPlaylist organizes the tree-structure over the "flat playlist" (just the files) in a nice way. In contrast to BasicPlaylist, ManagedPlaylist uses mainly offsets to address files, as the tree-structure may change during most operations. Additionally offset-based insert- and remove-functions are needed for synchronization with MPD (confer SynchronizablePlaylist). Of course, there are also functions to insert and remove using a reference to the parent-container, but they internally just call the offset-based functions."""

@@ -7,7 +7,7 @@
 # published by the Free Software Foundation
 #
 import os.path
-import urllib.request,urllib.parse,xml.dom.minidom
+import urllib.request,urllib.parse,xml.dom.minidom, urllib.error
 import webbrowser
 import itertools
 
@@ -168,22 +168,26 @@ class CoverFetcher(QtGui.QDialog):
         urls = []
         element = self.elements[self.elementIndex]
         for artist,album in itertools.product(element.tags[tags.get("artist")],element.tags[tags.ALBUM]):
-            lastFMUrl = 'http://ws.audioscrobbler.com/2.0/?method=album.getinfo&artist={0}&album={1}&api_key={2}'\
+            try:
+                lastFMUrl = 'http://ws.audioscrobbler.com/2.0/?method=album.getinfo&artist={0}&album={1}&api_key={2}'\
                             .format(urllib.parse.quote(artist),urllib.parse.quote(album),LASTFM_API_KEY)
-            document = xml.dom.minidom.parseString(urllib.request.urlopen(lastFMUrl).read())
-            lfm = document.firstChild
-            if lfm.getAttribute('status') != 'ok':
-                continue
-            for albumNode in lfm.childNodes:
-                if isinstance(albumNode,xml.dom.minidom.Element) and albumNode.tagName == 'album':
-                    for node in albumNode.childNodes:
-                        if isinstance(node,xml.dom.minidom.Element) and node.tagName == 'image'\
-                                and node.getAttribute('size') == 'extralarge' and node.firstChild != None:
-                            urls.append(node.firstChild.data)
+                document = xml.dom.minidom.parseString(urllib.request.urlopen(lastFMUrl).read())
+                lfm = document.firstChild
+                if lfm.getAttribute('status') != 'ok':
+                    continue
+                for albumNode in lfm.childNodes:
+                    if isinstance(albumNode,xml.dom.minidom.Element) and albumNode.tagName == 'album':
+                        for node in albumNode.childNodes:
+                            if isinstance(node,xml.dom.minidom.Element) and node.tagName == 'image'\
+                                    and node.getAttribute('size') == 'extralarge' and node.firstChild != None:
+                                urls.append(node.firstChild.data)
+            except urllib.error.URLError:
+                pass # The error message below will be displayed
+                
         if len(urls) == 0:
             QtGui.QMessageBox(QtGui.QMessageBox.Warning,"Fehler während der Coverabfrage",
                               "Beim Abfragen des Covers ist ein Fehler aufgetreten. Vielleicht hat last.fm kein Cover"
-                            +" für dieses Album.",QtGui.QMessageBox.Ok,self).exec_()
+                            +" für dieses Album. Oder die Netzwerkverbindung funktioniert nicht.",QtGui.QMessageBox.Ok,self).exec_()
         else:
             for url in urls:
                 self.loadFromUrl(QtCore.QUrl(url),"Cover von last.fm")

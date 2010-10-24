@@ -14,9 +14,6 @@ import pickle
 import datetime
 import logging
 
-
-distributor = None # the database distributor object
-
 def relPath(file):
     """Returns the relative path of a music file against the collection base path."""
     return os.path.relpath(file, options.music.collection)

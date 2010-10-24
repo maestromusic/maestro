@@ -6,16 +6,16 @@
 # published by the Free Software Foundation
 #
 
-import omg
 import logging
+from omg import distributor
 
 logger = logging.getLogger("plugins.dbupdatedebugger")
 
 def enable():
-    omg.distributor.indicesChanged.connect(handleSignal)
+    distributor.indicesChanged.connect(handleSignal)
     
 def disable():
-    omg.distributor.indicesChanged.disconnect(handleSignal)
+    distributor.indicesChanged.disconnect(handleSignal)
     
 def handleSignal(notice):
-    logger.debug("DB update notice for ids {}".format(notice.ids))    
+    logger.debug("DB update notice for ids {}".format(notice.ids))

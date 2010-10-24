@@ -110,3 +110,9 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
             return QtCore.QModelIndex()
         parent = node.getParent()
         return self.createIndex(parent.getChildren().index(node),0,node)
+
+    def getAllNodes(self):
+        """Generator which will return all nodes contained in the tree in depth-first-manner."""
+        for element in self.contents:
+            for sub in element.getAllNodes():
+                yield sub
