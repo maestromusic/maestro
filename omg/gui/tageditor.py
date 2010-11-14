@@ -14,7 +14,7 @@ from PyQt4.QtCore import Qt
 from omg import constants, tags
 from omg.models import tageditormodel, simplelistmodel
 from omg.gui import formatter, singletageditor, dialogs
-from omg.gui.misc import widgetlist, editorwidget
+from omg.gui.misc import widgetlist, editorwidget, tagwidgets
 
 class TagEditorWidget(QtGui.QDialog):
     def __init__(self,parent,elements):
@@ -72,10 +72,10 @@ class TagEditorWidget(QtGui.QDialog):
         row = self.tagEditorLayout.rowCount() # Count the empty rows, too (confer _removeSingleTagEditor)
         
         # Create and fill the EditorWidget
-        self.editorWidgets[tag] = editorwidget.EditorWidget()
-        tagBox = TagTypeBox(tag)
+        self.editorWidgets[tag] = editorwidget.EditorWidget(label=tagwidgets.TagLabel(tag))
+        tagBox = tagwidgets.TagTypeBox(tag)
         self.editorWidgets[tag].setEditor(tagBox)
-        #self.editorWidgets[tag].valueChanged.connect(lambda value: self._handleTagChangedByUser(tagBox,value))
+        #~ self.editorWidgets[tag].setLabel(tagwidgets.TagLabel(tag))
         self.editorWidgets[tag].valueChanged.connect(self._handleTagChangedByUser)
         
         # Create the Tag-Editor
@@ -185,7 +185,7 @@ class TagDialog(QtGui.QDialog):
         self.setWindowTitle("Tag-Wert hinzufügen")
         assert len(elements) > 0
         
-        self.typeEditor = TagTypeBox(self)
+        self.typeEditor =  tagwidgets.TagTypeBox(self)
         self.valueEditor = QtGui.QLineEdit(self)
         self.elementsBox = QtGui.QListView(self)
         # Use a formatter to print the title of the elements
@@ -240,25 +240,3 @@ class TagDialog(QtGui.QDialog):
         selectedElements = [allElements[i] for i in range(len(allElements))
                                 if self.elementsBox.selectionModel().isRowSelected(i,QtCore.QModelIndex())]
         return tageditormodel.Record(self.typeEditor.getTag(),self.valueEditor.text(),allElements,selectedElements)
-
-
-class TagTypeBox(QtGui.QComboBox):
-    def __init__(self,defaultTag = None,parent=None):
-        QtGui.QComboBox.__init__(self,parent)
-        self.setEditable(True)
-        self.setInsertPolicy(QtGui.QComboBox.NoInsert)
-        if defaultTag is None:
-            self.setEditText('')
-        
-        for tag in tags.tagList:
-            if tag.iconPath() is not None:
-                self.addItem(QtGui.QIcon(tag.iconPath()),tag.translated())
-            else: self.addItem(tag.translated())
-            if tag == defaultTag:
-                self.setCurrentIndex(self.count()-1)
-                
-    def getTag(self):
-        text = self.currentText().strip()
-        if text[0] == text[-1] and text[0] in ['"',"'"]: # Don't translate if the text is quoted
-            return tags.get(text[1:-1])
-        else: return tags.fromTranslation(text)
