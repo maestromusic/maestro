@@ -79,7 +79,9 @@ class EditorWidget(QtGui.QStackedWidget):
     def setValue(self,value):
         """Set the value contained in this EditorWidget."""
         if value != self._editorText():
-            self.editor.setText(value)
+            if isinstance(self.editor,QtGui.QLineEdit):
+                self.editor.setText(value)
+            else: self.editor.setEditText(value)
         if value != self.label.text():
             self.label.setText(value)
             self.valueChanged.emit(value)
@@ -98,7 +100,6 @@ class EditorWidget(QtGui.QStackedWidget):
         # - KeyPress: React to RETURN and ENTER (accept the value and display the label) and ESC (reset the editor to the label's value and display the label).
         if object == self.editor:
             if event.type() == QtCore.QEvent.FocusOut:
-                assert isinstance(self.editor,QtGui.QLineEdit)
                 if self.popup is None\
                         and (isinstance(self.editor,QtGui.QLineEdit) or not self.editor.view().isVisible()):
                     self.showLabel()

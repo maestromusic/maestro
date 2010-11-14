@@ -56,7 +56,7 @@ class Record:
 
 
 class TagEditorModel(QtCore.QObject):
-    tagChanged = QtCore.pyqtSignal(tags.Tag)
+    tagChanged = QtCore.pyqtSignal(tags.Tag,tags.Tag)
     tagRemoved = QtCore.pyqtSignal(tags.Tag)
     recordAdded = QtCore.pyqtSignal(Record)
     recordRemoved = QtCore.pyqtSignal(Record)
@@ -93,27 +93,42 @@ class TagEditorModel(QtCore.QObject):
         return self.tags[tag]
 
     def changeTag(self,oldTag,newTag):
+        # First check whether the existing values in oldTag are convertible to newTag
+        try:
+            for record in self.tags[oldTag]:
+                oldTag.type.convertValue(newTag.type,record.value)
+        except ValueError:
+            return False # conversion not possible
+            
         if newTag not in self.tags:
             self.tags[newTag] = self.tags[oldTag]
             del self.tags[oldTag]
             for record in self.tags[newTag]:
+                convertedValue = oldTag.type.convertValue(newTag.type,record.value)
+                if convertedValue != record.value:
+                    record.value = convertedValue
+                    #TODO: emit a signal?
                 record.tag = newTag
             self.tagChanged.emit(oldTag,newTag)
+            return True
         else:
             # This is a bit more tricky: We have to insert all records of oldTag to the already existing records in newTag
             oldRecords = self.tags[oldTag]
             del self.tags[oldTag]
             self.tagRemoved.emit(oldTag)
             for oldRecord in oldRecords:
-                newRecord = self.getRecord(newTag,oldRecord.value)
+                convertedValue = oldTag.type.convertValue(newTag.type,oldRecord.value)
+                newRecord = self.getRecord(newTag,convertedValue)
                 if newRecord is None:
                     oldRecord.tag = newTag
+                    oldRecord.value = convertedValue
                     self.tags[newTag].append(oldRecord)
                     self.recordAdded.emit(oldRecord)
                 else:
                     copy = newRecord.copy()
                     if newRecord.extend(oldRecord.elementsWithValue):
                         self.recordChanged.emit(copy,newRecord)
+            return True
     
     def removeTag(self,tag):
         del self.tags[tag]

@@ -50,7 +50,7 @@ TOTALLY_IGNORED_TAGS = ("tracknumber", "discnumber")
 class Type:
     """Class for the type of tags. Currently only three types are possible: varchar, date and text. For each of them there is an instance (e.g. tags.TYPE_VARCHAR) and you can get all of them via tags.TYPES. You should never create your own instances."""
     def __init__(self,name):
-        """Creates a new TagType-instance with given name. Do not use outside of this module."""
+        """Create a new TagType-instance with given name. Do NOT create your own instances, but use the instances created in this module."""
         self.name = name
 
     def __eq__(self,other):
@@ -80,9 +80,20 @@ class Type:
                     return False
                 else: return True
         else: assert False # should never happen
-    
+
+    def convertValue(self,newType,value):
+        """Convert <value> from this type to <newType> and return the result. This method converts from FlexiDate (type date) to strings (types varchar and text) and vice versa. If conversion fails or the converted value is not valid for newType (confer Type.isValid), this method will raise a ValueError."""
+        if self == TYPE_DATE and newType != TYPE_DATE:
+            convertedValue = value.strftime()
+        elif self != TYPE_DATE and newType == TYPE_DATE:
+            convertedValue = FlexiDate.strptime(value)
+        else: convertedValue = value # nothing to convert
+        if newType.isValid(convertedValue):
+            return convertedValue
+        else: raise ValueError("Converted value {} is not valid for type {}.".format(convertedValue,newType))
 
     def sqlFormat(self,value):
+        """Convert <value> into a string that can be inserted into database queries."""
         if self.name == 'date':
             if isinstance(value,FlexiDate):
                 return value.sqlFormat()
@@ -91,6 +102,7 @@ class Type:
 
     @staticmethod
     def byName(name):
+        """Given a type-name return the corresponding instance of this class."""
         for type in TYPES:
             if type.name == name:
                 return type

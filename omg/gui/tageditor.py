@@ -13,7 +13,7 @@ from PyQt4.QtCore import Qt
 
 from omg import constants, tags
 from omg.models import tageditormodel, simplelistmodel
-from omg.gui import formatter, singletageditor
+from omg.gui import formatter, singletageditor, dialogs
 from omg.gui.misc import widgetlist, editorwidget
 
 class TagEditorWidget(QtGui.QDialog):
@@ -22,6 +22,7 @@ class TagEditorWidget(QtGui.QDialog):
         self.setWindowTitle("Tags editieren")
         
         self.model = tageditormodel.TagEditorModel(elements)
+        self.model.tagChanged.connect(self._handleTagChanged)
         self.model.tagRemoved.connect(self._handleTagRemoved)
         self.model.recordAdded.connect(self._handleRecordAdded)
         self.model.recordChanged.connect(self._handleRecordChanged)
@@ -41,6 +42,7 @@ class TagEditorWidget(QtGui.QDialog):
         self.setLayout(QtGui.QVBoxLayout())
         self.layout().addWidget(self.recursiveBox)
         self.tagEditorLayout = QtGui.QGridLayout()
+        self.tagEditorLayout.setColumnStretch(1,1) # Stretch the column holding the values
         self.layout().addLayout(self.tagEditorLayout)
         self.layout().addStretch(1)
         buttonBarLayout = QtGui.QHBoxLayout()
@@ -69,14 +71,12 @@ class TagEditorWidget(QtGui.QDialog):
     def _addSingleTagEditor(self,tag):
         row = self.tagEditorLayout.rowCount() # Count the empty rows, too (confer _removeSingleTagEditor)
         
-        # Create the label (and the TagTypeBox beneath)
         # Create and fill the EditorWidget
-        self.editorWidgets[tag] = QtGui.QLabel(tag.name)  #TODO use a TagTypeBox
-        #self.editorWidgets[tag] = editorwidget.EditorWidget()
-        #tagTypeLabel = QtGui.QLabel(tag.name)
-        #self.editorWidgets[tag].setLabel(tagTypeLabel)
-        #tagTypeBox = TagTypeBox(tag)
-        #self.editorWidgets[tag].setEditor(tagTypeBox)
+        self.editorWidgets[tag] = editorwidget.EditorWidget()
+        tagBox = TagTypeBox(tag)
+        self.editorWidgets[tag].setEditor(tagBox)
+        #self.editorWidgets[tag].valueChanged.connect(lambda value: self._handleTagChangedByUser(tagBox,value))
+        self.editorWidgets[tag].valueChanged.connect(self._handleTagChangedByUser)
         
         # Create the Tag-Editor
         self.singleTagEditors[tag] = singletageditor.SingleTagEditor(tag,self.model)
@@ -111,7 +111,7 @@ class TagEditorWidget(QtGui.QDialog):
     def _handleRemoveSelected(self):
         for tagValueEditor in self.selectionManager.getSelectedWidgets():
             self.model.removeRecord(tagValueEditor.getRecord())
-        
+
     # Note that the following _handle-functions only add new SingleTagEditors or remove SingleTagEditors which have become empty. Unless they are newly created or removed, the editors are updated in their own _handle-functions.
     def _handleTagRemoved(self,tag):
         self._removeSingleTagEditor(tag)
@@ -132,6 +132,38 @@ class TagEditorWidget(QtGui.QDialog):
             self._removeSingleTagEditor(record.tag)
         else: pass # The SingleTagEditor will deal with it
 
+    def _handleTagChanged(self,oldTag,newTag):
+        for adict in (self.editorWidgets,self.singleTagEditors):
+            # Change key from oldTag to newTag
+            widget = adict[oldTag]
+            del adict[oldTag]
+            assert newTag not in adict
+            adict[newTag] = widget
+
+    def _handleTagChangedByUser(self,value):
+        # First we have to get the editorWidget responsible for this event and its tag
+        editorWidget = self.sender()
+        oldTag = None
+        for tag,widget in self.editorWidgets.items():
+            if widget == editorWidget:
+                oldTag = tag
+                break
+        assert oldTag is not None
+        newTag = editorWidget.getEditor().getTag()
+        if not newTag.isIndexed():
+            tagType = dialogs.NewTagDialog.queryTagType(newTag.name)
+            if tagType:
+                newTag = tags.addIndexedTag(newTag.name,tagType)
+            else: newTag = None
+
+        # In other words: If either newTag is None or changeTag fails, then reset the editor
+        if newTag is None or not self.model.changeTag(oldTag,newTag):
+            QtGui.QMessageBox.warning(self,"Ungültiger Wert","Mindestens ein Wert ist ungültig.")
+            # reset the editor...unfortunately this emits valueChanged again
+            editorWidget.valueChanged.disconnect(self._handleTagChangedByUser)
+            self.editorWidgets[oldTag].setValue(oldTag.translated())
+            editorWidget.valueChanged.connect(self._handleTagChangedByUser)
+        
     def _handleSave(self):
         self.model.save(self.recursiveBox.isChecked())
         self.accept()
@@ -193,6 +225,11 @@ class TagDialog(QtGui.QDialog):
                 QtGui.QMessageBox.warning(self,"Ungültiger Tagname.",
                                           "Ungültiger Tagname. Tagnamen dürfen nur Zahlen und Buchstaben enthalten.")
             else:
+                if not tag.isIndexed():
+                    tagType = dialogs.NewTagDialog.queryTagType(tag.name)
+                    if tagType:
+                        tag = tags.addIndexedTag(tag.name,tagType)
+                    else: return # Do nothing (in particular do not close the dialog)
                 if tag.isValid(self.valueEditor.text()):
                     self.accept()
                 else: QtGui.QMessageBox.warning(self,"Ungültiger Wert","Der eingegebene Wert ist ungültig.")
@@ -225,4 +262,3 @@ class TagTypeBox(QtGui.QComboBox):
         if text[0] == text[-1] and text[0] in ['"',"'"]: # Don't translate if the text is quoted
             return tags.get(text[1:-1])
         else: return tags.fromTranslation(text)
-        
