@@ -19,7 +19,7 @@ class WidgetList(QtGui.QWidget):
     widgetInserted = QtCore.pyqtSignal(QtGui.QWidget,int) # Actually the first parameter is a WidgetList
     
     # This signal is emitted when a widget isremoved from this WidgetList and contains the WidgetList, the position of the removed widget and that widget itself as parameters.
-    widgetRemoved = QtCore.pyqtSignal(QtGui.QWidget,int,QtGui.QWidget)  #   "
+    widgetRemoved = QtCore.pyqtSignal(QtGui.QWidget,int,QtGui.QWidget)
     
     def __init__(self,direction,parent=None):
         """Create a new WidgetList laying out children in the specified direction (confer the QBoxLayout::Direction-enum) and using the given parent."""
@@ -165,28 +165,33 @@ class SelectionManager(QtCore.QObject):
                 if self.selected[i][j]:
                     self.selected[i][j] = False
                     self.widgetLists[i].selectionChanged(j)
-            
+
+    def isSelectable(self,widgetList,widget):
+        """Return whether a widget in the specified widgetList is selectable. The default implementation always returns True, so you have to overwrite it, to get non-selectable widgets."""
+        return True
+
     def eventFilter(self,object,event):
         if event.type() == QtCore.QEvent.MouseButtonPress and event.button() == Qt.LeftButton:
             widgetList = object.parent()
             #~ try:
-            listIndex = self.widgetLists.index(widgetList)
-            widgetIndex = widgetList.index(object)
-            if Qt.ShiftModifier & event.modifiers() and self.anchor is not None:
-                if self.anchor[0] == listIndex:
-                    for i in range(min(widgetIndex,self.anchor[1]),max(widgetIndex,self.anchor[1])+1):
-                        if not self.selected[listIndex][i]:
-                            self.selected[listIndex][i] = True
-                            widgetList.selectionChanged(i)
-            elif Qt.ControlModifier & event.modifiers():
-                self.selected[listIndex][widgetIndex] = not self.selected[listIndex][widgetIndex]
-                self.anchor = (listIndex,widgetIndex)
-                widgetList.selectionChanged(widgetIndex)
-            else: # Clear and select a single widget
-                self.clear()
-                self.selected[listIndex][widgetIndex] = True
-                self.anchor = (listIndex,widgetIndex)
-                widgetList.selectionChanged(widgetIndex)
+            if self.isSelectable(widgetList,object):
+                listIndex = self.widgetLists.index(widgetList)
+                widgetIndex = widgetList.index(object)
+                if Qt.ShiftModifier & event.modifiers() and self.anchor is not None:
+                    if self.anchor[0] == listIndex:
+                        for i in range(min(widgetIndex,self.anchor[1]),max(widgetIndex,self.anchor[1])+1):
+                            if not self.selected[listIndex][i]:
+                                self.selected[listIndex][i] = True
+                                widgetList.selectionChanged(i)
+                elif Qt.ControlModifier & event.modifiers():
+                    self.selected[listIndex][widgetIndex] = not self.selected[listIndex][widgetIndex]
+                    self.anchor = (listIndex,widgetIndex)
+                    widgetList.selectionChanged(widgetIndex)
+                else: # Clear and select a single widget
+                    self.clear()
+                    self.selected[listIndex][widgetIndex] = True
+                    self.anchor = (listIndex,widgetIndex)
+                    widgetList.selectionChanged(widgetIndex)
             #~ except IndexError as e:
                 #~ logger.warning("Something's wrong with the SelectionManager's indices: {} {}".format(listIndex,widgetIndex))
 

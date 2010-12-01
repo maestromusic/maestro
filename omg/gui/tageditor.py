@@ -30,6 +30,8 @@ class TagEditorWidget(QtGui.QDialog):
         self.model.resetted.connect(self._handleReset)
         
         self.selectionManager = widgetlist.SelectionManager()
+        # Do not allow the user to select VariousLines
+        self.selectionManager.isSelectable = lambda wList,widget: not isinstance(widget,singletageditor.VariousLine)
         
         self.addRecordAction = QtGui.QAction("Tag hinzufügen...",self)
         self.addRecordAction.triggered.connect(self._handleAddRecord)
@@ -72,7 +74,9 @@ class TagEditorWidget(QtGui.QDialog):
         row = self.tagEditorLayout.rowCount() # Count the empty rows, too (confer _removeSingleTagEditor)
         
         # Create and fill the EditorWidget
-        self.editorWidgets[tag] = editorwidget.EditorWidget(label=tagwidgets.TagLabel(tag))
+        label = tagwidgets.TagLabel(tag)
+        label.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+        self.editorWidgets[tag] = editorwidget.EditorWidget(label=label)
         tagBox = tagwidgets.TagTypeBox(tag)
         self.editorWidgets[tag].setEditor(tagBox)
         #~ self.editorWidgets[tag].setLabel(tagwidgets.TagLabel(tag))
@@ -110,7 +114,8 @@ class TagEditorWidget(QtGui.QDialog):
 
     def _handleRemoveSelected(self):
         for tagValueEditor in self.selectionManager.getSelectedWidgets():
-            self.model.removeRecord(tagValueEditor.getRecord())
+            if tagValueEditor.isVisible():
+                self.model.removeRecord(tagValueEditor.getRecord())
 
     # Note that the following _handle-functions only add new SingleTagEditors or remove SingleTagEditors which have become empty. Unless they are newly created or removed, the editors are updated in their own _handle-functions.
     def _handleTagRemoved(self,tag):
