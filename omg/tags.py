@@ -135,10 +135,10 @@ class Tag:
         return True
 
     def __eq__(self,other):
-        return self.name == other.name
+        return other is not None and self.name == other.name
         
     def __ne__(self,other):
-        return self.name != other.name
+        return other is None or self.name != other.name
 
     def __hash__(self):
         return self.name.__hash__()
@@ -190,10 +190,10 @@ class IndexedTag(Tag):
         return self.type.sqlFormat(value)
         
     def __eq__(self,other):
-        return isinstance(other, IndexedTag) and self.id == other.id
+        return other is not None and isinstance(other, IndexedTag) and self.id == other.id
     
     def __ne__(self,other):
-        return self.id != other.id
+        return other is None or not isinstance(other,IndexedTag) or self.id != other.id
 
     def __hash__(self):
         return self.id

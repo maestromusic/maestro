@@ -13,7 +13,7 @@ from PyQt4.QtCore import Qt
 from omg import models, constants, FlexiDate, getIcon, tags
 from omg.models import simplelistmodel, tageditormodel
 from omg.gui import formatter
-from omg.gui.misc import editorwidget, listview, widgetlist
+from omg.gui.misc import editorwidget, listview, widgetlist, tagwidgets
 
 EXPAND_LIMIT = 2
 
@@ -79,8 +79,8 @@ class TagValueEditor(QtGui.QWidget):
         
         # Create and fill the EditorWidget
         self.editorWidget = editorwidget.EditorWidget()
-        #~ self.editor = TagLineEdit()
-        #~ self.editorWidget.setEditor(self.editor)
+        self.editor = tagwidgets.TagLineEdit(record.tag)
+        self.editorWidget.setEditor(self.editor)
         self.editorWidget.valueChanged.connect(self._handleValueChanged)
         firstLineLayout.addWidget(self.editorWidget)
         
@@ -167,7 +167,7 @@ class TVEWidgetList(widgetlist.WidgetList):
         widgetlist.WidgetList.__init__(self,QtGui.QBoxLayout.TopToBottom,parent)
         self.variousLine = None
         self.expanded = True
-        for tve in tves,:
+        for tve in tves:
             self.addWidget(tve)
         if self._isVLineNecessary():
             self.setExpanded(False) # Collapse for the start
@@ -253,12 +253,6 @@ class TVEWidgetList(widgetlist.WidgetList):
     def _isVLineNecessary(self):
         """Return whether a VariousLine is necessary given the records in this TVEWidgetList."""
         return self._variousCount() > 3
-
-
-class TagLineEdit(QtGui.QLineEdit):
-    def __init__(self,parent=None):
-        QtGui.QLineEdit.__init__(self,parent)
-    # TODO auto completion stuff
 
 
 class VariousLine(QtGui.QWidget):

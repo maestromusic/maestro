@@ -8,7 +8,7 @@
 from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
-from omg import tags
+from omg import tags, db
 
 class TagLabel(QtGui.QLabel):
     iconSize = QtCore.QSize(24,24)
@@ -56,3 +56,37 @@ class TagTypeBox(QtGui.QComboBox):
         if text[0] == text[-1] and text[0] in ['"',"'"]: # Don't translate if the text is quoted
             return tags.get(text[1:-1])
         else: return tags.fromTranslation(text)
+
+
+class TagLineEdit(QtGui.QLineEdit):
+    # Dictionary mapping tags to all the values which have been entered in a TagLineEdit during this application. Will be used in the completer.
+    insertedValues = {}
+    
+    def __init__(self,tag,parent=None):
+        QtGui.QLineEdit.__init__(self,parent)
+        self.editingFinished.connect(self._handleEditingFinished)
+        self.tag = None # Create the variable
+        self.setTag(tag)
+
+    def setTag(self,tag):
+        if tag != self.tag:
+            self.tag = tag
+            if tag in self.insertedValues:
+                completionStrings = self.insertedValues[tag][:] # copy the list
+            else: completionStrings = []
+
+            if tag != tags.TITLE and tag.isIndexed():
+                ext = [str(value) for value in db.allTagValues(tag) if str(value) not in completionStrings]
+                completionStrings.extend(ext)
+
+            if len(completionStrings) > 0:
+                self.setCompleter(QtGui.QCompleter(completionStrings))
+
+    def _handleEditingFinished(self):
+        if self.tag.isValid(self.text()):
+            # Add value to insertedValues (which will be shown in the completer)
+            if self.tag not in self.insertedValues:
+                self.insertedValues[self.tag] = []
+            if self.text() not in self.insertedValues[self.tag]:
+                # insert at the beginning, so that the most recent values will be at the top of the completer's list.
+                self.insertedValues[self.tag].insert(0,self.text())

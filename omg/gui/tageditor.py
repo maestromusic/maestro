@@ -16,7 +16,9 @@ from omg.models import tageditormodel, simplelistmodel
 from omg.gui import formatter, singletageditor, dialogs
 from omg.gui.misc import widgetlist, editorwidget, tagwidgets
 
+
 class TagEditorWidget(QtGui.QDialog):
+    
     def __init__(self,parent,elements):
         QtGui.QDialog.__init__(self,parent)
         self.setWindowTitle("Tags editieren")
@@ -191,13 +193,15 @@ class TagDialog(QtGui.QDialog):
         assert len(elements) > 0
         
         self.typeEditor =  tagwidgets.TagTypeBox(self)
-        self.valueEditor = QtGui.QLineEdit(self)
+        self.typeEditor.currentIndexChanged.connect(self._handleTagChanged)
+        self.valueEditor = tagwidgets.TagLineEdit(self.typeEditor.getTag())
         self.elementsBox = QtGui.QListView(self)
         # Use a formatter to print the title of the elements
         self.elementsBox.setModel(simplelistmodel.SimpleListModel(elements,lambda el: formatter.Formatter(el).title()))
         self.elementsBox.setSelectionMode(QtGui.QAbstractItemView.MultiSelection)
         for i in range(len(elements)):
-            self.elementsBox.selectionModel().select(self.elementsBox.model().index(i,0),QtGui.QItemSelectionModel.Select)
+            self.elementsBox.selectionModel().select(self.elementsBox.model().index(i,0),
+                                                     QtGui.QItemSelectionModel.Select)
         abortButton = QtGui.QPushButton("Abbrechen",self)
         abortButton.clicked.connect(self.reject)
         okButton = QtGui.QPushButton("OK",self)
@@ -245,3 +249,6 @@ class TagDialog(QtGui.QDialog):
         selectedElements = [allElements[i] for i in range(len(allElements))
                                 if self.elementsBox.selectionModel().isRowSelected(i,QtCore.QModelIndex())]
         return tageditormodel.Record(self.typeEditor.getTag(),self.valueEditor.text(),allElements,selectedElements)
+
+    def _handleTagChanged(self,value):
+        self.valueEditor.setTag(self.typeEditor.getTag())

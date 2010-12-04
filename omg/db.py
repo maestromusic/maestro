@@ -169,8 +169,13 @@ def tags(elid,tagList=None):
     return tags
 
 def tagValues(elid,tagList):
+    """Return all values which the element with id <elid> possesses in any of the tags in tagList (which may be a list of tag-specifiers or simply a single tag-specifier)."""
     return [value for tag,value in tags(elid,tagList)] # return only the second tuple part
-        
+
+def allTagValues(tagSpec):
+    """Return all tag values in the db for the given tag."""
+    return query("SELECT value FROM tag_{}".format(tagsModule.get(tagSpec).name)).getSingleColumn()
+    
 def addTag(elids,tagSpec,value,recursive=False):
     """Add an entry 'tag=value' into the tags-table. If necessary the value is inserted into the correct tagvalue-table."""
     addTagById(elids,tagSpec,idFromValue(tagSpec,value,insert=True),recursive)
