@@ -78,10 +78,8 @@ class TagEditorWidget(QtGui.QDialog):
         # Create and fill the EditorWidget
         label = tagwidgets.TagLabel(tag)
         label.setAlignment(Qt.AlignLeft | Qt.AlignTop)
-        self.editorWidgets[tag] = editorwidget.EditorWidget(label=label)
         tagBox = tagwidgets.TagTypeBox(tag)
-        self.editorWidgets[tag].setEditor(tagBox)
-        #~ self.editorWidgets[tag].setLabel(tagwidgets.TagLabel(tag))
+        self.editorWidgets[tag] = editorwidget.EditorWidget(editor=tagBox,label=label)
         self.editorWidgets[tag].valueChanged.connect(self._handleTagChangedByUser)
         
         # Create the Tag-Editor

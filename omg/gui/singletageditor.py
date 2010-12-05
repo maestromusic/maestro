@@ -78,9 +78,8 @@ class TagValueEditor(QtGui.QWidget):
         self.layout().addLayout(firstLineLayout)
         
         # Create and fill the EditorWidget
-        self.editorWidget = editorwidget.EditorWidget()
         self.editor = tagwidgets.TagLineEdit(record.tag)
-        self.editorWidget.setEditor(self.editor)
+        self.editorWidget = editorwidget.EditorWidget(editor = self.editor)
         self.editorWidget.valueChanged.connect(self._handleValueChanged)
         firstLineLayout.addWidget(self.editorWidget)
         

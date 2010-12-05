@@ -17,6 +17,11 @@ class TagLabel(QtGui.QLabel):
         QtGui.QLabel.__init__(self,parent)
         self.setTag(tag)
 
+    def text(self):
+        if self.tag is not None:
+            return self.tag.translated()
+        else: return ''
+        
     def setText(self,text):
         if text == '':
             self.setTag(None)
