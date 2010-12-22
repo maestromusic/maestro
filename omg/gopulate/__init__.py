@@ -132,7 +132,7 @@ class GopulateGuesser:
                 else:
                     elem.setPosition(0)
             elif tags.TITLE in t:
-                album = t[tags.TITLE][0]
+                album = t[tags.TITLE][0] #TODO: If there are two songs with the same title this will delete the first of them
                 albumsFoundByName[album] = elem
             else:
                 album = filename

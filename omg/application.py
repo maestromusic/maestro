@@ -165,6 +165,3 @@ def run(opts, args):
     config.shelve.close()
     logging.shutdown()
     sys.exit(returnValue)
-
-if __name__ == "__main__":
-    run()

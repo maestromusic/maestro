@@ -71,6 +71,27 @@ def elementCount(elid):
     """Return the number of children of the element with id <elid> or None if that element does not exist."""
     return query("SELECT elements FROM elements WHERE id  ?",elid).getSingle()
 
+def saveContainer(container):
+    assert not container.isInDB() and container.isContainer()
+
+    # Create the container
+    result = query("INSERT INTO elements(name,file,toplevel,elements) VALUES (?,0,1,?)",
+                        container.getTitle(),container.getChildrenCount())
+    container.id = result.insertId()
+
+    # Save the tags
+    setTags(container.id,container.tags,append=True)
+
+    # Save the contents
+    for i in range(container.getChildrenCount()):
+        query("INSERT INTO contents(container_id,position,element_id) VALUES (?,?,?)",
+                container.id,i+1,container.getChildren()[i].id)
+
+    # Set toplevel to 0 for all elements
+    elementIds = ",".join(str(el.id) for el in container.getChildren())
+    query("UPDATE elements SET toplevel = 0 WHERE id IN ({})".format(elementIds))
+
+    
 # Files-Table
 #================================================
 def path(elid):
@@ -214,7 +235,23 @@ def removeTagById(elids,tagSpec,valueId,recursive=False):
     else:
         for id in elids:
             function(id)
-        
+
+def setTags(id,tags,append=False):
+    """Set the tags of the element with the given id to the supplied tags, which is a tags.Storage object.
+    
+    If the optional parameter append is set to True, existing tags won't be touched, instead the 
+    given ones will be added. This function will not check for duplicates in that case."""
+    
+    existingTags = db.query("SELECT * FROM tags WHERE element_id=?;",id)
+    
+    if len(existingTags) > 0 and not append:
+        logger.warning("Deleting existing tags from container {0}".format(id))
+        query("DELETE FROM tags WHERE element_id=?;",id)
+    
+    for tag in tags.keys():
+        if tag.isIndexed():
+            for value in tags[tag]:
+                addTag(id,tag,value)
 
 # Help methods
 #=================================================

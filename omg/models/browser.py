@@ -11,7 +11,7 @@ import itertools
 from PyQt4 import QtCore
 from PyQt4.QtCore import Qt
 
-from omg import config, models, search, database, tags
+from omg import config, models, search, database, tags, distributor
 import omg
 from omg.models import rootedtreemodel, mimedata
 
@@ -24,6 +24,7 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
         self.layers = layers
         self.smallResult = smallResult
         self._loadLayer(self.root)
+        distributor.indicesChanged.connect(self._handleIndicesChanged)
     
     def setLayer(self,layers):
         """Set the layers of the model and reset."""
@@ -135,6 +136,9 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
                 element.loadContents(True,table)
             element.loadTags(True)
         node.contents.sort(key = lambda elem: elem.tags[tags.DATE][0] if tags.DATE in elem.tags else omg.FlexiDate(900))
+
+    def _handleIndicesChanged(self,databaseChangeNotice):
+        self.reset() #TODO: This is a bit brutal...
 
 
 class CriterionNode(models.Node):

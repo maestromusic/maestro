@@ -10,7 +10,7 @@ import logging
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
-from omg import config,mpclient
+from omg import config,mpclient,models, tags, db, strutils, distributor
 from omg.models import playlist as playlistmodel
 from . import delegates, formatter, tageditor
 
@@ -88,6 +88,36 @@ class PlaylistTreeView(QtGui.QTreeView):
     def editTags(self):
         dialog = tageditor.TagEditorWidget(self,[self.model().data(index) for index in self.selectedIndexes()])
         dialog.exec_()
+
+    def createContainer(self):
+        """Query the user for a title and create a new container containing the selected items."""
+        if not self.selectionModel().hasSelection():
+            return
+            
+        #TODO: Filter so that only the toplevel selected indexes remain
+        # Copy the elements as the parent will change!
+        elements = [self.model().data(index).copy() for index in self.selectionModel().selectedIndexes()]
+        
+        default = strutils.commonPrefix(el.tags[tags.TITLE][0] for el in elements if len(el.tags[tags.TITLE]) > 0)
+        default = strutils.rstripSeparator(default)
+        title,ok = QtGui.QInputDialog.getText(self,"Neuer Container","Gib den Titel des neuen Containers an:",
+                                              QtGui.QLineEdit.Normal,default)
+
+        if ok and not len(title) == 0:
+            container = models.Container(tags=tags.Storage(),contents=elements)
+            
+            # Get the common tags (choose those tags from elements[0] which appear in all other elements, too)
+            for tag in elements[0].tags:
+                if tag == tags.TITLE:
+                    continue
+                container.tags[tag] = [v for v in elements[0].tags[tag] if all(v in el.tags[tag] for el in elements[1:])]
+                    
+            # Add the title tag:
+            container.tags[tags.TITLE] = [title]
+
+            # Save the container
+            db.saveContainer(container)
+            distributor.indicesChanged.emit(distributor.DatabaseChangeNotice([container.id],created=True))
         
     def keyReleaseEvent(self,keyEvent):
         if keyEvent.key() == Qt.Key_Delete:
@@ -108,6 +138,11 @@ class PlaylistTreeView(QtGui.QTreeView):
         editTagsAction.triggered.connect(self.editTags)
         menu.addAction(editTagsAction)
 
+        createContainerAction = QtGui.QAction("Container erstellen",self)
+        createContainerAction.setEnabled(self.selectionModel().hasSelection())
+        createContainerAction.triggered.connect(self.createContainer)
+        menu.addAction(createContainerAction)
+        
         node = self.model().data(self.indexAt(event.pos()))
         for provider in contextMenuProvider:
          for action in provider(self,node):

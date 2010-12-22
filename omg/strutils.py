@@ -13,7 +13,7 @@
 
 #This file contains just several useful string functions.
 import re
-from omg import config
+from omg import config, constants
 
 def replace(text,dict):
     """Replace multiple pairs at a single blow. To be exact: The keys of dict are replaced by the corresponding values."""
@@ -57,3 +57,22 @@ def mapRecursively(f,aList):
             result.append(mapRecursively(f,item))
         else: result.append(f(item))
     return result
+
+def commonPrefix(strings):
+    """Given a list of strings return the longest common prefix."""
+    strings = list(strings)
+    if len(strings) == 0:
+        return ''
+    i = 0
+    while i < len(strings[0]) and all(strings[0][i] == string[i] for string in strings[1:]):
+        i = i + 1
+    return strings[0][:i]
+
+def rstripSeparator(string):
+    """Return a copy of <string> where whitespace at the end is removed. If after removing whitespace the string contains one of the separators from constants.SEPARATORS at its end, remove it together with additional whitespace."""
+    string = string.rstrip()
+    for sep in constants.SEPARATORS:
+        if string[-len(sep):] == sep:
+            string = string[:-len(sep)]
+            break
+    return string.rstrip()
