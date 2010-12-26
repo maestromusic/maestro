@@ -42,7 +42,12 @@ class ConfigOption:
     
     def updateValue(self, value, updateFileValue = False):
         if not isinstance(value, self.type):
-            if self.type in (int, str, bool):
+            if self.type == bool:
+                # bool("0") or bool("False") are True, but we want them to be false as this is what you type in a configuration file to make a variable false.
+                if value == "0" or value.lower() == "false":
+                    value = False
+                else: value = self.type(value)
+            elif self.type in (int, str):
                 value = self.type(value)
             elif self.type == list and isinstance(value, str):
                 value = [x.strip(" \t") for x in value.split(",")]
@@ -185,6 +190,7 @@ def initOmgOptions(options):
     options.addOption("log",        "consoleLogLevel",  str,    None,           shorts=("-v", "--loglevel"))
     
     options.addOption("misc",       "tagmanip26_cmd",   str,    os.path.abspath(os.path.join(os.path.split(os.path.split(__file__)[0])[0],"tagmanip26.py")))
+    options.addOption("misc",       "tags_python2_cmd", str,    os.path.abspath(os.path.join(os.path.split(__file__)[0],"realfiles2/tags_python2.py")))
     options.addOption("misc",       "show_ids",         bool,   False           )
 
 _defaultShelveContents = {
@@ -208,7 +214,7 @@ def init(copts):
     if  options.log.consoleLogLevel is None:
         logging.config.fileConfig(logConfFile)
     else:
-        # If we must change the configuration from logging.conf, things are ugly: We have to read the file using a ConfigParser, then change the configuration and write it into a io.StringIO-buffer which is finally passed to fileConfig.
+        # If we must change the configuration from logging.conf, things are ugly: We have to read the file using a ConfigParser, then change the configuration and write it into an io.StringIO-buffer which is finally passed to fileConfig.
         logConf = configparser.ConfigParser()
         logConf.read(logConfFile)
         logConf.set('handler_consoleHandler','level',options.log.consoleLogLevel)
