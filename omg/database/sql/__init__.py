@@ -10,7 +10,7 @@
 """This module contains an abstraction layer for SQL databases. It provides a common API to several third party SQL modules so that the actual SQL module can be exchanged without changing the project code.
 
 Currently the following drivers are supported:
-"mypysql": uses the mysql-python module (http://sourceforge.net/projects/mypysql/)
+"myconnpy": uses the myconnpy module (https://launchpad.net/myconnpy)
 "qtsql": uses the QtSql-Module of PyQt4 (http://doc.trolltech.com/4.2/qtsql.html)
 The supported drivers are stored in the module-variable drivers.
 
@@ -40,7 +40,7 @@ from omg import strutils
 
 # Identifiers of supported drivers. For each identifier there must be a module
 # <drivername>.py file in this package which contains the corresponding driver.
-drivers = {"mypysql","qtsql","myconnpy"}
+drivers = {"myconnpy","qtsql"}
 
 # When a driver is loaded _modules[driverIdentifier] will contain the driver's module.
 _modules = {}

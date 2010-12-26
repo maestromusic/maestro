@@ -9,10 +9,8 @@
 
 """Unittests for the sql-package."""
 
-import sql
-import sys
-import unittest
-import getpass
+import sys, unittest, getpass
+from omg.database import sql
 
 class SqlTest(unittest.TestCase):
     def setUpTestTable(self,driver):
@@ -72,11 +70,6 @@ class SqlTest(unittest.TestCase):
         print("Checking QtSQL driver...")
         self.setUpTestTable("qtsql")
         self.performTests()
-        
-    def testMyPySqlDriver(self):
-        print("Checking MyPySql driver...")
-        self.setUpTestTable("mypysql")
-        self.performTests()
 
     def testMyConnPyDriver(self):
         print("Checking MyConnPy driver...")
@@ -87,7 +80,7 @@ class SqlTest(unittest.TestCase):
 if __name__ == "__main__":
     testTable = "testtable"
 
-    username = input("Please enter the SQL username I should use: ")
-    password = getpass.getpass("Please enter the SQL password I should use: ")
-    database = input("Please enter the SQL database I should use: ")
+    username = "music"#input("Please enter the SQL username I should use: ")
+    password = "985vrN43Vdh3f3nJ"#getpass.getpass("Please enter the SQL password I should use: ")
+    database = "music"#input("Please enter the SQL database I should use: ")
     unittest.main()

@@ -54,12 +54,13 @@ def get():
     return db
 
 def resetDatabase(tagConfiguration):
-    """Drop all tables and create them without data again. All table rows will be lost! To determine which tag tables have to be created the string <tagConfiguration> is used. For its syntax confer _parseTagConfiguration."""
+    """Drop all tables and create them without data again. All table rows will be lost! To determine which tag tables have to be created the string <tagConfiguration> is used. For its syntax confer tags.parseTagConfiguration."""
     from . import tables
+    from omg import tags
     
     # First we have to reset the tagids-table...
     tables.tables['tagids'].reset()
-    for tagname,tagtype in _parseTagConfiguration(tagConfiguration).items():
+    for tagname,tagtype in tags.parseTagConfiguration(tagConfiguration).items():
         db.query("INSERT INTO tagids (tagname,tagtype) VALUES (?,?)",tagname,tagtype)
     # ...which is necessary to compute the list of all tables
     for name,table in tables.allTables().items():
@@ -197,23 +198,3 @@ def checkSuperfluousTags(fix=False):
                                         WHERE id NOT IN (SELECT value_id FROM tags WHERE tag_id = ?)"
                                         .format(tablename),tagid).getSingle()
     return {k:v for k,v in result.items() if v > 0}
-    
-def _parseTagConfiguration(config):
-    """Parse a string to configure tags and their types. This string should contain a comma-separated list of strings of the form tagname(tagtype) where the part in brackets is optional and defaults to 'varchar'. Check whether the syntax is correct and return a dictionary {tagname : tagtype}. Otherwise raise an exception."""
-    import re
-    from omg import tags as tagsModule
-    # Matches strings like "   tagname (   tagtype   )   " (the part in brackets is optional) and stores the interesting parts in the first and third group.
-    prog = re.compile('\s*(\w+)\s*(\(\s*(\w*)\s*\))?\s*$')
-    tags = {}
-    for tagstring in config.split(","):
-        result = prog.match(tagstring)
-        if result is None:
-            raise Exception("Invalid syntax in the tag configuration ('{0}').".format(tagstring))
-        tagname = result.groups()[0]
-        tagtype = result.groups()[2]
-        if not tagtype:
-            tagtype = "varchar"
-        if tagsModule.Type.byName(tagtype) is None:
-            raise Exception("Unknown tag type: '{}'".format(tagtype))
-        tags[tagname] = tagtype
-    return tags
