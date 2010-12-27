@@ -108,6 +108,12 @@ class Type:
                 return type
         else: raise IndexError("There is no tag-type with name '{}'.".format(name))
 
+    def valueFromString(self,string):
+        """Convert a string (which must be valid for this tag-type) into the preferred representation of values of this type. Actually this method does nothing than convert strings to FlexiDates if this is the date-type."""
+        if self == TYPE_DATE:
+            return FlexiDate.strptime(string)
+        else: return string
+
 TYPE_VARCHAR = Type('varchar')
 TYPE_TEXT = Type('text')
 TYPE_DATE = Type('date')
@@ -215,8 +221,8 @@ class IndexedTag(Tag):
 class OtherTag(Tag):
     """Special class for tags which are not indexed."""
     def __init__(self, name):
-        if not name.isalnum():
-            raise ValueError("Tag name must be alpha-numeric and contain at least one character.")
+        if len(name) == 0 or not name.isprintable():
+            raise ValueError("Tag name must contain only printable characters and at least one of them: '{}'".format(name))
         self.name = name
 
 
@@ -277,10 +283,54 @@ def init():
     tagList.extend(set(_tagsByName.values()) - set(tagList))
     
     _ignored = options.tags.ignored_tags
+    
     global TITLE,ALBUM,DATE
     TITLE = _tagsByName[options.tags.title_tag]
     ALBUM = _tagsByName[options.tags.album_tag]
     DATE = _tagsByName[options.tags.date_tag]
+
+
+def initFromString(tagConfiguration):
+    """Initialize the tagmodule from a string instead from the database. For the syntax of <tagConfiguration> confer parseTagConfiguration. This method does not need the database and makes it possible to use this module in test-applications without database connection."""
+    global _tagsById,_tagsByName,tagList, _ignored
+
+    _tagsById = {}
+    _tagsByName = {}
+    id = 10000 # some large value so that we do not collide with actual tags in the database
+    for tagname,tagtype in parseTagConfiguration(tagConfiguration).items():
+        newTag = IndexedTag(id,tagname,Type.byName(tagtype))
+        _tagsById[id] = newTag
+        _tagsByName[tagname] = newTag
+        id = id + 1
+        
+    # tagList contains the tags in the order specified by tags->tag_order...
+    tagList = [ _tagsByName[name] for name in options.tags.tag_order if name in _tagsByName ]
+    _ignored = options.tags.ignored_tags
+    
+    global TITLE,ALBUM,DATE
+    TITLE = _tagsByName[options.tags.title_tag]
+    ALBUM = _tagsByName[options.tags.album_tag]
+    DATE = _tagsByName[options.tags.date_tag]
+
+
+def parseTagConfiguration(config):
+    """Parse a string to configure tags and their types. This string should contain a comma-separated list of strings of the form tagname(tagtype) where the part in brackets is optional and defaults to 'varchar'. Check whether the syntax is correct and return a dictionary {tagname : tagtype}. Otherwise raise an exception."""
+    import re
+    # Matches strings like "   tagname (   tagtype   )   " (the part in brackets is optional) and stores the interesting parts in the first and third group.
+    prog = re.compile('\s*(\w+)\s*(\(\s*(\w*)\s*\))?\s*$')
+    tags = {}
+    for tagstring in config.split(","):
+        result = prog.match(tagstring)
+        if result is None:
+            raise Exception("Invalid syntax in the tag configuration ('{0}').".format(tagstring))
+        tagname = result.groups()[0]
+        tagtype = result.groups()[2]
+        if not tagtype:
+            tagtype = "varchar"
+        if Type.byName(tagtype) is None:
+            raise Exception("Unknown tag type: '{}'".format(tagtype))
+        tags[tagname] = tagtype
+    return tags
 
 
 class TagValueList(list):

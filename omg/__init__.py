@@ -75,7 +75,14 @@ class FlexiDate:
         
     def __str__(self):
         return self.strftime()
-    
+
+    def __repr__(self):
+        if self.month:
+            if self.day:
+                return "FlexiDate({},{},{})".format(self.year,self.month,self.day)
+            else: return "FlexiDate({},{})".format(self.year,self.month)
+        else: return "FlexiDate({})".format(self.year)
+        
     def __lt__(self, other):
         if self.year < other.year:
             return True
