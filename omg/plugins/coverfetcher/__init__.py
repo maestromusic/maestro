@@ -16,25 +16,24 @@ from PyQt4.QtCore import Qt
 
 from omg import covers, constants, models, tags
 from omg.config import options
-from omg.gui import formatter, playlist
+from omg.gui import formatter, treeview
 
 LASTFM_API_KEY = 'b25b959554ed76058ac220b7b2e0a026'
 
 def enable():
-    playlist.contextMenuProvider.append(getMenuEntries)
+    treeview.contextMenuProviders['playlist'].append(contextMenuProvider)
     
 def disable():
-    playlist.contextMenuProvider.remove(getMenuEntries)
+    treeview.contextMenuProviders['playlist'].remove(contextMenuProvider)
 
-def getMenuEntries(playlist,node):
+def contextMenuProvider(playlist,actions,currentIndex):
     """Provides an action for the playlist's context menu (confer playlist.contextMenuProvider). The action will only be enabled if at least one album is selected and in this case open a CoverFetcher-dialog for the selected albums."""
     action = QtGui.QAction("Cover holen...",playlist)
-    elements = [playlist.model().data(index) for index in playlist.selectedIndexes()]
-    elements = [element for element in elements if isinstance(element,models.Element)]
+    elements = [element for element in playlist.getSelectedNodes() if isinstance(element,models.Element)]
     if len(elements) == 0:
         action.setEnabled(False)
     else: action.triggered.connect(lambda: CoverFetcher(QtGui.QApplication.activeWindow(),elements).open())
-    return [action]
+    actions.append(action)
 
 
 class CoverData:

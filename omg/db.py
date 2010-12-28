@@ -17,8 +17,15 @@ logger = logging.getLogger()
 query = db.query
 
 
-def contents(elid,recursive=False):
-    newList = list(query("SELECT element_id FROM contents WHERE container_id = ?",elid).getSingleColumn())
+def contents(elids,recursive=False):
+    if isinstance(elids,int):
+        elids = [elids]
+
+    newList = list(query("""
+        SELECT DISTINCT element_id
+        FROM contents
+        WHERE container_id IN ({})
+        """.format(",".join(str(id) for id in elids))).getSingleColumn())
     if not recursive:
         return newList
     resultList = newList
@@ -91,7 +98,39 @@ def saveContainer(container):
     elementIds = ",".join(str(el.id) for el in container.getChildren())
     query("UPDATE elements SET toplevel = 0 WHERE id IN ({})".format(elementIds))
 
+
+def deleteElements(elids):
+    """Remove elements together with all of their content and tag references from the database."""
+    idList = ",".join(str(id) for id in elids)
+    db.query("DELETE FROM tags WHERE element_id IN ({})".format(idList))
+    db.query("DELETE FROM files WHERE element_id IN ({})".format(idList))
     
+    parentIds = list(db.query("SELECT container_id FROM contents WHERE element_id IN ({})"
+                        .format(idList)).getSingleColumn())
+    contentIds = list(db.query("SELECT element_id FROM contents WHERE container_id IN ({})"
+                        .format(idList)).getSingleColumn())
+    db.query("DELETE FROM contents WHERE container_id IN ({}) OR element_id IN ({})".format(idList,idList))
+    
+    if len(parentIds) > 0:
+        # Correct element counters
+        db.query("""
+            UPDATE elements 
+            SET elements = (SELECT COUNT(*) FROM contents WHERE container_id = id)
+            WHERE id IN ({})
+            """.format(",".join(str(id) for id in parentIds)))
+    
+    if len(contentIds) > 0:
+        # Set toplevel to 1 for those elements which do not have a parent anymore
+        db.query("""
+            UPDATE elements LEFT JOIN contents ON elements.id=contents.element_id
+            SET elements.toplevel = 1
+            WHERE contents.container_id IS NULL AND elements.id IN ({})
+            """.format(",".join(str(id) for id in contentIds)))
+
+    # Finally remove the elements itself
+    db.query("DELETE FROM elements WHERE id IN ({})".format(idList))
+
+
 # Files-Table
 #================================================
 def path(elid):

@@ -9,7 +9,7 @@
 import logging, copy, os
 from PyQt4 import QtCore
 
-from omg import tags, db, covers, realfiles, absPath, relPath
+from omg import tags, db, covers, realfiles, absPath, relPath, realfiles2
 from omg.database import queries,sql
 from omg.config import options
 from functools import reduce
@@ -77,7 +77,13 @@ class Node:
         if self.getParent() is None:
             return 0
         else: return 1 + self.getParent().getLevel()
-        
+
+    def maxDepth(self):
+        """Return the maximum depth of nodes below this node."""
+        if self.hasChildren():
+            return 1 + max(node.maxDepth() for node in self.getChildren())
+        else: return 0
+
     def index(self,node):
         """Return the index of <node> in this node's contents or raise a ValueError if the node is not found. See also find."""
         contents = self.getChildren()
@@ -327,33 +333,24 @@ class Element(Node):
 
     def deleteCoverCache(self):
         """Delete all covers from the built-in cover cache."""
-        del self._covers
+        if hasattr(self,"_covers"):
+            del self._covers
         
-    def delete(self, recursive = False):
-        """Deletes the element from the database."""
+    def delete(self,recursive = False):
+        """Deletes the element from the database. Note if <recursive> is True all children in the current tree structure will be removed, too. These are not necessarily the contents of this element in the database."""
         if not self.isInDB():
-            raise RuntimeError("delete can only be used on elements contained in the database.")
-        if self.isFile():
-            queries.delFile(id = self.id)
-        else:
-            queries.delContainer(self.id)
+            raise RuntimeError("Delete can only be used on elements contained in the database.")
 
-        if recursive and hasattr(self, "contents"):
-            for elem in self.contents[:]:
-                elem.delete(True)
+        db.deleteElement(self.id)
+
+        if recursive and self.getChildrenCount() > 0:
+            for element in self.contents:
+                element.delete(True)
+            self.contents = []
         if isinstance(self.parent, Element):
             self.parent._syncState["contents"] = True
         self.parent.contents.remove(self)
         self.id = None
-    
-    def maxDepth(self, loadFromDB = False):
-        """Returns the maximum depth of elements below this element (0 if it is a File, 1 if all contents are files, ...)"""
-        if self.isFile():
-            return 0
-        else:
-            if loadFromDB:
-                raise NotImplementedError()
-            return 1 + max((c.maxDepth(loadFromDB) for c in self.contents))
     
     def depthFirstGenerator(self,includeContainers=False):
         """Return a generator over all files below this element in depth-first manner. If <includeContainers> is True, the generator will return all elements below this element."""
@@ -429,10 +426,11 @@ class Container(Element):
             for element in self.contents:
                 if element.isContainer():
                     element.loadContents(recursive,table)
-                
+
     def getLength(self,refresh=False):
         """Return the length of this element, i.e. the sum of the lengths of all contents."""
-        return sum(element.getLength(refresh) for element in self.contents)
+        # Skip elements of length None
+        return sum(element.getLength(False) for element in self.contents if element.getLength(refresh) is not None)
 
     def commit(self, toplevel = False):
         """Commit this container into the database"""
@@ -533,14 +531,60 @@ class File(Element):
     
     def isContainer(self):
         return False
-    
+
+    def readFromFileSystem(self,*,tags=False,length=False,position=False,all=False):
+        if all:
+            tags = length = position = True
+
+        if not any(tags,length,position):
+            return
+
+        if self.getPath() is None:
+            raise RuntimeError("I need a path to read tags from the filesystem. Id: {}".format(self.id))
+            
+        real = realfiles2.get(self.getPath())
+        try:
+            real.read()
+        except realfiles2.TagIOError() as e:
+            logger.warning("Failed to read from file {}: {}".format(self.path, str(e)))
+        if tags:
+            self.tags = real.tags
+        if position:
+            self.position = real.position
+        if length:
+            self.length = real.length
+
+    def writeToFileSystem(self,*,tags=False,position=False,all=False):
+        if all:
+            tags = position = True
+
+        if not tags and not position:
+            return
+
+        if self.getPath() is None:
+            raise RuntimeError("I need a path to write to the filesystem. Id: {}".format(self.id))
+            
+        real = realfiles2.get(self.getPath())
+        if tags:
+            real.tags = tags
+        if position:
+            real.position = position
+        try:
+            if tags:
+                real.saveTags()
+            if position:
+                real.savePosition()
+        except TagIOError as e:
+            logger.warning("Failed to write to file {}: {}".format(self.path, str(e)))
+
+        
     def readTagsFromFilesystem(self):
         if self.getPath() is None:
             raise RuntimeError("I need a path to read tags from the filesystem.")
-        real = realfiles.File(absPath(self.getPath()))
+        real = realfiles2.get(self.getPath())
         try:
             real.read()
-        except realfiles.ReadTagError as e:
+        except realfiles2.TagIOError as e:
             logger.warning("Failed to read tags from file {}: {}".format(self.path, str(e)))
         if self.tags is not None and not equalsExceptIgnored(self.tags, real.tags):
             self._syncState["tags"] = True

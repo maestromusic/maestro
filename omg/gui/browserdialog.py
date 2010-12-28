@@ -9,10 +9,10 @@
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from omg import config, tags, strutils
+from omg import config, tags, utils
 
 # Layers that can be selected in BrowserDialog's comboboxes. Each item in the list is a list containing for each layer a list of the tagnames in that layer.
-selectableLayers = strutils.mapRecursively(tags.get,[
+selectableLayers = utils.mapRecursively(tags.get,[
      [['composer','artist','performer']],
      [['genre'],['composer','artist','performer']],
      [['composer','artist','performer'],['album']],
@@ -101,7 +101,7 @@ class ViewConfiguration(QtGui.QWidget):
         layout.addWidget(QtGui.QLabel("View {0}: ".format(index+1),self))
         self.comboBox = QtGui.QComboBox(self)
         for layers in selectableLayers:
-            self.comboBox.addItem(str(strutils.mapRecursively(str,layers)),layers)
+            self.comboBox.addItem(str(utils.mapRecursively(str,layers)),layers)
         layout.addWidget(self.comboBox)
         
     def setLayers(self,layers):

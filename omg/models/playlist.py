@@ -147,7 +147,12 @@ class BasicPlaylist(rootedtreemodel.RootedTreeModel):
 
     def _handleIndicesChanged(self,event):
         allIds = event.getAllIds()
-               
+
+        if (event.deleted or event.created)\
+                  and not set(allIds).isdisjoint(set(node.id for node in self.getAllNodes())):
+            self.restructure()
+            return
+
         for element in self.getAllNodes():
             if element.id in allIds:
                 index = self.getIndex(element)

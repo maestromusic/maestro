@@ -10,17 +10,11 @@ import logging
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
-from omg import config,mpclient,models, tags, db, strutils, distributor
+from omg import config,mpclient,models, tags, db, strutils, distributor, realfiles2
 from omg.models import playlist as playlistmodel
-from . import delegates, formatter, tageditor
+from . import delegates, formatter, treeview, tageditor
 
 logger = logging.getLogger("omg.gui.playlist")
-
-# Plugins may insert functions here to insert entries in the context menu. Each function must take two parameters:
-# - the playlist where the context-menu is opened
-# - the node where the mouse was clicked (None if the mouse was not over an element)
-# The function must return a list of QActions which will be inserted into the menu.
-contextMenuProvider = []
 
 class Playlist(QtGui.QWidget):
     model = None
@@ -56,47 +50,63 @@ class Playlist(QtGui.QWidget):
     def _handleDoubleClick(self,index):
         element = self.model.data(index)
         mpclient.play(element.getOffset())
+        
 
-
-class PlaylistTreeView(QtGui.QTreeView):
-    """Specialized QTreeView, which draws the currently playing track highlighted."""
+class PlaylistTreeView(treeview.TreeView):
+    """Specialized TreeView, which draws the currently playing track highlighted."""
     def __init__(self,parent):
-        QtGui.QTreeView.__init__(self,parent)
-        self.setHeaderHidden(True)
+        treeview.TreeView.__init__(self,parent)
         self.setModel(parent.model)
         self.setItemDelegate(delegates.PlaylistDelegate(self,parent.model))
-        self.setExpandsOnDoubleClick(False)
-        self.setAlternatingRowColors(True)
-        self.setSelectionMode(QtGui.QAbstractItemView.ExtendedSelection)
-        self.setDragEnabled(True)
+        self.setDefaultDropAction(Qt.MoveAction)
         self.setAcceptDrops(True)
         self.setDropIndicatorShown(True)
-        self.setDefaultDropAction(Qt.MoveAction)
-        
-        palette = QtGui.QPalette()
-        palette.setColor(QtGui.QPalette.Base,QtGui.QColor(0xE9,0xE9,0xE9))
-        palette.setColor(QtGui.QPalette.AlternateBase,QtGui.QColor(0xD9,0xD9,0xD9))
-        self.setPalette(palette)
 
-    def removeSelected(self):
-        # It may happen that an element and its parent element are selected. When removing the parent, the element will also be removed and will disappear from selectedIndexes(). An easy solution like 
-        # for i in selectedIndexes(): removeByQtIndex(i)
-        # would try to remove the child a second time.
-        while len(self.selectedIndexes()) > 0:
-            self.model().removeByQtIndex(self.selectedIndexes()[0])
+    def contextMenuProvider(self,actions,currentIndex):
+        treeview.TreeView.contextMenuProvider(self,actions,currentIndex)
+        
+        action = QtGui.QAction("Ausgewählte Elemente entfernen",self)
+        action.triggered.connect(self.removeSelected)
+        actions.insert(2,action)
+
+        action = QtGui.QAction("Container erstellen",self)
+        action.setEnabled(self.selectionModel().hasSelection())
+        action.triggered.connect(self.createContainer)
+        actions.insert(3,action)
+        
+        action = QtGui.QAction("Playlist-Baum restrukturieren",self)
+        action.triggered.connect(self.model().restructure)
+        actions.append(action)
+        
     
-    def editTags(self):
-        dialog = tageditor.TagEditorWidget(self,[self.model().data(index) for index in self.selectedIndexes()])
+    def editTags(self,recursive):
+        if not recursive:
+            elements = self.getSelectedNodes()
+        else: 
+            elements = self.getSelectedNodes(onlyToplevel=True)
+            ids = set(element.id for element in elements)
+            contentIds = db.contents(ids,recursive=True)
+            for id in contentIds:
+                if id not in ids:
+                    ids.add(id)
+                    newElement = models.createElement(id)
+                    newElement.loadTags()
+                    elements.append(newElement)
+
+        dialog = tageditor.TagEditorWidget(self,elements)
         dialog.exec_()
+        
+    def removeSelected(self):
+        for node in self.getSelectedNodes(onlyToplevel=True):
+            self.model().removeByQtIndex(self.model().getIndex(node))
 
     def createContainer(self):
         """Query the user for a title and create a new container containing the selected items."""
         if not self.selectionModel().hasSelection():
             return
-            
-        #TODO: Filter so that only the toplevel selected indexes remain
+
         # Copy the elements as the parent will change!
-        elements = [self.model().data(index).copy() for index in self.selectionModel().selectedIndexes()]
+        elements = [node.copy() for node in self.getSelectedNodes(onlyToplevel=True)]
         
         default = strutils.commonPrefix(el.tags[tags.TITLE][0] for el in elements if len(el.tags[tags.TITLE]) > 0)
         default = strutils.rstripSeparator(default)
@@ -123,33 +133,6 @@ class PlaylistTreeView(QtGui.QTreeView):
         if keyEvent.key() == Qt.Key_Delete:
             self.removeSelected()
 
-    def contextMenuEvent(self,event):
-        menu = QtGui.QMenu(self)
-         
-        restructureAction = QtGui.QAction("Restrukturieren",self)
-        restructureAction.triggered.connect(self.model().restructure)
-        menu.addAction(restructureAction)
-
-        removeAction = QtGui.QAction("Entfernen",self)
-        removeAction.triggered.connect(self.removeSelected)
-        menu.addAction(removeAction)
-        
-        editTagsAction = QtGui.QAction("Tags editieren...",self)
-        editTagsAction.triggered.connect(self.editTags)
-        menu.addAction(editTagsAction)
-
-        createContainerAction = QtGui.QAction("Container erstellen",self)
-        createContainerAction.setEnabled(self.selectionModel().hasSelection())
-        createContainerAction.triggered.connect(self.createContainer)
-        menu.addAction(createContainerAction)
-        
-        node = self.model().data(self.indexAt(event.pos()))
-        for provider in contextMenuProvider:
-         for action in provider(self,node):
-            menu.addAction(action)
-
-        menu.exec_(event.globalPos() + QtCore.QPoint(2,2))
-    
     def dropEvent(self,event):
         if event.source() is None:
             logger.debug("Drop from external source.")

@@ -9,10 +9,10 @@
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
-from omg import database, search, tags, config, constants, models, strutils, control
+from omg import database, search, tags, config, constants, models, utils, control
 from omg.models import browser as browsermodel
 
-from . import delegates, browserdialog, formatter
+from . import delegates, browserdialog, formatter, treeview, tageditor
 
 # Temporary tables used for search results (have to appear before the imports as they will be imported in some imports)
 TT_BIG_RESULT = 'tmp_browser_bigres'
@@ -53,7 +53,7 @@ class Browser(QtGui.QWidget):
         layout.addWidget(self.splitter)
         
         self.views = []
-        self.createViews(strutils.mapRecursively(tags.get,config.shelve['browser_views']))
+        self.createViews(utils.mapRecursively(tags.get,config.shelve['browser_views']))
     
     def search(self):
         """Search for the value in the search-box. If it is empty, display all values."""
@@ -78,55 +78,37 @@ class Browser(QtGui.QWidget):
             self.splitter.addWidget(newView)
 
 
-class BrowserTreeView(QtGui.QTreeView):
+class BrowserTreeView(treeview.TreeView):
     """TreeView for the Browser."""
     
     def __init__(self,parent,layers):
         """Initialize this TreeView with the given parent (which must be the browser-widget) and the given layers. This also will create a BrowserModel for this treeview (Note that each view of the browser uses its own model). <layers> must be a list of tag-lists. For each entry in <layers> a tag-layer using the entry's tags is created. A BrowserTreeView initialized with [[tags.get('genre')],[tags.get('artist'),tags.get('composer')]] will group result first into differen genres and then into different artist/composer-values, before finally displaying the elements itself."""
-        QtGui.QTreeView.__init__(self,parent)
+        treeview.TreeView.__init__(self,parent)
         self.setModel(browsermodel.BrowserModel(parent.table,layers,TT_SMALL_RESULT))
-        
-        self.setHeaderHidden(True)
         self.setItemDelegate(delegates.BrowserDelegate(self,self.model()))
-        self.setExpandsOnDoubleClick(False)
         self.doubleClicked.connect(self._handleDoubleClicked)
-        self.setAlternatingRowColors(True)
-        self.setSelectionMode(QtGui.QAbstractItemView.ExtendedSelection)
-        self.setDragEnabled(True)
+    
+    def editTags(self,recursive):
+        if not recursive:
+            # Just remove nodes which don't have tags
+            elements = [node for node in self.getSelectedNodes() if isinstance(node,models.Element)]
+        else:
+            selectedNodes = self.getSelectedNodes(onlyToplevel=True)
+            elements = []
+            ids = set()
+            for node in selectedNodes:
+                for child in node.getAllNodes():
+                    if isinstance(child,models.Element) and child.id not in ids:
+                        ids.add(child.id)
+                        newElement = models.createElement(child.id)
+                        newElement.loadTags()
+                        elements.append(newElement)
+        dialog = tageditor.TagEditorWidget(self,elements)
+        dialog.exec_()
         
-        palette = QtGui.QPalette()
-        palette.setColor(QtGui.QPalette.Base,QtGui.QColor(0xE9,0xE9,0xE9))
-        palette.setColor(QtGui.QPalette.AlternateBase,QtGui.QColor(0xD9,0xD9,0xD9))
-        self.setPalette(palette)
-        
-        self.delAction = QtGui.QAction("delete", self)
-        self.addAction(self.delAction)
-        self.delAction.triggered.connect(self._deleteSelected)
-            
     def _handleDoubleClicked(self,index):
         node = self.model().data(index)
         if isinstance(node,models.Element):
             control.playlist.insertElements([node],-1)
         elif isinstance(node,browsermodel.CriterionNode):
             control.playlist.insertElements(control.playlist.importElements(node.getElements()),-1)
-    
-    def _deleteSelected(self):
-        """Non-recursively deletes the selected elements from the database."""
-        sel = self.selectionModel().selection()
-        for i in sel:
-            parentIndex = i.topLeft().parent()
-            parentElem = parentIndex.internalPointer()
-            print(i.topLeft().internalPointer(), "-", i.bottomRight().internalPointer())
-            self.model().beginRemoveRows(parentIndex, i.topLeft().row(), i.bottomRight().row())
-            elems = (index.internalPointer() for index in i.indexes() if isinstance(index.internalPointer(), models.Element))
-            for elem in elems:
-                elem.delete(recursive = True)
-            self.model().endRemoveRows()
-            if isinstance(parentElem, models.Container):
-                parentElem.updateElementCounter()
-        
-    def contextMenuEvent(self, event):
-        menu = QtGui.QMenu(self)
-        menu.addAction(self.delAction)
-        menu.popup(event.globalPos())
-        event.accept()

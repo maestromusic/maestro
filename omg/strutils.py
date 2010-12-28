@@ -5,11 +5,6 @@
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 3 as
 # published by the Free Software Foundation
-#
-# This module contains an abstraction layer for SQL databases. It provides a common API
-# to several third party SQL modules so that the actual SQL module can be exchanged
-# without changing the project code.
-#
 
 #This file contains just several useful string functions.
 import re
@@ -48,15 +43,6 @@ def formatLength(lengthInSeconds):
     else:
         hours = int(lengthInSeconds / 3600)
         return "{0:d}:{1:02d}:{2:02d}".format(hours,minutes,seconds)
-        
-def mapRecursively(f,aList):
-    """Take <aList> which may contain (recursively) further lists and apply <f> to each element in these lists (except the lists). Return a copy a <aList> with the results."""
-    result = []
-    for item in aList:
-        if isinstance(item,list):
-            result.append(mapRecursively(f,item))
-        else: result.append(f(item))
-    return result
 
 def commonPrefix(strings):
     """Given a list of strings return the longest common prefix."""
@@ -72,7 +58,7 @@ def rstripSeparator(string):
     """Return a copy of <string> where whitespace at the end is removed. If after removing whitespace the string contains one of the separators from constants.SEPARATORS at its end, remove it together with additional whitespace."""
     string = string.rstrip()
     for sep in constants.SEPARATORS:
-        if string[-len(sep):] == sep:
+        if string.endswith(sep):
             string = string[:-len(sep)]
             break
     return string.rstrip()
