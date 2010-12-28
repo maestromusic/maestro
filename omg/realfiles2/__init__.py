@@ -11,13 +11,20 @@ from omg import config, tags, absPath
 from omg.config import options
 
 
+def get(path,absolute=False):
+    """Create a RealFile-instance for the given path, which must be absolute if the second parameter is true and otherwise relative to the music directory."""
+    if not absolute:
+        path = absPath(path)
+    return MutagenFile(path)
+
+
 class TagIOError(IOError):
     """Exception if reading or writing tags fails."""
     pass
 
 
-class AbstractFile:
-    """Abstract base class for File classes. Currently there is only one subclass, though."""
+class RealFile:
+    """Abstract base class for file classes. Currently there is only one subclass, though."""
     def __init__(self,path):
         """Create a file for the given path."""
         self.path = path
@@ -45,16 +52,10 @@ class AbstractFile:
         """Store tags and position in the file."""
         self.saveTags()
         self.savePosition()
-
-
-def get(path,absolute=False):
-    if not absolute:
-        path = absPath(path)
-    return MutagenFile(path)
         
 
-class MutagenFile(AbstractFile):
-    """This class implements the methods of AbstractFile by opening the tags_python2-script (which is written in Python 2 and hence can use Mutagen) in a subprocess and communicating pickled data over stdout and stdin."""
+class MutagenFile(RealFile):
+    """This class implements the methods of RealFile by opening the tags_python2-script (which is written in Python 2 and hence can use Mutagen) in a subprocess and communicating pickled data over stdout and stdin."""
     def _openProc(self):
         """Create the tags_python2-subprocess."""
         return subprocess.Popen(options.misc.tags_python2_cmd,

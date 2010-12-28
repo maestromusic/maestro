@@ -157,10 +157,6 @@ class Mp3File(File):
                 if unknownFrames is not None:
                     unknownFrames.add(key)
                 continue
-
-            # All other frames should have a text object which is a list of the values
-            assert hasattr(frameObject,'text') and isinstance(frameObject.text,list)
-            values = frameObject.text
             
             frame = FRAMES[key]
             if frame.type in (frames.IGNORE,frames.INFO):
@@ -168,6 +164,10 @@ class Mp3File(File):
                 if ignoredFrames is not None:
                     ignoredFrames.add(key)
                 continue
+                
+            # All other frames should have a text object which is a list of the values
+            assert hasattr(frameObject,'text') and isinstance(frameObject.text,list)
+            values = frameObject.text
 
             # Replace TXXX and WXXX frames by their descriptions
             if key == u'TXXX' or key == u'WXXX':
