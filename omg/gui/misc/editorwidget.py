@@ -12,10 +12,11 @@ from PyQt4.QtCore import Qt
 class EditorWidget(QtGui.QStackedWidget):
     """An EditorWidget contains two child-widgets stacked upon each other: An editor (either a QLineEdit or a QComboBox or a QTextEdit) and a QLabel showing the editor's value. Usually the label is displayed, but when the user clicks on it, the editor appears and the value can be edited. When the editor looses focus, the label reappears."""
 
-    valueChanged = QtCore.pyqtSignal(str)
+    valueChanged = QtCore.pyqtSignal()
     label = None
     editor = None
     popup = None # Contains the context-menu, while the editor displays one. This is necessary to prevent hiding the editor, when it looses focus to its context-menu.
+    fixed = False # If True, the currently active widget (editor and label) will remain active until fixed is set to false again. You may still use showEditor or showLabel to switch programmatically, though.
     
     def __init__(self,label=None,editor=None,parent=None):
         """Create a new EditorWidget. You may specify a label, an editor and a parent. By default a QLabel and an empty QLineEdit are created."""
@@ -36,7 +37,15 @@ class EditorWidget(QtGui.QStackedWidget):
         if self.editor is not None:
             self.label.setText(self._editorText())
         self.insertWidget(0,self.label)
-            
+
+    def isFixed(self):
+        """Return whether this EditorWidget is fixed, i.e. it does not switch between label and editor."""
+        return self.fixed
+
+    def setFixed(self,fixed):
+        """Set whether this EditorWidget is fixed, i.e. it does not switch between label and editor."""
+        self.fixed = fixed
+        
     def getEditor(self):
         """Return the editor used in this EditorWidget."""
         return self.editor
@@ -83,7 +92,7 @@ class EditorWidget(QtGui.QStackedWidget):
 
     def getValue(self):
         """Return the value contained in this EditorWidget."""
-        return self.label.text()
+        return self._editorText()
 
     def setValue(self,value):
         """Set the value contained in this EditorWidget."""
@@ -95,11 +104,11 @@ class EditorWidget(QtGui.QStackedWidget):
             else: self.editor.setEditText(value)
         if value != self.label.text():
             self.label.setText(value)
-            self.valueChanged.emit(value)
+            self.valueChanged.emit()
         
     def focusInEvent(self,focusEvent):
         # focusInEvents are used to switch to the editor.
-        if self.currentWidget() == self.label:
+        if not self.fixed and self.currentWidget() == self.label:
             self.showEditor()
             self.editor.setFocus(focusEvent.reason())
         QtGui.QStackedWidget.focusInEvent(self,focusEvent)
@@ -113,8 +122,9 @@ class EditorWidget(QtGui.QStackedWidget):
             if event.type() == QtCore.QEvent.FocusOut:
                 if (self.popup is None # No context-menu...so check for the view of a combobox
                         and not (isinstance(self.editor,QtGui.QComboBox) and self.editor.view().isVisible())):
-                    self.showLabel()
                     self.setValue(self._editorText())
+                    if not self.fixed:
+                        self.showLabel()
                     return False
                 return False
             elif event.type() == QtCore.QEvent.ContextMenu:
@@ -128,11 +138,13 @@ class EditorWidget(QtGui.QStackedWidget):
             elif event.type() == QtCore.QEvent.KeyPress:
                 if event.key() == Qt.Key_Return or event.key() == Qt.Key_Enter:
                     self.setValue(self._editorText())
-                    self.showLabel()
+                    if not self.fixed:
+                        self.showLabel()
                     return True
                 elif event.key() == Qt.Key_Escape:
                     self.setValue(self.label.text())
-                    self.showLabel()
+                    if not self.fixed:
+                        self.showLabel()
                     return True
         elif (isinstance(self.editor,QtGui.QTextEdit)
                     and object == self.editor.viewport()

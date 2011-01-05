@@ -5,54 +5,44 @@
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 3 as
 #
-import os.path
-import functools
-
 from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
 from omg import constants, tags
 from omg.models import tageditormodel, simplelistmodel
-from omg.gui import formatter, singletageditor, dialogs
-from omg.gui.misc import widgetlist, editorwidget, tagwidgets
+from omg.gui import formatter, singletageditor, dialogs, tagwidgets
+from omg.gui.misc import widgetlist, editorwidget, dynamicgridlayout
 
 
 class TagEditorWidget(QtGui.QDialog):
-    
     def __init__(self,parent,elements):
         QtGui.QDialog.__init__(self,parent)
         self.setWindowTitle("Tags editieren")
+
+        self.resize(600,450)
         
         self.model = tageditormodel.TagEditorModel(elements)
-        self.model.tagChanged.connect(self._handleTagChanged)
+        self.model.tagInserted.connect(self._handleTagInserted)
         self.model.tagRemoved.connect(self._handleTagRemoved)
-        self.model.recordAdded.connect(self._handleRecordAdded)
-        self.model.recordChanged.connect(self._handleRecordChanged)
-        self.model.recordRemoved.connect(self._handleRecordRemoved)
+        self.model.tagChanged.connect(self._handleTagChanged)
         self.model.resetted.connect(self._handleReset)
-        
+
+        self.undoAction = self.model.undoStack.createUndoAction(self,"Rückgängig")
+        self.redoAction = self.model.undoStack.createRedoAction(self,"Wiederholen")
+
         self.selectionManager = widgetlist.SelectionManager()
-        # Do not allow the user to select VariousLines
-        self.selectionManager.isSelectable = lambda wList,widget: not isinstance(widget,singletageditor.VariousLine)
-        
-        self.addRecordAction = QtGui.QAction("Tag hinzufügen...",self)
-        self.addRecordAction.triggered.connect(self._handleAddRecord)
-        self.removeSelectedAction = QtGui.QAction("Ausgewählte entfernen",self)
-        self.removeSelectedAction.triggered.connect(self._handleRemoveSelected)
-        
-        self.recursiveBox = QtGui.QCheckBox("Änderungen rekursive auf Unterelemente anwenden")
-        self.recursiveBox.setChecked(True)
+        # Do not allow the user to select ExpandLines
+        self.selectionManager.isSelectable = lambda wList,widget: not isinstance(widget,singletageditor.ExpandLine)
         
         self.setLayout(QtGui.QVBoxLayout())
-        self.layout().addWidget(self.recursiveBox)
-        self.tagEditorLayout = QtGui.QGridLayout()
-        self.tagEditorLayout.setColumnStretch(1,1) # Stretch the column holding the values
-        self.layout().addLayout(self.tagEditorLayout)
-        self.layout().addStretch(1)
+        label = QtGui.QLabel("Tags für {} Element{} bearbeiten.".format(len(elements),"e" if len(elements) != 1 else ''))
+        self.layout().addWidget(label)
+        self.scrollArea = QtGui.QScrollArea()
+        self.scrollArea.setWidgetResizable(True)
+        self.layout().addWidget(self.scrollArea)
         buttonBarLayout = QtGui.QHBoxLayout()
         self.layout().addLayout(buttonBarLayout,0)
 
-        
         addButton = QtGui.QPushButton("Tag hinzufügen")
         addButton.clicked.connect(self._handleAddRecord)
         buttonBarLayout.addWidget(addButton)
@@ -66,36 +56,51 @@ class TagEditorWidget(QtGui.QDialog):
         saveButton = QtGui.QPushButton("Speichern")
         saveButton.clicked.connect(self._handleSave)
         buttonBarLayout.addWidget(saveButton)
-        
+
+        self.viewport = QtGui.QWidget()
+        self.viewport.setLayout(QtGui.QVBoxLayout())
+        self.tagEditorLayout = dynamicgridlayout.DynamicGridLayout()
+        self.tagEditorLayout.setColumnStretch(1,1) # Stretch the column holding the values
+        self.viewport.layout().addLayout(self.tagEditorLayout)
+        self.viewport.layout().addStretch(1)
+        self.scrollArea.setWidget(self.viewport)
+
         self.singleTagEditors = {}
         self.editorWidgets = {}
         for tag in self.model.getTags():
-            self._addSingleTagEditor(tag)
-    
-    def _addSingleTagEditor(self,tag):
-        row = self.tagEditorLayout.rowCount() # Count the empty rows, too (confer _removeSingleTagEditor)
-        
+            self._insertSingleTagEditor(len(self.singleTagEditors),tag)
+            
+    def _insertSingleTagEditor(self,row,tag):
+        self.tagEditorLayout.insertRow(row)
+
         # Create and fill the EditorWidget
         label = tagwidgets.TagLabel(tag)
         label.setAlignment(Qt.AlignLeft | Qt.AlignTop)
         tagBox = tagwidgets.TagTypeBox(tag)
         self.editorWidgets[tag] = editorwidget.EditorWidget(editor=tagBox,label=label)
         self.editorWidgets[tag].valueChanged.connect(self._handleTagChangedByUser)
+        self.tagEditorLayout.addWidget(self.editorWidgets[tag],row,0)
         
         # Create the Tag-Editor
-        self.singleTagEditors[tag] = singletageditor.SingleTagEditor(tag,self.model)
+        self.singleTagEditors[tag] = singletageditor.SingleTagEditor(self,tag,self.model)
         self.singleTagEditors[tag].widgetList.setSelectionManager(self.selectionManager)
-        self.tagEditorLayout.addWidget(self.editorWidgets[tag],row,0)
         self.tagEditorLayout.addWidget(self.singleTagEditors[tag],row,1)
 
     def _removeSingleTagEditor(self,tag):
-        # Warning: Removing items from a QGridLayout does not move the other items. Thus, after this method there is an empty row in the layout.
-        editorWidget = self.editorWidgets[tag]
-        self.tagEditorLayout.removeWidget(editorWidget)
-        editorWidget.setParent(None)
+        # Simply removing the items would leave an empty row. Thus we use DynamicGridLayout.removeRow.
+        # First we have to find the row
+        row = None
+        for r in range(self.tagEditorLayout.rowCount()):
+            if self.tagEditorLayout.itemAtPosition(r,0).widget() == self.editorWidgets[tag]:
+                row = r
+                break
+        assert row is not None
+        self.tagEditorLayout.removeRow(row)
+
+        # Tidy up
+        self.editorWidgets[tag].setParent(None)
         del self.editorWidgets[tag]
         tagEditor = self.singleTagEditors[tag]
-        self.tagEditorLayout.removeWidget(tagEditor)
         tagEditor.widgetList.setSelectionManager(None)
         tagEditor.setParent(None)
         del self.singleTagEditors[tag]
@@ -104,38 +109,24 @@ class TagEditorWidget(QtGui.QDialog):
         for tag in list(self.singleTagEditors.keys()): # dict will change
             self._removeSingleTagEditor(tag)
         for tag in self.model.getTags():
-            self._addSingleTagEditor(tag)
+            self._insertSingleTagEditor(len(self.singleTagEditors),tag)
         
-    def _handleAddRecord(self):
-        dialog = TagDialog(self,self.model.elements)
+    def _handleAddRecord(self,tag=None):
+        dialog = TagDialog(self,self.model.getElements(),tag)
         if dialog.exec_() == QtGui.QDialog.Accepted:
             self.model.addRecord(dialog.getRecord())
-            self.updateGeometry()
 
     def _handleRemoveSelected(self):
-        for tagValueEditor in self.selectionManager.getSelectedWidgets():
-            if tagValueEditor.isVisible():
-                self.model.removeRecord(tagValueEditor.getRecord())
+        records = [re.getRecord() for re in self.selectionManager.getSelectedWidgets() if re.isVisible()]
+        if len(records) > 0:
+            self.model.removeRecords(records)
 
     # Note that the following _handle-functions only add new SingleTagEditors or remove SingleTagEditors which have become empty. Unless they are newly created or removed, the editors are updated in their own _handle-functions.
+    def _handleTagInserted(self,pos,tag):
+        self._insertSingleTagEditor(pos,tag)
+        
     def _handleTagRemoved(self,tag):
         self._removeSingleTagEditor(tag)
-        
-    def _handleRecordAdded(self,record):
-        if record.tag not in self.singleTagEditors:
-            self._addSingleTagEditor(record.tag)
-        else: pass # The already existing SingleTagEditor will deal with it
-    
-    def _handleRecordChanged(self,oldRecord,newRecord):
-        if oldRecord.tag != newRecord.tag:
-            self._handleRecordRemoved(oldRecord)
-            self._handleRecordAdded(newRecord)
-        else: pass # The SingleTagEditor will deal with it
-        
-    def _handleRecordRemoved(self,record):
-        if record.tag not in self.model.getTags():
-            self._removeSingleTagEditor(record.tag)
-        else: pass # The SingleTagEditor will deal with it
 
     def _handleTagChanged(self,oldTag,newTag):
         for adict in (self.editorWidgets,self.singleTagEditors):
@@ -144,8 +135,9 @@ class TagEditorWidget(QtGui.QDialog):
             del adict[oldTag]
             assert newTag not in adict
             adict[newTag] = widget
+        self.editorWidgets[newTag].setValue(newTag.translated())
 
-    def _handleTagChangedByUser(self,value):
+    def _handleTagChangedByUser(self):
         # First we have to get the editorWidget responsible for this event and its tag
         editorWidget = self.sender()
         oldTag = None
@@ -155,6 +147,8 @@ class TagEditorWidget(QtGui.QDialog):
                 break
         assert oldTag is not None
         newTag = editorWidget.getEditor().getTag()
+
+        # If it's a new tag query the type and write to the tagids-table
         if not newTag.isIndexed():
             tagType = dialogs.NewTagDialog.queryTagType(newTag.name)
             if tagType:
@@ -170,29 +164,44 @@ class TagEditorWidget(QtGui.QDialog):
             editorWidget.valueChanged.connect(self._handleTagChangedByUser)
         
     def _handleSave(self):
-        self.model.save(self.recursiveBox.isChecked())
-        self.accept()
+        if not all(singleTagEditor.isValid() for singleTagEditor in self.singleTagEditors.values()):
+            QtGui.QMessageBox.warning(self,"Ungültiger Wert","Mindestens ein Wert ist ungültig.")
+        else:
+            self.model.save()
+            self.accept()
         
-    def contextMenuEvent(self, event):
+    def contextMenuEvent(self,contextMenuEvent,tag=None):
         menu = QtGui.QMenu(self)
-        menu.addAction(self.addRecordAction)
-        menu.addAction(self.removeSelectedAction)
+
+        menu.addAction(self.undoAction)
+        menu.addAction(self.redoAction)
+        menu.addSeparator()
+        
+        addRecordAction = QtGui.QAction("Tag hinzufügen...",self)
+        addRecordAction.triggered.connect(lambda: self._handleAddRecord(tag))
+        menu.addAction(addRecordAction)
+        
+        removeSelectedAction = QtGui.QAction("Ausgewählte entfernen",self)
+        removeSelectedAction.triggered.connect(self._handleRemoveSelected)
+        menu.addAction(removeSelectedAction)
+        
         selectedRecords = [editor.getRecord() for editor in self.selectionManager.getSelectedWidgets()]
         for separator in self.model.getPossibleSeparators(selectedRecords):
             action = menu.addAction("Bei '{}' trennen".format(separator))
             action.triggered.connect(lambda: self.model.splitMany(selectedRecords,separator))
-        menu.popup(event.globalPos())
-        
-        
+
+        menu.popup(contextMenuEvent.globalPos())
+
+
 class TagDialog(QtGui.QDialog):
-    def __init__(self,parent,elements):
+    def __init__(self,parent,elements,tag=None):
         QtGui.QDialog.__init__(self,parent)
         self.setWindowTitle("Tag-Wert hinzufügen")
         assert len(elements) > 0
         
-        self.typeEditor =  tagwidgets.TagTypeBox(self)
+        self.typeEditor =  tagwidgets.TagTypeBox(defaultTag=tag)
         self.typeEditor.currentIndexChanged.connect(self._handleTagChanged)
-        self.valueEditor = tagwidgets.TagLineEdit(self.typeEditor.getTag())
+        self.valueEditor = tagwidgets.TagValueEditor(self.typeEditor.getTag())
         self.elementsBox = QtGui.QListView(self)
         # Use a formatter to print the title of the elements
         self.elementsBox.setModel(simplelistmodel.SimpleListModel(elements,lambda el: formatter.Formatter(el).title()))
@@ -237,7 +246,7 @@ class TagDialog(QtGui.QDialog):
                     if tagType:
                         tag = tags.addIndexedTag(tag.name,tagType)
                     else: return # Do nothing (in particular do not close the dialog)
-                if tag.isValid(self.valueEditor.text()):
+                if self.valueEditor.getValue() is not None:
                     self.accept()
                 else: QtGui.QMessageBox.warning(self,"Ungültiger Wert","Der eingegebene Wert ist ungültig.")
         else: QtGui.QMessageBox.warning(self,"Kein Stück ausgewählt.","Du musst mindestens ein Stück auswählen.")
@@ -246,7 +255,7 @@ class TagDialog(QtGui.QDialog):
         allElements = self.elementsBox.model().getItems()
         selectedElements = [allElements[i] for i in range(len(allElements))
                                 if self.elementsBox.selectionModel().isRowSelected(i,QtCore.QModelIndex())]
-        return tageditormodel.Record(self.typeEditor.getTag(),self.valueEditor.text(),allElements,selectedElements)
+        return tageditormodel.Record(self.typeEditor.getTag(),self.valueEditor.getValue(),allElements,selectedElements)
 
     def _handleTagChanged(self,value):
         self.valueEditor.setTag(self.typeEditor.getTag())

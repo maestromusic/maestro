@@ -18,8 +18,11 @@ class WidgetList(QtGui.QWidget):
     # This signal is emitted when a widget is inserted into this WidgetList and contains the WidgetList and the position of the inserted widget as parameters.
     widgetInserted = QtCore.pyqtSignal(QtGui.QWidget,int) # Actually the first parameter is a WidgetList
     
-    # This signal is emitted when a widget isremoved from this WidgetList and contains the WidgetList, the position of the removed widget and that widget itself as parameters.
+    # This signal is emitted when a widget is removed from this WidgetList and contains the WidgetList, the position of the removed widget and that widget itself as parameters.
     widgetRemoved = QtCore.pyqtSignal(QtGui.QWidget,int,QtGui.QWidget)
+
+    # This signal is emitted when a widget is moved in the WidgetList. The parameters are the WidgetList and the old and new position of the moved widget.
+    widgetMoved = QtCore.pyqtSignal(QtGui.QWidget,int,int)
     
     def __init__(self,direction,parent=None):
         """Create a new WidgetList laying out children in the specified direction (confer the QBoxLayout::Direction-enum) and using the given parent."""
@@ -75,7 +78,16 @@ class WidgetList(QtGui.QWidget):
         del self.children[index]
         widget.setParent(None)
         self.widgetRemoved.emit(self,index,widget)
-    
+
+    def moveWidget(self,widget,pos):
+        """Move <widget> to the index <pos>."""
+        oldPos = self.children.index(widget)
+        self.children.remove(widget)
+        self.layout().removeWidget(widget)
+        self.children.insert(pos,widget)
+        self.layout().insertWidget(pos,widget)
+        self.widgetMoved.emit(self,oldPos,pos)
+        
     def getSelectionManager(self):
         """Return the SelectionManager in charge of this WidgetList or None if there is no such SelectionManager."""
         return self.selectionManager
@@ -102,6 +114,7 @@ class WidgetList(QtGui.QWidget):
         QtGui.QWidget.paintEvent(self,event)
 
     def selectionChanged(self,index):
+        """Update the widget at <index> because its selection status has changed. This method is called by the selection manager."""
         child = self.children[index]
         self.update(child.x(),child.y(),child.width(),child.height())
 
@@ -128,6 +141,7 @@ class SelectionManager(QtCore.QObject):
         self.selected.append([False] * len(widgetList))
         widgetList.widgetInserted.connect(self._handleWidgetInserted)
         widgetList.widgetRemoved.connect(self._handleWidgetRemoved)
+        widgetList.widgetMoved.connect(self._handleWidgetMoved)
         for widget in widgetList:
             widget.installEventFilter(self)
         
@@ -138,6 +152,7 @@ class SelectionManager(QtCore.QObject):
             widget.removeEventFilter(self)
         widgetList.widgetInserted.disconnect(self._handleWidgetInserted)
         widgetList.widgetRemoved.disconnect(self._handleWidgetRemoved)
+        widgetList.widgetMoved.disconnect(self._handleWidgetMoved)
         del self.selected[index]
         del self.widgetLists[index]
     
@@ -157,7 +172,17 @@ class SelectionManager(QtCore.QObject):
     def getSelectionStatus(self,widgetList):
         """Return a list of booleans to encode the selection of <widgetList>: The i-th booleans stores whether the i-th widget of <widgetList> is selected."""
         return self.selected[self.widgetLists.index(widgetList)]
-        
+
+    def isSelected(self,widgetList,widget):
+        return self.selected[self.widgetLists.index(widgetList)][widgetList.index(widget)]
+
+    def setSelected(self,widgetList,widget,selected):
+        listIndex = self.widgetLists.index(widgetList)
+        widgetIndex = widgetList.index(widget)
+        if self.selected[listIndex][widgetIndex] != selected:
+            self.selected[listIndex][widgetIndex] = selected
+            widgetList.selectionChanged(widgetIndex)
+
     def clear(self):
         """Clear the selection."""
         for i in range(len(self.widgetLists)):
@@ -171,9 +196,8 @@ class SelectionManager(QtCore.QObject):
         return True
 
     def eventFilter(self,object,event):
-        if event.type() == QtCore.QEvent.MouseButtonPress and event.button() == Qt.LeftButton:
+        if event.type() == QtCore.QEvent.MouseButtonPress:
             widgetList = object.parent()
-            #~ try:
             if self.isSelectable(widgetList,object):
                 listIndex = self.widgetLists.index(widgetList)
                 widgetIndex = widgetList.index(object)
@@ -187,13 +211,12 @@ class SelectionManager(QtCore.QObject):
                     self.selected[listIndex][widgetIndex] = not self.selected[listIndex][widgetIndex]
                     self.anchor = (listIndex,widgetIndex)
                     widgetList.selectionChanged(widgetIndex)
-                else: # Clear and select a single widget
+                elif event.button() == Qt.LeftButton: # Clear and select a single widget
                     self.clear()
                     self.selected[listIndex][widgetIndex] = True
                     self.anchor = (listIndex,widgetIndex)
                     widgetList.selectionChanged(widgetIndex)
-            #~ except IndexError as e:
-                #~ logger.warning("Something's wrong with the SelectionManager's indices: {} {}".format(listIndex,widgetIndex))
+                #else: Do nothing on the right button, so that the selection won't be changed by opening a context menu
 
         return False # Don't stop the event
         
@@ -208,3 +231,12 @@ class SelectionManager(QtCore.QObject):
         listIndex = self.widgetLists.index(widgetList)
         widget.removeEventFilter(self)
         del self.selected[listIndex][index]
+
+    def _handleWidgetMoved(self,widgetList,oldPos,newPos):
+        """Handle the widgetMoved-signal from <widgetList> after a widget has been moved from <oldPos> to <newPos>"""
+        if oldPos != newPos:
+            listIndex = self.widgetLists.index(widgetList)
+            self.selected[listIndex].insert(newPos,self.selected[listIndex][oldPos])
+            if oldPos < newPos:
+                del self.selected[listIndex][oldPos]
+            else: del self.selected[listIndex][oldPos + 1] # Take the inserted value into account

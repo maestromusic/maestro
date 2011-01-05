@@ -215,10 +215,11 @@ class Element(Node):
     def outOfSync(self):
         return self.isInDB() and any(self._syncState.values())
         
-    def copy(self,contents=None):
-        """Reimplementation of Node.copy: In addition to contents the tags are also not copied by reference. Instead the copy will contain a copy of this node's tags.Storage-instance."""
+    def copy(self,contents=None,copyTags=True):
+        """Reimplementation of Node.copy: If <copyTags> is True, the element's copy will contain a copy of this node's tags.Storage-instance. Otherwise the tags will be copied by reference."""
         newNode = Node.copy(self,contents)
-        newNode.tags = self.tags.copy()
+        if copyTags:
+            newNode.tags = self.tags.copy()
         return newNode
 
     def loadTags(self,recursive=False,tagList=None, fromFS=False):
@@ -566,15 +567,15 @@ class File(Element):
             
         real = realfiles2.get(self.getPath())
         if tags:
-            real.tags = tags
+            real.tags = self.tags
         if position:
-            real.position = position
+            real.position = self.position
         try:
             if tags:
                 real.saveTags()
             if position:
                 real.savePosition()
-        except TagIOError as e:
+        except realfiles2.TagIOError as e:
             logger.warning("Failed to write to file {}: {}".format(self.path, str(e)))
 
     def getPath(self,refresh=True):

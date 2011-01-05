@@ -280,12 +280,12 @@ def setTags(id,tags,append=False):
     
     If the optional parameter append is set to True, existing tags won't be touched, instead the 
     given ones will be added. This function will not check for duplicates in that case."""
-    
-    existingTags = db.query("SELECT * FROM tags WHERE element_id=?;",id)
-    
-    if len(existingTags) > 0 and not append:
-        logger.warning("Deleting existing tags from container {0}".format(id))
-        query("DELETE FROM tags WHERE element_id=?;",id)
+
+    if not append:
+        existingTags = db.query("SELECT * FROM tags WHERE element_id=?;",id)
+        if len(existingTags) > 0:
+            logger.warning("Deleting existing tags from container {0}".format(id))
+            query("DELETE FROM tags WHERE element_id=?;",id)
     
     for tag in tags.keys():
         if tag.isIndexed():
