@@ -88,7 +88,7 @@ class GopulateGuesser:
                     continue
                 elem = omg.models.File(id)
                 elem.loadTags()
-                elem.readTagsFromFilesystem()
+                elem.readFromFilesystem(all=True)
                 t = elem.tags
                 
                 albumIds = elem.getParentIds(recursive = False)
@@ -113,7 +113,7 @@ class GopulateGuesser:
 #                    realfile.read()
 #                    t = realfile.tags
                     elem = omg.models.File(id = None, path = filename)
-                    elem.readTagsFromFilesystem()
+                    elem.readFromFilesystem(all=True)
                     t = elem.tags
                 except realfiles.NoTagError:
                     logger.warning("Skipping file '{0}' which has no tag".format(filename))
@@ -126,10 +126,7 @@ class GopulateGuesser:
                     albumsFoundByName[album] = omg.models.Container(id = None)
                 elem.parent = albumsFoundByName[album]
                 albumsFoundByName[album].contents.append(elem)
-                if tags.get("tracknumber") in t:
-                    trkn = int(t[tags.get("tracknumber")][0].split("/")[0]) # support 02/15 style
-                    elem.setPosition(trkn)
-                else:
+                if elem.position is None:
                     elem.setPosition(0)
             elif tags.TITLE in t:
                 album = t[tags.TITLE][0] #TODO: If there are two songs with the same title this will delete the first of them

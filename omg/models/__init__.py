@@ -228,7 +228,7 @@ class Element(Node):
         If <fromFS> is True, then tags are read from the file even if this element is in the DB (and is a file)."""
         if fromFS or not self.isInDB():
             if self.isFile():
-                self.readTagsFromFilesystem()
+                self.readFromFilesystem(tags=True)
             else: self.tags = tags.Storage()
         else:
             self.tags = tags.Storage()
@@ -532,11 +532,11 @@ class File(Element):
     def isContainer(self):
         return False
 
-    def readFromFileSystem(self,*,tags=False,length=False,position=False,all=False):
+    def readFromFilesystem(self,*,tags=False,length=False,position=False,all=False):
         if all:
             tags = length = position = True
 
-        if not any(tags,length,position):
+        if not any((tags,length,position)):
             return
 
         if self.getPath() is None:
@@ -545,7 +545,7 @@ class File(Element):
         real = realfiles2.get(self.getPath())
         try:
             real.read()
-        except realfiles2.TagIOError() as e:
+        except realfiles2.TagIOError as e:
             logger.warning("Failed to read from file {}: {}".format(self.path, str(e)))
         if tags:
             self.tags = real.tags
@@ -577,26 +577,6 @@ class File(Element):
         except TagIOError as e:
             logger.warning("Failed to write to file {}: {}".format(self.path, str(e)))
 
-        
-    def readTagsFromFilesystem(self):
-        if self.getPath() is None:
-            raise RuntimeError("I need a path to read tags from the filesystem.")
-        real = realfiles2.get(self.getPath())
-        try:
-            real.read()
-        except realfiles2.TagIOError as e:
-            logger.warning("Failed to read tags from file {}: {}".format(self.path, str(e)))
-        if self.tags is not None and not equalsExceptIgnored(self.tags, real.tags):
-            self._syncState["tags"] = True
-        self.tags = real.tags
-        self.fileTags = real.tags.copy()
-        self.length = real.length
-    
-    def writeTagsToFilesystem(self):
-        real = realfiles.File(absPath(self.path))
-        real.tags = self.tags
-        real.save_tags()
-            
     def getPath(self,refresh=True):
         """Return the path of this file. If the file is in the DB and no path is stored yet or <refresh> is True, the path will be fetched from the database and cached for subsequent calls."""
         if self.isInDB():
