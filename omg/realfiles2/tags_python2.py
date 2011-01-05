@@ -164,10 +164,14 @@ class Mp3File(File):
                 if ignoredFrames is not None:
                     ignoredFrames.add(key)
                 continue
-                
-            # All other frames should have a text object which is a list of the values
-            assert hasattr(frameObject,'text') and isinstance(frameObject.text,list)
-            values = frameObject.text
+
+            if hasattr(frameObject,'url'):
+                values = [frameObject.url]
+            else:
+                # All other frames should have a text object which is a list of the values
+                assert hasattr(frameObject,'text')
+                assert isinstance(frameObject.text,list)
+                values = frameObject.text
 
             # Replace TXXX and WXXX frames by their descriptions
             if key == u'TXXX' or key == u'WXXX':
@@ -268,6 +272,10 @@ if __name__=="__main__":
             pickle.dump(result,sys.stdout)
             sys.stdout.flush()
     except Exception as e:
-        print >> sys.stderr, "Error in subprocess: ", type(e), str(e)
+        type,value,tb = sys.exc_info()
+        print >> sys.stderr, "Error in subprocess: ", type.__name__, str(value)
+        print >> sys.stderr, "Traceback: "
+        import traceback
+        traceback.print_tb(tb)
         pickle.dump(1,sys.stdout) # Error
         sys.exit(1)
