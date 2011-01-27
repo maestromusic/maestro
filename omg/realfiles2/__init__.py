@@ -120,8 +120,8 @@ class MutagenFile(RealFile):
         if string.isdecimal():
             return int(string)
         # Watch for positions of the form 2/5
-        elif re.match('d+\s*/\s*d+$',position):
-             return int(position.split('/')[0])
+        elif re.match('\d+\s*/\s*\d+$',string):
+            return int(string.split('/')[0])
         else: return None
 
     def read(self):
