@@ -72,11 +72,11 @@ class OmgMainWindow(QtGui.QMainWindow):
         central = QtGui.QTabWidget()
         central.addTab(playlist,"playlist")
         
-        import omg.gopulate.models
-        import omg.gopulate.gui
-        gm = omg.gopulate.models.GopulateTreeModel(options.music.collection)
-        gw = omg.gopulate.gui.GopulateWidget(gm)
-        central.addTab(gw, "gopulate")
+        import omg.models.editor
+        import omg.gui.editor
+        gm = omg.models.editor.EditorModel()
+        gw = omg.gui.editor.EditorWidget(gm)
+        central.addTab(gw, "editor")
         
         import omg.filesystembrowser
         fb = omg.filesystembrowser.FileSystemBrowser()
@@ -84,9 +84,24 @@ class OmgMainWindow(QtGui.QMainWindow):
         fbDock.setWindowTitle("File browser")
         fbDock.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
         fbDock.setWidget(fb)
-        fb.currentDirectoriesChanged.connect(gm.setCurrentDirectories)
-        fb.searchDirectoryChanged.connect(gm.setSearchDirectory)
         self.addDockWidget(Qt.RightDockWidgetArea, fbDock)
+        
+        x = QtGui.QUndoView(gm.undoStack)
+        xDock = QtGui.QDockWidget()
+        xDock.setWindowTitle("test")
+        xDock.setWidget(x)
+        self.addDockWidget(Qt.RightDockWidgetArea, xDock)
+        #=======================================================================
+        # import omg.gui.tageditor
+        # tagedit = omg.gui.tageditor.TagEditorWidget()
+        # tagDock = QtGui.QDockWidget()
+        # tagDock.setWindowTitle("Tag editor")
+        # tagDock.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
+        # tagDock.setWidget(tagedit)
+        # self.addDockWidget(Qt.RightDockWidgetArea, tagDock)
+        #=======================================================================
+        
+        #TODO gw.itemsSelected.connect(tagedit.setElements)
         
 #        depotModel = omg.gopulate.models.GopulateTreeModel(None)
 #        depotWidget = omg.gopulate.gui.GopulateTreeWidget()
@@ -103,7 +118,6 @@ class OmgMainWindow(QtGui.QMainWindow):
         
         if options.gui.startTab == 'populate':
             central.setCurrentWidget(gw)
-        
         self.resize(config.shelve['widget_width'],config.shelve['widget_height'])
         
         if config.shelve['widget_position'] is None: # Center the self

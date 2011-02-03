@@ -93,7 +93,7 @@ class PlaylistTreeView(treeview.TreeView):
                     newElement.loadTags()
                     elements.append(newElement)
 
-        dialog = tageditor.TagEditorWidget(self,elements)
+        dialog = tageditor.TagEditorDialog(self,elements)
         dialog.exec_()
         
     def removeSelected(self):

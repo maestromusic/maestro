@@ -14,13 +14,24 @@ from omg.gui import formatter, singletageditor, dialogs, tagwidgets
 from omg.gui.misc import widgetlist, editorwidget, dynamicgridlayout
 
 
-class TagEditorWidget(QtGui.QDialog):
-    def __init__(self,parent,elements):
-        QtGui.QDialog.__init__(self,parent)
-        self.setWindowTitle("Tags editieren")
-
-        self.resize(600,450)
+class TagEditorDialog(QtGui.QDialog):
+    def __init__(self, parent, elements):
+        QtGui.QDialog.__init__(self, parent)
+        self.setLayout(QtGui.QVBoxLayout())
+        self.tagedit = TagEditorWidget(elements)
+        self.layout().addWidget(self.tagedit)
+        self.setWindowTitle("Edit tags")
+        self.resize(600,450) #TODO: klüger
+        self.tagedit.saved.connect(self.accept)
         
+        
+class TagEditorWidget(QtGui.QWidget):
+    
+    saved = QtCore.pyqtSignal()
+    
+    def __init__(self,elements = [], parent = None):
+        QtGui.QWidget.__init__(self,parent)
+                
         self.model = tageditormodel.TagEditorModel(elements)
         self.model.tagInserted.connect(self._handleTagInserted)
         self.model.tagRemoved.connect(self._handleTagRemoved)
@@ -69,7 +80,7 @@ class TagEditorWidget(QtGui.QDialog):
         self.editorWidgets = {}
         for tag in self.model.getTags():
             self._insertSingleTagEditor(len(self.singleTagEditors),tag)
-            
+         
     def _insertSingleTagEditor(self,row,tag):
         self.tagEditorLayout.insertRow(row)
 
@@ -168,7 +179,7 @@ class TagEditorWidget(QtGui.QDialog):
             QtGui.QMessageBox.warning(self,"Ungültiger Wert","Mindestens ein Wert ist ungültig.")
         else:
             self.model.save()
-            self.accept()
+            self.saved.emit()
         
     def contextMenuEvent(self,contextMenuEvent,tag=None):
         menu = QtGui.QMenu(self)

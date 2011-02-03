@@ -264,7 +264,7 @@ class GopulateDelegate(QtGui.QStyledItemDelegate):
         if elem.isFile():
             if painter:
                 painter.setFont(self.fileNameFont)
-                boundingRect = painter.drawText(rect, Qt.TextSingleLine, relPath(elem.getPath()))
+                boundingRect = painter.drawText(rect, Qt.TextSingleLine, elem.getPath())
                 rect.translate(0, boundingRect.height() + self.vItemSpace)
             else:
                 fSize = QtGui.QFontMetrics(self.font).size(Qt.TextSingleLine, relPath(elem.getPath()))

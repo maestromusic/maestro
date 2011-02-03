@@ -7,7 +7,7 @@
 # published by the Free Software Foundation
 #
 import logging, copy, os
-from PyQt4 import QtCore
+from PyQt4 import QtCore, QtGui
 
 from omg import tags, db, covers, realfiles, absPath, relPath, realfiles2
 from omg.database import queries,sql
@@ -194,7 +194,35 @@ class RootNode(Node):
     def setParent(self):
         raise RuntimeError("Cannot set the parent of a RootNode.")
 
+class PositionChangeCommand(QtGui.QUndoCommand):
+    
+    def __init__(self, element, pos):
+        QtGui.QUndoCommand.__init__(self, "change element position")
+        self.elem = element
+        self.pos = pos
+    
+    def redo(self):
+        self.oldpos = self.elem.position
+        self.elem.position = self.pos
+    
+    def undo(self):
+        self.elem.position = self.oldpos
 
+class TagChangeCommand(QtGui.QUndoCommand):
+    
+    def __init__(self, element, tag, index, value):
+        QtGui.QUndoCommand.__init__(self, "change »{}« tag".format(tag.name))
+        self.elem = element
+        self.tag = tag
+        self.index = index
+        self.value = value
+    
+    def redo(self):
+        self.oldValue = self.elem.tags[self.tag][self.index]
+        self.elem.tags[self.tag][self.index] = self.value
+    def undo(self):
+        self.elem.tags[self.tag][self.index] = self.oldValue
+        
 class Element(Node):
     """Abstract base class for elements (files or containers) in playlists, browser, etc.. Contains methods to load tags and contents from the database or from files."""
     tags = None # tags.Storage to store the tags. None until they are loaded
@@ -279,7 +307,7 @@ class Element(Node):
     
     def isAlbum(self):
         """Return whether this element is an album (that is, whether it is a container and has a album-tag matching a title-tag.)"""
-        return self.isContainer() and not set(self.tags[tags.ALBUM]).isdisjoint(set(self.tags[tags.TITLE]))
+        return self.isContainer() and (tags.ALBUM in self.tags and tags.TITLE in self.tags and not set(self.tags[tags.ALBUM]).isdisjoint(set(self.tags[tags.TITLE])))
         
     def hasAlbumTitle(self,container):
         """Return whether the given container has a title-tag equal to an album-tag of this element. Thus, to check whether <container> is an album of this element, it remains to check that it is a parent (see getParentIds)."""
@@ -342,7 +370,7 @@ class Element(Node):
         if not self.isInDB():
             raise RuntimeError("Delete can only be used on elements contained in the database.")
 
-        db.deleteElement(self.id)
+        db.deleteElements([self.id])
 
         if recursive and self.getChildrenCount() > 0:
             for element in self.contents:

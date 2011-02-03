@@ -59,7 +59,7 @@ class MutagenFile(RealFile):
     def _openProc(self):
         """Create the tags_python2-subprocess."""
         return subprocess.Popen(options.misc.tags_python2_cmd,
-                                stdout=subprocess.PIPE,stdin=subprocess.PIPE,stderr=subprocess.PIPE)
+                                stdout=subprocess.PIPE,stdin=subprocess.PIPE)
 
     def _transmit(self,proc,data,error):
         """Transmit <data> to the subprocess <proc>, then fetch the result and return it. If an error in the subprocess occurs, raise a TagIOError with the given message (among other stuff)."""

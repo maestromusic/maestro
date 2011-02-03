@@ -16,7 +16,10 @@ import logging
 
 def relPath(file):
     """Returns the relative path of a music file against the collection base path."""
-    return os.path.relpath(file, options.music.collection)
+    if os.path.isabs(file):
+        return os.path.relpath(file, options.music.collection)
+    else:
+        return file
 
 def absPath(file):
     """Returns the absolute path of a music file inside the collection directory, if it is not absolute already."""

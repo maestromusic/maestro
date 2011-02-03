@@ -8,7 +8,7 @@
 #
 import difflib, logging, os, itertools
 
-from PyQt4 import QtCore
+from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from omg import database, models, mpclient, tags, absPath, relPath, distributor
@@ -18,7 +18,69 @@ from . import rootedtreemodel, treebuilder, mimedata
 db = database.get()
 logger = logging.getLogger("omg.models.playlist")
 
+class RemoveContentsCommand(QtGui.QUndoCommand):
+    def __init__(self, model, parentIdx, row, num, text="remove element(s)"):
+        QtGui.QUndoCommand.__init__(self, text)
+        self.model = model
+        self.parentIdx = QtCore.QPersistentModelIndex(parentIdx)
+        self.row = row
+        self.num = num
+        self.parentItem = model.data(parentIdx, Qt.EditRole)
+        if self.parentItem is None:
+            self.parentItem = model.root
+        self.elements = self.parentItem.getChildren()[row:row+num]
+    
+    def redo(self):
+        self.model.beginRemoveRows(QtCore.QModelIndex(self.parentIdx), self.row, self.row+self.num-1)
+        del self.parentItem.getChildren()[self.row:self.row+self.num]
+        self.model.endRemoveRows()
+    
+    def undo(self):
+        self.model.beginInsertRows(QtCore.QModelIndex(self.parentIdx), self.row, self.row+self.num-1)
+        self.parentItem.getChildren()[self.row:self.row] = self.elements
+        for el in self.elements:
+            el.parent = self.parentItem
+        self.model.endInsertRows()
 
+class InsertContentsCommand(QtGui.QUndoCommand):
+    def __init__(self, model, parent, row, contents, copy = True, text = "insert element(s)"):
+        QtGui.QUndoCommand.__init__(self, text)
+        self.model = model
+        if parent.isFile():
+            raise ValueError("Cannot insert contents into file {}".format(parent))
+        self.parentIdx = QtCore.QPersistentModelIndex(model.getIndex(parent))
+        self.parentItem = parent
+        self.row = row
+        self.contents = contents
+        if copy:
+            self.contents = [node.copy() for node in self.contents]
+    
+    def redo(self):
+        self.model.beginInsertRows(QtCore.QModelIndex(self.parentIdx), self.row, self.row + len(self.contents) - 1)
+        for node in self.contents:
+            node.setParent(self.parentItem)
+        self.parentItem.getChildren()[self.row:self.row] = self.contents
+        self.model.endInsertRows()
+    
+    def undo(self):
+        self.model.beginRemoveRows(QtCore.QModelIndex(self.parentIdx), self.row, self.row + len(self.contents) - 1)
+        del self.parentItem.getChildren()[self.row:self.row+len(self.contents)]
+        self.model.endRemoveRows()
+        
+
+class ModelResetCommand(QtGui.QUndoCommand):
+    def __init__(self, model):
+        QtGui.QUndoCommand.__init__(self, "reset model")
+        self.model = model
+    
+    def redo(self):
+        self.oldRoot = self.model.root
+        self.model.setRoot(models.RootNode())
+    
+    def undo(self):
+        self.model.setRoot(self.oldRoot)
+        self.model.reset()
+        
 class BasicPlaylist(rootedtreemodel.RootedTreeModel):
     """Basic model for playlists. A BasicPlaylists contains a list of nodes and supports insertion and removal of nodes as well as drag and drop of omg's own mimetype (config-variable gui->mime) and "text/uri-list"."""
     # Toplevel elements in the playlist
@@ -29,12 +91,14 @@ class BasicPlaylist(rootedtreemodel.RootedTreeModel):
         rootedtreemodel.RootedTreeModel.__init__(self,models.RootNode())
         self.setContents([])
         distributor.indicesChanged.connect(self._handleIndicesChanged)
+        self.undoStack = QtGui.QUndoStack(self)
     
     def setRoot(self,root):
         """Set the root-node of this playlist which must be of type models.RootNode. All views using this model will be reset."""
         assert isinstance(root,models.RootNode)
         self.contents = root.contents
         rootedtreemodel.RootedTreeModel.setRoot(self,root)
+        self.undoStack.clear()
         
     def setContents(self,contents):
         """Set the contents of this playlist and set their parent to self.root. The contents are only the toplevel-elements in the playlist, not all files. All views using this model will be reset."""
@@ -67,13 +131,10 @@ class BasicPlaylist(rootedtreemodel.RootedTreeModel):
         if column > 0:
             return False
         
-        # Get the contents out of MimeData
-        if mimeData.hasFormat(options.gui.mime):
-            contents = [node.copy() for node in mimeData.retrieveData(options.gui.mime)]
-        elif mimeData.hasFormat("text/uri-list"):
-            contents = self.importPaths(relPath(url.path()) for url in mimeData.urls())
-        else: return False
-        
+        contents = self._prepareMimeData(mimeData)
+        if contents is None:
+            return False
+        self.undoStack.beginMacro("Drop item(s)")
         if parentIndex.isValid():
             parent = self.data(parentIndex)
         else: parent = self.root
@@ -85,8 +146,18 @@ class BasicPlaylist(rootedtreemodel.RootedTreeModel):
                 # Insert as sibling next to parent
                 self.insertContents(parent.getParent(),parent.getParent().index(parent)+1,contents,copy=False)
             else: self.insertContents(parent,parent.getChildrenCount(),contents,copy=False)
+        self.undoStack.endMacro()
         return True
 
+    def _prepareMimeData(self, mimeData):
+        """Create an Element structure from the MIME data that can be inserted into the model."""
+        if mimeData.hasFormat(options.gui.mime):
+            return [node.copy() for node in mimeData.retrieveData(options.gui.mime)]
+        elif mimeData.hasFormat("text/uri-list"):
+            return self.importPaths(relPath(url.path()) for url in mimeData.urls())
+        else:
+            return None
+        
     def removeRows(self,row,count,parentIndex):
         # Reimplementation of QAbstractItemModel.removeRows
         if parentIndex.isValid():
@@ -97,9 +168,11 @@ class BasicPlaylist(rootedtreemodel.RootedTreeModel):
         
     def removeContents(self,parent,start,end):
         """Remove the nodes with indices <start>-<end> (without <end>!) from <parent>'s children."""
-        self.beginRemoveRows(self.getIndex(parent),start,end-1)
-        del parent.getChildren()[start:end]
-        self.endRemoveRows()
+        command = RemoveContentsCommand(self, self.getIndex(parent), start, end-start, "remove Item")
+        self.undoStack.push(command)
+        #self.beginRemoveRows(self.getIndex(parent),start,end-1)
+        #del parent.getChildren()[start:end]
+        #self.endRemoveRows()
     
     def removeByQtIndex(self,index):
         """Remove the element with the given Qt-index from the model and remove all files within it from the MPD-playlist. The index may point to a file or a container, but must be valid."""
@@ -109,17 +182,22 @@ class BasicPlaylist(rootedtreemodel.RootedTreeModel):
         start =  element.getParent().index(element)
         self.removeContents(element.getParent(),start,start+1)
         
-    def insertContents(self,parent,index,contents,copy=True):
-        """Insert <contents> as children at the given index into the node <parent>. If <copy> is True, <contents> will be copied deeply which is usually the right thing to do, as the parents of the nodes in <contents> must be adjusted."""
-        if parent.isFile():
-            raise ValueError("Cannot insert contents into file {}".format(parent))
-        self.beginInsertRows(self.getIndex(parent),index,index+len(contents)-1)
-        if copy:
-            contents = [node.copy() for node in contents]
-        for node in contents:
-            node.setParent(parent)
-        parent.getChildren()[index:index] = contents
-        self.endInsertRows()
+    def insertContents(self,parent,row,contents,copy=True):
+        """Insert <contents> as children at the given row into the node <parent>. If <copy> is True, <contents> will be copied deeply which is usually the right thing to do, as the parents of the nodes in <contents> must be adjusted."""
+        
+        command = InsertContentsCommand(self, parent, row, contents, copy, text="insert Item(s)")
+        self.undoStack.push(command)
+        #=======================================================================
+        # if parent.isFile():
+        #    raise ValueError("Cannot insert contents into file {}".format(parent))
+        # self.beginInsertRows(self.getIndex(parent),row,row+len(contents)-1)
+        # if copy:
+        #    contents = [node.copy() for node in contents]
+        # for node in contents:
+        #    node.setParent(parent)
+        # parent.getChildren()[row:row] = contents
+        # self.endInsertRows()
+        #=======================================================================
     
     def importPaths(self,paths):
         """Return a list of elements from the given (relative) paths which may be inserted into the playlist."""

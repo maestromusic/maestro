@@ -76,7 +76,7 @@ class TreeView(QtGui.QTreeView):
         actions.append(action)
         
         action = QtGui.QAction("Ausgewählte Elemente aus DB löschen...", self)
-        action.setEnabled(hasSelectedElements)
+        action.setEnabled(any((i.isInDB() for i in self.getSelectedNodes())))
         action.triggered.connect(self.deleteFromDB)
         actions.append(action)
         
@@ -87,7 +87,7 @@ class TreeView(QtGui.QTreeView):
         for f in contextMenuProviders['all']:
             f(actions)
         if self.contextMenuProviderCategory is not None:
-            for f in contextMenuProviders[contextMenuProviderCategory]:
+            for f in contextMenuProviders[self.contextMenuProviderCategory]:
                 f(actions)
 
         menu = QtGui.QMenu(self)
