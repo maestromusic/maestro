@@ -56,6 +56,7 @@ class PlaylistTreeView(treeview.TreeView):
     """Specialized TreeView, which draws the currently playing track highlighted."""
     def __init__(self,parent):
         treeview.TreeView.__init__(self,parent)
+        self.contextMenuProviderCategory = 'playlist'
         self.setModel(parent.model)
         self.setItemDelegate(delegates.PlaylistDelegate(self,parent.model))
         self.setDefaultDropAction(Qt.MoveAction)

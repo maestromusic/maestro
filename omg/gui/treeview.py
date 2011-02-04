@@ -85,10 +85,10 @@ class TreeView(QtGui.QTreeView):
         actions = []
         self.contextMenuProvider(actions,currentIndex)
         for f in contextMenuProviders['all']:
-            f(actions)
+            f(self,actions,currentIndex)
         if self.contextMenuProviderCategory is not None:
-            for f in contextMenuProviders[contextMenuProviderCategory]:
-                f(actions)
+            for f in contextMenuProviders[self.contextMenuProviderCategory]:
+                f(self,actions,currentIndex)
 
         menu = QtGui.QMenu(self)
         for action in actions:

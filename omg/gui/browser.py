@@ -84,6 +84,7 @@ class BrowserTreeView(treeview.TreeView):
     def __init__(self,parent,layers):
         """Initialize this TreeView with the given parent (which must be the browser-widget) and the given layers. This also will create a BrowserModel for this treeview (Note that each view of the browser uses its own model). <layers> must be a list of tag-lists. For each entry in <layers> a tag-layer using the entry's tags is created. A BrowserTreeView initialized with [[tags.get('genre')],[tags.get('artist'),tags.get('composer')]] will group result first into differen genres and then into different artist/composer-values, before finally displaying the elements itself."""
         treeview.TreeView.__init__(self,parent)
+        self.contextMenuProviderCategory = 'browser'
         self.setModel(browsermodel.BrowserModel(parent.table,layers,TT_SMALL_RESULT))
         self.setItemDelegate(delegates.BrowserDelegate(self,self.model()))
         self.doubleClicked.connect(self._handleDoubleClicked)

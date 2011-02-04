@@ -21,10 +21,10 @@ from omg.gui import formatter, treeview
 LASTFM_API_KEY = 'b25b959554ed76058ac220b7b2e0a026'
 
 def enable():
-    treeview.contextMenuProviders['playlist'].append(contextMenuProvider)
+    treeview.contextMenuProviders['all'].append(contextMenuProvider)
     
 def disable():
-    treeview.contextMenuProviders['playlist'].remove(contextMenuProvider)
+    treeview.contextMenuProviders['all'].remove(contextMenuProvider)
 
 def contextMenuProvider(playlist,actions,currentIndex):
     """Provides an action for the playlist's context menu (confer playlist.contextMenuProvider). The action will only be enabled if at least one album is selected and in this case open a CoverFetcher-dialog for the selected albums."""

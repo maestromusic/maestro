@@ -140,7 +140,7 @@ class Mp3File(File):
         else: return description
         
     def _tagGenerator(self,ignoredFrames=None,unknownFrames=None):
-        """This generator filters the tags contained in self._file and returns a tuple (frame,values) for the rest (frame is an instance of frame.Frames contained in frames.FRAMES; values is a list of strings). The generator filters frames, which are ignored or unknown, away and replaces TXXX- and WXXX-frames by their nice names (basically their description)."""
+        """This generator filters the tags contained in self._file and returns a tuple (frame,values) for the rest (frame is an instance of frames.Frames contained in frames.FRAMES; values is a list of strings). The generator filters frames, which are ignored or unknown, away and replaces TXXX- and WXXX-frames by their nice names (basically their description)."""
         for key,frameObject in self._tags.items():
             # Warning: Keys may be as complicated as 'TXXX:QuodLibet::mycustomtag'
             # Thus we have to split the key first
