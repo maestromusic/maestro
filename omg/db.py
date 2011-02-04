@@ -100,6 +100,7 @@ def saveContainer(container):
 
 
 def deleteElements(elids):
+    #TODO: funktioniert nicht für mehr als eine Kindebene 
     """Remove elements together with all of their content and tag references from the database."""
     idList = ",".join(str(id) for id in elids)
     db.query("DELETE FROM tags WHERE element_id IN ({})".format(idList))

@@ -349,9 +349,10 @@ class TagEditorModel(QtCore.QObject):
             
         # First remove values contained in the database, but not in self.inner.tags from the database.
         # AND remove values which are already contained in the database and in self.inner.tags (that is, those tag-values where nothing has changed) from self.inner.tags so that they won't be added to the db later.
-        changedElementIds = []
         for tag in tags.tagList:
             for element in self.inner.elements:
+                if not element.isInDB():
+                    continue
                 if tag not in element.oldTags:
                     continue
                 for value in db.tagValues(element.id,tag):
@@ -369,10 +370,11 @@ class TagEditorModel(QtCore.QObject):
                 tag = tags.addIndexedTag(tag.name,tag.type)
             for record in self.inner.tags[tag]:
                 if len(record.elementsWithValue) > 0: # For unchanged tags this is []
-                    db.addTag([element.id for element in record.elementsWithValue],tag,record.value)
+                    db.addTag([element.id for element in record.elementsWithValue if element.isInDB()],tag,record.value)
 
-        changedIds = [element.id for element in self.getElements()] #TODO: This is not very accurate...
-        distributor.indicesChanged.emit(distributor.DatabaseChangeNotice(changedIds,tags=True))
+        changedIds = [element.id for element in self.getElements() if element.isInDB()] #TODO: This is not very accurate...
+        if len(changedIds) > 0:
+            distributor.indicesChanged.emit(distributor.DatabaseChangeNotice(changedIds,tags=True))
         
     def getPossibleSeparators(self,records):
         # Collect all separators appearing in the first record

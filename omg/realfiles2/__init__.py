@@ -59,7 +59,7 @@ class MutagenFile(RealFile):
     def _openProc(self):
         """Create the tags_python2-subprocess."""
         return subprocess.Popen(options.misc.tags_python2_cmd,
-                                stdout=subprocess.PIPE,stdin=subprocess.PIPE,stderr=subprocess.PIPE)
+                                stdout=subprocess.PIPE,stdin=subprocess.PIPE)
 
     def _transmit(self,proc,data,error):
         """Transmit <data> to the subprocess <proc>, then fetch the result and return it. If an error in the subprocess occurs, raise a TagIOError with the given message (among other stuff)."""
@@ -120,8 +120,8 @@ class MutagenFile(RealFile):
         if string.isdecimal():
             return int(string)
         # Watch for positions of the form 2/5
-        elif re.match('d+\s*/\s*d+$',string):
-             return int(string.split('/')[0])
+        elif re.match('\d+\s*/\s*\d+$',string):
+            return int(string.split('/')[0])
         else: return None
 
     def read(self):

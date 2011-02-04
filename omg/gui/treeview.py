@@ -76,7 +76,7 @@ class TreeView(QtGui.QTreeView):
         actions.append(action)
         
         action = QtGui.QAction("Ausgewählte Elemente aus DB löschen...", self)
-        action.setEnabled(hasSelectedElements)
+        action.setEnabled(any((i.isInDB() for i in self.getSelectedNodes())))
         action.triggered.connect(self.deleteFromDB)
         actions.append(action)
         

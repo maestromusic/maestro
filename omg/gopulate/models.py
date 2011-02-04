@@ -29,7 +29,7 @@ class GopulateTreeModel(BasicPlaylist):
     #currentDirectoryChanged = QtCore.pyqtSignal(['QString'])
     
     def __init__(self, searchdir):
-        rootedtreemodel.RootedTreeModel.__init__(self)
+        BasicPlaylist.__init__(self)
         self.current = None
         self.guesser = GopulateGuesser()
         self.setRoot(RootNode())

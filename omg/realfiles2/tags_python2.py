@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python2.6
 # -*- coding: utf-8 -*-
 # Copyright 2010 Martin Altmayer
 #
@@ -252,6 +252,7 @@ class Mp4File(File):
 if __name__=="__main__":
     try:
         while True: # process will be terminated by the main application
+            sys.stdin.flush()
             data = pickle.load(sys.stdin)
             if data['command'] not in COMMANDS:
                 raise ValueError("Unknown command: {}".format(data['command']))
