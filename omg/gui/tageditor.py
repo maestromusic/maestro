@@ -8,7 +8,7 @@
 from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
-from omg import constants, tags
+from omg import constants, tags, getIcon
 from omg.models import tageditormodel, simplelistmodel
 from omg.gui import formatter, singletageditor, dialogs, tagwidgets
 from omg.gui.misc import widgetlist, editorwidget, dynamicgridlayout
@@ -16,11 +16,11 @@ from omg.gui.misc import widgetlist, editorwidget, dynamicgridlayout
 
 class TagEditorDialog(QtGui.QDialog):
     def __init__(self, parent, elements):
-        QtGui.QDialog.__init__(self, parent)
+        QtGui.QDialog.__init__(self,parent)
         self.setLayout(QtGui.QVBoxLayout())
-        self.tagedit = TagEditorWidget(elements)
+        self.tagedit = TagEditorWidget(elements,dialog=self)
         self.layout().addWidget(self.tagedit)
-        self.setWindowTitle("Edit tags")
+        self.setWindowTitle(self.tr("Edit tags"))
         self.resize(600,450) #TODO: klüger
         self.tagedit.saved.connect(self.accept)
         
@@ -29,24 +29,25 @@ class TagEditorWidget(QtGui.QWidget):
     
     saved = QtCore.pyqtSignal()
     
-    def __init__(self,elements = [], parent = None):
+    def __init__(self,elements = [],parent = None,dialog=None):
         QtGui.QWidget.__init__(self,parent)
-                
+        style = QtGui.QApplication.style()
+        
         self.model = tageditormodel.TagEditorModel(elements)
         self.model.tagInserted.connect(self._handleTagInserted)
         self.model.tagRemoved.connect(self._handleTagRemoved)
         self.model.tagChanged.connect(self._handleTagChanged)
         self.model.resetted.connect(self._handleReset)
 
-        self.undoAction = self.model.undoStack.createUndoAction(self,"Rückgängig")
-        self.redoAction = self.model.undoStack.createRedoAction(self,"Wiederholen")
+        self.undoAction = self.model.undoStack.createUndoAction(self,self.tr("Undo"))
+        self.redoAction = self.model.undoStack.createRedoAction(self,self.tr("Redo"))
 
         self.selectionManager = widgetlist.SelectionManager()
         # Do not allow the user to select ExpandLines
         self.selectionManager.isSelectable = lambda wList,widget: not isinstance(widget,singletageditor.ExpandLine)
         
         self.setLayout(QtGui.QVBoxLayout())
-        label = QtGui.QLabel("Tags für {} Element{} bearbeiten.".format(len(elements),"e" if len(elements) != 1 else ''))
+        label = QtGui.QLabel(self.tr("Edit tags of %n element(s).","",len(elements)))
         self.layout().addWidget(label)
         self.scrollArea = QtGui.QScrollArea()
         self.scrollArea.setWidgetResizable(True)
@@ -54,19 +55,23 @@ class TagEditorWidget(QtGui.QWidget):
         buttonBarLayout = QtGui.QHBoxLayout()
         self.layout().addLayout(buttonBarLayout,0)
 
-        addButton = QtGui.QPushButton("Tag hinzufügen")
+        addButton = QtGui.QPushButton(QtGui.QIcon(getIcon("add.png")),self.tr("Add tag"))
         addButton.clicked.connect(self._handleAddRecord)
         buttonBarLayout.addWidget(addButton)
-        removeButton = QtGui.QPushButton("Ausgewählte entfernen")
+        removeButton = QtGui.QPushButton(QtGui.QIcon(getIcon("remove.png")),self.tr("Remove selected"))
         removeButton.clicked.connect(self._handleRemoveSelected)
         buttonBarLayout.addWidget(removeButton)
         buttonBarLayout.addStretch(1)
-        resetButton = QtGui.QPushButton("Zurücksetzen")
-        resetButton.clicked.connect(self.model.reset)
-        buttonBarLayout.addWidget(resetButton)
-        saveButton = QtGui.QPushButton("Speichern")
-        saveButton.clicked.connect(self._handleSave)
-        buttonBarLayout.addWidget(saveButton)
+        if dialog is not None:
+            resetButton = QtGui.QPushButton(style.standardIcon(QtGui.QStyle.SP_DialogResetButton),self.tr("Reset"))
+            resetButton.clicked.connect(self.model.reset)
+            buttonBarLayout.addWidget(resetButton)
+            cancelButton = QtGui.QPushButton(style.standardIcon(QtGui.QStyle.SP_DialogCancelButton),self.tr("Cancel"))
+            cancelButton.clicked.connect(dialog.reject)
+            buttonBarLayout.addWidget(cancelButton)
+            saveButton = QtGui.QPushButton(style.standardIcon(QtGui.QStyle.SP_DialogSaveButton),self.tr("Save"))
+            saveButton.clicked.connect(self._handleSave)
+            buttonBarLayout.addWidget(saveButton)
 
         self.viewport = QtGui.QWidget()
         self.viewport.setLayout(QtGui.QVBoxLayout())
@@ -168,7 +173,7 @@ class TagEditorWidget(QtGui.QWidget):
 
         # In other words: If either newTag is None or changeTag fails, then reset the editor
         if newTag is None or not self.model.changeTag(oldTag,newTag):
-            QtGui.QMessageBox.warning(self,"Ungültiger Wert","Mindestens ein Wert ist ungültig.")
+            QtGui.QMessageBox.warning(self,self.tr("Invalid value"),self.tr("At least one value is invalid for the new type."))
             # reset the editor...unfortunately this emits valueChanged again
             editorWidget.valueChanged.disconnect(self._handleTagChangedByUser)
             self.editorWidgets[oldTag].setValue(oldTag.translated())
@@ -176,7 +181,7 @@ class TagEditorWidget(QtGui.QWidget):
         
     def _handleSave(self):
         if not all(singleTagEditor.isValid() for singleTagEditor in self.singleTagEditors.values()):
-            QtGui.QMessageBox.warning(self,"Ungültiger Wert","Mindestens ein Wert ist ungültig.")
+            QtGui.QMessageBox.warning(self,self.tr("Invalid value"),self.tr("At least one value is invalid."))
         else:
             self.model.save()
             self.saved.emit()
@@ -188,17 +193,17 @@ class TagEditorWidget(QtGui.QWidget):
         menu.addAction(self.redoAction)
         menu.addSeparator()
         
-        addRecordAction = QtGui.QAction("Tag hinzufügen...",self)
+        addRecordAction = QtGui.QAction(self.tr("Add tag..."),self)
         addRecordAction.triggered.connect(lambda: self._handleAddRecord(tag))
         menu.addAction(addRecordAction)
         
-        removeSelectedAction = QtGui.QAction("Ausgewählte entfernen",self)
+        removeSelectedAction = QtGui.QAction(self.tr("Remove selected"),self)
         removeSelectedAction.triggered.connect(self._handleRemoveSelected)
         menu.addAction(removeSelectedAction)
         
         selectedRecords = [editor.getRecord() for editor in self.selectionManager.getSelectedWidgets()]
         for separator in self.model.getPossibleSeparators(selectedRecords):
-            action = menu.addAction("Bei '{}' trennen".format(separator))
+            action = menu.addAction(self.tr("Separate at '{}'").format(separator))
             action.triggered.connect(lambda: self.model.splitMany(selectedRecords,separator))
 
         menu.popup(contextMenuEvent.globalPos())
@@ -207,7 +212,7 @@ class TagEditorWidget(QtGui.QWidget):
 class TagDialog(QtGui.QDialog):
     def __init__(self,parent,elements,tag=None):
         QtGui.QDialog.__init__(self,parent)
-        self.setWindowTitle("Tag-Wert hinzufügen")
+        self.setWindowTitle(self.tr("Add tag value"))
         assert len(elements) > 0
         
         self.typeEditor =  tagwidgets.TagTypeBox(defaultTag=tag)
@@ -220,9 +225,9 @@ class TagDialog(QtGui.QDialog):
         for i in range(len(elements)):
             self.elementsBox.selectionModel().select(self.elementsBox.model().index(i,0),
                                                      QtGui.QItemSelectionModel.Select)
-        abortButton = QtGui.QPushButton("Abbrechen",self)
+        abortButton = QtGui.QPushButton(self.tr("Cancel"),self)
         abortButton.clicked.connect(self.reject)
-        okButton = QtGui.QPushButton("OK",self)
+        okButton = QtGui.QPushButton(self.tr("OK"),self)
         okButton.clicked.connect(self._handleOkButton)
         
         layout = QtGui.QVBoxLayout()
@@ -231,12 +236,12 @@ class TagDialog(QtGui.QDialog):
         secondLineLayout = QtGui.QHBoxLayout()
         layout.addLayout(firstLineLayout)
         layout.addLayout(secondLineLayout)
-        firstLineLayout.addWidget(QtGui.QLabel("Typ: ",self))
+        firstLineLayout.addWidget(QtGui.QLabel(self.tr("Type: "),self))
         firstLineLayout.addWidget(self.typeEditor)
         firstLineLayout.addStretch(1)
-        secondLineLayout.addWidget(QtGui.QLabel("Wert: ",self))
+        secondLineLayout.addWidget(QtGui.QLabel(self.tr("Value: "),self))
         secondLineLayout.addWidget(self.valueEditor)
-        layout.addWidget(QtGui.QLabel("Elemente: ",self))
+        layout.addWidget(QtGui.QLabel(self.tr("Elements: "),self))
         layout.addWidget(self.elementsBox)
         lastLineLayout = QtGui.QHBoxLayout()
         lastLineLayout.addStretch(1)
@@ -249,8 +254,8 @@ class TagDialog(QtGui.QDialog):
             try:
                 tag = self.typeEditor.getTag()
             except ValueError:
-                QtGui.QMessageBox.warning(self,"Ungültiger Tagname.",
-                                          "Ungültiger Tagname. Tagnamen dürfen nur Zahlen und Buchstaben enthalten.")
+                QtGui.QMessageBox.warning(self,self.tr("Invalid tag name"),
+                                          self.tr("Invalid tag name. Tag name must contain only letters and digits."))
             else:
                 if not tag.isIndexed():
                     tagType = dialogs.NewTagDialog.queryTagType(tag.name)
@@ -259,8 +264,9 @@ class TagDialog(QtGui.QDialog):
                     else: return # Do nothing (in particular do not close the dialog)
                 if self.valueEditor.getValue() is not None:
                     self.accept()
-                else: QtGui.QMessageBox.warning(self,"Ungültiger Wert","Der eingegebene Wert ist ungültig.")
-        else: QtGui.QMessageBox.warning(self,"Kein Stück ausgewählt.","Du musst mindestens ein Stück auswählen.")
+                else: QtGui.QMessageBox.warning(self,self.tr("Invalid value"),self.tr("The given value is invalid."))
+        else: QtGui.QMessageBox.warning(self,self.tr("No element selected"),
+                                        self.tr("You must select at lest one element."))
         
     def getRecord(self):
         allElements = self.elementsBox.model().getItems()

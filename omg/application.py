@@ -31,11 +31,11 @@ class OmgMainWindow(QtGui.QMainWindow):
     
     def initMenus(self):
         self.menus = {}
-        self.menus['extras'] = self.menuBar().addMenu("&Extras")
-        self.menus['help'] = self.menuBar().addMenu("&Help")
+        self.menus['extras'] = self.menuBar().addMenu(self.tr("&Extras"))
+        self.menus['help'] = self.menuBar().addMenu(self.tr("&Help"))
         
         self.aboutAction = QtGui.QAction(self)
-        self.aboutAction.setText("&About")
+        self.aboutAction.setText(self.tr("&About"))
         self.aboutAction.triggered.connect(self.showAboutDialog)
         self.menus['help'].addAction(self.aboutAction)
     
@@ -55,14 +55,14 @@ class OmgMainWindow(QtGui.QMainWindow):
     
         controlWidget = control.createWidget()
         controlDock = QtGui.QDockWidget()
-        controlDock.setWindowTitle("Playback control")
+        controlDock.setWindowTitle(self.tr("Playback control"))
         controlDock.setAllowedAreas(Qt.TopDockWidgetArea | Qt.BottomDockWidgetArea)
         controlDock.setWidget(controlWidget)
         self.addDockWidget(Qt.TopDockWidgetArea, controlDock)
         
         browser = browserModule.Browser()        
         browserDock = QtGui.QDockWidget()
-        browserDock.setWindowTitle("Element browser")
+        browserDock.setWindowTitle(self.tr("Element browser"))
         browserDock.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
         browserDock.setWidget(browser)
         self.addDockWidget(Qt.LeftDockWidgetArea, browserDock)
@@ -70,18 +70,18 @@ class OmgMainWindow(QtGui.QMainWindow):
         playlist = playlistModule.Playlist()
         
         central = QtGui.QTabWidget()
-        central.addTab(playlist,"playlist")
+        central.addTab(playlist,self.tr("Playlist"))
         
         import omg.models.editor
         import omg.gui.editor
         gm = omg.models.editor.EditorModel()
         gw = omg.gui.editor.EditorWidget(gm)
-        central.addTab(gw, "editor")
+        central.addTab(gw,self.tr("Editor"))
         
         import omg.filesystembrowser
         fb = omg.filesystembrowser.FileSystemBrowser()
         fbDock = QtGui.QDockWidget()
-        fbDock.setWindowTitle("File browser")
+        fbDock.setWindowTitle(self.tr("File browser"))
         fbDock.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
         fbDock.setWidget(fb)
         self.addDockWidget(Qt.RightDockWidgetArea, fbDock)
@@ -138,17 +138,35 @@ def run(opts, args):
     # Some Qt-classes need a running QApplication before they can be created
     app = QtGui.QApplication(sys.argv)
 
-    # Switch first to the directory containing this file
+    # Switch to the application's directory (one level above this file's directory)
     if os.path.dirname(__file__):
         os.chdir(os.path.dirname(__file__))
-    # And then one directory above
     os.chdir("../")
-    
-    # Import and initialize modules
-    from omg import config # Initialize config and logging
+
+    # Initialize config and logging
+    from omg import config 
     config.init(opts)
-    logging.getLogger("omg").debug("START")
+    logger = logging.getLogger('omg')
+    logger.debug("START")
     
+    # Load translators
+    qtTranslator = QtCore.QTranslator() # Translator for Qt's own strings
+    translatorDir = QtCore.QLibraryInfo.location(QtCore.QLibraryInfo.TranslationsPath)
+    translatorFile = "qt_" + QtCore.QLocale.system().name()
+    if qtTranslator.load(translatorFile,translatorDir):
+        app.installTranslator(qtTranslator)
+    else: logger.warning("Unable to load Qt's translator file {} from directory {}."
+                            .format(translatorFile,translatorDir))
+
+    translator = QtCore.QTranslator() # Translator for our strings
+    translatorDir = os.path.join(os.getcwd(),'i18n')
+    translatorFile = 'omg.'+config.options.i18n.locale
+    if translator.load(translatorFile,translatorDir):
+        app.installTranslator(translator)
+    else: logger.warning("Unable to load translator file {} from directory {}."
+                            .format(translatorFile,translatorDir))
+
+    # Load and initialize modules
     from omg import database
     database.connect()
     from omg import tags

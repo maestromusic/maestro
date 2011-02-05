@@ -40,7 +40,7 @@ class Browser(QtGui.QWidget):
         # ControlLine (containing searchBox and optionButton)
         controlLineLayout = QtGui.QHBoxLayout()
         layout.addLayout(controlLineLayout)
-        controlLineLayout.addWidget(QtGui.QLabel("Suche:",self))
+        controlLineLayout.addWidget(QtGui.QLabel(self.tr("Search: "),self))
         self.searchBox = QtGui.QLineEdit(self)
         self.searchBox.returnPressed.connect(self.search)
         controlLineLayout.addWidget(self.searchBox)

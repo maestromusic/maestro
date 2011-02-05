@@ -66,16 +66,16 @@ class PlaylistTreeView(treeview.TreeView):
     def contextMenuProvider(self,actions,currentIndex):
         treeview.TreeView.contextMenuProvider(self,actions,currentIndex)
         
-        action = QtGui.QAction("Ausgewählte Elemente entfernen",self)
+        action = QtGui.QAction(self.tr("Remove selected elements"),self)
         action.triggered.connect(self.removeSelected)
         actions.insert(2,action)
 
-        action = QtGui.QAction("Container erstellen",self)
+        action = QtGui.QAction(self.tr("Create container..."),self)
         action.setEnabled(self.selectionModel().hasSelection())
         action.triggered.connect(self.createContainer)
         actions.insert(3,action)
         
-        action = QtGui.QAction("Playlist-Baum restrukturieren",self)
+        action = QtGui.QAction(self.tr("Restructure playlist tree"),self)
         action.triggered.connect(self.model().restructure)
         actions.append(action)
         
@@ -111,7 +111,8 @@ class PlaylistTreeView(treeview.TreeView):
         
         default = strutils.commonPrefix(el.tags[tags.TITLE][0] for el in elements if len(el.tags[tags.TITLE]) > 0)
         default = strutils.rstripSeparator(default)
-        title,ok = QtGui.QInputDialog.getText(self,"Neuer Container","Gib den Titel des neuen Containers an:",
+        title,ok = QtGui.QInputDialog.getText(self,self.tr("New container"),
+                                              self.tr("Enter the title of the new container:"),
                                               QtGui.QLineEdit.Normal,default)
 
         if ok and not len(title) == 0:

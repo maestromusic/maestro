@@ -14,12 +14,12 @@ class NewTagDialog(QtGui.QDialog):
     def __init__(self, tagname, parent = None):
         QtGui.QDialog.__init__(self, parent)
         self.setWindowModality(QtCore.Qt.WindowModal)
-        label = QtGui.QLabel("The tag '{}' occured for the first time. Please enter its type:".format(tagname))
+        label = QtGui.QLabel(self.tr("The tag '{}' occured for the first time. Please enter its type:").format(tagname))
         self.combo = QtGui.QComboBox(self)
         self.combo.addItems([type.name for type in tags.TYPES])
         
-        self.ignoreButton = QtGui.QPushButton("ignore this tag")
-        self.okButton = QtGui.QPushButton("ok")
+        self.ignoreButton = QtGui.QPushButton(self.tr("Ignore this tag"))
+        self.okButton = QtGui.QPushButton(self.tr("Ok"))
         
         layout = QtGui.QVBoxLayout(self)
         layout.addWidget(label)

@@ -30,7 +30,7 @@ class BrowserDialog(QtGui.QDialog):
     def __init__(self,parent):
         """Initialize with the given parent, which must be the browser to configure."""
         QtGui.QDialog.__init__(self,parent)
-        self.setWindowTitle("Browser-Einstellungen")
+        self.setWindowTitle(self.tr("Browser configuration"))
         self.browser = parent
         
         self.viewConfigurations = []
@@ -40,7 +40,7 @@ class BrowserDialog(QtGui.QDialog):
         self.setLayout(layout)
         
         topLayout = QtGui.QHBoxLayout()
-        topLayout.addWidget(QtGui.QLabel("Anzahl der Views: "))
+        topLayout.addWidget(QtGui.QLabel(self.tr("Number of views: ")))
         spinBox = QtGui.QSpinBox()
         spinBox.setRange(1,5)
         spinBox.setValue(len(self.browser.views))
@@ -59,10 +59,10 @@ class BrowserDialog(QtGui.QDialog):
         layout.addLayout(bottomLayout)
         
         bottomLayout.addStretch(1)
-        abortButton = QtGui.QPushButton("Abbrechen")
+        abortButton = QtGui.QPushButton(self.tr("Cancel"))
         abortButton.clicked.connect(self.close)
         bottomLayout.addWidget(abortButton)
-        okButton = QtGui.QPushButton("OK")
+        okButton = QtGui.QPushButton(self.tr("OK"))
         okButton.clicked.connect(self._handleOk)
         bottomLayout.addWidget(okButton)
         
@@ -98,7 +98,7 @@ class ViewConfiguration(QtGui.QWidget):
         layout = QtGui.QHBoxLayout()
         self.setLayout(layout)
         
-        layout.addWidget(QtGui.QLabel("View {0}: ".format(index+1),self))
+        layout.addWidget(QtGui.QLabel(self.tr("View {}: ").format(index+1),self))
         self.comboBox = QtGui.QComboBox(self)
         for layers in selectableLayers:
             self.comboBox.addItem(str(utils.mapRecursively(str,layers)),layers)

@@ -83,7 +83,7 @@ class BrowserDelegate(abstractdelegate.AbstractDelegate):
         if isinstance(node,browser.ValueNode):
             self.addLine(node.value,"")
         elif isinstance(node,browser.VariousNode):
-            self.addLine("Unbekannt/Verschiedene","")
+            self.addLine(self.tr("Unknown/Various"))
         elif isinstance(node,models.Element):
             element = node
             f = formatter.Formatter(element)

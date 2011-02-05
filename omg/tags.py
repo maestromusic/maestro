@@ -16,11 +16,12 @@ This module provides methods to initialize the tag lists based on the database, 
 - To iterate over all indexed tags use tagList.
 - You may create tags simply via the constructors of IndexedTag or OtherTag. But in case of indexed tags the get-method translates automatically from tag-ids to tag-names and vice versa and it doesn't create new instances and in the other case it does just the same job as the OtherTag-constructor, so you are usually better off using that method.
 """
-import os.path
+import os.path, logging, datetime, xml.sax
 from collections import Sequence
+from xml.sax.handler import ContentHandler
+
 from omg import constants, FlexiDate, getIcon
 from omg.config import options
-import logging, datetime
 
 logger = logging.getLogger("tags")
 
@@ -32,6 +33,9 @@ _tagsByName = None
 
 # list of all tags that are ignored by config file
 _ignored = None
+
+# Dict mapping keys to their translations
+_translation = None
 
 # Local reference to the database, will be created in init
 db = None
@@ -47,17 +51,17 @@ DATE = None
 
 TOTALLY_IGNORED_TAGS = ("tracknumber", "discnumber")
 
-class Type:
-    """Class for the type of tags. Currently only three types are possible: varchar, date and text. For each of them there is an instance (e.g. tags.TYPE_VARCHAR) and you can get all of them via tags.TYPES. You should never create your own instances."""
+class ValueType:
+    """Class for the type of tag-values. Currently only three types are possible: varchar, date and text. For each of them there is an instance (e.g. tags.TYPE_VARCHAR) and you can get all of them via tags.TYPES. You should never create your own instances."""
     def __init__(self,name):
-        """Create a new TagType-instance with given name. Do NOT create your own instances, but use the instances created in this module."""
+        """Create a new ValueType-instance with given name. Do NOT create your own instances, but use the instances created in this module."""
         self.name = name
 
     def __eq__(self,other):
-        return isinstance(other,Type) and self.name == other.name
+        return isinstance(other,ValueType) and self.name == other.name
 
     def __ne__(self,other):
-        return not isinstance(other,Type) or self.name != other.name
+        return not isinstance(other,ValueType) or self.name != other.name
         
     def __hash__(self):
         return hash(self.name)
@@ -82,7 +86,7 @@ class Type:
         else: assert False # should never happen
 
     def convertValue(self,newType,value):
-        """Convert <value> from this type to <newType> and return the result. This method converts from FlexiDate (type date) to strings (types varchar and text) and vice versa. If conversion fails or the converted value is not valid for newType (confer Type.isValid), this method will raise a ValueError."""
+        """Convert <value> from this type to <newType> and return the result. This method converts from FlexiDate (type date) to strings (types varchar and text) and vice versa. If conversion fails or the converted value is not valid for newType (confer ValueType.isValid), this method will raise a ValueError."""
         if self == TYPE_DATE and newType != TYPE_DATE:
             convertedValue = value.strftime()
         elif self != TYPE_DATE and newType == TYPE_DATE:
@@ -114,9 +118,9 @@ class Type:
             return FlexiDate.strptime(string)
         else: return string
 
-TYPE_VARCHAR = Type('varchar')
-TYPE_TEXT = Type('text')
-TYPE_DATE = Type('date')
+TYPE_VARCHAR = ValueType('varchar')
+TYPE_TEXT = ValueType('text')
+TYPE_DATE = ValueType('date')
 TYPES = [TYPE_VARCHAR,TYPE_TEXT,TYPE_DATE]
 
 
@@ -157,19 +161,7 @@ class Tag:
         
     def translated(self):
         """Return the translation of this tag in the user's language. In most cases you will want to display this string rather than tag.name."""
-        # TODO: Store the translations somewhere else
-        nameDict = {
-            'title': "Titel",
-            'artist': "Künstler",
-            'composer': "Komponist",
-            'performer': "Performer",
-            'conductor': "Dirigent",
-            'album': "Album",
-            'genre': "Genre",
-            'date': "Datum",
-            'description': "Beschreibung"
-        }
-        return nameDict.get(self.name,self.name) # if self.name is not contained in the dict return the name itself
+        return _translation.get(self.name,self.name) # if self.name is not contained in the dict return the name itself
     
     def iconPath(self):
         """Return the path to the icon of this tag or None if there is no such icon."""
@@ -183,7 +175,7 @@ class IndexedTag(Tag):
     Indexed tags contain in addition to their name an id and compare equal if and only if this id is equal. In most cases you won't instantiate this class but use tags.get to get the already existing instances. Indexed tags have three public attributes: id, name and type where type must be one of the keys in database.tables.TagTable._tagQueries.
     """
     def __init__(self,id,name,type):
-        assert isinstance(id,int) and isinstance(name,str) and isinstance(type,Type)
+        assert isinstance(id,int) and isinstance(name,str) and isinstance(type,ValueType)
         self.id = id
         self.name = name.lower()
         self.type = type
@@ -240,12 +232,12 @@ def get(identifier):
     else: raise RuntimeError("Identifier's type is neither int nor string nor tag: {} of type {}".format(identifier,type(identifier)))
     
 def fromTranslation(translation):
-    """Return the tag whose translation is <translation>. If no such tag exists, invoke get to return a tag. Use this method to get a tag from user input, especially when using combo-boxes with predefined values containing translated tags."""
+    """Return the tag whose translation is <translation> (comparison is case-insensitive!). If no such tag exists, invoke get to return a tag. Use this method to get a tag from user input, especially when using combo-boxes with predefined values containing translated tags."""
     translation = translation.lower()
-    for tag in tagList:
-        if translation == tag.translated().lower():
-            return tag
-    return get(translation)
+    for key,name in _translation:
+        if name.lower() == translation:
+            return get(key)
+    else: return get(translation)
 
 def parse(string,sep=','):
     """Parse a string containing tag-names (by default comma-separated, but you may specify a different separator) and return a list of corresponding tags. If <string> contains a substring that is not a tag name, it is simply ignored."""
@@ -268,12 +260,14 @@ def addIndexedTag(name, type):
 
 def init():
     """Initialize the variables of this module based on the information of the tagids-table and config-file. At program start or after changes of that table this method must be called to ensure the module has the correct tags and their IDs."""
-    global _tagsById,_tagsByName,tagList, _ignored
+    global _tagsById,_tagsByName,tagList, _ignored, _translation
+
+    # Initialize _tagsById, _tagsByName and tagList from the database
     from omg import database
     _tagsById = {}
     _tagsByName = {}
     for row in database.get().query("SELECT id,tagname,tagtype FROM tagids"):
-        newTag = IndexedTag(row[0],row[1],Type.byName(row[2]))
+        newTag = IndexedTag(row[0],row[1],ValueType.byName(row[2]))
         _tagsById[newTag.id] = newTag
         _tagsByName[newTag.name] = newTag
     
@@ -281,30 +275,22 @@ def init():
     tagList = [ _tagsByName[name] for name in options.tags.tag_order if name in _tagsByName ]
     # ...and then all remaining tags in arbitrary order
     tagList.extend(set(_tagsByName.values()) - set(tagList))
-    
-    _ignored = options.tags.ignored_tags
-    
-    global TITLE,ALBUM,DATE
-    TITLE = _tagsByName[options.tags.title_tag]
-    ALBUM = _tagsByName[options.tags.album_tag]
-    DATE = _tagsByName[options.tags.date_tag]
 
-
-def initFromString(tagConfiguration):
-    """Initialize the tagmodule from a string instead from the database. For the syntax of <tagConfiguration> confer parseTagConfiguration. This method does not need the database and makes it possible to use this module in test-applications without database connection."""
-    global _tagsById,_tagsByName,tagList, _ignored
-
-    _tagsById = {}
-    _tagsByName = {}
-    id = 10000 # some large value so that we do not collide with actual tags in the database
-    for tagname,tagtype in parseTagConfiguration(tagConfiguration).items():
-        newTag = IndexedTag(id,tagname,Type.byName(tagtype))
-        _tagsById[id] = newTag
-        _tagsByName[tagname] = newTag
-        id = id + 1
-        
-    # tagList contains the tags in the order specified by tags->tag_order...
-    tagList = [ _tagsByName[name] for name in options.tags.tag_order if name in _tagsByName ]
+    # Initialize _translation
+    _translation = {}
+    files = [os.path.join('i18n','tags.'+options.i18n.locale+'.xml'),
+             os.path.join('i18n','tags.'+options.i18n.locale[:2]+'.xml')] #try de instead of de_DE
+    if all(not os.path.exists(file) for file in files):
+        logger.warning("I could not find a tag translation file for locale '{}'.".format(options.i18n.locale))
+    else:
+        for file in files:
+            if os.path.exists(file):
+                try:
+                    xml.sax.parse(file,TranslationFileHandler())
+                except xml.sax.SAXParseException as e:
+                    logger.warning("I could not parse tag translation file '{}'. Error message: {}"
+                                        .format(file,e.message()))
+            
     _ignored = options.tags.ignored_tags
     
     global TITLE,ALBUM,DATE
@@ -327,7 +313,7 @@ def parseTagConfiguration(config):
         tagtype = result.groups()[2]
         if not tagtype:
             tagtype = "varchar"
-        if Type.byName(tagtype) is None:
+        if ValueType.byName(tagtype) is None:
             raise Exception("Unknown tag type: '{}'".format(tagtype))
         tags[tagname] = tagtype
     return tags
@@ -416,3 +402,15 @@ class Storage(dict):
         """Remove all values from <other> from this Storage. <other> may be another Storage-instance or a dict mapping tags to value-lists. If <other> contains tags and values which are not contained in this Storage, just skip them."""
         for tag,valueList in other.items():
             self.removeValues(tag,*valueList)
+
+
+class TranslationFileHandler(xml.sax.handler.ContentHandler):
+    """Content handler for tag translation files."""
+    def startElement(self,name,attributes):
+        if 'key' not in attributes:
+            logger.warning("Incorrect tag translation file (key is missing).")
+            return
+        if 'name' not in attributes:
+            logger.warning("Incorrect tag translation file (name is missing).")
+
+        _translation[attributes['key']] = attributes['name']

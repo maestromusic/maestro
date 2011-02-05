@@ -32,14 +32,14 @@ class EditorTreeWidget(treeview.TreeView):
         self.setAcceptDrops(True)
         self.setDropIndicatorShown(True)
         #self.setDefaultDropAction(Qt.MoveAction)
-        self.mergeAction = QtGui.QAction("merge", self)
+        self.mergeAction = QtGui.QAction(self.tr("Merge"), self)
         self.mergeAction.triggered.connect(self._mergeSelected)
         
-        self.commitAction = QtGui.QAction("commit", self)
+        self.commitAction = QtGui.QAction(self.tr("Commit"), self)
         self.commitAction.triggered.connect(self._commitSelected)
         
         
-        self.flattenAction = QtGui.QAction("flatten", self)
+        self.flattenAction = QtGui.QAction(self.tr("Flatten"), self)
         self.flattenAction.triggered.connect(self._flattenSelected)
         
         self.viewport().setMouseTracking(True)
@@ -133,14 +133,15 @@ class EditorTreeWidget(treeview.TreeView):
         model.modelReset.connect(self.expandNotInDB)
         self.selectionModel().selectionChanged.connect(self._handleSelectionChanged)
         self.expandNotInDB()
-        self.undoAction = model.undoStack.createUndoAction(self, "Undo")
-        self.redoAction = model.undoStack.createRedoAction(self, "Redo")
+        self.undoAction = model.undoStack.createUndoAction(self,self.tr("Undo"))
+        self.redoAction = model.undoStack.createRedoAction(self,self.tr("Redo"))
         model.rowsInserted.connect(self.expandNotInDB)
     
     def _mergeSelected(self):
         indices = self.selectionModel().selectedIndexes()
         hint = calculateMergeHint(indices)
-        title,flag = QtGui.QInputDialog.getText(self, "merge elements", "Name of new subcontainer:", text = hint)
+        title,flag = QtGui.QInputDialog.getText(self,self.tr("Merge elements"),
+                                                self.tr("Name of new subcontainer:"), text = hint)
         if flag:
             self.model().merge(indices, title)
     
@@ -179,13 +180,13 @@ class EditorWidget(QtGui.QWidget):
         self.dirLabel = QtGui.QLabel()
         self.tree = EditorTreeWidget()
         
-        self.accept = QtGui.QPushButton('commit')
+        self.accept = QtGui.QPushButton(self.tr("Commit"))
         self.accept.pressed.connect(self._handleAcceptPressed)
         self.accept.released.connect(self._handleAcceptReleased)
         self.accept.clicked.connect(model.commit)
         self.tree.itemsSelected.connect(self.itemsSelected)
        
-        self.clear = QtGui.QPushButton('clear')
+        self.clear = QtGui.QPushButton(self.tr("Clear"))
         print(type(model))
         self.clear.clicked.connect(self._handleClear)
         
@@ -201,10 +202,10 @@ class EditorWidget(QtGui.QWidget):
         self.tree.setHeaderHidden(True)
     
     def _handleAcceptPressed(self):
-        self.accept.setText("calculating audio hashes...")
+        self.accept.setText(self.tr("Calculating audio hashes..."))
     
     def _handleAcceptReleased(self):
-        self.accept.setText("accept")
+        self.accept.setText(self.tr("Accept"))
     
     def _handleClear(self):
         self.tree.model().undoStack.push(playlist.ModelResetCommand(self.tree.model()))

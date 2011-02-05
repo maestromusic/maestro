@@ -220,13 +220,20 @@ class RecordEditor(QtGui.QWidget):
             self.elementsLabel.clear()
             self.elementsLabel.setVisible(False)
         else:
-            elements = self.record.getExceptions() if self.record.isUsual() else self.record.elementsWithValue
-            preposition = "außer in" if self.record.isUsual() else "in"
-            if len(elements) == 1:
-                self.elementsLabel.setText(" {} {}".format(preposition,elements[0].getTitle()))
+            if self.record.isUsual():
+                elements = self.record.getExceptions()
+                if len(elements) == 1:
+                    self.elementsLabel.setText(self.tr("except in {}".format(elements[0].getTitle())))
+                else: self.elementsLabel.setText(
+                            self.tr("except in {}/%n pieces","",len(self.record.allElements)).format(len(elements)))
             else:
-                self.elementsLabel.setText(" {} {}/{} Stücken"
-                        .format(preposition,len(elements),len(self.record.allElements)))
+                elements = self.record.elementsWithValue
+                if len(elements) == 1:
+                    if self.record.tag == tags.TITLE:
+                        pass # In this case we would display the elements own title which doesn't help
+                    self.elementsLabel.setText(self.tr("in {}".format(elements[0].getTitle())))
+                else: self.elementsLabel.setText(
+                            self.tr("in {}/%n pieces","",len(self.record.allElements)).format(len(elements)))
         
     def isExpanded(self):
         return self.expanded
@@ -267,7 +274,7 @@ class ExpandLine(QtGui.QWidget):
         
     def setNumber(self,number):
         """Set the number of non-common records which is displayed in this ExpandLine."""
-        self.label.setText("<i>({} verschiedene)</i>".format(number))
+        self.label.setText("<i>"+self.tr("{} different").format(number)+"</i>")
 
 
 class ExpandButton(QtGui.QPushButton):

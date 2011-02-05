@@ -60,22 +60,22 @@ class TreeView(QtGui.QTreeView):
         # Check whether at least one Element is selected
         hasSelectedElements = any(isinstance(node,models.Element) for node in self.getSelectedNodes())
         
-        action = QtGui.QAction("Tags editieren...",self)
+        action = QtGui.QAction(self.tr("Edit tags..."),self)
         action.setEnabled(hasSelectedElements)
         action.triggered.connect(lambda: self.editTags(False))
         actions.append(action)
 
-        action = QtGui.QAction("Tags rekursiv editieren...",self)
+        action = QtGui.QAction(self.tr("Edit tags recursively..."),self)
         action.setEnabled(self.selectionModel().hasSelection())
         action.triggered.connect(lambda: self.editTags(True))
         actions.append(action)
 
-        action = QtGui.QAction("Ausgewählte Elemente neu einlesen",self)
+        action = QtGui.QAction(self.tr("Read selected elements from files"),self)
         action.setEnabled(hasSelectedElements)
         action.triggered.connect(self.updateFromFileSystem)
         actions.append(action)
         
-        action = QtGui.QAction("Ausgewählte Elemente aus DB löschen...", self)
+        action = QtGui.QAction(self.tr("Remove selected elements from database..."), self)
         action.setEnabled(any((i.isInDB() for i in self.getSelectedNodes())))
         action.triggered.connect(self.deleteFromDB)
         actions.append(action)
@@ -103,8 +103,8 @@ class TreeView(QtGui.QTreeView):
         
     def deleteFromDB(self):
         """Non-recursively deletes the selected elements from the database."""
-        if (QtGui.QMessageBox.question(self,"Element löschen",
-                                       "Sollen die ausgewählten Elemente wirklich aus der Datenbank gelöscht werden?",
+        if (QtGui.QMessageBox.question(self,self.tr("Remove elements"),
+                                       self.tr("Should I really remove the selected elements from the database?"),
                                        QtGui.QMessageBox.Yes|QtGui.QMessageBox.No,QtGui.QMessageBox.No)
                 != QtGui.QMessageBox.Yes):
             return

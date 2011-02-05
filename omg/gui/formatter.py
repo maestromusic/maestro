@@ -12,6 +12,10 @@ from omg import covers, models, strutils, tags
 from omg.config import options
 import datetime
 
+from PyQt4 import QtCore
+translate = QtCore.QCoreApplication.translate
+trEnc = QtCore.QCoreApplication.CodecForTr
+ 
 class Formatter:
     """A Formatter takes an element and offers several functions to get formatted output from the tags, length, title etc. of the element."""
     def __init__(self,element):
@@ -55,7 +59,7 @@ class Formatter:
         elif isinstance(self.element,models.File):
             result = self.element.getPath()
         else:
-            result = "<Kein Titel>"
+            result = self.tr("Formatter","<No title>")
         if isinstance(self.element,models.Element) and self.element.isInDB() and options.misc.show_ids:
             return "[{0}] {1}".format(self.element.id,result)
         else: return result
@@ -93,10 +97,7 @@ class Formatter:
 
     def files(self):
         """Return the formatted number of files in the element."""
-        fileCount = self.element.getFileCount()
-        if fileCount == 1:
-            return "{0} Stück".format(fileCount)
-        else: return "{0} Stücke".format(fileCount)
+        return translate("Formatter","%n piece(s)","",trEnc,self.element.getFileCount())
 
 
 class HTMLFormatter(Formatter):
@@ -115,7 +116,7 @@ class HTMLFormatter(Formatter):
             if coverPath is not None:
                 lines.append('<table><tr><td valign="top"><img src="{0}"></td><td valign="top">'
                                 .format(cgi.escape(coverPath)))
-        else: lines.append('<i>External element</i>')
+        else: lines.append('<i>'+translate("HTMLFormatter","External element")+'</i>')
         lines.append('<div style="font-size: 14px; font-weight: bold">{0}</div>'.format(cgi.escape(self.title())))
         if tags.ALBUM in self.element.tags:
             lines.append('<div style="font-size: 14px; font-weight: bold; font-style: italic">{0}</div>'

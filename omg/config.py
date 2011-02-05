@@ -10,6 +10,7 @@ import os, logging, configparser, io
 import logging.config
 import shelve as shelveModule
 
+from PyQt4 import QtCore
 from . import constants
 
 logger = logging.getLogger("conf")
@@ -137,7 +138,9 @@ class Config:
                 self.shorts[s] = newOpt
                 
 def initOmgOptions(options):
-    
+
+    # No need to translate the strings in this method, as it is executed before any translators have been loaded.
+    options.addOption("i18n",       "locale",           str,    QtCore.QLocale.system().name(), shorts=("-l","--locale"), description="The locale used by omg (e.g. de_DE).")
     options.addOption("database",   "driver",           str,    "qtsql"         )
     options.addOption("database",   "mysql_user",       str,    ""              )
     options.addOption("database",   "mysql_password",   str,    ""              )

@@ -15,6 +15,8 @@ from PyQt4.QtCore import Qt
 from omg import constants, mpclient, strutils, models, getIcon
 from omg import control as controlModule
 
+translate = QtGui.QApplication.translate
+
 logger = logging.getLogger("gui.control")
 
 class ControlWidget(QtGui.QWidget):
@@ -236,9 +238,9 @@ class VolumeLabel(QtGui.QLabel):
         """Display the icon appropriate for the given volume."""
         range = VolumeLabel.volumeRange(volume)
         if range == 'muted':
-            self.setToolTip('click to unmute')
+            self.setToolTip(self.tr("Click to unmute"))
         else:
-            self.setToolTip('click to mute')
+            self.setToolTip(self.tr("Click to mute"))
         if range != self.state:
             self.state = range
             self.setPixmap(QtGui.QPixmap(getIcon("volume_{}.png".format(range))))
@@ -247,13 +249,13 @@ class VolumeLabel(QtGui.QLabel):
     def volumeRange(volume):
         """Maps the given volume to a string from {muted,low,medium,high}"""
         if volume == 0:
-            return 'muted'
+            return translate("VolumeLabel","muted")
         elif volume <= 33:
-            return 'low'
+            return translate("VolumeLabel","low")
         elif volume <= 66:
-            return 'medium'
+            return translate("VolumeLabel","medium")
         else:
-            return 'high'
+            return translate("VolumeLabel","high")
         
     def mousePressEvent(self, event):
         self.clicked.emit()
