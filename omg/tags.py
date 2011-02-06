@@ -407,10 +407,11 @@ class Storage(dict):
 class TranslationFileHandler(xml.sax.handler.ContentHandler):
     """Content handler for tag translation files."""
     def startElement(self,name,attributes):
-        if 'key' not in attributes:
-            logger.warning("Incorrect tag translation file (key is missing).")
-            return
-        if 'name' not in attributes:
-            logger.warning("Incorrect tag translation file (name is missing).")
+        if name == 'tag':
+            if 'key' not in attributes:
+                logger.warning("Incorrect tag translation file (key is missing).")
+                return
+            if 'name' not in attributes:
+                logger.warning("Incorrect tag translation file (name is missing).")
 
-        _translation[attributes['key']] = attributes['name']
+            _translation[attributes['key']] = attributes['name']
