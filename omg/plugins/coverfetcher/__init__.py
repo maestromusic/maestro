@@ -18,6 +18,8 @@ from omg import covers, constants, models, tags
 from omg.config import options
 from omg.gui import formatter, treeview
 
+translate = QtGui.QApplication.translate
+
 LASTFM_API_KEY = 'b25b959554ed76058ac220b7b2e0a026'
 
 def enable():
@@ -28,7 +30,7 @@ def disable():
 
 def contextMenuProvider(playlist,actions,currentIndex):
     """Provides an action for the playlist's context menu (confer playlist.contextMenuProvider). The action will only be enabled if at least one album is selected and in this case open a CoverFetcher-dialog for the selected albums."""
-    action = QtGui.QAction("Cover holen...",playlist)
+    action = QtGui.QAction(translate("CoverFetcher","Fetch cover..."),playlist)
     elements = [element for element in playlist.getSelectedNodes() if isinstance(element,models.Element)]
     if len(elements) == 0:
         action.setEnabled(False)
@@ -49,7 +51,7 @@ class CoverData:
 class CoverFetcher(QtGui.QDialog):
     def __init__(self,parent,elements):
         QtGui.QWidget.__init__(self,parent)
-        self.setWindowTitle("Cover holen")
+        self.setWindowTitle(self.tr("Fetch cover"))
         
         assert len(elements) >= 1
         self.elements = elements
@@ -105,7 +107,7 @@ class CoverFetcher(QtGui.QDialog):
         bottomRightLayout1 = QtGui.QHBoxLayout()
         rightLayout.addLayout(bottomRightLayout1)
         
-        coverFetchButton = QtGui.QPushButton("Cover von Last.fm holen",self)
+        coverFetchButton = QtGui.QPushButton(self.tr("Fetch cover from Last.fm"),self)
         coverFetchButton.clicked.connect(self._handleLastFMCoverButton)
         bottomRightLayout1.addWidget(coverFetchButton)
         lastfmLabel = LastFmLabel(self)
@@ -114,23 +116,23 @@ class CoverFetcher(QtGui.QDialog):
         bottomRightLayout2 = QtGui.QHBoxLayout()
         rightLayout.addLayout(bottomRightLayout2)
         
-        customCoverButton = QtGui.QPushButton("Eigenes Cover laden...",self)
+        customCoverButton = QtGui.QPushButton(self.tr("Load image file..."),self)
         customCoverButton.clicked.connect(self._handleCustomCoverButton)
         bottomRightLayout2.addWidget(customCoverButton)
-        urlCoverButton = QtGui.QPushButton("URL öffnen...",self)
+        urlCoverButton = QtGui.QPushButton(self.tr("Open URL..."),self)
         urlCoverButton.clicked.connect(self._handleUrlCoverButton)
         bottomRightLayout2.addWidget(urlCoverButton)
         
         bottomRightLayout3 = QtGui.QHBoxLayout()
         rightLayout.addLayout(bottomRightLayout3)
         
-        self.skipButton = QtGui.QPushButton("Überspringen",self)
+        self.skipButton = QtGui.QPushButton(self.tr("Skip"),self)
         self.skipButton.clicked.connect(self.nextElement)
         bottomRightLayout3.addWidget(self.skipButton)
-        self.saveButton = QtGui.QPushButton("Cover speichern",self)
+        self.saveButton = QtGui.QPushButton(self.tr("Save cover"),self)
         self.saveButton.clicked.connect(self.save)
         bottomRightLayout3.addWidget(self.saveButton)
-        cancelButton = QtGui.QPushButton("Abbrechen",self)
+        cancelButton = QtGui.QPushButton(self.tr("Cancel"),self)
         bottomRightLayout3.addWidget(cancelButton)
         cancelButton.clicked.connect(self.reject)
         
@@ -140,27 +142,27 @@ class CoverFetcher(QtGui.QDialog):
         self.nextElement()
     
     def _handleCustomCoverButton(self):
-        fileName = QtGui.QFileDialog.getOpenFileName(self,"Cover öffnen",os.path.expanduser("~"),
-                                                     "Bilddateien (*.png *.jpg *.bmp);;Alle Dateien (*)");
+        fileName = QtGui.QFileDialog.getOpenFileName(self,self.tr("Open cover file"),os.path.expanduser("~"),
+                                                     self.tr("Image files (*.png *.jpg *.bmp);;All files (*)"))
         if fileName == "": # user cancelled the dialog
             return
         
         image = QtGui.QPixmap(fileName)
         if image.isNull():
-            QtGui.QMessageBox(QtGui.QMessageBox.Warning,"Fehler beim Öffnen der Datei",
-                              "Die Datei konnte nicht geöffnet werden.",QtGui.QMessageBox.Ok,self).exec_()
+            QtGui.QMessageBox(QtGui.QMessageBox.Warning,self.tr("Failed to open the file"),
+                              self.tr("The file could not be opened."),QtGui.QMessageBox.Ok,self).exec_()
         else:
             self.addImage(image,fileName)
             self.setPosition(len(self.coverData)-1)
     
     def _handleUrlCoverButton(self):
-        url,ok = QtGui.QInputDialog.getText(self,"URL öffnen","Geben Sie die URL des Covers ein:")
+        url,ok = QtGui.QInputDialog.getText(self,self.tr("Open URL"),self.tr("Please enter the cover's URL:"))
         if not ok:
             return
         url = QtCore.QUrl(url)
         if not url.isValid():
-            QtGui.QMessageBox(QtGui.QMessageBox.Warning,"Ungültige URL",
-                              "Die eingegebene URL ist ungültig.",QtGui.QMessageBox.Ok,self).exec_()
+            QtGui.QMessageBox(QtGui.QMessageBox.Warning,self.tr("Invalid URL"),
+                              self.tr("The given URL is invalid."),QtGui.QMessageBox.Ok,self).exec_()
         else: self.loadFromUrl(url,url.toString())
     
     def _handleLastFMCoverButton(self):
@@ -184,12 +186,12 @@ class CoverFetcher(QtGui.QDialog):
                 pass # The error message below will be displayed
                 
         if len(urls) == 0:
-            QtGui.QMessageBox(QtGui.QMessageBox.Warning,"Fehler während der Coverabfrage",
-                              "Beim Abfragen des Covers ist ein Fehler aufgetreten. Vielleicht hat last.fm kein Cover"
-                            +" für dieses Album. Oder die Netzwerkverbindung funktioniert nicht.",QtGui.QMessageBox.Ok,self).exec_()
+            QtGui.QMessageBox(QtGui.QMessageBox.Warning,self.tr("Failed to fetch cover"),
+                              self.tr("An error occurred during fetching the cover. Maybe Last.fm does not have a cover for this album. Or there was an error with the connection."),
+                              QtGui.QMessageBox.Ok,self).exec_()
         else:
             for url in urls:
-                self.loadFromUrl(QtCore.QUrl(url),"Cover von last.fm")
+                self.loadFromUrl(QtCore.QUrl(url),self.tr("Cover from Last.fm"))
 
     def loadFromUrl(self,url,text):
         if self.requestId is not None:
@@ -197,13 +199,13 @@ class CoverFetcher(QtGui.QDialog):
         http = QtNetwork.QHttp(self)
         http.setHost(url.host())
         http.requestFinished.connect(lambda id,error: self._httpRequestFinished(text,buffer,id,error),
-                                     Qt.QueuedConnection) # for some reason 
+                                     Qt.QueuedConnection)
         buffer = QtCore.QBuffer()
         buffer.open(QtCore.QIODevice.WriteOnly)
         self.requestId = http.get(url.path(),buffer)
 
     def _httpRequestFinished(self,text,buffer,id,error):
-        # For some reason Qt fires this event twice, the first time with another requestId. I have no idead where that requestId comes from...
+        # For some reason Qt fires this event twice, the first time with another requestId. I have no idea where that requestId comes from...
         if id != self.requestId: 
             return
         
@@ -214,12 +216,12 @@ class CoverFetcher(QtGui.QDialog):
                 self.addImage(image,text)
                 self.setPosition(len(self.coverData)-1)
                 return
-        QtGui.QMessageBox(QtGui.QMessageBox.Warning,"Laden des Covers fehlgeschlagen",
-                          "Das Laden des Covers ist fehlgeschlagen.",QtGui.QMessageBox.Ok,self).exec_()
+        QtGui.QMessageBox(QtGui.QMessageBox.Warning,self.tr("Loading cover failed"),
+                          self.tr("The cover could not be loaded."),QtGui.QMessageBox.Ok,self).exec_()
     
     def addImage(self,image,text):
         assert(isinstance(image,QtGui.QPixmap))
-        text = "{0} - {1}x{2} Pixel".format(text,image.width(),image.height())
+        text = "{0} - {1}x{2} {3}".format(text,image.width(),image.height(),self.tr("pixel"))
         self.coverData.append(CoverData(image,text))
         if self.position is None:
             self.setPosition(0)
@@ -262,21 +264,21 @@ class CoverFetcher(QtGui.QDialog):
             self.skipButton.setEnabled(self.elementIndex != len(self.elements) - 1)
             self.clear()
             if element.hasCover():
-                self.addImage(QtGui.QPixmap(covers.getCoverPath(element.id)),"Vorheriges Cover")
+                self.addImage(QtGui.QPixmap(covers.getCoverPath(element.id)),self.tr("Previous cover"))
         else: self.close()
         
     def save(self):
         assert len(self.coverData) > 0
         element = self.elements[self.elementIndex]
         if element.hasCover():
-            if QtGui.QMessageBox(QtGui.QMessageBox.Question,"Datei überschreiben?",
-                                 "Soll das vorhandene Cover überschrieben werden?",
+            if QtGui.QMessageBox(QtGui.QMessageBox.Question,self.tr("Overwrite file?"),
+                                 self.tr("Should the existing cover be overriden?"),
                                  QtGui.QMessageBox.Yes|QtGui.QMessageBox.No,self).exec_() \
                      != QtGui.QMessageBox.Yes:
                 return
         if not covers.setCover(element.id,self.coverData[self.position].cover):
-            QtGui.QMessageBox(QtGui.QMessageBox.Warning,"Speichern fehlgeschlagen",
-                              "Das Cover konnte nicht gespeichert werden.",
+            QtGui.QMessageBox(QtGui.QMessageBox.Warning,self.tr("Saving cover failed"),
+                              self.tr("The cover could not be saved."),
                               QtGui.QMessageBox.Ok,self).exec_()
         else:
             self.nextElement()

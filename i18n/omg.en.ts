@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!DOCTYPE TS>
-<TS version="2.0" language="en">
+<!DOCTYPE TS><TS version="1.1" language="en">
 <context>
     <name>Browser</name>
     <message>
@@ -37,6 +36,144 @@
     <message>
         <location filename="../omg/gui/browserdialog.py" line="65"/>
         <source>OK</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>CoverFetcher</name>
+    <message>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="31"/>
+        <source>Fetch cover...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="52"/>
+        <source>Fetch cover</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="108"/>
+        <source>Fetch cover from Last.fm</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="117"/>
+        <source>Load image file...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="120"/>
+        <source>Open URL...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="127"/>
+        <source>Skip</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="130"/>
+        <source>Save cover</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="133"/>
+        <source>Cancel</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="143"/>
+        <source>Open cover file</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="143"/>
+        <source>Image files (*.png *.jpg *.bmp);;All files (*)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="150"/>
+        <source>Failed to open the file</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="150"/>
+        <source>The file could not be opened.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="157"/>
+        <source>Open URL</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="157"/>
+        <source>Please enter the cover&apos;s URL:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="162"/>
+        <source>Invalid URL</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="162"/>
+        <source>The given URL is invalid.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="187"/>
+        <source>Failed to fetch cover</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="187"/>
+        <source>An error occurred during fetching the cover. Maybe Last.fm does not have a cover for this album. Or there was an error with the connection.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="192"/>
+        <source>Cover from Last.fm</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="217"/>
+        <source>Loading cover failed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="217"/>
+        <source>The cover could not be loaded.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="222"/>
+        <source>pixel</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="265"/>
+        <source>Previous cover</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="272"/>
+        <source>Overwrite file?</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="272"/>
+        <source>Should the existing cover be overriden?</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="278"/>
+        <source>Saving cover failed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="278"/>
+        <source>The cover could not be saved.</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -397,32 +534,32 @@
 <context>
     <name>TreeView</name>
     <message>
-        <location filename="../omg/gui/treeview.py" line="63"/>
+        <location filename="../omg/gui/treeview.py" line="65"/>
         <source>Edit tags...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/gui/treeview.py" line="68"/>
+        <location filename="../omg/gui/treeview.py" line="70"/>
         <source>Edit tags recursively...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/gui/treeview.py" line="73"/>
+        <location filename="../omg/gui/treeview.py" line="75"/>
         <source>Read selected elements from files</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/gui/treeview.py" line="78"/>
+        <location filename="../omg/gui/treeview.py" line="80"/>
         <source>Remove selected elements from database...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/gui/treeview.py" line="106"/>
+        <location filename="../omg/gui/treeview.py" line="108"/>
         <source>Remove elements</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/gui/treeview.py" line="106"/>
+        <location filename="../omg/gui/treeview.py" line="108"/>
         <source>Should I really remove the selected elements from the database?</source>
         <translation type="unfinished"></translation>
     </message>

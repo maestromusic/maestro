@@ -41,6 +41,144 @@
     </message>
 </context>
 <context>
+    <name>CoverFetcher</name>
+    <message>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="31"/>
+        <source>Fetch cover...</source>
+        <translation>Cover holen...</translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="52"/>
+        <source>Fetch cover</source>
+        <translation>Cover holen</translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="108"/>
+        <source>Fetch cover from Last.fm</source>
+        <translation>Cover von Last.fm holen</translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="117"/>
+        <source>Load image file...</source>
+        <translation>Bilddatei laden...</translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="120"/>
+        <source>Open URL...</source>
+        <translation>URL öffnen...</translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="127"/>
+        <source>Skip</source>
+        <translation>Überspringen</translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="130"/>
+        <source>Save cover</source>
+        <translation>Cover speichern</translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="133"/>
+        <source>Cancel</source>
+        <translation>Abbrechen</translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="143"/>
+        <source>Open cover file</source>
+        <translation>Cover öffnen</translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="143"/>
+        <source>Image files (*.png *.jpg *.bmp);;All files (*)</source>
+        <translation>Bilddateien (*.png *.jpg *.bmp);;Alle Dateien (*)</translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="150"/>
+        <source>Failed to open the file</source>
+        <translation>Fehler beim Öffnen der Datei</translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="150"/>
+        <source>The file could not be opened.</source>
+        <translation>Datei konnte nicht geöffnet werden.</translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="157"/>
+        <source>Open URL</source>
+        <translation>URL öffnen</translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="157"/>
+        <source>Please enter the cover&apos;s URL:</source>
+        <translation>Bitte gib die URL des Covers ein:</translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="162"/>
+        <source>Invalid URL</source>
+        <translation>Ungültige URL</translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="162"/>
+        <source>The given URL is invalid.</source>
+        <translation>Die angegebene URL ist ungültig.</translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="187"/>
+        <source>Failed to fetch cover</source>
+        <translation>Fehler beim Laden des Covers</translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="187"/>
+        <source>An error occurred during fetching the cover. Maybe Last.fm does not have a cover for this album. Or there was an error with the connection.</source>
+        <translation>Beim Abfragen des Covers ist ein Fehler aufgetreten. Vielleicht hat last.fm kein Cover für dieses Album. Oder die Netzwerkverbindung funktioniert nicht.</translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="192"/>
+        <source>Cover from Last.fm</source>
+        <translation>Cover von Last.fm</translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="217"/>
+        <source>Loading cover failed</source>
+        <translation>Fehler beim Laden des Covers</translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="217"/>
+        <source>The cover could not be loaded.</source>
+        <translation>Das Cover konnte nicht geladen werden.</translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="222"/>
+        <source>pixel</source>
+        <translation>Pixel</translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="265"/>
+        <source>Previous cover</source>
+        <translation>Vorheriges Cover</translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="272"/>
+        <source>Overwrite file?</source>
+        <translation>Datei überschreiben?</translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="272"/>
+        <source>Should the existing cover be overriden?</source>
+        <translation>Soll das bestehende Cover überschrieben werden?</translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="278"/>
+        <source>Saving cover failed</source>
+        <translation>Fehler beim Speichern des Covers</translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="278"/>
+        <source>The cover could not be saved.</source>
+        <translation>Das Cover konnte nicht gespeichert werden.</translation>
+    </message>
+</context>
+<context>
     <name>EditorTreeWidget</name>
     <message>
         <location filename="../omg/gui/editor.py" line="35"/>
@@ -405,32 +543,32 @@
 <context>
     <name>TreeView</name>
     <message>
-        <location filename="../omg/gui/treeview.py" line="63"/>
+        <location filename="../omg/gui/treeview.py" line="65"/>
         <source>Edit tags...</source>
         <translation>Tags editieren...</translation>
     </message>
     <message>
-        <location filename="../omg/gui/treeview.py" line="68"/>
+        <location filename="../omg/gui/treeview.py" line="70"/>
         <source>Edit tags recursively...</source>
         <translation>Tags rekursiv editieren...</translation>
     </message>
     <message>
-        <location filename="../omg/gui/treeview.py" line="73"/>
+        <location filename="../omg/gui/treeview.py" line="75"/>
         <source>Read selected elements from files</source>
         <translation>Ausgewählte Elemente neu einlesen</translation>
     </message>
     <message>
-        <location filename="../omg/gui/treeview.py" line="78"/>
+        <location filename="../omg/gui/treeview.py" line="80"/>
         <source>Remove selected elements from database...</source>
         <translation>Ausgewählte Elemente aus DB löschen...</translation>
     </message>
     <message>
-        <location filename="../omg/gui/treeview.py" line="106"/>
+        <location filename="../omg/gui/treeview.py" line="108"/>
         <source>Remove elements</source>
         <translation>Elemente entfernen</translation>
     </message>
     <message>
-        <location filename="../omg/gui/treeview.py" line="106"/>
+        <location filename="../omg/gui/treeview.py" line="108"/>
         <source>Should I really remove the selected elements from the database?</source>
         <translation>Sollen die ausgewählten Elemente wirklich aus der Datenbank entfernt werden?</translation>
     </message>
