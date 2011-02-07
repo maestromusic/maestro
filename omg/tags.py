@@ -234,7 +234,7 @@ def get(identifier):
 def fromTranslation(translation):
     """Return the tag whose translation is <translation> (comparison is case-insensitive!). If no such tag exists, invoke get to return a tag. Use this method to get a tag from user input, especially when using combo-boxes with predefined values containing translated tags."""
     translation = translation.lower()
-    for key,name in _translation:
+    for key,name in _translation.items():
         if name.lower() == translation:
             return get(key)
     else: return get(translation)
