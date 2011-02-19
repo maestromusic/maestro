@@ -34,7 +34,7 @@ class NewTagDialog(QtGui.QDialog):
         self.okButton.clicked.connect(self.accept)
         
     def selectedType(self):
-        return tags.Type.byName(self.combo.currentText())
+        return tags.ValueType.byName(self.combo.currentText())
     
     @staticmethod
     def queryTagType(name, parent = None):

@@ -41,7 +41,9 @@ class Record:
         return False
     
     def extend(self,elements):
-        return any(self.append(element) for element in elements)
+        # Take care that self.append is executed for all elements
+        results = [self.append(element) for element in elements]
+        return any(results)
             
     def removeElements(self,elements):
         for element in elements:

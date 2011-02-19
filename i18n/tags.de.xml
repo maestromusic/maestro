@@ -15,4 +15,5 @@
   <tag key="cddb" name="CDDB" />
   <tag key="date" name="Datum" />
   <tag key="arranger" name="Arrangeur" />
+  <tag key="recordingdate" name="Aufnahmedatum" />
 </tagtranslation>
