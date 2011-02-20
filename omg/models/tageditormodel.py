@@ -297,14 +297,12 @@ class TagEditorModel(QtCore.QObject):
         self.undoStack.endMacro()
 
     def changeTag(self,oldTag,newTag):
-        print("ChangeTag {} {}".format(oldTag,newTag))
         # First check whether the existing values in oldTag are convertible to newTag
         try:
             for record in self.inner.tags[oldTag]:
                 oldTag.type.convertValue(newTag.type,record.value)
         except ValueError:
             return False # conversion not possible
-        print("beginMacro")
         self.undoStack.beginMacro("Change Tag")
 
         if newTag not in self.inner.tags:
@@ -315,11 +313,9 @@ class TagEditorModel(QtCore.QObject):
                 newRecord.value = oldTag.type.convertValue(newTag.type,record.value)
                 command = UndoCommand(self,self.inner.changeRecord,oldTag,record,newRecord)
                 self.undoStack.push(command)
-            print("changed the records")
             # Finally change the tag itself
             command = UndoCommand(self,self.inner.changeTag,oldTag,newTag)
             self.undoStack.push(command)
-            print("changed the tag")
         else: # Now we have to add all converted records to the existing tag
             # The easiest way to do this is to remove all records and add the converted records again
             for record in self.inner.tags[oldTag]:
@@ -331,6 +327,7 @@ class TagEditorModel(QtCore.QObject):
             self.removeTag(oldTag)
 
         self.undoStack.endMacro()
+            
         return True
 
     def save(self):

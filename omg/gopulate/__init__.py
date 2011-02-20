@@ -161,10 +161,10 @@ class GopulateGuesser:
                 else:
                     discname_id =  db.idFromValue(tags.TITLE,discname_reduced)
                     if discname_id is not None:
-                        album_id = database.get().query('SELECT element_id FROM tags WHERE tag_id=? and value_id= ?',
+                        album_id = db.query('SELECT element_id FROM tags WHERE tag_id=? and value_id= ?',
                                                         tags.TITLE.id, discname_id).getSingle()
                         if album_id is not None:
-                            file = database.get().query('SELECT file FROM elements WHERE id = ?', album_id).getSingle()
+                            file = db.query('SELECT file FROM elements WHERE id = ?', album_id).getSingle()
                             if file == True:
                                 album_id = None
                     else:

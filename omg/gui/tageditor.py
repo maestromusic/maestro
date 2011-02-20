@@ -152,6 +152,7 @@ class TagEditorWidget(QtGui.QWidget):
             assert newTag not in adict
             adict[newTag] = widget
         self.editorWidgets[newTag].setValue(newTag.translated())
+        self.singleTagEditors[newTag].setTag(newTag)
 
     def _handleTagChangedByUser(self):
         # First we have to get the editorWidget responsible for this event and its tag

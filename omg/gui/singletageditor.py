@@ -53,6 +53,10 @@ class SingleTagEditor(QtGui.QWidget):
         if self._isExLineNecessary():
             self.setExpanded(False) # Collapse for the start
 
+    def setTag(self,tag):
+        """Set the tag this SingleTagEditor feels responsible for. This does not change the appearance of the editor or the value in the editor but simply the set of recordAdded-, recordRemoved,...-signals this SingleTagEditor will react to."""
+        self.tag = tag
+
     def isValid(self):
         return all(widget.isValid() for widget in self.widgetList if isinstance(widget,RecordEditor))
 

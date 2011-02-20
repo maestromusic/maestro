@@ -137,7 +137,7 @@ def allTables():
     """Return a dictionary mapping the table-names to SQLTable-instances and containing all tables which should be in the database (according to the information in tagids)."""
     result = dict(tables)
     if 'tagids' in tables:
-        tagTables = {"tag_"+tagname:TagTable(tagname,tags.Type.byName(tagtype))
+        tagTables = {"tag_"+tagname:TagTable(tagname,tags.ValueType.byName(tagtype))
                         for tagname,tagtype in database.get().query("SELECT tagname,tagtype FROM tagids")}
         result.update(tagTables)
     return result
