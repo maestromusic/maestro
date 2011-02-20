@@ -10,7 +10,7 @@ import itertools
 from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
-from omg import constants, models, tags, FlexiDate, db, distributor, utils
+from omg import constants, models, tags, FlexiDate, db, distributor, utils, strutils
 from . import simplelistmodel
 
 RATIO = 0.75
@@ -415,6 +415,16 @@ class TagEditorModel(QtCore.QObject):
     def splitMany(self,records,separator):
         return any(self.split(record,separator) for record in records)
 
+    def replaceCommonStart(self,records,newStart):
+        replaceLength = len(strutils.commonPrefix(str(record.value) for record in records))
+        self.undoStack.beginMacro("Edit common start")
+        for record in records:
+            newRecord = record.copy()
+            newRecord.value = newStart + record.value[replaceLength:]
+            command = UndoCommand(self,self.inner.changeRecord,record.tag,record,newRecord)
+            self.undoStack.push(command)
+        self.undoStack.endMacro()
+        
     def _commonCount(self,tag):
         c = 0
         for record in self.inner.tags[tag]:

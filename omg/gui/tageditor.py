@@ -8,7 +8,7 @@
 from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
-from omg import constants, tags, getIcon
+from omg import constants, tags, getIcon, strutils
 from omg.models import tageditormodel, simplelistmodel
 from omg.gui import formatter, singletageditor, dialogs, tagwidgets
 from omg.gui.misc import widgetlist, editorwidget, dynamicgridlayout
@@ -200,14 +200,27 @@ class TagEditorWidget(QtGui.QWidget):
         removeSelectedAction = QtGui.QAction(self.tr("Remove selected"),self)
         removeSelectedAction.triggered.connect(self._handleRemoveSelected)
         menu.addAction(removeSelectedAction)
-        
+
         selectedRecords = [editor.getRecord() for editor in self.selectionManager.getSelectedWidgets()]
+
+        if len(selectedRecords) > 0 and len(strutils.commonPrefix(str(record.value) for record in selectedRecords)) > 0:
+            action = menu.addAction(self.tr("Edit common start..."))
+            action.triggered.connect(self._editCommonStart)
+
         for separator in self.model.getPossibleSeparators(selectedRecords):
             action = menu.addAction(self.tr("Separate at '{}'").format(separator))
             action.triggered.connect(lambda: self.model.splitMany(selectedRecords,separator))
 
         menu.popup(contextMenuEvent.globalPos())
 
+    def _editCommonStart(self):
+        selectedRecords = [editor.getRecord() for editor in self.selectionManager.getSelectedWidgets()]
+        commonStart = strutils.commonPrefix(str(record.value) for record in selectedRecords)
+        text,ok = QtGui.QInputDialog.getText (self,self.tr("Edit common start"),
+                                              self.tr("Insert a new text will replace the common start of all selected records:"),text=commonStart)
+        if ok:
+            self.model.replaceCommonStart(selectedRecords,text)
+        
 
 class TagDialog(QtGui.QDialog):
     def __init__(self,parent,elements,tag=None):
