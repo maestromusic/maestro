@@ -216,8 +216,12 @@ class SelectionManager(QtCore.QObject):
                     self.selected[listIndex][widgetIndex] = True
                     self.anchor = (listIndex,widgetIndex)
                     widgetList.selectionChanged(widgetIndex)
-                #else: Do nothing on the right button, so that the selection won't be changed by opening a context menu
-
+                elif event.button() == Qt.RightButton:
+                    # If there is a selection, do nothing. so that the selection is not changed on opening a context menu
+                    if not self.hasSelection():
+                        self.selected[listIndex][widgetIndex] = True
+                        self.anchor = (listIndex,widgetIndex)
+                        widgetList.selectionChanged(widgetIndex)
         return False # Don't stop the event
         
     def _handleWidgetInserted(self,widgetList,index):

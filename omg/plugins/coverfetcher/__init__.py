@@ -30,7 +30,7 @@ def disable():
 
 def contextMenuProvider(playlist,actions,currentIndex):
     """Provides an action for the playlist's context menu (confer playlist.contextMenuProvider). The action will only be enabled if at least one album is selected and in this case open a CoverFetcher-dialog for the selected albums."""
-    action = QtGui.QAction(translate("CoverFetcher","Fetch cover..."),playlist)
+    action = QtGui.QAction(translate("CoverFetcher","Add cover..."),playlist)
     elements = [element for element in playlist.getSelectedNodes() if isinstance(element,models.Element)]
     if len(elements) == 0:
         action.setEnabled(False)
@@ -51,7 +51,7 @@ class CoverData:
 class CoverFetcher(QtGui.QDialog):
     def __init__(self,parent,elements):
         QtGui.QWidget.__init__(self,parent)
-        self.setWindowTitle(self.tr("Fetch cover"))
+        self.setWindowTitle(self.tr("Add cover"))
         
         assert len(elements) >= 1
         self.elements = elements

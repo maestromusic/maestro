@@ -267,7 +267,9 @@ class TagEditorModel(QtCore.QObject):
 
     def changeRecord(self,oldRecord,newRecord):
         self.undoStack.beginMacro("Change record")
-        if oldRecord.tag != newRecord.tag:
+
+        # If the tag has changed or the new value does already exist, we simply remove the old and add the new record. Otherwise we really change the record so that its position stays the same because this is what the user expects.
+        if oldRecord.tag != newRecord.tag or self.inner.getRecord(newRecord.tag,newRecord.value) is not None:
             self.removeRecord(oldRecord)
             self.addRecord(newRecord)
         else:
@@ -362,6 +364,7 @@ class TagEditorModel(QtCore.QObject):
                     else:
                         # This value is already in the database, so there is no need to add it
                         record.elementsWithValue.remove(element)
+
         # In the second step add the tags which remained in self.tags to the database.
         for tag in self.inner.tags:
             # Ensure that the tag exists
@@ -412,16 +415,24 @@ class TagEditorModel(QtCore.QObject):
     def splitMany(self,records,separator):
         return any(self.split(record,separator) for record in records)
 
-    def replaceCommonStart(self,records,newStart):
-        replaceLength = len(strutils.commonPrefix(str(record.value) for record in records))
-        self.undoStack.beginMacro("Edit common start")
-        for record in records:
+    def editMany(self,records,newValues):
+        self.undoStack.beginMacro("Edit many")
+        for record, value in zip(records,newValues):
             newRecord = record.copy()
-            newRecord.value = newStart + record.value[replaceLength:]
+            newRecord.value = value
             command = UndoCommand(self,self.inner.changeRecord,record.tag,record,newRecord)
             self.undoStack.push(command)
         self.undoStack.endMacro()
-        
+
+    def extendRecords(self,records):
+        self.undoStack.beginMacro("Extend records")
+        for record in records:
+            newRecord = record.copy()
+            newRecord.elementsWithValue = self.inner.elements[:] # copy the list!
+            command = UndoCommand(self,self.inner.changeRecord,record.tag,record,newRecord)
+            self.undoStack.push(command)
+        self.undoStack.endMacro()
+
     def _commonCount(self,tag):
         c = 0
         for record in self.inner.tags[tag]:

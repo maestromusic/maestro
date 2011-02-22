@@ -227,14 +227,14 @@ class RecordEditor(QtGui.QWidget):
             if self.record.isUsual():
                 elements = self.record.getExceptions()
                 if len(elements) == 1:
-                    self.elementsLabel.setText(self.tr("except in {}".format(elements[0].getTitle())))
+                    self.elementsLabel.setText(self.tr("except in {}").format(elements[0].getTitle()))
                 else: self.elementsLabel.setText(
                             self.tr("except in {}/%n pieces","",len(self.record.allElements)).format(len(elements)))
             else:
                 elements = self.record.elementsWithValue
                 if len(elements) == 1:
                     if self.record.tag != tags.TITLE:
-                        self.elementsLabel.setText(self.tr("in {}".format(elements[0].getTitle())))
+                        self.elementsLabel.setText(self.tr("in {}").format(elements[0].getTitle()))
                     else: pass # In this case we would display the elements own title which doesn't help 
                 else: self.elementsLabel.setText(
                             self.tr("in {}/%n pieces","",len(self.record.allElements)).format(len(elements)))

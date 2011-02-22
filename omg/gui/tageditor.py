@@ -8,6 +8,8 @@
 from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
+import itertools
+
 from omg import constants, tags, getIcon, strutils
 from omg.models import tageditormodel, simplelistmodel
 from omg.gui import formatter, singletageditor, dialogs, tagwidgets
@@ -202,15 +204,44 @@ class TagEditorWidget(QtGui.QWidget):
         removeSelectedAction.triggered.connect(self._handleRemoveSelected)
         menu.addAction(removeSelectedAction)
 
+        # Fancy stuff
+        fancyMenu = menu.addMenu(self.tr("Fancy stuff"))
         selectedRecords = [editor.getRecord() for editor in self.selectionManager.getSelectedWidgets()]
 
-        if len(selectedRecords) > 0 and len(strutils.commonPrefix(str(record.value) for record in selectedRecords)) > 0:
-            action = menu.addAction(self.tr("Edit common start..."))
-            action.triggered.connect(self._editCommonStart)
+        if len(selectedRecords) > 0:
+            commonPrefix = strutils.commonPrefix(str(record.value) for record in selectedRecords)
+            
+            if not all(record.isCommon() for record in selectedRecords):
+                action = fancyMenu.addAction(self.tr("Extend to all elements"))
+                action.triggered.connect(lambda: self.model.extendRecords(selectedRecords))
+            
+            if len(commonPrefix) > 0:
+                action = fancyMenu.addAction(self.tr("Edit common start..."))
+                action.triggered.connect(self._editCommonStart)
 
-        for separator in self.model.getPossibleSeparators(selectedRecords):
-            action = menu.addAction(self.tr("Separate at '{}'").format(separator))
-            action.triggered.connect(lambda: self.model.splitMany(selectedRecords,separator))
+            if len(commonPrefix) > 0:
+                if commonPrefix[-1].upper() == "I":
+                    # Bugfix: If up to four pieces using roman numbers are selected, the commonPrefix will contain an 'I'. Consequently the 'I' is missing in the rest and numberFromPrefix won't find a number in the first piece.
+                    prefixLength = len(commonPrefix) - 1
+                else: prefixLength = len(commonPrefix)
+                rests = [str(record.value)[prefixLength:] for record in selectedRecords]
+                if any(strutils.numberFromPrefix(rest)[0] is not None for rest in rests):
+                    action = fancyMenu.addAction(self.tr("Remove common start (including numbers)"))
+                    newValues = []
+                    for record,rest in zip(selectedRecords,rests):
+                        number,prefix = strutils.numberFromPrefix(rest)
+                        if number is not None:
+                            newValues.append(record.value[prefixLength+len(prefix):])
+                        else: newValues.append(record.value[prefixLength])
+                    action.triggered.connect(lambda: self.model.editMany(selectedRecords,newValues))
+                else:
+                    action = fancyMenu.addAction(self.tr("Remove common start"))
+                    newValues = [record.value[len(commonPrefix):] for record in selectedRecords]
+                    action.triggered.connect(lambda: self.model.editMany(selectedRecords,newValues))
+                
+            for separator in self.model.getPossibleSeparators(selectedRecords):
+                action = fancyMenu.addAction(self.tr("Separate at '{}'").format(separator))
+                action.triggered.connect(lambda: self.model.splitMany(selectedRecords,separator))
 
         menu.popup(contextMenuEvent.globalPos())
 
@@ -220,7 +251,8 @@ class TagEditorWidget(QtGui.QWidget):
         text,ok = QtGui.QInputDialog.getText (self,self.tr("Edit common start"),
                                               self.tr("Insert a new text will replace the common start of all selected records:"),text=commonStart)
         if ok:
-            self.model.replaceCommonStart(selectedRecords,text)
+            newValues = [text+record.value[len(commonStart):] for record in selectedRecords]
+            self.model.editMany(selectedRecords,newValues)
         
 
 class TagDialog(QtGui.QDialog):

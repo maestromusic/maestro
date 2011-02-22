@@ -137,6 +137,7 @@ class EditorWidget(QtGui.QStackedWidget):
                 return True
             elif event.type() == QtCore.QEvent.KeyPress:
                 if event.key() == Qt.Key_Return or event.key() == Qt.Key_Enter:
+                    #TODO: Fix the following problem: If one uses an EditorWidget to change the value of one record in the tageditor to match that of another record, the EditorWidget will be removed as the two records will be merged. This leads to a crash...
                     self.setValue(self._editorText())
                     if not self.fixed:
                         self.showLabel()
