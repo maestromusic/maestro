@@ -10,7 +10,6 @@ import subprocess, pickle, re
 from omg import config, tags, absPath
 from omg.config import options
 
-
 def get(path,absolute=False):
     """Create a RealFile-instance for the given path, which must be absolute if the second parameter is true and otherwise relative to the music directory."""
     if not absolute:
@@ -53,7 +52,7 @@ class RealFile:
         self.saveTags()
         self.savePosition()
         
-
+    
 class MutagenFile(RealFile):
     """This class implements the methods of RealFile by opening the tags_python2-script (which is written in Python 2 and hence can use Mutagen) in a subprocess and communicating pickled data over stdout and stdin."""
     def _openProc(self):

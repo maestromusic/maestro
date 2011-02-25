@@ -98,7 +98,7 @@ class BasicPlaylist(rootedtreemodel.RootedTreeModel):
         assert isinstance(root,models.RootNode)
         self.contents = root.contents
         rootedtreemodel.RootedTreeModel.setRoot(self,root)
-        self.undoStack.clear()
+       # self.undoStack.clear()
         
     def setContents(self,contents):
         """Set the contents of this playlist and set their parent to self.root. The contents are only the toplevel-elements in the playlist, not all files. All views using this model will be reset."""

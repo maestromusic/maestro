@@ -75,7 +75,7 @@ FRAMES = {
 'TPOS': (u"Part of a set",                           POS,        u"discnumber"),
 'TPRO': (u"Produced notice",                         TEXT,       u"produced notice"),
 'TRCK': (u"Track number/Position in set",            POS,        u"tracknumber"),
-'TRSO': (u"Internet radio station name",             TEXT,       u"internet radio station name"),
+'TRSN': (u"Internet radio station name",             TEXT,       u"internet radio station name"),
 'TRSO': (u"Internet radio station owner",            TEXT,       u"internet radio station owner"),
 'TSOA': (u"Album sort order",                        TEXT,       u"album sort order"),
 'TSOP': (u"Performer sort order",                    TEXT,       u"performer sort order"),
