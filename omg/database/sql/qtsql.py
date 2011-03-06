@@ -6,6 +6,9 @@
 # it under the terms of the GNU General Public License version 3 as
 # published by the Free Software Foundation
 #
+
+"""Database driver using QtSql. Have a look at database.sql.AbstractSQL for docstrings."""
+
 from PyQt4 import QtSql
 import datetime, threading
 
@@ -34,16 +37,20 @@ class Sql(AbstractSql):
         with self.lock:
             query = QtSql.QSqlQuery(self._db)
             query.setForwardOnly(True) # improves performance
+
+            # Prepare
             if not query.prepare(queryString):
                 if self._db.lastError() is not None:
                     raise DBException("Query failed: {}".format(self._db.lastError().text()),queryString,args)
                 else: raise DBException("Query failed",queryString,args)
-    
+
+            # Bind
             for i,arg in enumerate(args):
                 if isinstance(arg,utils.FlexiDate):
                     arg = arg.toSql()
                 query.bindValue(i,arg)
-                
+
+            # Execute
             if query.exec_():
                 return SqlResult(query)
             else:

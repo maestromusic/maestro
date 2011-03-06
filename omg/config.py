@@ -142,7 +142,7 @@ def initOmgOptions(options):
     # No need to translate the strings in this method, as it is executed before any translators have been loaded.
     options.addOption("i18n",       "locale",           str,    QtCore.QLocale.system().name(), shorts=("-l","--locale"), description="The locale used by omg (e.g. de_DE).")
     
-    options.addOption("database",   "drivers",          list,   "qtsql"         )
+    options.addOption("database",   "drivers",          list,   ["qtsql"]       )
     options.addOption("database",   "mysql_user",       str,    ""              )
     options.addOption("database",   "mysql_password",   str,    ""              )
     options.addOption("database",   "mysql_host",       str,    "localhost"     )

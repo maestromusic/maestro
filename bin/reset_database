@@ -7,21 +7,21 @@
 # published by the Free Software Foundation
 #
 
-"""Convenience script to reset the database (drop all tables and create them again). The script will ask you which tags you want to use."""
+"""Convenience script to reset the database (drop all tables and create them again)."""
 
 from omg import database,config
 
 if input("Really? (y,n)") != "y":
     quit()
-    
-defaultTags = "album,artist,composer,date(date),genre,performer,title"
-tags = input("What tags do you want to use? [{}]".format(defaultTags))
-
-if tags.strip() == '':
-    tags = defaultTags
 
 config.init({})    
 database.connect()
 print("Resetting database...")
-database.resetDatabase(tags.strip())
+database.resetDatabase()
 print("...done")
+
+# Check for superfluous tables
+if database.checkSuperfluousTables():
+    if input("Drop superfluous tables? (y,n)") == "y":
+        database.checkSuperfluousTables(fix=True)
+        print("...done")
