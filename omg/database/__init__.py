@@ -37,17 +37,21 @@ class DBLayoutException(Exception):
 # Database connection object
 db = None
 
+# Table prefix
+prefix = None
+
 # Logger for database warnings
 logger = logging.getLogger("omg.database")
 
 def connect():
     """Connect to the database server with information from the config file. The drivers specified in ``options.database.drivers`` are tried in the given order."""
-    global db
+    global db, prefix
     if db is None:
         db = sql.newConnection(options.database.drivers)
         db.connect(*[options.database.__getattr__(key) for key in
                      ("mysql_user","mysql_password","mysql_db","mysql_host","mysql_port")])
         logger.info("Database connection is open.")
+        prefix = options.database.prefix
     else: logger.warning("database.connect has been called although the database connection was already open")
     return db
 
@@ -73,33 +77,52 @@ def getCheckMethods():
 
 def checkElementCounters(fix=False):
     """Search elements.elements for wrong entries and correct them if *fix* is true. Return the number of wrong entries."""
-    if "elements" not in listTables():
+    if prefix+"elements" not in listTables():
         return 0
         
     if fix:
-        return db.query("UPDATE elements \
-                         SET elements = (SELECT COUNT(*) FROM contents WHERE container_id = id)").affectedRows()
+        return db.query("""
+            UPDATE {0}elements
+            SET elements =
+                (SELECT COUNT(*) FROM {0}contents
+                 WHERE container_id = id)
+            """.format(prefix)).affectedRows()
     else:
-        return db.query("SELECT COUNT(*) FROM elements \
-                           WHERE elements != (SELECT COUNT(*) FROM contents WHERE container_id = id)").getSingle()
+        return db.query("""
+            SELECT COUNT(*) FROM {0}elements \
+            WHERE elements !=
+                (SELECT COUNT(*) FROM {0}contents
+                 WHERE container_id = id)
+            """.format(prefix)).getSingle()
 
 def checkFileFlags(fix=False):
     """Return the number of wrong entries in elements.file and correct them if *fix* is True."""
-    if "elements" not in listTables():
+    if prefix+"elements" not in listTables():
         return 0
     if fix:
-        return db.query("UPDATE elements SET file = (id IN (SELECT element_id FROM files))").affectedRows()
-    else: return db.query("SELECT COUNT(*) FROM elements WHERE file != (id IN (SELECT element_id FROM files))").getSingle()
+        return db.query("""
+            UPDATE {0}elements
+            SET file = (id IN (SELECT element_id FROM {0}files))
+            """.format(prefix)).affectedRows()
+    else: return db.query("""
+                SELECT COUNT(*) FROM {0}elements
+                WHERE file != (id IN (SELECT element_id FROM {0}files))
+                """.format(prefix)).getSingle()
     
 def checkTopLevelFlags(fix=False):
     """Search elements.toplevel for wrong entries and correct them if *fix* is True. Return the number of wrong entries."""
-    if "elements" not in listTables():
+    if prefix+"elements" not in listTables():
         return 0
     
     if fix:
-        return db.query("UPDATE elements SET toplevel = (NOT id IN (SELECT element_id FROM contents))").affectedRows()
-    else: return db.query("SELECT COUNT(*) FROM elements \
-                           WHERE toplevel != (NOT id IN (SELECT element_id FROM contents))").getSingle()
+        return db.query("""
+            UPDATE {0}elements
+            SET toplevel = (NOT id IN (SELECT element_id FROM {0}contents))
+            """.format(prefix)).affectedRows()
+    else: return db.query("""
+                SELECT COUNT(*) FROM {0}elements
+                WHERE toplevel != (NOT id IN (SELECT element_id FROM {0}contents))
+                """.format(prefix)).getSingle()
 
 def checkMissingTables(fix=False):
     """Search the database for missing tables and create them if fix is true. Return a list of the missing tables."""
@@ -113,7 +136,7 @@ def checkMissingTables(fix=False):
 def checkSuperfluousTables(fix=False):
     """Search the database for tables which are not used by this program (this may depend on the installed plugins) and return them as a list. If *fix* is true delete these tables. All table rows will be lost!"""
     from . import tables
-    tableNames = [table.name for table in tables.tables]
+    tableNames = [prefix+table.name for table in tables.tables]
     superfluousTables = list(filter(lambda t: t not in tableNames,listTables()))
     if fix:
         for table in superfluousTables:
@@ -129,16 +152,16 @@ def checkValueIds(fix=False):
     for id,name,type in result:
         if fix:
             result2 = db.query("""
-                DELETE FROM tags
-                WHERE tag_id = ? AND NOT value_id IN (SELECT id FROM values_{} WHERE tag_id=?)
-                """.format(type),id,id)
+                DELETE FROM {0}tags
+                WHERE tag_id = ? AND NOT value_id IN (SELECT id FROM {0}values_{1} WHERE tag_id=?)
+                """.format(prefix,type),id,id)
             brokenEntries[name] = result2.affectedRows()
         else:
             brokenEntries[name] = db.query("""
                     SELECT COUNT(*)
-                    FROM tags 
-                    WHERE tag_id = ? AND NOT value_id IN (SELECT id FROM values_{} WHERE tag_id=?)
-                    """.format(type),id,id).getSingle()
+                    FROM {0}tags 
+                    WHERE tag_id = ? AND NOT value_id IN (SELECT id FROM {0}values_{1} WHERE tag_id=?)
+                    """.format(prefix,type),id,id).getSingle()
     return {k:v for k,v in brokenEntries.items() if v > 0}
 
 def checkEmptyContainers(fix=False):
@@ -146,24 +169,24 @@ def checkEmptyContainers(fix=False):
     if "elements" not in listTables() or "files" not in listTables():
         return 0
     if fix:
-        return db.query("DELETE FROM elements WHERE elements=0 \
-                         AND NOT id IN (SELECT element_id FROM files)").affectedRows()
-    else: return db.query("SELECT COUNT(*) FROM elements WHERE elements=0 \
-                           AND NOT id IN (SELECT element_id FROM files)").getSingle()
+        return db.query("DELETE FROM {0}elements WHERE elements=0 \
+                         AND NOT id IN (SELECT element_id FROM {0}files)".format(prefix)).affectedRows()
+    else: return db.query("SELECT COUNT(*) FROM {0}elements WHERE elements=0 \
+                           AND NOT id IN (SELECT element_id FROM {0}files)".format(prefix)).getSingle()
 
 def checkSuperfluousTags(fix=False):
     """Search the values_*-tables for values that are never used in the tags-table. If *fix* is true, delete these entries. Return a dictionary mapping names to the number of superfluous tags with this name (but only where this number is positive)."""
     result = {}
-    for id,name,type in db.query("SELECT id,tagname,tagtype FROM tagids"):
-        tablename = "values_{0}".format(type)
+    for id,name,type in db.query("SELECT id,tagname,tagtype FROM {0}tagids".format(prefix)):
+        tablename = "{0}values_{1}".format(prefix,type)
         if tablename not in listTables(): # If something's wrong with the tagids-table, tablename may not exist
             continue
         if fix:
             result[name] = db.query("DELETE FROM {} \
-                                     WHERE tag_id=? AND id NOT IN (SELECT value_id FROM tags WHERE tag_id = ?)"
-                                        .format(tablename),id,id).affectedRows()
+                                     WHERE tag_id=? AND id NOT IN (SELECT value_id FROM {}tags WHERE tag_id = ?)"
+                                        .format(tablename,prefix),id,id).affectedRows()
         else:
-            result[name] = db.query("SELECT COUNT(*) FROM {0} \
-                                     WHERE tag_id=? AND id NOT IN (SELECT value_id FROM tags WHERE tag_id = ?)"
-                                        .format(tablename),id,id).getSingle()
+            result[name] = db.query("SELECT COUNT(*) FROM {} \
+                                     WHERE tag_id=? AND id NOT IN (SELECT value_id FROM {}tags WHERE tag_id = ?)"
+                                        .format(tablename,prefix),id,id).getSingle()
     return {k:v for k,v in result.items() if v > 0}

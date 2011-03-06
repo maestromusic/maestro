@@ -12,6 +12,7 @@
 import re
 from omg import constants,database
 from omg.database.sql import DBException
+from omg.config import options
 
 db = database.get()
 
@@ -21,18 +22,21 @@ class SQLTable:
     This class contains methods to create, check and drop a table in an SQL database. Note that instantiating SQLTable does not create an actual table or modify the database in any way. The class has two public attributes:
 
         * ``createQuery`` contains the query which can be used to create the table and is given in the constructor.
-        * ``name`` contains the name of the table. And is extracted from ``createQuery``.
+        * ``name`` contains the name of the table and is extracted from ``createQuery``.
     """
     def __init__(self,createQuery):
-        self.createQuery = createQuery
-        result = re.match("\s*CREATE\s*TABLE\s*(\w+)",createQuery,re.I)
-        self.name = result.group(1)
-        if self.name is None:
+        regexp = re.compile("\s*CREATE\s*TABLE\s*(\w+)\s")
+        result = regexp.match(createQuery)
+        if result is None:
             raise DBException("Bad SQL-Query: {}".format(createQuery))
+        else:
+            self.name = result.group(1)
+            self.creqteQuery = regexp.sub("CREATE TABLE {}{} ".format(options.database.prefix,self.name),createQuery,1)
+
 
     def exists(self):
         """Return whether this table exists in the database."""
-        result = db.query("SHOW TABLES LIKE '{}'".format(self.name))
+        result = db.query("SHOW TABLES LIKE '{}{}'".format(options.database.prefix,self.name))
         return result.size() > 0
         
     def create(self):
@@ -44,11 +48,11 @@ class SQLTable:
     def reset(self):
         """Drop this table and create it without data again. All table rows will be lost!"""
         if self.exists():
-            db.query("DROP table {}".format(self.name))
+            db.query("DROP table {}{}".format(options.database.prefix,self.name))
         self.create()
 
 
-# Dictionary mapping table names to table objects which are created with the following queries
+# Dictionary mapping table names to table objects which are created with the following queries. Do not include the database prefix!
 tables = [SQLTable(createQuery) for createQuery in (
 """CREATE TABLE elements (
         id          MEDIUMINT UNSIGNED  NOT NULL AUTO_INCREMENT,
