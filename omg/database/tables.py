@@ -15,6 +15,7 @@ from omg.database.sql import DBException
 from omg.config import options
 
 db = database.get()
+prefix = database.prefix
 
 class SQLTable:
     """A table in the database.
@@ -22,21 +23,18 @@ class SQLTable:
     This class contains methods to create, check and drop a table in an SQL database. Note that instantiating SQLTable does not create an actual table or modify the database in any way. The class has two public attributes:
 
         * ``createQuery`` contains the query which can be used to create the table and is given in the constructor.
-        * ``name`` contains the name of the table and is extracted from ``createQuery``.
+        * ``name`` contains the name of the table including the optional prefix and is extracted from ``createQuery``.
     """
     def __init__(self,createQuery):
-        regexp = re.compile("\s*CREATE\s*TABLE\s*(\w+)\s")
-        result = regexp.match(createQuery)
+        self.createQuery = createQuery
+        result = re.match("\s*CREATE\s*TABLE\s*(\w+)",createQuery,re.I)
         if result is None:
             raise DBException("Bad SQL-Query: {}".format(createQuery))
-        else:
-            self.name = result.group(1)
-            self.creqteQuery = regexp.sub("CREATE TABLE {}{} ".format(options.database.prefix,self.name),createQuery,1)
-
+        else: self.name = result.group(1)
 
     def exists(self):
         """Return whether this table exists in the database."""
-        result = db.query("SHOW TABLES LIKE '{}{}'".format(options.database.prefix,self.name))
+        result = db.query("SHOW TABLES LIKE '{}'".format(self.name))
         return result.size() > 0
         
     def create(self):
@@ -48,31 +46,31 @@ class SQLTable:
     def reset(self):
         """Drop this table and create it without data again. All table rows will be lost!"""
         if self.exists():
-            db.query("DROP table {}{}".format(options.database.prefix,self.name))
+            db.query("DROP table {}".format(self.name))
         self.create()
 
 
-# Dictionary mapping table names to table objects which are created with the following queries. Do not include the database prefix!
+# Dictionary mapping table names to table objects which are created with the following queries.
 tables = [SQLTable(createQuery) for createQuery in (
-"""CREATE TABLE elements (
+"""CREATE TABLE {}elements (
         id          MEDIUMINT UNSIGNED  NOT NULL AUTO_INCREMENT,
         file        TINYINT(1)          NOT NULL,
         toplevel    TINYINT(1)          NOT NULL,
         elements    SMALLINT  UNSIGNED  NOT NULL DEFAULT 0,
         PRIMARY KEY(id)
     ) ENGINE InnoDB, CHARACTER SET 'utf8';
-""",
-"""CREATE TABLE contents (
+""".format(prefix),
+"""CREATE TABLE {0}contents (
         container_id MEDIUMINT UNSIGNED NOT NULL,
         position     SMALLINT  UNSIGNED NOT NULL,
         element_id   MEDIUMINT UNSIGNED NOT NULL,
         PRIMARY KEY(container_id,position),
         INDEX element_idx(element_id),
-        FOREIGN KEY(container_id) REFERENCES elements(id) ON DELETE CASCADE,
-        FOREIGN KEY(element_id) REFERENCES elements(id) ON DELETE CASCADE
+        FOREIGN KEY(container_id) REFERENCES {0}elements(id) ON DELETE CASCADE,
+        FOREIGN KEY(element_id) REFERENCES {0}elements(id) ON DELETE CASCADE
     ) ENGINE InnoDB, CHARACTER SET 'utf8';
-""",
-"""CREATE TABLE files (
+""".format(prefix),
+"""CREATE TABLE {0}files (
         element_id MEDIUMINT UNSIGNED NOT NULL,
         path       VARCHAR(511)       NOT NULL,
         hash       VARCHAR(63),
@@ -82,52 +80,52 @@ tables = [SQLTable(createQuery) for createQuery in (
         INDEX path_idx(path(333)),
         INDEX hash_idx(hash),
         INDEX length_idx(length),
-        FOREIGN KEY(element_id) REFERENCES elements(id) ON DELETE CASCADE
+        FOREIGN KEY(element_id) REFERENCES {0}elements(id) ON DELETE CASCADE
     ) ENGINE InnoDB, CHARACTER SET 'utf8';
-""",
-"""CREATE TABLE tagids (
+""".format(prefix),
+"""CREATE TABLE {}tagids (
         id      SMALLINT UNSIGNED             NOT NULL AUTO_INCREMENT,
         tagname VARCHAR(63)                   NOT NULL,
         tagtype ENUM('varchar','date','text') NOT NULL DEFAULT 'varchar',
         PRIMARY KEY(id),
         UNIQUE INDEX(tagname)
     ) ENGINE InnoDB, CHARACTER SET 'utf8';
-""",
-"""CREATE TABLE tags (
+""".format(prefix),
+"""CREATE TABLE {0}tags (
         element_id MEDIUMINT UNSIGNED NOT NULL,
         tag_id     SMALLINT  UNSIGNED NOT NULL,
         value_id   MEDIUMINT UNSIGNED NOT NULL,
         INDEX tag_value_idx(tag_id,value_id),
         INDEX element_idx(element_id),
-        FOREIGN KEY(element_id) REFERENCES elements(id) ON DELETE CASCADE,
-        FOREIGN KEY(tag_id) REFERENCES tagids(id) ON DELETE CASCADE
+        FOREIGN KEY(element_id) REFERENCES {0}elements(id) ON DELETE CASCADE,
+        FOREIGN KEY(tag_id) REFERENCES {0}tagids(id) ON DELETE CASCADE
     ) ENGINE InnoDB, CHARACTER SET 'utf8';
-""",
-"""CREATE TABLE values_varchar (
+""".format(prefix),
+"""CREATE TABLE {0}values_varchar (
         id     MEDIUMINT UNSIGNED NOT NULL AUTO_INCREMENT,
         tag_id SMALLINT  UNSIGNED NOT NULL,
-        value  VARCHAR({})        NOT NULL,
+        value  VARCHAR({1})        NOT NULL,
         PRIMARY KEY(id),
         INDEX tag_value_idx(tag_id,value),
-        FOREIGN KEY(tag_id) REFERENCES tagids(id)
+        FOREIGN KEY(tag_id) REFERENCES {0}tagids(id)
     ) ENGINE InnoDB, CHARACTER SET 'utf8';
-""".format(constants.TAG_VARCHAR_LENGTH),
-"""CREATE TABLE values_text (
+""".format(prefix,constants.TAG_VARCHAR_LENGTH),
+"""CREATE TABLE {0}values_text (
         id     MEDIUMINT UNSIGNED NOT NULL AUTO_INCREMENT,
         tag_id SMALLINT  UNSIGNED NOT NULL,
         value  TEXT               NOT NULL,
         PRIMARY KEY(id),
         INDEX tag_value_idx(tag_id,value(10)),
-        FOREIGN KEY(tag_id) REFERENCES tagids(id)
+        FOREIGN KEY(tag_id) REFERENCES {0}tagids(id)
     ) ENGINE InnoDB, CHARACTER SET 'utf8';
-""",
-"""CREATE TABLE values_date (
+""".format(prefix),
+"""CREATE TABLE {0}values_date (
         id     MEDIUMINT UNSIGNED NOT NULL AUTO_INCREMENT,
         tag_id SMALLINT  UNSIGNED NOT NULL,
         value  INT       UNSIGNED NOT NULL,
         PRIMARY KEY(id),
         INDEX tag_value_idx(tag_id,value),
-        FOREIGN KEY(tag_id) REFERENCES tagids(id)
+        FOREIGN KEY(tag_id) REFERENCES {0}tagids(id)
     ) ENGINE InnoDB, CHARACTER SET 'utf8';
-"""
+""".format(prefix)
 )]

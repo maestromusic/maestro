@@ -9,46 +9,47 @@
 
 """Script to convert Omg's database from version 0.1 to version 0.2. Make a backup before using this script!"""
 
+import sys
 from omg import database,config
 
-config.init({})    
-db = database.connect()
+config.init({})
 
-print("Renaming old tables...")
-for table in db.query("SHOW TABLES").getSingleColumn():
-    db.query("RENAME TABLE {0} TO zzz_{0}".format(table))
-print("...done")
+prefix = config.options.database.prefix
+if not prefix:
+    print("You must specify a table prefix for the version 0.2 tables in your config-file.")
+    sys.exit()
+    
+db = database.connect()
 
 print("Creating new tables...")
 database.resetDatabase()
 print("...done")
 
 print("Copying data (except tags)...")
-db.query("""INSERT INTO elements (id,file,toplevel,elements)
-                (SELECT id,file,toplevel,elements FROM zzz_elements);""")
-db.query("""INSERT INTO contents (container_id,position,element_id)
-                (SELECT container_id,position,element_id FROM zzz_contents);""")
-db.query("""INSERT INTO files (element_id,path,hash,verified,length)
-                (SELECT element_id,path,hash,verified,length FROM zzz_files);""")
-db.query("""INSERT INTO tagids (id,tagname,tagtype)
-                (SELECT id,tagname,tagtype FROM zzz_tagids);""")
+db.query("""INSERT INTO {}elements (id,file,toplevel,elements)
+                (SELECT id,file,toplevel,elements FROM elements);""".format(prefix))
+db.query("""INSERT INTO {}contents (container_id,position,element_id)
+                (SELECT container_id,position,element_id FROM contents);""".format(prefix))
+db.query("""INSERT INTO {}files (element_id,path,hash,verified,length)
+                (SELECT element_id,path,hash,verified,length FROM files);""".format(prefix))
+db.query("""INSERT INTO {}tagids (id,tagname,tagtype)
+                (SELECT id,tagname,tagtype FROM tagids);""".format(prefix))
 print("...done")
 
 print("Copying tags...")
-for tagid,tagname,tagtype in db.query("SELECT id,tagname,tagtype FROM tagids"):
-    idIncrement = db.query("SELECT MAX(id) FROM values_{}".format(tagtype)).getSingle()
+for tagid,tagname,tagtype in db.query("SELECT id,tagname,tagtype FROM {}tagids".format(prefix)):
+    idIncrement = db.query("SELECT MAX(id) FROM {}values_{}".format(prefix,tagtype)).getSingle()
 
     # Copy values
     if tagtype != "date":
-        db.query("""INSERT INTO values_{} (id,tag_id,value) (SELECT {}+id,{},value FROM zzz_tag_{})"""
-                                .format(tagtype,idIncrement,tagid,tagname))
+        db.query("""INSERT INTO {}values_{} (id,tag_id,value) (SELECT {}+id,{},value FROM tag_{})"""
+                                .format(prefix,tagtype,idIncrement,tagid,tagname))
     else: # Convert dates
-        db.query("""INSERT INTO values_date (id,tag_id,value)
-                    (SELECT {}+id,{},10000*YEAR(value)+100*MONTH(value)+DAY(value) FROM zzz_tag_{})"""
-                            .format(idIncrement,tagid,tagname))
+        db.query("""INSERT INTO {}values_date (id,tag_id,value)
+                    (SELECT {}+id,{},10000*YEAR(value)+100*MONTH(value)+DAY(value) FROM tag_{})"""
+                            .format(prefix,idIncrement,tagid,tagname))
         
     # Copy relations
-    db.query("""INSERT INTO tags (element_id,tag_id,value_id)
-                    (SELECT element_id,tag_id,value_id+{} FROM zzz_tags WHERE tag_id = {})""".format(idIncrement,tagid))
+    db.query("""INSERT INTO {}tags (element_id,tag_id,value_id)
+                 (SELECT element_id,tag_id,value_id+{} FROM tags WHERE tag_id = {})""".format(prefix,idIncrement,tagid))
 print("...done")
-print("If everything went fine you just have to delete the zzz_*-tables.")

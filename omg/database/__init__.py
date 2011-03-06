@@ -136,7 +136,7 @@ def checkMissingTables(fix=False):
 def checkSuperfluousTables(fix=False):
     """Search the database for tables which are not used by this program (this may depend on the installed plugins) and return them as a list. If *fix* is true delete these tables. All table rows will be lost!"""
     from . import tables
-    tableNames = [prefix+table.name for table in tables.tables]
+    tableNames = [table.name for table in tables.tables]
     superfluousTables = list(filter(lambda t: t not in tableNames,listTables()))
     if fix:
         for table in superfluousTables:
