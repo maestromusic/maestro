@@ -6,8 +6,15 @@
 # it under the terms of the GNU General Public License version 3 as
 #
 
+import datetime
+
 def mapRecursively(f,aList):
-    """Take <aList> which may contain (recursively) further lists and apply <f> to each element in these lists (except the lists). Return a copy a <aList> with the results."""
+    """Take *aList* which may contain (recursively) further lists and apply *f* to each element in these lists (except the lists). Return a copy of *aList* with the results::
+
+            >>> mapRecursively(lambda x: 2*x,[1,2,[3,4],[5]])
+            [2,4,[6,8],[10]]
+            
+    \ """
     result = []
     for item in aList:
         if isinstance(item,list):
@@ -16,12 +23,118 @@ def mapRecursively(f,aList):
     return result
 
 
-class OrderedDict(dict):
-    """Ordered subclass of dictionary which allows inserting key: value-mappings at arbitrary positions - in contrast to collections.OrderedDict. By default new mappings will be appended at the end of the order. Use the insert*-methods to insert somewhere else.
+class FlexiDate:
+    """A FlexiDate is a date which can store a date consisting simply of a year or of a year and a month or of year, month and day. OMG uses this class to store tags of type date, where most users will only specify a year, but some may give month and day, too.
 
-    Note that currently the views returned by keys(), values() and items() do not take the order into account."""
+    Note that while MySQL's DATE type can store dates where day and month may be unspecified, neither datetime.date nor QDate can. Thus binding FlexiDates to SQL-queries does not work. For this reason FlexiDates are stored as integers in the DB (confer :meth:`FlexiDate.toSql` and :meth:`FlexiDate.fromSql`.
+
+    The parameters may be anything that can be converted to :func:`int`. *month* and *day* may also be ``None``. If *month* or *day* are 0 or ``None`` they are regarded as unspecified. Note that you must not give a nonzero *day* if *month* is zero or ``None``. This method raises a :exc:`ValueException` if conversion to :func:`int` fails or if the date is invalid (confer :class:`datetime.date`).
+    """
+    def __init__(self, year, month = None, day = None):
+        self.year = int(year)
+        
+        if month == 0 or month is None: # cannot pass None to int(), so we have to check for it here
+            self.month = None
+            if day is not None and day != 0:
+                raise ValueError("Cannot store a day if month is None.")
+        elif 1 <= month <= 12:
+            self.month = int(month)
+        else: raise ValueError("Invalid month given.")
+        
+        if day == 0 or day is None:
+            self.day = None
+        else:
+            self.day = int(day)
+            datetime.date(self.year,self.month,self.day) # Check date
+    
+    @staticmethod
+    def strptime(string):
+        """Parse FlexiDates from strings in one of the formats ``'YYYY-mm-dd'`` or ``'YYYY-mm'`` or ``'YYYY'``. Raise a :exc:`ValueError` if that fails."""
+        if not isinstance(string,str):
+            raise TypeError("Argument must be a string.")
+        try:
+            return FlexiDate(*map(int,string.split("-")))
+        except TypeError as e:
+            # A TypeError is raised if the number of arguments doesn't fit. In our case that's more a kind of ValueError.
+            raise ValueError(e.message)
+    
+    def strftime(self, format = ("{Y:04d}-{m:02d}-{d:02d}", "{Y:04d}-{m:02d}", "{Y:04d}")):
+        """Format the FlexiDate according to the given format. *format* must be a 3-tuple of
+        format strings, where the first one if used if year, month and day are specified,
+        the second one is used if only the day misses, and the third one is used if there
+        is only a year. The format strings are python format strings, where Y=year, m=month, d=day."""
+        if self.month:
+            if self.day:
+                format = format[0]
+            else: format = format[1]
+        else: format = format[2]
+        return format.format(Y=self.year, m=self.month, d=self.day)
+        
+    def toSql(self):
+        """Convert this FlexiDate to an int as used to store it in the database."""
+        result = 10000*self.year
+        if self.month is not None:
+            result += 100*self.month
+            if self.day is not None:
+                result += self.day
+        return result
+
+    @staticmethod
+    def fromSql(value):
+        """Create a FlexiDate from an int as used to store FlexiDates in the database."""
+        if value is None or value == 0:
+            return None
+        try:
+            value = int(value)
+            return FlexiDate(value // 10000,(value // 100) % 100,value % 100)
+        except ValueError as e:
+            raise ValueError("Cannot create a FlexiDate from value {}: {}".format(value,e))
+        
+    def __str__(self):
+        return self.strftime()
+
+    def __repr__(self):
+        if self.month:
+            if self.day:
+                return "FlexiDate({},{},{})".format(self.year,self.month,self.day)
+            else: return "FlexiDate({},{})".format(self.year,self.month)
+        else: return "FlexiDate({})".format(self.year)
+        
+    def __lt__(self, other):
+        for a,b in ((self.year,other.year),(self.month,other.month),(self.day,other.day)):
+            if a == b:
+                continue
+            if a is None:
+                return True
+            if b is None:
+                return False
+            return a < b
+        else: return False # Equality
+
+    def __gt__(self, other):
+        return other.__lt__(self)
+    
+    def __le__(self, other):
+        return self == other or self.__lt__(other)
+    
+    def __ge__(self, other):
+        return self == other or self.__gt__(other)
+        
+    def __eq__(self, other):
+        return isinstance(other,FlexiDate) and\
+            self.year == other.year and self.month == other.month and self.day == other.day
+        
+    def __ne__(self,other):
+        """Do something weird."""
+        return not isinstance(other,FlexiDate) or\
+            self.year != other.year or self.month != other.month or self.day != other.day
+
+
+class OrderedDict(dict):
+    """Ordered subclass of :class:`dict` which allows inserting key-value-mappings at arbitrary positions -- in contrast to :class:`collections.OrderedDict`. By default new mappings will be appended at the end of the order. Use the insert*-methods to insert somewhere else.
+    
+    Note that currently the views returned by :meth:`keys <dict.keys>`, :meth:`values <dict.values>` and :meth:`items <dict.items>` do not respect the order."""
     def __init__(self):
-        """Create an empty ordered dictionary."""
         dict.__init__(self)
         self._keyList = []
 
@@ -39,14 +152,14 @@ class OrderedDict(dict):
         return iter(self._keyList)
 
     def insert(self,pos,key,value):
-        """Insert the mapping <key>: <value> at the position <pos>."""
+        """Insert the mapping ``key: value`` at the position *pos*."""
         if key in self:
             raise ValueError("Key '{}' is already contained in this OrderedDict.".format(key))
         self._keyList.insert(pos,key)
         self.__setitem__(key,value)
 
     def changeKey(self,oldKey,newKey):
-        """Change the key <oldKey> into <newKey>."""
+        """Change the key *oldKey* into *newKey*."""
         if newKey in self:
             raise ValueError("Key '{}' is already contained in the OrderedDict.")
         pos = self._keyList.index(oldKey)
@@ -55,13 +168,13 @@ class OrderedDict(dict):
         dict.__delitem__(self,oldKey) # Do not use del as it would try tor remove oldKey from _keyList
 
     def index(self,key):
-        """Return the position of <key>."""
+        """Return the position of *key*."""
         return self._keyList.index(key)
 
     def insertAfter(self,posKey,key,value):
-        """Insert the mapping <key>: <value> into this OrderedDict after the key <posKey>."""
+        """Insert the mapping ``key: value`` after the key *posKey*."""
         self.insert(self.index(posKey)+1,key,value)
 
     def insertBefore(self,posKey,key,value):
-        """Insert the mapping <key>: <value> into this OrderedDict before the key <posKey>."""
+        """Insert the mapping ``key: value`` before the key *posKey*."""
         self.insert(self.index(posKey),key,value)

@@ -7,62 +7,79 @@
 # published by the Free Software Foundation
 #
 
-"""This module contains an abstraction layer for SQL databases. It provides a common API to several third party SQL modules so that the actual SQL module can be exchanged without changing the project code.
+"""
+This module contains an abstraction layer for MySQL databases. It provides a common API to several third party MySQL connector modules so that the actual connector can be exchanged without changing the project code.
 
 Currently the following drivers are supported:
-"myconnpy": uses the myconnpy module (https://launchpad.net/myconnpy)
-"qtsql": uses the QtSql-Module of PyQt4 (http://doc.trolltech.com/4.2/qtsql.html)
-The supported drivers are stored in the module-variable drivers.
 
-Usage of the module:
-=====================================
-import sql
+* `qtsql`: uses the QtSql-Module of PyQt4 (http://doc.trolltech.com/latest/qtsql.html)
 
-db = sql.newConnection(drivername)    # use the driver's string identifier above
+The following example shows basic usage of the module::
 
-result = db.query("SELECT name,country FROM persons WHERE id = ?",person)   # Use ? as placeholder to insert parameters which are automatically escaped
+    import sql
 
-# When using query, this iterator yields for each person a tuple with the corresponding data.
-for row in result:
-  print(row[0])  #  e.g. ("Max Mustermann","Germany")
+    db = sql.newConnection()    # this will try to find a working driver
+    
+    # Use ? as placeholder to insert parameters which are automatically escaped
+    result = db.query("SELECT name,country FROM persons WHERE id = ?",person)   
 
-# Another way is to use queryDict. The iterator will then return a dictionary {columnname => data} for each person
-result = db.queryDict("SELECT name,country FROM persons WHERE id = ?",person)
+    # When using query, this iterator yields for each person a tuple with the corresponding data.
+    for row in result:
+      print(row[0])  #  e.g. ("Max Mustermann","Germany")
 
-for row in result:
-  print(row[0])  #  e.g. {"name": "Max Mustermann","country": "Germany"}
+    # An easy method to retrieve a single value from the database is getSingle:
+    number = db.query("SELECT COUNT(*) FROM persons").getSingle()
+    # Note that this will raise an EmptyResultException if the query does return an empty result.
 
-# An easy method to retrieve a single value from the database is getSingle:
-number = db.query("SELECT COUNT(*) FROM persons").getSingle()
+The main class of the module is :class:`AbstractSQL <omg.database.sql.AbstractSQL>` which is subclassed by every driver.
 """
 
-from omg import strutils
+from PyQt4 import QtCore
 
-# Identifiers of supported drivers. For each identifier there must be a module
-# <drivername>.py file in this package which contains the corresponding driver.
-drivers = {"myconnpy","qtsql"}
+from omg.utils import FlexiDate
 
 # When a driver is loaded _modules[driverIdentifier] will contain the driver's module.
 _modules = {}
 
-
 class DBException(Exception):
-    """Class for database-related exceptions in this package."""
+    """This exception is raised if something goes wrong with the database connection, or if an invalid query is executed."""
+    def __init__(self,message,query=None,args=None):
+        Exception.__init__(self)
+        self.message = message
+        self.query = query
+        self.arguments = args #self.args is a property
+
+    def __str__(self):
+        if self.query is not None:
+            if self.arguments is not None:
+                return "\n".join((self.message,self.query,str(self.arguments)))
+            else: return "\n".join((self.message,self.query))
+        else: return self.message
 
 
-def newConnection(driver):
-    """Create a new database connection object using the given driver identifier. This method does not open a connection."""
-    if driver not in drivers:
-        raise Exception("driver '{0}' is not known.".format(driver))
-    if driver not in _modules:
-        _modules[driver] = __import__(driver,globals(),locals())
-    return _modules[driver].Sql()
+class EmptyResultException(Exception):
+    """This exception is executed if :meth:`getSingle`, :meth:`getSingleRow` or :meth:`getSingleColumn` are performed on a result which does not contain any row."""
+
+
+def newConnection(drivers=["qtsql"]):
+    """Create a new database connection object. *drivers* is a list of driver-module names which will be tried in the given order until one is loaded successfully. If no driver can be loaded, a :exc:`DBException <omg.database.sql.DBException>` is raised. This method does not actually open a connection, but only sets up the t
+    connection object."""
+    for driver in drivers:
+        try:
+            if driver not in _modules:
+                _modules[driver] = __import__(driver,globals(),locals())
+            return _modules[driver].Sql()
+        except Exception as e:
+            import logging
+            logging.warning("Could not load driver {}: {}".format(driver,e))
+            # Try next driver...
+    else: raise DBException("Couldn't load any driver from {}".format(drivers))
     
     
 class AbstractSql:
     """Abstract base class for an SQL connection object.
     
-    This class encapsulates a connection to a database. To create instances of AbstractSql use newConnection and specify a driver.
+    This class encapsulates a connection to a database. To create instances of AbstractSql use :func:`newConnection <omg.database.sql.newConnection>` which will create a non-abstract subclass of this depending on the driver.
     """
     def connect(self,username,password,database,host="localhost",port=3306):
         """Connect to a database using the given information."""
@@ -70,83 +87,76 @@ class AbstractSql:
     def query(self,queryString,*args):
         """Perform a query in the database.
         
-        Execute the query queryString and return an AbstractSqlResult-instance which yields the result's rows in tuples. The queryString may contain ? as placeholders which are replaced by the args-parameters in the given order. Those parameters must be either string or integer and strings are escaped before replacing. In particular you must not use quotation marks around string parameters: "SELECT id FROM table WHERE name = ?" works fine. A drawback is that you cannot use placeholders to select a table: "SELECT id FROM ?" will not work.
+        Execute the query *queryString* and return an :class:``AbstractSqlResult`` which yields the result's rows in tuples. *queryString* may contain ``'?'`` as placeholders which are replaced by the *args*-parameters in the given order. Note that you must not use quotation marks around string parameters::
+
+            SELECT id FROM table WHERE name = ?
+
+        works fine. A drawback is that you cannot use placeholders to select a table::
+        
+            SELECT id FROM ?
+
+        will not work.
         """
         
-    def queryDict(self,queryString,*args):
-        """Perform a query in the database.
+    def multiQuery(self,queryString,args):
+        """Perform a query several times with changing parameter sets.
+
+        Equivalent to::
         
-        Execute the query queryString and return an SqlResult object which yields the result's rows in dictionaries with the column names as keys. The queryString may contain ? as placeholders which are replaced by the args-parameters in the given order. Those parameters must be either string or integer and strings are escaped before replacing. In particular you must not use quotation marks around string parameters: "SELECT id FROM table WHERE name = ?" works fine. A drawback is that you cannot use placeholders to select a table: "SELECT id FROM ?" will not work.
-        """
+            for parameters in args:
+                self.query(queryString,*parameters)
+
+        In some drivers :func:`multiQuery` may be faster than this loop because the query has to be sent to the server and parsed only once.
+
+        Finally one example::
+
+            SQL.multiQuery("INSERT INTO persons VALUES (?,?)",(("Peter","Germany"),("Julie","France")))
+
+    \ """
+        for parameters in args:
+            self.query(queryString,*parameters)
+
+    def transaction():
+        """Start a transaction."""
         
-    def escapeString(self,string,likeStatement=False):
-        """Escape a string for insertion in MySql queries.
+    def commit():
+        """Commit a transaction."""
         
-        This function escapes the characters which are listed in the documentation of mysql_real_escape_string and is used as a replacement for that function. But it doesn't emulate mysql_real_escape string correctly, which would be difficult since that function needs a database connection to determine the connection's encoding. If <likeStatement> is true this method also escapes '%' and '_' so that the return value may safely be used in LIKE-statements.
-        """
-        return _escapeString(string,likeStatement)
+    def rollback():
+        """Rollback a transaction."""
 
 
 class AbstractSqlResult:
     """Abstract base class for classes which encapsulate a query result set.
     
-    This class (or rather driver-dependent subclasses of it) encapsulates the result of the execution of an SQL query. It may contain selected rows from the database or information like the number of affected rows. SqlResult-subclasses implement __iter__ so they may be used in for-loops to retrieve all rows from the result set. Depending on whether query or queryDict was used to create an SqlResult-instance the rows are returned as tuple or as dictionary. In the latter case the column-names are used as keys unless the query specified an alias. A short way to retrieve a single value from the database is getSingle. But be careful not to mix different access methods like getSingle, getSingleColumn and iterator methods (e.g. next) since they may change internal cursors and could interfere with each other.
+    This class (or rather driver-dependent subclasses of it) encapsulates the result of the execution of an SQL query. It may contain selected rows from the database or information like the number of affected rows. :class:`AbstractSqlResult`-subclasses implement ``__iter__`` so they may be used in ``for``-loops to retrieve all rows as tuples from the result set. A short way to retrieve a single value from the database is getSingle.
+
+    .. warning::
+        Be careful not to mix different access methods like getSingle, getSingleColumn and iterator methods (e.g. next) since they all may change internal cursors and could interfere with each other.
     """
     def size(self):
-        """Returns the number of rows selected in a select query. You can also use the built-in len-method."""
+        """Returns the number of rows selected in a select query. You can also use the built-in :func:`len`-method."""
     
     def next(self):
-        """Yields the next row from the result set or raises a StopIteration if there is no such row."""
+        """Yields the next row from the result set or raises a :exc:`StopIteration` if there is no such row."""
         
     def executedQuery(self):
         """Return the query which produced this SqlResult. The query won't contain placeholders but the actual values used when executing."""
         
     def affectedRows(self):
-        """Return the number of rows affected by the query producing this SqlResult."""
+        """Return the number of rows affected by the query producing this :class:`AbstracSqlResult`."""
     
     def insertId(self):
-        """Return the last value which was used in an AUTO_INCREMENT-column when this SqlResult was created."""
+        """Return the last value which was used in an ``AUTO_INCREMENT``-column when this AbstractSqlResult was created."""
     
     def getSingle(self):
-        """Returns the first value from the first row of the result set and should be used as a shorthand method if the result contains only one value. Do not use this method together with iterators or getSingleColumn as both of them may move the internal cursor."""
+        """Returns the first value from the first row of the result set and should be used as a shorthand method if the result contains only one value. If the result set does not contain any row, an :exc:`EmptyResultException` is raised."""
         
     def getSingleColumn(self):
-        """Returns a generator for the first column of the result set and should be used as a shorthand method if the result contains only one column. Do not use this method together with iterators or getSingle as both of them may move the internal cursor."""
+        """Returns a generator for the first column of the result set and should be used as a shorthand method if the result contains only one column. If the result set does not contain any row, an :exc:`EmptyResultException` is raised."""
         
     def getSingleRow(self):
-        """Returns the first row of the result set or None if there is no row. This method should be used as a shorthand if there is only one row in the result set."""
+        """Returns the first row of the result set or raises an :exc:`EmptyResultException` if the result does not contain any rows. This method should be used as a shorthand if there is only one row in the result set."""
         if self.size() == 0:
-            return None
+            raise EmptyResultException()
         else: return self.next()
-
-
-def _escapeString(string,likeStatement=False):
-        """Escape a string for insertion in MySql queries.
-        
-        This function escapes the characters which are listed in the documentation of mysql_real_escape_string and is used as a replacement for that function. But it doesn't emulate mysql_real_escape string correctly, which would be difficult since that function needs a database connection to determine the connection's encoding. If <likeStatement> is true this method also escapes '%' and '_' so that the return value may safely be used in LIKE-statements.
-        """
-        escapeDict = {
-             '\\': '\\\\',
-             "'": "\\'",
-             '"': '\\"',
-             '\x00': '\\0',
-             '0x1A': '\\Z', # ASCII 26
-             '\n': '\\n',
-             '\r': '\\r'
-             }
-        if likeStatement:
-            escapeDict.update({'%':'\%','_':'\_'})
-        return strutils.replace(string,escapeDict)
-        
-def _replaceQueryArgs(query,*args):
-    """Replace occurences of '?' in query by the arguments which must be either string or int. String arguments are escaped."""
-    if query.count('?') != len(args):
-        raise DBException("Number of '?' must match number of query parameters.")
-    for arg in args:
-        if isinstance(arg,str):
-            arg = "'"+_escapeString(arg)+"'"
-        elif isinstance(arg,int):
-            arg = str(arg)
-        else: raise DBException("All arguments must be either string or int, but I got one of type {0}".format(type(arg)))
-        query = query.replace('?',arg,1) # Replace only first occurence
-    return query
