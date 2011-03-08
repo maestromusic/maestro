@@ -1,4 +1,4 @@
-#TODO 
+#TODO aktualisieren
 TABLE containers (PRIMARY KEY: id):
 ------------------------------------------------------------------------------------
 id        | MEDIUMINT UNSIGNED NOT NULL AUTO_INCREMENT | eindeutige ID des containers
