@@ -8,7 +8,8 @@
 #
 import logging
 
-from omg import database, FlexiDate
+from omg import database
+from omg.utils import FlexiDate
 from omg import tags as tagsModule # this module defines a method called 'tags'
 db = database.get()
 
