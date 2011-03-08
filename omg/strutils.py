@@ -20,21 +20,21 @@ def replace(text,dict):
 
 
 def nextNonWhiteSpace(string,pos=0):
-    """Return the position of the first non-whitespace character in *string*, beginning at *pos*. If no such character is found, return the length of *string*."""
+    """Return the position of the first non-whitespace character in string, beginning at *pos*. If no such character is found, return ``len(string)``."""
     while pos < len(string) and string[pos].isspace():
         pos = pos + 1
     return pos
 
 
 def nextWhiteSpace(string,pos=0):
-    """Return the position of the first whitespace character in *string*, beginning at *pos*. If no such character is found, return the length of *string*."""
+    """Return the position of the first whitespace character in string, beginning at *pos*. If no such character is found, return `len(string)`."""
     while pos < len(string) and not string[pos].isspace():
         pos = pos + 1
     return pos
 
 
 def formatLength(lengthInSeconds):
-    """Convert a number of seconds into a string like ``01:34``, ``00:05`` or ``1:20:00``. Hours are only displayed when *lengthInSeconds* is at least 3600. Minutes and seconds are displayed with leading zeros."""
+    """Convert a number of seconds in a string like ``01:34``, ``00:05`` or ``1:20:00``. Hours are only displayed when *lengthInSeconds* is at least 3600. Minutes and seconds are displayed with leading zeros."""
     if not isinstance(lengthInSeconds,int):
         lengthInSeconds = int(lengthInSeconds)
         
@@ -47,7 +47,7 @@ def formatLength(lengthInSeconds):
         return "{0:d}:{1:02d}:{2:02d}".format(hours,minutes,seconds)
 
 def commonPrefix(strings):
-    """Given a list of string or something that can be converted to one, return the longest common prefix."""
+    """Given a list of strings return the longest common prefix."""
     strings = list(strings)
     if len(strings) == 0:
         return ''
@@ -58,17 +58,14 @@ def commonPrefix(strings):
 
         
 def numberFromPrefix(string):
-    """Check whether string starts with something like ``'23'``, ``'1.'``, ``'IV.  '``. To be precise: This method first checks whether *string* starts with an arabic or roman integer number (roman numbers are case-insensitive). If so, the method returns a tuple containing
+    """Check whether string starts with something like ``23``, ``1.``, ``IV.``. To be precise: This method first checks whether *string* starts with an arabic or roman integer number (roman numbers are case-insensitive). If so, the method returns a tuple containing
 
         * the number (as ``int``) and
-        * the prefix. This is the part at the beginning of *string* containing the number and -- if present -- a period directly following the number and/or subsequent whitespace.
+        * the prefix. This is the part at the beginning of *string* containing the number and -- optionally -- one of ``['.',',',':']`` and finally subsequent whitespace. There must be at least one whitespace character at the end of the prefix, otherwise this method assumes it has found a false positive (e.g. ``Intermezzo`` where the ``I`` would be recognized as roman number).
 
-    If no number is found, this method returns ``(None,"")``. For example::
+    If no number is found, this method returns ``(None,"")``.
 
-        >>> numberFromPrefix("IV. Allegro vivace")
-        (4,"IV. ")
-
-    This method is used to find numbers in song titles. To avoid false positives, it currently finds only roman numbers build from I,V and X.
+    This method is used to find numbers in song titles (e.g. ``IV. Allegro vivace``). To avoid false positives, it currently finds only roman numbers build from I,V and X.
     """
     if len(string) == 0:
         return (None,"")
@@ -90,11 +87,15 @@ def numberFromPrefix(string):
                 return (None,"") # just looks like a roman number...give up
         else: return (None,"") # no number found...give up
         
-    # Ok I found a prefix
-    if string[i] == '.':
+    # Ok I found a prefix. Check whether it is followed by one of the allowed punctuation marks and by whitespace.
+    # Include any subsequent whitespace in the prefix and ensure there is at least one.
+    if string[i] in '.,:':
         i += 1
-        while (string[i].isspace()):
-            i += 1
+    if not string[i].isspace():
+        return (None,"")
+    while (string[i].isspace()):
+        i += 1
+        
     return (number,string[:i])
 
 
@@ -118,7 +119,7 @@ def isRomanNumber(string):
 
 
 def romanToArabic(roman):
-    """Return the value of the given roman number (which may contain upper and lower case letters) or raise a :exc:`ValueError` if *roman* is not a correct roman number."""
+    """Return the value of the given roman number (which may contain upper and lower case letters) or raise a ValueError if *roman* is not a correct roman number."""
     roman = roman.upper()
     if not all(c in "MDCLXVI" for c in roman):
         raise ValueError("Invalid character in roman number.")

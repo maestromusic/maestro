@@ -141,9 +141,7 @@ def initOmgOptions(options):
 
     # No need to translate the strings in this method, as it is executed before any translators have been loaded.
     options.addOption("i18n",       "locale",           str,    QtCore.QLocale.system().name(), shorts=("-l","--locale"), description="The locale used by omg (e.g. de_DE).")
-    
-    options.addOption("database",   "drivers",          list,   ["qtsql"]       )
-    options.addOption("database",   "prefix",           str,    ""              )
+    options.addOption("database",   "driver",           str,    "qtsql"         )
     options.addOption("database",   "mysql_user",       str,    ""              )
     options.addOption("database",   "mysql_password",   str,    ""              )
     options.addOption("database",   "mysql_host",       str,    "localhost"     )
@@ -209,9 +207,7 @@ options = Config()
 
 def init(copts):
     initOmgOptions(options)
-    if os.path.exists("{}.{}".format(constants.CONFIG,constants.VERSION)):
-        options.readFromFile("{}.{}".format(constants.CONFIG,constants.VERSION))
-    else: options.readFromFile(constants.CONFIG)
+    options.readFromFile(constants.CONFIG)
     options.readConsoleParameters(copts)
     
     if os.path.exists(os.path.join(constants.CONFDIR,"logging.conf")):
