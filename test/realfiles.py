@@ -75,8 +75,8 @@ class ReadTest(BaseTest):
         for key,values in self.file.tags.items():
             self.assertEqual(values,ORIGINAL_TAGS[key])
         self.assertEqual(self.file.tags,ORIGINAL_TAGS)
-        self.assertEqual(type(self.file.length),float)
-        self.assertGreater(self.file.length,0)
+        self.assertIn(type(self.file.length),(float, int))
+        self.assertGreaterEqual(self.file.length,0)
 
 
 class RemoveTest(BaseTest):
