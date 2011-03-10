@@ -63,7 +63,9 @@ class OpenTest(BaseTest):
 
     def tearDown(self):
         os.remove(PATH_WITHOUT_EXT)
-
+    
+    def __str__(self):
+        return "OpenTest for file {0}".format(self.full)
 
 class ReadTest(BaseTest):
     def setUp(self):
@@ -77,6 +79,9 @@ class ReadTest(BaseTest):
         self.assertEqual(self.file.tags,ORIGINAL_TAGS)
         self.assertIn(type(self.file.length),(float, int))
         self.assertGreaterEqual(self.file.length,0)
+    
+    def __str__(self):
+        return "ReadTest for file {0}".format(self.full)
 
 
 class RemoveTest(BaseTest):
@@ -93,6 +98,8 @@ class RemoveTest(BaseTest):
     def tearDown(self):
         os.remove(self.test)
 
+    def __str__(self):
+        return "RemoveTest for file {0}".format(self.full)
 
 class EmptyFileTest(BaseTest):
     def setUp(self):
@@ -130,7 +137,7 @@ class WriteTest(BaseTest):
 if __name__ == "__main__":
     suite = unittest.TestSuite()
     
-    for ext in ('ogg','mp3'):
+    for ext in ('ogg','mp3', 'mpc', 'flac', 'spx', 'm4a'):
         suite.addTest(OpenTest(ext))
         suite.addTest(ReadTest(ext))
         suite.addTest(RemoveTest(ext))
