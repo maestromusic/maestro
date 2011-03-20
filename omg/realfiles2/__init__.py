@@ -10,7 +10,7 @@ import subprocess, pickle, re, logging
 from omg import config, tags, absPath
 from omg.config import options
 import cutags
-
+cutags.setVerbosity(42)
 logger = logging.getLogger("omg.realfiles2")
 
 def get(path,absolute=False):
@@ -94,7 +94,7 @@ class UFile(RealFile):
         if self._f is None:
             self._f = cutags.File(self.path)
     def read(self):
-        self._ensureFileIsLoaded()
+        self._f = cutags.File(self.path)
         self.length = self._f.length
         self.bitrate = self._f.bitrate
         self.channels = self._f.channels
@@ -118,20 +118,20 @@ class UFile(RealFile):
             if tag.name.upper() not in self._f.tags:
                 self._f.tags[tag.name.upper()] = values
             else: self._f.tags[tag.name.upper()].extend(values) # May happen if there exist an IndexedTag and an OtherTag with the same name...actually this should never happen
-        self._f.store()
+        self._f.save()
     def savePosition(self):
         self._ensureFileIsLoaded()
         self._f.tags["TRACKNUMBER"] = str(self.position)
-        self._f.store()
-    def remove(self, tags):
+        self._f.save()
+    def remove(self, tagsToDelete):
         self._ensureFileIsLoaded()
         changed = False
-        for t in tags:
+        for t in tagsToDelete:
             if t.name.upper() in self._f.tags:
                 del self._f.tags[t.name.upper()]
                 changed = True
         if changed:
-            self._f.store()
+            self._f.save()
             
         
     

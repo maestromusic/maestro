@@ -51,7 +51,8 @@ class BaseTest(unittest.TestCase):
         self.full = PATH_FULL + "." + ext
         self.empty = PATH_EMPTY + "." + ext
         self.test = PATH_TEST + "." + ext
-
+    def __str__(self):
+        return "{name} for file {f}".format(name = self.__class__.__name__, f = self.full)
    
 class OpenTest(BaseTest):
     def setUp(self):
@@ -63,9 +64,6 @@ class OpenTest(BaseTest):
 
     def tearDown(self):
         os.remove(PATH_WITHOUT_EXT)
-    
-    def __str__(self):
-        return "OpenTest for file {0}".format(self.full)
 
 class ReadTest(BaseTest):
     def setUp(self):
@@ -79,10 +77,6 @@ class ReadTest(BaseTest):
         self.assertEqual(self.file.tags,ORIGINAL_TAGS)
         self.assertIn(type(self.file.length),(float, int))
         self.assertGreaterEqual(self.file.length,0)
-    
-    def __str__(self):
-        return "ReadTest for file {0}".format(self.full)
-
 
 class RemoveTest(BaseTest):
     def setUp(self):
@@ -92,14 +86,13 @@ class RemoveTest(BaseTest):
     def runTest(self):
         tagsToRemove = [tags.get(name) for name in ('artist','title','conductor','notexistent2')]
         self.file.remove(tagsToRemove)
+        del self.file
+        self.file = realfiles2.get(self.test, absolute = True)
         self.file.read()
         self.assertEqual(self.file.tags,{k:v for k,v in ORIGINAL_TAGS.items() if k not in tagsToRemove})
 
     def tearDown(self):
         os.remove(self.test)
-
-    def __str__(self):
-        return "RemoveTest for file {0}".format(self.full)
 
 class EmptyFileTest(BaseTest):
     def setUp(self):
@@ -109,6 +102,8 @@ class EmptyFileTest(BaseTest):
     def runTest(self):
         self.file.tags[tags.get('artist')] = ['Someone','Everyone']
         self.file.save()
+        del self.file
+        self.file = realfiles2.get(self.test, absolute = True)
         self.file.read()
         self.assertEqual(self.file.tags,{tags.get('artist'): ['Someone','Everyone']})
 
@@ -125,6 +120,8 @@ class WriteTest(BaseTest):
         self.file.tags = TAGS_TO_WRITE
         self.file.position = 2
         self.file.save()
+        del self.file
+        self.file = realfiles2.get(self.test, absolute = True)
         self.file.read()
         self.assertEqual(self.file.position,2)
         self.assertEqual(self.file.tags,TAGS_TO_WRITE)
@@ -132,16 +129,44 @@ class WriteTest(BaseTest):
 
     def tearDown(self):
         os.remove(self.test)
+    
 
+class Id3Test(unittest.TestCase):
+    def setUp(self):
+        self.test =  'test/realfiles/three_types_of_comments_test.mp3'
+        shutil.copyfile('test/realfiles/three_types_of_comments.mp3', self.test)
+        self.file = realfiles2.get(self.test, absolute=True)
+    
+    def test_read(self):
+        self.file.read()
+        self.file.tags
+        self.assertEqual(self.file.tags[tags.get('genre')], ['Rock'])
+        self.assertEqual(len(self.file.tags[tags.get('comment')]), 3)
+    
+    def test_write(self):
+        self.file.read()
+        self.file.tags[tags.get('comment')].append('another comment')
+        self.file.save()
+        del self.file
+        self.file = realfiles2.get(self.test, absolute = True)
+        self.file.read()
+        self.assertEqual(len(self.file.tags[tags.get('comment')]), 4)
+    
+    def tearDown(self):
+        os.remove(self.test)
+        
+        
 
 if __name__ == "__main__":
     suite = unittest.TestSuite()
     
-    for ext in ('ogg','mp3', 'mpc', 'flac', 'spx', 'm4a'):
+    for ext in ('ogg','mp3', 'mpc', 'flac', 'spx'):
         suite.addTest(OpenTest(ext))
         suite.addTest(ReadTest(ext))
         suite.addTest(RemoveTest(ext))
         suite.addTest(EmptyFileTest(ext))
         suite.addTest(WriteTest(ext))
+        suite.addTest(Id3Test('test_read'))
+        suite.addTest(Id3Test('test_write'))
     
     unittest.TextTestRunner(verbosity=2).run(suite)
