@@ -9,6 +9,8 @@
 import sys
 import os
 import logging
+import configparser
+from PyQt4 import QtGui
 
 logger = logging.getLogger("omg.plugins")
 
@@ -20,8 +22,8 @@ if not os.path.isdir(PLUGIN_DIR):
     plugins = []
 else:
     # List of all plugins (or to be precise: all subdirectories of PLUGIN_DIR which contain a PLUGININFO file)
-    plugins = [path for path in os.listdir(PLUGIN_DIR) if os.path.isdir(PLUGIN_DIR+path) 
-                                                          and os.path.isfile(PLUGIN_DIR+path+"/PLUGININFO")]
+    plugins = [path for path in os.listdir(PLUGIN_DIR) if os.path.isdir(os.path.join(PLUGIN_DIR,path)) 
+                      and os.path.isfile(os.path.join(PLUGIN_DIR,path,"PLUGININFO"))]
                                                       
 # Dict mapping plugin-names to loaded modules. Contains all plugin-modules which have been loaded
 loadedPlugins = {}
@@ -46,6 +48,7 @@ def enablePlugin(pluginName):
         if pluginName not in loadedPlugins:
             logger.info("Loading plugin '{}'...".format(pluginName))
             loadedPlugins[pluginName] = getattr(__import__("omg.plugins",fromlist=[pluginName]),pluginName)
+            loadedPlugins[pluginName].info = PluginInfo(pluginName)
         else: logger.info("Enabling plugin '{}'...".format(pluginName))
         loadedPlugins[pluginName].enable()
         enabledPlugins.append(pluginName)
@@ -64,3 +67,26 @@ def teardown():
     for name in enabledPlugins:
         if hasattr(loadedPlugins[name],'teardown'):
             loadedPlugins[name].teardown()
+class PluginInfo(object):
+    def __init__(self, plugin):
+        path = os.path.join(os.path.dirname(sys.modules["omg.plugins."+plugin].__file__), "PLUGININFO")
+        with open(path, "rt") as plugininfo:
+            for line in plugininfo:
+                if "=" in line:
+                    a,b = line.strip().split("=",1)
+                    setattr(self, a, b)
+def showListDialog(parent = None):
+    """Display a dialog window listing available and enabled plugins."""
+    dialog = QtGui.QDialog(parent)
+    
+    group = QtGui.QGroupBox()
+    glayout = QtGui.QVBoxLayout()
+    for plugin in loadedPlugins.values():
+        glayout.addWidget(QtGui.QCheckBox("{0}: {1}".format(plugin.info.name, plugin.info.description)))
+    group.setLayout(glayout)
+    label = QtGui.QLabel(dialog.tr("Available plugins:"))
+    layout = QtGui.QVBoxLayout()
+    layout.addWidget(label)
+    layout.addWidget(group)
+    dialog.setLayout(layout)
+    dialog.exec()

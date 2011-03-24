@@ -14,6 +14,7 @@ from PyQt4.QtCore import Qt
 from omg import database, models, mpclient, tags, absPath, relPath, distributor
 from omg.config import options
 from . import rootedtreemodel, treebuilder, mimedata
+import omg
 
 db = database.get()
 logger = logging.getLogger("omg.models.playlist")
@@ -209,7 +210,7 @@ class BasicPlaylist(rootedtreemodel.RootedTreeModel):
         """Return a list of absolute paths to all files in the given paths (which must be absolute, too). That is, if a path in <paths> is a file, it will be contained in the resulting list, whereas if it is a directory, all files within (recursively) will be contained in the result."""
         filePaths = []
         for path in paths:
-            if os.path.isfile(path):
+            if os.path.isfile(path) and omg.hasKnownExtension(path):
                 filePaths.append(path)
             elif os.path.isdir(path):
                 filePaths.extend(self._collectFiles(os.path.join(path,p) for p in os.listdir(path)))

@@ -148,15 +148,18 @@ class GopulateDelegate(QtGui.QStyledItemDelegate):
         self.iconSize = options.gui.iconsize
         self.iconRect = QtCore.QRect(0, 0, self.iconSize, self.iconSize)
         self.font = QtGui.QFont()
+        self.font.setPointSize(9)
         self.fileNameFont = QtGui.QFont()
         self.fileNameFont.setPointSize(7)
         
         self.titleFont = QtGui.QFont()
         self.titleFont.setItalic(True)
+        self.titleFont.setPointSize(9)
         
         self.albumFont = QtGui.QFont()
         self.albumFont.setBold(True)
         self.albumFont.setItalic(True)
+        self.albumFont.setPointSize(9)
         
         self.positionFont = QtGui.QFont()
         self.positionFont.setBold(True)
@@ -229,7 +232,8 @@ class GopulateDelegate(QtGui.QStyledItemDelegate):
             height += fSize.height() + self.vItemSpace
         
         # ——————— now, paint/calculate all other tags ———————
-        for t in (t for t in tags.tagList if t in elem.tags):
+        for t in elem.tags:
+        #for t in (t for t in tags.tagList if t in elem.tags):
             data = elem.tags[t]
             if t == tags.TITLE or (t == tags.ALBUM and elem.isAlbum()):
                 continue

@@ -10,7 +10,7 @@ import sys, os, random, logging, io
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from omg import constants
+from . import constants, plugins
 from omg.config import options
 
 # Global variables. Only for debugging! Later there may be more than one browser, playlist, etc.
@@ -26,7 +26,24 @@ names = ['Organize Music by Groups',
          'Oh Maddin ... Grmpf',
          'Oh Michael ... Grmpf'  ]
 
-
+class DragDropTabWidget(QtGui.QTabWidget):
+    """A QTabWidget that switches tabs if the user drags something over a tab."""
+    
+    def __init__(self, parent = None):
+        QtGui.QTableWidget.__init__(self, parent)
+        self.setAcceptDrops(True)
+    
+    def dragEnterEvent(self, evt):
+        idx = self.tabBar().tabAt(evt.pos())
+        if idx != -1:
+            self.tabBar().setCurrentIndex(idx)
+        evt.accept()
+    def dragMoveEvent(self, evt):
+        idx = self.tabBar().tabAt(evt.pos())
+        if idx != -1:
+            self.tabBar().setCurrentIndex(idx)
+        evt.accept()
+    
 class OmgMainWindow(QtGui.QMainWindow):
     
     def initMenus(self):
@@ -38,7 +55,15 @@ class OmgMainWindow(QtGui.QMainWindow):
         self.aboutAction.setText(self.tr("&About"))
         self.aboutAction.triggered.connect(self.showAboutDialog)
         self.menus['help'].addAction(self.aboutAction)
+        
+        self.pluginListAction = QtGui.QAction(self)
+        self.pluginListAction.setText(self.tr("&Plugins"))
+        self.pluginListAction.triggered.connect(self._handlePluginListAction)
+        self.menus['extras'].addAction(self.pluginListAction)
     
+    def _handlePluginListAction(self):
+        plugins.showListDialog(self)
+        
     def __init__(self, parent = None):
         QtGui.QMainWindow.__init__(self, parent)
         self.setDockNestingEnabled(True)
@@ -69,9 +94,8 @@ class OmgMainWindow(QtGui.QMainWindow):
         
         playlist = playlistModule.Playlist()
         
-        central = QtGui.QTabWidget()
+        central = DragDropTabWidget()
         central.addTab(playlist,self.tr("Playlist"))
-        
         import omg.models.editor
         import omg.gui.editor
         gm = omg.models.editor.EditorModel()

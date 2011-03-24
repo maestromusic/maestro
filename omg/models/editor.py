@@ -86,7 +86,8 @@ class EditorModel(BasicPlaylist):
         
     def commit(self):
         """Commits all the containers and files in the current model into the database."""
-        
+        #Todo: make undoable
         logger.debug("commit called")
         for item in self.root.contents:
             item.commit(toplevel = True)
+        self.layoutChanged.emit()

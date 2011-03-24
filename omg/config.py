@@ -150,6 +150,14 @@ def initOmgOptions(options):
     
     
     options.addOption("music",      "collection",       str,    "."             , description="Collection base directory")
+    options.addOption("music",      "extensions",       list,    ["flac",
+                                                                  "m4a",
+                                                                  "mp3",
+                                                                  "mp4",
+                                                                  "mpc",
+                                                                  "oga",
+                                                                  "ogg",
+                                                                  "spx"]        , description="Recognized file extensions")
     
     options.addOption("control",    "timer_interval",   int,    300             , description="Interval of mpd synchronization")
     
@@ -167,7 +175,8 @@ def initOmgOptions(options):
     options.addOption("tags",       "ignored_tags",     list,   ["tracktotal",
                                                                  "disctotal",
                                                                  "tracknumber",
-                                                                 "discnumber"]  )
+                                                                 "discnumber",
+                                                                 "compilation"]  )
     options.addOption("tags",       "tag_order",        list,   ["title",
                                                                  "artist",
                                                                  "album",

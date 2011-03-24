@@ -13,6 +13,7 @@ import logging
 from omg import constants, tags
 from omg.gui.delegates import GopulateDelegate
 from omg.models import Element, RootNode, playlist
+from .playlist import PlaylistTreeView
 from . import treeview, tageditor
 
 logger = logging.getLogger("gui.editor")
@@ -80,10 +81,12 @@ class EditorTreeWidget(treeview.TreeView):
             event.setDropAction(Qt.MoveAction)
         elif event.keyboardModifiers() & Qt.ControlModifier:
             event.setDropAction(Qt.CopyAction)
+        elif isinstance(event.source(), PlaylistTreeView):
+            event.setDropAction(Qt.CopyAction)
         else:
             event.setDropAction(event.proposedAction())
         QtGui.QTreeView.dragMoveEvent(self, event)
-        
+    
     def wheelEvent(self, wheelEvent):
         if QtGui.QApplication.keyboardModifiers() & Qt.AltModifier:
             index = self.indexAt(wheelEvent.pos())
@@ -187,7 +190,6 @@ class EditorWidget(QtGui.QWidget):
         self.tree.itemsSelected.connect(self.itemsSelected)
        
         self.clear = QtGui.QPushButton(self.tr("Clear"))
-        print(type(model))
         self.clear.clicked.connect(self._handleClear)
         
         layout = QtGui.QVBoxLayout(self)
@@ -200,6 +202,9 @@ class EditorWidget(QtGui.QWidget):
         
         self.tree.setModel(model)
         self.tree.setHeaderHidden(True)
+        
+        self.setAcceptDrops(True)
+        
     
     def _handleAcceptPressed(self):
         self.accept.setText(self.tr("Calculating audio hashes..."))

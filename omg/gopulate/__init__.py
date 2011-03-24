@@ -155,7 +155,7 @@ class GopulateGuesser:
             if discnumber!= None:
                 album.tags[tags.get("discnumber")] = [ discnumber ]
                 logger.info("detected part of a multi-disc container '{}'".format(album.tags[tags.TITLE][0]))
-                discname_reduced = re.sub(FIND_DISC_RE,"",album.tags[tags.TITLE][0],flags=re.IGNORECASE)
+                discname_reduced = re.sub(FIND_DISC_RE,"",album.tags[tags.TITLE][0],flags=re.IGNORECASE).strip(' .,;:/|')
                 if discname_reduced in finalDictionary:
                     metaContainer = finalDictionary[discname_reduced]
                 else:

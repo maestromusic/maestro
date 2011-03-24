@@ -28,6 +28,14 @@ def absPath(file):
     else:
         return file
 
+def hasKnownExtension(file):
+    """Return True if the given path has a known extension (e.g., appears in options.music.extension).
+    Does _not_ check whether the file actually exists, is readable, etc."""
+    s = file.rsplit(".", 1)
+    if len(s) == 1:
+        return False
+    else:
+        return s[1].lower() in options.music.extensions
 def getIcon(name):
     return os.path.join(constants.IMAGES, "icons", name)
 
