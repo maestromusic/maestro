@@ -14,16 +14,21 @@ import itertools
 from PyQt4 import QtCore,QtGui,QtNetwork
 from PyQt4.QtCore import Qt
 
-from omg import covers, constants, models, tags
-from omg.config import options
+from omg import covers, constants, models, tags, config
 from omg.gui import formatter, treeview
 
 translate = QtGui.QApplication.translate
 
 LASTFM_API_KEY = 'b25b959554ed76058ac220b7b2e0a026'
 
+def config():
+    return ("coverfetcher",{
+            "cover_fetcher_cover_size": (int,400,"Cover size in the coverfetcher.")
+        })
+    
 def enable():
     treeview.contextMenuProviders['all'].append(contextMenuProvider)
+    config.config.addPlugin(
     
 def disable():
     treeview.contextMenuProviders['all'].remove(contextMenuProvider)

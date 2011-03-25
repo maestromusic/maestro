@@ -134,7 +134,7 @@ class OmgMainWindow(QtGui.QMainWindow):
                                       )
     
     
-def run(opts, args):
+def run(cmdConfig):
     # Some Qt-classes need a running QApplication before they can be created
     app = QtGui.QApplication(sys.argv)
 
@@ -145,7 +145,7 @@ def run(opts, args):
 
     # Initialize config and logging
     from omg import config 
-    config.init(opts)
+    config.init(cmdConfig)
     logger = logging.getLogger('omg')
     logger.debug("START")
     

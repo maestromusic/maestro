@@ -5,8 +5,9 @@ import logging
 HOME    = os.path.expanduser("~")
 CONFDIR = os.path.join(HOME, ".omg")
 CONFIG  = os.path.join(CONFDIR, "config")
-SHELVE = os.path.join(CONFDIR,"shelve","shelve")
-IMAGES = "images/"
+STORAGE = os.path.join(CONFDIR,"storage")
+IMAGES = "images"
+PLUGINS = "plugins"
 
 LOGLEVELS = {'debug': logging.DEBUG,
              'info': logging.INFO,
