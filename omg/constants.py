@@ -1,9 +1,12 @@
 # -*- coding: utf-8 -*-
 import os
 import logging
-
-HOME    = os.path.expanduser("~")
-CONFDIR = os.path.join(HOME, ".omg")
+import os
+if 'XDG_CONFIG_HOME' in os.environ:
+    CONFDIR = os.path.join(os.environ['XDG_CONFIG_HOME'], 'omg')
+else:
+    HOME    = os.path.expanduser("~")
+    CONFDIR = os.path.join(HOME, ".config", "omg")
 CONFIG  = os.path.join(CONFDIR, "config")
 SHELVE = os.path.join(CONFDIR,"shelve","shelve")
 IMAGES = "images/"
