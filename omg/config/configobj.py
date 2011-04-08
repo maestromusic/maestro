@@ -2041,7 +2041,6 @@ class ConfigObj(Section):
         if not output.endswith(newline):
             output += newline
 
-        print(output)
         # encoding the data to bytes
         if self.encoding:
             output = output.encode(self.encoding)
@@ -2056,7 +2055,6 @@ class ConfigObj(Section):
         if outfile is not None:
             outfile.write(output)
         else:
-            print("HERE I AM")
             h = open(self.filename, 'wb')
             h.write(output)
             h.close()

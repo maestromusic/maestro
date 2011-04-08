@@ -13,16 +13,16 @@ from . import configobj
 
 options = None
 storage = None
-values = None
-stoValues = None
+optionObject = None
+storageObject = None
 
 def init(cmdOptions = []):
     """Initialize the config-module: Read the config files and create the module variables.  *cmdOptions* is a list of options given on the command line that will overwrite the corresponding option from the file or the default. Each list item has to be a string like ``main.collection=/var/music``."""
-    global options, storage, values, stoValues
-    options = Config(cmdOptions,storage=False)
-    values = ValueSection(options)
-    storage = Config([],storage=True)
-    stoValues = ValueSection(storage)
+    global options, storage, optionObject, storageObject
+    optionObject = Config(cmdOptions,storage=False)
+    options = ValueSection(optionObject)
+    storageObject = Config([],storage=True)
+    storage = ValueSection(storageObject)
 
 
 class Option:
@@ -286,8 +286,20 @@ class ValueSection:
         else:
             option = self._section.__getattr__(name)
             if not isinstance(option,Option):
-                raise ConfigError("Cannot write sections via attribute assignment (section name '{}').".format(name))
+                raise ConfigError("Cannot write sections via ValueSection (section name '{}').".format(name))
             else: option.updateValue(value,fileValue=True)
+
+    def __getitem__(self,key):
+        result = self._section.__getitem__(key)
+        if isinstance(result,Option):
+            return result.getValue()
+        else: return ValueSection(result)
+
+    def __setitem__(self,key,value):
+        option = self._section.__getitem__(key)
+        if not isinstance(option,Option):
+            raise ConfigError("Cannot write sections via ValueSection (section name '{}').".format(name))
+        else: option.updateValue(value,fileValue=True)
 
 
 class ConfigError(Exception):

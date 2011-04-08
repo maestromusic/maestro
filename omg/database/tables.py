@@ -12,8 +12,6 @@
 import re
 from omg import constants,database
 from omg.database.sql import DBException
-from omg.config import options
-
 db = database.get()
 prefix = database.prefix
 

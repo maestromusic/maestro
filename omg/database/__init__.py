@@ -7,7 +7,7 @@
 # published by the Free Software Foundation
 
 """
-The database module provides an abstraction layer to several Python-MySQL connectors. Furthermore it contains methods to extract information about the database, check its integrity and correct minor errors.
+The database module provides an abstraction layer to several Python-MySQL connectors.
 
 The actual database drivers which connect to the database using a third party connector are found in the :mod:`SQL package <omg.database.sql>`. The definitions of Omg's tables are found in the :mod:`tables-module <omg.database.tables>`.
 
@@ -26,8 +26,7 @@ or, if the connection was already established in another module::
 \ """
 
 import logging
-from omg import strutils
-from omg.config import options
+from omg import strutils, config
 from . import sql
 
 
@@ -44,14 +43,14 @@ prefix = None
 logger = logging.getLogger("omg.database")
 
 def connect():
-    """Connect to the database server with information from the config file. The drivers specified in ``options.database.drivers`` are tried in the given order."""
+    """Connect to the database server with information from the config file. The drivers specified in ``config.options.database.drivers`` are tried in the given order."""
     global db, prefix
     if db is None:
-        db = sql.newConnection(options.database.drivers)
-        db.connect(*[options.database.__getattr__(key) for key in
+        db = sql.newConnection(config.options.database.drivers)
+        db.connect(*[config.options.database[key] for key in
                      ("mysql_user","mysql_password","mysql_db","mysql_host","mysql_port")])
         logger.info("Database connection is open.")
-        prefix = options.database.prefix
+        prefix = config.options.database.prefix
     else: logger.warning("database.connect has been called although the database connection was already open")
     return db
 

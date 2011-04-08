@@ -150,13 +150,13 @@ class AbstractSqlResult:
         """Return the last value which was used in an ``AUTO_INCREMENT``-column when this AbstractSqlResult was created."""
     
     def getSingle(self):
-        """Returns the first value from the first row of the result set and should be used as a shorthand method if the result contains only one value. If the result set does not contain any row, an :exc:`EmptyResultException` is raised."""
+        """Return the first value from the first row of the result set. Use this as a shorthand method if the result contains only one value. If the result set does not contain any row, an :exc:`EmptyResultException` is raised."""
         
     def getSingleColumn(self):
-        """Returns a generator for the first column of the result set and should be used as a shorthand method if the result contains only one column. If the result set does not contain any row, an :exc:`EmptyResultException` is raised."""
+        """Return a generator for the first column of the result set. Use this as a shorthand method if the result contains only one column. Contrary to getSingeRow, this method does not raise an :exc:`EmptyResultException` if the result set is empty."""
         
     def getSingleRow(self):
-        """Returns the first row of the result set or raises an :exc:`EmptyResultException` if the result does not contain any rows. This method should be used as a shorthand if there is only one row in the result set."""
+        """Return the first row of the result set or raise an :exc:`EmptyResultException` if the result does not contain any rows. Use this as a shorthand if there is only one row in the result set."""
         if self.size() == 0:
             raise EmptyResultException()
         else: return self.next()

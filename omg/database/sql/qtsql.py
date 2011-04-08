@@ -141,9 +141,7 @@ class SqlResult(AbstractSqlResult):
         return self._result.value(0)
 
     def getSingleColumn(self):
-        if self.size() == 0:
-            raise EmptyResultException()
-        else: return (row[0] for row in self)
+        return (row[0] for row in self)
 
 
 class SqlResultIterator:

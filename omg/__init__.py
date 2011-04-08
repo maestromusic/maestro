@@ -7,12 +7,14 @@
 # published by the Free Software Foundation
 #
 
+# Some global functions that did not fit anywhere else
+import os
+
+from PyQt4 import QtGui
+
 from omg import constants
 from omg.config import options
 import os
-import pickle
-import datetime
-import logging
 
 def relPath(file):
     """Returns the relative path of a music file against the collection base path."""
@@ -28,7 +30,9 @@ def absPath(file):
     else:
         return file
 
-def getIcon(name):
+def getIconPath(name):
     return os.path.join(constants.IMAGES, "icons", name)
 
+def getIcon(name):
+    return QtGui.QIcon(getIconPath(name))
 

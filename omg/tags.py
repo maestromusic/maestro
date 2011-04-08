@@ -22,9 +22,8 @@ import os.path, logging, xml.sax
 from collections import Sequence
 from xml.sax.handler import ContentHandler
 
-from omg import constants, getIcon
+from omg import config, constants, getIcon
 from omg.utils import FlexiDate
-from omg.config import options
 
 logger = logging.getLogger("tags")
 
@@ -47,7 +46,6 @@ tagList = None
 # Will be initialized with the first call of init, so remember to change also that function whenever changing the following lines.
 TITLE = None
 ALBUM = None
-DATE = None
 
 
 class ValueType:
@@ -143,7 +141,7 @@ class Tag:
             raise ValueError("Invalid tagname '{}'".format(name))
         self.id = id
         self.name = name.lower()
-        self.type = type
+        self.type = valueType
 
     def isValid(self,value):
         """Return whether the given value is a valid tag-value for this tag (this depends only on the tag-type)."""
@@ -274,16 +272,16 @@ def init():
         _tagsByName[newTag.name] = newTag
     
     # tagList contains the tags in the order specified by tags->tag_order...
-    tagList = [ _tagsByName[name] for name in options.tags.tag_order if name in _tagsByName ]
+    tagList = [ _tagsByName[name] for name in config.options.tags.tag_order if name in _tagsByName ]
     # ...and then all remaining tags in arbitrary order
     tagList.extend(set(_tagsByName.values()) - set(tagList))
 
     # Initialize _translation
     _translation = {}
-    files = [os.path.join('i18n','tags.'+options.i18n.locale+'.xml'),
-             os.path.join('i18n','tags.'+options.i18n.locale[:2]+'.xml')] #try de instead of de_DE
+    files = [os.path.join('i18n','tags.'+config.options.i18n.locale+'.xml'),
+             os.path.join('i18n','tags.'+config.options.i18n.locale[:2]+'.xml')] #try de instead of de_DE
     if all(not os.path.exists(file) for file in files):
-        logger.warning("I could not find a tag translation file for locale '{}'.".format(options.i18n.locale))
+        logger.warning("I could not find a tag translation file for locale '{}'.".format(config.options.i18n.locale))
     else:
         for file in files:
             if os.path.exists(file):
@@ -292,13 +290,10 @@ def init():
                 except xml.sax.SAXParseException as e:
                     logger.warning("I could not parse tag translation file '{}'. Error message: {}"
                                         .format(file,e.message()))
-            
-    _ignored = options.tags.ignored_tags
     
-    global TITLE,ALBUM,DATE
-    TITLE = _tagsByName[options.tags.title_tag]
-    ALBUM = _tagsByName[options.tags.album_tag]
-    DATE = _tagsByName[options.tags.date_tag]
+    global TITLE,ALBUM
+    TITLE = _tagsByName[config.options.tags.title_tag]
+    ALBUM = _tagsByName[config.options.tags.album_tag]
 
 
 class TagValueList(list):
