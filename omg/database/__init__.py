@@ -25,8 +25,8 @@ or, if the connection was already established in another module::
 
 \ """
 
-import logging
-from omg import strutils, config
+import sys
+from omg import strutils, config, logging
 from . import sql
 
 
@@ -47,16 +47,23 @@ def connect():
     global db, prefix
     if db is None:
         db = sql.newConnection(config.options.database.drivers)
-        db.connect(*[config.options.database[key] for key in
-                     ("mysql_user","mysql_password","mysql_db","mysql_host","mysql_port")])
+        try:
+            db.connect(*[config.options.database[key] for key in
+                         ("mysql_user","mysql_password","mysql_db","mysql_host","mysql_port")])
+        except sql.DBException as e:
+            logger.error("I cannot connect to the database. Did you provide the correct information in the config file? MySQL error: {}".format(e.message))
+            sys.exit(1)
+            
         logger.info("Database connection is open.")
         prefix = config.options.database.prefix
     else: logger.warning("database.connect has been called although the database connection was already open")
     return db
 
+
 def get():
     """Return the database connection object or None if the connection has not yet been opened."""
     return db
+
 
 def resetDatabase():
     """Drop all tables and create them without data again. All table rows will be lost!"""
@@ -64,128 +71,7 @@ def resetDatabase():
     for table in tables.tables:
         table.reset()
 
+
 def listTables():
     """Return a list of all tables in the database."""
     return list(db.query("SHOW TABLES").getSingleColumn())
-    
-def getCheckMethods():
-    """Return all methods of this module that check the database in a dictionary using the method names as keys."""
-    import types, sys
-    module = sys.modules[globals()['__name__']]
-    return {k:v for k,v in module.__dict__.items() if type(v) is types.FunctionType and k.startswith("check")}
-
-def checkElementCounters(fix=False):
-    """Search elements.elements for wrong entries and correct them if *fix* is true. Return the number of wrong entries."""
-    if prefix+"elements" not in listTables():
-        return 0
-        
-    if fix:
-        return db.query("""
-            UPDATE {0}elements
-            SET elements =
-                (SELECT COUNT(*) FROM {0}contents
-                 WHERE container_id = id)
-            """.format(prefix)).affectedRows()
-    else:
-        return db.query("""
-            SELECT COUNT(*) FROM {0}elements \
-            WHERE elements !=
-                (SELECT COUNT(*) FROM {0}contents
-                 WHERE container_id = id)
-            """.format(prefix)).getSingle()
-
-def checkFileFlags(fix=False):
-    """Return the number of wrong entries in elements.file and correct them if *fix* is True."""
-    if prefix+"elements" not in listTables():
-        return 0
-    if fix:
-        return db.query("""
-            UPDATE {0}elements
-            SET file = (id IN (SELECT element_id FROM {0}files))
-            """.format(prefix)).affectedRows()
-    else: return db.query("""
-                SELECT COUNT(*) FROM {0}elements
-                WHERE file != (id IN (SELECT element_id FROM {0}files))
-                """.format(prefix)).getSingle()
-    
-def checkTopLevelFlags(fix=False):
-    """Search elements.toplevel for wrong entries and correct them if *fix* is True. Return the number of wrong entries."""
-    if prefix+"elements" not in listTables():
-        return 0
-    
-    if fix:
-        return db.query("""
-            UPDATE {0}elements
-            SET toplevel = (NOT id IN (SELECT element_id FROM {0}contents))
-            """.format(prefix)).affectedRows()
-    else: return db.query("""
-                SELECT COUNT(*) FROM {0}elements
-                WHERE toplevel != (NOT id IN (SELECT element_id FROM {0}contents))
-                """.format(prefix)).getSingle()
-
-def checkMissingTables(fix=False):
-    """Search the database for missing tables and create them if fix is true. Return a list of the missing tables."""
-    from . import tables
-    missingTables = filter(lambda t: not t.exists(),tables.tables)
-    if fix:
-        for table in missingTables:
-            table.create()
-    return [table.name for table in missingTables]
-    
-def checkSuperfluousTables(fix=False):
-    """Search the database for tables which are not used by this program (this may depend on the installed plugins) and return them as a list. If *fix* is true delete these tables. All table rows will be lost!"""
-    from . import tables
-    tableNames = [table.name for table in tables.tables]
-    superfluousTables = list(filter(lambda t: t not in tableNames,listTables()))
-    if fix:
-        for table in superfluousTables:
-            db.query("DROP TABLE {0}".format(table))
-    return superfluousTables
-
-def checkValueIds(fix=False):
-    """Search for rows in tags whose value_id does not exist in the corresponding value_*-table. If *fix* is true, remove those rows. Return a dictionary mapping tagnames to the number of broken rows (only if nonzero)."""
-    if not "tagids" in listTables():
-        return None
-    result = db.query("SELECT id,tagname,tagtype FROM tagids")
-    brokenEntries = {}
-    for id,name,type in result:
-        if fix:
-            result2 = db.query("""
-                DELETE FROM {0}tags
-                WHERE tag_id = ? AND NOT value_id IN (SELECT id FROM {0}values_{1} WHERE tag_id=?)
-                """.format(prefix,type),id,id)
-            brokenEntries[name] = result2.affectedRows()
-        else:
-            brokenEntries[name] = db.query("""
-                    SELECT COUNT(*)
-                    FROM {0}tags 
-                    WHERE tag_id = ? AND NOT value_id IN (SELECT id FROM {0}values_{1} WHERE tag_id=?)
-                    """.format(prefix,type),id,id).getSingle()
-    return {k:v for k,v in brokenEntries.items() if v > 0}
-
-def checkEmptyContainers(fix=False):
-    """Return the number of empty elements which are NOT files and delete them if *fix* is true. These are usually there because of a crash in the populate code. This method uses elements.elements so you might have to use checkElementCounters before using it."""
-    if "elements" not in listTables() or "files" not in listTables():
-        return 0
-    if fix:
-        return db.query("DELETE FROM {0}elements WHERE elements=0 \
-                         AND NOT id IN (SELECT element_id FROM {0}files)".format(prefix)).affectedRows()
-    else: return db.query("SELECT COUNT(*) FROM {0}elements WHERE elements=0 \
-                           AND NOT id IN (SELECT element_id FROM {0}files)".format(prefix)).getSingle()
-
-def checkSuperfluousTags(fix=False):
-    """Search the values_*-tables for values that are never used in the tags-table. If *fix* is true, delete these entries. Return a dictionary mapping names to the number of superfluous tags with this name (but only where this number is positive)."""
-    result = {}
-    for id,name,type in db.query("SELECT id,tagname,tagtype FROM {0}tagids".format(prefix)):
-        tablename = "{0}values_{1}".format(prefix,type)
-        if tablename not in listTables(): # If something's wrong with the tagids-table, tablename may not exist
-            continue
-        if fix:
-            result[name] = db.query("DELETE FROM {} \
-                                     WHERE tag_id=? AND id NOT IN (SELECT value_id FROM {}tags WHERE tag_id = ?)"
-                                        .format(tablename,prefix),id,id).affectedRows()
-        else:
-            result[name] = db.query("SELECT COUNT(*) FROM {} \
-                                     WHERE tag_id=? AND id NOT IN (SELECT value_id FROM {}tags WHERE tag_id = ?)"
-                                        .format(tablename,prefix),id,id).getSingle()
-    return {k:v for k,v in result.items() if v > 0}

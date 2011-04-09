@@ -6,9 +6,8 @@
 # it under the terms of the GNU General Public License version 3 as
 # published by the Free Software Foundation
 #
-import sys
-import os
-import logging
+import os, sys
+from omg import logging
 
 logger = logging.getLogger("omg.plugins")
 

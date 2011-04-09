@@ -8,16 +8,38 @@
 # This module handles configuration options from files and from the command line.
 
 import os, sys
-from omg import constants
+from omg import constants, logging
 from . import configobj
+
+CONFDIR = None
 
 options = None
 storage = None
 optionObject = None
 storageObject = None
 
+logger = logging.getLogger("config")
+
 def init(cmdOptions = []):
     """Initialize the config-module: Read the config files and create the module variables.  *cmdOptions* is a list of options given on the command line that will overwrite the corresponding option from the file or the default. Each list item has to be a string like ``main.collection=/var/music``."""
+    
+    # Find the config directory and ensure that it exists
+    global CONFDIR
+    if 'XDG_CONFIG_HOME' in os.environ: 
+        CONFDIR = os.path.join(os.environ['XDG_CONFIG_HOME'], 'omg') 
+    else: CONFDIR = os.path.join(constants.HOME, ".config", "omg")
+
+    if not os.path.exists(CONFDIR):
+        try:
+            os.makedirs(CONFDIR) # also create intermediate directories
+        except OSError:
+            logger.exception("Could not create config directory '{}'.".format(CONFDIR))
+            sys.exit(1)
+    elif not os.path.isdir(CONFDIR):
+        logger.warning("Config directory '{}' is not a directory.".format(CONFDIR))
+        sys.exit(1)
+
+    # Initialize config and storage
     global options, storage, optionObject, storageObject
     optionObject = Config(cmdOptions,storage=False)
     options = ValueSection(optionObject)
@@ -152,24 +174,24 @@ class ConfigSection:
         return self._name
 
     def updateFromFile(self,fileSection,path):
-        """Read the *fileSection* (of type ``configobj.Section``) and update this section (options and subsections) with the values from the file. If *fileSection* contains an unknown option, skip it and print a warning to stderr. The parameter *path* is only used for these warnings and should contain the path to the config file."""
+        """Read the *fileSection* (of type ``configobj.Section``) and update this section (options and subsections) with the values from the file. If *fileSection* contains an unknown option, skip it and log a warning. The parameter *path* is only used for these warnings and should contain the path to the config file."""
         for name,member in fileSection.items():
             if isinstance(member,configobj.Section):
                 if name not in self._members:
-                    print("Error in config file '{}': Unknown section '{}' in section '{}'."
-                        .format(path,name,self._name),file=sys.stderr)
+                    logger.error("Error in config file '{}': Unknown section '{}' in section '{}'."
+                                    .format(path,name,self._name))
                 elif isinstance(self._members[name],Option):
-                    print("Error in config file '{}': '{}' is not a section in section '{}'."
-                            .format(path,name,self._name),file=sys.stderr)
+                    logger.error("Error in config file '{}': '{}' is not a section in section '{}'."
+                                    .format(path,name,self._name))
                 else:
                     self._members[name].updateFromFile(member,path)
             else:
                 if name not in self._members:
-                    print("Error in config file '{}': Unknown option '{}' in section '{}'."
-                             .format(path,name,self._name),file=sys.stderr)
+                    logger.error("Error in config file '{}': Unknown option '{}' in section '{}'."
+                                    .format(path,name,self._name))
                 elif isinstance(self._members[name],ConfigSection):
-                    print("Error in config file '{}': '{}' is not an option in section '{}'."
-                             .format(path,name,self._name),file=sys.stderr)
+                    logger.error("Error in config file '{}': '{}' is not an option in section '{}'."
+                                    .format(path,name,self._name))
                 else:
                     self._members[name].updateValue(member,fileValue=True)
 
@@ -190,8 +212,8 @@ class Config(ConfigSection):
     \ """
     def __init__(self,cmdConfig,storage):
         ConfigSection.__init__(self,"<Default>",storage,{})
-        
-        self._path = constants.STORAGE if self._storage else constants.CONFIG
+
+        self._path = os.path.join(CONFDIR,"storage" if self._storage else "config")
         if os.path.exists("{}.{}".format(self._path,constants.VERSION)):
             self._path = "{}.{}".format(self._path,constants.VERSION) # Load version specific config
 
@@ -205,8 +227,8 @@ class Config(ConfigSection):
         self._openFile()
         for sectionName,section in self._configObj.items():
             if not isinstance(section,configobj.Section):
-                print("Error in config file '{}': Option '{}' does not belong to any section."
-                        .format(self._path,sectionName),file=sys.stderr)
+                logger.error("Error in config file '{}': Option '{}' does not belong to any section."
+                                .format(self._path,sectionName))
             if sectionName in self._members:
                 self._members[sectionName].updateFromFile(section,self._path)
         # Let the file open until plugin config is loaded
@@ -221,13 +243,14 @@ class Config(ConfigSection):
                     section = section[key]
                 section[keys[-1]].updateValue(value,fileValue=False)
             except KeyError:
-                print("Unknown config option on command line '{}'.".format(option),file=sys.stderr)
+                logger.error("Unknown config option on command line '{}'.".format(option))
             except Exception:
-                print("Invalid config option on command line '{}'.".format(line),file=sys.stderr)
+                logger.error("Invalid config option on command line '{}'.".format(line))
 
     def _openFile(self):
         """Open the file this object corresponds to and store a ``configobj.ConfigObj``-object in ``self._configObj``."""
-        self._configObj = configobj.ConfigObj(self._path,encoding='UTF-8',file_error=True,unrepr=self._storage)
+        self._configObj = configobj.ConfigObj(self._path,encoding='UTF-8',
+                                              create_empty=True,unrepr=self._storage)
         
     def _addSection(self,name,options):
         if name in self._members:

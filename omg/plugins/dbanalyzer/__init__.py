@@ -13,7 +13,7 @@ from PyQt4.QtCore import Qt
 
 from omg import getIcon,database
 
-# don't use relative import since this file may be executed directly and is not a package in this case.
+# don't use relative import since this file may be executed directly and is not a package in that case.
 from omg.plugins.dbanalyzer import checks
 
 def storage():
@@ -227,14 +227,15 @@ class DBAnalyzerDialog(QtGui.QDialog):
 if __name__ == "__main__":
     import sys, os
 
-    # Switch to the application's directory (three level above this file's directory)
+    # Switch to the application's directory (three levels above this file's directory)
     if os.path.dirname(__file__):
         os.chdir(os.path.dirname(__file__))
     os.chdir("../../../")
 
-    from omg import constants, config, tags
+    from omg import constants, config, logging, tags
     config.init()
     config.storageObject.loadPlugins(storage())
+    logging.init()
     database.connect()
     tags.init()
     

@@ -18,14 +18,14 @@ This module provides methods to store tags, convert them between different value
     * Only in the case that the tag in question is not already in the database you should (and must) create the :class:`Tag`-instance using the constructor of :class:`Tag`.
     
 \ """
-import os.path, logging, xml.sax
+import os.path, xml.sax
 from collections import Sequence
 from xml.sax.handler import ContentHandler
 
-from omg import config, constants, getIcon
+from omg import config, constants, logging, getIconPath
 from omg.utils import FlexiDate
 
-logger = logging.getLogger("tags")
+logger = logging.getLogger("omg.tags")
 
 # Module variables - Will be initialized with the first call of init.
 #=================================================================================
@@ -195,7 +195,7 @@ class Tag:
     
     def iconPath(self):
         """Return the path to the icon of this tag or ``None`` if there is no such icon."""
-        path = getIcon("tag_{}.png".format(self.name))
+        path = getIconPath("tag_{}.png".format(self.name))
         return path if os.path.isfile(path) else None
 
     @staticmethod
