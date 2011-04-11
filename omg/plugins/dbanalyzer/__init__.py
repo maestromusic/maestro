@@ -6,17 +6,49 @@
 # published by the Free Software Foundation
 #
 
-import types
-
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from omg import getIcon,database
+from omg import getIcon,database, application, constants, config
 
 # don't use relative import since this file may be executed directly and is not a package in that case.
 from omg.plugins.dbanalyzer import checks
 
-def storage():
+# the action that is inserted into the Extras menu
+_action = None
+_widget = None
+
+def enable():
+    global _action
+    _action = QtGui.QAction(application.mainWindow)
+    _action.setText(QtGui.QApplication.translate("DBAnalyzerDialog","DB Analyzer"))
+    _action.triggered.connect(_openDialog)
+    application.mainWindow.menus['extras'].addAction(_action)
+
+
+def _openDialog():
+    global _widget # store the widget in a variable or it will immediately destroyed
+    _widget = DBAnalyzerDialog()
+    _widget.setWindowTitle("OMG version {} – Database Analyzer".format(constants.VERSION))
+ 
+    screen = QtGui.QDesktopWidget().screenGeometry()
+    size =  QtCore.QSize(config.storage.dbanalyzer.width,config.storage.dbanalyzer.height)
+    _widget.resize(size)
+    x = config.storage.dbanalyzer.pos_x
+    y = config.storage.dbanalyzer.pos_y
+    if x is None or y is None:
+        _widget.move((screen.width()-size.width())/2, (screen.height()-size.height())/2)
+    else: _widget.move(x,y)
+    _widget.show()
+ 
+    _widget.fetchData()
+
+
+def disable():
+    application.mainwindow.menus['extras'].removeAction(_action)
+
+
+def defaultStorage():
     return {"dbanalyzer": {
             "width": (800,"Width of the window."),
             "height": (600,"Height of the window."),
@@ -79,9 +111,9 @@ class DBAnalyzerDialog(QtGui.QDialog):
         # Buttons
         buttonLayout = QtGui.QHBoxLayout()
         problemsLayout.addLayout(buttonLayout)
-        fixButton = QtGui.QPushButton(getIcon("edit-clear.png"),self.tr("Fix problem"))
-        fixButton.clicked.connect(self._handleFixButton)
-        buttonLayout.addWidget(fixButton,0)
+        self.fixButton = QtGui.QPushButton(getIcon("edit-clear.png"),self.tr("Fix problem"))
+        self.fixButton.clicked.connect(self._handleFixButton)
+        buttonLayout.addWidget(self.fixButton,0)
         buttonLayout.addStretch(1)
         closeButton = QtGui.QPushButton(QtGui.QIcon.fromTheme('window-close'),self.tr("Close"))
         closeButton.clicked.connect(self.close)
@@ -159,6 +191,7 @@ class DBAnalyzerDialog(QtGui.QDialog):
     def loadDetails(self,check):
         """Load details for the current check into the details table and label. Deactivate the table if there are no problems with the current check."""
         self.currentCheck = check
+        self.fixButton.setEnabled(check.getNumber() > 0)
 
         # Format detail table header
         self.detailTable.clear()
@@ -223,44 +256,23 @@ class DBAnalyzerDialog(QtGui.QDialog):
             tags.append(tuple)
         return(tags)
 
+    def close(self):
+        config.storage.dbanalyzer.width = self.width()
+        config.storage.dbanalyzer.height = self.height()
+        config.storage.dbanalyzer.pos_x = self.x()
+        config.storage.dbanalyzer.pos_y = self.y()
+        QtGui.QDialog.close(self)
+
 
 if __name__ == "__main__":
-    import sys, os
-
-    # Switch to the application's directory (three levels above this file's directory)
-    if os.path.dirname(__file__):
-        os.chdir(os.path.dirname(__file__))
-    os.chdir("../../../")
-
-    from omg import constants, config, logging, tags
-    config.init()
-    config.storageObject.loadPlugins(storage())
-    logging.init()
-    database.connect()
-    tags.init()
-    
-    app = QtGui.QApplication(sys.argv)
-        
-    widget = DBAnalyzerDialog()
-    widget.setWindowTitle("OMG version {} – Database Analyzer".format(constants.VERSION))
-
-    screen = QtGui.QDesktopWidget().screenGeometry()
-    size =  QtCore.QSize(config.storage.dbanalyzer.width,config.storage.dbanalyzer.height)
-    widget.resize(size)
-    x = config.storage.dbanalyzer.pos_x
-    y = config.storage.dbanalyzer.pos_y
-    if x is None or y is None:
-        widget.move((screen.width()-size.width())/2, (screen.height()-size.height())/2)
-    else: widget.move(x,y)
-    widget.show()
-
-    widget.fetchData()
-
+    app = application.init()
+    config.storageObject.loadPlugins(defaultStorage())
+         
+    _openDialog()
     returnValue = app.exec_()
-
-    config.storage.dbanalyzer.width = widget.width()
-    config.storage.dbanalyzer.height = widget.height()
-    config.storage.dbanalyzer.pos_x = widget.x()
-    config.storage.dbanalyzer.pos_y = widget.y()
+    
     config.storageObject.write()
+    from omg import logging
+    logging.shutdown()
+    import sys
     sys.exit(returnValue)

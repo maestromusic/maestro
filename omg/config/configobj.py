@@ -1,7 +1,7 @@
 # This is a modified version of configobj-py3 by Zubin Mithra (https://bitbucket.org/zubin71/configobj-py3)
 # which itself is a Python 3 version of ConfigObj (http://www.voidspace.org.uk/python/configobj.html).
 # The difference is mainly that bug https://bitbucket.org/zubin71/configobj-py3/issue/1/expected-an-object-with-the-buffer
-# is fixed.
+# is fixed and that validation stuff that is not needed by Omg was removed.
 
 
 # configobj.py
@@ -1467,19 +1467,6 @@ class ConfigObj(Section):
             return line.decode(self.default_encoding)
         return line
 
-    def _str(self, value):
-        """
-        Used by ``stringify`` within validate, to turn non-string values
-        into strings.
-        """
-        
-        # Bytes type string should NOT be stringified at any cost.
-        if isinstance(value, bytes):
-            return value
-        if not isinstance(value, str):
-            return str(value)
-        else:
-            return value
 
     def _parse(self, infile):
         """Actually parse the config file."""
@@ -1862,51 +1849,7 @@ class ConfigObj(Section):
         (value, comment) = mat.groups()
         return (newvalue + value, comment, cur_index)
 
-    def _handle_configspec(self, configspec):
-        """Parse the configspec."""
-        # FIXME: Should we check that the configspec was created with the 
-        #        correct settings ? (i.e. ``list_values=False``)
-        if not isinstance(configspec, ConfigObj):
-            try:
-                configspec = ConfigObj(configspec,
-                                       raise_errors=True,
-                                       file_error=True,
-                                       _inspec=True)
-            except ConfigObjError as e:
-                # FIXME: Should these errors have a reference
-                #        to the already parsed ConfigObj ?
-                raise ConfigspecError('Parsing configspec failed: %s' % e)
-            except IOError as e:
-                raise IOError('Reading configspec failed: %s' % e)
 
-        self.configspec = configspec
-
-    def _set_configspec(self, section, copy):
-        """
-        Called by validate. Handles setting the configspec on subsections
-        including sections to be validated by __many__
-        """
-        configspec = section.configspec
-        many = configspec.get('__many__')
-        if isinstance(many, dict):
-            for entry in section.sections:
-                if entry not in configspec:
-                    section[entry].configspec = many
-
-        for entry in configspec.sections:
-            if entry == '__many__':
-                continue
-            if entry not in section:
-                section[entry] = {}
-                section[entry]._created = True
-                if copy:
-                    # copy comments
-                    section.comments[entry] = configspec.comments.get(entry, [])
-                    section.inline_comments[entry] = configspec.inline_comments.get(entry, '')
-
-            # Could be a scalar when we expect a section
-            if isinstance(section[entry], Section):
-                section[entry].configspec = configspec[entry]
 
     def _write_line(self, indent_string, entry, this_entry, comment):
         """Write an individual line, for the write method"""
@@ -1987,13 +1930,16 @@ class ConfigObj(Section):
             comment = self._handle_comment(section.inline_comments[entry])
             
             if isinstance(this_entry, dict):
-                # a section
-                out.append(self._write_marker(
-                    indent_string,
-                    this_entry.depth,
-                    entry,
-                    comment))
-                out.extend(self.write(section=this_entry))
+                # MODIFICATION
+                if len(this_entry) > 0 or len(comment) > 0: # Do not write empty sections
+                    # END MODIFICATION
+                    # a section
+                    out.append(self._write_marker(
+                        indent_string,
+                        this_entry.depth,
+                        entry,
+                        comment))
+                    out.extend(self.write(section=this_entry))
             else:
                 out.append(self._write_line(
                     indent_string,
@@ -2058,267 +2004,7 @@ class ConfigObj(Section):
             h = open(self.filename, 'wb')
             h.write(output)
             h.close()
-    
-    def validate(self, validator, preserve_errors=False, copy=False,
-                 section=None):
-        """
-        Test the ConfigObj against a configspec.
-        
-        It uses the ``validator`` object from *validate.py*.
-        
-        To run ``validate`` on the current ConfigObj, call: ::
-        
-            test = config.validate(validator)
-        
-        (Normally having previously passed in the configspec when the ConfigObj
-        was created - you can dynamically assign a dictionary of checks to the
-        ``configspec`` attribute of a section though).
-        
-        It returns ``True`` if everything passes, or a dictionary of
-        pass/fails (True/False). If every member of a subsection passes, it
-        will just have the value ``True``. (It also returns ``False`` if all
-        members fail).
-        
-        In addition, it converts the values from strings to their native
-        types if their checks pass (and ``stringify`` is set).
-        
-        If ``preserve_errors`` is ``True`` (``False`` is default) then instead
-        of a marking a fail with a ``False``, it will preserve the actual
-        exception object. This can contain info about the reason for failure.
-        For example the ``VdtValueTooSmallError`` indicates that the value
-        supplied was too small. If a value (or section) is missing it will
-        still be marked as ``False``.
-        
-        You must have the validate module to use ``preserve_errors=True``.
-        
-        You can then use the ``flatten_errors`` function to turn your nested
-        results dictionary into a flattened list of failures - useful for
-        displaying meaningful error messages.
-        """
-        if section is None:
-            if self.configspec is None:
-                raise ValueError('No configspec supplied.')
-            if preserve_errors:
-                # We do this once to remove a top level dependency on the validate module
-                # Which makes importing configobj faster
-                from validate import VdtMissingValue
-                self._vdtMissingValue = VdtMissingValue
-                
-            section = self
 
-            if copy:
-                section.initial_comment = section.configspec.initial_comment
-                section.final_comment = section.configspec.final_comment
-                section.encoding = section.configspec.encoding
-                section.BOM = section.configspec.BOM
-                section.newlines = section.configspec.newlines
-                section.indent_type = section.configspec.indent_type
-            
-        #
-        # section.default_values.clear() #??
-        configspec = section.configspec
-        self._set_configspec(section, copy)
-    
-        def validate_entry(entry, spec, val, missing, ret_true, ret_false):
-            section.default_values.pop(entry, None)
-
-            try:
-                section.default_values[entry] = validator.get_default_value(configspec[entry])
-            except (KeyError, AttributeError, validator.baseErrorClass):
-                # No default, bad default or validator has no 'get_default_value'
-                # (e.g. SimpleVal)
-                pass
-
-            try:
-                check = validator.check(spec,
-                                        val,
-                                        missing=missing
-                                        )
-            except validator.baseErrorClass as e:
-                if not preserve_errors or isinstance(e, self._vdtMissingValue):
-                    out[entry] = False
-                else:
-                    # preserve the error
-                    out[entry] = e
-                    ret_false = False
-                ret_true = False
-            else:
-                ret_false = False
-                out[entry] = True
-                if self.stringify or missing:
-                    # if we are doing type conversion
-                    # or the value is a supplied default
-                    if not self.stringify:
-                        if isinstance(check, (list, tuple)):
-                            # preserve lists
-                            check = [self._str(item) for item in check]
-                        elif missing and check is None:
-                            # convert the None from a default to a ''
-                            check = ''
-                        else:
-                            check = self._str(check)
-                    if (check != val) or missing:
-                        section[entry] = check
-                if not copy and missing and entry not in section.defaults:
-                    section.defaults.append(entry)
-            return ret_true, ret_false
-
-        #
-        out = {}
-        ret_true = True
-        ret_false = True
-
-        unvalidated = [k for k in section.scalars if k not in configspec]
-        incorrect_sections = [k for k in configspec.sections if k in section.scalars]
-        incorrect_scalars = [k for k in configspec.scalars if k in section.sections]
-
-        for entry in configspec.scalars:
-            if entry in ('__many__', '___many___'):
-                # reserved names
-                continue
-            if (not entry in section.scalars) or (entry in section.defaults):
-                # missing entries
-                # or entries from defaults
-                missing = True
-                val = None
-                if copy and entry not in section.scalars:
-                    # copy comments
-                    section.comments[entry] = (
-                        configspec.comments.get(entry, []))
-                    section.inline_comments[entry] = (
-                        configspec.inline_comments.get(entry, ''))
-                #
-            else:
-                missing = False
-                val = section[entry]
-
-            ret_true, ret_false = validate_entry(entry, configspec[entry], val,
-                                                 missing, ret_true, ret_false)
-
-        many = None
-        if '__many__' in configspec.scalars:
-            many = configspec['__many__']
-        elif '___many___' in configspec.scalars:
-            many = configspec['___many___']
-
-        if many is not None:
-            for entry in unvalidated:
-                val = section[entry]
-                ret_true, ret_false = validate_entry(entry, many, val, False,
-                                                     ret_true, ret_false)
-            unvalidated = []
-
-        for entry in incorrect_scalars:
-            ret_true = False
-            if not preserve_errors:
-                out[entry] = False
-            else:
-                ret_false = False
-                msg = 'Value %r was provided as a section' % entry
-                out[entry] = validator.baseErrorClass(msg)
-        for entry in incorrect_sections:
-            ret_true = False
-            if not preserve_errors:
-                out[entry] = False
-            else:
-                ret_false = False
-                msg = 'Section %r was provided as a single value' % entry
-                out[entry] = validator.baseErrorClass(msg)
-
-        # Missing sections will have been created as empty ones when the
-        # configspec was read.
-        for entry in section.sections:
-            # FIXME: this means DEFAULT is not copied in copy mode
-            if section is self and entry == 'DEFAULT':
-                continue
-            if section[entry].configspec is None:
-                unvalidated.append(entry)
-                continue
-            if copy:
-                section.comments[entry] = configspec.comments.get(entry, [])
-                section.inline_comments[entry] = configspec.inline_comments.get(entry, '')
-            check = self.validate(validator, preserve_errors=preserve_errors, copy=copy, section=section[entry])
-            out[entry] = check
-            if check == False:
-                ret_true = False
-            elif check == True:
-                ret_false = False
-            else:
-                ret_true = False
-
-        section.extra_values = unvalidated
-        if preserve_errors and not section._created:
-            # If the section wasn't created (i.e. it wasn't missing)
-            # then we can't return False, we need to preserve errors
-            ret_false = False
-        #
-        if ret_false and preserve_errors and out:
-            # If we are preserving errors, but all
-            # the failures are from missing sections / values
-            # then we can return False. Otherwise there is a
-            # real failure that we need to preserve.
-            ret_false = not any(out.values())
-        if ret_true:
-            return True
-        elif ret_false:
-            return False
-        return out
-
-    
-    def reset(self):
-        """Clear ConfigObj instance and restore to 'freshly created' state."""
-        self.clear()
-        self._initialise()
-        # FIXME: Should be done by '_initialise', but ConfigObj constructor (and reload)
-        #        requires an empty dictionary
-        self.configspec = None
-        # Just to be sure ;-)
-        self._original_configspec = None
-
-    def reload(self):
-        """
-        Reload a ConfigObj from file.
-
-        This method raises a ``ReloadError`` if the ConfigObj doesn't have
-        a filename attribute pointing to a file.
-        """
-        if not isinstance(self.filename, str):
-            raise ReloadError()
-
-        filename = self.filename
-        current_options = {}
-        for entry in OPTION_DEFAULTS:
-            if entry == 'configspec':
-                continue
-            current_options[entry] = getattr(self, entry)
-
-        configspec = self._original_configspec
-        current_options['configspec'] = configspec
-
-        self.clear()
-        self._initialise(current_options)
-        self._load(filename, configspec)
-
-class SimpleVal(object):
-    """
-    A simple validator.
-    Can be used to check that all members expected are present.
-
-    To use it, provide a configspec with all your members in (the value given
-    will be ignored). Pass an instance of ``SimpleVal`` to the ``validate``
-    method of your ``ConfigObj``. ``validate`` will return ``True`` if all
-    members are present, or a dictionary with True/False meaning
-    present/missing. (Whole missing sections will be replaced with ``False``)
-    """
-
-    def __init__(self):
-        self.baseErrorClass = ConfigObjError
-
-    def check(self, check, member, missing=False):
-        """A dummy check method, always returns the value unchanged."""
-        if missing:
-            raise self.baseErrorClass()
-        return member
 
 def flatten_errors(cfg, res, levels=None, results=None):
     """

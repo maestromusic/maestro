@@ -21,7 +21,7 @@ storageObject = None
 logger = logging.getLogger("config")
 
 def init(cmdOptions = []):
-    """Initialize the config-module: Read the config files and create the module variables.  *cmdOptions* is a list of options given on the command line that will overwrite the corresponding option from the file or the default. Each list item has to be a string like ``main.collection=/var/music``."""
+    """Initialize the config-module: Read the config files and create the module variables. *cmdOptions* is a list of options given on the command line that will overwrite the corresponding option from the file or the default. Each list item has to be a string like ``main.collection=/var/music``."""
     
     # Find the config directory and ensure that it exists
     global CONFDIR
@@ -45,6 +45,11 @@ def init(cmdOptions = []):
     options = ValueSection(optionObject)
     storageObject = Config([],storage=True)
     storage = ValueSection(storageObject)
+
+
+def shutdown():
+    optionObject.write()
+    storageObject.write()
 
 
 class Option:
@@ -93,7 +98,8 @@ class ConfigOption(Option):
         elif self.type in (int, str):
             return self.type(value)
         elif self.type == list and isinstance(value, str):
-            return [x.strip(" \t") for x in value.split(",")]
+            values = [x.strip(" \t") for x in value.split(",")]
+            return [x for x in values if len(x) > 0]
         else:
             raise ConfigError("{} has type {} which does not match type {} of this option and can't be converted"
                                  .format(value,type(value),self.type))
@@ -103,6 +109,8 @@ class ConfigOption(Option):
         if self.type == bool:
             return "True" if value else "False"
         elif self.type == list:
+            if len(value) == 0:
+                return ""
             return ", ".join(str(v) for v in value)
         else: return str(value)
 
@@ -120,10 +128,10 @@ class ConfigOption(Option):
             if self.fileValue is None:
                 del fileSection[self.name]
             # Overwrite only if the string in the config gives a different value
-            elif self.fileValue != self._importValue(fileSection[self.name]):
-                fileSection[self.name] = self._exportValue(self.fileValue)
+            elif self.fileValue != self._import(fileSection[self.name]):
+                fileSection[self.name] = self._export(self.fileValue)
         elif self.fileValue is not None:
-            fileSection[self.name] = self._exportValue(self.fileValue)
+            fileSection[self.name] = self._export(self.fileValue)
 
 
 class StorageOption(Option):
@@ -250,6 +258,7 @@ class Config(ConfigSection):
     def _openFile(self):
         """Open the file this object corresponds to and store a ``configobj.ConfigObj``-object in ``self._configObj``."""
         self._configObj = configobj.ConfigObj(self._path,encoding='UTF-8',
+                                              write_empty_values=True,
                                               create_empty=True,unrepr=self._storage)
         
     def _addSection(self,name,options):

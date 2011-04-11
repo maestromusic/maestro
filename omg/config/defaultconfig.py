@@ -12,7 +12,7 @@ from PyQt4 import QtCore
 defaults = {
 "main": {
     "collection": (str,".","Music collection base directory"),
-    "plugins": (list,["coverfetcher","wtx","dbupdatedebugger","dbinfo"],"List of plugin names (i.e. the name of the corresponding directory in /omg/plugins/.")
+    "plugins": (list,["dbanalyzer"],"List of plugin names (i.e. the name of the corresponding directory in /omg/plugins/.")
 },
     
 "i18n": {

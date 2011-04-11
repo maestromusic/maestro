@@ -7,7 +7,7 @@
 #
 
 """
-This module wraps Python's logging module in a way that logging works even if that module is not yet configured.
+This module wraps Python's logging module in a way so that logging works even if that module is not yet configured.
 Simply use ``logging.getLogger(name)`` to get a Logger and use it like the usual loggers. Before logging is configured everything will be printed to the console, so call ``init`` as early as possible (but after the config module has been initialized).
 """
 
@@ -97,3 +97,10 @@ def init():
     else:
         global configured
         configured = True
+
+
+def shutdown():
+    """Shuts down Python's logging system. Further log calls after this method will be printed to stderr."""
+    global configured
+    logging.shutdown()
+    configured = False

@@ -50,6 +50,8 @@ class Check:
     
     def fix(self):
         """Fix the problem and delete cached data. After this method :meth:`getNumber` should return ''0''."""
+        if self.getNumber() > 0:
+            self._fix()
         self.number = None
         self.data = None
 
@@ -78,8 +80,7 @@ class ElementCounterCheck(Check):
                 """.format(prefix))
             return [(row[0],getTitle(row[0]),row[1],row[2]) for row in result]
 
-    def fix(self):
-        Check.fix(self)
+    def _fix(self):
         db.query("""
                 UPDATE {0}elements
                 SET elements = (SELECT COUNT(*) FROM {0}contents WHERE container_id = id)
@@ -106,8 +107,7 @@ class ToplevelFlagCheck(Check):
                     """.format(prefix))
             return [(row[0],getTitle(row[0]),row[1],(row[1] + 1) % 2) for row in result]
 
-    def fix(self):
-        Check.fix(self)
+    def _fix(self):
         db.query("""
             UPDATE {0}elements
             SET toplevel = (NOT id IN (SELECT element_id FROM {0}contents))
@@ -134,8 +134,7 @@ class FileFlagCheck(Check):
                 """.format(prefix))
             return [(row[0],getTitle(row[0]),row[1],(row[1] + 1) % 2) for row in result]
 
-    def fix(self):
-        Check.fix(self)
+    def _fix(self):
         db.query("""
             UPDATE {0}elements LEFT JOIN {0}files ON id = element_id
             SET file = (element_id IS NOT NULL)
@@ -164,8 +163,7 @@ class EmptyContainerCheck(Check):
                 """.format(prefix))
             return [(row[0],getTitle(row[0]),row[1],row[2]) for row in result]
 
-    def fix(self):
-        Check.fix(self)
+    def _fix(self):
         db.query("""
                 UPDATE {0}elements LEFT JOIN {0}contents ON id = container_id
                                    LEFT JOIN {0}files ON id = {0}files.element_id
@@ -207,8 +205,7 @@ class SuperfluousTagValuesCheck(Check):
                 result.extend((type.name,row[0],row[1],row[2]) for row in db.query(self._query(type.name,True,False)))
             return result
 
-    def fix(self):
-        Check.fix(self)
+    def _fix(self):
         for type in tags.TYPES:
             db.query(self._query(type.name,False,True))
 
@@ -243,8 +240,7 @@ class ValueIdsCheck(Check):
                                     for row in db.query(self._query(type.name,True,False)))
             return result
             
-    def fix(self):
-        Check.fix(self)
+    def _fix(self):
         for type in tags.TYPES:
             db.query(self._query(type.name,False,True))
 

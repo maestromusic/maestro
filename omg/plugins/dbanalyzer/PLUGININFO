@@ -1,0 +1,4 @@
+name=DBAnalyzer
+author=Martin Altmayer
+version=1.0
+description=Provides statistics about the database, finds errors in it and allows the user to correct them.

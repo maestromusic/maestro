@@ -4,7 +4,6 @@ import logging
 
 HOME    = os.path.expanduser("~")
 IMAGES = "images"
-PLUGINS = "plugins"
 
 
 YES_ANSWERS = ["y", "Y", ""]
