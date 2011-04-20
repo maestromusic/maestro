@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# Copyright 2009 Martin Altmayer
+# Copyright 2011 Martin Altmayer
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 3 as
@@ -53,26 +53,72 @@ rollback = query
 
 def connect():
     """Connect to the database server with information from the config file. The drivers specified in ``config.options.database.drivers`` are tried in the given order."""
-    global db
     if db is not None:
         logger.warning("database.connect has been called although the database connection was already open")
     else:
-        db = sql.newConnection(config.options.database.drivers)
-        try:
-            db.connect(*[config.options.database[key] for key in
-                         ("mysql_user","mysql_password","mysql_db","mysql_host","mysql_port")])
-        except sql.DBException as e:
-            logger.error("I cannot connect to the database. Did you provide the correct information in the config file? MySQL error: {}".format(e.message))
-            sys.exit(1)
-            
-        logger.info("Database connection is open.")
-        global prefix, query, multiQuery, transaction, commit, rollback
+        global prefix
         prefix = config.options.database.prefix
-        query = db.query
-        multiQuery = db.multiQuery
-        transaction = db.transaction
-        commit = db.commit
-        rollback = db.rollback
+        authValues = [config.options.database["mysql_"+key] for key in sql.AUTH_OPTIONS]
+        _connect(config.options.database.drivers,authValues)
+        logger.info("Database connection is open.")
+        
+
+def testConnect(driver):
+    """Connect to the database server using the test connection information (config.options.database.test_*). If any of these options is empty, the standard option will be used instead (config.options.database.mysql_*). The table prefix will in be config.options.database.test_prefix even if it is empty. For safety this method will abort the program if prefix, db-name and host coincide with the standard values used by connect."""
+    authValues = []
+    host = None
+    dbName = None
+    for option in sql.AUTH_OPTIONS:
+        value = config.options.database["test_"+option]
+        if not value: # Replace empty values by standard values
+            value = config.options.database["mysql_"+option]
+        authValues.append(value)
+        if option == "host":
+            host = value
+        if option == "db":
+            dbName = value
+
+    global prefix
+    prefix = config.options.database.test_prefix
+
+    # Abort if the connection information and the prefix is equal
+    if (prefix == config.options.database.prefix
+            and dbName == config.options.database.mysql_db
+            and host == config.options.database.mysql_host):
+        print("Safety stop: Test database connection information coincides with the usual information. Please supply at least a different prefix.",file=sys.stderr)
+        sys.exit(1)
+        
+    _connect([driver],authValues)
+
+
+def _connect(drivers,authValues):
+    global db
+    try:
+        db = sql.newConnection(drivers)
+        db.connect(*authValues)
+    except sql.DBException as e:
+        logger.error("I cannot connect to the database. Did you provide the correct information in the config file? MySQL error: {}".format(e.message))
+        sys.exit(1)
+    
+    global query, multiQuery, transaction, commit, rollback
+    query = db.query
+    multiQuery = db.multiQuery
+    transaction = db.transaction
+    commit = db.commit
+    rollback = db.rollback
+
+
+def close():
+    """Close the current connection."""
+    if db is not None:
+        global db, query, multiQuery, transaction, commit, rollback
+        db = None
+        query = None
+        multiQuery = None
+        transaction = None
+        commit = None
+        rollback = None
+    else: logger.warning("database.close has been called although no connection was opened.")
 
 
 def resetDatabase():
@@ -83,5 +129,5 @@ def resetDatabase():
 
 
 def listTables():
-    """Return a list of all tables in the database."""
-    return list(db.query("SHOW TABLES").getSingleColumn())
+    """Return a list of all table names in the database."""
+    return list(query("SHOW TABLES").getSingleColumn())

@@ -10,10 +10,8 @@
 """Unittests for the sql-package."""
 
 import sys, unittest, getpass
-from omg.database import sql
+from omg import config, database as db
 from omg.utils import FlexiDate
-
-testTable = "tmp_omg_test_table"
 
 data = (
     ("Tobias Ä",24,1.8,True,None),
@@ -22,6 +20,8 @@ data = (
     ("Frédéric François Chopin",39,1.6,False,FlexiDate(1849,10,17))
 )
 
+testTable = "sqltest"
+
 class SqlTestCase(unittest.TestCase):
     def __init__(self,driver):
         unittest.TestCase.__init__(self)
@@ -29,16 +29,15 @@ class SqlTestCase(unittest.TestCase):
         
     def setUp(self):
         print("Checking driver '{}'...".format(self.driver))
-        self.db = sql.newConnection([self.driver])
-        self.db.connect(username,password,database)
+        db.testConnect(self.driver)
 
     def tearDown(self):
-        self.db.close()
+        db.close()
 
     def runTest(self):
         # Create the table
-        self.db.query("""
-            CREATE TEMPORARY TABLE {} (
+        db.query("""
+            CREATE TEMPORARY TABLE {}{} (
             id INT UNSIGNED NOT NULL AUTO_INCREMENT,
             name VARCHAR(30) NOT NULL,
             age INT NOT NULL,
@@ -47,73 +46,70 @@ class SqlTestCase(unittest.TestCase):
             death INT NULL DEFAULT NULL,
             PRIMARY KEY(id)
             ) ENGINE InnoDB, CHARACTER SET 'utf8';
-            """.format(testTable)
+            """.format(db.prefix,testTable)
         )
         
         # Fill it with data
-        result = self.db.query("INSERT INTO {} (name,age,size,male) VALUES (?,?,?,?)"
-                                    .format(testTable),*data[0][:-1]) # without death
+        result = db.query("INSERT INTO {}{} (name,age,size,male) VALUES (?,?,?,?)"
+                                .format(db.prefix,testTable),*data[0][:-1]) # without death column
         self.assertEqual(result.insertId(),1)
 
-        result = self.db.multiQuery("INSERT INTO {} (name,age,size,male,death) VALUES (?,?,?,?,?)".format(testTable),
-                                    data[1:])
+        result = db.multiQuery("INSERT INTO {}{} (name,age,size,male,death) VALUES (?,?,?,?,?)"
+                                .format(db.prefix,testTable),data[1:])
         self.assertEqual(result.affectedRows(),1) # The result contains only information about the last query
         self.assertEqual(result.insertId(),4)
 
         # And retrieve it again
-        result = self.db.query("SELECT id,name,age,size,male,death FROM {} ORDER BY id".format(testTable))
+        result = db.query("SELECT id,name,age,size,male,death FROM {}{} ORDER BY id".format(db.prefix,testTable))
         self.assertEqual(len(result),4)
         for i,row in enumerate(result):
             self.assertEqual(i+1,row[0]) # id
             for j in range(5):
                 self.assertEqual(data[i][j],row[j+1]if j+1<5 else FlexiDate.fromSql(row[j+1]))
 
-        result = self.db.query("SELECT id FROM {} WHERE age = ?".format(testTable),24)
+        result = db.query("SELECT id FROM {}{} WHERE age = ?".format(db.prefix,testTable),24)
         self.assertEqual(result.getSingle(),1)
 
-        result = self.db.query("SELECT id FROM {} ORDER BY id".format(testTable))
+        result = db.query("SELECT id FROM {}{} ORDER BY id".format(db.prefix,testTable))
         for i,v in enumerate(result.getSingleColumn()):
             self.assertEqual(i+1,v)
 
-        result = self.db.query("SELECT id,age FROM {} WHERE id = ?".format(testTable),2)
+        result = db.query("SELECT id,age FROM {}{} WHERE id = ?".format(db.prefix,testTable),2)
         row = result.getSingleRow()
         self.assertEqual(row[0],2)
         self.assertEqual(row[1],data[1][1])
 
         # Start modifying the data
-        result = self.db.query("DELETE FROM {} WHERE death IS NOT NULL".format(testTable))
+        result = db.query("DELETE FROM {}{} WHERE death IS NOT NULL".format(db.prefix,testTable))
         self.assertEqual(result.affectedRows(),1)
 
         # Test transactions
-        self.db.transaction()
+        db.transaction()
         for i in range(1,4):
-            self.db.query("UPDATE {} SET age=age+1 WHERE id = ?".format(testTable),i)
-        self.db.commit()
+            db.query("UPDATE {}{} SET age=age+1 WHERE id = ?".format(db.prefix,testTable),i)
+        db.commit()
 
-        result = self.db.query("SELECT age FROM {} ORDER BY id".format(testTable))
+        result = db.query("SELECT age FROM {}{} ORDER BY id".format(db.prefix,testTable))
         self.assertListEqual(list(result.getSingleColumn()),[25,23,22])
 
-        self.db.transaction()
+        db.transaction()
         for i in range(1,4):
-            self.db.query("UPDATE {} SET death = ?".format(testTable),FlexiDate(2000))
-        self.db.rollback()
+            db.query("UPDATE {}{} SET death = ?".format(db.prefix,testTable),FlexiDate(2000))
+        db.rollback()
 
-        result = self.db.query("SELECT death FROM {}".format(testTable))
+        result = db.query("SELECT death FROM {}{}".format(db.prefix,testTable))
         self.assertListEqual(list(FlexiDate.fromSql(value) for value in result.getSingleColumn()),3*[None])
 
         # Check exceptions
-        self.assertRaises(sql.DBException,lambda: self.db.query("STUPID QUERY"))
+        self.assertRaises(db.sql.DBException,lambda: db.query("STUPID QUERY"))
         
-        result = self.db.query("SELECT * FROM {} WHERE death IS NOT NULL".format(testTable))
-        self.assertRaises(sql.EmptyResultException,result.getSingle)
-        self.assertRaises(sql.EmptyResultException,result.getSingleRow)
-        self.assertRaises(sql.EmptyResultException,result.getSingleColumn)
+        result = db.query("SELECT * FROM {}{} WHERE death IS NOT NULL".format(db.prefix,testTable))
+        self.assertRaises(db.sql.EmptyResultException,result.getSingle)
+        self.assertRaises(db.sql.EmptyResultException,result.getSingleRow)
         
 
 if __name__ == "__main__":
-    username = input("Please enter the SQL username I should use: ")
-    password = getpass.getpass("Please enter the SQL password I should use: ")
-    database = input("Please enter the SQL database I should use: ")
+    config.init()
 
     suite = unittest.TestSuite()
     for driver in ("qtsql",):

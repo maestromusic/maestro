@@ -22,11 +22,18 @@ defaults = {
 "database": {
     "drivers": (list,["qtsql"], "List of drivers OMG will try to connect to the database."),
     "prefix":  (str,"","Prefix which will be prepended to the table names."),
+    "mysql_db": (str,"omg","Name of the database"),
     "mysql_user": (str,"","MySQL user name"),
     "mysql_password": (str,"","MySQL password"),
     "mysql_host": (str,"localhost","MySQL host name"),
     "mysql_port": (int,3306,"MySQL port"),
-    "mysql_db": (str,"omg","Name of the database"),
+    
+    "test_db": (str,"","Name of the database used by (unit)test scripts. If this is empty the normal database will be used (In this case you must specify a test-prefix which differs from the standard prefix."),
+    "test_user": (str,"","MySQL user name for test scripts"),
+    "test_password": (str,"","MySQL password for test scripts"),
+    "test_host": (str,"localhost","MySQL host name for test scripts"),
+    "test_port": (int,3306,"MySQL port for test scripts"),
+    "test_prefix": (str,"omgtest_","Table prefix for the test tables."),
 },
 
 "mpd": {

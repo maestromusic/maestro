@@ -41,6 +41,10 @@ from omg.utils import FlexiDate
 # When a driver is loaded _modules[driverIdentifier] will contain the driver's module.
 _modules = {}
 
+# Database connection information in the order it must be supplied to the connect method
+AUTH_OPTIONS = ["user","password","db","host","port"]
+
+
 class DBException(Exception):
     """This exception is raised if something goes wrong with the database connection, or if an invalid query is executed."""
     def __init__(self,message,query=None,args=None):
