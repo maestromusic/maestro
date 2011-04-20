@@ -13,14 +13,13 @@ The actual database drivers which connect to the database using a third party co
 
 The easiest way to use this package is::
 
-    import database
-    db = database.connect()
+    from omg import database as db
+    db.connect()
     db.query(...)
 
 or, if the connection was already established in another module::
 
-    import database
-    db = database.get()
+    import db
     db.query(...)
 
 \ """
@@ -33,19 +32,31 @@ from . import sql
 class DBLayoutException(Exception):
     """Exception that occurs if the existing database layout doesn't meet the requirements."""
 
-# Database connection object
-db = None
-
 # Table prefix
 prefix = None
 
 # Logger for database warnings
 logger = logging.getLogger("omg.database")
 
+# Database connection object
+db = None
+
+# These methods will be replaced by the database connection object's corresponding methods once the connection has been established.
+def query(*params):
+    logger.error("Cannot access database before a connection was opened.")
+
+multiQuery = query
+transaction = query
+commit = query
+rollback = query
+
+
 def connect():
     """Connect to the database server with information from the config file. The drivers specified in ``config.options.database.drivers`` are tried in the given order."""
-    global db, prefix
-    if db is None:
+    global db
+    if db is not None:
+        logger.warning("database.connect has been called although the database connection was already open")
+    else:
         db = sql.newConnection(config.options.database.drivers)
         try:
             db.connect(*[config.options.database[key] for key in
@@ -55,14 +66,13 @@ def connect():
             sys.exit(1)
             
         logger.info("Database connection is open.")
+        global prefix, query, multiQuery, transaction, commit, rollback
         prefix = config.options.database.prefix
-    else: logger.warning("database.connect has been called although the database connection was already open")
-    return db
-
-
-def get():
-    """Return the database connection object or None if the connection has not yet been opened."""
-    return db
+        query = db.query
+        multiQuery = db.multiQuery
+        transaction = db.transaction
+        commit = db.commit
+        rollback = db.rollback
 
 
 def resetDatabase():

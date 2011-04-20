@@ -9,7 +9,7 @@
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from omg import getIcon,database, application, constants, config
+from omg import getIcon, database as db, application, constants, config
 
 # don't use relative import since this file may be executed directly and is not a package in that case.
 from omg.plugins.dbanalyzer import checks
@@ -121,10 +121,6 @@ class DBAnalyzerDialog(QtGui.QDialog):
         
     def fetchData(self):
         """Forget all data and fetch it from the database."""
-        global db, prefix
-        db = database.get()
-        prefix = database.prefix
-
         # Clear
         self.statisticsTable.clear()
         self.tagTable.clear()
@@ -226,32 +222,32 @@ class DBAnalyzerDialog(QtGui.QDialog):
         return [
             (self.tr("Elements"),db.query(
                     "SELECT COUNT(*) FROM {}elements"
-                        .format(prefix)).getSingle()),
+                        .format(db.prefix)).getSingle()),
             (self.tr("Files"),db.query(
                     "SELECT COUNT(*) FROM {}files"
-                        .format(prefix)).getSingle()),
+                        .format(db.prefix)).getSingle()),
             (self.tr("Containers"),db.query(
                     "SELECT COUNT(*) FROM {}elements WHERE file = 0"
-                        .format(prefix)).getSingle()),
+                        .format(db.prefix)).getSingle()),
             (self.tr("Toplevel elements"),db.query(
                     "SELECT COUNT(*) FROM {}elements WHERE toplevel = 1"
-                        .format(prefix)).getSingle()),
+                        .format(db.prefix)).getSingle()),
             (self.tr("Content relations"),db.query(
                     "SELECT COUNT(*) FROM {}contents"
-                        .format(prefix)).getSingle()),
+                        .format(db.prefix)).getSingle()),
             (self.tr("Tag relations"),db.query(
                     "SELECT COUNT(*) FROM {}tags"
-                        .format(prefix)).getSingle())
+                        .format(db.prefix)).getSingle())
             ]
 
     def getTags(self):
         """Gather and return the data for the tags table."""
         tags = []
-        result = db.query("SELECT id,tagname,tagtype FROM {}tagids ORDER BY id".format(prefix))
+        result = db.query("SELECT id,tagname,tagtype FROM {}tagids ORDER BY id".format(db.prefix))
         for id,name,type in result:
             tuple = (id,name,type,
-                db.query("SELECT COUNT(*) FROM {}values_{} WHERE tag_id={}".format(prefix,type,id)).getSingle(),
-                db.query("SELECT COUNT(*) FROM {}tags WHERE tag_id={}".format(prefix,id)).getSingle()
+                db.query("SELECT COUNT(*) FROM {}values_{} WHERE tag_id={}".format(db.prefix,type,id)).getSingle(),
+                db.query("SELECT COUNT(*) FROM {}tags WHERE tag_id={}".format(db.prefix,id)).getSingle()
              )
             tags.append(tuple)
         return(tags)

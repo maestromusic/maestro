@@ -247,7 +247,7 @@ def addTag(name,type):
     if name in _tagsByName:
         raise RuntimeError("Requested creation of tag {} which is already there".format(name))
     from omg import database
-    id = database.get().query(
+    id = database.query(
         "INSERT INTO {}tagids (tagname,tagtype) VALUES (?,?)".format(database.prefix),
         name,type.name).insertId()
     newTag = Tag(id,name,type)
@@ -266,7 +266,7 @@ def init():
     from omg import database
     _tagsById = {}
     _tagsByName = {}
-    for row in database.get().query("SELECT id,tagname,tagtype FROM {}tagids".format(database.prefix)):
+    for row in database.query("SELECT id,tagname,tagtype FROM {}tagids".format(database.prefix)):
         newTag = Tag(row[0],row[1],ValueType.byName(row[2]))
         _tagsById[newTag.id] = newTag
         _tagsByName[newTag.name] = newTag
