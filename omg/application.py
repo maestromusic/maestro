@@ -89,6 +89,7 @@ def run(cmdConfig = []):
     plugins.loadPlugins()
     
     # Create GUI
+    import omg.filesystembrowser
     from omg.gui import mainwindow
     global mainWindow
     mainWindow = mainwindow.MainWindow()

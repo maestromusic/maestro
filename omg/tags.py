@@ -22,8 +22,8 @@ import os.path, xml.sax
 from collections import Sequence
 from xml.sax.handler import ContentHandler
 
-from omg import config, constants, logging, getIconPath
-from omg.utils import FlexiDate
+from omg import config, constants, logging
+from omg.utils import FlexiDate, getIconPath
 
 logger = logging.getLogger("omg.tags")
 
