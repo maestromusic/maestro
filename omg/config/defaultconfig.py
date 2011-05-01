@@ -6,13 +6,23 @@
 # published by the Free Software Foundation
 #
 
+"""
+This module stores the default configuration of OMG' core. Plugin default configuration is returned by the plugin's defaultConfig and defaultStorage methods. The return values of these methods use the same format as the dicts in this module:
+
+defaults and defaultStorage are dicts mapping section names to other dicts which store the options and nested sections of that section (using their names as keys again). Nested sections are again dicts, of course. Options are tuples consisting of:
+
+    - For default: type (one of str,list or int),default value and optionally a description string.
+    - For defaultStorage: default value and optionally a description string. If you don't specify a description you must use tuples with only one element!
+
+"""
+
 from PyQt4 import QtCore
 
 # No use to translate strings here, as this is executed before any translators have been loaded.
 defaults = {
 "main": {
     "collection": (str,".","Music collection base directory"),
-    "plugins": (list,["dbanalyzer"],"List of plugin names (i.e. the name of the corresponding directory in /omg/plugins/.")
+    "plugins": (list,["dbanalyzer","logodock"],"List of plugin names (i.e. the name of the corresponding directory in /omg/plugins/.")
 },
     
 "i18n": {
@@ -67,16 +77,16 @@ defaults = {
 }
 }
 
+# The default values must be stored in tuples of length 1, since dicts will start a new section
 storage = {
 "gui": {
-    'widget_position': (None,), # center the window
-    'widget_width': (800,),
-    'widget_height': (600,),
-    'browser_views': ([[['composer','artist','performer']],[['genre'],['composer','artist','performer']]],),
+    'central_widgets': ([],),
+    'dock_widgets': ([],),
 }
 }
 
 # Stuff from OMG 0.1 --- not clear whether it will be used in OMG 0.2
+   # 'browser_views': ([[['composer','artist','performer']],[['genre'],['composer','artist','performer']]],),
     #~ options.addOption("tags",       "search_tags",      list,   ["album",
                                                                  #~ "performer",
                                                                  #~ "conductor",

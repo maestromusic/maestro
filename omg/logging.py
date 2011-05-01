@@ -15,6 +15,7 @@ import logging, logging.config, os, sys
 
 configured = False # Whether logging has been configured (i.e. init has been successfully called).
 
+
 class Logger:
     """A logger prints log messages to stderr until logging is configured. Afterwards it wraps a usual Python Logger with the same name."""
     def __init__(self,name):
@@ -54,7 +55,7 @@ class Logger:
             import traceback
             traceback.print_tb(tb)
             del tb # confer sys.exc_info
-        else: 
+        else:
             if self._logger is None:
                 self._logger = logging.getLogger(self.name)
             self._logger.exception(message)

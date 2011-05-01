@@ -5,6 +5,11 @@
 # it under the terms of the GNU General Public License version 3 as
 # published by the Free Software Foundation
 #
+
+"""
+This module controls the startup and finishing process of OMG. :func:`run` runs the application while :func:`init` only initializes the most basic modules without starting a graphical interface.
+"""
+
 import sys, os
 
 from PyQt4 import QtCore, QtGui
@@ -12,10 +17,11 @@ from PyQt4.QtCore import Qt
 
 from omg import config, logging, database, tags
 
+# The application's main window
 mainWindow = None
 
 
-def init(cmdConfig = []):
+def init(cmdConfig = [],testDB=False):
     """Initialize the application, translators, modules (config, logging, database and tags) but do not create a GUI or load any plugins. Return the QApplication instance. This is useful for scripts which need OMG's framework, but not its GUI and for testing (or playing around) in Python's shell::
 
         >>> from omg import application, tags
@@ -25,6 +31,7 @@ def init(cmdConfig = []):
         ["title", "artist", "album", ...]
 
     *cmdOptions* is a list of options given on the command line that will overwrite the corresponding option from the file or the default. Each list item has to be a string like ``main.collection=/var/music``.
+    If *testDB* is True, the database connection will be build using :func:`database.testConnect`. Warning: In this case the tags-module won't be initialized since the test database is usually empty.
     """
     # Some Qt-classes need a running QApplication before they can be created
     app = QtGui.QApplication(sys.argv)
@@ -58,8 +65,10 @@ def init(cmdConfig = []):
                             .format(translatorFile,translatorDir))
 
     # Initialize remaining modules
-    database.connect()
-    tags.init()
+    if not testDB:
+        database.connect()
+        tags.init()
+    else: database.testConnect()
     
     # TODO
     #~ from omg import distributor 
@@ -74,22 +83,24 @@ def run(cmdConfig = []):
     """Run OMG. *cmdOptions* is a list of options given on the command line that will overwrite the corresponding option from the file or the default. Each list item has to be a string like ``main.collection=/var/music``.
     """
     app = init(cmdConfig)
+
+    # Load Plugins
+    from omg import plugins
+    plugins.loadPlugins()
     
     # Create GUI
     from omg.gui import mainwindow
     global mainWindow
     mainWindow = mainwindow.MainWindow()
-
-    # Load Plugins
-    from omg import plugins
-    plugins.loadPlugins()
+    plugins.mainWindowInit()
     
     # Launch application
     mainWindow.show()
     returnValue = app.exec_()
     
     # Close operations
-    mainWindow.shutdown()
+    mainWindow.saveLayout()
+    
     #TODO
     #import omg.gopulate
     #omg.gopulate.terminate()

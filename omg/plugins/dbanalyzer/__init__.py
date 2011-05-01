@@ -6,62 +6,69 @@
 # published by the Free Software Foundation
 #
 
+"""The DBAnalyzer displays statistics about the database, finds errors in it and allows the user to correct them. It is provided as central widget, dialog (in the extras menu) and standalone application (bin/dbanalyzer)."""
+
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from omg import getIcon, database as db, application, constants, config
+from omg.gui import mainwindow
 
 # don't use relative import since this file may be executed directly and is not a package in that case.
 from omg.plugins.dbanalyzer import checks
 
-# the action that is inserted into the Extras menu
-_action = None
-_widget = None
+_action = None # the action that is inserted into the Extras menu
+_widget = None # the dialog widget must be stored in a variable or it will vanish immediately
 
+
+# The next few (undocumented) functions are called by the plugin system
 def enable():
     global _action
     _action = QtGui.QAction(application.mainWindow)
     _action.setText(QtGui.QApplication.translate("DBAnalyzerDialog","DB Analyzer"))
     _action.triggered.connect(_openDialog)
+    mainwindow.addWidgetData(mainwindow.WidgetData(
+        "dbanalyzer",QtGui.QApplication.translate("DBAnalyzerDialog","DB Analyzer"),DBAnalyzerDialog,True,False))
+
+
+def mainWindowInit():
     application.mainWindow.menus['extras'].addAction(_action)
 
 
-def _openDialog():
-    global _widget # store the widget in a variable or it will immediately destroyed
-    _widget = DBAnalyzerDialog()
-    _widget.setWindowTitle("OMG version {} – Database Analyzer".format(constants.VERSION))
- 
-    screen = QtGui.QDesktopWidget().screenGeometry()
-    size =  QtCore.QSize(config.storage.dbanalyzer.width,config.storage.dbanalyzer.height)
-    _widget.resize(size)
-    x = config.storage.dbanalyzer.pos_x
-    y = config.storage.dbanalyzer.pos_y
-    if x is None or y is None:
-        _widget.move((screen.width()-size.width())/2, (screen.height()-size.height())/2)
-    else: _widget.move(x,y)
-    _widget.show()
- 
-    _widget.fetchData()
-
-
 def disable():
-    application.mainwindow.menus['extras'].removeAction(_action)
+    application.mainWindow.menus['extras'].removeAction(_action)
+    mainwindow.removeWidgetData("dbanalyzer")
 
 
 def defaultStorage():
     return {"dbanalyzer": {
-            "width": (800,"Width of the window."),
-            "height": (600,"Height of the window."),
-            "pos_x": (None,"X-Pos of the window."),
-            "pos_y": (None,"Y-Pos of the window.")
+            "size": ((800,600),"Size of the window."),
+            "pos": (None,"Position of the window as tuple or None to center the window")
         }}
+
+
+def _openDialog():
+    """Open the DBAnalyzer as a dialog."""
+    global _widget # store the widget in a variable or it will immediately destroyed
+    _widget = DBAnalyzerDialog(dialog=True)
+    _widget.setWindowTitle("OMG version {} – Database Analyzer".format(constants.VERSION))
+
+    # TODO: use restoreGeometry
+    screen = QtGui.QDesktopWidget().screenGeometry()
+    size = QtCore.QSize(*config.storage.dbanalyzer.size)
+    _widget.resize(size)
+    pos = config.storage.dbanalyzer.pos
+    if pos is None:
+        _widget.move((screen.width()-size.width())/2, (screen.height()-size.height())/2)
+    else: _widget.move(*pos)
+    _widget.show()
 
 
 class DBAnalyzerDialog(QtGui.QDialog):
     """A dialog that displays statistics about the database, finds errors in it and allows the user to correct them."""
     currentCheck = None # The check that is currently displayed in the details view.
     
-    def __init__(self,parent=None):
+    def __init__(self,parent=None,dialog=False):
         QtGui.QDialog.__init__(self,parent)
         self.setLayout(QtGui.QHBoxLayout())
         leftLayout = QtGui.QVBoxLayout()
@@ -112,13 +119,21 @@ class DBAnalyzerDialog(QtGui.QDialog):
         buttonLayout = QtGui.QHBoxLayout()
         problemsLayout.addLayout(buttonLayout)
         self.fixButton = QtGui.QPushButton(getIcon("edit-clear.png"),self.tr("Fix problem"))
+        self.fixButton.setEnabled(False)
         self.fixButton.clicked.connect(self._handleFixButton)
         buttonLayout.addWidget(self.fixButton,0)
-        buttonLayout.addStretch(1)
-        closeButton = QtGui.QPushButton(QtGui.QIcon.fromTheme('window-close'),self.tr("Close"))
-        closeButton.clicked.connect(self.close)
-        buttonLayout.addWidget(closeButton,0)
+        refreshButton = QtGui.QPushButton(QtGui.QIcon.fromTheme('view-refresh'),self.tr("Refresh"))
+        refreshButton.clicked.connect(self.fetchData)
+        buttonLayout.addWidget(refreshButton,0)
         
+        buttonLayout.addStretch(1)
+        if dialog:
+            closeButton = QtGui.QPushButton(QtGui.QIcon.fromTheme('window-close'),self.tr("Close"))
+            closeButton.clicked.connect(self.close)
+            buttonLayout.addWidget(closeButton,0)
+
+        self.fetchData()
+    
     def fetchData(self):
         """Forget all data and fetch it from the database."""
         # Clear
@@ -253,10 +268,8 @@ class DBAnalyzerDialog(QtGui.QDialog):
         return(tags)
 
     def close(self):
-        config.storage.dbanalyzer.width = self.width()
-        config.storage.dbanalyzer.height = self.height()
-        config.storage.dbanalyzer.pos_x = self.x()
-        config.storage.dbanalyzer.pos_y = self.y()
+        config.storage.dbanalyzer.size = (self.width(),self.height())
+        config.storage.dbanalyzer.pos = (self.x(),self.y())
         QtGui.QDialog.close(self)
 
 

@@ -35,6 +35,14 @@ def loadPlugins():
             enablePlugin(pluginName)
 
 
+def mainWindowInit():
+    """Call plugin.mainWindowInit for all enabled plugins."""
+    for pluginName in enabledPlugins:
+        plugin = loadedPlugins[pluginName]
+        if hasattr(plugin,"mainWindowInit"):
+            plugin.mainWindowInit()
+
+
 def enablePlugin(pluginName):
     """Enable the plugin with the given name. If it has not yet been imported, import it."""
     if pluginName in enabledPlugins:

@@ -5,20 +5,38 @@
 # it under the terms of the GNU General Public License version 3 as
 # published by the Free Software Foundation
 #
-# This module handles configuration options from files and from the command line.
 
-import os, sys
+"""
+This package handles OMG's configuration. There are five sources where configuration may come from: Three files in the configuration directory, the default options which are hard coded into the defaultconfig module (and into plugins) and finally the command line where arbitrary config options may be overwritten using the -c option. The three files are:
+
+    - config. This is the main configuration file and the one that is mainly edited by the user. But it may be written from the program, too. It contains several sections which may contain options and nested sections. Options must have a type (str,int or list) and a default value stored in defaultconfig. To get the option ``size`` from the section ``gui`` simply use ``config.options.gui.size``. This will directly return the option's value. In the rare cases you need the option itself as ConfigOption-instance use ``config.optionObject.gui.size``. Instead of attribute access you may also use item access: ``config.options['gui']['size']``. Both types of access allow to write values via assignment. Note that values will not be written to the file before the application terminates, though.
+
+    - storage. This file holds persistent information and is mainly written by the program. But it is human readable and can thus be edited by the user, too. The most important difference to config is that this file uses ConfigObj's unrepr-mode. Therefore you may store any combination of Python's standard types including lists and dicts. Access works like for config, but with the variables ``config.storage`` and ``config.storageObject``.
+
+    - binary. The last file contains simply a pickled dict to store arbitrary binary data. During the application this dict can be accessed via config.binary which really is simply a dict, so there are no sections or attribute access like for config and storage. Take care that your keys don't conflict with other modules!
+
+    Both config and storage may only contain options which are defined in the defaultconfig module or in the default configuration of a plugin that is returned by its defaultConfig- or defaultStorage-method (to be precise they may contain sections which are not defined. OMG will assume that they belong to a plugin that is not loaded).
+
+    Call init at application start to read options and call shutdown at the end to write the options. Use loadPlugins and removePlugins to add or remove plugin configuration.
+"""
+
+import os, sys, pickle
 from omg import constants, logging
 from . import configobj
 
 CONFDIR = None
 
+# These are the main access objects. The first two give direct access to the values, while the last two yield ConfigOption instances
 options = None
 storage = None
 optionObject = None
 storageObject = None
 
+# A dict which will be pickled and stored in a file
+binary = None
+
 logger = logging.getLogger("config")
+
 
 def init(cmdOptions = []):
     """Initialize the config-module: Read the config files and create the module variables. *cmdOptions* is a list of options given on the command line that will overwrite the corresponding option from the file or the default. Each list item has to be a string like ``main.collection=/var/music``."""
@@ -46,14 +64,27 @@ def init(cmdOptions = []):
     storageObject = Config([],storage=True)
     storage = ValueSection(storageObject)
 
+    # Initialize pickled
+    global binary
+    path = _getPath("binary")
+    if os.path.exists(path):
+        try:
+            binary = pickle.load(open(path,"rb"))
+        except:
+            logger.exception("Could not load binary configuration from '{}'.".format(path))
+            binary = {}
+    else: binary = {}
+
 
 def shutdown():
+    """Store the configuration persistently on application shutdown."""
     optionObject.write()
     storageObject.write()
+    pickle.dump(binary,open(_getPath("binary"),"wb"))
 
 
 class Option:
-    """Baseclass for options. An option has the following attributes:
+    """Baseclass for options used by the config and storage files. An option has the following attributes:
     
             * ``name``: Its name,
             * ``default``: the default value,
@@ -221,9 +252,7 @@ class Config(ConfigSection):
     def __init__(self,cmdConfig,storage):
         ConfigSection.__init__(self,"<Default>",storage,{})
 
-        self._path = os.path.join(CONFDIR,"storage" if self._storage else "config")
-        if os.path.exists("{}.{}".format(self._path,constants.VERSION)):
-            self._path = "{}.{}".format(self._path,constants.VERSION) # Load version specific config
+        self._path = _getPath("storage" if self._storage else "config")
 
         # First read the default config
         from . import defaultconfig
@@ -262,11 +291,13 @@ class Config(ConfigSection):
                                               create_empty=True,unrepr=self._storage)
         
     def _addSection(self,name,options):
+        """Add a section with the given name and options."""
         if name in self._members:
             raise ConfigError("Error in config file '{}': Cannot add section '{}' twice.".format(self._path,name))
         else: self._members[name] = ConfigSection(name,self._storage,options)
 
     def loadPlugins(self,sections):
+        """Load plugin configuration. *sections* stores the default configuration of the plugins. It is a dict mapping section names (usually the plugin name) to a section dict like in the defaultconfig module. After storing this default configuration check if these sections exist in the config and storage file and read them."""
         for name,section in sections.items():
             self._addSection(name,section)
             if self._configObj is None: # This is the case if plugins are loaded during runtime
@@ -276,12 +307,14 @@ class Config(ConfigSection):
         self._configObj = None
 
     def removePlugins(self,sectionNames):
+        """Remove the plugin configuration of one or more plugins. *sectionNames* contains the names of the sections used by the plugins that should be removed."""
         for name in sectionNames:
             if name not in self._members:
                 raise ConfigError("Cannot remove plugin section '{}' from config because it doesn't exist.".format(name))
             del self._members[name]
 
     def write(self):
+        """Write the configuration to the correct file."""
         self._openFile()
         for section in self._members.values():
             section._write(self._configObj)
@@ -289,20 +322,22 @@ class Config(ConfigSection):
         self._configObj = None
             
     def pprint(self):
+        """Debug method: Print this configuration."""
         for section in self._members.values():
-            self.pprintSection(section,1)
+            self._pprintSection(section,1)
 
-    def pprintSection(self,section,nesting):
+    def _pprintSection(self,section,nesting):
         print(("    "*(nesting-1))+('['*nesting)+section._name+(']'*nesting))
         for member in section._members.values():
             if isinstance(member,ConfigSection):
                 print()
-                self.pprintSection(member,nesting+1)
+                self._pprintSection(member,nesting+1)
             else: print("{}{}: {}".format("    "*(nesting-1),member.name,member.getValue()))
         print()
 
 
 class ValueSection:
+    """A ValueSection wraps a ConfigSection. On attribute access or item access it will directly return the option's value. This class is used by ``config.options`` and ``config.storage``."""
     def __init__(self,section):
         self._section = section
 
@@ -332,6 +367,14 @@ class ValueSection:
         if not isinstance(option,Option):
             raise ConfigError("Cannot write sections via ValueSection (section name '{}').".format(name))
         else: option.updateValue(value,fileValue=True)
+
+
+def _getPath(fileName):
+    """Get the path to a configugation file. *fileName* may be ``'config'`` or ``'storage'`` or``'binary'``."""
+    path = os.path.join(CONFDIR,fileName)
+    if os.path.exists("{}.{}".format(path,constants.VERSION)):
+        return "{}.{}".format(path,constants.VERSION) # Load version specific config
+    else: return path
 
 
 class ConfigError(Exception):

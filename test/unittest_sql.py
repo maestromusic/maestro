@@ -9,7 +9,7 @@
 
 """Unittests for the sql-package."""
 
-import sys, unittest, getpass
+import sys, unittest
 from omg import config, database as db
 from omg.utils import FlexiDate
 
