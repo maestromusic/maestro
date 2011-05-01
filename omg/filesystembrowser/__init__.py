@@ -16,7 +16,9 @@ from omg.gui import mainwindow
 considering the container structure in the database. It is meant to help building up the database.
 Folders which contain music files that are not yet present in the database are marked with a
 special icon."""
-  
+
+translate = QtCore.QCoreApplication.translate
+
 class IconProvider(QtGui.QFileIconProvider):
     pass
 
@@ -98,12 +100,13 @@ class FileSystemBrowserDock(QtGui.QDockWidget):
     """A DockWidget wrapper for the FileSystemBrowser."""
     def __init__(self, parent = None):
         QtGui.QDockWidget.__init__(self, parent)
+        self.setWindowTitle(translate("FileSystemBrowser","File System Browser"))
         self.setWidget(FileSystemBrowser())
         
         
 # register this widget in the main application
 data = mainwindow.WidgetData(id = "filesystembrowser",
-                             name = "File System Browser",
+                             name = translate("FileSystemBrowser","File System Browser"),
                              theClass = FileSystemBrowserDock,
                              central = False,
                              default = True,

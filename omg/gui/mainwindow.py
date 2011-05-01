@@ -112,7 +112,7 @@ class MainWindow(QtGui.QMainWindow):
         for data in _widgetData:
             if not data.central:
                 action = QtGui.QAction(data.name,self.menus['dockwidgets'])
-                action.triggered.connect(lambda: self.addDockWidget(data))
+                action.triggered.connect(functools.partial(self.addDockWidget,data))
                 if data.unique:
                     # This is used to find and enable the action if the single instance is hidden (closed)
                     action.setObjectName(data.id)
