@@ -85,10 +85,10 @@ class MainWindow(QtGui.QMainWindow):
         self.menus['extras'] = self.menuBar().addMenu(self.tr("&Extras"))
         self.menus['help'] = self.menuBar().addMenu(self.tr("&Help"))
         
-        self.aboutAction = QtGui.QAction(self)
-        self.aboutAction.setText(self.tr("&About"))
-        self.aboutAction.triggered.connect(self.showAboutDialog)
-        self.menus['help'].addAction(self.aboutAction)
+        aboutAction = QtGui.QAction(self)
+        aboutAction.setText(self.tr("&About"))
+        aboutAction.triggered.connect(self.showAboutDialog)
+        self.menus['help'].addAction(aboutAction)
 
     def updateViewMenu(self):
         """Update the view menu whenever the list of registered widgets has changed."""

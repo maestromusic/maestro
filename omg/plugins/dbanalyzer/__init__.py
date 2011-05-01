@@ -11,7 +11,7 @@
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from omg import getIcon, database as db, application, constants, config
+from omg import getIcon, database as db, application, constants, config, getIcon
 from omg.gui import mainwindow
 
 # don't use relative import since this file may be executed directly and is not a package in that case.
@@ -28,7 +28,8 @@ def enable():
     _action.setText(QtGui.QApplication.translate("DBAnalyzerDialog","DB Analyzer"))
     _action.triggered.connect(_openDialog)
     mainwindow.addWidgetData(mainwindow.WidgetData(
-        "dbanalyzer",QtGui.QApplication.translate("DBAnalyzerDialog","DB Analyzer"),DBAnalyzerDialog,True,False))
+        "dbanalyzer",QtGui.QApplication.translate("DBAnalyzerDialog","DB Analyzer"),DBAnalyzerDialog,True,False,
+        icon=getIcon("dbanalyzer.png","dbanalyzer")))
 
 
 def mainWindowInit():
@@ -52,6 +53,7 @@ def _openDialog():
     global _widget # store the widget in a variable or it will immediately destroyed
     _widget = DBAnalyzerDialog(dialog=True)
     _widget.setWindowTitle("OMG version {} – Database Analyzer".format(constants.VERSION))
+    _widget.setWindowIcon(getIcon("dbanalyzer.png","dbanalyzer"))
 
     # TODO: use restoreGeometry
     screen = QtGui.QDesktopWidget().screenGeometry()

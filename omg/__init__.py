@@ -30,9 +30,10 @@ def absPath(file):
     else:
         return file
 
-def getIconPath(name):
-    return os.path.join(constants.IMAGES, "icons", name)
+def getIconPath(name,plugin=None):
+    if plugin is None:
+        return os.path.join(constants.IMAGES, "icons", name)
+    else: return os.path.join(constants.IMAGES,"plugins",plugin,"icons",name)
 
-def getIcon(name):
-    return QtGui.QIcon(getIconPath(name))
-
+def getIcon(name,plugin=None):
+    return QtGui.QIcon(getIconPath(name,plugin))
