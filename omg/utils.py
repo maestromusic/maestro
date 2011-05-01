@@ -6,7 +6,10 @@
 # it under the terms of the GNU General Public License version 3 as
 #
 
-import datetime
+import datetime, os
+from omg import config
+from omg import constants
+from PyQt4 import QtGui
 
 def mapRecursively(f,aList):
     """Take *aList* which may contain (recursively) further lists and apply *f* to each element in these lists (except the lists). Return a copy of *aList* with the results::
@@ -22,6 +25,34 @@ def mapRecursively(f,aList):
         else: result.append(f(item))
     return result
 
+def hasKnownExtension(file):
+    """Return True if the given path has a known extension (i.e., appears in options.main.extension).
+    Does _not_ check whether the file actually exists, is readable, etc."""
+    s = file.rsplit(".", 1)
+    if len(s) == 1:
+        return False
+    else:
+        return s[1].lower() in config.options.main.extensions
+
+def relPath(file):
+    """Returns the relative path of a music file against the collection base path."""
+    if os.path.isabs(file):
+        return os.path.relpath(file, config.options.main.collection)
+    else:
+        return file
+
+def absPath(file):
+    """Returns the absolute path of a music file inside the collection directory, if it is not absolute already."""
+    if not os.path.isabs(file):
+        return os.path.join(config.options.main.collection, file)
+    else:
+        return file
+
+def getIconPath(name):
+    return os.path.join(constants.IMAGES, "icons", name)
+
+def getIcon(name):
+    return QtGui.QIcon(getIconPath(name))
 
 class FlexiDate:
     """A FlexiDate is a date which can store a date consisting simply of a year or of a year and a month or of year, month and day. OMG uses this class to store tags of type date, where most users will only specify a year, but some may give month and day, too.

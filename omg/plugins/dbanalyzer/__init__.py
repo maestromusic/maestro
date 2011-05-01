@@ -11,7 +11,8 @@
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from omg import getIcon, database as db, application, constants, config
+from omg import database as db, application, constants, config
+from omg.utils import getIcon
 from omg.gui import mainwindow
 
 # don't use relative import since this file may be executed directly and is not a package in that case.

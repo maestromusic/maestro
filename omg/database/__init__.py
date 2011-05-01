@@ -218,7 +218,10 @@ def verified(elid):
     
 def idFromPath(path):
     """Return the element_id of a file from the given path, or None if it is not found."""
-    return query("SELECT element_id FROM {}files WHERE path=?".format(prefix),path).getSingle()
+    try:
+        return query("SELECT element_id FROM {}files WHERE path=?".format(prefix),path).getSingle()
+    except sql.EmptyResultException:
+        return None
 
 def idFromHash(hash):
     """Return the element_id of a file from its hash, or None if it is not found."""
