@@ -164,6 +164,8 @@ def idFromHash(hash):
     else:
         raise RuntimeError("Hash not unique upon filenames!")
 
+def fileInDB(path):
+    return database.get().query("SELECT COUNT(*) FROM files WHERE path=?", path).getSingle() == 1
 # tagvalue-tables
 #============================================
 def valueFromId(tagSpec,valueId):
