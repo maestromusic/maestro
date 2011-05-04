@@ -47,12 +47,16 @@ def absPath(file):
         return os.path.join(config.options.main.collection, file)
     else:
         return file
+        
+def getIconPath(name,plugin=None):
+    if plugin is None:
+        return os.path.join(constants.IMAGES, "icons", name)
+    else: return os.path.join(constants.IMAGES,"plugins",plugin,"icons",name)
 
-def getIconPath(name):
-    return os.path.join(constants.IMAGES, "icons", name)
 
-def getIcon(name):
-    return QtGui.QIcon(getIconPath(name))
+def getIcon(name,plugin=None):
+    return QtGui.QIcon(getIconPath(name,plugin))
+
 
 class FlexiDate:
     """A FlexiDate is a date which can store a date consisting simply of a year or of a year and a month or of year, month and day. OMG uses this class to store tags of type date, where most users will only specify a year, but some may give month and day, too.

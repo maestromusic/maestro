@@ -217,19 +217,19 @@ class ConfigSection:
         for name,member in fileSection.items():
             if isinstance(member,configobj.Section):
                 if name not in self._members:
-                    logger.error("Error in config file '{}': Unknown section '{}' in section '{}'."
+                    logger.warning("Error in config file '{}': Unknown section '{}' in section '{}'."
                                     .format(path,name,self._name))
                 elif isinstance(self._members[name],Option):
-                    logger.error("Error in config file '{}': '{}' is not a section in section '{}'."
+                    logger.warning("Error in config file '{}': '{}' is not a section in section '{}'."
                                     .format(path,name,self._name))
                 else:
                     self._members[name].updateFromFile(member,path)
             else:
                 if name not in self._members:
-                    logger.error("Error in config file '{}': Unknown option '{}' in section '{}'."
+                    logger.warning("Error in config file '{}': Unknown option '{}' in section '{}'."
                                     .format(path,name,self._name))
                 elif isinstance(self._members[name],ConfigSection):
-                    logger.error("Error in config file '{}': '{}' is not an option in section '{}'."
+                    logger.warning("Error in config file '{}': '{}' is not an option in section '{}'."
                                     .format(path,name,self._name))
                 else:
                     self._members[name].updateValue(member,fileValue=True)
@@ -264,7 +264,7 @@ class Config(ConfigSection):
         self._openFile()
         for sectionName,section in self._configObj.items():
             if not isinstance(section,configobj.Section):
-                logger.error("Error in config file '{}': Option '{}' does not belong to any section."
+                logger.warning("Error in config file '{}': Option '{}' does not belong to any section."
                                 .format(self._path,sectionName))
             if sectionName in self._members:
                 self._members[sectionName].updateFromFile(section,self._path)

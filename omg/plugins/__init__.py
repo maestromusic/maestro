@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # Copyright 2009 Martin Altmayer
 #
@@ -7,8 +6,14 @@
 # published by the Free Software Foundation
 #
 import os, sys
-from omg import logging, config
 
+from PyQt4 import QtCore,QtGui
+from PyQt4.QtCore import Qt
+
+from omg import logging, config
+from omg.gui import mainwindow
+
+translate = QtCore.QCoreApplication.translate
 logger = logging.getLogger("omg.plugins")
 
 # Directory containing the plugins
@@ -21,7 +26,7 @@ else:
     # List of all plugins (or to be precise: all subdirectories of PLUGINDIR which contain a PLUGININFO file)
     plugins = [path for path in os.listdir(PLUGINDIR) if os.path.isdir(PLUGINDIR+path) 
                                                           and os.path.isfile(PLUGINDIR+path+"/PLUGININFO")]
-                                                      
+
 # Dict mapping plugin-names to loaded modules. Contains all plugin-modules which have been loaded
 loadedPlugins = {}
 
@@ -37,10 +42,20 @@ def loadPlugins():
 
 def mainWindowInit():
     """Call plugin.mainWindowInit for all enabled plugins."""
+    pluginAction = QtGui.QAction(mainwindow.mainWindow)
+    pluginAction.setText(translate("PluginDialog","&Plugins..."))
+    pluginAction.triggered.connect(_showPluginDialog)
+    mainwindow.mainWindow.menus['extras'].addAction(pluginAction)
+    
     for pluginName in enabledPlugins:
         plugin = loadedPlugins[pluginName]
         if hasattr(plugin,"mainWindowInit"):
             plugin.mainWindowInit()
+
+
+def _showPluginDialog():
+    from omg.plugins import dialog
+    dialog.PluginDialog(mainwindow.mainWindow).exec_()
 
 
 def enablePlugin(pluginName):
