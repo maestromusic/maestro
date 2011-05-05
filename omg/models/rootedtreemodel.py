@@ -10,7 +10,8 @@ from PyQt4 import QtCore
 from PyQt4.QtCore import Qt
 
 from . import Node, Element
-from omg.gui import formatter
+#from omg.gui import formatter
+
 
 class RootedTreeModel(QtCore.QAbstractItemModel):
     """The RootedTreeModel subclasses QAbstractItemModel to create a simple model for QTreeViews. It takes one root node which is not considered part of the data of this model (and is not displayed by QTreeViews). Nodes in a RootedTreeModel may have every type, but must implement the following methods:
@@ -116,3 +117,98 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
         for element in self.contents:
             for sub in element.getAllNodes():
                 yield sub
+
+
+class EditableRootedTreeModel(RootedTreeModel):
+    """EditableRootedTreeModel extends RootedTreeModel to include functions that modify the tree structure."""
+    def insert(self,parent,pos,node):
+        """Insert *node* at position *pos* into *parent*."""
+        self.insertMany(parent,pos,[node])
+
+    def insertMany(self,parent,pos,nodes):
+        """Insert the given nodes at position *pos* into *parent*."""
+        self.beginInsertRows(self.getIndex(parent),pos,pos+len(nodes)-1)
+        parent.getChildren()[pos:pos] = nodes
+        for node in nodes:
+            node.setParent(parent)
+        self.endInsertRows()
+        
+    def remove(self,node):
+        """Remove *node* and all of its children from the model."""
+        parent = node.getParent()
+        if parent is None:
+            raise ValueError("Cannot remove root node.")
+        pos = parent.index(node)
+        self.beginRemoveRows(self.getIndex(parent),pos,pos)
+        del parent.getChildren()[pos]
+        self.endRemoveRows()
+        
+    def removeByIndex(self,index):
+        """Remove the node with Qt-index *index*."""
+        if not index.isValid():
+            raise ValueError("removeByIndex needs a valid index.")
+        self.remove(self.data(index))
+
+    def move(self,sourceParent,sourceFirst,sourceLast,destParent,pos):
+        """Move the children of *sourceParent* with position *sourceFirst* up to and including *sourceLast* into *destParent* and insert them at position *pos*. Make sure that the move is valid or an exception is raised:
+
+            - You must not move nodes into one of their children.
+            - If *sourceParent* equals *destParent*, *pos* must not be in the range *sourceFirst* ... *sourceLast*+1.
+
+        In the latter case confer http://doc.qt.nokia.com/stable/qabstractitemmodel.html#beginMoveRows for the correct way to specify the positions (basically this function needs the old positions before anything has happened).
+        """
+        if sourceParent == destParent and pos >= sourceFirst and pos <= sourceLast + 1:
+            raise ValueError("Invalid positions in move: pos ∈ [sourceFirst,sourceLast+1]. Exact values were (pos,sourceFirst,sourceLast) = ({},{},{}).".format(pos,sourceFirst,sourceLast))
+        ok = self.beginMoveRows(self.getIndex(sourceParent),sourceFirst,sourceLast,self.getIndex(destParent),pos)
+        if not ok:
+            raise ValueError("Cannot move nodes.")
+            
+        movingNodes = sourceParent.getChildren()[sourceFirst:sourceLast+1]
+        if pos < sourceFirst:
+            # First remove, then insert
+            del sourceParent.getChildren()[sourceFirst:sourceLast+1]
+            destParent.getChildren()[pos:pos] = movingNodes
+        else:
+            destParent.getChildren()[pos:pos] = movingNodes
+            del sourceParent.getChildren()[sourceFirst:sourceLast+1]
+        for node in movingNodes:
+            node.setParent(destParent)
+        self.endMoveRows()
+        
+    def flatten(self,node):
+        """Replace *node* by its children. *node* must have at least one child."""
+        if node == self.root:
+            raise ValueError("Cannot flatten root node.")
+        if node.getChildrenCount() == 0:
+            raise ValueError("Cannot flatten empty nodes.")
+        parent = node.getParent()
+        pos = parent.index(node)
+        # Move children behind the node
+        self.move(node,0,node.getChildrenCount()-1,parent,pos+1)
+        # and remove the node itself
+        self.remove(node)
+
+    def split(self,node,pos):
+        """Split *node* at position *pos*: Insert a copy of *node* directly after it and insert all children of *node* with position *pos* or higher into the copy. If *pos* equals 0 or the number of children of node, do nothing and return False (you cannot split at the boundary). Otherwise return True."""
+        if node == self.root:
+            raise ValueError("Cannot split root node.")
+        if pos < 0 or pos > node.getChildrenCount():
+            raise ValueError("Invalid position: {}".format(pos))
+        if pos == 0 or pos == node.getChildrenCount():
+            return False # nothing to do here
+        parent = node.getParent()
+        nodePos = parent.index(node)
+        # Do not copy the contents
+        copy = node.copy(contents=[])
+        self.insert(parent,nodePos+1,copy)
+        self.move(node,pos,node.getChildrenCount()-1,copy,0)
+        return True
+
+    def insertParent(self,parent,startPos,endPos,newParent):
+        """Add a new node *newParent* between *parent* and some of its children. To be precise: Replace the children with positions *startPos* up to and including *endPos* by *newParent* and insert those nodes as children into *newParent* (at position 0).""" 
+        if startPos < 0 or endPos < startPos or endPos >= parent.getChildrenCount():
+            raise ValueError("Invalid start or end position in insertParent ({} and {}).".format(startPos,endPos))
+        if newParent == parent:
+            raise ValueError("parent and newParent must be distinct.")
+        self.insert(parent,startPos,newParent)
+        self.move(parent,startPos+1,endPos+1,newParent,0)
