@@ -10,7 +10,7 @@
 """Script to convert Omg's database from version 0.1 to version 0.2. Make a backup before using this script!"""
 
 import sys
-from omg import database,config
+from omg import database as db,config
 
 config.init({})
 
@@ -19,10 +19,10 @@ if not prefix:
     print("You must specify a table prefix for the version 0.2 tables in your config-file.")
     sys.exit()
     
-db = database.connect()
+db.connect()
 
 print("Creating new tables...")
-database.resetDatabase()
+db.resetDatabase()
 print("...done")
 
 print("Copying data (except tags)...")
@@ -32,8 +32,13 @@ db.query("""INSERT INTO {}contents (container_id,position,element_id)
                 (SELECT container_id,position,element_id FROM contents);""".format(prefix))
 db.query("""INSERT INTO {}files (element_id,path,hash,verified,length)
                 (SELECT element_id,path,hash,verified,length FROM files);""".format(prefix))
-db.query("""INSERT INTO {}tagids (id,tagname,tagtype)
-                (SELECT id,tagname,tagtype FROM tagids);""".format(prefix))
+
+# Copying the tagids is a bit tricky since we can set the sortkeys only after referenced tag has been inserted (foreign key constraint). So insert in ascending order and set the sortkey to the first tag that is inserted (that with minimal id). Then update with the title tag.
+minId = db.query("SELECT MIN(id) FROM tagids").getSingle()
+titleId = db.query("SELECT id FROM tagids WHERE tagname = ?",config.options.tags.title_tag).getSingle()
+db.query("""INSERT INTO {}tagids (id,tagname,tagtype,sortkey)
+                (SELECT id,tagname,tagtype,{} FROM tagids ORDER BY id ASC);""".format(prefix,minId))
+db.query("UPDATE {}tagids SET sortkey={}".format(prefix,titleId))
 print("...done")
 
 print("Copying tags...")

@@ -292,6 +292,10 @@ def init():
                                         .format(file,e.message()))
     
     global TITLE,ALBUM
+    if config.options.tags.title_tag not in _tagsByName:
+        raise RuntimeError("Cannot find a '{}'-tag in the database.".format(config.options.tags.title_tag))
+    if config.options.tags.album_tag not in _tagsByName:
+        raise RuntimeError("Cannot find a '{}'-tag in the database.".format(config.options.tags.album_tag))
     TITLE = _tagsByName[config.options.tags.title_tag]
     ALBUM = _tagsByName[config.options.tags.album_tag]
 

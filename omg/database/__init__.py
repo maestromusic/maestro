@@ -123,7 +123,8 @@ def resetDatabase():
     """Drop all tables and create them without data again. All table rows will be lost!"""
     from . import tables
     # Some tables are referenced by other tables and must therefore be dropped last and created first
-    referencedTables = [table for table in tables.tables if table.name in [prefix+"elements",prefix+"tagids"]]
+    referencedTables = [table for table in tables.tables if table.name in
+        [prefix+"elements",prefix+"tagids",prefix+"flag_names"]]
     otherTables = [table for table in tables.tables if table not in referencedTables]
     for table in otherTables:
         if table.exists():

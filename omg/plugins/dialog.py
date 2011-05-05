@@ -32,7 +32,7 @@ class PluginDialog(QtGui.QDialog):
     def __init__(self,parent=None):
         QtGui.QDialog.__init__(self,parent)
         self.setLayout(QtGui.QVBoxLayout())
-        self.setWindowTitle("OMG version {} – Database Analyzer".format(constants.VERSION))
+        self.setWindowTitle("OMG version {} – Plugins".format(constants.VERSION))
         if "pluginwindow_geometry" in config.binary and isinstance(config.binary["mainwindow_geometry"],bytearray):
             success = self.restoreGeometry(config.binary["pluginwindow_geometry"])
         else: success = False

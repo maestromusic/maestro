@@ -19,9 +19,3 @@ database.connect()
 print("Resetting database...")
 database.resetDatabase()
 print("...done")
-
-# Check for superfluous tables
-if database.checkSuperfluousTables():
-    if input("Drop superfluous tables? (y,n)") == "y":
-        database.checkSuperfluousTables(fix=True)
-        print("...done")

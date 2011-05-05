@@ -51,9 +51,10 @@ class SQLTable:
 tables = [SQLTable(createQuery) for createQuery in (
 """CREATE TABLE {}elements (
         id          MEDIUMINT UNSIGNED  NOT NULL AUTO_INCREMENT,
-        file        TINYINT(1)          NOT NULL,
-        toplevel    TINYINT(1)          NOT NULL,
+        file        BOOLEAN             NOT NULL,
+        toplevel    BOOLEAN             NOT NULL,
         elements    SMALLINT  UNSIGNED  NOT NULL DEFAULT 0,
+        major       BOOLEAN             NOT NULL,
         PRIMARY KEY(id)
     ) ENGINE InnoDB, CHARACTER SET 'utf8';
 """.format(db.prefix),
@@ -80,12 +81,15 @@ tables = [SQLTable(createQuery) for createQuery in (
         FOREIGN KEY(element_id) REFERENCES {0}elements(id) ON DELETE CASCADE
     ) ENGINE InnoDB, CHARACTER SET 'utf8';
 """.format(db.prefix),
-"""CREATE TABLE {}tagids (
+"""CREATE TABLE {0}tagids (
         id      SMALLINT UNSIGNED             NOT NULL AUTO_INCREMENT,
         tagname VARCHAR(63)                   NOT NULL,
         tagtype ENUM('varchar','date','text') NOT NULL DEFAULT 'varchar',
+        sortkey SMALLINT UNSIGNED             NOT NULL,
+        private BOOLEAN                       NOT NULL,
         PRIMARY KEY(id),
-        UNIQUE INDEX(tagname)
+        UNIQUE INDEX(tagname),
+        FOREIGN KEY(sortkey) REFERENCES {0}tagids(id) ON DELETE CASCADE
     ) ENGINE InnoDB, CHARACTER SET 'utf8';
 """.format(db.prefix),
 """CREATE TABLE {0}tags (
@@ -99,12 +103,14 @@ tables = [SQLTable(createQuery) for createQuery in (
     ) ENGINE InnoDB, CHARACTER SET 'utf8';
 """.format(db.prefix),
 """CREATE TABLE {0}values_varchar (
-        id     MEDIUMINT UNSIGNED NOT NULL AUTO_INCREMENT,
-        tag_id SMALLINT  UNSIGNED NOT NULL,
-        value  VARCHAR({1})        NOT NULL,
+        id              MEDIUMINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        tag_id          SMALLINT  UNSIGNED NOT NULL,
+        value           VARCHAR({1})       NOT NULL,
+        sort_value      VARCHAR({1}),
+        hide            BOOLEAN            NOT NULL,
         PRIMARY KEY(id),
         INDEX tag_value_idx(tag_id,value),
-        FOREIGN KEY(tag_id) REFERENCES {0}tagids(id)
+        FOREIGN KEY(tag_id) REFERENCES {0}tagids(id) ON DELETE CASCADE
     ) ENGINE InnoDB, CHARACTER SET 'utf8';
 """.format(db.prefix,constants.TAG_VARCHAR_LENGTH),
 """CREATE TABLE {0}values_text (
@@ -113,7 +119,7 @@ tables = [SQLTable(createQuery) for createQuery in (
         value  TEXT               NOT NULL,
         PRIMARY KEY(id),
         INDEX tag_value_idx(tag_id,value(10)),
-        FOREIGN KEY(tag_id) REFERENCES {0}tagids(id)
+        FOREIGN KEY(tag_id) REFERENCES {0}tagids(id) ON DELETE CASCADE
     ) ENGINE InnoDB, CHARACTER SET 'utf8';
 """.format(db.prefix),
 """CREATE TABLE {0}values_date (
@@ -122,7 +128,20 @@ tables = [SQLTable(createQuery) for createQuery in (
         value  INT       UNSIGNED NOT NULL,
         PRIMARY KEY(id),
         INDEX tag_value_idx(tag_id,value),
-        FOREIGN KEY(tag_id) REFERENCES {0}tagids(id)
+        FOREIGN KEY(tag_id) REFERENCES {0}tagids(id) ON DELETE CASCADE
     ) ENGINE InnoDB, CHARACTER SET 'utf8';
+""".format(db.prefix),
+"""CREATE TABLE {}flag_names (
+        id      SMALLINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        name    VARCHAR({})       NOT NULL,
+        PRIMARY KEY(id)
+) ENGINE InnoDB, CHARACTER SET 'utf8';
+""".format(db.prefix,constants.FLAG_VARCHAR_LENGTH),
+"""CREATE TABLE {0}flags (
+        element_id      MEDIUMINT UNSIGNED NOT NULL,
+        flag_id         SMALLINT UNSIGNED NOT NULL,
+        FOREIGN KEY(element_id) REFERENCES {0}elements(id) ON DELETE CASCADE,
+        FOREIGN KEY(flag_id) REFERENCES {0}flag_names(id) ON DELETE CASCADE
+) ENGINE InnoDB;
 """.format(db.prefix)
 )]
