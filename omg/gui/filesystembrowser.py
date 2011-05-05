@@ -29,7 +29,7 @@ class FileSystemBrowserModel(QtGui.QFileSystemModel):
         self.setFilter(QtCore.QDir.AllDirs | QtCore.QDir.NoDotAndDotDot)
         self.dirtyFolderIcon = QtGui.QIcon("images/icons/folder_unknown.svg")
         self.musicFolderIcon = QtGui.QIcon("images/icons/folder_ok.svg")
-        self.defaultFolderIcon = QtGui.QIcon.fromTheme("folder")
+        self.defaultFolderIcon = QtGui.QIcon("images/icons/folder.svg")
 
     def columnCount(self, index):
         return 1
