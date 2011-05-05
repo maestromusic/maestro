@@ -70,19 +70,11 @@ class FileSystemBrowser(QtGui.QTreeView):
         musikindex = self.model().setRootPath(rootDirectory)
         self.setRootIndex(musikindex)
         self.setSelectionMode(self.ExtendedSelection)
-        self.doubleClicked.connect(self._handleDoubleClick)
         self.setDragDropMode(QtGui.QAbstractItemView.DragOnly)
-        
-        self.findAllAlbumsAction = QtGui.QAction("find all albums here now", self)
-        self.findAllAlbumsAction.triggered.connect(self._handleFindAllAlbums)
         
     def selectionChanged(self, current, previous):
         self.currentDirectoriesChanged.emit([self.model().filePath(item) for item in self.selectedIndexes()], False)
         QtGui.QTreeView.selectionChanged(self, current, previous)
-        
-    def _handleFindAllAlbums(self):
-        paths = [self.model().filePath(index) for index in self.selectedIndexes()]
-        self.currentDirectoriesChanged.emit(paths, True)
         
     def contextMenuEvent(self, event):
         if self.selectionModel().hasSelection():
@@ -92,9 +84,6 @@ class FileSystemBrowser(QtGui.QTreeView):
             event.accept()
         else:
             event.ignore()
-    
-    def _handleDoubleClick(self, index):
-        self.searchDirectoryChanged.emit(self.model().filePath(index))
 
 class FileSystemBrowserDock(QtGui.QDockWidget):
     """A DockWidget wrapper for the FileSystemBrowser."""

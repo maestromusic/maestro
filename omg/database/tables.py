@@ -143,5 +143,9 @@ tables = [SQLTable(createQuery) for createQuery in (
         FOREIGN KEY(element_id) REFERENCES {0}elements(id) ON DELETE CASCADE,
         FOREIGN KEY(flag_id) REFERENCES {0}flag_names(id) ON DELETE CASCADE
 ) ENGINE InnoDB;
-""".format(db.prefix)
+""".format(db.prefix),
+"""CREATE TABLE {}folders (
+        folder       VARCHAR(511)    NOT NULL,
+        state        ENUM('unknown','nomusic','ok','unsynced')    NOT NULL DEFAULT 'unknown'
+) ENGINE InnoDB, CHARACTER SET 'utf8';""".format(db.prefix),        
 )]

@@ -25,24 +25,7 @@ logger = logging.getLogger('gopulate')
 # regular expression to find discnumber indicators in the album string
 FIND_DISC_RE=r" ?[([]?(?:cd|disc|part|teil|disk|vol)\.? ?([iI0-9]+)[)\]]?"
 
-hashQueue = queue.Queue()
-def hasher():
-    """Run function for the commit thread."""
-    while True:
-        fun, args, kwargs = hashQueue.get()
-        fun(*args, **kwargs)
-        hashQueue.task_done()
-        logger.debug("task done")
-        
-hashThread = threading.Thread(target = hasher)
-hashThread.daemon = True
-hashThread.start()
 
-
-def terminate():
-    """Terminates this module; waits for all threads to complete."""
-    
-    hashQueue.join() # wait until all tasks in the commit queue are done
     
     
 class GopulateGuesser:
