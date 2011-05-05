@@ -15,7 +15,7 @@ import sys, os
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from omg import config, logging, database, tags
+from omg import config, logging, database, tags, sync
 
 # The application's main window
 mainWindow = None
@@ -106,6 +106,7 @@ def run(cmdConfig = []):
     #import omg.gopulate
     #omg.gopulate.terminate()
     plugins.shutdown()
+    sync.shutdown()
     config.shutdown()
     logging.shutdown()
     sys.exit(returnValue)

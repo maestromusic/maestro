@@ -12,6 +12,7 @@ from PyQt4 import QtCore, QtGui
 from omg import tags, db, covers, realfiles, absPath, relPath, realfiles2
 from omg.database import queries,sql
 from omg.config import options
+from ..sync import hashQueue
 from functools import reduce
 
 logger = logging.getLogger(name="models")
@@ -627,9 +628,7 @@ class File(Element):
         return self.length
     
     def computeHash(self):
-        """Computes the hash of the audio stream. If delayed is set True, the computation will run in a seperate
-        thread; after completion, the hash will be stored into the database, which requires that the element
-        has been added to the DB."""
+        """Computes the hash of the audio stream and stores it in the object's hash attribute."""
     
         import hashlib,tempfile,subprocess
         handle, tmpfile = tempfile.mkstemp()
@@ -637,7 +636,6 @@ class File(Element):
             ["mplayer", "-dumpfile", tmpfile, "-dumpaudio", absPath(self.path)], #TODO: konfigurierbar machen
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE)
-        # wtf ? for some reason handle is int instead of file handle, as said in documentation
         with open(handle,"br") as hdl:
             self.hash = hashlib.sha1(hdl.read()).hexdigest()
         os.remove(tmpfile)
@@ -669,7 +667,7 @@ class File(Element):
             hash = 'pending'            
         db.query(querytext, self.id, relPath(self.path), hash, int(self.length))
         if hash == 'pending':
-            omg.gopulate.hashQueue.put((self.computeAndStoreHash, [], {}))
+            hashQueue.put((self.computeAndStoreHash, [], {}))
         self._syncState = {}
          
     def __repr__(self):
