@@ -148,7 +148,10 @@ class Builder(object):
         return m(o)
 
     def build_List(self, o):
-        return map(self.build, o.elts)
+        # Modification start
+        # Use list(map()) since map returns map objects under Python 3
+        return list(map(self.build, o.elts))
+        # Modification end
     
     def build_Num(self, o):
         return o.n

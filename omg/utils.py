@@ -117,7 +117,8 @@ class FlexiDate:
     @staticmethod
     def fromSql(value):
         """Create a FlexiDate from an int as used to store FlexiDates in the database."""
-        if value is None or value == 0:
+        from omg import database
+        if database.isNull(value):
             return None
         try:
             value = int(value)
