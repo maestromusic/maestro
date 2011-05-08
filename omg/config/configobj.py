@@ -1,7 +1,7 @@
 # This is a modified version of configobj-py3 by Zubin Mithra (https://bitbucket.org/zubin71/configobj-py3)
 # which itself is a Python 3 version of ConfigObj (http://www.voidspace.org.uk/python/configobj.html).
 # The difference is mainly that bug https://bitbucket.org/zubin71/configobj-py3/issue/1/expected-an-object-with-the-buffer
-# is fixed and that validation stuff that is not needed by Omg was removed.
+# is fixed and that validation, configspec and interpolation stuff that is not needed by OMG was removed.
 
 
 # configobj.py
@@ -91,36 +91,25 @@ __version__ = '4.7.2'
 __all__ = (
     '__version__',
     'DEFAULT_INDENT_TYPE',
-    'DEFAULT_INTERPOLATION',
     'ConfigObjError',
     'NestingError',
     'ParseError',
     'DuplicateError',
-    'ConfigspecError',
     'ConfigObj',
     'SimpleVal',
-    'InterpolationError',
-    'InterpolationLoopError',
-    'MissingInterpolationOption',
     'RepeatSectionError',
     'ReloadError',
     'UnreprError',
     'UnknownType',
-    'flatten_errors',
-    'get_extra_values'
 )
 
-DEFAULT_INTERPOLATION = 'configparser'
 DEFAULT_INDENT_TYPE = '    '
-MAX_INTERPOL_DEPTH = 10
 
 OPTION_DEFAULTS = {
-    'interpolation': True,
     'raise_errors': False,
     'list_values': True,
     'create_empty': False,
     'file_error': False,
-    'configspec': None,
     'stringify': True,
     # option may be set to one of ('', ' ', '\t')
     'indent_type': None,
@@ -231,25 +220,6 @@ class DuplicateError(ConfigObjError):
     """
 
 
-class ConfigspecError(ConfigObjError):
-    """
-    An error occured whilst parsing a configspec.
-    """
-
-
-class InterpolationError(ConfigObjError):
-    """Base class for the two interpolation errors."""
-
-
-class InterpolationLoopError(InterpolationError):
-    """Maximum interpolation depth exceeded in string interpolation."""
-
-    def __init__(self, option):
-        InterpolationError.__init__(
-            self,
-            'interpolation loop detected in value "%s".' % option)
-
-
 class RepeatSectionError(ConfigObjError):
     """
     This error indicates additional sections in a section with a
@@ -257,196 +227,18 @@ class RepeatSectionError(ConfigObjError):
     """
 
 
-class MissingInterpolationOption(InterpolationError):
-    """A value specified for interpolation was missing."""
-    def __init__(self, option):
-        msg = 'missing option "%s" in interpolation.' % option
-        InterpolationError.__init__(self, msg)
-
-
 class UnreprError(ConfigObjError):
     """An error parsing in unrepr mode."""
 
 
-class InterpolationEngine(object):
-    """
-    A helper class to help perform string interpolation.
-
-    This class is an abstract base class; its descendants perform
-    the actual work.
-    """
-
-    # compiled regexp to use in self.interpolate()
-    _KEYCRE = re.compile(r"%\(([^)]*)\)s")
-    _cookie = '%'
-
-    def __init__(self, section):
-        # the Section instance that "owns" this engine
-        self.section = section
-
-
-    def interpolate(self, key, value):
-        # short-cut
-        if not self._cookie in value:
-            return value
-        
-        def recursive_interpolate(key, value, section, backtrail):
-            """The function that does the actual work.
-
-            ``value``: the string we're trying to interpolate.
-            ``section``: the section in which that string was found
-            ``backtrail``: a dict to keep track of where we've been,
-            to detect and prevent infinite recursion loops
-
-            This is similar to a depth-first-search algorithm.
-            """
-            # Have we been here already?
-            if (key, section.name) in backtrail:
-                # Yes - infinite loop detected
-                raise InterpolationLoopError(key)
-            # Place a marker on our backtrail so we won't come back here again
-            backtrail[(key, section.name)] = 1
-
-            # Now start the actual work
-            match = self._KEYCRE.search(value)
-            while match:
-                # The actual parsing of the match is implementation-dependent,
-                # so delegate to our helper function
-                k, v, s = self._parse_match(match)
-                if k is None:
-                    # That's the signal that no further interpolation is needed
-                    replacement = v
-                else:
-                    # Further interpolation may be needed to obtain final value
-                    replacement = recursive_interpolate(k, v, s, backtrail)
-                # Replace the matched string with its final value
-                start, end = match.span()
-                value = ''.join((value[:start], replacement, value[end:]))
-                new_search_start = start + len(replacement)
-                # Pick up the next interpolation key, if any, for next time
-                # through the while loop
-                match = self._KEYCRE.search(value, new_search_start)
-
-            # Now safe to come back here again; remove marker from backtrail
-            del backtrail[(key, section.name)]
-
-            return value
-
-        # Back in interpolate(), all we have to do is kick off the recursive
-        # function with appropriate starting values
-        value = recursive_interpolate(key, value, self.section, {})
-        return value
-
-
-    def _fetch(self, key):
-        """Helper function to fetch values from owning section.
-
-        Returns a 2-tuple: the value, and the section where it was found.
-        """
-        # switch off interpolation before we try and fetch anything !
-        save_interp = self.section.main.interpolation
-        self.section.main.interpolation = False
-
-        # Start at section that "owns" this InterpolationEngine
-        current_section = self.section
-        while True:
-            # try the current section first
-            val = current_section.get(key)
-            if val is not None and not isinstance(val, Section):
-                break
-            # try "DEFAULT" next
-            val = current_section.get('DEFAULT', {}).get(key)
-            if val is not None and not isinstance(val, Section):
-                break
-            # move up to parent and try again
-            # top-level's parent is itself
-            if current_section.parent is current_section:
-                # reached top level, time to give up
-                break
-            current_section = current_section.parent
-
-        # restore interpolation to previous value before returning
-        self.section.main.interpolation = save_interp
-        if val is None:
-            raise MissingInterpolationOption(key)
-        return val, current_section
-
-
-    def _parse_match(self, match):
-        """Implementation-dependent helper function.
-
-        Will be passed a match object corresponding to the interpolation
-        key we just found (e.g., "%(foo)s" or "$foo"). Should look up that
-        key in the appropriate config file section (using the ``_fetch()``
-        helper function) and return a 3-tuple: (key, value, section)
-
-        ``key`` is the name of the key we're looking for
-        ``value`` is the value found for that key
-        ``section`` is a reference to the section where it was found
-
-        ``key`` and ``section`` should be None if no further
-        interpolation should be performed on the resulting value
-        (e.g., if we interpolated "$$" and returned "$").
-        """
-        raise NotImplementedError()
-
-
-class ConfigParserInterpolation(InterpolationEngine):
-    """Behaves like ConfigParser."""
-    _cookie = '%'
-    _KEYCRE = re.compile(r"%\(([^)]*)\)s")
-
-    def _parse_match(self, match):
-        key = match.group(1)
-        value, section = self._fetch(key)
-        return key, value, section
-
-
-class TemplateInterpolation(InterpolationEngine):
-    """Behaves like string.Template."""
-    _cookie = '$'
-    _delimiter = '$'
-    _KEYCRE = re.compile(r"""
-        \$(?:
-          (?P<escaped>\$)              |   # Two $ signs
-          (?P<named>[_a-z][_a-z0-9]*)  |   # $name format
-          {(?P<braced>[^}]*)}              # ${name} format
-        )
-        """, re.IGNORECASE | re.VERBOSE)
-
-    def _parse_match(self, match):
-        # Valid name (in or out of braces): fetch value from section
-        key = match.group('named') or match.group('braced')
-        if key is not None:
-            value, section = self._fetch(key)
-            return key, value, section
-        # Escaped delimiter (e.g., $$): return single delimiter
-        if match.group('escaped') is not None:
-            # Return None for key and section to indicate it's time to stop
-            return None, self._delimiter, None
-        # Anything else: ignore completely, just return it unchanged
-        return None, match.group(), None
-
-
-interpolation_engines = {
-    'configparser': ConfigParserInterpolation,
-    'template': TemplateInterpolation,
-}
-
 def __newobj__(cls, *args):
     # Hack for pickle
     return cls.__new__(cls, *args)
-    
+
+
 class Section(dict):
     """
     A dictionary-like object that represents a section in a config file.
-
-    It does string interpolation if the 'interpolation' attribute
-    of the 'main' object is set to True.
-
-    Interpolation is tried first from this object, then from the 'DEFAULT'
-    section of this object, next from the parent and its 'DEFAULT' section,
-    and so on until the main object is reached.
 
     A Section will behave like an ordered dictionary - following the
     order of the ``scalars`` and ``sections`` attributes.
@@ -496,51 +288,12 @@ class Section(dict):
         # for comments :-)
         self.comments = {}
         self.inline_comments = {}
-        # the configspec
-        self.configspec = None
         # for defaults
         self.defaults = []
         self.default_values = {}
         self.extra_values = []
         self._created = False
 
-    def _interpolate(self, key, value):
-        try:
-            # do we already have an interpolation engine?
-            engine = self._interpolation_engine
-        except AttributeError:
-            # not yet: first time running _interpolate(), so pick the engine
-            name = self.main.interpolation
-            if name == True:  # note that "if name:" would be incorrect here
-                # backwards-compatibility: interpolation=True means use default
-                name = DEFAULT_INTERPOLATION
-            name = name.lower()  # so that "Template", "template", etc. all work
-            class_ = interpolation_engines.get(name, None)
-            if class_ is None:
-                # invalid value for self.main.interpolation
-                self.main.interpolation = False
-                return value
-            else:
-                # save reference to engine so we don't have to do this again
-                engine = self._interpolation_engine = class_(self)
-        # let the engine do the actual work
-        return engine.interpolate(key, value)
-
-    def __getitem__(self, key):
-        """Fetch the item and do string interpolation."""
-        val = dict.__getitem__(self, key)
-        if self.main.interpolation: 
-            if isinstance(val, str):
-                return self._interpolate(key, val)
-            if isinstance(val, list):
-                def _check(entry):
-                    if isinstance(entry, str):
-                        return self._interpolate(key, entry)
-                    return entry
-                new = [_check(entry) for entry in val]
-                if new != val:
-                    return new
-        return val
 
     def __setitem__(self, key, value, unrepr=False):
         """
@@ -611,13 +364,6 @@ class Section(dict):
         del self.comments[key]
         del self.inline_comments[key]
 
-    def get(self, key, default=None):
-        """A version of ``get`` that doesn't bypass string interpolation."""
-        try:
-            return self[key]
-        except KeyError:
-            return default
-
 
     def update(self, indict):
         """
@@ -665,7 +411,6 @@ class Section(dict):
         self.sections = []
         self.comments = {}
         self.inline_comments = {}
-        self.configspec = None
         self.defaults = []
         self.extra_values = []
 
@@ -713,12 +458,7 @@ class Section(dict):
 
     def __repr__(self):
         """x.__repr__() <==> repr(x)"""
-        def _getval(key):
-            try:
-                return self[key]
-            except MissingInterpolationOption:
-                return dict.__getitem__(self, key)
-        return '{%s}' % ', '.join([('%s: %s' % (repr(key), repr(_getval(key))))
+        return '{%s}' % ', '.join([('%s: %s' % (repr(key), repr(self[key])))
             for key in (self.scalars + self.sections)])
 
     __str__ = __repr__
@@ -754,146 +494,6 @@ class Section(dict):
             newdict[entry] = this_entry
         return newdict
 
-
-    def merge(self, indict):
-        """
-        A recursive update - useful for merging config files.
-        
-        >>> a = '''[section1]
-        ...     option1 = True
-        ...     [[subsection]]
-        ...     more_options = False
-        ...     # end of file'''.splitlines()
-        >>> b = '''# File is user.ini
-        ...     [section1]
-        ...     option1 = False
-        ...     # end of file'''.splitlines()
-        >>> c1 = ConfigObj(b)
-        >>> c2 = ConfigObj(a)
-        >>> c2.merge(c1)
-        >>> c2
-        ConfigObj({'section1': {'option1': 'False', 'subsection': {'more_options': 'False'}}})
-        """
-        for key, val in list(indict.items()):
-            if (key in self and isinstance(self[key], dict) and
-                                isinstance(val, dict)):
-                self[key].merge(val)
-            else:   
-                self[key] = val
-
-
-    def rename(self, oldkey, newkey):
-        """
-        Change a keyname to another, without changing position in sequence.
-        
-        Implemented so that transformations can be made on keys,
-        as well as on values. (used by encode and decode)
-        
-        Also renames comments.
-        """
-        if oldkey in self.scalars:
-            the_list = self.scalars
-        elif oldkey in self.sections:
-            the_list = self.sections
-        else:
-            raise KeyError('Key "%s" not found.' % oldkey)
-        pos = the_list.index(oldkey)
-        #
-        val = self[oldkey]
-        dict.__delitem__(self, oldkey)
-        dict.__setitem__(self, newkey, val)
-        the_list.remove(oldkey)
-        the_list.insert(pos, newkey)
-        comm = self.comments[oldkey]
-        inline_comment = self.inline_comments[oldkey]
-        del self.comments[oldkey]
-        del self.inline_comments[oldkey]
-        self.comments[newkey] = comm
-        self.inline_comments[newkey] = inline_comment
-    
-    def walk(self, function, raise_errors=True,
-            call_on_sections=False, **keywargs):
-        """
-        Walk every member and call a function on the keyword and value.
-        
-        Return a dictionary of the return values
-        
-        If the function raises an exception, raise the errror
-        unless ``raise_errors=False``, in which case set the return value to
-        ``False``.
-        
-        Any unrecognised keyword arguments you pass to walk, will be pased on
-        to the function you pass in.
-        
-        Note: if ``call_on_sections`` is ``True`` then - on encountering a
-        subsection, *first* the function is called for the *whole* subsection,
-        and then recurses into it's members. This means your function must be
-        able to handle strings, dictionaries and lists. This allows you
-        to change the key of subsections as well as for ordinary members. The
-        return value when called on the whole subsection has to be discarded.
-        
-        See  the encode and decode methods for examples, including functions.
-        
-        .. admonition:: caution
-        
-            You can use ``walk`` to transform the names of members of a section
-            but you mustn't add or delete members.
-        
-        >>> config = '''[XXXXsection]
-        ... XXXXkey = XXXXvalue'''.splitlines()
-        >>> cfg = ConfigObj(config)
-        >>> cfg
-        ConfigObj({'XXXXsection': {'XXXXkey': 'XXXXvalue'}})
-        >>> def transform(section, key):
-        ...     val = section[key]
-        ...     newkey = key.replace('XXXX', 'CLIENT1')
-        ...     section.rename(key, newkey)
-        ...     if isinstance(val, (tuple, list, dict)):
-        ...         pass
-        ...     else:
-        ...         val = val.replace('XXXX', 'CLIENT1')
-        ...         section[newkey] = val
-        >>> cfg.walk(transform, call_on_sections=True)
-        {'CLIENT1section': {'CLIENT1key': None}}
-        >>> cfg
-        ConfigObj({'CLIENT1section': {'CLIENT1key': 'CLIENT1value'}})
-        """
-        out = {}
-        # scalars first
-        for i in range(len(self.scalars)):
-            entry = self.scalars[i]
-            try:
-                val = function(self, entry, **keywargs)
-                # bound again in case name has changed
-                entry = self.scalars[i]
-                out[entry] = val
-            except Exception:
-                if raise_errors:
-                    raise
-                else:
-                    entry = self.scalars[i]
-                    out[entry] = False
-        # then sections
-        for i in range(len(self.sections)):
-            entry = self.sections[i]
-            if call_on_sections:
-                try:
-                    function(self, entry, **keywargs)
-                except Exception:
-                    if raise_errors:
-                        raise
-                    else:
-                        entry = self.sections[i]
-                        out[entry] = False
-                # bound again in case name has changed
-                entry = self.sections[i]
-            # previous result is discarded
-            out[entry] = self[entry].walk(
-                function,
-                raise_errors=raise_errors,
-                call_on_sections=call_on_sections,
-                **keywargs)
-        return out
     
     def as_bool(self, key):
         """
@@ -1002,37 +602,6 @@ class Section(dict):
             return list(result)
         return [result]
 
-    def restore_default(self, key):
-        """
-        Restore (and return) default value for the specified key.
-
-        This method will only work for a ConfigObj that was created
-        with a configspec and has been validated.
-
-        If there is no default value for this key, ``KeyError`` is raised.
-        """
-        default = self.default_values[key]
-        dict.__setitem__(self, key, default)
-        if key not in self.defaults:
-            self.defaults.append(key)
-        return default
-
-    def restore_defaults(self):
-        """
-        Recursively restore default values to all members
-        that have them.
-
-        This method will only work for a ConfigObj that was created
-        with a configspec and has been validated.
-
-        It doesn't delete or modify entries without default values.
-        """
-        for key in self.default_values:
-            self.restore_default(key)
-
-        for section in self.sections:
-            self[section].restore_defaults()
-
 
 class ConfigObj(Section):
     """An object to read, create, and write config files."""
@@ -1136,28 +705,26 @@ class ConfigObj(Section):
         'true': True, 'false': False,
         }
 
-    def __init__(self, infile=None, options=None, configspec=None, encoding=None,
-                 interpolation=True, raise_errors=False, list_values=True,
+    def __init__(self, infile=None, options=None, encoding=None,
+                 raise_errors=False, list_values=True,
                  create_empty=False, file_error=False, stringify=True,
                  indent_type=None, default_encoding=None, unrepr=False,
-                 write_empty_values=False, _inspec=False):
+                 write_empty_values=False):
         """
         Parse a config file or create a config file object.
         
-        ``ConfigObj(infile=None, configspec=None, encoding=None,
-                    interpolation=True, raise_errors=False, list_values=True,
+        ``ConfigObj(infile=None, encoding=None,
+                    raise_errors=False, list_values=True,
                     create_empty=False, file_error=False, stringify=True,
                     indent_type=None, default_encoding=None, unrepr=False,
-                    write_empty_values=False, _inspec=False)``
+                    write_empty_values=False)``
         """
-        self._inspec = _inspec
         # init the superclass
         Section.__init__(self, self, 0, self)
         
         infile = infile or []
         
-        _options = {'configspec': configspec,
-                    'encoding': encoding, 'interpolation': interpolation,
+        _options = {'encoding': encoding,
                     'raise_errors': raise_errors, 'list_values': list_values,
                     'create_empty': create_empty, 'file_error': file_error,
                     'stringify': stringify, 'indent_type': indent_type,
@@ -1182,18 +749,12 @@ class ConfigObj(Section):
                 keyword_value = _options[entry]
                 if value != keyword_value:
                     options[entry] = keyword_value
-        
-        # XXXX this ignores an explicit list_values = True in combination
-        # with _inspec. The user should *never* do that anyway, but still...
-        if _inspec:
-            options['list_values'] = False
+
         
         self._initialise(options)
-        configspec = options['configspec']
-        self._original_configspec = configspec
-        self._load(infile, configspec)
+        self._load(infile)
     
-    def _load(self, infile, configspec):
+    def _load(self, infile):
 
         if isinstance(infile, str):
             self.filename = infile
@@ -1232,11 +793,6 @@ class ConfigObj(Section):
                 for entry in infile:
                     self[entry] = infile[entry]
             del self._errors
-            
-            if configspec is not None:
-                self._handle_configspec(configspec)
-            else:
-                self.configspec = None
             return
         
         elif getattr(infile, 'read', MISSING) is not MISSING:
@@ -1283,11 +839,6 @@ class ConfigObj(Section):
             raise error
         # delete private attributes
         del self._errors
-        
-        if configspec is None:
-            self.configspec = None
-        else:
-            self._handle_configspec(configspec)
     
     def _initialise(self, options=None):
         if options is None:
@@ -1297,7 +848,6 @@ class ConfigObj(Section):
         self.filename = None
         self._errors = []
         self.raise_errors = options['raise_errors']
-        self.interpolation = options['interpolation']
         self.list_values = options['list_values']
         self.create_empty = options['create_empty']
         self.file_error = options['file_error']
@@ -1312,10 +862,6 @@ class ConfigObj(Section):
         
         self.initial_comment = []
         self.final_comment = []
-        self.configspec = None
-        
-        if self._inspec:
-            self.list_values = False
         
         # Clear section attributes as well
         Section._initialise(self)
@@ -1775,9 +1321,6 @@ class ConfigObj(Section):
         Given a value string, unquote, remove comment,
         handle lists. (including empty and single member lists)
         """
-        if self._inspec:
-            # Parsing a configspec so don't handle comments
-            return (value, '')
         # do we look for lists in values ?
         if not self.list_values:
             mat = self._nolistvalue.match(value)
@@ -1909,8 +1452,6 @@ class ConfigObj(Section):
         cs = '#'
         csp = '# '
         if section is None:
-            int_val = self.interpolation
-            self.interpolation = False
             section = self
             for line in self.initial_comment:
                 line = self._decode_element(line)
@@ -1957,7 +1498,6 @@ class ConfigObj(Section):
                 if stripped_line and not stripped_line.startswith(cs):
                     line = csp + line
                 out.append(line)
-            self.interpolation = int_val
             
         if section is not self:
             return out
@@ -2007,91 +1547,3 @@ class ConfigObj(Section):
             h = open(self.filename, 'wb')
             h.write(output)
             h.close()
-
-
-def flatten_errors(cfg, res, levels=None, results=None):
-    """
-    An example function that will turn a nested dictionary of results
-    (as returned by ``ConfigObj.validate``) into a flat list.
-
-    ``cfg`` is the ConfigObj instance being checked, ``res`` is the results
-    dictionary returned by ``validate``.
-
-    (This is a recursive function, so you shouldn't use the ``levels`` or
-    ``results`` arguments - they are used by the function.)
-
-    Returns a list of keys that failed. Each member of the list is a tuple::
-
-        ([list of sections...], key, result)
-
-    If ``validate`` was called with ``preserve_errors=False`` (the default)
-    then ``result`` will always be ``False``.
-
-    *list of sections* is a flattened list of sections that the key was found
-    in.
-
-    If the section was missing (or a section was expected and a scalar provided
-    - or vice-versa) then key will be ``None``.
-
-    If the value (or section) was missing then ``result`` will be ``False``.
-
-    If ``validate`` was called with ``preserve_errors=True`` and a value
-    was present, but failed the check, then ``result`` will be the exception
-    object returned. You can use this as a string that describes the failure.
-
-    For example *The value "3" is of the wrong type*.
-    """
-    if levels is None:
-        # first time called
-        levels = []
-        results = []
-    if res == True:
-        return results
-    if res == False or isinstance(res, Exception):
-        results.append((levels[:], None, res))
-        if levels:
-            levels.pop()
-        return results
-    for (key, val) in list(res.items()):
-        if val == True:
-            continue
-        if isinstance(cfg.get(key), dict):
-            # Go down one level
-            levels.append(key)
-            flatten_errors(cfg[key], val, levels, results)
-            continue
-        results.append((levels[:], key, val))
-    #
-    # Go up one level
-    if levels:
-        levels.pop()
-    #
-    return results
-
-def get_extra_values(conf, _prepend=()):
-    """
-    Find all the values and sections not in the configspec from a validated
-    ConfigObj.
-
-    ``get_extra_values`` returns a list of tuples where each tuple represents
-    either an extra section, or an extra value.
-
-    The tuples contain two values, a tuple representing the section the value 
-    is in and the name of the extra values. For extra values in the top level
-    section the first member will be an empty tuple. For values in the 'foo'
-    section the first member will be ``('foo',)``. For members in the 'bar'
-    subsection of the 'foo' section the first member will be ``('foo', 'bar')``.
-
-    NOTE: If you call ``get_extra_values`` on a ConfigObj instance that hasn't
-    been validated it will return an empty list.
-    """
-    out = []
-
-    out.extend([(_prepend, name) for name in conf.extra_values])
-    for name in conf.sections:
-        if name not in conf.extra_values:
-            out.extend(get_extra_values(conf[name], _prepend + (name,)))
-    return out
-
-
-"""*A programming language is a medium of expression.* - Paul Graham"""
