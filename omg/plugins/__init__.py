@@ -74,6 +74,8 @@ def enablePlugin(pluginName):
             config.storageObject.loadPlugins(loadedPlugins[pluginName].defaultStorage())
         loadedPlugins[pluginName].enable()
         enabledPlugins.append(pluginName)
+        if not pluginName in config.options.main.plugins:
+            config.options.main.plugins = config.options.main.plugins + [pluginName]
 
 
 def disablePlugin(pluginName):
@@ -88,6 +90,8 @@ def disablePlugin(pluginName):
         if hasattr(loadedPlugins[pluginName],'defaultStorage'):
             config.storageObject.removePlugins([pluginName])
         enabledPlugins.remove(pluginName)
+        if pluginName in config.options.main.plugins:
+            config.options.main.plugins = [name for name in config.options.main.plugins if name != pluginName]
 
 
 def shutdown():

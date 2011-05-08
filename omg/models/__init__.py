@@ -6,12 +6,10 @@
 # it under the terms of the GNU General Public License version 3 as
 # published by the Free Software Foundation
 #
-import logging, copy, os
+import copy, os
 from PyQt4 import QtCore, QtGui
 
-from omg import tags, db, covers, realfiles, absPath, relPath, realfiles2
-from omg.database import queries,sql
-from omg.config import options
+from omg import tags, logging, config
 from ..sync import hashQueue
 from functools import reduce
 

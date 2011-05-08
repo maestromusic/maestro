@@ -9,7 +9,7 @@
 
 """Database driver using QtSql. Have a look at database.sql.AbstractSQL for docstrings."""
 
-from PyQt4 import QtSql
+from PyQt4 import QtSql, QtCore
 import datetime, threading
 
 from . import DBException, EmptyResultException, AbstractSql, AbstractSqlResult
@@ -30,8 +30,9 @@ class Sql(AbstractSql):
         self.lock = threading.Lock()
 
     def close(self):
-        self._db.close()
-        del self._db
+        with self.lock:
+            self._db.close()
+            del self._db
         
     def query(self,queryString,*args):
         with self.lock:
@@ -46,9 +47,7 @@ class Sql(AbstractSql):
 
             # Bind
             for i,arg in enumerate(args):
-                if isinstance(arg,utils.FlexiDate):
-                    arg = arg.toSql()
-                query.bindValue(i,arg)
+                query.bindValue(i,_convertBindParameter(arg))
 
             # Execute
             if query.exec_():
@@ -57,7 +56,7 @@ class Sql(AbstractSql):
                 if self._db.lastError() is not None:
                     raise DBException("Query failed: {}".format(self._db.lastError().text()),queryString,args)
                 else: raise DBException("Query failed",queryString,args)
-
+        
     def multiQuery(self,queryString,argSets):
         with self.lock:
             if not isinstance(argSets,list):
@@ -72,9 +71,7 @@ class Sql(AbstractSql):
 
             # Bind
             for i in range(len(argSets[0])):
-                values = [argSet[i] if not isinstance(argSet[i],utils.FlexiDate)
-                                       else argSet[i].toSql()
-                          for argSet in argSets]
+                values = [_convertBindParameter(argSet[i]) for argSet in argSets]
                 query.addBindValue(values)
 
             # Execute
@@ -103,6 +100,9 @@ class Sql(AbstractSql):
                 if self._db.lastError() is not None:
                     raise DBException("Rollback failed: {}".format(self._db.lastError().text()))
                 else: raise DBException("Rollback failed.")
+
+    def isNull(self,value):
+        return isinstance(value,QtCore.QPyNullVariant)
 
 
 class SqlResult(AbstractSqlResult):
@@ -157,3 +157,13 @@ class SqlResultIterator:
             record = self._result.record()
             return tuple(record.value(i) for i in range(record.count()))
         else: raise StopIteration
+
+
+def _convertBindParameter(arg):
+    """Convert *arg* before binding."""
+    if arg is None:
+        # TODO: This is ugly! We need a type to create a QPyNullVariant, but we cannot know the type of the column this value will be bound to. Luckily it works regardless what type we choose...
+        return QtCore.QPyNullVariant(int)
+    elif isinstance(arg,utils.FlexiDate):
+        return arg.toSql()
+    else: return arg

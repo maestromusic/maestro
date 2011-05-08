@@ -50,8 +50,8 @@ class SqlTestCase(unittest.TestCase):
         )
         
         # Fill it with data
-        result = db.query("INSERT INTO {}{} (name,age,size,male) VALUES (?,?,?,?)"
-                                .format(db.prefix,testTable),*data[0][:-1]) # without death column
+        result = db.query("INSERT INTO {}{} (name,age,size,male,death) VALUES (?,?,?,?,?)"
+                                .format(db.prefix,testTable),*data[0]) # without death column
         self.assertEqual(result.insertId(),1)
 
         result = db.multiQuery("INSERT INTO {}{} (name,age,size,male,death) VALUES (?,?,?,?,?)"

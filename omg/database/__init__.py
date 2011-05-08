@@ -7,9 +7,9 @@
 # published by the Free Software Foundation
 
 """
-The database module provides an abstraction layer to several Python-MySQL connectors.
+The database module establishes the database connection and provides many functions to fetch data.
 
-The actual database drivers which connect to the database using a third party connector are found in the :mod:`SQL package <omg.database.sql>`. The definitions of Omg's tables are found in the :mod:`tables-module <omg.database.tables>`.
+The actual database drivers which connect to the database using a third party connector can be found in the :mod:`SQL package <omg.database.sql>`. The definitions of OMG's tables can be found in the :mod:`tables-module <omg.database.tables>`.
 
 The easiest way to use this package is::
 
@@ -19,18 +19,30 @@ The easiest way to use this package is::
 
 or, if the connection was already established in another module::
 
-    import db
+    from omg import database as db
     db.query(...)
+
+
+Threading
+========================================================================
+Each thread must have its own connection object. This module stores all connection objects and methods like ``query`` automatically choose the correct connection. However you have to initialize the connection for each thread and use a ``with`` statement to ensure the connection is finally closed again. Typically the ``run``-method of your thread will look like this::
+
+    from omg import database as db
+    
+    class MyThread(threading.Thread):
+        def run(self):
+            with db.connect():
+                # Do stuff in your thread and use the database module as usual:
+                db.query(...) # These methods will use the connection of your thread
+                db.tags(...)
+            # Finally the thread's connection is closed by the context manager
 
 \ """
 
-import sys
+import sys, threading
+
 from omg import strutils, config, logging, utils
 from . import sql
-
-
-class DBLayoutException(Exception):
-    """Exception that occurs if the existing database layout doesn't meet the requirements."""
 
 # Table prefix
 prefix = None
@@ -38,33 +50,48 @@ prefix = None
 # Logger for database warnings
 logger = logging.getLogger("omg.database")
 
-# Database connection object
-db = None
+# Each thread must have its own connection object. This maps thread identifiers to the connection object
+connections = {}
 
-# These methods will be replaced by the database connection object's corresponding methods once the connection has been established.
-def query(*params):
-    logger.error("Cannot access database before a connection was opened.")
 
-multiQuery = query
-transaction = query
-commit = query
-rollback = query
+# Connection and maintenance methods
+#=======================================================================
+class ConnectionContextManager:
+    """Connection manager that ensures that connections in threads other than the main thread are closed and removed from the dict ``connections`` when the thread terminates."""
+    def __init__(self,connection):
+        self._connection = connection
+
+    def __enter__(self):
+        return None
+
+    def __exit__(self,exc_type, exc_value, traceback):
+        close(self._connection)
+        return False # If the suite was stopped by an exception, don't stop it
 
 
 def connect():
-    """Connect to the database server with information from the config file. The drivers specified in ``config.options.database.drivers`` are tried in the given order."""
-    if db is not None:
-        logger.warning("database.connect has been called although the database connection was already open")
-    else:
-        global prefix
+    """Connect to the database server with information from the config file. The drivers specified in ``config.options.database.drivers`` are tried in the given order. This method must be called exactly once for each thread that wishes to access the database. It returns a :class:`ConnectionContextManager` that will automatically close the connection if used in a ``with`` statement."""
+    threadId = threading.current_thread().ident
+    if threadId in connections:
+        logger.warning("database.connect has been called although a connection for this thread was already open.")
+        return connections[threadId]
+
+    global prefix
+    if prefix is None:
         prefix = config.options.database.prefix
-        authValues = [config.options.database["mysql_"+key] for key in sql.AUTH_OPTIONS]
-        _connect(config.options.database.drivers,authValues)
-        logger.info("Database connection is open.")
+    authValues = [config.options.database["mysql_"+key] for key in sql.AUTH_OPTIONS]
+    return _connect(config.options.database.drivers,authValues)
         
 
 def testConnect(driver=None):
-    """Connect to the database server using the test connection information (config.options.database.test_*). If any of these options is empty, the standard option will be used instead (config.options.database.mysql_*). The table prefix will in be config.options.database.test_prefix even if it is empty. For safety this method will abort the program if prefix, db-name and host coincide with the standard values used by connect."""
+    """Connect to the database server using the test connection information (config.options.database.test_*). If any of these options is empty, the standard option will be used instead (config.options.database.mysql_*). The table prefix will in be config.options.database.test_prefix even if it is empty. For safety this method will abort the program if prefix, db-name and host coincide with the standard values used by connect.
+
+    As :func:`connect`, this method returns a :class:`ConnectionContextManager`."""
+    threadId = threading.current_thread().ident
+    if threadId in connections:
+        logger.warning("database.testConnect has been called although a connection for this thread was already open.")
+        return connections[threadId]
+        
     authValues = []
     host = None
     dbName = None
@@ -79,46 +106,41 @@ def testConnect(driver=None):
             dbName = value
 
     global prefix
-    prefix = config.options.database.test_prefix
+    if prefix is None:
+        prefix = config.options.database.test_prefix
 
     # Abort if the connection information and the prefix is equal
     if (prefix == config.options.database.prefix
             and dbName == config.options.database.mysql_db
             and host == config.options.database.mysql_host):
-        print("Safety stop: Test database connection information coincides with the usual information. Please supply at least a different prefix.",file=sys.stderr)
+        logger.critical("Safety stop: Test database connection information coincides with the usual information. Please supply at least a different prefix.")
         sys.exit(1)
 
     if driver is not None:
         drivers = [driver]
     else: drivers = config.options.database.drivers
-    _connect(drivers,authValues)
+    return _connect(drivers,authValues)
 
 
 def _connect(drivers,authValues):
-    global db
     try:
-        db = sql.newConnection(drivers)
-        db.connect(*authValues)
+        connection = sql.newConnection(drivers)
+        connection.connect(*authValues)
+        connections[threading.current_thread().ident] = connection
+        return ConnectionContextManager(connection)
     except sql.DBException as e:
         logger.error("I cannot connect to the database. Did you provide the correct information in the config file? MySQL error: {}".format(e.message))
         sys.exit(1)
     
-    global query, multiQuery, transaction, commit, rollback
-    query = db.query
-    multiQuery = db.multiQuery
-    transaction = db.transaction
-    commit = db.commit
-    rollback = db.rollback
-
 
 def close():
-    """Close the current connection."""
-    global db, query, multiQuery, transaction, commit, rollback
-    if db is None:
-        logger.warning("database.close has been called although no connection was opened.")
-    db, query, multiQuery, transaction, commit, rollback = 6 * [None]
-
-
+    """Close the database connection of this thread. If you use the context manager returned by :func:`connect`, this method is called automatically."""
+    threadId = threading.current_thread().ident
+    connection = connections[threading.current_thread().ident]
+    del connections[threading.current_thread().ident]
+    connection.close()
+    
+    
 def resetDatabase():
     """Drop all tables and create them without data again. All table rows will be lost!"""
     from . import tables
@@ -128,7 +150,7 @@ def resetDatabase():
     otherTables = [table for table in tables.tables if table not in referencedTables]
     for table in otherTables:
         if table.exists():
-            db.query("DROP TABLE {}".format(table.name))
+            query("DROP TABLE {}".format(table.name))
     for table in referencedTables:
         table.reset()
     for table in otherTables:
@@ -140,7 +162,45 @@ def listTables():
     return list(query("SHOW TABLES").getSingleColumn())
 
 
+# Standard methods which are redirected to this thread's connection object
+#=========================================================================
+def query(*params):
+    try:
+        return connections[threading.current_thread().ident].query(*params)
+    except KeyError:
+        raise RuntimeError("Cannot access database before a connection for this thread has been opened.")
 
+def multiQuery(queryString,args):
+    try:
+        return connections[threading.current_thread().ident].multiQuery(queryString,args)
+    except KeyError:
+        raise RuntimeError("Cannot access database before a connection for this thread has been opened.")
+
+def transaction():
+    try:
+        connections[threading.current_thread().ident].transaction()
+    except KeyError:
+        raise RuntimeError("Cannot access database before a connection for this thread has been opened.")
+
+def commit():
+    try:
+        connections[threading.current_thread().ident].commit()
+    except KeyError:
+        raise RuntimeError("Cannot access database before a connection for this thread has been opened.")
+
+def rollback():
+    try:
+        connections[threading.current_thread().ident].rollback()
+    except KeyError:
+        raise RuntimeError("Cannot access database before a connection for this thread has been opened.")
+
+def isNull(value):
+    try:
+        return connections[threading.current_thread().ident].isNull(value)
+    except KeyError:
+        raise RuntimeError("Cannot access database before a connection for this thread has been opened.")
+
+        
 # contents-table
 #=======================================================================
 def contents(elids,recursive=False):

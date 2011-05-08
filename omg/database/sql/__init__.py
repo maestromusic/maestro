@@ -36,7 +36,6 @@ The main class of the module is :class:`AbstractSQL <omg.database.sql.AbstractSQ
 
 from PyQt4 import QtCore
 
-from omg.utils import FlexiDate
 
 # When a driver is loaded _modules[driverIdentifier] will contain the driver's module.
 _modules = {}
@@ -95,7 +94,9 @@ class AbstractSql:
 
             SELECT id FROM table WHERE name = ?
 
-        works fine. A drawback is that you cannot use placeholders to select a table::
+        works fine. You may also use FlexiDates as parameters since they will be converted automatically.
+
+        A drawback is that you cannot use placeholders to select a table::
         
             SELECT id FROM ?
 
@@ -128,6 +129,12 @@ class AbstractSql:
         
     def rollback():
         """Rollback a transaction."""
+
+    def isNull(value):
+        """Return whether *value* represents a NULL value from a MySQL table. What is returned for NULL values depends on the driver."""
+
+    def close():
+        """Close this driver."""
 
 
 class AbstractSqlResult:
