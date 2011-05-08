@@ -100,8 +100,11 @@ class MainWindow(QtGui.QMainWindow):
                 if data.icon is not None:
                     action.setIcon(data.icon)
                 action.setCheckable(True)
-                # At the first time this is executed the main window itself is not visible, so use isVisibleTo
-                action.setChecked(data in self._centralWidgets and self._centralWidgets[data].isVisibleTo(self))
+                if data in self._centralWidgets:
+                    widget = self._centralWidgets[data]
+                    # Check the action, if the widget is contained in the tab widget (we cannot use isVisible since inactive tabs are not visible).
+                    action.setChecked(self.centralWidget().indexOf(widget) >= 0)
+                else: action.setChecked(False)
                 action.toggled.connect(functools.partial(self._toggleCentralWidget,data))
                 self.menus['view'].addAction(action)
 
@@ -212,6 +215,8 @@ class MainWindow(QtGui.QMainWindow):
                 if hasattr(widget,"restoreState"):
                     widget.restoreState(options)
             else: logger.info("Could not load central widget '{}'".format(data))
+        if config.storage.gui.central_tab_index < self.centralWidget().count():
+            self.centralWidget().setCurrentIndex(config.storage.gui.central_tab_index)
         
         # Restore dock widgets (create them with correct object names and use QMainWindow.restoreState)
         self._dockWidgets = {}
@@ -234,14 +239,17 @@ class MainWindow(QtGui.QMainWindow):
             
     def saveLayout(self):
         """Save the geometry and state of the main window and the central widgets and dock widgets which are not hidden at application end."""
-        # Store central widgets that are visible
+        # Store central widgets
         centralWidgetList = []
         for data,widget in self._centralWidgets.items():
-            if hasattr(widget,"saveState"):
-                state = widget.saveState()
-            else: state = None
-            centralWidgetList.append((data.id,state))
+            # store only widgets that are contained in the QTabWidget
+            if self.centralWidget().indexOf(widget) >= 0:
+                if hasattr(widget,"saveState"):
+                    state = widget.saveState()
+                else: state = None
+                centralWidgetList.append((data.id,state))
         config.storage.gui.central_widgets = centralWidgetList
+        config.storage.gui.central_tab_index = self.centralWidget().currentIndex()
 
         # Store dock widgets that are visible and remove the rest so saveState won't store their position
         dockWidgetList = []
