@@ -237,11 +237,10 @@ class MainWindow(QtGui.QMainWindow):
         # Store central widgets that are visible
         centralWidgetList = []
         for data,widget in self._centralWidgets.items():
-            if widget.isVisibleTo(self):
-                if hasattr(widget,"saveState"):
-                    state = widget.saveState()
-                else: state = None
-                centralWidgetList.append((data.id,state))
+            if hasattr(widget,"saveState"):
+                state = widget.saveState()
+            else: state = None
+            centralWidgetList.append((data.id,state))
         config.storage.gui.central_widgets = centralWidgetList
 
         # Store dock widgets that are visible and remove the rest so saveState won't store their position
