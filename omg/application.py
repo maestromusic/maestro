@@ -83,11 +83,9 @@ def run(cmdConfig = []):
     """Run OMG. *cmdOptions* is a list of options given on the command line that will overwrite the corresponding option from the file or the default. Each list item has to be a string like ``main.collection=/var/music``.
     """
     app = init(cmdConfig)
-
     # Load Plugins
     from omg import plugins
     plugins.loadPlugins()
-    
     # Create GUI
     import omg.gui.filesystembrowser
     from omg.gui import mainwindow
