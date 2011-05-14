@@ -6,30 +6,27 @@
 # it under the terms of the GNU General Public License version 3 as
 # published by the Free Software Foundation
 #
-import copy, os
-from PyQt4 import QtCore, QtGui
+import copy
 
-from omg import tags, logging, config
-from ..sync import hashQueue
-from functools import reduce
+from omg import tags, logging, config, covers, realfiles2, database as db
 
 logger = logging.getLogger(name="models")
 
 class Node:
     """(Abstract) base class for elements in a RootedTreeModel...that is almost everything in playlists, browser etc.. Node implements the methods required by RootedTreeModel as well as some basic tree-structure methods. To implement getParent, setParent and getChildren, it uses self.parent as parent and self.contents as the list of children, but does not create these variables. Subclasses must either create self.contents and self.parent or overwrite the methods."""
     
-    def hasChildren(self):
+    def hasContents(self):
         """Return whether this node has at least one child node."""
         return len(self.getChildren()) > 0
         
-    def getChildren(self):
-        """Return the list of children."""
+    def getContents(self):
+        """Return the list of contents."""
         # This is a default implementation and does not mean that every node has a contents-attribute
         return self.contents
     
-    def getChildrenCount(self):
+    def getContentsCount(self):
         """Return the number of children or None if it is unknown."""
-        return len(self.getChildren())
+        return len(self.getContents())
     
     def getParent(self):
         """Return the parent of this element."""
@@ -79,13 +76,13 @@ class Node:
 
     def maxDepth(self):
         """Return the maximum depth of nodes below this node."""
-        if self.hasChildren():
-            return 1 + max(node.maxDepth() for node in self.getChildren())
+        if self.hasContents():
+            return 1 + max(node.maxDepth() for node in self.getContents())
         else: return 0
 
     def index(self,node):
         """Return the index of <node> in this node's contents or raise a ValueError if the node is not found. See also find."""
-        contents = self.getChildren()
+        contents = self.getContents()
         for i in range(0,len(contents)):
             if contents[i] == node:
                 return i
@@ -93,7 +90,7 @@ class Node:
         
     def find(self,node):
         """Return the index of <node> in this node's contents or -1 if the node is not found. See also index."""
-        contents = self.getChildren()
+        contents = self.getContents()
         for i in range(0,len(contents)):
             if contents[i] == node:
                 return i
@@ -101,19 +98,19 @@ class Node:
 
     def getAllNodes(self):
         """Generator which will return all nodes contained in this node or in children of it (including the node itself)."""
-        assert self.getChildren() is not None
+        assert self.getContents() is not None
         yield self
-        for element in self.getChildren():
+        for element in self.getContents():
             for file in element.getAllFiles():
                 yield file
         
     def getAllFiles(self):
         """Generator which will return all files contained in this node or in children of it (possibly including the node itself)."""
-        assert self.getChildren() is not None
+        assert self.getContents() is not None
         if self.isFile():
             yield self
         else:
-            for element in self.getChildren():
+            for element in self.getContents():
                 for file in element.getAllFiles():
                     yield file
                         
@@ -121,7 +118,7 @@ class Node:
         """Return the number of files contained in this element or in child-elements of it."""
         if self.isFile():
             return 1
-        else: return sum(element.getFileCount() for element in self.getChildren())
+        else: return sum(element.getFileCount() for element in self.getContents())
         
     def getOffset(self):
         """Get the offset of this element in the current tree structure."""
@@ -129,7 +126,7 @@ class Node:
             return 0
         else:
             offset = self.getParent().getOffset()
-            for child in self.getParent().getChildren():
+            for child in self.getParent().getContents():
                 if child == self:
                     return offset
                 else: offset = offset + child.getFileCount()
@@ -141,13 +138,13 @@ class Node:
         if childIndex < 0 or childIndex >= self.getChildrenCount():
             raise IndexError("childIndex {} is out of bounds.".format(childIndex))
         offset = 0
-        for node in self.getChildren()[:childIndex]:
+        for node in self.getContents()[:childIndex]:
             offset = offset + node.getFileCount()
         return offset
         
     def getFileAtOffset(self,offset):
         """Get the file at the given <offset>. Note that <offset> is relative to this element, not to the whole playlist (unless the element is the rootnode)."""
-        assert self.getChildren() is not None
+        assert self.getContents() is not None
         offset = int(offset)
         if offset == 0 and self.isFile():
             return self
@@ -165,8 +162,8 @@ class Node:
         if offset < 0:
             raise IndexError("Offset {0} is out of bounds".format(offset))
         cOffset = 0
-        for i in range(0,self.getChildrenCount()):
-            fileCount = self.getChildren()[i].getFileCount()
+        for i in range(0,self.getContentCount()):
+            fileCount = self.getContent()[i].getFileCount()
             if offset < cOffset + fileCount:
                 return i,offset-cOffset
             else: cOffset = cOffset + fileCount
@@ -179,7 +176,7 @@ class Node:
         index,innerOffset = self.getChildIndexAtOffset(offset)
         if index is None:
             return None,None
-        else: return self.getChildren()[index],innerOffset
+        else: return self.getContents()[index],innerOffset
 
 
 class RootNode(Node):
@@ -193,34 +190,6 @@ class RootNode(Node):
     def setParent(self):
         raise RuntimeError("Cannot set the parent of a RootNode.")
 
-class PositionChangeCommand(QtGui.QUndoCommand):
-    
-    def __init__(self, element, pos):
-        QtGui.QUndoCommand.__init__(self, "change element position")
-        self.elem = element
-        self.pos = pos
-    
-    def redo(self):
-        self.oldpos = self.elem.position
-        self.elem.position = self.pos
-    
-    def undo(self):
-        self.elem.position = self.oldpos
-
-class TagChangeCommand(QtGui.QUndoCommand):
-    
-    def __init__(self, element, tag, index, value):
-        QtGui.QUndoCommand.__init__(self, "change »{}« tag".format(tag.name))
-        self.elem = element
-        self.tag = tag
-        self.index = index
-        self.value = value
-    
-    def redo(self):
-        self.oldValue = self.elem.tags[self.tag][self.index]
-        self.elem.tags[self.tag][self.index] = self.value
-    def undo(self):
-        self.elem.tags[self.tag][self.index] = self.oldValue
         
 class Element(Node):
     """Abstract base class for elements (files or containers) in playlists, browser, etc.. Contains methods to load tags and contents from the database or from files."""
@@ -232,15 +201,19 @@ class Element(Node):
         raise RuntimeError(
                 "Cannot instantiate abstract base class Element. Use Container, File or models.createElement.")
     
+    @staticmethod
+    def fromId(id, *, position = None, parentId = None):
+        if db.isFile(id):
+            return File.fromId(id, position = position, parentId = parentId)
+        else:
+            return Container.fromId(id, position = position, parentId = parentId)
+
     def isInDB(self, recursive = False):
         """Return whether this element is contained in the database, that is whether it has an id. If recursive is True, only return True if this element and all of its recursive children are in the database."""
         if not recursive:
             return self.id is not None
         else:
             return self.id is not None and (self.isFile() or all(e.isInDB(True) for e in self.contents))
-    
-    def outOfSync(self):
-        return self.isInDB() and any(self._syncState.values())
         
     def copy(self,contents=None,copyTags=True):
         """Reimplementation of Node.copy: If <copyTags> is True, the element's copy will contain a copy of this node's tags.Storage-instance. Otherwise the tags will be copied by reference."""
@@ -267,20 +240,12 @@ class Element(Node):
             for element in self.getChildren():
                 element.loadTags(recursive, tagList, fromFS)
     
-    def ensureTagsAreLoaded(self,recursive=False):
-        """Load tags if they are not loaded yet."""
-        if self.tags is None:
-            self.loadTags()
-        if recursive:
-            for element in self.getChildren():
-                element.ensureTagsAreLoaded()
-    
     def getPosition(self,refresh=False):
         """Return the position of this element. For elements in the database this is the number from the contents-table, not the index of this element in the parent's list of children! To get the latter, use parent.index(self). The value will be cached and will be only recomputed if <refresh> is True. This method returns None if the element has no parent or the parent is not of type Element.
            For elements outside the DB, you have to take care of self.position directly."""
         if not self.isInDB():
             return self.position
-        if self.position is not None and not refresh:
+        if self.position is not None:
             return self.position
         else:
             # Without parent, there can't be a position
@@ -289,57 +254,7 @@ class Element(Node):
             return db.position(self.parent.id,self.id)
     
     def setPosition(self, position):
-        if position != self.position:
-            self.position = position
-            if self.isInDB() and self.parent.isInDB():
-                dbPosition = db.query("SELECT position FROM contents WHERE container_id = ? AND element_id = ?", 
-                                 self.parent.id,self.id).getSingle()
-                if dbPosition != position:
-                    logger.debug("out of sync contents at id {} ({} {})".format(self.id, dbPosition, position))
-                    self.parent._syncState["contents"] = True
-        
-    def getParentIds(self,recursive = False):
-        """Return a list containing the ids of all parents of this element from the database. If <recursive> is True all ancestors will be added recursively."""
-        if not self.isInDB():
-            raise RuntimeError("getParentIds can only be used on elements contained in the database.")
-        return db.parents(self.id,recursive)
-    
-    def isAlbum(self):
-        """Return whether this element is an album (that is, whether it is a container and has a album-tag matching a title-tag.)"""
-        return self.isContainer() and (tags.ALBUM in self.tags and tags.TITLE in self.tags and not set(self.tags[tags.ALBUM]).isdisjoint(set(self.tags[tags.TITLE])))
-        
-    def hasAlbumTitle(self,container):
-        """Return whether the given container has a title-tag equal to an album-tag of this element. Thus, to check whether <container> is an album of this element, it remains to check that it is a parent (see getParentIds)."""
-        for title in container.tags[tags.TITLE]:
-            if title in self.tags[tags.ALBUM]:
-                return True
-        return False
-
-    def isContainedInAlbum(self):
-        """Check whether this element is in the current tree-structure contained in an album of itself."""
-        if tags.ALBUM in self.tags:
-            parent = self.getParent()
-            while isinstance(parent,Element):
-                if self.hasAlbumTitle(parent):
-                    return True
-                parent = parent.getParent()
-        return False
-        
-    def getAlbumIds(self):
-        """Return the ids of all album-containers of this element from the database. This can only be used for elements in the database."""
-        if not self.isInDB():
-            raise RuntimeError("getAlbumIds can only be used on elements contained in the database.")
-        parentIds = self.getParentIds(True)
-        albumTitles = self.tags[tags.ALBUM]
-        if len(albumTitles) > 0:
-            albums = []
-            for id in parentIds:
-                for title in db.tagValues(id,tags.TITLE):
-                    if title in albumTitles:
-                        albums.append(id)
-                        break
-            return albums
-        else: return []
+        self.position = position
         
     def hasCover(self):
         """Return whether this element has a cover."""
@@ -363,33 +278,7 @@ class Element(Node):
         """Delete all covers from the built-in cover cache."""
         if hasattr(self,"_covers"):
             del self._covers
-        
-    def delete(self,recursive = False):
-        """Deletes the element from the database. Note if <recursive> is True all children in the current tree structure will be removed, too. These are not necessarily the contents of this element in the database."""
-        if not self.isInDB():
-            raise RuntimeError("Delete can only be used on elements contained in the database.")
 
-        db.deleteElements([self.id])
-
-        if recursive and self.getChildrenCount() > 0:
-            for element in self.contents:
-                element.delete(True)
-            self.contents = []
-        if isinstance(self.parent, Element):
-            self.parent._syncState["contents"] = True
-        self.parent.contents.remove(self)
-        self.id = None
-    
-    def depthFirstGenerator(self,includeContainers=False):
-        """Return a generator over all files below this element in depth-first manner. If <includeContainers> is True, the generator will return all elements below this element."""
-        for element in self.contents:
-            if element.isFile():
-                yield element
-            else:
-                if includeContainers:
-                    yield element
-                for sub in element.depthFirstGenerator(includeContainers):
-                    yield sub
     # Misc
     #====================================================
     def getTitle(self):
@@ -413,7 +302,7 @@ class Container(Element):
     contents = None
     
     """Element-subclass for containers."""
-    def __init__(self,id=None,tags=None,contents=None, position = None):
+    def __init__(self, tags, position, id = None, contents = None):
         """Initialize this element with the given id, which must be an integer or None (for external containers). Optionally you may specify a tags.Storage object holding the tags of this element and/or a list of contents. Note that the list won't be copied but the parents will be changed to this container."""
         if id is not None and not isinstance(id,int):
             raise ValueError("id must be either None or an integer. I got {}".format(id))
@@ -423,7 +312,12 @@ class Container(Element):
         if contents is None:
             self.contents = []
         else: self.setContents(contents)
-        self._syncState = {}
+    
+    @staticmethod
+    def fromId(id, *, position = None, parentId = None):
+        if position is None:
+            position = db.position(parentId, id) if parentId is not None else None
+        return Container(db.tags(id), position = position, id)
     
     def setContents(self,contents):
         """Set the list of contents of this container to <contents>. Note that the list won't be copied and in fact altered: the parents will be set to this container."""
@@ -431,108 +325,43 @@ class Container(Element):
         self.contents = contents
         for element in self.contents:
             element.setParent(self)
-        
-    def isFile(self):
-        return False
-    
+
     def isContainer(self):
         return True
     
-    def loadContents(self,recursive=False,table="elements"):
+    def loadContents(self,recursive=False,table=None):
         """Delete the stored contents-list and fetch the contents from the database. You may use the <table>-parameter to restrict the child elements to a specific table: The table with name <table> must contain a column 'id' and this method will only fetch elements which appear in that column. If <recursive> is true loadContents will be called recursively for all child elements.
         If this container is not contained in the DB, this method won't do anything (except the recursive call if <recursive> is True)."""
         if self.isInDB():
+            if table is None:
+                table = db.prefix + "elements"
             additionalJoin = "JOIN elements ON elements.id = {}.id".format(table) if table != 'elements' else ''
             result = db.query("""
                     SELECT contents.element_id,contents.position,elements.file
                     FROM contents JOIN {0} ON contents.container_id = {1} AND contents.element_id = {0}.id {2}
                     ORDER BY contents.position
                     """.format(table,self.id,additionalJoin))
-            self.setContents([createElement(id,file=file,position=pos) for id,pos,file in result])
+            contents = []
+            for id,pos,file in result:
+                if file:
+                    contents.append(File.fromId(id, position = pos))
+                else:
+                    contents.append(Container.fromId(id, position = pos))
+            self.setContents(contents)
             
         if recursive:
             for element in self.contents:
                 if element.isContainer():
                     element.loadContents(recursive,table)
 
-    def getLength(self,refresh=False):
+    def getLength(self):
         """Return the length of this element, i.e. the sum of the lengths of all contents."""
         # Skip elements of length None
-        return sum(element.getLength(False) for element in self.contents if element.getLength(refresh) is not None)
-
-    def commit(self, toplevel = False):
-        """Commit this container into the database"""
-        logger.debug("commiting container {}".format(self))
-        wasInDB = self.isInDB()
-        if not wasInDB:
-            self.id = queries.addContainer(
-                            "spast", tags = self.tags, file = False, elements = len(self.contents), toplevel = toplevel)
-        else:
-            queries.delContents(self.id)
-        for elem in self.contents:
-            elem.commit()
-            try:
-                queries.addContent(self.id, elem.getPosition(), elem.id)
-            except sql.DBException as exc:
-                print(self.id)
-                print(elem.getPosition())
-                print(elem.id)
-                print(self.tags['title'])
-        if wasInDB:
-            queries.updateElementCounter(self.id)
-        self.syncState = {}
-
-    
-    def updateSameTags(self, metaContainer = False):
-        """Sets the tags of this element to be exactly those which are the same for all contents."""
-        self.commonTags = set(x for x in reduce(lambda x,y: x & y, [set(tr.tags.keys()) for tr in self.contents]) \
-                              if (x.name not in tags.TOTALLY_IGNORED_TAGS))
-        if metaContainer:
-            self.commonTags = self.commonTags - {tags.TITLE, tags.ALBUM}
-        self.commonTagValues = {}
-        differentTags=set()
-        for file in self.contents:
-            t = file.tags
-            for tag in self.commonTags:
-                if tag not in self.commonTagValues:
-                    self.commonTagValues[tag] = t[tag]
-                if self.commonTagValues[tag] != t[tag]:
-                    differentTags.add(tag)
-        self.sameTags = self.commonTags - differentTags
-        newTags = tags.Storage()
-        for tag in self.sameTags:
-            newTags[tag] = self.commonTagValues[tag]
-        if self.tags:
-            self.tags.merge(newTags)
-        else:
-            self.tags = newTags
-    
-    def updateElementCounter(self):
-        queries.updateElementCounter(self.id)
-        
-    def flatten(self):
-        newContents = list(self.depthFirstGenerator())
-        i = 1
-        for elem in newContents:
-            elem.parent = self
-            elem.position = i
-            i += 1
-        self.contents = newContents
-
-def equalsExceptIgnored(tags1, tags2):
-    """Checks if two tags are equal, but ignores all ignored tags for this check."""
-    set1 = set(k for k in tags1.keys() if not k.isIgnored() )
-    set2 = set(k for k in tags2.keys() if not k.isIgnored() )
-    if set1 != set2:
-        return False
-    for tag in set1:
-        if tags1[tag] != tags2[tag]:
-            return False
-    return True
+        return sum(element.getLength(False) for element in self.contents if element.getLength() is not None)
 
 
 class File(Element):
-    def __init__(self, id = None, tags = None, length = None, path = None, position = None):
+    def __init__(self, tags, length, path, position, id = None):
         """Initialize this element with the given id, which must be an integer or None (for external files). Optionally you may specify a tags.Storage object holding the tags of this element and/or a file path."""
         if id is not None and not isinstance(id,int):
             raise ValueError("id must be either None or an integer. I got {}".format(id))
@@ -545,138 +374,34 @@ class File(Element):
         self.path = path
         self._syncState = {}
     
-    def hasChildren(self):
+    def hasContents(self):
         return False
     
-    def getChildren(self):
+    def getContents(self):
         return []
 
-    def getChildrenCount(self):
+    def getContentsCount(self):
         return 0
         
     def isFile(self):
         return True
     
-    def isContainer(self):
-        return False
+    @staticmethod
+    def fromId(id, *, position = None, parentId = None):
+        if position is None:
+            position = db.position(parentId, id) if parentId is not None else None
+        return File(db.tags(id), length = db.length(id), path = db.path(id), position = position, id)
+    @staticmethod
+    def fromFilesystem(path):
+        real = realfiles2.get(path)
+        real.read()
+        return File(tags = real.tags, length = real.length, path = real.path, position = real.position)
 
-    def readFromFilesystem(self,*,tags=False,length=False,position=False,all=False):
-        if all:
-            tags = length = position = True
-
-        if not any((tags,length,position)):
-            return
-
-        if self.getPath() is None:
-            raise RuntimeError("I need a path to read tags from the filesystem. Id: {}".format(self.id))
-            
-        real = realfiles2.get(self.getPath())
-        try:
-            real.read()
-        except realfiles2.TagIOError as e:
-            logger.warning("Failed to read from file {}: {}".format(self.path, str(e)))
-        if tags:
-            self.tags = real.tags
-        if position:
-            self.position = real.position
-        if length:
-            self.length = real.length
-
-    def writeToFileSystem(self,*,tags=False,position=False,all=False):
-        if all:
-            tags = position = True
-
-        if not tags and not position:
-            return
-
-        if self.getPath() is None:
-            raise RuntimeError("I need a path to write to the filesystem. Id: {}".format(self.id))
-            
-        real = realfiles2.get(self.getPath())
-        if tags:
-            real.tags = self.tags
-        if position:
-            real.position = self.position
-        try:
-            if tags:
-                real.saveTags()
-            if position:
-                real.savePosition()
-        except realfiles2.TagIOError as e:
-            logger.warning("Failed to write to file {}: {}".format(self.path, str(e)))
-
-    def getPath(self,refresh=True):
-        """Return the path of this file. If the file is in the DB and no path is stored yet or <refresh> is True, the path will be fetched from the database and cached for subsequent calls."""
-        if self.isInDB():
-            if refresh or self.path == None:
-                path = db.query("SELECT path FROM files WHERE element_id = {0}".format(self.id)).getSingle()
-                if path is None:
-                    raise ValueError("The element with id {0} has no path. Maybe it is a container.".format(self.id))
-                self.path = path
-            return self.path
-        else:
-            if hasattr(self,'path'):
-                return self.path
-            else: return None
-    
-    def getLength(self,refresh=False):
-        """Return the length of this file. If the file is in the DB and no length is stored yet or <refresh> is True, the length will be fetched from the database and cached for subsequent calls."""
-        if self.isInDB() and (refresh or not self.length):
-            self.length = db.query("SELECT length FROM files WHERE element_id = {0}".format(self.id)).getSingle()
+    def getLength(self):
+        """Return the length of this file."""
         return self.length
-    
-    def computeHash(self):
-        """Computes the hash of the audio stream and stores it in the object's hash attribute."""
-    
-        import hashlib,tempfile,subprocess
-        handle, tmpfile = tempfile.mkstemp()
-        subprocess.check_call(
-            ["mplayer", "-dumpfile", tmpfile, "-dumpaudio", absPath(self.path)], #TODO: konfigurierbar machen
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE)
-        with open(handle,"br") as hdl:
-            self.hash = hashlib.sha1(hdl.read()).hexdigest()
-        os.remove(tmpfile)
-    
-    def computeAndStoreHash(self):
-        self.computeHash()
-        db.query("UPDATE files SET hash = ? WHERE element_id = ?;", self.hash, self.id)
-        logger.debug("hash of file {} has been computed and set".format(self.path))
-        
-    def commit(self, toplevel = False):
-        """Save this file into the database. After that, the object has an id attribute"""
-        if self.isInDB(): #TODO: tags commiten
-            return
-        
-        import omg.gopulate
-        logger.debug("commiting file {}".format(self.path))
-        self.id = queries.addContainer(
-                                        os.path.basename(self.path),
-                                        tags = self.tags,
-                                        file = True,
-                                        elements = 0,
-                                        toplevel = toplevel)
-        querytext = "INSERT INTO files (element_id,path,hash,length) VALUES(?,?,?,?);"
-        if self.length is None:
-            self.length = 0
-        if hasattr(self, "hash"):
-            hash = self.hash
-        else:
-            hash = 'pending'            
-        db.query(querytext, self.id, relPath(self.path), hash, int(self.length))
-        if hash == 'pending':
-            hashQueue.put((self.computeAndStoreHash, [], {}))
-        self._syncState = {}
-         
+     
     def __repr__(self):
         return "File {}".format(self.path)
 
-def createElement(id,tags=None,contents=None,file=None, position=None):
-    """Create an element with the given id, tags and contents. Depending on <file> an instance of Container or of File will be created. If <file> is None, the file-flag (elements.file) will be read from the database. Note that contents will be ignored if a File-instance is created."""
-    if file is None:
-        file = db.query("SELECT file FROM elements WHERE id=?",id).getSingle()
-        if file is None:
-            raise ValueError("There is no element with id {}".format(id))
-    if file:
-        return File(id,tags=tags, position = position)
-    else: return Container(id,tags=tags,contents=contents, position = position)
+

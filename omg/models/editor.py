@@ -90,3 +90,76 @@ class EditorModel(BasicPlaylist):
         logger.debug("commit called")
         for item in self.root.contents:
             item.commit(toplevel = True)
+
+
+# ALTER KRAM
+def computeHash(self):
+        """Computes the hash of the audio stream and stores it in the object's hash attribute."""
+    
+        import hashlib,tempfile,subprocess
+        handle, tmpfile = tempfile.mkstemp()
+        subprocess.check_call(
+            ["mplayer", "-dumpfile", tmpfile, "-dumpaudio", absPath(self.path)], #TODO: konfigurierbar machen
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE)
+        with open(handle,"br") as hdl:
+            self.hash = hashlib.sha1(hdl.read()).hexdigest()
+        os.remove(tmpfile)
+    
+    def computeAndStoreHash(self):
+        self.computeHash()
+        db.query("UPDATE files SET hash = ? WHERE element_id = ?;", self.hash, self.id)
+        logger.debug("hash of file {} has been computed and set".format(self.path))
+        
+    def commit(self, toplevel = False):
+        """Save this file into the database. After that, the object has an id attribute"""
+        if self.isInDB(): #TODO: tags commiten
+            return
+        
+        import omg.gopulate
+        logger.debug("commiting file {}".format(self.path))
+        self.id = queries.addContainer(
+                                        os.path.basename(self.path),
+                                        tags = self.tags,
+                                        file = True,
+                                        elements = 0,
+                                        toplevel = toplevel)
+        querytext = "INSERT INTO files (element_id,path,hash,length) VALUES(?,?,?,?);"
+        if self.length is None:
+            self.length = 0
+        if hasattr(self, "hash"):
+            hash = self.hash
+        else:
+            hash = 'pending'            
+        db.query(querytext, self.id, relPath(self.path), hash, int(self.length))
+        if hash == 'pending':
+            hashQueue.put((self.computeAndStoreHash, [], {}))
+        self._syncState = {}
+class PositionChangeCommand(QtGui.QUndoCommand):
+    
+    def __init__(self, element, pos):
+        QtGui.QUndoCommand.__init__(self, "change element position")
+        self.elem = element
+        self.pos = pos
+    
+    def redo(self):
+        self.oldpos = self.elem.position
+        self.elem.position = self.pos
+    
+    def undo(self):
+        self.elem.position = self.oldpos
+
+class TagChangeCommand(QtGui.QUndoCommand):
+    
+    def __init__(self, element, tag, index, value):
+        QtGui.QUndoCommand.__init__(self, "change »{}« tag".format(tag.name))
+        self.elem = element
+        self.tag = tag
+        self.index = index
+        self.value = value
+    
+    def redo(self):
+        self.oldValue = self.elem.tags[self.tag][self.index]
+        self.elem.tags[self.tag][self.index] = self.value
+    def undo(self):
+        self.elem.tags[self.tag][self.index] = self.oldValue
