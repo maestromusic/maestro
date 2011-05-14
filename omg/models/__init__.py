@@ -8,7 +8,7 @@
 #
 import copy
 
-from omg import tags, logging, config, covers, realfiles2, database as db
+from omg import tags, logging, config, covers, realfiles2, modify, database as db
 
 logger = logging.getLogger(name="models")
 
@@ -196,6 +196,7 @@ class Element(Node):
     tags = None # tags.Storage to store the tags. None until they are loaded
     position = None
     length = None
+    id = None
     
     def __init__(self):
         raise RuntimeError(
@@ -211,7 +212,7 @@ class Element(Node):
     def isInDB(self, recursive = False):
         """Return whether this element is contained in the database, that is whether it has an id. If recursive is True, only return True if this element and all of its recursive children are in the database."""
         if not recursive:
-            return self.id is not None
+            return self.id > 0
         else:
             return self.id is not None and (self.isFile() or all(e.isInDB(True) for e in self.contents))
         
@@ -221,40 +222,6 @@ class Element(Node):
         if copyTags:
             newNode.tags = self.tags.copy()
         return newNode
-
-    def loadTags(self,recursive=False,tagList=None, fromFS=False):
-        """Delete the stored tags and load them again. If this element is contained in the DB, tags will be loaded from there. Otherwise if this is a file, tags will be loaded from that file or no tags will be loaded if this is a container.
-        If <recursive> is True, all tags from children of this node (recursively) will be loaded, too.
-        If <tagList> is not None only tags in the given list will be loaded (e.g. only title-tags).
-        If <fromFS> is True, then tags are read from the file even if this element is in the DB (and is a file)."""
-        if fromFS or not self.isInDB():
-            if self.isFile():
-                self.readFromFilesystem(tags=True)
-            else: self.tags = tags.Storage()
-        else:
-            self.tags = tags.Storage()
-            for tag,value in db.tags(self.id,tagList):
-                self.tags.add(tag,value)
-
-        if recursive:
-            for element in self.getChildren():
-                element.loadTags(recursive, tagList, fromFS)
-    
-    def getPosition(self,refresh=False):
-        """Return the position of this element. For elements in the database this is the number from the contents-table, not the index of this element in the parent's list of children! To get the latter, use parent.index(self). The value will be cached and will be only recomputed if <refresh> is True. This method returns None if the element has no parent or the parent is not of type Element.
-           For elements outside the DB, you have to take care of self.position directly."""
-        if not self.isInDB():
-            return self.position
-        if self.position is not None:
-            return self.position
-        else:
-            # Without parent, there can't be a position
-            if self.parent is None or not isinstance(self.parent,Element) or not self.parent.isInDB():
-                return None
-            return db.position(self.parent.id,self.id)
-    
-    def setPosition(self, position):
-        self.position = position
         
     def hasCover(self):
         """Return whether this element has a cover."""
@@ -302,10 +269,9 @@ class Container(Element):
     contents = None
     
     """Element-subclass for containers."""
-    def __init__(self, tags, position, id = None, contents = None):
-        """Initialize this element with the given id, which must be an integer or None (for external containers). Optionally you may specify a tags.Storage object holding the tags of this element and/or a list of contents. Note that the list won't be copied but the parents will be changed to this container."""
-        if id is not None and not isinstance(id,int):
-            raise ValueError("id must be either None or an integer. I got {}".format(id))
+    def __init__(self, tags, position, id, contents = None):
+        """Initialize this container, optionally with a contents list.
+        Note that the list won't be copied but the parents will be changed to this container."""
         self.id = id
         self.tags = tags
         self.position = position
