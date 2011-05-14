@@ -44,6 +44,8 @@ print("...done")
 print("Copying tags...")
 for tagid,tagname,tagtype in db.query("SELECT id,tagname,tagtype FROM {}tagids".format(prefix)):
     idIncrement = db.query("SELECT MAX(id) FROM {}values_{}".format(prefix,tagtype)).getSingle()
+    if not isinstance(idIncrement, int):
+        idIncrement = 0
 
     # Copy values
     if tagtype != "date":

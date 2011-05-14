@@ -35,6 +35,7 @@ class FileSystemBrowserModel(QtGui.QFileSystemModel):
         return 1
     
     def getIcon(self, index):
+        return self.defaultFolderIcon
         path = self.filePath(index)
         files = os.listdir(path)
         dirty = False

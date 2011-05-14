@@ -74,8 +74,8 @@ def init(cmdConfig = [],initTags=True,testDB=False):
         tags.init()
     
     # TODO
-    #~ from omg import distributor 
-    #~ distributor.init()
+    from omg import distributor 
+    distributor.init()
     #~ from omg import search
     #~ search.init()
 
@@ -88,13 +88,13 @@ def run(cmdConfig = []):
     app = init(cmdConfig)
 
     # Load remaining modules
-    from omg import tags, sync, search
+    from omg import tags, search
     search.init()
-    
+
     # Load Plugins
     from omg import plugins
-    plugins.loadPlugins()
-    
+    plugins.enablePlugins()
+
     # Create GUI
     import omg.gui.filesystembrowser
     from omg.gui import mainwindow
@@ -110,7 +110,7 @@ def run(cmdConfig = []):
     search.shutdown()
     mainWindow.saveLayout()
     plugins.shutdown()
-    sync.shutdown()
+    #sync.shutdown()
     config.shutdown()
     logging.shutdown()
     sys.exit(returnValue)
