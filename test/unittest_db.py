@@ -48,7 +48,7 @@ class ElementsContentsTestCase(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    application.init(testDB=True)
+    application.init(initTags=False,testDB=True)
     db.resetDatabase()
     
     suite = unittest.TestSuite()

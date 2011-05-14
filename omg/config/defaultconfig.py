@@ -57,7 +57,9 @@ defaults = {
     "tag_order": (list,["title","artist","album","composer","date","genre","peformer","conductor"],
                   "Order in which tags will be displayed. Must contain title and album! Tags which don't appear in this list will be displayed in arbitrary order after the tags in the list."),
     "title_tag": (str,"title","Key of the title-tag."),
-    "album_tag": (str,"album","Key of the album-tag.")
+    "album_tag": (str,"album","Key of the album-tag."),
+    "search_tags":(list,["album","performer","conductor","title","lyricist","composer","date","artist"],
+                    "Tags that will be searched, if you type a text without prefix in a searchbox. Use prefixes to search for other tags."),
 },
 
 "gui": {

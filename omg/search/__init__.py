@@ -6,96 +6,217 @@
 # it under the terms of the GNU General Public License version 3 as
 # published by the Free Software Foundation
 #
-from omg import database, tags
-from omg.config import options
+import threading, time
+
+from PyQt4 import QtCore
+from PyQt4.QtCore import Qt
+
+from omg import database as db, tags, config
 from . import searchparser
 from . import criteria as criteriaModule
 
-# Temporary table used by the search algorithm
+# If the main application terminates it will stop the search thread (confer search.shutdown). But if the main thread crashes, this will not happen. Therefore the search thread will wake every TIMEOUT seconds and check whether the main thread is still alive.
+TIMEOUT = 2
+
+
+engines = []
+
+# Name of the temporary search table
 TT_HELP = 'tmp_help'
 
-# Logical modes
-DISJUNCTION = 1
-CONJUNCTION = 2
+# Commands that are used by the main thread to control the search thread.
+PAUSE,SEARCH,QUIT = range(3)
 
-# Reference to the database connection
-db = None
-
+    
 def init():
-    """Initialize the search-module."""
-    global db
-    criteria.searchTags = [tags.get(t) for t in options.tags.search_tags if tags.get(t).isIndexed()]
-    db = database.get()
-    db.query("DROP TABLE IF EXISTS {0}".format(TT_HELP))
-    db.query("""
-        CREATE TABLE IF NOT EXISTS {0} (
-            id MEDIUMINT UNSIGNED NOT NULL,
-            value MEDIUMINT UNSIGNED NULL)
-            CHARACTER SET 'utf8';
-        """.format(TT_HELP))
+    """Initialize the search module."""
+    criteriaModule.SEARCH_TAGS = set()
+    for tagname in config.options.tags.search_tags:
+        if tags.exists(tagname):
+            criteriaModule.SEARCH_TAGS.add(tags.get(tagname))
 
 
-def createResultTempTable(tableName,dropIfExists):
-    """Create a temporary table of the given name which may be used as resultTable for the search- and textSearch-methods. If dropIfExists is true, an existing table of the same name will be dropped (otherwise an DBException will be raised when performing the CREATE-query)."""
-    if dropIfExists:
-        db.query("DROP TABLE IF EXISTS {0}".format(tableName)) # TODO: For debugging reasons a persistent table is created
-    db.query("""
-        CREATE TABLE IF NOT EXISTS {0} (
-            id MEDIUMINT UNSIGNED,
-            file TINYINT UNSIGNED,
-            toplevel TINYINT UNSIGNED DEFAULT 0,
-            new TINYINT UNSIGNED DEFAULT 1,
-            PRIMARY KEY(id))
-            CHARACTER SET 'utf8';
-        """.format(tableName))
+def shutdown():
+    """Shutdown the search module. This will destroy all result tables that are still existent!"""
+    for engine in engines[:]:
+        engine.shutdown()
 
 
-def stdTextSearch(searchString,resultTable,fromTable='elements',logicalMode=CONJUNCTION):
-    stdSearch(searchparser.parseSearchString(searchString),resultTable,fromTable,logicalMode)
+class SearchEngine(QtCore.QObject):
+    _thread = None      # Search thread
+    _searchEvent = None # threading.Event that is used to wake the search thread
+    _lock = None        # threading.Lock to protect the data shared between the threads
+    _tables = None      # list of result tables associated to this engine
 
-
-def stdSearch(criteria,resultTable,fromTable='elements',logicalMode=CONJUNCTION):
-    search(criteria,resultTable,fromTable,logicalMode)
-    addChildren(resultTable)
-    addFilledParents(resultTable)
-    setTopLevelFlag(resultTable)
-
-
-def textSearch(searchString,resultTable,fromTable='elements',logicalMode=CONJUNCTION):
-    """Parse the given search string to TextCriteria and submit them together with all other arguments to the search-method."""
-    search(searchparser.parseSearchString(searchString),resultTable,fromTable,logicalMode)
-
-
-def search(criteria,resultTable,fromTable='elements',logicalMode=CONJUNCTION):
-    """Search the database and store the result in a table.
+    # The following variables are shared with the search thread. Use _lock whenever accessing them
+    _criteria = None    # list of criteria
+    _fromTable = None   # the algorithm will look for results in this table
+    _resultTable = None # and put the results in this one
+    _commend = None     # command to control search thread 
     
-    This method finds all direct results fulfilling all or at least one of the given criteria and writes them into <resultTable>.
+    searchFinished = QtCore.pyqtSignal()
     
-    Detailed parameter description:
-    - <criteria> is a list of criteria (confer the criteria-module). Depending on <logicalMode> only elements fulfilling all or at least one of the criteria will be found.
-    - The id of each container found by the search is stored in the 'id'-column of <resultTable>. This table should be created with the createResultTempTable-method (or has to contain at least the columns created by that method and default values for all other columns. This table will be truncated before the search is performed!
-    - This method will find only elements with records in <fromTable>. Since <fromTable> defaults to 'elements' usually all elements are searched. <fromTable> must contain an 'id'-column holding container-ids.
-    - <logicalMode> specifies if a container must fulfill all criteria (CONJUNCTION) or only at least one criterion (DISJUNCTION) to be found.
-    """
-    assert(logicalMode == CONJUNCTION) #TODO: Support DISJUNCTION
-    
-    # Build a list if only one criterion is submitted
-    if not hasattr(criteria,'__iter__'):
-        criteria = (criteria,)
-    else:
-        # Sort the most complicated criteria to the front hoping that we get right from the beginning only a few results
-        criteria.sort(key=criteriaModule.sortKey,reverse=True)
+    def __init__(self):
+        QtCore.QObject.__init__(self)
+        self._tables = []
+        self._criteria = []
+        self._command = PAUSE
+        self._lock = threading.Lock()
+        self._searchEvent = threading.Event()
+        self._thread = SearchThread(self)
+        self._thread.start()
+        engines.append(self)
+
+    def createResultTable(self,part,customColumns=""):
+        """Create a MySQL table that can hold search results. The table will be created in memory. *part* must be a string which is unique among all result tables of this engine. To create a unique table name, use *part* and the thread name of this engine's search thread. So *part* must be unique among all result tables of this engine but you may create result tables for different engines using the same *part*.
         
-    db.query("TRUNCATE TABLE {0}".format(resultTable))
-    
-    # We firstly search for the direct results of the first query... 
-    db.query("INSERT INTO {0} (id,file) {1}".format(resultTable,criteria[0].getQuery(fromTable)))
-    # ...and afterwards delete those entries which do not match the other queries
-    for criterion in criteria[1:]:
-        db.query("TRUNCATE TABLE {0}".format(TT_HELP))
-        db.query("INSERT INTO {0} (id) {1}".format(TT_HELP,criterion.getQuery(resultTable,('id',))))
-        db.query("DELETE FROM {0} WHERE id NOT IN (SELECT id FROM {1})".format(resultTable,TT_HELP))
+        All tables created with this method are belong to this engine and will be dropped when this engine is shut down.
+        """
+        # TODO: This breaks if one day Python uses a format for its thread names which contains characters apart from '-' that are not allowed in table names. I need a thread-safe method to create unique names, though.
+        threadIdentifier = self._thread.name.replace('-','')
+        tableName = "{}tmp_search_{}_{}".format(db.prefix,part,threadIdentifier)
+        if tableName in db.listTables():
+            raise ValueError("A table with name '{}' does already exist.".format(tableName))
+        if len(customColumns) > 0 and customColumns[-1] != ',':
+            customColumns = customColumns + ','
+        db.query("""
+            CREATE TABLE {} (
+                id MEDIUMINT UNSIGNED,
+                {}
+                toplevel TINYINT UNSIGNED DEFAULT 0,
+                new TINYINT UNSIGNED DEFAULT 1,
+                PRIMARY KEY(id))
+                ENGINE MEMORY;
+            """.format(tableName,customColumns))
+        with self._lock:
+            self._tables.append(tableName)
+        return tableName
 
+    def runSearch(self,fromTable,resultTable,criteria):
+        """Search in *fromTable* for elements matching every criterion in *criteria* and store them in *resultTable*."""
+        with self._lock:
+            self._criteria = criteria
+            self._fromTable = fromTable
+            self._resultTable = resultTable
+            self._command = SEARCH
+        self._searchEvent.set()
+
+    def shutdown(self):
+        """Shut down this engine. In particular terminate the search thread and drop all result tables associated with this engine."""
+        engines.remove(self)
+        self._command = QUIT
+        # Wake up the thread to tell it to shut down
+        self._searchEvent.set()
+        # Wait for the thread to finish before dropping the tables
+        self._thread.join()
+        self._thread = None
+        for tableName in self._tables:
+            db.query("DROP TABLE {}".format(tableName))
+
+
+class SearchThread(threading.Thread):
+    """Each SearchEngine controls a SearchThread that does the actual searching."""
+    def __init__(self,engine):
+        threading.Thread.__init__(self)
+        self.engine = engine
+        self._parentThread = threading.current_thread()
+
+    def run(self):
+        engine = self.engine
+        tables = {}
+        fromTable = None
+        resultTable = None
+        criteria = []
+        command = PAUSE
+        
+        with db.connect():
+            db.query("""
+            CREATE TEMPORARY TABLE IF NOT EXISTS {0} (
+                id MEDIUMINT UNSIGNED NOT NULL,
+                value MEDIUMINT UNSIGNED NULL)
+                CHARACTER SET 'utf8';
+            """.format(TT_HELP))
+        
+            while True:
+                # Copy data criteria from main thread
+                with self.engine._lock:
+                    command = self.engine._command
+                    newFromTable = self.engine._fromTable
+                    newResultTable = self.engine._resultTable
+                    newCriteria = self.engine._criteria[:]
+
+                if command == QUIT or not self._parentThread.is_alive():
+                    print("Quit search thread")
+                    return # Terminate the thread
+
+                if command == PAUSE:
+                    criteria = []
+                    if engine._searchEvent.wait(TIMEOUT):
+                        engine._searchEvent.clear()
+                    continue # Start again copying data
+                
+                if newFromTable != fromTable or newResultTable != resultTable:
+                    print("Switch from {} -> {} to {} -> {}".format(fromTable,resultTable,newFromTable,newResultTable))
+                    fromTable = newFromTable
+                    resultTable = newResultTable
+                    # Start a new search
+                    db.query("TRUNCATE TABLE {}".format(resultTable))
+                    tables[resultTable] = []
+                    criteria = newCriteria
+                else:
+                    if not criteriaModule.isNarrower(newCriteria,tables[resultTable]):
+                        print("I got new criteria which are not narrower than the old ones. I'll start a new search.")
+                        db.query("TRUNCATE TABLE {}".format(resultTable))
+                        tables[resultTable] = []
+                        criteria = newCriteria
+                    else:
+                        criteria = criteriaModule.reduce(newCriteria,tables[resultTable])
+    
+                if len(criteria) == 0:
+                    # Nothing to do
+                    self.engine.searchFinished.emit()
+                    if engine._searchEvent.wait(TIMEOUT):
+                        engine._searchEvent.clear()
+                    continue # Start again copying data
+
+                if len(criteria) > 0:
+                    criteria.sort(key=criteriaModule.sortKey)
+
+                if any(c.isInvalid() for c in criteria):
+                    print("Invalid criteria")
+                    db.query("TRUNCATE TABLE {}".format(resultTable))
+                    self.engine.searchFinished.emit()
+                    print("Finished search")
+                    if engine._searchEvent.wait(TIMEOUT):
+                        engine._searchEvent.clear()
+                    continue # Start again copying data
+                    
+                # Process criteria
+                #=====================
+                criterion = criteria.pop(0)
+                if len(tables[resultTable]) == 0:
+                    # We firstly search for the direct results of the first query... 
+                    print("Starting search...")
+                    db.query("TRUNCATE TABLE {0}".format(resultTable))
+                    queryData = criterion.getQuery(fromTable)
+                    queryData[0] = "INSERT INTO {0} (id) {1}".format(resultTable,queryData[0])
+                    #print(*queryData)
+                    db.query(*queryData)
+                else:
+                    # ...and afterwards delete those entries which do not match the other queries
+                    db.query("TRUNCATE TABLE {0}".format(TT_HELP))
+                    queryData = criterion.getQuery(resultTable)
+                    queryData[0] = "INSERT INTO {0} (id) {1}".format(TT_HELP,queryData[0])
+                    #print(*queryData)
+                    db.query(*queryData)
+                    db.query("DELETE FROM {0} WHERE id NOT IN (SELECT id FROM {1})".format(resultTable,TT_HELP))
+
+                tables[resultTable].append(criterion)
+
+                if len(criteria) == 0:
+                    print("Finished search")
+                    self.engine.searchFinished.emit()
+    
 
 def addChildren(resultTable,fromTable="elements"):
     while True:

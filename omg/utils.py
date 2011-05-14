@@ -105,7 +105,7 @@ class FlexiDate:
         else: format = format[2]
         return format.format(Y=self.year, m=self.month, d=self.day)
         
-    def toSql(self):
+    def toSql(self,maximum=False):
         """Convert this FlexiDate to an int as used to store it in the database."""
         result = 10000*self.year
         if self.month is not None:
@@ -114,6 +114,9 @@ class FlexiDate:
                 result += self.day
         return result
 
+    def toMaximalSql(self):
+         return 10000*self.year + 100*12 + 31
+         
     @staticmethod
     def fromSql(value):
         """Create a FlexiDate from an int as used to store FlexiDates in the database."""
@@ -125,7 +128,7 @@ class FlexiDate:
             return FlexiDate(value // 10000,(value // 100) % 100,value % 100)
         except ValueError as e:
             raise ValueError("Cannot create a FlexiDate from value {}: {}".format(value,e))
-        
+
     def __str__(self):
         return self.strftime()
 

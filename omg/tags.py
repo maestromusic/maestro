@@ -226,12 +226,12 @@ def get(identifier):
         identifier = identifier.lower()
         if identifier in _tagsByName:
             return _tagsByName[identifier]
-        else: raise RuntimeError("There is no tag with name '{}'".format(identifier))
+        else: raise ValueError("There is no tag with name '{}'".format(identifier))
     elif isinstance(identifier, Tag):
         return identifier
     else:
-        raise RuntimeError("Identifier's type is neither int nor string nor tag: {} of type {}"
-                                .format(identifier,type(identifier)))
+        raise TypeError("Identifier's type is neither int nor string nor tag: {} of type {}"
+                            .format(identifier,type(identifier)))
 
 
 def fromTranslation(translation):

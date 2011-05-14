@@ -6,39 +6,130 @@
 # it under the terms of the GNU General Public License version 3 as
 # published by the Free Software Foundation
 #
-from omg import database, tags
+import re
 
-# When deciding which criterion should be performed first, TextCriteria where tag is not None, are favored by this factor since they tend to give less results than searches in all tags.
-SINGLE_TAG_MULTIPLIER = 3
+from omg import database as db, tags, utils
 
-searchTags = None
+# Initialized in search.init
+SEARCH_TAGS = set()
 
-class TextCriterion:
-    """A TextCriterion contains a tag t and a tag-value v. If t is not None the criterion is fulfilled for a container if the container has a t-tag matching v (i.e. with value equal to v if t.type is date or containing the string v otherwise). If tag is None, the TextCriterion tries all tags contained in the config-variable tags->search_tags and is fulfilled if it at least one tag matches v.
-    """
-    def __init__(self,tag,value):
-        """Initialize this TextCriterion with the given value in the given tag. If tag is None the criterion is fulfilled if at least one tag matches the value."""
-        self.tag = tag
-        self.value = value
-        
+
+class Criterion:
+    """A criterion matches a subset of elements. The search algorithm will take a list of criteria and search for all elements matching every criterion. This is only an abstract base."""
     def getQuery(self,fromTable,columns=None):
-        """Return a SELECT-query fetching the rows of <fromTable> which fulfill this criterion. <fromTable> must contain an 'id'-column holding container-ids and a 'file'-column with the corresponding file-flags. By default only the id- and file-columns of <fromTable> are selected, but you can specify a list of columns in the <column>-parameter.
-        """
-        if self.tag is not None:
-            return _buildSelectForSingleTag(self.tag,self.value,fromTable,columns)
-        else:
-            # Build a query to search in all tags contained in the config-variable tags->search_tags...or to be exact: In all of those tags if the search-value is a number; otherwise exclude date-tags.
-            try:
-                number = int(self.value)
-                tagsToSearch = searchTags
-            except ValueError:
-                tagsToSearch = (tag for tag in searchTags if tag.type != tags.TYPE_DATE)
-        return " UNION ".join(("({0})".format(_buildSelectForSingleTag(tag,self.value,fromTable,columns))\
-                                 for tag in tagsToSearch))
+        """Create a MySQL query for this criterion, selecting the columns *columns* from *fromTable*. *columns* must not contain table names like in ''elements.id''. Check whether this criterion is valid before using this method!
+
+        This method will return a list containing the query (which may contain placeholders) and optional parameters that should be bound to the query such that MySQL will use them to replace the placeholders. Simply use::
+
+            db.query(*criterion.getQuery(...))
+
+        \ """
+
+    def isValid(self):
+        """Return whether this criterion is valid. An invalid criterion cannot create a query and does not match any element."""
+
+    def isNarrower(self,other):
+        """Return whether this criterion is narrower than *other*, i.e. if the set of elements matching this criterion is a subset (not necessarily strict) of the set of elements matching *other*."""
 
 
-class TagIdCriterion:
-    """A TagIdCriterion contains a dictionary mapping tags to value-ids. It will be fulfilled for all elements having at least one of the tags with the corresponding value. For example {<genre-tag>: 1,<artist-tag>:2} will match all elements which have either the value of id 1 (in table tag_genre) as a genre-tag or the value of id 2 (in table tag_artist) as an artist-tag or both. TagIdCriterion works only with indexed tags.
+class TextCriterion(Criterion):
+    """A TextCriterion matches if an element contains a tag ''t'' from *tagSet* and a value ''v'' for the tag ''t'' that contains the search string *value*. If *tagSet* is None, config.options.tags.search_tags will be used.
+
+    If *tagSet* contains tags of type date they will only be searched if *value* is of the form ''1998'' or ''1700-1850'', where all numbers may have 1-4 digits and in the second case the first number must be less or equal than the second one. Note that, as usual the TextCriterion matches also if *value* is contained in a non-date search tag.
+
+    A TextCriterion contains the following variables:
+
+        - ''value'': The search value.
+        - ''tagSet'': a copy of *tagSet*. If *value* does not have one of the formats described above, all tags of type date will be removed. In this case this might be the empty set, in which case the criterion is invalid.
+        - ''years'': If *value* is ''1999'' this will be ''(1999,None)''; if *value* is ''1600-1700'', this will be ''(1600,1700)'' and if *value* has none of these formats, ''years'' will be None.
+        
+    \ """
+    dateRegexp = re.compile("^(\d{1,4})(-\d{1,4})?$")
+    
+    def __init__(self,tagSet,value):
+        if tagSet is None:
+            self.tagSet = set(SEARCH_TAGS)
+        elif isinstance(tagSet,tags.Tag):
+            self.tagSet = set(tagSet)
+        else: self.tagSet = set(tagSet)
+        self.value = value
+
+        # Compute years if value is of the form "1999" or "1990-2000"
+        self.years = None
+        if tags.TYPE_DATE in self.getSearchTypes():
+            match = self.dateRegexp.match(self.value)
+            if match is not None:
+                years = match.group(1,2)
+                startYear = int(years[0])
+                if years[1] is None:
+                    self.years = (startYear,None)
+                else:
+                    endYear = int(years[1][1:]) # skip the minus sign!
+                    if startYear <= endYear:
+                        self.years = (startYear,endYear)
+                    #else: self.years = None
+        if self.years is None:
+            # Warning: This may result in an empty list
+            self.tagSet = set(tag for tag in self.tagSet if tag.type != tags.TYPE_DATE)
+
+    def getSearchTypes(self):
+        """Return the set of types that appear in ''tagSet''."""
+        return set(tag.type for tag in self.tagSet)
+
+    def getQuery(self,fromTable,columns=None):
+        if len(self.tagSet) == 0:
+            raise RuntimeError("Criterion {} is not valid.".format(self))
+        parameters = []
+        subQueries = []
+        for valueType in self.getSearchTypes():
+            tagIdList = ",".join(str(tag.id) for tag in self.tagSet if tag.type == valueType)
+            if valueType != tags.TYPE_DATE:
+                whereClause = "INSTR(v.value,?)"
+                parameters.append(self.value)
+            else:
+                assert self.years is not None
+                if self.years[1] is None:
+                    whereClause = "v.value = {}".format(utils.FlexiDate(self.years[0]).toSql())
+                else:
+                    whereClause = "v.value BETWEEN {} AND {}".format(
+                            utils.FlexiDate(self.years[0]).toSql(),
+                            utils.FlexiDate(self.years[1]).toMaximalSql())
+        
+            subQueries.append("""(
+                    SELECT DISTINCT {1}
+                    FROM {2} AS el JOIN {0}tags AS t ON el.id = t.element_id
+                                   JOIN {0}values_{3} AS v ON t.tag_id = v.tag_id AND t.value_id = v.id
+                    WHERE t.tag_id IN ({4}) AND {5}
+                )""".format(db.prefix,_formatColumns(columns,"el"),fromTable,valueType.name,tagIdList,whereClause))
+
+        return [" UNION ".join(subQueries)] + parameters
+            
+
+    def isNarrower(self,other):
+        if not isinstance(other,TextCriterion):
+            return False
+        if not self.tagSet <= other.tagSet:
+            return False
+        # Note that it is not possible to build strict narrower queries if other.years is not None, since the old string must be a substring of the new one.
+        return self.years == other.years and self.value.find(other.value) > -1
+
+    def isInvalid(self):
+        return len(self.tagSet) == 0
+
+    def __str__(self):
+        if self.tagSet != SEARCH_TAGS:
+            return "{}:{}".format([tag.name for tag in self.tagSet],self.value)
+        else: return self.value
+
+    def __eq__(self,other):
+        return isinstance(other,TextCriterion) and other.tagSet == self.tagSet and other.value == self.value
+
+    def __ne__(self,other):
+        return not isinstance(other,TextCriterion) or other.tagSet != self.tagSet or other.value != self.value
+        
+
+class TagIdCriterion(Criterion):
+    """A TagIdCriterion contains a dictionary mapping tags to value-ids. It will be fulfilled for all elements having at least one of the tags with the corresponding value. For example {<genre-tag>: 1,<artist-tag>:2} will match all elements which have either the value of id 1 (in table tag_genre) as a genre-tag or the value of id 2 (in table tag_artist) as an artist-tag or both.
     """
     def __init__(self,valueIds):
         """Initialize a new TagIdCriterion with the given dictionary mapping tags to value-ids."""
@@ -46,16 +137,14 @@ class TagIdCriterion:
         self.valueIds = valueIds
         
     def getQuery(self,fromTable,columns=None):
-        """Return a SELECT-query fetching the rows of <fromTable> which fulfill this criterion. <fromTable> must contain an 'id'-column holding container-ids and a 'file'-column with the corresponding file-flags. By default only the id- and file-columns of <fromTable> are selected, but you can specify a list of columns in the <column>-parameter.
-        """
         whereExpression = " OR ".join("(tags.tag_id = {0} AND tags.value_id = {1})".format(tag.id,valueId)
                                          for tag,valueId in self.valueIds.items())
-        return """
-            SELECT {0}
-            FROM {1} JOIN tags ON {1}.id = tags.element_id
-            WHERE {2}
-            GROUP BY {1}.id
-            """.format(_formatColumns(columns,fromTable),fromTable,whereExpression)
+        return ("""
+            SELECT {1}
+            FROM {2} AS el JOIN {0}tags AS t ON el.id = t.element_id
+            WHERE {3}
+            GROUP BY el.id
+            """.format(db.prefix,_formatColumns(columns,"el"),fromTable,whereExpression),) # tuple!
 
     def getTags(self):
         """Return a list of all tags appearing in this TagIdMatch."""
@@ -64,60 +153,79 @@ class TagIdCriterion:
     def add(self,valueIds):
         """Add one or more tag=>id-mappings to this criterion. It will be fulfilled if a container contains at least one tag together with a value with the corresponding id."""
         self.valueIds.update(valueIds)
-        
 
-class MissingTagCriterion:
+    def isNarrower(self,other):
+        if not isinstance(other,TagIdCriterion):
+            return False
+        else:
+            # self is narrower if and only if it contains only k,v pairs from other
+            return set(self.valueIds.items()) <= set(other.valueIds.items())
+
+    def isInvalid(self):
+        return len(self.valueIds) == 0
+
+    def __eq__(self,other):
+        return isinstance(other,TagIdCriterion) and other.valueIds == self.valueIds
+
+    def __ne__(self,other):
+        return not isinstance(other,TagIdCriterion) or other.valueIds != self.valueIds
+
+
+
+class MissingTagCriterion(Criterion):
     """A MissingTagCriterion specifies a list of tags which a container must not have in order to match this criterion."""
     
     def __init__(self,tags):
-        """Initialize a new MissingTagCriterion with the given list of tags."""
-        self.tags = tags
+        """Initialize a new MissingTagCriterion with the given set of tags."""
+        self.tags = set(tags)
     
     def getTags(self):
-        """Return the list of tags a container must not have in order to match this criterion."""
+        """Return the set of tags a container must not have in order to match this criterion."""
         return self.tags
     
     def getQuery(self,fromTable,columns=None):
-        """Return a SELECT-query fetching the rows of <fromTable> which fulfill this criterion. <fromTable> must contain an 'id'-column holding element-ids and a 'file'-column with the corresponding file-flags. By default only the id- and file-column of <fromTable> are selected, but you can specify a list of columns in the <column>-parameter.
-        """
-        return """
+        # return a tuple!
+        return ("""
             SELECT {0}
             FROM {1} LEFT JOIN tags ON {1}.id = tags.element_id AND tags.tag_id IN ({2})
             WHERE tags.value_id IS NULL
-            """.format(_formatColumns(columns,fromTable),fromTable,",".join([str(tag.id) for tag in self.tags]))
-            
+            """.format(_formatColumns(columns,fromTable),fromTable,",".join([str(tag.id) for tag in self.tags])),)
 
-def _buildSelectForSingleTag(tag,value,fromTable,columns=None):
-    """Build a select query that will select all elements matching a given tag-value.
-    
-    fromTable must be the name of a database-table containing an 'id'-column which holds element-ids and a 'file'-column with the corresponding file-flags. The query returned by this function will select all those elements which have a tag of the sort <tag> matching <value> (i.e. if <tag>.type is date, the tag-value must equal <value>, otherwise <value> must be contained in the tag-value). By default only the id- and file-columns of <fromTable> are selected, but you can specify a list of columns in the <column>-parameter.
-    """
-    if tag.type == tags.TYPE_DATE:
-        whereExpression = " = {0}".format(value)
-    else: whereExpression = " LIKE '%{0}%'".format(database.get().escapeString(value,likeStatement=True))
-    return """
-        SELECT {4}
-        FROM {0} JOIN tags ON {0}.id = tags.element_id
-                 JOIN tag_{1} ON tags.value_id = tag_{1}.id
-        WHERE tags.tag_id = {2} AND tag_{1}.value {3}
-        GROUP BY {0}.id
-        """.format(fromTable,tag.name,tag.id,whereExpression,_formatColumns(columns,fromTable))
+    def isNarrower(self,other):
+        return isinstance(other,MissingTagCriterion) and self.tags >= other.tags
+
+    def isInvalid(self):
+        return len(self.tags) == 0
+
+    def __eq__(self,other):
+        return isinstance(other,MissingTagCriterion) and self.tags == other.tags
+
+    def __ne__(self,other):
+        return not isinstance(other,MissingTagCriterion) or self.tags != other.tags
+
+
+def isNarrower(aList,bList):
+    """Return whether the set of elements matching each criterion in *aList* is a subset of the elements matching each criterion in *bList*."""
+    # :-) For each b \in bList there must be an a \in aList that is narrower than b
+    return all(any(a.isNarrower(b) for a in aList) for b in bList)
+
+
+def reduce(criteria,processed):
+    """Filter criteria from *criteria* which must match every element that matches the criteria *processed* and return the rest. If for example *processed* contains 'hello', then 'hell' will be filtered away."""
+    return [c for c in criteria if not any(p.isNarrower(c) for p in processed)]
 
 
 def _formatColumns(columns,fromTable):
     """Generate a string which can be used after SELECT and will select the given columns from the given table. A possible result would be "elements.id,elements.position,elements.elements"."""
     if columns is None:
-        columns = ('id','file')
+        columns = ('id',)
     return ",".join("{0}.{1}".format(fromTable,column) for column in columns)
     
 
 def sortKey(criterion):
     """Compute a "complexity" value for a criterion.
     
-    This function is used to sort the complicated criteria to the front hoping that we get right from the beginning only a few results. In the current implementation complexity means basically the length of the search value. This makes sense also for a second reason: MySQLs Turbo-Boyer-Moore-algorithm for queries containing "LIKE '%<search value>%' is faster for longer search values."""
+    This function is used to sort the complicated criteria to the front hoping that we get right from the beginning only a few results."""
     if not isinstance(criterion,TextCriterion):
-        return 1000 # Just a high value to sort these criteria to the front
-    else: # TextCriterion
-        if criterion.tag is None:
-            return len(criterion.value)
-        else: return SINGLE_TAG_MULTIPLIER * len(criterion.value)
+        return 0 # sort to the front
+    else: return len(criterion.tagSet)

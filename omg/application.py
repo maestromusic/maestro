@@ -15,13 +15,13 @@ import sys, os
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from omg import config, logging, database, tags, sync
+from omg import config, logging, database
 
 # The application's main window
 mainWindow = None
 
 
-def init(cmdConfig = [],testDB=False):
+def init(cmdConfig = [],initTags=True,testDB=False):
     """Initialize the application, translators, modules (config, logging, database and tags) but do not create a GUI or load any plugins. Return the QApplication instance. This is useful for scripts which need OMG's framework, but not its GUI and for testing (or playing around) in Python's shell::
 
         >>> from omg import application, tags
@@ -67,8 +67,11 @@ def init(cmdConfig = [],testDB=False):
     # Initialize remaining modules
     if not testDB:
         database.connect()
-        tags.init()
     else: database.testConnect()
+
+    if initTags:
+        from omg import tags
+        tags.init()
     
     # TODO
     #~ from omg import distributor 
@@ -84,6 +87,10 @@ def run(cmdConfig = []):
     """
     app = init(cmdConfig)
 
+    # Load remaining modules
+    from omg import tags, sync, search
+    search.init()
+    
     # Load Plugins
     from omg import plugins
     plugins.loadPlugins()
@@ -98,13 +105,10 @@ def run(cmdConfig = []):
     # Launch application
     mainWindow.show()
     returnValue = app.exec_()
-    
+
     # Close operations
+    search.shutdown()
     mainWindow.saveLayout()
-    
-    #TODO
-    #import omg.gopulate
-    #omg.gopulate.terminate()
     plugins.shutdown()
     sync.shutdown()
     config.shutdown()

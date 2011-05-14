@@ -58,15 +58,12 @@ connections = {}
 #=======================================================================
 class ConnectionContextManager:
     """Connection manager that ensures that connections in threads other than the main thread are closed and removed from the dict ``connections`` when the thread terminates."""
-    def __init__(self,connection):
-        self._connection = connection
-
     def __enter__(self):
         return None
 
     def __exit__(self,exc_type, exc_value, traceback):
-        close(self._connection)
-        return False # If the suite was stopped by an exception, don't stop it
+        close()
+        return False # If the suite was stopped by an exception, don't stop that exception
 
 
 def connect():
@@ -127,7 +124,7 @@ def _connect(drivers,authValues):
         connection = sql.newConnection(drivers)
         connection.connect(*authValues)
         connections[threading.current_thread().ident] = connection
-        return ConnectionContextManager(connection)
+        return ConnectionContextManager()
     except sql.DBException as e:
         logger.error("I cannot connect to the database. Did you provide the correct information in the config file? MySQL error: {}".format(e.message))
         sys.exit(1)
@@ -255,30 +252,30 @@ def isToplevel(elid):
     return query("SELECT toplevel FROM {}elements WHERE id = ?".format(prefix),elid).getSingle() == 1
     
 def elementCount(elid):
-    """Return the number of children of the element with id <elid> or None if that element does not exist."""
+    """Return the number of children of the element with id <elid> or raise an sql.EmptyResultException if that element does not exist."""
     return query("SELECT elements FROM {}elements WHERE id  ?".format(prefix),elid).getSingle()
 
 
 # Files-Table
 #================================================
 def path(elid):
-    """Return the path of the file with id <elid> or None if that file does not exist.""" 
+    """Return the path of the file with id <elid> or raise an sql.EmptyResultException if that element does not exist.""" 
     return query("SELECT path FROM {}files WHERE element_id=?".format(prefix),fileid).getSingle()
 
 def hash(elid):
-    """Return the hash of the file with id <elid> or None if that file does not exist."""
+    """Return the hash of the file with id <elid> or raise an sql.EmptyResultException if that element does not exist.""" 
     return query("SELECT hash FROM {}files WHERE element_id=?".format(prefix),fileid).getSingle()
 
 def length(elid):
-    """Return the length of the file with id <elid> or None if that file does not exist."""
+    """Return the length of the file with id <elid> or raise an sql.EmptyResultException if that element does not exist.""" 
     return query("SELECT length FROM {}files WHERE element_id=?".format(prefix),fileid).getSingle()
 
 def verified(elid):
-    """Return the verified-timestamp of the file with id <elid> or None if that file does not exist."""
+    """Return the verified-timestamp of the file with id <elid> or raise an sql.EmptyResultException if that element does not exist.""" 
     return query("SELECT verified FROM {}files WHERE element_id=?".format(prefix),fileid).getSingle()
     
 def idFromPath(path):
-    """Return the element_id of a file from the given path, or None if it is not found."""
+    """Return the element_id of a file from the given path or raise an sql.EmptyResultException if that element does not exist.""" 
     try:
         return query("SELECT element_id FROM {}files WHERE path=?".format(prefix),path).getSingle()
     except sql.EmptyResultException:

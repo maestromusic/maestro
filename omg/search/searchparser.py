@@ -78,7 +78,9 @@ def _createCriterionFromString(string):
             searchValue = string[index+1:]
             if tagname in TAG_ABBREVIATIONS:
                 tagname = TAG_ABBREVIATIONS[tagname]
-            return TextCriterion(tags.get(tagname),searchValue)
+            if tags.exists(tagname):
+                return TextCriterion([tags.get(tagname)],searchValue)
+            else: return TextCriterion(None,searchValue)
         else: return TextCriterion(None,string[1:]) # Skip the colon at the beginning
     except ValueError: # No colon found
         return TextCriterion(None,string);

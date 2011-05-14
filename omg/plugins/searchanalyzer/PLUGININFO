@@ -1,0 +1,4 @@
+name=SearchAnalyzer
+author=Martin Altmayer
+version=1.0
+description=Displays the internal search result tables to help debugging the search.
