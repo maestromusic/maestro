@@ -31,12 +31,14 @@ hashThread.daemon = True
 hashThread.start()
 
 def init():
+    global fsct
     fsct = FileSystemCheckThread()
     fsct.daemon = True
     fsct.start()
 def shutdown():
     """Terminates this module; waits for all threads to complete."""
     hashQueue.join() # wait until all tasks in the commit queue are done
+    #fsct.join()
     
 
 class FileSystemCheckThread(threading.Thread):
@@ -45,39 +47,30 @@ class FileSystemCheckThread(threading.Thread):
         threading.Thread.__init__(self)
         
     def run(self):
-        print("run!")
+        db.connect()
         for root, dirs, files in os.walk(config.options.main.collection, topdown = True):
             relRoot = relPath(root)
-            print("in {}".format(relRoot))
             num = db.query("SELECT count(*) FROM {}folders WHERE path=?".format(db.prefix), relRoot).getSingle()
-            print(num)
             if num != 0:
                 status = db.query("SELECT state FROM {0}folders WHERE path = ?".format(db.prefix), relRoot).getSingle()
             else:
                 db.query("INSERT INTO {0}folders (path) VALUES(?)".format(db.prefix), relRoot)
                 logger.info("Previously unseen folder: {}".format(root))
                 status = 'unknown'
-            print("bla")
             if status == 'unknown':
-                print("status unknown")
                 music = False
                 dirty = False
                 for f in files:
                     f = os.path.join(root, f)
-                    print("checking {}".format(f))
                     if os.path.isfile(f) and hasKnownExtension(f):
-                        print("..is a music file")
                         if not db.idFromPath(relPath(f)):
-                            print("unsynced!")
                             status = 'unsynced'
                             dirty = True
                             break
                         music = True
                 if music and not dirty:
                     status = 'ok'
-                    print("ok")
                 else:
-                    print("nomusic")
                     status = 'nomusic'
                 logger.info("Folder {} has status {}".format(relRoot, status))
                 db.query("UPDATE {0}folders SET state = ? WHERE path = ?".format(db.prefix), status, relRoot)

@@ -9,7 +9,7 @@
 
 from PyQt4 import QtCore
 
-from omg import db
+from omg import database as db
 
 indicesChanged = None
 _instance = None

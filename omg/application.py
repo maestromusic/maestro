@@ -71,8 +71,8 @@ def init(cmdConfig = [],testDB=False):
     else: database.testConnect()
     
     # TODO
-    #~ from omg import distributor 
-    #~ distributor.init()
+    from omg import distributor 
+    distributor.init()
     #~ from omg import search
     #~ search.init()
 
@@ -85,7 +85,10 @@ def run(cmdConfig = []):
     app = init(cmdConfig)
     # Load Plugins
     from omg import plugins
-    plugins.loadPlugins()
+    plugins.enablePlugins()
+    
+    import omg.sync
+    #omg.sync.init()
     # Create GUI
     import omg.gui.filesystembrowser
     from omg.gui import mainwindow

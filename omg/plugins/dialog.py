@@ -14,16 +14,16 @@ from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
 from omg import logging, config, constants
-from . import PLUGINDIR, enabledPlugins, enablePlugin, disablePlugin
+from . import PLUGINDIR, PLUGININFO_OPTIONS, plugins
 
 translate = QtCore.QCoreApplication.translate
 
 logger = logging.getLogger("omg.plugins")
 
-PLUGININFO_KEYS = ["name","author","version","description"]
 COLUMN_HEADERS = [translate("PluginDialog","Enabled"),
                   translate("PluginDialog","Name"),translate("PluginDialog","Author"),
-                  translate("PluginDialog","Version"),translate("PluginDialog","Description")
+                  translate("PluginDialog","Version"),translate("PluginDialog","Description"),
+                  translate("PluginDialog","Minimum OMG version"), translate("PluginDialog", "Maximum OMG version")
                   ]
 
 
@@ -53,62 +53,25 @@ class PluginDialog(QtGui.QDialog):
         closeButton = QtGui.QPushButton(QtGui.QIcon.fromTheme('window-close'),self.tr("Close"))
         closeButton.clicked.connect(self.close)
         buttonLayout.addWidget(closeButton,0)
-
-        allData = self.loadData()
-        allData.sort(key=lambda el: el[1]["name"].lower())
-        self.pluginNames = [el[0] for el in allData]
         
-        self.table.setRowCount(len(allData))
-        self.table.setColumnCount(len(PLUGININFO_KEYS)+1)
+        self.table.setRowCount(len(plugins))
+        self.table.setColumnCount(len(PLUGININFO_OPTIONS)+1)
         self.table.setHorizontalHeaderLabels(COLUMN_HEADERS)
         self.table.verticalHeader().hide()
         
-        for i,data in enumerate(allData):
-            pluginName,data = data
+        for i,plugin in enumerate(plugins.values()):
             item = QtGui.QTableWidgetItem()
-            item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsUserCheckable)
-            item.setCheckState(Qt.Checked if pluginName in enabledPlugins else Qt.Unchecked)
+            item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsUserCheckable if plugin.version_ok else Qt.NoItemFlags)
+            item.setCheckState(Qt.Checked if plugin.enabled else Qt.Unchecked)
             self.table.setItem(i,0,item)
-            for j,key in enumerate(PLUGININFO_KEYS):
-                item = QtGui.QTableWidgetItem(data[key])
-                item.setFlags(Qt.ItemIsEnabled)
+            for j,key in enumerate(PLUGININFO_OPTIONS):
+                item = QtGui.QTableWidgetItem(plugin.data[key])
+                item.setFlags(Qt.ItemIsEnabled if plugin.version_ok else Qt.NoItemFlags)
                 self.table.setItem(i,j+1,item)
         self.table.resizeColumnsToContents()
 
         # Connect at the end so _handleCellChanged is not called when the cells are initialized
         self.table.cellChanged.connect(self._handleCellChanged)
-
-    def loadData(self):
-        """Load plugin data from the PLUGININFO files. Return it as tuple (plugin directory,PLUGININFO data), where the second entry is a dict mapping the keys from PLUGININFO_KEYS to the corresponding value in the file."""
-        data = []
-        for pluginName in os.listdir(PLUGINDIR):
-            dir = os.path.join(PLUGINDIR,pluginName)
-            if os.path.isdir(dir):
-                filePath = os.path.join(dir,"PLUGININFO")
-                if os.path.exists(filePath) and os.path.isfile(filePath):
-                    data.append((pluginName,self.readFile(filePath)))
-        return data
-
-    def readFile(self,path):
-        """Read the file with the given path and return a dict mapping the keys from PLUGININFO_KEYS to the corresponding value in the file."""
-        try:
-            with open(path,"r") as file:
-                data = {}
-                for line in file:
-                    key,value = line.split("=",1)
-                    key = key.strip().lower()
-                    value = value.strip()
-                    if key in PLUGININFO_KEYS:
-                        data[key] = value
-                    else: logger.warning("Unknown key '{}' in {}".format(key,path))
-
-                for key in PLUGININFO_KEYS:
-                    if key not in data:
-                        logger.warning("Missing key '{}' in {}".format(key,path))
-                        data[key] = ""
-                return data
-        except IOError:
-            return {k:"" for k in PLUGININFO_KEYS}
 
     def close(self):
         # Copy the bytearray to avoid memory access errors
@@ -118,9 +81,9 @@ class PluginDialog(QtGui.QDialog):
     def _handleCellChanged(self,row,column):
         """Enable or disable plugins when the check state of a plugin has been changed."""
         if column == 0:
-            pluginName = self.pluginNames[row]
+            plugin = list(plugins.values())[row]
             item = self.table.item(row,column)
-            if pluginName in enabledPlugins and item.checkState() == Qt.Unchecked:
-                disablePlugin(pluginName)
-            elif pluginName not in enabledPlugins and item.checkState() == Qt.Checked:
-                enablePlugin(pluginName)
+            if plugin.enabled and item.checkState() == Qt.Unchecked:
+                plugin.disable()
+            elif not plugin.enabled and item.checkState() == Qt.Checked:
+                plugin.enable()
