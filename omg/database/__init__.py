@@ -260,19 +260,19 @@ def elementCount(elid):
 #================================================
 def path(elid):
     """Return the path of the file with id <elid> or raise an sql.EmptyResultException if that element does not exist.""" 
-    return query("SELECT path FROM {}files WHERE element_id=?".format(prefix),fileid).getSingle()
+    return query("SELECT path FROM {}files WHERE element_id=?".format(prefix),elid).getSingle()
 
 def hash(elid):
     """Return the hash of the file with id <elid> or raise an sql.EmptyResultException if that element does not exist.""" 
-    return query("SELECT hash FROM {}files WHERE element_id=?".format(prefix),fileid).getSingle()
+    return query("SELECT hash FROM {}files WHERE element_id=?".format(prefix),elid).getSingle()
 
 def length(elid):
     """Return the length of the file with id <elid> or raise an sql.EmptyResultException if that element does not exist.""" 
-    return query("SELECT length FROM {}files WHERE element_id=?".format(prefix),fileid).getSingle()
+    return query("SELECT length FROM {}files WHERE element_id=?".format(prefix),elid).getSingle()
 
 def verified(elid):
     """Return the verified-timestamp of the file with id <elid> or raise an sql.EmptyResultException if that element does not exist.""" 
-    return query("SELECT verified FROM {}files WHERE element_id=?".format(prefix),fileid).getSingle()
+    return query("SELECT verified FROM {}files WHERE element_id=?".format(prefix),elid).getSingle()
     
 def idFromPath(path):
     """Return the element_id of a file from the given path or raise an sql.EmptyResultException if that element does not exist.""" 
