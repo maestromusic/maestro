@@ -47,7 +47,18 @@ def absPath(file):
         return os.path.join(config.options.main.collection, file)
     else:
         return file
-        
+
+def collectFiles(paths):
+    """Return a list of absolute paths to all files in the given paths (which must be absolute, too).
+    That is, if a path in <paths> is a file, it will be contained in the resulting list, whereas if it is a directory,
+    all files within (recursively) will be contained in the result."""
+    filePaths = []
+    for path in paths:
+        if os.path.isfile(path):
+            filePaths.append(path)
+        elif os.path.isdir(path):
+            filePaths.extend(collectFiles(os.path.join(path,p) for p in os.listdir(path)))
+    return filePaths     
 def getIconPath(name,plugin=None):
     if plugin is None:
         return os.path.join(constants.IMAGES, "icons", name)

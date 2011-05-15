@@ -10,12 +10,53 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 import logging
 
-from omg import constants, tags
-from omg.gui.delegates import GopulateDelegate
-from omg.models import Element, RootNode, playlist
-from . import treeview, tageditor
+from omg.gui import mainwindow
+from omg.models import editor
+from . import treeview
 
+translate = QtCore.QCoreApplication.translate
 logger = logging.getLogger("gui.editor")
+
+class EditorTreeView(treeview.TreeView):
+    def __init__(self, parent = None):
+        treeview.TreeView.__init__(self, parent)
+        self.setContextMenuPolicy(Qt.DefaultContextMenu)
+        self.setSelectionMode(self.ExtendedSelection)
+        self.setDragEnabled(True)
+        self.setAcceptDrops(True)
+        self.setDropIndicatorShown(True)
+        self.setModel(editor.EditorModel())
+        self.viewport().setMouseTracking(True)
+
+class EditorMainWidget(QtGui.QDockWidget):
+    """A DockWidget for the EditorTreeView."""
+    def __init__(self, parent = None):
+        QtGui.QDockWidget.__init__(self, parent)
+        self.setWindowTitle(translate("Editor","editor"))
+        self.setWidget(EditorTreeView())
+
+class EditorSmallWidget(QtGui.QDockWidget):
+    def __init__(self, parent = None):
+        QtGui.QDockWidget.__init__(self, parent)
+        self.setWindowTitle(translate("Editor", "small editor"))
+        self.setWidget(EditorTreeView())        
+# register this widget in the main application
+data1 = mainwindow.WidgetData(id = "maineditor",
+                             name = translate("Editor","editor"),
+                             theClass = EditorMainWidget,
+                             central = True,
+                             default = True,
+                             unique = False,
+                             preferredDockArea = None)
+data2 = mainwindow.WidgetData(id = "smalleditor",
+                             name = translate("Editor","small editor"),
+                             theClass = EditorSmallWidget,
+                             central = False,
+                             default = False,
+                             unique = False,
+                             preferredDockArea = Qt.RightDockWidgetArea)
+mainwindow.addWidgetData(data1)
+mainwindow.addWidgetData(data2)
 
 class EditorTreeWidget(treeview.TreeView):
     """Suitable widget to display an EditorModel"""
@@ -170,7 +211,7 @@ class EditorTreeWidget(treeview.TreeView):
         items = [self.model().data(index, Qt.EditRole) for index in self.selectionModel().selectedIndexes() ]
         self.itemsSelected.emit(items)
         
-class EditorWidget(QtGui.QWidget):
+class OldEditorWidget(QtGui.QWidget):
     """EditorWidget consists of an EditorTreeModel and buttons to control the editing process."""
     
     dbChanged = QtCore.pyqtSignal()

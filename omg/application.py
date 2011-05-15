@@ -97,6 +97,7 @@ def run(cmdConfig = []):
 
     # Create GUI
     import omg.gui.filesystembrowser
+    import omg.gui.editor
     from omg.gui import mainwindow
     global mainWindow
     mainWindow = mainwindow.MainWindow()

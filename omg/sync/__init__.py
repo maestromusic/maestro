@@ -47,30 +47,30 @@ class FileSystemCheckThread(threading.Thread):
         threading.Thread.__init__(self)
         
     def run(self):
-        db.connect()
-        for root, dirs, files in os.walk(config.options.main.collection, topdown = True):
-            relRoot = relPath(root)
-            num = db.query("SELECT count(*) FROM {}folders WHERE path=?".format(db.prefix), relRoot).getSingle()
-            if num != 0:
-                status = db.query("SELECT state FROM {0}folders WHERE path = ?".format(db.prefix), relRoot).getSingle()
-            else:
-                db.query("INSERT INTO {0}folders (path) VALUES(?)".format(db.prefix), relRoot)
-                logger.info("Previously unseen folder: {}".format(root))
-                status = 'unknown'
-            if status == 'unknown':
-                music = False
-                dirty = False
-                for f in files:
-                    f = os.path.join(root, f)
-                    if os.path.isfile(f) and hasKnownExtension(f):
-                        if not db.idFromPath(relPath(f)):
-                            status = 'unsynced'
-                            dirty = True
-                            break
-                        music = True
-                if music and not dirty:
-                    status = 'ok'
+        with db.connect():
+            for root, dirs, files in os.walk(config.options.main.collection, topdown = True):
+                relRoot = relPath(root)
+                num = db.query("SELECT count(*) FROM {}folders WHERE path=?".format(db.prefix), relRoot).getSingle()
+                if num != 0:
+                    status = db.query("SELECT state FROM {0}folders WHERE path = ?".format(db.prefix), relRoot).getSingle()
                 else:
-                    status = 'nomusic'
-                logger.info("Folder {} has status {}".format(relRoot, status))
-                db.query("UPDATE {0}folders SET state = ? WHERE path = ?".format(db.prefix), status, relRoot)
+                    db.query("INSERT INTO {0}folders (path) VALUES(?)".format(db.prefix), relRoot)
+                    logger.info("Previously unseen folder: {}".format(root))
+                    status = 'unknown'
+                if status == 'unknown':
+                    music = False
+                    dirty = False
+                    for f in files:
+                        f = os.path.join(root, f)
+                        if os.path.isfile(f) and hasKnownExtension(f):
+                            if not db.idFromPath(relPath(f)):
+                                status = 'unsynced'
+                                dirty = True
+                                break
+                            music = True
+                    if music and not dirty:
+                        status = 'ok'
+                    else:
+                        status = 'nomusic'
+                    logger.info("Folder {} has status {}".format(relRoot, status))
+                    db.query("UPDATE {0}folders SET state = ? WHERE path = ?".format(db.prefix), status, relRoot)

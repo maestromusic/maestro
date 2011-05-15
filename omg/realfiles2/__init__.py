@@ -5,17 +5,19 @@
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 3 as
 #
-import subprocess, pickle, re
+import subprocess, pickle, re, os
 
-from omg import config, tags, absPath
-from omg.config import options
+from .. import tags, logging
+from ..utils import absPath
+from ..config import options
 import cutags
 
-def get(path,absolute=False):
-    """Create a RealFile-instance for the given path, which must be absolute if the second parameter is true and otherwise relative to the music directory."""
-    if not absolute:
+logger = logging.getLogger("realfiles2")
+
+def get(path):
+    """Create a RealFile-instance for the given path, which may be a relative or absolute path."""
+    if not os.path.isabs(path):
         path = absPath(path)
-    #return MutagenFile(path)
     return UFile(path)
 
 
@@ -56,8 +58,6 @@ class RealFile:
     
     def _valueFromString(self,tag,value):
         """Convert the string <value> to the preferred format of <tag> (e.g. convert "2010" to a FlexiDate-instance). Return None and log a message if conversion fails."""
-        if not tag.isIndexed():
-            return value
         try:
             if tag.type == tags.TYPE_DATE:
                 # Chop of the time part of values of the form
@@ -97,9 +97,9 @@ class UFile(RealFile):
         if "TRACKNUMBER" in self._f.tags:
             self.position = self._parsePosition(self._f.tags["TRACKNUMBER"][0])  # Further tracknumbers are ignored
         for key,values in self._f.tags.items():
-            tag = tags.get(key.lower())
-            if tag.isIgnored():
+            if key.lower() in ["tracknumber", "discnumber"]:
                 continue
+            tag = tags.get(key.lower())
             values = [self._valueFromString(tag,value) for value in values]
             values = list(filter(lambda x: x is not None,values))
             if len(values) > 0:

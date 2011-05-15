@@ -7,9 +7,6 @@
 #
 from PyQt4 import QtGui, QtCore
 from omg.config import options
-from omg import utils
-import os
-from omg import database as db
 from omg.gui import mainwindow
 
 """This module contains a dock widget that displays the music in directory view, i.e. without
@@ -26,38 +23,13 @@ class FileSystemBrowserModel(QtGui.QFileSystemModel):
     
     def __init__(self, parent = None):
         QtGui.QFileSystemModel.__init__(self, parent)
-        self.setFilter(QtCore.QDir.AllDirs | QtCore.QDir.NoDotAndDotDot)
+        self.setFilter(QtCore.QDir.AllEntries | QtCore.QDir.NoDotAndDotDot)
         self.dirtyFolderIcon = QtGui.QIcon("images/icons/folder_unknown.svg")
         self.musicFolderIcon = QtGui.QIcon("images/icons/folder_ok.svg")
         self.defaultFolderIcon = QtGui.QIcon("images/icons/folder.svg")
 
     def columnCount(self, index):
         return 1
-    
-    def getIcon(self, index):
-        return self.defaultFolderIcon
-        path = self.filePath(index)
-        files = os.listdir(path)
-        dirty = False
-        music = False
-        for f in files:
-            f = os.path.join(path, f)
-            if os.path.isfile(f) and utils.hasKnownExtension(f):
-                if not db.idFromPath(utils.relPath(f)):
-                    dirty = True
-                    break
-                music = True
-        if dirty:
-            return self.dirtyFolderIcon
-        elif music:
-            return self.musicFolderIcon
-        else:
-            return self.defaultFolderIcon
-    def data(self, index, role = QtCore.Qt.DisplayRole):
-        if index.isValid() and role == self.FileIconRole:
-            return self.getIcon(index)
-        else:
-            return super().data(index, role)
                 
         
 class FileSystemBrowser(QtGui.QTreeView):
