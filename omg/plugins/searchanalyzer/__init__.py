@@ -6,6 +6,9 @@
 # published by the Free Software Foundation
 #
 
+"""This plugin adds a central widget that allows the user to search and will display the search result
+table without any fancy grouping as the browser does (it will add titles, though)."""
+
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
@@ -27,7 +30,7 @@ def enable():
     mainwindow.addWidgetData(mainwindow.WidgetData(
         "searchanalyzer",
         QtGui.QApplication.translate("SearchAnalyzer","Search Analyzer"),
-        SearchAnalyzer,True,False))
+        SearchAnalyzer,True,False,False))
 
 
 def mainWindowInit():
@@ -64,6 +67,7 @@ def _openDialog():
 
 
 class SearchAnalyzer(QtGui.QDialog):
+    """Display search result tables and allow the user to search the database."""
     def __init__(self,parent=None,dialog=False):
         QtGui.QDialog.__init__(self,parent)
 

@@ -6,8 +6,9 @@
 # it under the terms of the GNU General Public License version 3 as
 # published by the Free Software Foundation
 #
-# Methods to parse queries of the form "Symphony composer:Haydn  title:'Le Matin'".
-#
+
+"""Methods to parse queries of the form "Symphony composer:Haydn  title:'Le Matin'"."""
+
 from omg import strutils, tags
 from .criteria import TextCriterion
         
@@ -21,7 +22,8 @@ TAG_ABBREVIATIONS = {"t": "title",
                      }
 
 def _removeQuotationMarks(string):
-    """Removes quotation marks (" or ') from string but keeps quotation marks which are in a string delimited by the other sort of quotation marks. So abc"def'ghi" becomes abcdef'ghi."""
+    """Removes quotation marks (" or ') from string but keeps quotation marks which are in a string delimited
+    by the other sort of quotation marks. So abc"def'ghi" becomes abcdef'ghi."""
     result = ''
     quotPos = 0 # position _after_ the last closing quotation mark
     pos = 0
@@ -29,8 +31,10 @@ def _removeQuotationMarks(string):
         if string[pos] in ('"',"'"):
             try:
                 result += string[quotPos:pos]
-                quotPos = string.index(string[pos],pos+1)+1 # find next quotation mark of the same type and skip it
-                result += string[pos+1:quotPos-1] # append the text between the quotation marks without the marks
+                # find next quotation mark of the same type and skip it
+                quotPos = string.index(string[pos],pos+1)+1
+                # append the text between the quotation marks without the marks
+                result += string[pos+1:quotPos-1]
                 pos = quotPos
             except ValueError: # no closing quotation mark found
                 return result + string[pos+1:] # so just add the rest of the string
@@ -42,7 +46,10 @@ def _removeQuotationMarks(string):
 
 
 def _splitStringQuot(string):
-    """Like the str.split functions this function returns a list of the words in string using any whitespace as delimiters. But unlike str.split whitespace within quotation marks (" or ') is ignored and the quotation marks are removed. So 'ab"cd ef" gh ij' becomes ['abcd ef','gh','ij']. If no closing quotation mark is found, the remaining string is regarded as one word: 'ab "cde' becomes ['ab','cde']."""
+    """Like the str.split functions this function returns a list of the words in string using any whitespace
+    as delimiters. But unlike str.split whitespace within quotation marks (" or ') is ignored and the quotation
+    marks are removed. So 'ab"cd ef" gh ij' becomes ['abcd ef','gh','ij']. If no closing quotation mark is
+    found, the remaining string is regarded as one word: 'ab "cde' becomes ['ab','cde']."""
     startPos = strutils.nextNonWhiteSpace(string) # beginning of the current word
     pos = startPos # current position of parsing
 
@@ -51,9 +58,11 @@ def _splitStringQuot(string):
         # Check for quotation marks
         if string[pos] in ('"',"'"):
             try:
-                pos = string.index(string[pos],pos+1)+1 # find next quotation mark of the same type and skip it
+                # find next quotation mark of the same type and skip it
+                pos = string.index(string[pos],pos+1)+1 
             except ValueError: # no closing quotation mark found
-                splitList.append(string[startPos:]) # so regard the rest of string as one word and stop splitting
+                # so regard the rest of string as one word and stop splitting
+                splitList.append(string[startPos:]) 
                 return splitList
         elif string[pos].isspace():
             splitList.append(string[startPos:pos])
@@ -70,7 +79,8 @@ def _splitStringQuot(string):
 
 
 def _createCriterionFromString(string):
-    """Splits a queryString like "composer:Beethoven" into a tuple consisting of a tag prefix and a search value and creates a TextCriterion-instance from it."""
+    """Splits a queryString like "composer:Beethoven" into a tuple consisting of a tag prefix and a search
+    value and creates a TextCriterion-instance from it."""
     try:
         index = string.index(':')
         if index > 0:
@@ -87,6 +97,7 @@ def _createCriterionFromString(string):
 
 
 def parseSearchString(searchString):
-    """Parses searchString and returns a list of the queries contained in it. Queries with empty values are left out."""
+    """Parses searchString and returns a list of the queries contained in it. Queries with empty values are
+    left out."""
     criteria = [_createCriterionFromString(queryString) for queryString in _splitStringQuot(searchString)]
     return [criterion for criterion in criteria if len(criterion.value) > 0]
