@@ -37,7 +37,10 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
         
     def data(self,index,role=Qt.EditRole):
         if not index.isValid():
-            return None
+            if role == Qt.EditRole:
+                return self.root
+            else:
+                return None
         if role == Qt.DisplayRole:
             return str(index.internalPointer())
         if role == Qt.EditRole:
@@ -58,8 +61,8 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
         if not index.isValid():
             if self.root is None:
                 return False
-            else: return self.root.hasChildren()
-        else: return self.data(index).hasChildren()
+            else: return self.root.hasContents()
+        else: return self.data(index).hasContents()
         
     def rowCount(self,parent):
         if parent.column() > 0:
@@ -67,8 +70,8 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
         if not parent.isValid():
             if self.root is None:
                 return 0
-            return self.root.getChildrenCount()
-        else: return self.data(parent).getChildrenCount()
+            return self.root.getContentsCount()
+        else: return self.data(parent).getContentsCount()
 
     def columnCount(self,parent):
         return 1
@@ -90,7 +93,7 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
             parent = self.root
         else:
             parent = parent.internalPointer()
-        child = parent.getChildren()[row]
+        child = parent.getContents()[row]
         return self.createIndex(row,column,child)
         
     def flags(self,index):
@@ -110,7 +113,7 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
         if node == self.root:
             return QtCore.QModelIndex()
         parent = node.getParent()
-        return self.createIndex(parent.getChildren().index(node),0,node)
+        return self.createIndex(parent.getContents().index(node),0,node)
 
     def getAllNodes(self):
         """Generator which will return all nodes contained in the tree in depth-first-manner."""
@@ -128,7 +131,7 @@ class EditableRootedTreeModel(RootedTreeModel):
     def insertMany(self,parent,pos,nodes):
         """Insert the given nodes at position *pos* into *parent*."""
         self.beginInsertRows(self.getIndex(parent),pos,pos+len(nodes)-1)
-        parent.getChildren()[pos:pos] = nodes
+        parent.getContents()[pos:pos] = nodes
         for node in nodes:
             node.setParent(parent)
         self.endInsertRows()
@@ -140,7 +143,7 @@ class EditableRootedTreeModel(RootedTreeModel):
             raise ValueError("Cannot remove root node.")
         pos = parent.index(node)
         self.beginRemoveRows(self.getIndex(parent),pos,pos)
-        del parent.getChildren()[pos]
+        del parent.getContents()[pos]
         self.endRemoveRows()
         
     def removeByIndex(self,index):
@@ -163,14 +166,14 @@ class EditableRootedTreeModel(RootedTreeModel):
         if not ok:
             raise ValueError("Cannot move nodes.")
             
-        movingNodes = sourceParent.getChildren()[sourceFirst:sourceLast+1]
+        movingNodes = sourceParent.getContents()[sourceFirst:sourceLast+1]
         if pos < sourceFirst:
             # First remove, then insert
-            del sourceParent.getChildren()[sourceFirst:sourceLast+1]
-            destParent.getChildren()[pos:pos] = movingNodes
+            del sourceParent.getContents()[sourceFirst:sourceLast+1]
+            destParent.getContents()[pos:pos] = movingNodes
         else:
-            destParent.getChildren()[pos:pos] = movingNodes
-            del sourceParent.getChildren()[sourceFirst:sourceLast+1]
+            destParent.getContentn()[pos:pos] = movingNodes
+            del sourceParent.getContents()[sourceFirst:sourceLast+1]
         for node in movingNodes:
             node.setParent(destParent)
         self.endMoveRows()
@@ -179,7 +182,7 @@ class EditableRootedTreeModel(RootedTreeModel):
         """Replace *node* by its children. *node* must have at least one child."""
         if node == self.root:
             raise ValueError("Cannot flatten root node.")
-        if node.getChildrenCount() == 0:
+        if not node.hasContents():
             raise ValueError("Cannot flatten empty nodes.")
         parent = node.getParent()
         pos = parent.index(node)
@@ -192,21 +195,21 @@ class EditableRootedTreeModel(RootedTreeModel):
         """Split *node* at position *pos*: Insert a copy of *node* directly after it and insert all children of *node* with position *pos* or higher into the copy. If *pos* equals 0 or the number of children of node, do nothing and return False (you cannot split at the boundary). Otherwise return True."""
         if node == self.root:
             raise ValueError("Cannot split root node.")
-        if pos < 0 or pos > node.getChildrenCount():
+        if pos < 0 or pos > node.getContentsCount():
             raise ValueError("Invalid position: {}".format(pos))
-        if pos == 0 or pos == node.getChildrenCount():
+        if pos == 0 or pos == node.getContentsCount():
             return False # nothing to do here
         parent = node.getParent()
         nodePos = parent.index(node)
         # Do not copy the contents
         copy = node.copy(contents=[])
         self.insert(parent,nodePos+1,copy)
-        self.move(node,pos,node.getChildrenCount()-1,copy,0)
+        self.move(node,pos,node.getContentsCount()-1,copy,0)
         return True
 
     def insertParent(self,parent,startPos,endPos,newParent):
         """Add a new node *newParent* between *parent* and some of its children. To be precise: Replace the children with positions *startPos* up to and including *endPos* by *newParent* and insert those nodes as children into *newParent* (at position 0).""" 
-        if startPos < 0 or endPos < startPos or endPos >= parent.getChildrenCount():
+        if startPos < 0 or endPos < startPos or endPos >= parent.getContentsCount():
             raise ValueError("Invalid start or end position in insertParent ({} and {}).".format(startPos,endPos))
         if newParent == parent:
             raise ValueError("parent and newParent must be distinct.")

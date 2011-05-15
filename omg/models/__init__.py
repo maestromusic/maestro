@@ -9,6 +9,7 @@
 import copy
 
 from omg import tags, logging, config, covers, realfiles2, modify, database as db
+from omg.utils import relPath
 
 logger = logging.getLogger(name="models")
 
@@ -17,7 +18,7 @@ class Node:
     
     def hasContents(self):
         """Return whether this node has at least one child node."""
-        return len(self.getChildren()) > 0
+        return len(self.getContents()) > 0
         
     def getContents(self):
         """Return the list of contents."""
@@ -254,14 +255,12 @@ class Element(Node):
         return formatter.Formatter(self).title()
     
     def toolTipText(self):
-        """Return a HTML-text which may be used in tooltips for this element."""
-        from omg.gui import formatter
-        return formatter.HTMLFormatter(self).detailView()
+        return str(self)
     
     def __str__(self):
         if self.tags is not None:
-            return "<{} {}{}>".format(type(self).__name__,self.getTitle(),'' if self.isInDB() else " (external)")
-        else: return "<{} {}>".format(type(self).__name__,self.id if self.isInDB() else "(external)")
+            return "<{}[{}] {}>".format(type(self).__name__,self.id, self.getTitle())
+        else: return "<{}[{}]>".format(type(self).__name__,self.id)
     
 
 class Container(Element):
@@ -283,7 +282,7 @@ class Container(Element):
     def fromId(id, *, position = None, parentId = None):
         if position is None:
             position = db.position(parentId, id) if parentId is not None else None
-        return Container(db.tags(id), position = position, id)
+        return Container(db.tags(id), position = position, id = id)
     
     def setContents(self,contents):
         """Set the list of contents of this container to <contents>. Note that the list won't be copied and in fact altered: the parents will be set to this container."""
@@ -327,10 +326,8 @@ class Container(Element):
 
 
 class File(Element):
-    def __init__(self, tags, length, path, position, id = None):
+    def __init__(self, tags, length, path, position, id):
         """Initialize this element with the given id, which must be an integer or None (for external files). Optionally you may specify a tags.Storage object holding the tags of this element and/or a file path."""
-        if id is not None and not isinstance(id,int):
-            raise ValueError("id must be either None or an integer. I got {}".format(id))
         self.id = id
         self.tags = tags
         self.length = length
@@ -356,18 +353,23 @@ class File(Element):
     def fromId(id, *, position = None, parentId = None):
         if position is None:
             position = db.position(parentId, id) if parentId is not None else None
-        return File(db.tags(id), length = db.length(id), path = db.path(id), position = position, id)
+        return File(db.tags(id), length = db.length(id), path = db.path(id), position = position, id = id)
     @staticmethod
     def fromFilesystem(path):
         real = realfiles2.get(path)
+        rpath = relPath(path)
+        id = db.idFromPath(rpath)
+        if id is None:
+            print("id is none")
+            id = modify.editorIdForPath(rpath)
         real.read()
-        return File(tags = real.tags, length = real.length, path = real.path, position = real.position)
+        return File(tags = real.tags, length = real.length, path = real.path, position = real.position, id = id)
 
     def getLength(self):
         """Return the length of this file."""
         return self.length
      
     def __repr__(self):
-        return "File {}".format(self.path)
+        return "File[{}] {}".format(self.id, self.path)
 
 

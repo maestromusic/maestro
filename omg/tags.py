@@ -260,7 +260,7 @@ def addTag(name,type):
 
 def init():
     """Initialize the variables of this module based on the information of the tagids-table and config-file. At program start or after changes of that table this method must be called to ensure the module has the correct tags and their IDs."""
-    global _tagsById,_tagsByName,tagList, _ignored, _translation
+    global _tagsById,_tagsByName,tagList, _translation
 
     # Initialize _tagsById, _tagsByName and tagList from the database
     from omg import database
