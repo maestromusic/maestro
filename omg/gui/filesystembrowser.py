@@ -99,6 +99,7 @@ data = mainwindow.WidgetData(id = "filesystembrowser",
                              name = translate("FileSystemBrowser","File System Browser"),
                              theClass = FileSystemBrowserDock,
                              central = False,
+                             dock = True,
                              default = True,
                              unique = False,
                              preferredDockArea = QtCore.Qt.RightDockWidgetArea)

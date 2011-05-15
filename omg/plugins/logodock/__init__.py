@@ -17,7 +17,7 @@ from omg.gui import mainwindow
 
 def enable():
     mainwindow.addWidgetData(mainwindow.WidgetData(
-        "logodock",QtGui.QApplication.translate("LogoDock","Logo"),LogoDock,False,False,
+        "logodock",QtGui.QApplication.translate("LogoDock","Logo"),LogoDock,False,True,False,
         preferredDockArea=Qt.RightDockWidgetArea))
 
 

@@ -28,7 +28,8 @@ def enable():
     _action.setText(QtGui.QApplication.translate("DBAnalyzerDialog","DB Analyzer"))
     _action.triggered.connect(_openDialog)
     mainwindow.addWidgetData(mainwindow.WidgetData(
-        "dbanalyzer",QtGui.QApplication.translate("DBAnalyzerDialog","DB Analyzer"),DBAnalyzerDialog,True,False,
+        "dbanalyzer",QtGui.QApplication.translate("DBAnalyzerDialog","DB Analyzer"),DBAnalyzerDialog,
+        True,False,False,
         icon=utils.getIcon("dbanalyzer.png","dbanalyzer")))
 
 

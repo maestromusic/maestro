@@ -7,15 +7,26 @@
 #
 
 """
-This module implements OMG's flexible widget system. It consists of mainwindow.MainWindow which the toplevel window of OMG and a flexible amount of central widgets (which are displayed as tabs in the center) and dock widgets. This module manages a list of all available widget types (confer WidgetData). Plugins may add their own widgets using addWidgetData. From this list a View menu is created that allows the user to show/hide central widgets and add new dock widgets. While there can be only at most one instance of each central widget, dock widgets can have many instances (unless the unique-flag in the corresponding WidgetData is set to True).
-At the end of the application the state and position of each widget is saved and at application start it will be restored again.
+This module implements OMG's flexible widget system. It consists of mainwindow.MainWindow which the toplevel
+window of OMG and a flexible amount of central widgets (which are displayed as tabs in the center) and dock
+widgets. This module manages a list of all available widget types (confer WidgetData). Plugins may add their
+own widgets using addWidgetData. From this list a View menu is created that allows the user to show/hide
+central widgets and add new dock widgets. While there can be only at most one instance of each central widget,
+dock widgets can have many instances (unless the unique-flag in the corresponding WidgetData is set to True).
+At the end of the application the state and position of each widget is saved and at application start it will
+be restored again.
 
 To work with this system central widgets or dock widget must follow some rules:
 
     - Data about them must be registered using addWidgetData.
-    - The widget must provide a constructor which takes a parent as first parameter and has default values for all other parameters.
+    - The widget must provide a constructor which takes a parent as first parameter and has default values for
+    all other parameters.
     - Dock widgets must be subclasses of QDockWidget.
-    - Of course the generic system can only store the position and not the inner state of each widget. If a widget wants to store its state, it must provide the methods saveState to return a state object to be saved and restoreState which will be called with that state object as parameter on the next application start. The state object may be anything that can be stored in a variable in config.storage (i.e. any combination of standard Python types including lists and dicts).
+    - Of course the generic system can only store the position and not the inner state of each widget. If a
+    widget wants to store its state, it must provide the methods saveState to return a state object to be
+    saved and restoreState which will be called with that state object as parameter on the next application
+    start. The state object may be anything that can be stored in a variable in config.storage (i.e. any
+    combination of standard Python types including lists and dicts).
 
 """
 
@@ -38,7 +49,7 @@ _widgetData = []
 def addWidgetData(data):
     """Add widget data to the list of registered widgets."""
     if data in _widgetData:
-        logging.warning("Attempt to add central widget data twice: {}".format(data))
+        logging.warning("Attempt to add widget data twice: {}".format(data))
     else: _widgetData.append(data)
     if mainWindow is not None:
         mainWindow._widgetDataAdded(data)
@@ -55,12 +66,16 @@ def removeWidgetData(id):
 
 
 class MainWindow(QtGui.QMainWindow):
-    """The main window of OMG. It contains a QTabWidget as actual central widget (in Qt sense) so that using tabs several widgets can be displayed as central widgets (in OMG's sense)."""
+    """The main window of OMG. It contains a QTabWidget as actual central widget (in Qt sense) so that using
+    tabs several widgets can be displayed as central widgets (in OMG's sense)."""
 
-    # Dict mapping WidgetData instances to corresponding central widgets. If a central widget has been created once it will always be contained in this dict even if it has been hidden (except that it will be removed if the widget data has been removed. This may happen if a plugin is removed at runtime).
+    # Dict mapping WidgetData instances to corresponding central widgets. If a central widget has been created
+    # once it will always be contained in this dict even if it has been hidden (except that it will be removed
+    # if the widget data has been removed. This may happen if a plugin is removed at runtime).
     _centralWidgets = None
 
-    # Dict mapping WidgetData instances to lists of corresponding dock widgets. As above this dict may contain hidden docks.
+    # Dict mapping WidgetData instances to lists of corresponding dock widgets. As above this dict may contain
+    # hidden docks.
     _dockWidgets = None
     
     def __init__(self,parent=None):
@@ -79,7 +94,8 @@ class MainWindow(QtGui.QMainWindow):
         mainWindow = self
 
     def initMenus(self):
-        """Initialize menus except the view menu which cannot be initialized before all widgets have been loaded."""
+        """Initialize menus except the view menu which cannot be initialized before all widgets have been
+        loaded."""
         self.menus = {}
         self.menus['view'] = self.menuBar().addMenu(self.tr("&View"))
         self.menus['extras'] = self.menuBar().addMenu(self.tr("&Extras"))
@@ -102,7 +118,8 @@ class MainWindow(QtGui.QMainWindow):
                 action.setCheckable(True)
                 if data in self._centralWidgets:
                     widget = self._centralWidgets[data]
-                    # Check the action, if the widget is contained in the tab widget (we cannot use isVisible since inactive tabs are not visible).
+                    # Check the action, if the widget is contained in the tab widget (we cannot use isVisible
+                    # since inactive tabs are not visible).
                     action.setChecked(self.centralWidget().indexOf(widget) >= 0)
                 else: action.setChecked(False)
                 action.toggled.connect(functools.partial(self._toggleCentralWidget,data))
@@ -113,7 +130,7 @@ class MainWindow(QtGui.QMainWindow):
         self.menus['dockwidgets'] = self.menus['view'].addMenu(self.tr("New dock widget"))
 
         for data in _widgetData:
-            if not data.central:
+            if data.dock:
                 action = QtGui.QAction(data.name,self.menus['dockwidgets'])
                 action.triggered.connect(functools.partial(self.addDockWidget,data))
                 if data.unique:
@@ -137,7 +154,8 @@ class MainWindow(QtGui.QMainWindow):
                 self.centralWidget().removeTab(index)
         
     def addCentralWidget(self,data):
-        """Add a central widget corresponding to the given WidgetData. If a widget of this type existed and was hidden once, simply show it again. Otherwise create a new widget."""
+        """Add a central widget corresponding to the given WidgetData. If a widget of this type existed and
+        was hidden once, simply show it again. Otherwise create a new widget."""
         if data not in self._centralWidgets:
             widget = data.theClass(self)
             self._centralWidgets[data] = widget
@@ -153,7 +171,8 @@ class MainWindow(QtGui.QMainWindow):
         return widget
 
     def addDockWidget(self,data,objectName=None):
-        """Add a dock widget corresponding to the given WidgetData. If there is a hidden dock widget of this type, simply show it again. Otherwise create a new widget."""
+        """Add a dock widget corresponding to the given WidgetData. If there is a hidden dock widget of this
+        type, simply show it again. Otherwise create a new widget."""
         if data in self._dockWidgets:
             # First try to simply unhide an existing dock of this type
             for widget in self._dockWidgets[data]:
@@ -166,11 +185,15 @@ class MainWindow(QtGui.QMainWindow):
         self._createDockWidget(data)
 
     def _createDockWidget(self,data,objectName=None):
-        """Create a new dock widget for the given WidgetData and set its objectName to *objectName*. If that is None, compute an unused objectName."""
+        """Create a new dock widget for the given WidgetData and set its objectName to *objectName*. If that
+        is None, compute an unused objectName."""
         if data not in self._dockWidgets:
             self._dockWidgets[data] = []
             
-        # For the unique object name required by restoreState compute the first string of the form data.id+<int> that is not already in use. Unique dock widgets get simply their data.id as object name. This is also used by the event filter to find and enable the corresponding action in the view menu if the dock is closed.
+        # For the unique object name required by restoreState compute the first string of the form
+        # data.id+<int> that is not already in use. Unique dock widgets get simply their data.id as object
+        # name. This is also used by the event filter to find and enable the corresponding action in the
+        # view menu if the dock is closed.
         if objectName is None:
             if data.unique:
                 objectName = data.id
@@ -193,9 +216,11 @@ class MainWindow(QtGui.QMainWindow):
         return widget
         
     def restoreLayout(self):
-        """Restore the geometry and state of the main window and the central widgets and dock widgets on application start."""
+        """Restore the geometry and state of the main window and the central widgets and dock widgets on
+        application start."""
         # Resize and move the widget to the size and position it had when the program was closed
-        if "mainwindow_geometry" in config.binary and isinstance(config.binary["mainwindow_geometry"],bytearray):
+        if "mainwindow_geometry" in config.binary \
+              and isinstance(config.binary["mainwindow_geometry"],bytearray):
             success = self.restoreGeometry(config.binary["mainwindow_geometry"])
         else: success = False
         if not success: # Default geometry
@@ -209,7 +234,8 @@ class MainWindow(QtGui.QMainWindow):
         self._centralWidgets = {}
         for id,options in config.storage.gui.central_widgets:
             data = WidgetData.fromId(id)
-            # It may happen that data is None (for example if it belongs to a widget from a plugin and this plugin has been removed since the last application shutdown). Simply do not load this widget
+            # It may happen that data is None (for example if it belongs to a widget from a plugin and this
+            # plugin has been removed since the last application shutdown). Simply do not load this widget
             if data is not None:
                 widget = self.addCentralWidget(data)
                 if hasattr(widget,"restoreState"):
@@ -238,7 +264,8 @@ class MainWindow(QtGui.QMainWindow):
                     QtGui.QMainWindow.addDockWidget(self,data.preferredDockArea,widget)
             
     def saveLayout(self):
-        """Save the geometry and state of the main window and the central widgets and dock widgets which are not hidden at application end."""
+        """Save the geometry and state of the main window and the central widgets and dock widgets which are
+        not hidden at application end."""
         # Store central widgets
         centralWidgetList = []
         for data,widget in self._centralWidgets.items():
@@ -261,8 +288,11 @@ class MainWindow(QtGui.QMainWindow):
                     else: state = None
                     dockWidgetList.append((data.id,widget.objectName(),state))
                 else:
-                    # TODO: The idea of this is that the state of dock widgets that have been closed should not be stored. But it does not work (even using the commented lines) which in my opinion is a bug in Qt.
-                    # If you open four dock widgets of a certain type (say logodock), the binary config file will forever contain information about logodock1 up to logodock4.
+                    # TODO: The idea of this is that the state of dock widgets that have been closed should
+                    # not be stored. But it does not work (even using the commented lines) which in my
+                    # opinion is a bug in Qt.
+                    # If you open four dock widgets of a certain type (say logodock), the binary config file
+                    # will forever contain information about logodock1 up to logodock4.
                     self.removeDockWidget(widget)
                     #widget.setObjectName(None)
                     widget.setParent(None)
@@ -277,7 +307,8 @@ class MainWindow(QtGui.QMainWindow):
         """Display the About dialog."""
         box = QtGui.QMessageBox(QtGui.QMessageBox.NoIcon,self.tr("About OMG"),
                 '<div align="center"><img src="images/omg.png" /><br />'
-                + self.tr("This is OMG version {} by Martin Altmayer and Michael Helmling.").format(constants.VERSION)
+                + self.tr("This is OMG version {} by Martin Altmayer and Michael Helmling.")
+                             .format(constants.VERSION)
                 + '</div>',
                 QtGui.QMessageBox.Ok)
         box.exec_()
@@ -292,7 +323,7 @@ class MainWindow(QtGui.QMainWindow):
             if data in self._centralWidgets:
                 self._centralWidgets[data].setParent(None)
                 del self._centralWidgets[data]
-        else:
+        elif data.dock:
             if data in self._dockWidgets:
                 for widget in self._dockWidgets[data]:
                     widget.setParent(None)
@@ -314,23 +345,33 @@ class MainWindow(QtGui.QMainWindow):
 
 
 class WidgetData:
-    """A WidgetData instance stores information about one type of widget (central or dock). It contains the following information:
+    """A WidgetData instance stores information about one type of widget (central and/or dock). It contains
+    the following information:
 
-        - id: a unique string to identify the WidgetData. This string is used to store the widgets persistently.
+        - id: a unique string to identify the WidgetData. This string is used to store the widgets
+          persistently.
         - name: a nice name which will be displayed in the View menu.
-        - theClass: the class that must be instantiated to create a widget of this type. Remember that this must be a subclass of QDockWidget if central is False.
-        - central: Whether this is a central widget.
-        - default: Whether this widget should be displayed if no information from the last application run is present (e.g. at the very first launch).
-        - unique: Only relevant for dock widgets. It stores whether there may be more than one instance of this widget.
-        - preferredDockArea: Only relevant for dock widgets. Contains the dock area where this widget will be placed when it is newly created. One of the values of Qt.DockWidgetAreas.
+        - theClass: the class that must be instantiated to create a widget of this type. Remember that this
+          must be a subclass of QDockWidget if central is False.
+        - central: Whether this widget may be used in the center.
+        - dock: Whether this widget may be used as dock widget.
+        - default: Whether this widget should be displayed if no information from the last application run is
+          present (e.g. at the very first launch).
+        - unique: Only relevant for dock widgets. It stores whether there may be more than one instance of
+          this widget.
+        - preferredDockArea: Only relevant for dock widgets. Contains the dock area where this widget will be
+          placed when it is newly created. One of the values of Qt.DockWidgetAreas.
         - icon: Optional. An icon which is displayed in tabs or docks for this widget.
 
     """
-    def __init__(self,id,name,theClass,central,default,unique=False,preferredDockArea=None,icon=None):
+    def __init__(self,id,name,theClass,central,dock,default,unique=False,preferredDockArea=None,icon=None):
+        if not (central or dock):
+            raise ValueError("Either central or dock must be True.")
         self.id = id
         self.name = name
         self.theClass = theClass
         self.central = central
+        self.dock = dock
         self.default = default
         self.unique = unique
         self.preferredDockArea = preferredDockArea
