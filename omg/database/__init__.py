@@ -41,7 +41,7 @@ Each thread must have its own connection object. This module stores all connecti
 
 import sys, threading
 
-from omg import strutils, config, logging, utils
+from omg import strutils, config, logging, utils, tags
 from . import sql
 
 # Table prefix
@@ -318,7 +318,13 @@ def idFromValue(tagSpec,value,insert=False):
 
 # tags-Table
 #=======================================================================
-def tags(elid,tagList=None):
+def tags(elid):
+    result = tags.Storage()
+    for tagId,value in listTagse(elid):
+        result[tags.get(tagId)].append(value)
+    return result
+    
+def listTags(elid,tagList=None):
     if tagList is not None:
         if isinstance(tagList,int) or isinstance(tagList,str) or isinstance(tagList,tagsModule.Tag):
             tagid = tagsModule.get(tagList).id
@@ -340,7 +346,7 @@ def tags(elid,tagList=None):
 
 def tagValues(elid,tagList):
     """Return all values which the element with id *elid* possesses in any of the tags in tagList (which may be a list of tag-specifiers or simply a single tag-specifier)."""
-    return [value for tag,value in tags(elid,tagList)] # return only the second tuple part
+    return [value for tag,value in listTags(elid,tagList)] # return only the second tuple part
 
 def allTagValues(tagSpec):
     """Return all tag values in the db for the given tag."""
