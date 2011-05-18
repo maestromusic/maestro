@@ -35,7 +35,7 @@ import functools
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from omg import config, constants, logging
+from .. import config, constants, logging, modify
 
 # This will contain the single instance of MainWindow once it is initialized
 mainWindow = None
@@ -49,7 +49,7 @@ _widgetData = []
 def addWidgetData(data):
     """Add widget data to the list of registered widgets."""
     if data in _widgetData:
-        logging.warning("Attempt to add widget data twice: {}".format(data))
+        logger.warning("Attempt to add widget data twice: {}".format(data))
     else: _widgetData.append(data)
     if mainWindow is not None:
         mainWindow._widgetDataAdded(data)
@@ -59,7 +59,7 @@ def removeWidgetData(id):
     """Remove the WidgetData instance with the given id from the list of registered widgets."""
     data = WidgetData.fromId(id)
     if data is None:
-        logging.warning("Attempt to remove nonexistent widget data: {}".format(id))
+        logger.warning("Attempt to remove nonexistent widget data: {}".format(id))
     else: _widgetData.remove(data)
     if mainWindow is not None:
         mainWindow._widgetDataRemoved(data)
@@ -97,6 +97,9 @@ class MainWindow(QtGui.QMainWindow):
         """Initialize menus except the view menu which cannot be initialized before all widgets have been
         loaded."""
         self.menus = {}
+        self.menus['edit'] = self.menuBar().addMenu(self.tr("&Edit"))
+        self.menus['edit'].addAction(modify.stack.createUndoAction(self, prefix=''))
+        self.menus['edit'].addAction(modify.stack.createRedoAction(self, prefix=''))
         self.menus['view'] = self.menuBar().addMenu(self.tr("&View"))
         self.menus['extras'] = self.menuBar().addMenu(self.tr("&Extras"))
         self.menus['help'] = self.menuBar().addMenu(self.tr("&Help"))

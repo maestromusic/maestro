@@ -10,19 +10,37 @@
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
-from . import logging
+from .. import logging, modify
+from . import mimedata
 from ..models import rootedtreemodel, RootNode, File
 from ..config import options
 from ..utils import hasKnownExtension, collectFiles
-import omg.modify as modify
+
+from collections import OrderedDict
 logger = logging.getLogger("models.editor")
 
 class EditorModel(rootedtreemodel.EditableRootedTreeModel):
     def __init__(self):
         rootedtreemodel.EditableRootedTreeModel.__init__(self, RootNode())
         self.contents = []
+        modify.dispatcher.changes.connect(self.handleChangeEvent)
+
     
     
+    def handleChangeEvent(self, event):
+        if event.origin is None or event.origin == self:
+            logger.info("CHANGE EVENT INCOMING!!!!!")
+            logger.info(str(event))
+            for id in event.changes:
+                if id is None:
+                    self.setRoot(event.changes[id].copy())
+                    print("new root with {} children".format(event.changes[id].getContentsCount()))
+                else:
+                    allNodes = self.root.getAllNodes()
+                    next(allNodes) # skip root node
+                    for node in allNodes:
+                        if node.id == id:
+                            node 
     def setContents(self,contents):
         """Set the contents of this playlist and set their parent to self.root. The contents are only the toplevel-elements in the playlist, not all files. All views using this model will be reset."""
         self.contents = contents
@@ -42,22 +60,34 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
     
     def mimeTypes(self):
         return [options.gui.mime,"text/uri-list"]
-    
+    def mimeData(self,indexes):
+        return mimedata.createFromIndexes(self,indexes)
     def dropMimeData(self,mimeData,action,row,column,parentIndex):
         if action == Qt.IgnoreAction:
             return True
 
         if column > 0:
             return False
-        
-        if mimeData.hasFormat("text/uri-list"):
-            parent = self.data(parentIndex, role = Qt.EditRole)
-            if parent is not None and parent.isFile(): # if something is dropped on a file, make it a sibling instead of a child of that file
+        parent = self.data(parentIndex, role = Qt.EditRole)
+        if parent is not None and parent.isFile(): # if something is dropped on a file, make it a sibling instead of a child of that file
                 parent = parent.parent
                 row = parentIndex.row() + 1
+        if mimeData.hasFormat("text/uri-list"):
             nodes = self._handleUrlDrop(mimeData.urls())
-            self.insertMany(parent, row, nodes)
-        return False
+        elif mimeData.hasFormat(options.gui.mime):
+            nodes = [node.copy() for node in mimeData.retrieveData(options.gui.mime)]
+        else:
+            return False
+        changes = OrderedDict()
+        parent_copy = parent.copy()
+        parent_copy.contents[row:row] = nodes
+        for n in nodes:
+            n.setParent(parent_copy)
+        changes[None] = (parent, parent_copy)
+        command = modify.UndoCommand(level = modify.EDITOR, changes = changes, contentsChanged = True, origin = self)
+        logger.info("pushing undo command")
+        modify.stack.activeStack().push(command)
+        return True
     
     def _handleUrlDrop(self, urls):
         files = sorted(set( (f for f in collectFiles((url.path() for url in urls)) if hasKnownExtension(f)) ))

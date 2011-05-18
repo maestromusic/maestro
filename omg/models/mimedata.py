@@ -11,8 +11,9 @@ import itertools
 from PyQt4 import QtCore
 from PyQt4.QtCore import Qt
 
-from omg import models, absPath
-from omg.config import options
+from ..utils import absPath
+from .. import models 
+from ..config import options
 
 class MimeData(QtCore.QMimeData):
     """Subclass of QMimeData specialized to transport a tree of elements. It supports two MimeTypes: The first one is used internally by omg and stores the tree-structure. Its name is stored in the config variable "gui->mime". The second one is "text/uri-list" and contains a list of URLs to all files in the tree. This type is used by applications like Amarok and Dolphin."""
@@ -41,7 +42,7 @@ class MimeData(QtCore.QMimeData):
     def paths(self):
         """Return a list of absolute paths to all files contained in this MimeData-instance."""
         files = itertools.chain.from_iterable(element.getAllFiles() for element in self.elementList)
-        return [absPath(file.getPath()) for file in files]
+        return [absPath(file.path) for file in files]
         
     def urls(self):
         return [QtCore.QUrl("file://"+path) for path in self.paths()]

@@ -102,8 +102,8 @@ class Node:
         assert self.getContents() is not None
         yield self
         for element in self.getContents():
-            for file in element.getAllFiles():
-                yield file
+            for node in element.getAllNodes():
+                yield node
         
     def getAllFiles(self):
         """Generator which will return all files contained in this node or in children of it (possibly including the node itself)."""
@@ -360,7 +360,6 @@ class File(Element):
         rpath = relPath(path)
         id = db.idFromPath(rpath)
         if id is None:
-            print("id is none")
             id = modify.editorIdForPath(rpath)
         real.read()
         return File(tags = real.tags, length = real.length, path = real.path, position = real.position, id = id)

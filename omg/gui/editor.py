@@ -8,11 +8,13 @@
 
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
-import logging
 
-from omg.gui import mainwindow
-from omg.models import editor
+from collections import OrderedDict
+from ..gui import mainwindow
+from ..models import editor, Container
 from . import treeview
+from .. import logging, modify, tags
+
 
 translate = QtCore.QCoreApplication.translate
 logger = logging.getLogger("gui.editor")
@@ -33,7 +35,34 @@ class EditorMainWidget(QtGui.QDockWidget):
     def __init__(self, parent = None):
         QtGui.QDockWidget.__init__(self, parent)
         self.setWindowTitle(translate("Editor","editor"))
-        self.setWidget(EditorTreeView())
+        widget = QtGui.QWidget()
+        self.setWidget(widget)
+        vb = QtGui.QVBoxLayout(widget)
+        self.editor = EditorTreeView()
+        vb.addWidget(self.editor)
+        self.buttonBar = QtGui.QWidget()
+        vb.addWidget(self.buttonBar)
+        hb = QtGui.QHBoxLayout(self.buttonBar)
+        self.newContainerButton = QtGui.QPushButton(translate("Editor", "new container"))
+        self.newContainerButton.clicked.connect(self.newContainerDialog)
+        hb.addWidget(self.newContainerButton)
+    
+    def newContainerDialog(self):
+        title, ok = QtGui.QInputDialog.getText(self, "Title", "Title of the container:")
+        if not ok:
+            return
+        changes = OrderedDict()
+        c_tags = tags.Storage()
+        c_tags[tags.TITLE] = [title]
+        container = Container(c_tags, None, modify.newEditorId())
+        oldRoot = self.editor.model().root
+        newRoot = oldRoot.copy()
+        newRoot.contents.append(container)
+        container.setParent(newRoot)
+        changes[None] = (oldRoot, newRoot)
+        comm = modify.UndoCommand(modify.EDITOR, changes, contentsChanged = True, origin = self.editor.model())
+        modify.stack.activeStack().push(comm)
+        
 
 class EditorSmallWidget(QtGui.QDockWidget):
     def __init__(self, parent = None):

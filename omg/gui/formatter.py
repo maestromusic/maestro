@@ -57,7 +57,7 @@ class Formatter:
         if tags.TITLE in self.element.tags:
             result = " - ".join(self.element.tags[tags.TITLE])
         elif isinstance(self.element,models.File):
-            result = self.element.getPath()
+            result = self.element.path
         else:
             result = self.tr("Formatter","<No title>")
         if isinstance(self.element,models.Element) and self.element.isInDB() and options.misc.show_ids:
