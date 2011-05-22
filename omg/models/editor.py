@@ -20,27 +20,31 @@ from collections import OrderedDict
 logger = logging.getLogger("models.editor")
 
 class EditorModel(rootedtreemodel.EditableRootedTreeModel):
-    def __init__(self):
+    def __init__(self, name = 'default'):
         rootedtreemodel.EditableRootedTreeModel.__init__(self, RootNode())
         self.contents = []
+        self.name = name
         modify.dispatcher.changes.connect(self.handleChangeEvent)
 
     
     
     def handleChangeEvent(self, event):
-        if event.origin is None or event.origin == self:
-            logger.info("CHANGE EVENT INCOMING!!!!!")
-            logger.info(str(event))
-            for id in event.changes:
-                if id is None:
-                    self.setRoot(event.changes[id].copy())
-                    print("new root with {} children".format(event.changes[id].getContentsCount()))
-                else:
-                    allNodes = self.root.getAllNodes()
-                    next(allNodes) # skip root node
-                    for node in allNodes:
-                        if node.id == id:
-                            node 
+        logger.info("incoming change event at {}".format(self.name))
+        for id,elem in event.changes.items():
+            if id == self.root.id:
+                print("new root with {} children".format(event.changes[id].getContentsCount()))
+                self.setRoot(event.changes[id].copy())
+            else:
+                allNodes = self.root.getAllNodes()
+                next(allNodes) # skip root node
+                for node in allNodes:
+                    if node.id == id:
+                        print("woha, changing something tricky")
+                        elemcopy = elem.copy()
+                        parent = node.parent
+                        index = node.parent.index(node)
+                        self.remove(node)
+                        self.insert(parent, index, elemcopy)
     def setContents(self,contents):
         """Set the contents of this playlist and set their parent to self.root. The contents are only the toplevel-elements in the playlist, not all files. All views using this model will be reset."""
         self.contents = contents
@@ -63,30 +67,83 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
     def mimeData(self,indexes):
         return mimedata.createFromIndexes(self,indexes)
     def dropMimeData(self,mimeData,action,row,column,parentIndex):
+        print("dropMimeData on {} row {}".format(self.data(parentIndex, Qt.EditRole), row))
+        if action == Qt.MoveAction:
+            print("move action drop")
+        elif action == Qt.CopyAction:
+            print("copy action drop")
         if action == Qt.IgnoreAction:
             return True
 
         if column > 0:
             return False
-        parent = self.data(parentIndex, role = Qt.EditRole)
-        if parent is not None and parent.isFile(): # if something is dropped on a file, make it a sibling instead of a child of that file
+        parent = self.data(parentIndex, Qt.EditRole)
+        if parent is not self.root and parent.isFile(): # if something is dropped on a file, make it a sibling instead of a child of that file
                 parent = parent.parent
                 row = parentIndex.row() + 1
-        if mimeData.hasFormat("text/uri-list"):
+        if row == -1:
+            row = parent.getContentsCount()
+        parent_copy = parent.copy()
+        changes = OrderedDict()
+        if mimeData.hasFormat(options.gui.mime):
+            orig_nodes = mimeData.retrieveData(options.gui.mime)
+            for o in orig_nodes:
+                for n in o.getAllNodes():
+                    if n.id == parent.id:
+                        QtGui.QMessageBox.critical(None, self.tr('error'),self.tr('You cannot put a container below itself in the hierarchy!'))
+                        logger.error('recursion error')
+                        return False
+            if action == Qt.CopyAction:
+                nodes = [n.copy() for n in orig_nodes]
+                parent_copy.contents[row:row] = nodes
+                for n in nodes:
+                    n.setParent(parent_copy)
+            else:
+                # if nodes are moved, we must handle the case that nodes are moved inside the same parent in a special way.
+                # this may happen even if the parents are not the same python objects, because they can be moved between different
+                # editors that show the same container.
+                sameParentIndexes = [n.parent.index(n) for n in orig_nodes if n.parent.id == parent.id]
+                sameParentNodes = [parent_copy.contents[i] for i in sameParentIndexes]
+                otherParentNodes = [n for n in orig_nodes if n.parent.id != parent.id]
+                print("sameParentIds: {}".format(sameParentIndexes))
+                otherParentIds = set(n.parent.id for n in otherParentNodes)
+                print("otherParentIds: {}".format(otherParentIds))
+                offset = 0
+                for i in reversed(sameParentIndexes):
+                    # remove the elements that were moved, and remember how much of them are moved before
+                    # the selected insertion row.
+                    del parent_copy.contents[i]
+                    if i < row:
+                        offset += 1
+                row -= offset
+                # create remove events for the nodes with different parents
+                for id in otherParentIds:
+                    children = [n for n in otherParentNodes if n.parent.id == id]
+                    otherParent_before = children[0].parent.copy()
+                    otherParent_after = children[0].parent.copy()
+                    for c in reversed(children):
+                        del otherParent_after.contents[c.parent.index(c)]
+                    changes[id] = (otherParent_before, otherParent_after)
+                    print("changes[{}]: {}".format(id, changes[id]))
+                otherParentNodes_copy = [n.copy() for n in otherParentNodes]
+                # now insert the nodes (and possibly others from other parents
+                parent_copy.contents[row:row] = sameParentNodes + otherParentNodes_copy
+                for n in sameParentNodes + otherParentNodes_copy:
+                    n.setParent(parent_copy)
+
+        elif mimeData.hasFormat("text/uri-list"):
             nodes = self._handleUrlDrop(mimeData.urls())
-        elif mimeData.hasFormat(options.gui.mime):
-            nodes = [node.copy() for node in mimeData.retrieveData(options.gui.mime)]
+            parent_copy.contents[row:row] = nodes
+            for n in nodes:
+                n.setParent(parent_copy)
         else:
             return False
-        changes = OrderedDict()
-        parent_copy = parent.copy()
-        parent_copy.contents[row:row] = nodes
-        for n in nodes:
-            n.setParent(parent_copy)
-        changes[None] = (parent, parent_copy)
-        command = modify.UndoCommand(level = modify.EDITOR, changes = changes, contentsChanged = True, origin = self)
-        logger.info("pushing undo command")
-        modify.stack.activeStack().push(command)
+
+            
+        changes[parent.id] = (parent.copy(), parent_copy)
+        command = modify.UndoCommand(level = modify.EDITOR, changes = changes, contentsChanged = True)
+        
+        modify.pushEditorCommand(command)
         return True
     
     def _handleUrlDrop(self, urls):

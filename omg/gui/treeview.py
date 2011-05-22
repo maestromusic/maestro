@@ -67,21 +67,6 @@ class TreeView(QtGui.QTreeView):
         action.triggered.connect(lambda: self.editTags(False))
         actions.append(action)
 
-        action = QtGui.QAction(translate("TreeView","Edit tags recursively..."),self)
-        action.setEnabled(self.selectionModel().hasSelection())
-        action.triggered.connect(lambda: self.editTags(True))
-        actions.append(action)
-
-        action = QtGui.QAction(translate("TreeView","Read selected elements from files"),self)
-        action.setEnabled(hasSelectedElements)
-        action.triggered.connect(self.updateFromFileSystem)
-        actions.append(action)
-        
-        action = QtGui.QAction(translate("TreeView","Remove selected elements from database..."), self)
-        action.setEnabled(any((i.isInDB() for i in self.getSelectedNodes())))
-        action.triggered.connect(self.deleteFromDB)
-        actions.append(action)
-        
     def contextMenuEvent(self,event):
         currentIndex = self.indexAt(event.pos())
         actions = []
@@ -98,18 +83,3 @@ class TreeView(QtGui.QTreeView):
 
         menu.popup(event.globalPos() + QtCore.QPoint(2,2))
         event.accept()
-
-    def updateFromFileSystem(self):
-        ids = [element.id for element in self.getSelectedNodes()]
-        #TODO hier gehts weiter
-        
-    def deleteFromDB(self):
-        """Non-recursively deletes the selected elements from the database."""
-        if (QtGui.QMessageBox.question(self,translate("TreeView","Remove elements"),
-                                       translate("TreeView","Should I really remove the selected elements from the database?"),
-                                       QtGui.QMessageBox.Yes|QtGui.QMessageBox.No,QtGui.QMessageBox.No)
-                != QtGui.QMessageBox.Yes):
-            return
-        ids = [element.id for element in self.getSelectedNodes()]
-        db.deleteElements(ids)
-        distributor.indicesChanged.emit(distributor.DatabaseChangeNotice(ids,deleted=True))

@@ -51,11 +51,11 @@ class MimeData(QtCore.QMimeData):
 def createFromIndexes(model,indexList):
     """Create a MimeData-instance containing the elements represented by the given indexes in <model>."""
     #TODO: Filter the index list for elements whose parents are contained, too (don't drag them twice)
-    nodes = [model.data(index) for index in indexList]
-    
+    nodes = [model.data(index, role = Qt.EditRole) for index in indexList]
     from . import browser
     if isinstance(model,browser.BrowserModel):
         # Add either the node or invoke getElements recursively
         return MimeData(itertools.chain.from_iterable(
                         [node] if isinstance(node,models.Element) else node.getElements() for node in nodes))
-    else: return MimeData(nodes)
+    else:
+        return MimeData(nodes)

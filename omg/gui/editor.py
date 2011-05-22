@@ -12,6 +12,7 @@ from PyQt4.QtCore import Qt
 from collections import OrderedDict
 from ..gui import mainwindow
 from ..models import editor, Container
+from ..config import options
 from . import treeview
 from .. import logging, modify, tags
 
@@ -20,15 +21,52 @@ translate = QtCore.QCoreApplication.translate
 logger = logging.getLogger("gui.editor")
 
 class EditorTreeView(treeview.TreeView):
-    def __init__(self, parent = None):
+    def __init__(self, parent = None, name='default'):
         treeview.TreeView.__init__(self, parent)
         self.setContextMenuPolicy(Qt.DefaultContextMenu)
         self.setSelectionMode(self.ExtendedSelection)
         self.setDragEnabled(True)
         self.setAcceptDrops(True)
+        self.setDefaultDropAction(Qt.MoveAction)
         self.setDropIndicatorShown(True)
-        self.setModel(editor.EditorModel())
+        self.setModel(editor.EditorModel(name))
         self.viewport().setMouseTracking(True)
+    
+    def dragEnterEvent(self, event):
+        if event.source() is self:
+            event.setDropAction(Qt.MoveAction)
+        else:
+            event.setDropAction(Qt.CopyAction)
+        treeview.TreeView.dragEnterEvent(self, event)
+    def dragMoveEvent(self, event):
+        #treeview.TreeView.dragMoveEvent(self, event)
+        if event.keyboardModifiers() & Qt.ShiftModifier:
+            event.setDropAction(Qt.MoveAction)
+        elif event.keyboardModifiers() & Qt.ControlModifier:
+            event.setDropAction(Qt.CopyAction)
+        treeview.TreeView.dragMoveEvent(self, event)
+    def dropEvent(self, event):
+        if event.keyboardModifiers() & Qt.ShiftModifier:
+            event.setDropAction(Qt.MoveAction)
+        elif event.keyboardModifiers() & Qt.ControlModifier:
+            event.setDropAction(Qt.CopyAction)
+        elif event.source() is self:
+            event.setDropAction(Qt.MoveAction)
+        else:
+            event.setDropAction(Qt.CopyAction)
+        treeview.TreeView.dropEvent(self, event)
+        logger.debug("dropEvent in treeview completed")
+        
+    def keyPressEvent(self, keyEvent):
+        if keyEvent.key() == Qt.Key_Delete:
+            self.removeSelected()
+            keyEvent.accept()
+        else:
+            QtGui.QTreeView.keyPressEvent(self, keyEvent)
+    def removeSelected(self):
+        while len(self.selectedIndexes()) > 0:
+            self.model().removeByIndex(self.selectedIndexes()[0])   
+               
 
 class EditorMainWidget(QtGui.QDockWidget):
     """A DockWidget for the EditorTreeView."""
@@ -38,7 +76,7 @@ class EditorMainWidget(QtGui.QDockWidget):
         widget = QtGui.QWidget()
         self.setWidget(widget)
         vb = QtGui.QVBoxLayout(widget)
-        self.editor = EditorTreeView()
+        self.editor = EditorTreeView(name='main')
         vb.addWidget(self.editor)
         self.buttonBar = QtGui.QWidget()
         vb.addWidget(self.buttonBar)
@@ -46,6 +84,8 @@ class EditorMainWidget(QtGui.QDockWidget):
         self.newContainerButton = QtGui.QPushButton(translate("Editor", "new container"))
         self.newContainerButton.clicked.connect(self.newContainerDialog)
         hb.addWidget(self.newContainerButton)
+        label =QtGui.QLabel('editor "{}", root node id: {}'.format('main', self.editor.model().root.id))
+        hb.addWidget(label)
     
     def newContainerDialog(self):
         title, ok = QtGui.QInputDialog.getText(self, "Title", "Title of the container:")
@@ -59,16 +99,23 @@ class EditorMainWidget(QtGui.QDockWidget):
         newRoot = oldRoot.copy()
         newRoot.contents.append(container)
         container.setParent(newRoot)
-        changes[None] = (oldRoot, newRoot)
-        comm = modify.UndoCommand(modify.EDITOR, changes, contentsChanged = True, origin = self.editor.model())
-        modify.stack.activeStack().push(comm)
+        changes[oldRoot.id] = (oldRoot, newRoot)
+        comm = modify.UndoCommand(modify.EDITOR, changes, contentsChanged = True, text=self.tr('new container'))
+        modify.pushEditorCommand(comm)
         
 
 class EditorSmallWidget(QtGui.QDockWidget):
     def __init__(self, parent = None):
         QtGui.QDockWidget.__init__(self, parent)
         self.setWindowTitle(translate("Editor", "small editor"))
-        self.setWidget(EditorTreeView())        
+        widget = QtGui.QWidget()
+        self.setWidget(widget)
+        vb = QtGui.QVBoxLayout(widget)
+        self.editor = EditorTreeView(name = 'small')
+        
+        vb.addWidget(self.editor)
+        label = QtGui.QLabel('editor "{}", root node id: {}'.format('small', self.editor.model().root.id))
+        vb.addWidget(label)        
 # register this widget in the main application
 data1 = mainwindow.WidgetData(id = "maineditor",
                              name = translate("Editor","editor"),

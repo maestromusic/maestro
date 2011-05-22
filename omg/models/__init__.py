@@ -38,6 +38,14 @@ class Node:
         """Set the parent of this node."""
         # This is a default implementation and does not mean that every node has a parent-attribute
         self.parent = parent
+
+    
+    def setContents(self,contents):
+        """Set the list of contents of this container to <contents>. Note that the list won't be copied and in fact altered: the parents will be set to this container."""
+        assert isinstance(contents,list)
+        self.contents = contents
+        for element in self.contents:
+            element.setParent(self)
         
     def isFile(self):
         """Return whether this node holds a file. Note that this is in general not the opposite of isContainer as e.g. rootnodes are neither."""
@@ -184,12 +192,16 @@ class RootNode(Node):
     """Rootnode at the top of a RootedTreeModel."""
     def __init__(self):
         self.contents = []
+        self.id = modify.newEditorId()
     
     def getParent(self):
         return None
     
     def setParent(self):
         raise RuntimeError("Cannot set the parent of a RootNode.")
+    
+    def __repr__(self):
+        return 'RootNode[{}] with {} children'.format(self.id, len(self.contents))
 
         
 class Element(Node):
@@ -283,13 +295,7 @@ class Container(Element):
         if position is None:
             position = db.position(parentId, id) if parentId is not None else None
         return Container(db.tags(id), position = position, id = id)
-    
-    def setContents(self,contents):
-        """Set the list of contents of this container to <contents>. Note that the list won't be copied and in fact altered: the parents will be set to this container."""
-        assert isinstance(contents,list)
-        self.contents = contents
-        for element in self.contents:
-            element.setParent(self)
+
 
     def isContainer(self):
         return True
@@ -342,6 +348,9 @@ class File(Element):
     
     def getContents(self):
         return []
+    
+    def setContents(self):
+        raise RuntimeError("Cannot assign contents to a file!")
 
     def getContentsCount(self):
         return 0
