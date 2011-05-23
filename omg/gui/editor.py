@@ -39,21 +39,22 @@ class EditorTreeView(treeview.TreeView):
             event.setDropAction(Qt.CopyAction)
         treeview.TreeView.dragEnterEvent(self, event)
     def dragMoveEvent(self, event):
-        #treeview.TreeView.dragMoveEvent(self, event)
-        if event.keyboardModifiers() & Qt.ShiftModifier:
-            event.setDropAction(Qt.MoveAction)
-        elif event.keyboardModifiers() & Qt.ControlModifier:
-            event.setDropAction(Qt.CopyAction)
+        if isinstance(event.source(), EditorTreeView):
+            if event.keyboardModifiers() & Qt.ShiftModifier:
+                event.setDropAction(Qt.MoveAction)
+            elif event.keyboardModifiers() & Qt.ControlModifier:
+                event.setDropAction(Qt.CopyAction)
         treeview.TreeView.dragMoveEvent(self, event)
     def dropEvent(self, event):
-        if event.keyboardModifiers() & Qt.ShiftModifier:
-            event.setDropAction(Qt.MoveAction)
-        elif event.keyboardModifiers() & Qt.ControlModifier:
-            event.setDropAction(Qt.CopyAction)
-        elif event.source() is self:
-            event.setDropAction(Qt.MoveAction)
-        else:
-            event.setDropAction(Qt.CopyAction)
+        if isinstance(event.source(), EditorTreeView):
+            if event.keyboardModifiers() & Qt.ShiftModifier:
+                event.setDropAction(Qt.MoveAction)
+            elif event.keyboardModifiers() & Qt.ControlModifier:
+                event.setDropAction(Qt.CopyAction)
+            elif event.source() is self:
+                event.setDropAction(Qt.MoveAction)
+            else:
+                event.setDropAction(Qt.CopyAction)
         treeview.TreeView.dropEvent(self, event)
         logger.debug("dropEvent in treeview completed")
         
@@ -64,8 +65,7 @@ class EditorTreeView(treeview.TreeView):
         else:
             QtGui.QTreeView.keyPressEvent(self, keyEvent)
     def removeSelected(self):
-        while len(self.selectedIndexes()) > 0:
-            self.model().removeByIndex(self.selectedIndexes()[0])   
+        self.model().fireRemoveIndexes(self.selectedIndexes())
                
 
 class EditorMainWidget(QtGui.QDockWidget):

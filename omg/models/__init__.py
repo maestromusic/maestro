@@ -330,6 +330,8 @@ class Container(Element):
         # Skip elements of length None
         return sum(element.getLength(False) for element in self.contents if element.getLength() is not None)
 
+    def __repr__(self):
+        return "Container[{}] with {} elements".format(self.id, len(self.contents))
 
 class File(Element):
     def __init__(self, tags, length, path, position, id):

@@ -29,24 +29,27 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
     
     
     def handleChangeEvent(self, event):
+        """React on an incoming ChangeEvent by applying all changes that affect the
+        current model."""
         logger.info("incoming change event at {}".format(self.name))
         for id,elem in event.changes.items():
             if id == self.root.id:
-                print("new root with {} children".format(event.changes[id].getContentsCount()))
                 self.setRoot(event.changes[id].copy())
             else:
                 allNodes = self.root.getAllNodes()
                 next(allNodes) # skip root node
                 for node in allNodes:
                     if node.id == id:
-                        print("woha, changing something tricky")
                         elemcopy = elem.copy()
                         parent = node.parent
                         index = node.parent.index(node)
                         self.remove(node)
                         self.insert(parent, index, elemcopy)
+    
     def setContents(self,contents):
-        """Set the contents of this playlist and set their parent to self.root. The contents are only the toplevel-elements in the playlist, not all files. All views using this model will be reset."""
+        """Set the contents of this playlist and set their parent to self.root.
+        The contents are only the toplevel-elements in the playlist, not all files.
+        All views using this model will be reset."""
         self.contents = contents
         self.root.contents = contents
         for node in contents:
@@ -64,85 +67,89 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
     
     def mimeTypes(self):
         return [options.gui.mime,"text/uri-list"]
+    
     def mimeData(self,indexes):
         return mimedata.createFromIndexes(self,indexes)
+    
     def dropMimeData(self,mimeData,action,row,column,parentIndex):
+        """This function does all the magic that happens if elements are dropped onto this editor."""
         print("dropMimeData on {} row {}".format(self.data(parentIndex, Qt.EditRole), row))
-        if action == Qt.MoveAction:
-            print("move action drop")
-        elif action == Qt.CopyAction:
-            print("copy action drop")
         if action == Qt.IgnoreAction:
             return True
-
         if column > 0:
             return False
         parent = self.data(parentIndex, Qt.EditRole)
-        if parent is not self.root and parent.isFile(): # if something is dropped on a file, make it a sibling instead of a child of that file
+        if parent is not self.root and parent.isFile():
+                # if something is dropped on a file, make it a sibling instead of a child of that file
                 parent = parent.parent
                 row = parentIndex.row() + 1
         if row == -1:
+            # if something is dropped on now item, append it to the end of the parent
             row = parent.getContentsCount()
-        parent_copy = parent.copy()
+        parent_copy = parent.copy() # all changes will be performed on this copy
         changes = OrderedDict()
         if mimeData.hasFormat(options.gui.mime):
+            # first case: OMG mime data -> nodes from an editor, browser etc.
             orig_nodes = mimeData.retrieveData(options.gui.mime)
             for o in orig_nodes:
+                # check for recursion error
                 for n in o.getAllNodes():
                     if n.id == parent.id:
                         QtGui.QMessageBox.critical(None, self.tr('error'),self.tr('You cannot put a container below itself in the hierarchy!'))
-                        logger.error('recursion error')
                         return False
             if action == Qt.CopyAction:
+                # the easy case: just add the copied nodes at the specified row
                 nodes = [n.copy() for n in orig_nodes]
                 parent_copy.contents[row:row] = nodes
                 for n in nodes:
                     n.setParent(parent_copy)
+                changes[parent.id] = (parent.copy(), parent_copy)
             else:
                 # if nodes are moved, we must handle the case that nodes are moved inside the same parent in a special way.
                 # this may happen even if the parents are not the same python objects, because they can be moved between different
                 # editors that show the same container.
                 sameParentIndexes = [n.parent.index(n) for n in orig_nodes if n.parent.id == parent.id]
+                sameParentIndexes.sort(reverse = True)
                 sameParentNodes = [parent_copy.contents[i] for i in sameParentIndexes]
                 otherParentNodes = [n for n in orig_nodes if n.parent.id != parent.id]
                 print("sameParentIds: {}".format(sameParentIndexes))
                 otherParentIds = set(n.parent.id for n in otherParentNodes)
                 print("otherParentIds: {}".format(otherParentIds))
                 offset = 0
-                for i in reversed(sameParentIndexes):
+                for i in sameParentIndexes:
                     # remove the elements that were moved, and remember how much of them are moved before
                     # the selected insertion row.
                     del parent_copy.contents[i]
                     if i < row:
                         offset += 1
                 row -= offset
-                # create remove events for the nodes with different parents
-                for id in otherParentIds:
-                    children = [n for n in otherParentNodes if n.parent.id == id]
-                    otherParent_before = children[0].parent.copy()
-                    otherParent_after = children[0].parent.copy()
-                    for c in reversed(children):
-                        del otherParent_after.contents[c.parent.index(c)]
-                    changes[id] = (otherParent_before, otherParent_after)
-                    print("changes[{}]: {}".format(id, changes[id]))
                 otherParentNodes_copy = [n.copy() for n in otherParentNodes]
                 # now insert the nodes (and possibly others from other parents
                 parent_copy.contents[row:row] = sameParentNodes + otherParentNodes_copy
                 for n in sameParentNodes + otherParentNodes_copy:
                     n.setParent(parent_copy)
-
+                changes[parent.id] = (parent.copy(), parent_copy)
+                # create remove events for the nodes with different parents
+                for id in otherParentIds:
+                    children = [n for n in otherParentNodes if n.parent.id == id]
+                    children.sort(key = lambda n: n.parent.index(n), reverse = True)
+                    otherParent_before = children[0].parent.copy()
+                    otherParent_after = children[0].parent.copy()
+                    for c in children:
+                        del otherParent_after.contents[c.parent.index(c)]
+                    changes[id] = (otherParent_before, otherParent_after)
+                
         elif mimeData.hasFormat("text/uri-list"):
+            # easy case: files and/or folders are dropped from outside or from a filesystembrowser.
             nodes = self._handleUrlDrop(mimeData.urls())
             parent_copy.contents[row:row] = nodes
             for n in nodes:
                 n.setParent(parent_copy)
-        else:
+            changes[parent.id] = (parent.copy(), parent_copy)
+        else: #unknown mimedata
             return False
 
-            
-        changes[parent.id] = (parent.copy(), parent_copy)
-        command = modify.UndoCommand(level = modify.EDITOR, changes = changes, contentsChanged = True)
-        
+        command = modify.UndoCommand(level = modify.EDITOR, changes = changes, contentsChanged = True)        
         modify.pushEditorCommand(command)
         return True
     
@@ -152,7 +159,30 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
         for f in files:
             elementList.append(File.fromFilesystem(f))
         return elementList
-        
+    
+    def fireRemoveIndexes(self, elements):
+        """Creates and pushes an UndoCommand that removes the selected elements from this model (and all other
+        editor models containing them). Elements must be an iterable of either QModelIndexes or Nodes.
+        """ 
+        if len(elements) == 0:
+            return
+        if isinstance(elements[0], QtCore.QModelIndex):
+            elements = [self.data(i, Qt.EditRole) for i in elements]
+        for i in reversed(elements):
+            for p in i.getParents():
+                if p in elements:
+                    elements.remove(i)
+        changes = OrderedDict()
+        affectedParents = set(i.parent for i in elements)
+        for p in affectedParents:
+            oldParent = p.copy()
+            newParent = p.copy()
+            for child in sorted((i for i in elements if i.parent == p), key = lambda i: i.parent.index(i), reverse = True):
+                del newParent.contents[child.parent.index(child)]
+            changes[p.id] = (oldParent, newParent)
+        command = modify.UndoCommand(level = modify.EDITOR, changes = changes, contentsChanged = True)
+        modify.pushEditorCommand(command)
+                        
 #===============================================================================
 # class OldEditorModel(BasicPlaylist):
 #    
