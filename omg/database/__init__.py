@@ -41,7 +41,7 @@ Each thread must have its own connection object. This module stores all connecti
 
 import sys, threading
 
-from omg import strutils, config, logging, utils, tags
+from omg import strutils, config, logging, utils, tags as tagsModule, constants
 from . import sql
 
 # Table prefix
@@ -319,9 +319,9 @@ def idFromValue(tagSpec,value,insert=False):
 # tags-Table
 #=======================================================================
 def tags(elid):
-    result = tags.Storage()
-    for tagId,value in listTagse(elid):
-        result[tags.get(tagId)].append(value)
+    result = tagsModule.Storage()
+    for (tagId,value) in listTags(elid):
+        result[tagsModule.get(tagId)].append(value)
     return result
     
 def listTags(elid,tagList=None):
@@ -341,7 +341,7 @@ def listTags(elid,tagList=None):
     tags = set()
     for tagid,valueid in result:
         tag = tagsModule.get(tagid)
-        tags.append((tag,valueFromId(tag,valueid)))
+        tags.update((tag,valueFromId(tag,valueid)))
     return tags
 
 def tagValues(elid,tagList):

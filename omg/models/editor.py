@@ -10,9 +10,9 @@
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
-from .. import logging, modify
+from .. import logging, modify, database as db, tags
 from . import mimedata
-from ..models import rootedtreemodel, RootNode, File
+from ..models import rootedtreemodel, RootNode, File, Container
 from ..config import options
 from ..utils import hasKnownExtension, collectFiles
 
@@ -158,7 +158,7 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
         elementList = []
         for f in files:
             elementList.append(File.fromFilesystem(f))
-        return elementList
+        return self.guessTree(elementList)
     
     def fireRemoveIndexes(self, elements):
         """Creates and pushes an UndoCommand that removes the selected elements from this model (and all other
@@ -182,23 +182,57 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
             changes[p.id] = (oldParent, newParent)
         command = modify.UndoCommand(level = modify.EDITOR, changes = changes, contentsChanged = True)
         modify.pushEditorCommand(command)
-                        
+    
+    def guessTree(self, files):
+        """Tries to guess a container structure from the given File list."""
+        
+        albumsFoundByName = {} # name->container map
+        albumsFoundByID = {} #id->container map
+        
+        for file in files:
+            id = file.id
+            t = file.tags
+            if id > 0:
+                albumIds = db.parents(id)
+                for aid in albumIds:
+                    if not aid in albumsFoundByID:
+                        albumsFoundByID[aid] = Container.fromId(aid)
+                    exAlb = albumsFoundByID[aid]
+                    exAlbName = ", ".join(exAlb.tags[tags.TITLE])
+                    if not exAlbName in albumsFoundByName:
+                        albumsFoundByName[exAlbName] = exAlb
+                    
+                    file.parent = exAlb
+                    exAlb.contents.append(file)
+            if tags.ALBUM in t:
+                album = t[tags.ALBUM][0] # we don't support multiple album tags
+                if not album in albumsFoundByName:
+                    albumsFoundByName[album] = Container(tags = tags.Storage(), position = None, id = modify.newEditorId())
+                file.parent = albumsFoundByName[album]
+                albumsFoundByName[album].contents.append(file)
+                if file.position is None:
+                    file.position = 0
+            elif tags.TITLE in t:
+                album = t[tags.TITLE][0] #TODO: If there are two songs with the same title this will delete the first of them
+                albumsFoundByName[album] = file
+            else:
+                album = file.path
+                albumsFoundByName[album] = file
+            
+        
+        for album in albumsFoundByName.values():
+            self.finalize(album)
+            
+        return albumsFoundByName.values()
+        
+    def finalize(self, album):
+        if album.isFile():
+            return
+        album.contents.sort(key=lambda x : x.position or -1)
+        album.tags[tags.TITLE] = album.contents[0].tags[tags.ALBUM]
+                  
 #===============================================================================
-# class OldEditorModel(BasicPlaylist):
-#    
-#    def __init__(self):
-#        BasicPlaylist.__init__(self)
-#        
-#    def _prepareMimeData(self, mimeData):
-#        """Overwrites the function of BasicPlaylist to add album-recognition intelligence."""
-#        if mimeData.hasFormat(options.gui.mime): # already elements -> no preprocessing needed
-#            return [node.copy() for node in mimeData.retrieveData(options.gui.mime)]
-#        elif mimeData.hasFormat('text/uri-list'):
-#            filePaths = [relPath(path) for path in self._collectFiles(absPath(p.path()) for p in mimeData.urls())]
-#            guess = omg.gopulate.GopulateGuesser(filePaths)
-#            return guess.guessTree(True)
-#        else:
-#            return None
+
 #        
 #    def merge(self, indices, name):
 #        self.undoStack.beginMacro("Merge {} items, title »{}«".format(len(indices),name))
@@ -247,13 +281,6 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
 #            self.dataChanged.emit(parentIdx, parentIdx)
 #        self.undoStack.endMacro()
 #        
-#    def commit(self):
-#        """Commits all the containers and files in the current model into the database."""
-#        
-#        logger.debug("commit called")
-#        for item in self.root.contents:
-#            item.commit(toplevel = True)
-# 
 # 
 # # ALTER KRAM
 # def computeHash(self):
@@ -298,32 +325,4 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
 #    if hash == 'pending':
 #        hashQueue.put((self.computeAndStoreHash, [], {}))
 #    self._syncState = {}
-# class PositionChangeCommand(QtGui.QUndoCommand):
-#    
-#    def __init__(self, element, pos):
-#        QtGui.QUndoCommand.__init__(self, "change element position")
-#        self.elem = element
-#        self.pos = pos
-#    
-#    def redo(self):
-#        self.oldpos = self.elem.position
-#        self.elem.position = self.pos
-#    
-#    def undo(self):
-#        self.elem.position = self.oldpos
-# 
-# class TagChangeCommand(QtGui.QUndoCommand):
-#    
-#    def __init__(self, element, tag, index, value):
-#        QtGui.QUndoCommand.__init__(self, "change »{}« tag".format(tag.name))
-#        self.elem = element
-#        self.tag = tag
-#        self.index = index
-#        self.value = value
-#    
-#    def redo(self):
-#        self.oldValue = self.elem.tags[self.tag][self.index]
-#        self.elem.tags[self.tag][self.index] = self.value
-#    def undo(self):
-#        self.elem.tags[self.tag][self.index] = self.oldValue
 #===============================================================================

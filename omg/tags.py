@@ -113,6 +113,12 @@ class ValueType:
         if self == TYPE_DATE:
             return FlexiDate.strptime(string)
         else: return string
+    
+    def __repr__(self):
+        return 'ValueType({})'.format(self.name)
+    
+    def __str__(self):
+        return self.name
 
 # Modul variables for the existing types
 TYPE_VARCHAR = ValueType('varchar')
