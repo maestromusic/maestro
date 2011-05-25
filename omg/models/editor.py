@@ -204,7 +204,7 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
                     
                     file.parent = exAlb
                     exAlb.contents.append(file)
-            if tags.ALBUM in t:
+            elif tags.ALBUM in t:
                 album = t[tags.ALBUM][0] # we don't support multiple album tags
                 if not album in albumsFoundByName:
                     albumsFoundByName[album] = Container(tags = tags.Storage(), position = None, id = modify.newEditorId())

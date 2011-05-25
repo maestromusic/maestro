@@ -300,6 +300,7 @@ def valueFromId(tagSpec,valueId):
                     .format(prefix,tag.type), tag.id,valueId).getSingle()
     if tag.type == tagsModule.TYPE_DATE:
         value = utils.FlexiDate.fromSql(value)
+    return value
 
 
 def idFromValue(tagSpec,value,insert=False):
@@ -321,7 +322,11 @@ def idFromValue(tagSpec,value,insert=False):
 def tags(elid):
     result = tagsModule.Storage()
     for (tagId,value) in listTags(elid):
-        result[tagsModule.get(tagId)].append(value)
+        tag = tagsModule.get(tagId)
+        if tag not in result:
+            result[tag] = [value]
+        else:
+            result[tag].append(value)
     return result
     
 def listTags(elid,tagList=None):
@@ -341,7 +346,10 @@ def listTags(elid,tagList=None):
     tags = set()
     for tagid,valueid in result:
         tag = tagsModule.get(tagid)
-        tags.update((tag,valueFromId(tag,valueid)))
+        val = valueFromId(tag, valueid)
+        if val is None:
+            print('value for tag {} with id {} not found'.format(tag, valueid))
+        tags.add((tag,valueFromId(tag,valueid)))
     return tags
 
 def tagValues(elid,tagList):

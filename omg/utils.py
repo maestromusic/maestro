@@ -69,7 +69,7 @@ def getIcon(name,plugin=None):
     return QtGui.QIcon(getIconPath(name,plugin))
 
 
-class FlexiDate:
+class FlexiDate(object):
     """A FlexiDate is a date which can store a date consisting simply of a year or of a year and a month or of year, month and day. OMG uses this class to store tags of type date, where most users will only specify a year, but some may give month and day, too.
 
     Note that while MySQL's DATE type can store dates where day and month may be unspecified, neither datetime.date nor QDate can. Thus binding FlexiDates to SQL-queries does not work. For this reason FlexiDates are stored as integers in the DB (confer :meth:`FlexiDate.toSql` and :meth:`FlexiDate.fromSql`.
@@ -179,7 +179,8 @@ class FlexiDate:
         return not isinstance(other,FlexiDate) or\
             self.year != other.year or self.month != other.month or self.day != other.day
 
-
+    def __hash__(self):
+        return id(self)
 class OrderedDict(dict):
     """Ordered subclass of :class:`dict` which allows inserting key-value-mappings at arbitrary positions -- in contrast to :class:`collections.OrderedDict`. By default new mappings will be appended at the end of the order. Use the insert*-methods to insert somewhere else.
     

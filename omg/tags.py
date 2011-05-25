@@ -193,7 +193,7 @@ class Tag:
         return '"{0}"'.format(self.name)
 
     def __str__(self):
-        return self.translated()
+        return self.name
         
     def translated(self):
         """Return the translation of this tag in the user's language. In most cases you will want to display this string rather than ``tag.name``."""
@@ -225,7 +225,10 @@ def exists(identifier):
         
     
 def get(identifier):
-    """Return the tag identified by *identifier*. If *identifier* is an integer return the tag with this id. If *identifier* is a string return the tag with this name. If *identifier* is a Tag-instance, return *identifier*. This method does not create new instances of the tags but returns always the same instance."""
+    """Return the tag identified by *identifier*. If *identifier* is an integer return the tag with this id.
+    If *identifier* is a string return the tag with this name.
+    If *identifier* is a Tag-instance, return *identifier*.
+    This method does not create new instances of the tags but returns always the same instance."""
     if isinstance(identifier,int):
         return _tagsById[identifier]
     elif isinstance(identifier,str):
