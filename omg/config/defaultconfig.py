@@ -88,18 +88,3 @@ storage = {
     'central_tab_index': (-1,),
 }
 }
-
-# Stuff from OMG 0.1 --- not clear whether it will be used in OMG 0.2
-   # 'browser_views': ([[['composer','artist','performer']],[['genre'],['composer','artist','performer']]],),
-    #~ options.addOption("tags",       "search_tags",      list,   ["album",
-                                                                 #~ "performer",
-                                                                 #~ "conductor",
-                                                                 #~ "title",
-                                                                 #~ "lyricist",
-                                                                 #~ "composer",
-                                                                 #~ "date",
-                                                                 #~ "artist"]      , description="Tags that will be searched, if you type a text without prefix in a searchbox. Use prefixes to search for other tags.")
-    #~ options.addOption("tags",       "ignored_tags",     list,   ["tracktotal",
-                                                                 #~ "disctotal",
-                                                                 #~ "tracknumber",
-                                                                 #~ "discnumber"]  )

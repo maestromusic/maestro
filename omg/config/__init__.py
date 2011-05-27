@@ -7,17 +7,34 @@
 #
 
 """
-This package handles OMG's configuration. There are five sources where configuration may come from: Three files in the configuration directory, the default options which are hard coded into the defaultconfig module (and into plugins) and finally the command line where arbitrary config options may be overwritten using the -c option. The three files are:
+This package handles OMG's configuration. There are five sources where configuration may come from:
+Three files in the configuration directory, the default options which are hard coded into the defaultconfig module
+(and into plugins) and finally the command line where arbitrary config options may be overwritten using the -c option.
+The three files are:
+    - config. This is the main configuration file and the one that is mainly edited by the user.
+    But it may be written from the program, too. It contains several sections which may contain options
+    and nested sections. Options must have a type (str,int or list) and a default value stored in defaultconfig.
+    To get the option “size” from the section “gui” simply use “config.options.gui.size”.
+    This will directly return the option's value. In the rare cases you need the option itself as
+    ConfigOption-instance use “config.optionObject.gui.size”. Instead of attribute access you may also use item
+    access: “config.options['gui']['size']”. Both types of access allow to write values via assignment. Note
+    that values will not be written to the file before the application terminates, though.
 
-    - config. This is the main configuration file and the one that is mainly edited by the user. But it may be written from the program, too. It contains several sections which may contain options and nested sections. Options must have a type (str,int or list) and a default value stored in defaultconfig. To get the option ``size`` from the section ``gui`` simply use ``config.options.gui.size``. This will directly return the option's value. In the rare cases you need the option itself as ConfigOption-instance use ``config.optionObject.gui.size``. Instead of attribute access you may also use item access: ``config.options['gui']['size']``. Both types of access allow to write values via assignment. Note that values will not be written to the file before the application terminates, though.
+    - storage. This file holds persistent information and is mainly written by the program. But it is human
+    readable and can thus be edited by the user, too. The most important difference to config is that this
+    file uses ConfigObj's unrepr-mode. Therefore you may store any combination of Python's standard types
+    including lists and dicts. Access works like for config, but with the variables “config.storage” and “config.storageObject”.
 
-    - storage. This file holds persistent information and is mainly written by the program. But it is human readable and can thus be edited by the user, too. The most important difference to config is that this file uses ConfigObj's unrepr-mode. Therefore you may store any combination of Python's standard types including lists and dicts. Access works like for config, but with the variables ``config.storage`` and ``config.storageObject``.
+    - binary. The last file contains simply a pickled dict to store arbitrary binary data. During the application this
+    dict can be accessed via config.binary which really is simply a dict, so there are no sections or attribute access
+    like for config and storage. Take care that your keys don't conflict with other modules!
 
-    - binary. The last file contains simply a pickled dict to store arbitrary binary data. During the application this dict can be accessed via config.binary which really is simply a dict, so there are no sections or attribute access like for config and storage. Take care that your keys don't conflict with other modules!
+    Both config and storage may only contain options which are defined in the defaultconfig module or in the default configuration
+    of a plugin that is returned by its defaultConfig or defaultStorage method (to be precise they may contain sections which are
+    not defined. OMG will assume that they belong to a plugin that is not loaded).
 
-    Both config and storage may only contain options which are defined in the defaultconfig module or in the default configuration of a plugin that is returned by its defaultConfig- or defaultStorage-method (to be precise they may contain sections which are not defined. OMG will assume that they belong to a plugin that is not loaded).
-
-    Call init at application start to read options and call shutdown at the end to write the options. Use loadPlugins and removePlugins to add or remove plugin configuration.
+    Call init at application start to read options and call shutdown at the end to write the options. Use loadPlugins and
+    removePlugins to add or remove plugin configuration.
 """
 
 import os, sys, pickle
@@ -86,10 +103,11 @@ def shutdown():
 class Option:
     """Baseclass for options used by the config and storage files. An option has the following attributes:
     
-            * ``name``: Its name,
-            * ``default``: the default value,
-            * ``fileValue``: the value in the config file or ``None`` if the file does not contain this option,
-            * ``value``:  ``None`` or a value set from the program which will overwrite fileValue during runtime, but will not be written to the config file (this is used when options are specified on the command line).
+            * “name”: Its name,
+            * “default”: the default value,
+            * “fileValue”: the value in the config file or “None“ if the file does not contain this option,
+            * “value”:  “None” or a value set from the program which will overwrite fileValue during runtime,
+              but will not be written to the config file (this is used when options are specified on the command line).
             * description (optional): A short text describing the option.
             
     \ """
@@ -136,7 +154,7 @@ class ConfigOption(Option):
                                  .format(value,type(value),self.type))
 
     def _export(self,value):
-        """Convert *value* (of type ``self.type``) into a string (for the config file)."""
+        """Convert *value* (of type “self.type”) into a string (for the config file)."""
         if self.type == bool:
             return "True" if value else "False"
         elif self.type == list:
@@ -243,9 +261,12 @@ class ConfigSection:
 
 
 class Config(ConfigSection):
-    """This is the main object of the config-module and stores the configuration of one config file. It is itself a section with the name ``<Default>``. Upon creation this class will read the defaults and then the config/storage-file.The parameters are:
+    """This is the main object of the config-module and stores the configuration of one config file.
+    It is itself a section with the name “<Default>”. Upon creation this class will read the defaults
+    and then the config/storage-file.The parameters are:
 
-        * *cmdOptions*: a list of strings of the form ``main.collection=/var/music``. The options given in these strings will overwrite the options from the file or the defaults.
+        * *cmdOptions*: a list of strings of the form “main.collection=/var/music”. The options given in these
+          strings will overwrite the options from the file or the defaults.
         * *storage*: whether this object corresponds to a storage file (confer module documentation).
 
     \ """
@@ -337,7 +358,8 @@ class Config(ConfigSection):
 
 
 class ValueSection:
-    """A ValueSection wraps a ConfigSection. On attribute access or item access it will directly return the option's value. This class is used by ``config.options`` and ``config.storage``."""
+    """A ValueSection wraps a ConfigSection. On attribute access or item access it will directly return
+    the option's value. This class is used by ``config.options`` and ``config.storage``."""
     def __init__(self,section):
         self._section = section
 
