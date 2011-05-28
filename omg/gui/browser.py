@@ -40,11 +40,14 @@ mainwindow.addWidgetData(mainwindow.WidgetData(
         preferredDockArea=Qt.LeftDockWidgetArea))
 
 
+searchEngine = None
+smallResult = None
+
+
 class Browser(QtGui.QWidget):
     """Browser-widget to search the music collection. The browser contains a searchbox, a button to open the configuration-dialog and one or more views. Depending on whether a search value is entered or not, the browser displayes results from TT_BIG_RESULT or 'elements' (the correct table is stored in self.table). Each view has a list of tag-sets ('layers') and will group the contents of self.table according to the layers."""
     
     views = None # List of BrowserTreeViews
-    
     table = db.prefix + "elements" # The MySQL-table whose contents are currently displayed
     
     showHiddenValues = False
@@ -53,10 +56,13 @@ class Browser(QtGui.QWidget):
         """Initialize a new Browser with the given parent."""
         QtGui.QWidget.__init__(self,parent)
 
-        self.searchEngine = search.SearchEngine()
-        self.searchEngine.searchFinished.connect(self._handleSearchFinished)
-        self.bigResult = self.searchEngine.createResultTable("browser_big")
-        self.smallResult = self.searchEngine.createResultTable("browser_small")
+        global searchEngine, smallResult
+        if searchEngine is None:
+            searchEngine = search.SearchEngine()
+            smallResult = searchEngine.createResultTable("browser_small")
+            
+        searchEngine.searchFinished.connect(self._handleSearchFinished)
+        self.bigResult = searchEngine.createResultTable("browser_big")
         
         # Layout
         layout = QtGui.QVBoxLayout(self)
@@ -104,11 +110,11 @@ class Browser(QtGui.QWidget):
         """Search for the value in the search-box. If it is empty, display all values."""
         criteria = self.searchBox.getCriteria()
         if len(criteria) > 0:
-            self.searchEngine.runSearch(db.prefix+"elements",self.bigResult,criteria)
+            searchEngine.search(db.prefix+"elements",self.bigResult,criteria)
             self.table = self.bigResult
         else:
             self.table = db.prefix + "elements"
-            self._handleSearchFinished()
+            self._handleSearchFinished(None)
     
     def createViews(self,layersList):
         """Destroy all existing views and create views according to <layersList>: For each entry of <layersList> a BrowserTreeView using the entry as layers is created. Therefore each entry of <layersList> must be a list of tag-lists (confer BrowserTreeView.__init__)."""
@@ -135,7 +141,7 @@ class Browser(QtGui.QWidget):
         dialog.move(self.mapTo(self.window(),pos))
         dialog.show()
     
-    def _handleSearchFinished(self):
+    def _handleSearchFinished(self,key):
         for view in self.views:
             view.model().setTable(self.table)
 
@@ -147,6 +153,6 @@ class BrowserTreeView(treeview.TreeView):
         """Initialize this TreeView with the given parent (which must be the browser-widget) and the given layers. This also will create a BrowserModel for this treeview (Note that each view of the browser uses its own model). <layers> must be a list of tag-lists. For each entry in <layers> a tag-layer using the entry's tags is created. A BrowserTreeView initialized with [[tags.get('genre')],[tags.get('artist'),tags.get('composer')]] will group result first into differen genres and then into different artist/composer-values, before finally displaying the elements itself."""
         treeview.TreeView.__init__(self,parent)
         self.contextMenuProviderCategory = 'browser'
-        self.setModel(browsermodel.BrowserModel(parent.table,layers,parent.smallResult))
+        self.setModel(browsermodel.BrowserModel(parent.table,layers,smallResult))
         #self.setItemDelegate(delegates.BrowserDelegate(self,self.model()))
         #self.doubleClicked.connect(self._handleDoubleClicked)
