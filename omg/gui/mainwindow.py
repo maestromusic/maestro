@@ -23,9 +23,9 @@ To work with this system central widgets or dock widget must follow some rules:
     all other parameters.
     - Dock widgets must be subclasses of QDockWidget.
     - Of course the generic system can only store the position and not the inner state of each widget. If a
-    widget wants to store its state, it must provide the methods saveState to return a state object to be
-    saved and restoreState which will be called with that state object as parameter on the next application
-    start. The state object may be anything that can be stored in a variable in config.storage (i.e. any
+    widget wants to store its state, it must provide the method saveState to return a state object to be
+    saved and a keyword parameter 'state' in the constructor (with default value None) to restore the state
+    again. The state object may be anything that can be stored in a variable in config.storage (i.e. any
     combination of standard Python types including lists and dicts).
 
 """
@@ -160,11 +160,14 @@ class MainWindow(QtGui.QMainWindow):
             if index >= 0:
                 self.centralWidget().removeTab(index)
         
-    def addCentralWidget(self,data):
+    def addCentralWidget(self,data,state=None):
         """Add a central widget corresponding to the given WidgetData. If a widget of this type existed and
-        was hidden once, simply show it again. Otherwise create a new widget."""
+        was hidden once, simply show it again. Otherwise create a new widget. In this case *state* will be
+        passed to the constructor, if the class has a ''saveState''-method."""
         if data not in self._centralWidgets:
-            widget = data.theClass(self)
+            if hasattr(data.theClass,'saveState'):
+                widget = data.theClass(self,state)
+            else: widget = data.theClass(self)
             self._centralWidgets[data] = widget
         else:
             widget = self._centralWidgets[data]
@@ -191,7 +194,7 @@ class MainWindow(QtGui.QMainWindow):
         # If that did not work, create a new widget
         self._createDockWidget(data)
 
-    def _createDockWidget(self,data,objectName=None):
+    def _createDockWidget(self,data,objectName=None,state=None):
         """Create a new dock widget for the given WidgetData and set its objectName to *objectName*. If that
         is None, compute an unused objectName."""
         if data not in self._dockWidgets:
@@ -210,7 +213,10 @@ class MainWindow(QtGui.QMainWindow):
                     i += 1
                 objectName = data.id + str(i)
         
-        widget = data.theClass(self)
+        if hasattr(data.theClass,'saveState'):
+            widget = data.theClass(self,state=state)
+        else: widget = data.theClass(self)
+        
         widget.setObjectName(objectName)
         self._dockWidgets[data].append(widget)
         QtGui.QMainWindow.addDockWidget(self,data.preferredDockArea,widget)
@@ -244,9 +250,7 @@ class MainWindow(QtGui.QMainWindow):
             # It may happen that data is None (for example if it belongs to a widget from a plugin and this
             # plugin has been removed since the last application shutdown). Simply do not load this widget
             if data is not None:
-                widget = self.addCentralWidget(data)
-                if hasattr(widget,"restoreState"):
-                    widget.restoreState(options)
+                widget = self.addCentralWidget(data,options)
             else: logger.info("Could not load central widget '{}'".format(data))
         if config.storage.gui.central_tab_index < self.centralWidget().count():
             self.centralWidget().setCurrentIndex(config.storage.gui.central_tab_index)
@@ -256,9 +260,7 @@ class MainWindow(QtGui.QMainWindow):
         for id,objectName,options in config.storage.gui.dock_widgets:
             data = WidgetData.fromId(id)
             if data is not None: # As above it may happen that data is None.
-                widget = self._createDockWidget(data,objectName)
-                if hasattr(widget,"restoreState"):
-                    widget.restoreState(options)
+                widget = self._createDockWidget(data,objectName,options)
             else: logger.info("Could not load dock widget '{}' with object name '{}'".format(data,objectName))
 
         # Restore state

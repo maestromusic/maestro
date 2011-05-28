@@ -58,7 +58,8 @@ def collectFiles(paths):
             filePaths.append(path)
         elif os.path.isdir(path):
             filePaths.extend(collectFiles(os.path.join(path,p) for p in os.listdir(path)))
-    return filePaths     
+    return filePaths
+
 def getIconPath(name,plugin=None):
     if plugin is None:
         return os.path.join(constants.IMAGES, "icons", name)

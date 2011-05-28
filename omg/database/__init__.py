@@ -246,7 +246,11 @@ def isFile(elid):
 def isContainer(elid):
     """Return whether the element with id <elid> exists and is a container."""
     return query("SELECT file FROM {}elements WHERE id = ?".format(prefix),elid).getSingle() == 0
-    
+
+def isMajor(elid):
+    """Return whether the element with id *elid* is a major element (it should be a container then)."""
+    return query("SELECT major FROM {}elements WHERE id = ?".format(prefix),elid).getSingle() == 1
+
 def isToplevel(elid):
     """Return whether the element with id <elid> exists and is toplevel element."""
     return query("SELECT toplevel FROM {}elements WHERE id = ?".format(prefix),elid).getSingle() == 1
