@@ -105,11 +105,14 @@ class Node:
                 return i
         return -1
 
-    def getAllNodes(self):
-        """Generator which will return all nodes contained in this node or in children of it (including the node itself)."""
-        assert self.getContents() is not None
-        yield self
-        for element in self.getContents():
+    def getAllNodes(self, skipSelf = False):
+        """Generator which will return all nodes contained in this node or in children of it, including the node itself
+        if skipSelf is not set True."""
+        if not skipSelf:
+            yield self
+        if self.isFile():
+            return
+        for element in self.contents:
             for node in element.getAllNodes():
                 yield node
         
@@ -267,11 +270,13 @@ class Element(Node):
         return formatter.Formatter(self).title()
     
     def toolTipText(self):
+        if self.tags is not None:
+            return '\n'.join( ('{t}: {v}'.format(t = tag.translated(), v = ', '.join(map(str, values))) for (tag,values) in self.tags.items() ))
         return str(self)
     
     def __str__(self):
         if self.tags is not None:
-            return "<{}[{}] {}>".format(type(self).__name__,self.id, self.getTitle())
+            return "({}) <{}[{}]> {}".format(self.position if self.position is not None else '', type(self).__name__,self.id, self.getTitle())
         else: return "<{}[{}]>".format(type(self).__name__,self.id)
     
 

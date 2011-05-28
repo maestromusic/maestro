@@ -11,7 +11,7 @@
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from omg import database as db, application, constants, config, utils
+from omg import database as db, application, constants, config, utils, tags as tagsModule
 from omg.gui import mainwindow
 
 # don't use relative import since this file may be executed directly and is not a package in that case.
@@ -96,7 +96,7 @@ class DBAnalyzerDialog(QtGui.QDialog):
         tagBox.setLayout(tagLayout)
         leftLayout.addWidget(tagBox,1)
 
-        self.tagTable = QtGui.QTableWidget(1,5)
+        self.tagTable = QtGui.QTableWidget(1,7)
         self.tagTable.verticalHeader().hide()
         tagLayout.addWidget(self.tagTable)
 
@@ -157,7 +157,13 @@ class DBAnalyzerDialog(QtGui.QDialog):
         # Tags
         tags = self.getTags()
         self.tagTable.setRowCount(len(tags))
-        for i,header in enumerate((self.tr("ID"),self.tr("Name"),self.tr("Type"),self.tr("Values"),self.tr("Refs"))):
+        for i,header in enumerate((self.tr("ID"),
+                                   self.tr("Name"),
+                                   self.tr("Type"),
+                                   self.tr("SortKey"),
+                                   self.tr("Private"),
+                                   self.tr("Values"),
+                                   self.tr("Refs"))):
             self.tagTable.setHorizontalHeaderItem(i,QtGui.QTableWidgetItem(header))
         for i,tuple in enumerate(tags):
             for j,data in enumerate(tuple):
@@ -261,9 +267,9 @@ class DBAnalyzerDialog(QtGui.QDialog):
     def getTags(self):
         """Gather and return the data for the tags table."""
         tags = []
-        result = db.query("SELECT id,tagname,tagtype FROM {}tagids ORDER BY id".format(db.prefix))
-        for id,name,type in result:
-            tuple = (id,name,type,
+        result = db.query("SELECT id,tagname,tagtype,sortkey,private FROM {}tagids ORDER BY id".format(db.prefix))
+        for id,name,type,sort,private in result:
+            tuple = (id,name,type,tagsModule.get(sort),private,
                 db.query("SELECT COUNT(*) FROM {}values_{} WHERE tag_id={}".format(db.prefix,type,id)).getSingle(),
                 db.query("SELECT COUNT(*) FROM {}tags WHERE tag_id={}".format(db.prefix,id)).getSingle()
              )

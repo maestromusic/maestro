@@ -24,7 +24,8 @@ from xml.sax.handler import ContentHandler
 
 from omg import config, constants, logging
 from omg.utils import FlexiDate, getIconPath
-
+import PyQt4
+translate = PyQt4.QtGui.QApplication.translate
 logger = logging.getLogger("omg.tags")
 
 # Module variables - Will be initialized with the first call of init.
@@ -50,8 +51,9 @@ ALBUM = None
 
 class ValueType:
     """Class for the type of tag-values. Currently only three types are possible: varchar, date and text. For each of them there is an instance (e.g. ``tags.TYPE_VARCHAR``) and you can get all of them via ``tags.TYPES``. You should never create your own instances."""
-    def __init__(self,name):
+    def __init__(self,name, description = ''):
         self.name = name
+        self.description = description
 
     def __eq__(self,other):
         return isinstance(other,ValueType) and self.name == other.name
@@ -121,9 +123,9 @@ class ValueType:
         return self.name
 
 # Modul variables for the existing types
-TYPE_VARCHAR = ValueType('varchar')
-TYPE_TEXT = ValueType('text')
-TYPE_DATE = ValueType('date')
+TYPE_VARCHAR = ValueType('varchar', translate('tags', 'a tag type for normal (not too long) text values'))
+TYPE_TEXT = ValueType('text', translate('tags', 'a tag type for long texts (like e.g. lyrics)'))
+TYPE_DATE = ValueType('date', translate('tags', 'a tag type for dates'))
 TYPES = [TYPE_VARCHAR,TYPE_TEXT,TYPE_DATE]
 
 
@@ -223,7 +225,13 @@ def exists(identifier):
         raise RuntimeError("Identifier's type is neither int nor string: {} of type {}"
                                 .format(identifier,type(identifier)))
         
-    
+class UnknownTagError(RuntimeError):
+    tagname = None
+    def __init__(self, tagname):
+        self.tagname = tagname
+    def __str__(self):
+        return 'unknown tag {}'.format(self.tagname)
+
 def get(identifier):
     """Return the tag identified by *identifier*. If *identifier* is an integer return the tag with this id.
     If *identifier* is a string return the tag with this name.
@@ -235,7 +243,8 @@ def get(identifier):
         identifier = identifier.lower()
         if identifier in _tagsByName:
             return _tagsByName[identifier]
-        else: raise ValueError("There is no tag with name '{}'".format(identifier))
+        else:
+            raise UnknownTagError(identifier)
     elif isinstance(identifier, Tag):
         return identifier
     else:
@@ -252,13 +261,18 @@ def fromTranslation(translation):
     else: return get(translation)
 
 
-def addTag(name,type):
+def addTag(name, type, sort = None, private = False):
+    """Adds a new tag named <name> of type <type> to the database. The parameter <sort> is the tag by which elements should
+    be sorted if displayed below a ValueNode of this new tag; this defaults to the TITLE tag.
+    If private is True, a private tag is created.""" 
     if name in _tagsByName:
         raise RuntimeError("Requested creation of tag {} which is already there".format(name))
+    if sort is None:
+        sort = TITLE
     from omg import database
     id = database.query(
-        "INSERT INTO {}tagids (tagname,tagtype) VALUES (?,?)".format(database.prefix),
-        name,type.name).insertId()
+        "INSERT INTO {}tagids (tagname,tagtype, sortkey, private) VALUES (?, ?, ?, ?)".format(database.prefix),
+        name,type.name, sort.id, private).insertId()
     newTag = Tag(id,name,type)
     _tagsByName[name] = newTag
     _tagsById[id] = newTag

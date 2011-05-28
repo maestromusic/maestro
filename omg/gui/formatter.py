@@ -59,7 +59,7 @@ class Formatter:
         elif isinstance(self.element,models.File):
             result = self.element.path
         else:
-            result = self.tr("Formatter","<No title>")
+            result = translate("Formatter","<No title>")
         if isinstance(self.element,models.Element) and self.element.isInDB() and options.misc.show_ids:
             return "[{0}] {1}".format(self.element.id,result)
         else: return result

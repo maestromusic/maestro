@@ -17,11 +17,14 @@ from ..config import options
 from ..utils import hasKnownExtension, collectFiles
 
 from collections import OrderedDict
+from functools import reduce
+import re
+
 logger = logging.getLogger("models.editor")
 
 class EditorModel(rootedtreemodel.EditableRootedTreeModel):
     def __init__(self, name = 'default'):
-        rootedtreemodel.EditableRootedTreeModel.__init__(self, RootNode())
+        super().__init__(RootNode())
         self.contents = []
         self.name = name
         modify.dispatcher.changes.connect(self.handleChangeEvent)
@@ -55,9 +58,9 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
         for node in contents:
             node.setParent(self.root)
         self.reset()
-            
+        
     def flags(self,index):
-        defaultFlags = rootedtreemodel.EditableRootedTreeModel.flags(self,index)
+        defaultFlags = super().flags(index)
         if index.isValid():
             return defaultFlags | Qt.ItemIsDropEnabled | Qt.ItemIsDragEnabled
         else: return defaultFlags | Qt.ItemIsDropEnabled
@@ -74,6 +77,7 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
     def dropMimeData(self,mimeData,action,row,column,parentIndex):
         """This function does all the magic that happens if elements are dropped onto this editor."""
         print("dropMimeData on {} row {}".format(self.data(parentIndex, Qt.EditRole), row))
+        QtGui.QApplication.changeOverrideCursor(Qt.ArrowCursor) # dont display the DnD cursor during the warning
         if action == Qt.IgnoreAction:
             return True
         if column > 0:
@@ -95,6 +99,7 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
                 # check for recursion error
                 for n in o.getAllNodes():
                     if n.id == parent.id:
+                        
                         QtGui.QMessageBox.critical(None, self.tr('error'),self.tr('You cannot put a container below itself in the hierarchy!'))
                         return False
             if action == Qt.CopyAction:
@@ -142,6 +147,8 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
         elif mimeData.hasFormat("text/uri-list"):
             # easy case: files and/or folders are dropped from outside or from a filesystembrowser.
             nodes = self._handleUrlDrop(mimeData.urls())
+            if nodes is False:
+                return False
             parent_copy.contents[row:row] = nodes
             for n in nodes:
                 n.setParent(parent_copy)
@@ -155,9 +162,37 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
     
     def _handleUrlDrop(self, urls):
         files = sorted(set( (f for f in collectFiles((url.path() for url in urls)) if hasKnownExtension(f)) ))
+        progress = QtGui.QProgressDialog()
+        progress.setLabelText(self.tr("Importing {0} files...").format(len(files)))
+        progress.setRange(0, len(files))
+        progress.setMinimumDuration(1500)
+        progress.setWindowModality(Qt.WindowModal)
+        print(len(files))
         elementList = []
-        for f in files:
-            elementList.append(File.fromFilesystem(f))
+        for i,f in enumerate(files):
+            progress.setValue(i+1)
+            QtGui.QApplication.processEvents();
+            if progress.wasCanceled():
+                return False
+            readOk = False
+            while not readOk:
+                try:
+                    elementList.append(File.fromFilesystem(f))
+                    readOk = True
+                except tags.UnknownTagError as e:
+                    descMap = {'{n} ({d})'.format(n = t.name, d = t.description):t for t in tags.TYPES}
+                    selection, ok = QtGui.QInputDialog.getItem(None,
+                       self.tr('new tag »{0}« found'.format(e.tagname)),
+                       self.tr('File <{0}> contains a so far unknown tag »{1}«. What should its type be?'.format(f, e.tagname)),
+                       list(descMap.keys()),
+                       0,
+                       False,
+                       QtCore.Qt.Dialog)
+                    if ok:
+                        tags.addTag(e.tagname, descMap[selection])
+                    else:
+                        progress.cancel()
+                        return False
         return self.guessTree(elementList)
     
     def fireRemoveIndexes(self, elements):
@@ -196,8 +231,7 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
                 albumIds = db.parents(id)
                 for aid in albumIds:
                     if not aid in albumsFoundByID:
-                        albumsFoundByID[aid] = Container.fromId(aid)
-                    exAlb = albumsFoundByID[aid]
+                        exAlb = albumsFoundByID[aid] = Container.fromId(aid)
                     exAlbName = ", ".join(exAlb.tags[tags.TITLE])
                     if not exAlbName in albumsFoundByName:
                         albumsFoundByName[exAlbName] = exAlb
@@ -205,7 +239,7 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
                     file.parent = exAlb
                     exAlb.contents.append(file)
             elif tags.ALBUM in t:
-                album = t[tags.ALBUM][0] # we don't support multiple album tags
+                album = ", ".join(t[tags.ALBUM])
                 if not album in albumsFoundByName:
                     albumsFoundByName[album] = Container(tags = tags.Storage(), position = None, id = modify.newEditorId())
                 file.parent = albumsFoundByName[album]
@@ -213,7 +247,7 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
                 if file.position is None:
                     file.position = 0
             elif tags.TITLE in t:
-                album = t[tags.TITLE][0] #TODO: If there are two songs with the same title this will delete the first of them
+                album = "SingleFile" + ", ".join(t[tags.TITLE])
                 albumsFoundByName[album] = file
             else:
                 album = file.path
@@ -222,107 +256,54 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
         
         for album in albumsFoundByName.values():
             self.finalize(album)
-            
-        return albumsFoundByName.values()
+        FIND_DISC_RE=r" ?[([]?(?:cd|disc|part|teil|disk|vol)\.? ?([iI0-9]+)[)\]]?"
+        metaContainers = {}
+        finalAlbums = []
+        for name, album in albumsFoundByName.items():
+            discstring = re.findall(FIND_DISC_RE,name,flags=re.IGNORECASE)
+            if len(discstring) > 0:
+                discnumber = discstring[0]
+                if discnumber.lower().startswith("i"): #roman number, support I-III :)
+                    discnumber = len(discnumber)
+                else:
+                    discnumber = int(discnumber)
+                discname_reduced = re.sub(FIND_DISC_RE,"",name,flags=re.IGNORECASE)
+                if discname_reduced in metaContainers:
+                    metaContainer = metaContainers[discname_reduced]
+                else:
+                    metaContainer = Container(tags.Storage(), None, modify.newEditorId(), None)
+                    metaContainers[discname_reduced] = metaContainer
+                metaContainer.contents.append(album)
+                album.position = discnumber
+                album.parent = metaContainer
+            else:
+                finalAlbums.append(album)
+        for title, album in metaContainers.items():
+            self.finalize(album)
+            album.tags[tags.TITLE] = [title]
+        finalAlbums.extend(metaContainers.values())
+        return finalAlbums
         
     def finalize(self, album):
+        """Finalize a heuristically guessed album: Update tags such that the album contains
+        all tags that are equal in all children."""
         if album.isFile():
             return
         album.contents.sort(key=lambda x : x.position or -1)
-        album.tags[tags.TITLE] = album.contents[0].tags[tags.ALBUM]
-                  
-#===============================================================================
-
-#        
-#    def merge(self, indices, name):
-#        self.undoStack.beginMacro("Merge {} items, title »{}«".format(len(indices),name))
-#        amount = len(indices)
-#        if amount > 0:
-#            indices.sort(key = lambda ind: ind.row())
-#            
-#            rows = [ ind.row() for ind in indices ]
-#            elements = [ ind.internalPointer() for ind in indices ]
-#            parentIdx = indices[0].parent()
-#            parent = elements[0].parent
-#            if not parent:
-#                parent = self.root()
-#            lastrow = self.rowCount(parentIdx)
-#            for row in reversed(rows): # remove element from current child list
-#                if row != rows[0]:
-#                    for r in range(row+1,lastrow): # adjust position of elements behind
-#                        child = parentIdx.child(r,0).internalPointer()
-#                        self.undoStack.push(PositionChangeCommand(child, child.position - 1))
-#                self.undoStack.push(
-#                      RemoveContentsCommand(self, parentIdx, row, 1))
-#                lastrow -= 1
-#            
-#            newContainer = Container(id = None)
-#            newContainer.parent = parent
-#            newContainer.position = elements[0].position
-#            newContainer.loadTags()
-#            newContainer.setContents(elements)
-#            for element,j in zip(elements, itertools.count(1)):
-#                self.undoStack.push(PositionChangeCommand(element, j))
-#                for tag, i in zip(element.tags[tags.TITLE], itertools.count()):
-#                    if tag.find(name) != -1:
-#                        newtag = tag.replace(name, "").\
-#                            strip(constants.FILL_CHARACTERS).\
-#                            lstrip("0123456789").\
-#                            strip(constants.FILL_CHARACTERS)
-#                        if newtag == "":
-#                            newtag = "Part {}".format(i+1)
-#                        self.undoStack.push(TagChangeCommand(element, tags.TITLE, i, newtag))
-#            newContainer.updateSameTags()  
-#            newContainer.tags[tags.TITLE] = [ name ]
-#            self.undoStack.push(InsertContentsCommand(self, parent, row, [newContainer], copy = False))
-#            
-#            self.dataChanged.emit(
-#                self.index(row, 0, parentIdx), self.index(self.rowCount(parentIdx)-1, 0, parentIdx))
-#            self.dataChanged.emit(parentIdx, parentIdx)
-#        self.undoStack.endMacro()
-#        
-# 
-# # ALTER KRAM
-# def computeHash(self):
-#        """Computes the hash of the audio stream and stores it in the object's hash attribute."""
-#    
-#        import hashlib,tempfile,subprocess
-#        handle, tmpfile = tempfile.mkstemp()
-#        subprocess.check_call(
-#            ["mplayer", "-dumpfile", tmpfile, "-dumpaudio", absPath(self.path)], #TODO: konfigurierbar machen
-#            stdout=subprocess.PIPE,
-#            stderr=subprocess.PIPE)
-#        with open(handle,"br") as hdl:
-#            self.hash = hashlib.sha1(hdl.read()).hexdigest()
-#        os.remove(tmpfile)
-#    
-# def computeAndStoreHash(self):
-#    self.computeHash()
-#    db.query("UPDATE files SET hash = ? WHERE element_id = ?;", self.hash, self.id)
-#    logger.debug("hash of file {} has been computed and set".format(self.path))
-#    
-# def commit(self, toplevel = False):
-#    """Save this file into the database. After that, the object has an id attribute"""
-#    if self.isInDB(): #TODO: tags commiten
-#        return
-#    
-#    import omg.gopulate
-#    logger.debug("commiting file {}".format(self.path))
-#    self.id = queries.addContainer(
-#                                    os.path.basename(self.path),
-#                                    tags = self.tags,
-#                                    file = True,
-#                                    elements = 0,
-#                                    toplevel = toplevel)
-#    querytext = "INSERT INTO files (element_id,path,hash,length) VALUES(?,?,?,?);"
-#    if self.length is None:
-#        self.length = 0
-#    if hasattr(self, "hash"):
-#        hash = self.hash
-#    else:
-#        hash = 'pending'            
-#    db.query(querytext, self.id, relPath(self.path), hash, int(self.length))
-#    if hash == 'pending':
-#        hashQueue.put((self.computeAndStoreHash, [], {}))
-#    self._syncState = {}
-#===============================================================================
+        commonTags = set(x for x in reduce(lambda x,y: x & y, [set(elem.tags.keys()) for elem in album.getAllNodes(skipSelf = True)]))
+        commonTagValues = {}
+        differentTags=set()
+        
+        for element in album.getAllNodes(skipSelf = True):
+            t = element.tags
+            for tag in commonTags:
+                if tag not in commonTagValues:
+                    commonTagValues[tag] = t[tag]
+                elif commonTagValues[tag] != t[tag]:
+                    differentTags.add(tag)
+        sameTags = commonTags - differentTags
+        album.tags.clear()
+        for tag in sameTags:
+            album.tags[tag] = commonTagValues[tag]
+        if tags.ALBUM in album.tags:
+            album.tags[tags.TITLE] = album.tags[tags.ALBUM]
