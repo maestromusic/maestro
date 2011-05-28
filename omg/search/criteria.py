@@ -218,7 +218,7 @@ def reduce(criteria,processed):
 def _formatColumns(columns,fromTable):
     """Generate a string which can be used after SELECT and will select the given columns from the given table. A possible result would be "elements.id,elements.position,elements.elements"."""
     if columns is None:
-        columns = ('id',)
+        columns = ('id','major')
     return ",".join("{0}.{1}".format(fromTable,column) for column in columns)
     
 

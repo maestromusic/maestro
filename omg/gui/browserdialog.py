@@ -9,7 +9,8 @@
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from omg import config, tags, utils
+from .. import config, tags, utils
+from . import dialogs
 
 # Layers that can be selected in BrowserDialog's comboboxes. Each item in the list is a list containing for each layer a list of the tagnames in that layer.
 selectableLayers = utils.mapRecursively(tags.get,[
@@ -25,7 +26,41 @@ selectableLayers = utils.mapRecursively(tags.get,[
      [['album']]
 ])
 
-class BrowserDialog(QtGui.QDialog):
+
+class BrowserDialog(dialogs.FancyTabbedPopup):
+    def __init__(self,browser):
+        dialogs.FancyTabbedPopup.__init__(self,browser.window())
+        self.browser = browser
+        self.viewConfigurations = []
+                
+        self.flagTab = QtGui.QWidget()
+        self.addTab(self.flagTab,self.tr("Flags"))
+        optionTab = QtGui.QWidget()
+        optionLayout = QtGui.QVBoxLayout()
+        optionTab.setLayout(optionLayout)
+        self.addTab(optionTab,self.tr("Options"))
+        
+        instantSearchBox = QtGui.QCheckBox(self.tr("Instant search"))
+        instantSearchBox.setChecked(self.browser.searchBox.getInstantSearch())
+        instantSearchBox.clicked.connect(self.browser.searchBox.setInstantSearch)
+        optionLayout.addWidget(instantSearchBox)
+        
+        hideInBrowserBox = QtGui.QCheckBox(self.tr("Show hidden values"))
+        hideInBrowserBox.setChecked(self.browser.getShowHiddenValues())
+        hideInBrowserBox.clicked.connect(self.browser.setShowHiddenValues)
+        optionLayout.addWidget(hideInBrowserBox)
+        
+        viewConfigButton = QtGui.QPushButton(self.tr("Configure Views..."))
+        viewConfigButton.clicked.connect(lambda: ViewConfigurationDialog(self.browser).exec_())
+        viewConfigButton.setSizePolicy(QtGui.QSizePolicy(QtGui.QSizePolicy.Fixed,QtGui.QSizePolicy.Fixed))
+        optionLayout.addWidget(viewConfigButton)
+        
+        optionLayout.addStretch(1)
+        
+        self.adjustSize()
+
+
+class ViewConfigurationDialog(QtGui.QDialog):
     """The BrowserDialog allows you to configure the views and their layers of a browser."""
     def __init__(self,parent):
         """Initialize with the given parent, which must be the browser to configure."""

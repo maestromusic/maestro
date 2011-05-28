@@ -6,8 +6,10 @@
 # published by the Free Software Foundation
 
 from PyQt4 import QtGui, QtCore
+from PyQt4.QtCore import Qt
 
-from omg import tags
+from omg import tags, utils
+
 
 class NewTagDialog(QtGui.QDialog):
 
@@ -42,3 +44,21 @@ class NewTagDialog(QtGui.QDialog):
         if d.exec() == QtGui.QDialog.Accepted:
             return d.selectedType()
         return None
+
+
+class FancyTabbedPopup(QtGui.QTabWidget):
+    def __init__(self,parent = None):
+        QtGui.QTabWidget.__init__(self,parent)
+        self.setAutoFillBackground(True)
+        self.setDocumentMode(True)
+        effect = QtGui.QGraphicsDropShadowEffect()
+        effect.setOffset(2,2)
+        self.setGraphicsEffect(effect)
+                
+        closeButton = QtGui.QToolButton()
+        closeButton.setIcon(utils.getIcon('close_button.png'))
+        closeButton.setStyleSheet(
+            "QToolButton { border: None } QToolButton:hover { border: 1px solid white; }")
+        closeButton.clicked.connect(self.close)
+        self.setCornerWidget(closeButton)
+        

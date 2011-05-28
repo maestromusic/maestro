@@ -96,8 +96,10 @@ def run(cmdConfig = []):
     plugins.enablePlugins()
 
     # Create GUI
+    # First import all modules that want to add WidgetData
     import omg.gui.filesystembrowser
     import omg.gui.editor
+    import omg.gui.browser
     from omg.gui import mainwindow
     global mainWindow
     mainWindow = mainwindow.MainWindow()

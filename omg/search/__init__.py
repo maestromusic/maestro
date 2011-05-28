@@ -74,7 +74,7 @@ class SearchEngine(QtCore.QObject):
         all result tables of this engine but you may create result tables for different engines using the
         same *part*.
         
-        All tables created with this method are belong to this engine and will be dropped when this engine is
+        All tables created with this method belong to this engine and will be dropped when this engine is
         shut down.
         
         Warning: Do not change the set of elements in the result table, unless you are not going to use it for
@@ -94,8 +94,9 @@ class SearchEngine(QtCore.QObject):
             CREATE TABLE {} (
                 id MEDIUMINT UNSIGNED,
                 {}
-                toplevel TINYINT UNSIGNED DEFAULT 0,
-                new TINYINT UNSIGNED DEFAULT 1,
+                toplevel BOOLEAN DEFAULT 0,
+                direct BOOLEAN DEFAULT 1,
+                major BOOLEAN DEFAULT 0,
                 PRIMARY KEY(id))
                 ENGINE MEMORY;
             """.format(tableName,customColumns))
@@ -260,7 +261,8 @@ class SearchThread(threading.Thread):
                     print("Starting search...")
                     db.query("TRUNCATE TABLE {0}".format(resultTable))
                     queryData = criterion.getQuery(fromTable)
-                    queryData[0] = "INSERT INTO {0} (id) {1}".format(resultTable,queryData[0])
+                    # Prepend the returned query with INSERT INTO...
+                    queryData[0] = "INSERT INTO {0} (id,major) {1}".format(resultTable,queryData[0])
                     #print(*queryData)
                     db.query(*queryData)
                 else:
@@ -270,7 +272,7 @@ class SearchThread(threading.Thread):
                     # not contained in TT_HELP.
                     db.query("TRUNCATE TABLE {0}".format(TT_HELP))
                     queryData = criterion.getQuery(resultTable)
-                    queryData[0] = "INSERT INTO {0} (id) {1}".format(TT_HELP,queryData[0])
+                    queryData[0] = "INSERT INTO {0} (id,value) {1}".format(TT_HELP,queryData[0])
                     #print(*queryData)
                     db.query(*queryData)
                     db.query("DELETE FROM {0} WHERE id NOT IN (SELECT id FROM {1})"
@@ -279,79 +281,64 @@ class SearchThread(threading.Thread):
                 tables[resultTable].append(criterion)
 
                 if len(criteria) == 0:
+                    print("Starting post-processing...")
+                    self.postProcessing(resultTable)
                     print("Finished search")
                     self.engine.searchFinished.emit()
+                    
+    @staticmethod
+    def _procContainer(processedIds,id):
+        parents = db.parents(id)
+        result = False
+        for pid in parents:
+            if pid not in processedIds:
+                if SearchThread._procContainer(processedIds,pid):
+                    result = True
+            elif processedIds[pid][0]:
+                result = True
+        
+        major = db.isMajor(id)
+        if major:
+            result = True
+        processedIds[id] = (result,major)
+        return result
     
-
-def addChildren(resultTable,fromTable="elements"):
-    while True:
-        db.query("TRUNCATE TABLE {0}".format(TT_HELP))
-        # First store all direct results which have children in TT_HELP
+    def postProcessing(self,resultTable):
         result = db.query("""
-            INSERT INTO {0} (id)
-                SELECT {1}.id
-                FROM {1} JOIN elements ON {1}.id = elements.id
-                WHERE {1}.new = 1 AND elements.elements > 0
-            """.format(TT_HELP,resultTable))
-        if result.affectedRows() == 0:
-            break
-        db.query("UPDATE {0} SET new = 0".format(resultTable))
-        db.query("""
-            INSERT IGNORE INTO {0} (id,file,new)
-                SELECT contents.element_id,{2}.file,1
-                FROM {1} AS parents JOIN contents ON parents.id = contents.container_id
-                                    JOIN {2} ON {2}.id = contents.element_id
-                GROUP BY contents.element_id
-                """.format(resultTable,TT_HELP,fromTable))
+                SELECT DISTINCT {0}contents.container_id
+                FROM {1} JOIN {0}contents ON {1}.id = {0}contents.element_id
+                """.format(db.prefix,resultTable))
+        
+        if result.size() > 0:
+            processedIds = {}
+            for id in result.getSingleColumn():
+                if not id in processedIds:
+                    SearchThread._procContainer(processedIds, id)
+            args = [(id,tup[1]) for id,tup in processedIds.items() if tup[0]]
+            if len(args) > 0:
+                db.multiQuery(
+                    "INSERT IGNORE INTO {} (id,major,direct) VALUES (?,?,0)"
+                    .format(resultTable),args)
+
+        setTopLevelFlags(resultTable)
 
 
-def addFilledParents(resultTable,fromTable="elements"):
+def setTopLevelFlags(table):
     db.query("TRUNCATE TABLE {0}".format(TT_HELP))
-    db.query("UPDATE {0} SET new = 1".format(resultTable))
-    while True:
-         # If fromTable is not elements this query part will ensure that only elements in fromTable will be
-         # added.
-        if fromTable != 'elements':
-            restrictToFromTablePart = "JOIN {0} ON {0}.id = contents.element_id".format(fromTable)
-        else: restrictToFromTablePart = ''
-        result = db.query("""
-            INSERT INTO {0} (id,value)
-                SELECT contents.container_id, COUNT(*)
-                FROM {1} JOIN contents ON {1}.id = contents.element_id {2}
-                WHERE {1}.new = 1
-                GROUP BY contents.container_id
-                """.format(TT_HELP,resultTable,restrictToFromTablePart))
-        if result.affectedRows() == 0:
-            break
-        db.query("UPDATE {0} SET new = 0".format(resultTable))
+    if table == db.prefix + "elements":
         db.query("""
-            INSERT IGNORE INTO {0} (id,file,new)
-                SELECT {1}.id,0,1
-                FROM {1} JOIN elements ON {1}.id = elements.id
-                WHERE elements.elements = {1}.value
-                """.format(resultTable,TT_HELP))
+            INSERT INTO {1} (id)
+                SELECT DISTINCT {0}contents.element_id
+            """.format(db.prefix,TT_HELP))
+    else:
+        # in this case make sure the results as well as their parents are contained in table
+        db.query("""
+            INSERT INTO {1} (id)
+                SELECT DISTINCT c.element_id
+                FROM contents AS c JOIN {2} AS parents ON c.container_id = parents.id
+                                   JOIN {2} AS children ON c.element_id = children.id
+                """.format(db.prefix,TT_HELP,table))
 
-
-def setTopLevelFlag(table):
-    db.query("TRUNCATE TABLE {0}".format(TT_HELP))
-    if table != "elements":
-        restrictToTablePart = "JOIN {0} ON contents.element_id = {0}.id".format(table)
-    else: restrictToTablePart = ''
-    db.query("""
-        INSERT INTO {0} (id)
-            SELECT DISTINCT contents.element_id
-            FROM {1} AS parents JOIN contents ON parents.id = contents.container_id {2}
-            """.format(TT_HELP,table,restrictToTablePart))
-    db.query("UPDATE {0} SET toplevel = 1".format(table))
+    db.query("UPDATE {} SET toplevel = 1".format(table))
     db.query("INSERT INTO {0} (id) (SELECT id FROM {1}) ON DUPLICATE KEY UPDATE toplevel = 0"
                 .format(table,TT_HELP))
-    
-    
-def printResultTable(table):
-    result = db.query("""
-        SELECT res.id,res.file,res.toplevel,res.new,elements.name
-        FROM {0} as res JOIN elements ON res.id = elements.id
-        """.format(table))
-    print("Printing result table "+table)
-    for row in result:
-        print("{0} '{4}' File: {1} Toplevel: {2} New: {3}".format(*row))

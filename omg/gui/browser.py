@@ -1,37 +1,62 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# Copyright 2009 Martin Altmayer
+# Copyright 2011 Martin Altmayer
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 3 as
 # published by the Free Software Foundation
 #
+
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
-from omg import database, search, tags, config, constants, models, utils, control
-from omg.models import browser as browsermodel
+from .. import database as db, config, search, constants, utils, tags
+from ..search import searchbox
+from . import mainwindow, treeview, browserdialog
+from ..models import browser as browsermodel
+                         
+translate = QtCore.QCoreApplication.translate
 
-from . import delegates, browserdialog, formatter, treeview, tageditor
 
-# Temporary tables used for search results (have to appear before the imports as they will be imported in some imports)
-TT_BIG_RESULT = 'tmp_browser_bigres'
-TT_SMALL_RESULT = 'tmp_browser_smallres'
+class BrowserDock(QtGui.QDockWidget):
+    def __init__(self,parent=None,state=None):
+        QtGui.QDockWidget.__init__(self,parent)
+        self.setWindowTitle(self.tr("Browser"))
+        self.browser = Browser(self,state)
+        self.setWidget(self.browser)
+        
+    def saveState(self):
+        return self.browser.saveState()
+
+
+mainwindow.addWidgetData(mainwindow.WidgetData(
+        id="browser",
+        name=translate("Browser","Browser"),
+        theClass = BrowserDock,
+        central=False,
+        dock=True,
+        default=True,
+        unique=False,
+        preferredDockArea=Qt.LeftDockWidgetArea))
+
 
 class Browser(QtGui.QWidget):
     """Browser-widget to search the music collection. The browser contains a searchbox, a button to open the configuration-dialog and one or more views. Depending on whether a search value is entered or not, the browser displayes results from TT_BIG_RESULT or 'elements' (the correct table is stored in self.table). Each view has a list of tag-sets ('layers') and will group the contents of self.table according to the layers."""
     
     views = None # List of BrowserTreeViews
-    searchBox = None
     
-    table = "elements" # The MySQL-table whose contents are currently displayed
+    table = db.prefix + "elements" # The MySQL-table whose contents are currently displayed
     
-    def __init__(self,parent = None):
+    showHiddenValues = False
+    
+    def __init__(self,parent = None,state = None):
         """Initialize a new Browser with the given parent."""
         QtGui.QWidget.__init__(self,parent)
 
-        search.createResultTempTable(TT_BIG_RESULT,True)
-        search.createResultTempTable(TT_SMALL_RESULT,True)
+        self.searchEngine = search.SearchEngine()
+        self.searchEngine.searchFinished.connect(self._handleSearchFinished)
+        self.bigResult = self.searchEngine.createResultTable("browser_big")
+        self.smallResult = self.searchEngine.createResultTable("browser_small")
         
         # Layout
         layout = QtGui.QVBoxLayout(self)
@@ -40,32 +65,50 @@ class Browser(QtGui.QWidget):
         # ControlLine (containing searchBox and optionButton)
         controlLineLayout = QtGui.QHBoxLayout()
         layout.addLayout(controlLineLayout)
-        controlLineLayout.addWidget(QtGui.QLabel(self.tr("Search: "),self))
-        self.searchBox = QtGui.QLineEdit(self)
-        self.searchBox.returnPressed.connect(self.search)
+        
+        self.searchBox = searchbox.SearchBox(self)
+        self.searchBox.criteriaChanged.connect(self.search)
         controlLineLayout.addWidget(self.searchBox)
-        optionButton = QtGui.QPushButton(self)
-        optionButton.setIcon(QtGui.QIcon(constants.IMAGES+"icons/options.png"))
-        optionButton.clicked.connect(lambda: browserdialog.BrowserDialog(self).exec_())
-        controlLineLayout.addWidget(optionButton)
+        
+        self.optionButton = QtGui.QPushButton(self)
+        self.optionButton.setIcon(utils.getIcon('options.png'))
+        self.optionButton.clicked.connect(self._handleOptionButton)
+        controlLineLayout.addWidget(self.optionButton)
         
         self.splitter = QtGui.QSplitter(Qt.Vertical,self)
         layout.addWidget(self.splitter)
         
+        # Restore state
+        viewsToRestore = config.storage.browser.views
+        if state is not None and isinstance(state,dict):
+            if 'instant' in state:
+                self.searchBox.setInstantSearch(state['instant'])
+            if 'showHiddenValues' in state:
+                self.showHiddenValues = state['showHiddenValues']
+            if 'views' in state:
+                viewsToRestore = state['views']
+                
         self.views = []
-        self.createViews(utils.mapRecursively(tags.get,config.shelve['browser_views']))
-    
+        # Convert tag names to tags, leaving the nested list structure unchanged
+        self.createViews(utils.mapRecursively(tags.get,viewsToRestore))
+        self.search() # Start an empty search to display all elements  
+          
+    def saveState(self):
+        return {
+            'instant': self.searchBox.getInstantSearch(),
+            'showHiddenValues': self.showHiddenValues,
+            'views': utils.mapRecursively(lambda tag: tag.name,[view.model().getLayers() for view in self.views])
+        }
+        
     def search(self):
         """Search for the value in the search-box. If it is empty, display all values."""
-        if self.searchBox.text():
-            search.stdTextSearch(self.searchBox.text(),TT_BIG_RESULT)
-            self.table = TT_BIG_RESULT
+        criteria = self.searchBox.getCriteria()
+        if len(criteria) > 0:
+            self.searchEngine.runSearch(db.prefix+"elements",self.bigResult,criteria)
+            self.table = self.bigResult
         else:
-            self.table = "elements"
-            database.get().query("TRUNCATE TABLE {0}".format(TT_BIG_RESULT))
-        
-        for view in self.views:
-            view.model().setTable(self.table)
+            self.table = db.prefix + "elements"
+            self._handleSearchFinished()
     
     def createViews(self,layersList):
         """Destroy all existing views and create views according to <layersList>: For each entry of <layersList> a BrowserTreeView using the entry as layers is created. Therefore each entry of <layersList> must be a list of tag-lists (confer BrowserTreeView.__init__)."""
@@ -77,6 +120,25 @@ class Browser(QtGui.QWidget):
             self.views.append(newView)
             self.splitter.addWidget(newView)
 
+    def getShowHiddenValues(self):
+        return self.showHiddenValues
+    
+    def setShowHiddenValues(self,showHiddenValues):
+        self.showHiddenValues = showHiddenValues
+        for view in self.views:
+            view.setShowHiddenValues(showHiddenValues)
+        
+    def _handleOptionButton(self):
+        dialog = browserdialog.BrowserDialog(self)
+        pos = QtCore.QPoint(self.optionButton.x(),
+                            self.optionButton.y()+self.optionButton.frameGeometry().height())
+        dialog.move(self.mapTo(self.window(),pos))
+        dialog.show()
+    
+    def _handleSearchFinished(self):
+        for view in self.views:
+            view.model().setTable(self.table)
+
 
 class BrowserTreeView(treeview.TreeView):
     """TreeView for the Browser."""
@@ -85,31 +147,6 @@ class BrowserTreeView(treeview.TreeView):
         """Initialize this TreeView with the given parent (which must be the browser-widget) and the given layers. This also will create a BrowserModel for this treeview (Note that each view of the browser uses its own model). <layers> must be a list of tag-lists. For each entry in <layers> a tag-layer using the entry's tags is created. A BrowserTreeView initialized with [[tags.get('genre')],[tags.get('artist'),tags.get('composer')]] will group result first into differen genres and then into different artist/composer-values, before finally displaying the elements itself."""
         treeview.TreeView.__init__(self,parent)
         self.contextMenuProviderCategory = 'browser'
-        self.setModel(browsermodel.BrowserModel(parent.table,layers,TT_SMALL_RESULT))
-        self.setItemDelegate(delegates.BrowserDelegate(self,self.model()))
-        self.doubleClicked.connect(self._handleDoubleClicked)
-    
-    def editTags(self,recursive):
-        if not recursive:
-            # Just remove nodes which don't have tags
-            elements = [node for node in self.getSelectedNodes() if isinstance(node,models.Element)]
-        else:
-            selectedNodes = self.getSelectedNodes(onlyToplevel=True)
-            elements = []
-            ids = set()
-            for node in selectedNodes:
-                for child in node.getAllNodes():
-                    if isinstance(child,models.Element) and child.id not in ids:
-                        ids.add(child.id)
-                        newElement = models.createElement(child.id)
-                        newElement.loadTags()
-                        elements.append(newElement)
-        dialog = tageditor.TagEditorDialog(self,elements)
-        dialog.exec_()
-        
-    def _handleDoubleClicked(self,index):
-        node = self.model().data(index)
-        if isinstance(node,models.Element):
-            control.playlist.insertElements([node],-1)
-        elif isinstance(node,browsermodel.CriterionNode):
-            control.playlist.insertElements(control.playlist.importElements(node.getElements()),-1)
+        self.setModel(browsermodel.BrowserModel(parent.table,layers,parent.smallResult))
+        #self.setItemDelegate(delegates.BrowserDelegate(self,self.model()))
+        #self.doubleClicked.connect(self._handleDoubleClicked)

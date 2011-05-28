@@ -86,11 +86,13 @@ storage = {
     'central_widgets': ([],),
     'dock_widgets': ([],),
     'central_tab_index': (-1,),
+},
+"browser": {
+    'views': ([[['composer','artist','performer']],[['genre'],['composer','artist','performer']]],),
 }
 }
 
 # Stuff from OMG 0.1 --- not clear whether it will be used in OMG 0.2
-   # 'browser_views': ([[['composer','artist','performer']],[['genre'],['composer','artist','performer']]],),
     #~ options.addOption("tags",       "search_tags",      list,   ["album",
                                                                  #~ "performer",
                                                                  #~ "conductor",

@@ -12,9 +12,9 @@ table without any fancy grouping as the browser does (it will add titles, though
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from omg import search, config, application, database as db, constants
+from omg import search, config, application, database as db, constants, utils
 from omg.search import searchbox
-from omg.gui import mainwindow
+from omg.gui import mainwindow, dialogs
 
 
 _action = None # the action that is inserted into the Extras menu
@@ -86,6 +86,11 @@ class SearchAnalyzer(QtGui.QDialog):
         self.searchBox.criteriaChanged.connect(self._handleCriteriaChanged)
         topLayout.addWidget(self.searchBox)
 
+        self.optionButton = QtGui.QToolButton(self)
+        self.optionButton.setIcon(utils.getIcon("options.png"))
+        self.optionButton.clicked.connect(self._handleOptionButton)
+        topLayout.addWidget(self.optionButton)
+        
         self.instantSearchBox = QtGui.QCheckBox(self.tr("Instant search"))
         self.instantSearchBox.setChecked(True)
         self.instantSearchBox.clicked.connect(self.searchBox.setInstantSearch)
@@ -146,3 +151,19 @@ class SearchAnalyzer(QtGui.QDialog):
         else:
             self.table.setEnabled(False)
             self.engine.runSearch("{}elements".format(db.prefix),self.resultTable,criteria)
+            
+    def _handleOptionButton(self):
+        dialog = OptionDialog(self)
+        pos = (self.optionButton.x(),self.optionButton.y()+self.optionButton.frameGeometry().height())
+        dialog.move(*pos)
+        dialog.show()
+
+
+class OptionDialog(dialogs.FancyTabbedPopup):
+    def __init__(self,parent = None):
+        dialogs.FancyTabbedPopup.__init__(self,parent)
+        self.resize(200,100)
+                
+        self.flagTab = QtGui.QWidget()
+        self.addTab(self.flagTab,"Flags")
+        
