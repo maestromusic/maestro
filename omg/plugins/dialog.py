@@ -87,3 +87,4 @@ class PluginDialog(QtGui.QDialog):
                 plugin.disable()
             elif not plugin.enabled and item.checkState() == Qt.Checked:
                 plugin.enable()
+                plugin.mainWindowInit()

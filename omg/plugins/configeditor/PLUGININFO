@@ -1,0 +1,5 @@
+name=Configeditor
+author=Michael Helmlnig
+version=0.0.1
+description=Provides a dialog to edit OMG's main configuration file.
+minomgversion=0.2.1
