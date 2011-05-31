@@ -153,7 +153,7 @@ class Browser(QtGui.QWidget):
     def _handleOptionButton(self):
         if self._dialog is None:
             self._dialog = browserdialog.BrowserDialog(self)
-            self._dialog.setCurrentIndex(self._lastDialogTabIndex)
+            self._dialog.tabWidget.setCurrentIndex(self._lastDialogTabIndex)
             pos = QtCore.QPoint(self.optionButton.x(),
                                 self.optionButton.y()+self.optionButton.frameGeometry().height())
             self._dialog.move(self.mapTo(self.window(),pos))
@@ -161,7 +161,7 @@ class Browser(QtGui.QWidget):
     
     def _handleDialogClosed(self):
         # Note: This is called by the dialog and not by a signal
-        self._lastDialogTabIndex = self._dialog.currentIndex()
+        self._lastDialogTabIndex = self._dialog.tabWidget.currentIndex()
         self._dialog = None
         
     def _handleSearchFinished(self,request):

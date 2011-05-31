@@ -46,19 +46,40 @@ class NewTagDialog(QtGui.QDialog):
         return None
 
 
-class FancyTabbedPopup(QtGui.QTabWidget):
+class FancyTabbedPopup(QtGui.QFrame):
     def __init__(self,parent = None):
-        QtGui.QTabWidget.__init__(self,parent)
-        self.setAutoFillBackground(True)
-        self.setDocumentMode(True)
-        effect = QtGui.QGraphicsDropShadowEffect()
-        effect.setOffset(2,2)
-        self.setGraphicsEffect(effect)
-                
+        QtGui.QFrame.__init__(self,parent)
+        
+        # Create components
+        self.setLayout(QtGui.QVBoxLayout())
+        self.tabWidget = QtGui.QTabWidget(self)
+        self.tabWidget.setDocumentMode(True)
+        self.layout().addWidget(self.tabWidget)
+        
         closeButton = QtGui.QToolButton()
         closeButton.setIcon(utils.getIcon('close_button.png'))
         closeButton.setStyleSheet(
             "QToolButton { border: None } QToolButton:hover { border: 1px solid white; }")
         closeButton.clicked.connect(self.close)
-        self.setCornerWidget(closeButton)
+        self.tabWidget.setCornerWidget(closeButton)
+        
+        # Fancy desing code
+        self.setAutoFillBackground(True)
+        self.setFrameStyle(QtGui.QFrame.Box | QtGui.QFrame.Plain);
+        self.setLineWidth(1);
+        p = self.palette()
+        p.setColor(QtGui.QPalette.Window,p.window().color().lighter(105))
+        # Unbelievably this is used for the border...
+        p.setColor(QtGui.QPalette.WindowText, Qt.darkGray)
+        self.setPalette(p)
+        
+        # Therefore we also have to change the palette of tabWidget so that the font is rendered normally.
+        p = self.tabWidget.palette()
+        p.setBrush(QtGui.QPalette.WindowText,self.parent().palette().windowText())
+        self.tabWidget.setPalette(p)
+        
+        effect = QtGui.QGraphicsDropShadowEffect()
+        effect.setOffset(0,0)
+        effect.setBlurRadius(20)
+        self.setGraphicsEffect(effect)
         

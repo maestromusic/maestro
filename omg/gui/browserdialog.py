@@ -34,11 +34,11 @@ class BrowserDialog(dialogs.FancyTabbedPopup):
         self.viewConfigurations = []
                 
         self.flagTab = QtGui.QWidget()
-        self.addTab(self.flagTab,self.tr("Flags"))
+        self.tabWidget.addTab(self.flagTab,self.tr("Flags"))
         optionTab = QtGui.QWidget()
         optionLayout = QtGui.QVBoxLayout()
         optionTab.setLayout(optionLayout)
-        self.addTab(optionTab,self.tr("Options"))
+        self.tabWidget.addTab(optionTab,self.tr("Options"))
         
         instantSearchBox = QtGui.QCheckBox(self.tr("Instant search"))
         instantSearchBox.setChecked(self.browser.searchBox.getInstantSearch())
