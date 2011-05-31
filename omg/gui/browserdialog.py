@@ -58,6 +58,10 @@ class BrowserDialog(dialogs.FancyTabbedPopup):
         optionLayout.addStretch(1)
         
         self.adjustSize()
+        
+    def close(self):
+        self.browser._handleDialogClosed()
+        dialogs.FancyTabbedPopup.close(self)
 
 
 class ViewConfigurationDialog(QtGui.QDialog):

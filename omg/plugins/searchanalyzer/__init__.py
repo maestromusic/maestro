@@ -71,14 +71,14 @@ class SearchAnalyzer(QtGui.QDialog):
     
     # If the user clears the search field, it may happen that the last searchFinished signal arrives after, we
     # have cleared the table due to the empty search field. This flag is used to ignore such late signals. 
-    _ignoreSearchFinished = True
+    _ignoreSearchFinished = False
     
     def __init__(self,parent=None,dialog=False):
         QtGui.QDialog.__init__(self,parent)
 
         self.engine = search.SearchEngine()
-        #self.engine.searchStarted.connect(self.updateLabel)
-        self.engine.searchFinished.connect(self.updateTable)
+        self.engine.searchFinished.connect(self._handleSearchFinished)
+        self.engine.searchStopped.connect(self._handleSearchStopped)
         self.resultTable = self.engine.createResultTable("analyzer",
                 "name VARCHAR({}) NULL".format(constants.TAG_VARCHAR_LENGTH))
         
@@ -102,9 +102,6 @@ class SearchAnalyzer(QtGui.QDialog):
         topLayout.addWidget(self.instantSearchBox)
         topLayout.addStretch(1)
 
-        self.label = QtGui.QLabel()
-        self.layout().addWidget(self.label)
-
         self.table = QtGui.QTableWidget()
         self.layout().addWidget(self.table)
 
@@ -116,12 +113,18 @@ class SearchAnalyzer(QtGui.QDialog):
             closeButton.clicked.connect(self.close)
             buttonLayout.addWidget(closeButton,0)
 
-    def updateLabel(self):
-        self.criteriaLabel.setText(", ".join(str(criterion) for criterion in self.engine.getCriteria()))
+    def _handleSearchStopped(self,stopRequest):
+        self._ignoreSearchFinished = False
+        self.table.clear()
+        self.table.setRowCount(0)
+        self.table.setColumnCount(0)
+        self.table.setEnabled(True)
+        
+    def _handleSearchFinished(self,searchRequest):
+        if not self._ignoreSearchFinished:
+            self.updateTable()
 
-    def updateTable(self,searchKey):
-        if self._ignoreSearchFinished:
-            return
+    def updateTable(self):
         self.table.clear()
         # Add the titles. If there are more than one title, concatenate them.
         db.query("""
@@ -151,15 +154,11 @@ class SearchAnalyzer(QtGui.QDialog):
         criteria = self.searchBox.getCriteria()
         if len(criteria) == 0:
             self._ignoreSearchFinished = True
-            self.table.clear()
-            self.table.setRowCount(0)
-            self.table.setColumnCount(0)
-            self.table.setEnabled(True)
-            self.label.setText("")
+            self.engine.stopSearch(owner=self)
+            # Wait until the search is stopped
         else:
             self.table.setEnabled(False)
-            self._ignoreSearchFinished = False
-            self.engine.search("{}elements".format(db.prefix),self.resultTable,criteria,key="searchanalyzer")
+            self.engine.search("{}elements".format(db.prefix),self.resultTable,criteria,owner=self)
             
     def _handleOptionButton(self):
         dialog = OptionDialog(self)

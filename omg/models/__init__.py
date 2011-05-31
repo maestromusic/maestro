@@ -13,8 +13,13 @@ from omg.utils import relPath
 
 logger = logging.getLogger(name="models")
 
+
 class Node:
-    """(Abstract) base class for elements in a RootedTreeModel...that is almost everything in playlists, browser etc.. Node implements the methods required by RootedTreeModel as well as some basic tree-structure methods. To implement getParent, setParent and getChildren, it uses self.parent as parent and self.contents as the list of children, but does not create these variables. Subclasses must either create self.contents and self.parent or overwrite the methods."""
+    """(Abstract) base class for elements in a RootedTreeModel...that is almost everything in playlists,
+    browser etc.. Node implements the methods required by RootedTreeModel as well as many tree-structure 
+    methods. To implement getParent, setParent and getChildren, it uses self.parent as parent and
+    self.contents as the list of children, but does not create these variables. Subclasses must either create
+    self.contents and self.parent or overwrite the methods."""
     
     def hasContents(self):
         """Return whether this node has at least one child node."""
@@ -38,25 +43,31 @@ class Node:
         """Set the parent of this node."""
         # This is a default implementation and does not mean that every node has a parent-attribute
         self.parent = parent
-
     
     def setContents(self,contents):
-        """Set the list of contents of this container to <contents>. Note that the list won't be copied and in fact altered: the parents will be set to this container."""
+        """Set the list of contents of this container to *contents*. Note that the list won't be copied and in
+        fact altered: the parents will be set to this container."""
         assert isinstance(contents,list)
         self.contents = contents
         for element in self.contents:
             element.setParent(self)
         
     def isFile(self):
-        """Return whether this node holds a file. Note that this is in general not the opposite of isContainer as e.g. rootnodes are neither."""
+        """Return whether this node holds a file. Note that this is in general not the opposite of isContainer
+        as e.g. rootnodes are neither."""
         return False
     
     def isContainer(self):
-        """Return whether this node holds a container. Note that this is in general not the opposite of isFile as e.g. rootnodes are neither."""
+        """Return whether this node holds a container. Note that this is in general not the opposite of isFile
+        as e.g. rootnodes are neither."""
         return False
 
     def copy(self,contents=None):
-        """Return a copy of this node. All attributes will be copied by reference, with the exception of the list of contents: If this instance contains a content-attribute, the new node will contain a deep copy of it. Note that a shallow copy makes no sense, because the parent-attributes have to be adjusted. If you do not want this behaviour, you may specify the parameter <contents> and the contents will be set to that parameter. The parents of all elements of <contents> will be adjusted in this case, too."""
+        """Return a copy of this node. All attributes will be copied by reference, with the exception of the
+        list of contents: If this instance contains a content-attribute, the new node will contain a deep copy
+        of it. Note that a shallow copy makes no sense, because the parent-attributes have to be adjusted. If
+        you do not want this behaviour, you may specify the parameter *contents* and the contents will be set
+        to that parameter. The parents of all elements of <contents> will be adjusted in this case, too."""
         newNode = copy.copy(self)
         if contents is None:
             if hasattr(self,'contents'):
@@ -71,7 +82,8 @@ class Node:
         return newNode
     
     def getParents(self):
-        """Returns a generator yielding all parents of this node in the current tree structure, from the direct parent to the root-node."""
+        """Returns a generator yielding all parents of this node in the current tree structure, from the
+        direct parent to the root-node."""
         parent = self.getParent()
         while parent is not None:
             yield parent
@@ -226,19 +238,40 @@ class Element(Node):
             return Container.fromId(id, position = position, parentId = parentId)
 
     def isInDB(self, recursive = False):
-        """Return whether this element is contained in the database, that is whether it has an id. If recursive is True, only return True if this element and all of its recursive children are in the database."""
+        """Return whether this element is contained in the database, that is whether it has an id. If
+        *recursive* is True, only return True if this element and all of its recursive children are in the
+        database."""
         if not recursive:
             return self.id > 0
         else:
             return self.id is not None and (self.isFile() or all(e.isInDB(True) for e in self.contents))
         
     def copy(self,contents=None,copyTags=True):
-        """Reimplementation of Node.copy: If <copyTags> is True, the element's copy will contain a copy of this node's tags.Storage-instance. Otherwise the tags will be copied by reference."""
+        """Reimplementation of Node.copy: If *copyTags* is True, the element's copy will contain a copy of
+        this node's tags.Storage-instance. Otherwise the tags will be copied by reference."""
         newNode = Node.copy(self,contents)
         if copyTags:
             newNode.tags = self.tags.copy()
         return newNode
+    
+    def loadTags(self,recursive=False,fromFS=False): 
+        """Delete the stored tags and load them again. If this element is contained in the DB, tags will be
+        loaded from there. Otherwise if this is a file, tags will be loaded from that file or no tags will be
+        loaded if this is a container. 
+        If *recursive* is True, all tags from children of this node (recursively) will be loaded, too.
+        If *fromFS* is True, then tags are read from the file even if this element is in the DB (if it is a
+        file).""" 
+        if fromFS or not self.isInDB(): 
+            if self.isFile(): 
+                self.readFromFilesystem(tags=True) 
+            else: self.tags = tags.Storage() 
+        else: 
+            self.tags = db.tags(self.id) 
         
+        if recursive: 
+            for element in self.getChildren(): 
+                element.loadTags(recursive, fromFS) 
+         
     def hasCover(self):
         """Return whether this element has a cover."""
         return self.isInDB() and covers.hasCover(self.id)
@@ -311,18 +344,16 @@ class Container(Element):
         if self.isInDB():
             if table is None:
                 table = db.prefix + "elements"
-            additionalJoin = "JOIN elements ON elements.id = {}.id".format(table) if table != 'elements' else ''
+                additionalJoin = ''
+            else: additionalJoin = "JOIN {0}elements AS el ON el.id = t.id".format(db.prefix)
+            
             result = db.query("""
-                    SELECT contents.element_id,contents.position,elements.file
-                    FROM contents JOIN {0} ON contents.container_id = {1} AND contents.element_id = {0}.id {2}
-                    ORDER BY contents.position
-                    """.format(table,self.id,additionalJoin))
-            contents = []
-            for id,pos,file in result:
-                if file:
-                    contents.append(File.fromId(id, position = pos))
-                else:
-                    contents.append(Container.fromId(id, position = pos))
+                    SELECT c.element_id,c.position,el.file
+                    FROM {0}contents AS c JOIN {1} AS t ON c.container_id = {2} AND c.element_id = t.id {3}
+                    ORDER BY c.position
+                    """.format(db.prefix,table,self.id,additionalJoin))
+                    
+            contents = [(File if file else Container).fromId(id,position=pos) for id,pos,file in result]
             self.setContents(contents)
             
         if recursive:
@@ -337,6 +368,7 @@ class Container(Element):
 
     def __repr__(self):
         return "Container[{}] with {} elements".format(self.id, len(self.contents))
+
 
 class File(Element):
     def __init__(self, tags, length, path, position, id):
@@ -370,6 +402,7 @@ class File(Element):
         if position is None:
             position = db.position(parentId, id) if parentId is not None else None
         return File(db.tags(id), length = db.length(id), path = db.path(id), position = position, id = id)
+        
     @staticmethod
     def fromFilesystem(path):
         real = realfiles2.get(path)

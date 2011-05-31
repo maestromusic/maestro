@@ -17,22 +17,39 @@ from omg.models import rootedtreemodel, mimedata
 
 logger = logging.getLogger("omg.gui.browser")
 
+searchEngine = None
+smallResult = None
+
+def initSearchEngine():
+    global searchEngine, smallResult
+    if searchEngine is None:
+        searchEngine = search.SearchEngine()
+        smallResult = searchEngine.createResultTable("browser_small")
+        
 
 class BrowserModel(rootedtreemodel.RootedTreeModel):
     showHiddenValues = False
-
-    def __init__(self,table,layers,smallResult):
+    _ignoreSearchFinished = False
+    
+    def __init__(self,table,layers,browser):
         """Initialize this model. It will contain only elements from <table>, group them according to <layers> and will use <smallResult> as temporary search table (BrowserModels perform internal searches when CriterionNodes are expanded for the first time."""
         rootedtreemodel.RootedTreeModel.__init__(self,RootNode(self))
         self.table = table
+        self.browser = browser
         self.layers = layers
-        self.smallResult = smallResult
-        self._loadLayer(self.root)
+        
+        if searchEngine is None:
+            initSearchEngine()
+        
+        searchEngine.searchFinished.connect(self._handleSearchFinished)
+        searchEngine.searchStopped.connect(self._handleSearchStopped)
+        
+        self._startLoading(self.root)
         #distributor.indicesChanged.connect(self._handleIndicesChanged)
     
     def reset(self):
         """Reset the model."""
-        self._loadLayer(self.root)
+        self._startLoading(self.root)
         rootedtreemodel.RootedTreeModel.reset(self)
 
     def setLayer(self,layers):
@@ -63,27 +80,33 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
             self.showHiddenValues = showHiddenValues
             self.reset()
         
-    def _loadLayer(self,node):
+    def _startLoading(self,node):
         """Load the contents of <node>, which must be either root or a CriterionNode (The contents of Elements are loaded via Element.loadContents)."""
         assert node == self.root or isinstance(node,CriterionNode)
         
         if node == self.root:
-            table = self.table
+            # No need to search...load directly
+            if len(self.layers) > 0:
+                self._loadTagLayer(node,self.table)
+            else: self._loadContainerLayer(node,self.table)
         else:
             # Collect the criteria in this node and its parents and put the search results into smallResult
-            # search.stdSearch(node._collectCriteria(),self.smallResult,self.table)
-            table = self.smallResult
-        
-        # Determine whether to load a tag-layer or the container-layer at the bottom of the tree.
-        if node.layerIndex+1 < len(self.layers):
-            self._loadTagLayer(node,table)
-            #TODO: Add code to load automatically
-            #~ if (recursive or 
-                #~ db.query("SELECT COUNT(*) FROM {0}".format(SMALL_RESULT)).getSingle()
-                     #~ < self._getNextLayer().DIRECT_LOAD_LIMIT):
-                #~ for element in self.elements:
-                    #~ element.update(recursive)
-        else: self._loadContainerLayer(node,table)
+            searchEngine.search(self.table,smallResult,node._collectCriteria(),owner=node,parent=self.browser,data=self,lockTable=True)
+    
+    
+    
+    def _handleSearchStopped(self,stopRequest):
+        if stopRequest.owner is self.browser:
+            self._ignoreSearchFinished = False
+            
+    def _handleSearchFinished(self,searchRequest):
+        if not self._ignoreSearchFinished and searchRequest.data is self and searchRequest.owner is not None:
+            # Determine whether to load a tag-layer or the container-layer at the bottom of the tree.
+            node = searchRequest.owner
+            if node.layerIndex+1 < len(self.layers):
+                self._loadTagLayer(node,smallResult)
+            else: self._loadContainerLayer(node,smallResult)
+            searchEngine.releaseTable(smallResult)
     
     def _loadTagLayer(self,node,table):
         """Load the contents of *node* into a tag-layer, using elements from *table*."""
@@ -123,7 +146,6 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
                         aNode.valueIds[tagId] = valueId
                         break
 
-        node.contents = valueNodes
         
         # Check whether a VariousNode is necessary
         result = db.query("""
@@ -133,18 +155,47 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
             WHERE t.value_id IS NULL
             LIMIT 1
             """.format(db.prefix,table,",".join(str(tag.id) for tag in tagSet)))
+
         if len(result) > 0:
-            node.contents.append(VariousNode(node,self,tagSet))
+            valueNodes.append(VariousNode(node,self,tagSet))
             
         if len(hiddenNodes) > 0:
-            node.contents.append(HiddenValuesNode(node,hiddenNodes))
+            valueNodes.append(HiddenValuesNode(node,hiddenNodes))
+        
+        if node.hasContents():
+            self.beginRemoveRows(self.getIndex(node),0,node.getContentsCount()-1)
+            node.setContents([])
+            self.endRemoveRows()
+        
+        if len(valueNodes) > 0:
+            self.beginInsertRows(self.getIndex(node),0,len(valueNodes)-1)
+            node.setContents(valueNodes)
+            self.endInsertRows()
             
         # Tag-layers containing only one CriterionNode are not helpful, so if this happens load the contents of the only CriterionNode and put them into node, removing the onlay CriterionNode.
 #        if len(valueNodes) == 1:
-#            self._loadLayer(valueNodes[0])
+#            self._startLoading(valueNodes[0])
 #            for n in valueNodes[0].contents:
 #                n.parent = node
 #            node.contents = valueNodes[0].contents
+
+    def _loadContainerLayer(self,node,table):
+        """Load the contents of <node> into a container-layer, using elements from <table>. Note that this creates all children of <node> not only the next level of the tree-structure as _loadTagLayer does."""
+        result = db.query("SELECT id,file FROM {0} WHERE toplevel = 1".format(table))
+        if node.hasContents():
+            self.beginRemoveRows(self.getIndex(node),0,node.getContentsCount()-1)
+            node.setContents([])
+            self.endRemoveRows()
+        self.beginInsertRows(self.getIndex(node),0,len(result)-1)
+        node.setContents([(models.File if file else models.Container).fromId(id) for id,file in result])
+        for element in node.contents:
+            element.parent = node
+            if element.isContainer():
+                element.loadContents(True,table)
+            element.loadTags(True)
+        #node.contents.sort(key = lambda elem: elem.tags[tags.DATE][0] if tags.DATE in elem.tags else omg.FlexiDate(900))
+        self.endInsertRows()
+
 
 
 class HiddenValuesNode(models.Node):
@@ -154,132 +205,6 @@ class HiddenValuesNode(models.Node):
         
     def __str__(self):
         return "<HiddenValues>"
-
-
-class BrowserModelOld(rootedtreemodel.RootedTreeModel):
-    """Model for a BrowserTreeView."""
-    def __init__(self,table,layers,smallResult):
-        """Initialize this model. It will contain only elements from <table>, group them according to <layers> and will use <smallResult> as temporary search table (BrowserModels perform internal searches when CriterionNodes are expanded for the first time."""
-        rootedtreemodel.RootedTreeModel.__init__(self,RootNode(self))
-        self.table = table
-        self.layers = layers
-        self.smallResult = smallResult
-        self._loadLayer(self.root)
-        distributor.indicesChanged.connect(self._handleIndicesChanged)
-    
-    def setLayer(self,layers):
-        """Set the layers of the model and reset."""
-        self.layers = layers
-        self.reset()
-    
-    def getLayers(self):
-        """Return the layers of this model."""
-        return self.layers
-    
-    def setTable(self,table):
-        """Set the table of this model. The model will only contain elements from <table>."""
-        self.table = table
-        self.reset()
-        
-    def getTable(self):
-        """Return the table in which this model's contents are contained."""
-        return self.table
-        
-    def reset(self):
-        """Reset the model."""
-        self._loadLayer(self.root)
-        rootedtreemodel.RootedTreeModel.reset(self)
-    
-    def flags(self,index):
-        defaultFlags = rootedtreemodel.RootedTreeModel.flags(self,index)
-        if index.isValid():
-            return defaultFlags | Qt.ItemIsDragEnabled
-        else: return defaultFlags
-    
-    def mimeTypes(self):
-        return [config.get("gui","mime")]
-    
-    def mimeData(self,indexes):
-        return mimedata.createFromIndexes(self,indexes)
-        
-    def _loadLayer(self,node):
-        """Load the contents of <node>, which must be either root or a CriterionNode (The contents of Elements are loaded via Element.loadContents)."""
-        assert node == self.root or isinstance(node,CriterionNode)
-        
-        if node == self.root:
-            table = self.table
-        else:
-            # Collect the criteria in this node and its parents and put the search results into smallResult
-            search.stdSearch(node._collectCriteria(),self.smallResult,self.table)
-            table = self.smallResult
-        
-        # Determine whether to load a tag-layer or the container-layer at the bottom of the tree.
-        if node.layerIndex+1 < len(self.layers):
-            self._loadTagLayer(node,table)
-            #TODO: Add code to load automatically
-            #~ if (recursive or 
-                #~ db.query("SELECT COUNT(*) FROM {0}".format(SMALL_RESULT)).getSingle()
-                     #~ < self._getNextLayer().DIRECT_LOAD_LIMIT):
-                #~ for element in self.elements:
-                    #~ element.update(recursive)
-        else: self._loadContainerLayer(node,table)
-
-
-    def _loadTagLayer(self,node,table):
-        """Load the contents of <node> into a tag-layer, using elements from <table>."""
-        tagSet = self.layers[node.layerIndex+1]
-        valueNodes = []
-        values = []
-        for tag in tagSet:
-            # Get all values and corresponding ids of the given tag appearing in at least one toplevel result.
-            result = database.get().query("""
-                SELECT DISTINCT tag_{0}.id,tag_{0}.value
-                FROM {1} JOIN tags ON {1}.id = tags.element_id AND tags.tag_id = {2}
-                         JOIN tag_{0} ON tags.value_id = tag_{0}.id
-                WHERE {1}.toplevel = 1
-                """.format(tag.name,table,tag.id))
-            for row in result:
-                try:
-                    # If there is already a value node with value row[1], add this tag to that node
-                    valueNodes[values.index(row[1])].valueIds[tag] = row[0]
-                except ValueError: # there is no value node of this value...so add one
-                    valueNodes.append(ValueNode(node,self,row[1],{tag:row[0]}))
-                    values.append(row[1])
-                    
-        valueNodes.sort(key=lambda node: str.lower(node.value))
-            
-        # Check whether a VariousNode is necessary
-        result = database.get().query("""
-                SELECT {0}.id
-                FROM {0} LEFT JOIN tags ON {0}.id = tags.element_id AND tags.tag_id IN ({1})
-                WHERE tags.value_id IS NULL
-                LIMIT 1
-                """.format(table,",".join(str(tag.id) for tag in tagSet)))
-        if result.size():
-            valueNodes.append(VariousNode(node,self,tagSet))
-            
-        node.contents = valueNodes
-        
-        # Tag-layers containing only one CriterionNode are not helpful, so if this happens load the contents of the only CriterionNode and put them into node, removing the onlay CriterionNode.
-        if len(valueNodes) == 1:
-            self._loadLayer(valueNodes[0])
-            for n in valueNodes[0].contents:
-                n.parent = node
-            node.contents = valueNodes[0].contents
-    
-    def _loadContainerLayer(self,node,table):
-        """Load the contents of <node> into a container-layer, using elements from <table>. Note that this creates all children of <node> not only the next level of the tree-structure as _loadTagLayer does."""
-        result = database.get().query("SELECT id,file FROM {0} WHERE toplevel = 1".format(table))
-        node.contents = [models.createElement(id,file=file) for id,file in result]
-        for element in node.contents:
-            element.parent = node
-            if element.isContainer():
-                element.loadContents(True,table)
-            element.loadTags(True)
-        node.contents.sort(key = lambda elem: elem.tags[tags.DATE][0] if tags.DATE in elem.tags else omg.FlexiDate(900))
-
-    def _handleIndicesChanged(self,databaseChangeNotice):
-        self.reset() #TODO: This is a bit brutal...
 
 
 class CriterionNode(models.Node):
@@ -312,21 +237,15 @@ class CriterionNode(models.Node):
         
     def getContentsCount(self):
         if self.contents is None:
-            self.model._loadLayer(self)
+            self.model._startLoading(self)
+            return 1 # "Loading..."
         return len(self.contents)
         
     def getContents(self):
         if self.contents is None:
-            self.model._loadLayer(self)
+            self.contents = [LoadingNode(self)]
+            self.model._startLoading(self)
         return self.contents
-
-    def getElements(self):
-        """Return all elements (container and files) contained in this CriterionNode."""
-        if self.contents is None:
-            self.model._loadLayer(self)
-        # Add either the node or invoke getElements recursively
-        return itertools.chain(*[[node] if isinstance(node,models.Element)
-                                 else node.getElements() for node in self.contents])
 
 
 class ValueNode(CriterionNode):
@@ -361,3 +280,14 @@ class RootNode(models.RootNode):
         models.RootNode.__init__(self)
         self.model = model
         self.layerIndex = -1
+        
+
+class LoadingNode(models.Node):
+    def __init__(self,parent):
+        self.parent = parent
+    
+    def hasContents(self):
+        return False
+        
+    def __str__(self):
+        return "Loading..."

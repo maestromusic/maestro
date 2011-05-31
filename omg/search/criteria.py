@@ -76,7 +76,7 @@ class TextCriterion(Criterion):
         """Return the set of types that appear in ''tagSet''."""
         return set(tag.type for tag in self.tagSet)
 
-    def getQuery(self,fromTable,columns=None):
+    def getQuery(self,fromTable,columns):
         if len(self.tagSet) == 0:
             raise RuntimeError("Criterion {} is not valid.".format(self))
         parameters = []
@@ -129,26 +129,26 @@ class TextCriterion(Criterion):
         
 
 class TagIdCriterion(Criterion):
-    """A TagIdCriterion contains a dictionary mapping tags to value-ids. It will be fulfilled for all elements having at least one of the tags with the corresponding value. For example {<genre-tag>: 1,<artist-tag>:2} will match all elements which have either the value of id 1 (in table tag_genre) as a genre-tag or the value of id 2 (in table tag_artist) as an artist-tag or both.
+    """A TagIdCriterion contains a dictionary mapping tag-ids to value-ids. It will be fulfilled for all elements having at least one of the tags with the corresponding value. For example {<genre-tag>: 1,<artist-tag>:2} will match all elements which have either the value of id 1 (in table tag_genre) as a genre-tag or the value of id 2 (in table tag_artist) as an artist-tag or both.
     """
     def __init__(self,valueIds):
         """Initialize a new TagIdCriterion with the given dictionary mapping tags to value-ids."""
         assert isinstance(valueIds,dict)
         self.valueIds = valueIds
         
-    def getQuery(self,fromTable,columns=None):
-        whereExpression = " OR ".join("(tags.tag_id = {0} AND tags.value_id = {1})".format(tag.id,valueId)
-                                         for tag,valueId in self.valueIds.items())
-        return ("""
+    def getQuery(self,fromTable,columns):
+        whereExpression = " OR ".join("(t.tag_id = {0} AND t.value_id = {1})".format(tagId,valueId)
+                                         for tagId,valueId in self.valueIds.items())
+        return ["""
             SELECT {1}
             FROM {2} AS el JOIN {0}tags AS t ON el.id = t.element_id
             WHERE {3}
             GROUP BY el.id
-            """.format(db.prefix,_formatColumns(columns,"el"),fromTable,whereExpression),) # tuple!
+            """.format(db.prefix,_formatColumns(columns,"el"),fromTable,whereExpression)] # return as list!
 
     def getTags(self):
         """Return a list of all tags appearing in this TagIdMatch."""
-        return self.valueIds.keys()
+        return [tags.get(tagId) for tagId in self.valueIds.keys()]
         
     def add(self,valueIds):
         """Add one or more tag=>id-mappings to this criterion. It will be fulfilled if a container contains at least one tag together with a value with the corresponding id."""
@@ -217,8 +217,6 @@ def reduce(criteria,processed):
 
 def _formatColumns(columns,fromTable):
     """Generate a string which can be used after SELECT and will select the given columns from the given table. A possible result would be "elements.id,elements.position,elements.elements"."""
-    if columns is None:
-        columns = ('id','major')
     return ",".join("{0}.{1}".format(fromTable,column) for column in columns)
     
 

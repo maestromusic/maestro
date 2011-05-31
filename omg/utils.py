@@ -182,6 +182,8 @@ class FlexiDate(object):
 
     def __hash__(self):
         return id(self)
+    
+    
 class OrderedDict(dict):
     """Ordered subclass of :class:`dict` which allows inserting key-value-mappings at arbitrary positions -- in contrast to :class:`collections.OrderedDict`. By default new mappings will be appended at the end of the order. Use the insert*-methods to insert somewhere else.
     
@@ -230,3 +232,19 @@ class OrderedDict(dict):
     def insertBefore(self,posKey,key,value):
         """Insert the mapping ``key: value`` before the key *posKey*."""
         self.insert(self.index(posKey),key,value)
+
+
+_usedKeys = set()
+
+def getUniqueKey(prefix):
+    """Generate a globally unique key starting with *prefix*."""
+    for i in range(2**64):
+        key = "{}_{}".format(prefix,i)
+        if key not in _usedKeys:
+            _usedKeys.add(key)
+            return key
+    raise RuntimeError("Unique keys for prefix {} exhausted.".format(prefix))
+    
+def freeUniqueKey(key):
+    """Free the given key, so that it may be returned again by getUniqueKey."""
+    _usedKeys.discard(key)
