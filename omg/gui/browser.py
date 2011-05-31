@@ -12,7 +12,7 @@ from PyQt4.QtCore import Qt
 
 from .. import database as db, config, search, constants, utils, tags
 from ..search import searchbox
-from . import mainwindow, treeview, browserdialog
+from . import mainwindow, treeview, browserdialog, delegates
 from ..models import browser as browsermodel
                          
 translate = QtCore.QCoreApplication.translate
@@ -179,5 +179,5 @@ class BrowserTreeView(treeview.TreeView):
         treeview.TreeView.__init__(self,parent)
         self.contextMenuProviderCategory = 'browser'
         self.setModel(browsermodel.BrowserModel(parent.table,layers,parent))
-        #self.setItemDelegate(delegates.BrowserDelegate(self,self.model()))
+        self.setItemDelegate(delegates.BrowserDelegate(self,self.model()))
         #self.doubleClicked.connect(self._handleDoubleClicked)

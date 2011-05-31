@@ -10,9 +10,8 @@ from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 import os.path
 
-from omg import strutils, tags, covers, models, constants, relPath
-from omg.models import playlist,browser
-from omg.config import options
+from .. import tags, covers, models, constants, config
+from ..models import browser
 from . import abstractdelegate, formatter
 
 # Styles used in the delegates
@@ -90,26 +89,28 @@ class BrowserDelegate(abstractdelegate.AbstractDelegate):
             if element.isFile():
                 # First find out whether the file has a cover (usually not...)
                 if element.hasCover():
-                    self.drawCover(options.gui.browser_cover_size,element)
+                    self.drawCover(config.options.gui.browser_cover_size,element)
                 
-                if tags.ALBUM in element.tags and not element.isContainedInAlbum():
-                    # This is the complicated version: The element has an album but is not displayed within the album. So draw an album cover and display the album tags.
-                    if not element.hasCover(): # Do not draw a second cover (see above)
-                        albumIds = element.getAlbumIds()
-                        for albumId in albumIds:
-                            cover = covers.getCover(albumId, options.gui.browser_cover_size)
-                            if cover is not None:
-                                self.drawCover(options.gui.browser_cover_size, None, cover)
-                                break # Draw only one cover even if there are several albums
-                    self.addLine(f.title(),"",BR_TITLE_STYLE)
-                    self.addLine(f.album(),"",BR_ALBUM_STYLE)
-                else:
-                    self.addLine(f.title(),"")
+                self.addLine(f.title(),"")
+#                if tags.ALBUM in element.tags and not element.isContainedInAlbum():
+#                    # This is the complicated version: The element has an album but is not displayed within the album. So draw an album cover and display the album tags.
+#                    if not element.hasCover(): # Do not draw a second cover (see above)
+#                        albumIds = element.getAlbumIds()
+#                        for albumId in albumIds:
+#                            cover = covers.getCover(albumId, options.gui.browser_cover_size)
+#                            if cover is not None:
+#                                self.drawCover(options.gui.browser_cover_size, None, cover)
+#                                break # Draw only one cover even if there are several albums
+#                    self.addLine(f.title(),"",BR_TITLE_STYLE)
+#                    self.addLine(f.album(),"",BR_ALBUM_STYLE)
+#                else:
+#                    self.addLine(f.title(),"")
+
                 # Independent of the album problem above we list the artists which were not listed in parent containers.
                 self.addLine(f.tag(tags.get("composer"),True,self._getTags),"")
                 self.addLine(f.tag(tags.get("artist"),True,self._getTags),"")
             else:
-                coverSize = options.gui.browser_cover_size
+                coverSize = config.options.gui.browser_cover_size
                 self.drawCover(coverSize,element)
                 
                 self.addLine(f.title(),f.tag(tags.get("date")),BR_TITLE_STYLE)

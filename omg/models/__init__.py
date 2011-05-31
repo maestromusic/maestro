@@ -17,8 +17,8 @@ logger = logging.getLogger(name="models")
 class Node:
     """(Abstract) base class for elements in a RootedTreeModel...that is almost everything in playlists,
     browser etc.. Node implements the methods required by RootedTreeModel as well as many tree-structure 
-    methods. To implement getParent, setParent and getChildren, it uses self.parent as parent and
-    self.contents as the list of children, but does not create these variables. Subclasses must either create
+    methods. To implement getParent, setParent and getContents, it uses self.parent as parent and
+    self.contents as the list of contents, but does not create these variables. Subclasses must either create
     self.contents and self.parent or overwrite the methods."""
     
     def hasContents(self):
@@ -159,7 +159,7 @@ class Node:
     
     def getChildOffset(self,childIndex):
         """Return the offset of the child with index <childIndex> in this node."""
-        if childIndex < 0 or childIndex >= self.getChildrenCount():
+        if childIndex < 0 or childIndex >= self.getContentCount():
             raise IndexError("childIndex {} is out of bounds.".format(childIndex))
         offset = 0
         for node in self.getContents()[:childIndex]:
@@ -269,7 +269,7 @@ class Element(Node):
             self.tags = db.tags(self.id) 
         
         if recursive: 
-            for element in self.getChildren(): 
+            for element in self.getContents(): 
                 element.loadTags(recursive, fromFS) 
          
     def hasCover(self):
