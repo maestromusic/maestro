@@ -23,6 +23,9 @@ import re
 logger = logging.getLogger("models.editor")
 
 class EditorModel(rootedtreemodel.EditableRootedTreeModel):
+    
+    guessAlbums = True # whether to guess album structure on file drop
+    
     def __init__(self, name = 'default'):
         super().__init__(RootNode())
         self.contents = []
@@ -48,7 +51,30 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
                         index = node.parent.index(node)
                         self.remove(node)
                         self.insert(parent, index, elemcopy)
-    
+
+    def fireRemoveIndexes(self, elements):
+        """Creates and pushes an UndoCommand that removes the selected elements from this model (and all other
+        editor models containing them). Elements must be an iterable of either QModelIndexes or Nodes.
+        """ 
+        if len(elements) == 0:
+            return
+        if isinstance(elements[0], QtCore.QModelIndex):
+            elements = [self.data(i, Qt.EditRole) for i in elements]
+        for i in reversed(elements):
+            for p in i.getParents():
+                if p in elements:
+                    elements.remove(i)
+        changes = OrderedDict()
+        affectedParents = set(i.parent for i in elements)
+        for p in affectedParents:
+            oldParent = p.copy()
+            newParent = p.copy()
+            for child in sorted((i for i in elements if i.parent == p), key = lambda i: i.parent.index(i), reverse = True):
+                del newParent.contents[child.parent.index(child)]
+            changes[p.id] = (oldParent, newParent)
+        command = modify.UndoCommand(level = modify.EDITOR, changes = changes, contentsChanged = True)
+        modify.pushEditorCommand(command)
+           
     def setContents(self,contents):
         """Set the contents of this playlist and set their parent to self.root.
         The contents are only the toplevel-elements in the playlist, not all files.
@@ -161,6 +187,8 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
         return True
     
     def _handleUrlDrop(self, urls):
+        '''This method is called if url MIME data is dropped onto this model, from an external file manager
+        or a filesystembrowser widget.'''
         files = sorted(set( (f for f in collectFiles((url.path() for url in urls)) if hasKnownExtension(f)) ))
         progress = QtGui.QProgressDialog()
         progress.setLabelText(self.tr("Importing {0} files...").format(len(files)))
@@ -193,31 +221,14 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
                     else:
                         progress.cancel()
                         return False
-        return self.guessTree(elementList)
-    
-    def fireRemoveIndexes(self, elements):
-        """Creates and pushes an UndoCommand that removes the selected elements from this model (and all other
-        editor models containing them). Elements must be an iterable of either QModelIndexes or Nodes.
-        """ 
-        if len(elements) == 0:
-            return
-        if isinstance(elements[0], QtCore.QModelIndex):
-            elements = [self.data(i, Qt.EditRole) for i in elements]
-        for i in reversed(elements):
-            for p in i.getParents():
-                if p in elements:
-                    elements.remove(i)
-        changes = OrderedDict()
-        affectedParents = set(i.parent for i in elements)
-        for p in affectedParents:
-            oldParent = p.copy()
-            newParent = p.copy()
-            for child in sorted((i for i in elements if i.parent == p), key = lambda i: i.parent.index(i), reverse = True):
-                del newParent.contents[child.parent.index(child)]
-            changes[p.id] = (oldParent, newParent)
-        command = modify.UndoCommand(level = modify.EDITOR, changes = changes, contentsChanged = True)
-        modify.pushEditorCommand(command)
-    
+        if self.guessAlbums:
+            return self.guessTree(elementList)
+        else:
+            return elementList
+        
+    def setGuessAlbums(self, state):
+        self.guessAlbums = state == Qt.Checked
+        
     def guessTree(self, files):
         """Tries to guess a container structure from the given File list."""
         

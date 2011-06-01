@@ -38,6 +38,7 @@ The three files are:
 """
 
 import os, sys, pickle
+from collections import OrderedDict
 from omg import constants, logging
 from . import configobj
 
@@ -181,8 +182,10 @@ class ConfigOption(Option):
                 fileSection[self.name] = self._export(self.fileValue)
         elif self.fileValue is not None:
             fileSection[self.name] = self._export(self.fileValue)
-
-
+    
+    def updateFileValue(self,value):
+        self.value = self.getValue() # Store the old value, so that the effective value does not change
+        self.fileValue = self._import(value)
 class StorageOption(Option):
     """Subclass of :class:`Option` for options in the Storage file. These options do not have a type but may store dicts, list, tuples of basic datatypes."""
     def updateValue(self,value,fileValue):
@@ -207,7 +210,7 @@ class ConfigSection:
     def __init__(self,name,storage,members):
         self._name = name
         self._storage = storage
-        self._members = {}
+        self._members = OrderedDict()
         for name,member in members.items():
             if isinstance(member,dict):
                 self._members[name] = ConfigSection(name,storage,member)
@@ -218,7 +221,10 @@ class ConfigSection:
 
     def __getitem__(self,member):
         return self._members[member]
-
+    def __len__(self):
+        return len(self._members)
+    def __iter__(self):
+        return self._members.__iter__()
     def __getattr__(self,member):
         if member in self._members:
             return self._members[member]
@@ -271,7 +277,7 @@ class Config(ConfigSection):
 
     \ """
     def __init__(self,cmdConfig,storage):
-        ConfigSection.__init__(self,"<Default>",storage,{})
+        ConfigSection.__init__(self,"<Default>",storage,OrderedDict())
 
         self._path = _getPath("storage" if self._storage else "config")
 
