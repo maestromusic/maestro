@@ -172,7 +172,8 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
             node.setContents(valueNodes)
             self.endInsertRows()
             
-        # Tag-layers containing only one CriterionNode are not helpful, so if this happens load the contents of the only CriterionNode and put them into node, removing the onlay CriterionNode.
+        # Tag-layers containing only one CriterionNode are not helpful, so if this happens load the contents
+        # of the only CriterionNode and put them into node, removing the original CriterionNode.
 #        if len(valueNodes) == 1:
 #            self._startLoading(valueNodes[0])
 #            for n in valueNodes[0].contents:
@@ -191,7 +192,7 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
         for element in node.contents:
             element.parent = node
             if element.isContainer():
-                element.loadContents(True,table)
+                element.loadContents(True)
             element.loadTags(True)
         #node.contents.sort(key = lambda elem: elem.tags[tags.DATE][0] if tags.DATE in elem.tags else omg.FlexiDate(900))
         self.endInsertRows()
@@ -201,19 +202,21 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
 class HiddenValuesNode(models.Node):
     def __init__(self,parent,valueNodes):
         self.parent = parent
-        self.contents = valueNodes
+        self.setContents(valueNodes)
         
     def __str__(self):
         return "<HiddenValues>"
+        
+    def toolTipText(self):
+        return None
 
 
 class CriterionNode(models.Node):
     """CriterionNode is the base class for nodes used to group elements according to a criterion (confer search.criteria) in a BrowserModel."""
-    def __init__(self,parent,model,criterion):
+    def __init__(self,parent,model):
         """Initialize this CriterionNode with the parent-node <parent> and the given model and criterion."""
         self.parent = parent
         self.model = model
-        self.criterion = criterion
         self.layerIndex = parent.layerIndex + 1
         self.contents = None
     
@@ -229,7 +232,7 @@ class CriterionNode(models.Node):
     
     def getCriterion(self):
         """Return the criterion of this node."""
-        return self.criterion
+        assert False # implemented in subclasses
     
     def hasContents(self):
         # Always return True. The contents of a CriterionNode are loaded when getChildren or getChildrenCount is called for the first time. Prior to this call hasChildren=True will tell the view that the node is expandable and make the view draw a plus-sign in front of the node.
@@ -252,25 +255,38 @@ class ValueNode(CriterionNode):
     """A ValueNode groups elements which have the same tag-value in one or more tags. Not that only the value must coincide, the tags need not be the same, but they must be in a given list. This enables BrowserViews display e.g. all artists and all composers in one tag-layer."""
     def __init__(self,parent,model,value,valueIds):
         """Initialize this ValueNode with the parent-node <parent> and the given model. <valueIds> is a dict mapping tags to value-ids of the tag. This node will contain elements having at least one of the value-ids in the corresponding tag. <value> is the value of the value-ids (which should be the same for all tags) and will be displayed on the node."""
-        CriterionNode.__init__(self,parent,model,None)
+        CriterionNode.__init__(self,parent,model)
         self.value = value
         self.valueIds = valueIds
     
+    def getCriterion(self):
+        return search.criteria.TagIdCriterion(self.valueIds)
+        
     def __str__(self):
         return "<ValueNode '{0}' ({1})>".format(self.value, ", ".join(map(str,self.valueIds)))
     
-    def getCriterion(self):
-        return search.criteria.TagIdCriterion(self.valueIds)
+    def toolTipText(self):
+        if config.options.misc.show_ids: # Display the value-ids
+            idString = ", ".join("{} {}".format(tags.get(tagId).name,valueId) for tagId,valueId in self.valueIds.items())
+            return "{} [{}]".format(self.value,idString)
+        else: return self.value
 
 
 class VariousNode(CriterionNode):
     """A VariousNode groups elements in a tag-layer which have no tag in any of the tags in the tag-layer's tagset."""
     def __init__(self,parent,model,tagSet):
         """Initialize this VariousNode with the parent-node <parent>, the given model and the tag-layer's tagset <tagSet>."""
-        CriterionNode.__init__(self,parent,model,search.criteria.MissingTagCriterion(tagSet))
+        CriterionNode.__init__(self,parent,model)
+        self.tagSet = tagSet
+
+    def getCriterion(self):
+        return search.criteria.MissingTagCriterion(self.tagSet)
         
     def __str__(self):
         return "<VariousNode>"
+        
+    def toolTipText(self):
+        return None
 
 
 class RootNode(models.RootNode):
@@ -290,4 +306,7 @@ class LoadingNode(models.Node):
         return False
         
     def __str__(self):
-        return "Loading..."
+        return "<LoadingNode>"
+        
+    def toolTipText(self):
+        None

@@ -344,18 +344,17 @@ class Container(Element):
         if self.isInDB():
             if table is None:
                 table = db.prefix + "elements"
-                additionalJoin = ''
-            else: additionalJoin = "JOIN {0}elements AS el ON el.id = t.id".format(db.prefix)
-            
+                
             result = db.query("""
-                    SELECT c.element_id,c.position,el.file
-                    FROM {0}contents AS c JOIN {1} AS t ON c.container_id = {2} AND c.element_id = t.id {3}
+                    SELECT c.element_id,c.position,res.file
+                    FROM {0}contents AS c JOIN {1} AS res ON c.container_id = {2} AND c.element_id = res.id
                     ORDER BY c.position
-                    """.format(db.prefix,table,self.id,additionalJoin))
+                    """.format(db.prefix,table,self.id))
                     
             contents = [(File if file else Container).fromId(id,position=pos) for id,pos,file in result]
             self.setContents(contents)
-            
+        else: raise RuntimeError("Called loadContents on a container that is not in the db.")
+        
         if recursive:
             for element in self.contents:
                 if element.isContainer():

@@ -16,6 +16,7 @@ from . import abstractdelegate, formatter
 
 # Styles used in the delegates
 STD_STYLE = abstractdelegate.STD_STYLE
+BR_SPECIAL_NODE_STYLE = abstractdelegate.DelegateStyle(11,False,True)
 PL_TITLE_STYLE = abstractdelegate.DelegateStyle(13,True,False)
 PL_ALBUM_STYLE = abstractdelegate.DelegateStyle(13,True,True)
 PL_EXTERNAL_FILE_STYLE = abstractdelegate.DelegateStyle(11,False,True)
@@ -82,7 +83,11 @@ class BrowserDelegate(abstractdelegate.AbstractDelegate):
         if isinstance(node,browser.ValueNode):
             self.addLine(node.value,"")
         elif isinstance(node,browser.VariousNode):
-            self.addLine(self.tr("Unknown/Various"))
+            self.addLine(self.tr("Unknown/Various"),style1=BR_SPECIAL_NODE_STYLE)
+        elif isinstance(node,browser.HiddenValuesNode):
+            self.addLine(self.tr("Hidden"),style1=BR_SPECIAL_NODE_STYLE)
+        elif isinstance(node,browser.LoadingNode):
+            self.addLine(self.tr("Loading..."),style1=BR_SPECIAL_NODE_STYLE)
         elif isinstance(node,models.Element):
             element = node
             f = formatter.Formatter(element)

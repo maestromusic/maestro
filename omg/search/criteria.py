@@ -183,13 +183,13 @@ class MissingTagCriterion(Criterion):
         """Return the set of tags a container must not have in order to match this criterion."""
         return self.tags
     
-    def getQuery(self,fromTable,columns=None):
-        # return a tuple!
-        return ("""
-            SELECT {0}
-            FROM {1} LEFT JOIN tags ON {1}.id = tags.element_id AND tags.tag_id IN ({2})
-            WHERE tags.value_id IS NULL
-            """.format(_formatColumns(columns,fromTable),fromTable,",".join([str(tag.id) for tag in self.tags])),)
+    def getQuery(self,fromTable,columns):
+        # return a list!
+        return ["""
+            SELECT {1}
+            FROM {2} AS el LEFT JOIN {0}tags AS t ON el.id = t.element_id AND t.tag_id IN ({3})
+            WHERE t.value_id IS NULL
+            """.format(db.prefix,_formatColumns(columns,'el'),fromTable,",".join([str(tag.id) for tag in self.tags]))]
 
     def isNarrower(self,other):
         return isinstance(other,MissingTagCriterion) and self.tags >= other.tags
