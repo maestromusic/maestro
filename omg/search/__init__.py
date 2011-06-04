@@ -6,7 +6,7 @@
 # it under the terms of the GNU General Public License version 3 as
 # published by the Free Software Foundation
 #
-import threading, time
+import threading
 
 from PyQt4 import QtCore
 from PyQt4.QtCore import Qt
@@ -132,7 +132,7 @@ class SearchEngine(QtCore.QObject):
 
     def releaseTable(self,table):
         with self._lock:
-            print("Releasing table {}".format(table))
+            #print("Releasing table {}".format(table))
             self._releaseTables.add(table)
         self._searchEvent.set()
 
@@ -218,7 +218,7 @@ class SearchThread(threading.Thread):
                     # Nevertheless it happens...
                     with self.engine._lock:
                         if self.engine._command == SEARCH and len(self.engine._newRequests) == 0 and len(self.engine._releaseTables) == 0:
-                            print("Weird thing happened")
+                            #print("Weird thing happened")
                             continue
                 
                 # Copy data from main thread
@@ -257,10 +257,10 @@ class SearchThread(threading.Thread):
                 
                 # Invalid criteria like 'date:foo' do not have results. Calling criterion.getQuery will fail.
                 if any(c.isInvalid() for c in currentRequest.criteria):
-                    print("Invalid criteria")
+                    #print("Invalid criteria")
                     db.query("TRUNCATE TABLE {}".format(currentRequest.resultTable))
                     self.tables[currentRequest.resultTable][1] = []
-                    print("Finished search")
+                    #print("Finished search")
                     if currentRequest.lockTable:
                         with self.engine._lock:
                             self.lockedTables.add(currentRequest.resultTable)
@@ -272,15 +272,15 @@ class SearchThread(threading.Thread):
                 if len(currentRequest.criteria) == 0:
                     # We already finished the request in the last loop.
                     # Or the criteria were redundant and were removed by criteriaModule.reduce.
-                    print("Starting post-processing...")
+                    #print("Starting post-processing...")
                     self.postProcessing(currentRequest.resultTable)
                     # After post processing forget the data we collected about this table.
                     # Any other search going to this table must first truncate it.
                     del self.tables[currentRequest.resultTable]
-                    print("Finished search")
+                    #print("Finished search")
                     if currentRequest.lockTable:
                         with self.engine._lock:
-                            print("Add to result locked tables: {}".format(currentRequest.resultTable))
+                            #print("Add to locked tables: {}".format(currentRequest.resultTable))
                             self.lockedTables.add(currentRequest.resultTable)
                     self.engine.searchFinished.emit(currentRequest)
                     self.requests.pop(0)
@@ -289,7 +289,6 @@ class SearchThread(threading.Thread):
                 
                 # Finally do some work and process a criterion:
                 criterion = currentRequest.criteria.pop(0)
-                #time.sleep(2)
                 self.processCriterion(currentRequest.fromTable,currentRequest.resultTable,criterion)
                 self.tables[currentRequest.resultTable][1].append(criterion)
         
@@ -331,7 +330,7 @@ class SearchThread(threading.Thread):
         """This is where the actual search happens."""
         if len(self.tables[resultTable][1]) == 0:
             # We firstly search for the direct results of the first query... 
-            print("Starting search...")
+            #print("Starting search...")
             db.query("TRUNCATE TABLE {0}".format(resultTable))
             queryData = criterion.getQuery(fromTable,columns=('id','file','major'))
             # Prepend the returned query with INSERT INTO...

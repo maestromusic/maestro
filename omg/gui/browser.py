@@ -129,7 +129,7 @@ class Browser(QtGui.QWidget):
             
     def _handleSearchStopped(self,stopRequest):
         if stopRequest.owner is self:
-            self._ignoreSearchEvenst = False
+            self._ignoreSearchFinished = False
             self.showElements()
     
     def createViews(self,layersList):

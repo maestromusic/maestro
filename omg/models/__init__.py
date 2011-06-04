@@ -30,9 +30,13 @@ class Node:
         # This is a default implementation and does not mean that every node has a contents-attribute
         return self.contents
     
-    def getContentsCount(self):
+    def getContentsCount(self,recursive=False):
         """Return the number of children or None if it is unknown."""
-        return len(self.getContents())
+        if not recursive:
+            return len(self.getContents())
+        else:
+            # Add the child itself
+            return sum(child.getContentsCount(True)+1 for child in self.getContents())   
     
     def getParent(self):
         """Return the parent of this element."""
@@ -119,7 +123,7 @@ class Node:
 
     def getAllNodes(self, skipSelf = False):
         """Generator which will return all nodes contained in this node or in children of it, including the node itself
-        if skipSelf is not set True."""
+        if *skipSelf* is not set True."""
         if not skipSelf:
             yield self
         if self.isFile():
@@ -231,11 +235,11 @@ class Element(Node):
                 "Cannot instantiate abstract base class Element. Use Container, File or models.createElement.")
     
     @staticmethod
-    def fromId(id, *, position = None, parentId = None):
+    def fromId(id, *, position=None, parentId=None, loadData=True):
         if db.isFile(id):
-            return File.fromId(id, position = position, parentId = parentId)
+            return File.fromId(id, position=position, parentId=parentId,loadData=loadData)
         else:
-            return Container.fromId(id, position = position, parentId = parentId)
+            return Container.fromId(id, position=position, parentId=parentId, loadData=loadData)
 
     def isInDB(self, recursive = False):
         """Return whether this element is contained in the database, that is whether it has an id. If
@@ -318,27 +322,29 @@ class Container(Element):
     contents = None
     
     """Element-subclass for containers."""
-    def __init__(self, tags, position, id, contents = None):
+    def __init__(self, id, contents, tags, position):
         """Initialize this container, optionally with a contents list.
         Note that the list won't be copied but the parents will be changed to this container."""
         self.id = id
-        self.tags = tags
-        self.position = position
         if contents is None:
             self.contents = []
         else: self.setContents(contents)
+        self.tags = tags
+        self.position = position
     
     @staticmethod
-    def fromId(id, *, position = None, parentId = None):
-        if position is None:
-            position = db.position(parentId, id) if parentId is not None else None
-        return Container(db.tags(id), position = position, id = id)
-
+    def fromId(id, *, contents=None, tags=None, position=None, parentId=None, loadData=True):
+        if loadData:
+            if tags is None:
+                tags = db.tags(id)
+            if position is None and parentId is not None:
+                position = db.position(parentId,position)
+        return Container(id,contents,tags,position)
 
     def isContainer(self):
         return True
     
-    def loadContents(self,recursive=False,table=None):
+    def loadContents(self,recursive=False,table=None,loadData=True):
         """Delete the stored contents-list and fetch the contents from the database. You may use the <table>-parameter to restrict the child elements to a specific table: The table with name <table> must contain a column 'id' and this method will only fetch elements which appear in that column. If <recursive> is true loadContents will be called recursively for all child elements.
         If this container is not contained in the DB, this method won't do anything (except the recursive call if <recursive> is True)."""
         if self.isInDB():
@@ -351,14 +357,15 @@ class Container(Element):
                     ORDER BY c.position
                     """.format(db.prefix,table,self.id))
                     
-            contents = [(File if file else Container).fromId(id,position=pos) for id,pos,file in result]
+            contents = [(File if file else Container).fromId(id,position=pos,loadData=loadData) 
+                            for id,pos,file in result]
             self.setContents(contents)
         else: raise RuntimeError("Called loadContents on a container that is not in the db.")
         
         if recursive:
             for element in self.contents:
                 if element.isContainer():
-                    element.loadContents(recursive,table)
+                    element.loadContents(recursive,table,loadData)
 
     def getLength(self):
         """Return the length of this element, i.e. the sum of the lengths of all contents."""
@@ -370,7 +377,7 @@ class Container(Element):
 
 
 class File(Element):
-    def __init__(self, tags, length, path, position, id):
+    def __init__(self, id, tags, path, length, position):
         """Initialize this element with the given id, which must be an integer or None (for external files). Optionally you may specify a tags.Storage object holding the tags of this element and/or a file path."""
         self.id = id
         self.tags = tags
@@ -379,28 +386,19 @@ class File(Element):
         if path is not None and not isinstance(path,str):
             raise ValueError("path must be either None or a string. I got {}".format(id))
         self.path = path
-        self._syncState = {}
-    
-    def hasContents(self):
-        return False
-    
-    def getContents(self):
-        return []
-    
-    def setContents(self):
-        raise RuntimeError("Cannot assign contents to a file!")
-
-    def getContentsCount(self):
-        return 0
-        
-    def isFile(self):
-        return True
     
     @staticmethod
-    def fromId(id, *, position = None, parentId = None):
-        if position is None:
-            position = db.position(parentId, id) if parentId is not None else None
-        return File(db.tags(id), length = db.length(id), path = db.path(id), position = position, id = id)
+    def fromId(id, *, tags=None, path=None, length=None, position=None, parentId=None, loadData=True):
+        if loadData:
+            if tags is None:
+                tags = db.tags(id)
+            if path is None:
+                path = db.path(id)
+            if length is None:
+                length = db.length(id)
+            if position is None and parentId is not None:
+                position = db.position(parentId,id)
+        return File(id,tags,path,length,position)
         
     @staticmethod
     def fromFilesystem(path):
@@ -412,6 +410,21 @@ class File(Element):
         real.read()
         return File(tags = real.tags, length = real.length, path = real.path, position = real.position, id = id)
 
+    def hasContents(self):
+        return False
+    
+    def getContents(self):
+        return []
+    
+    def setContents(self):
+        raise RuntimeError("Cannot assign contents to a file!")
+
+    def getContentsCount(self,recursive=False):
+        return 0
+        
+    def isFile(self):
+        return True
+    
     def getLength(self):
         """Return the length of this file."""
         return self.length
