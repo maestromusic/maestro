@@ -140,17 +140,21 @@ class ConfigOption(Option):
         if isinstance(value,self.type):
             return value
 
-        if self.type == bool:
-            # bool("0") or bool("False") are True, but we want them to be false as this is what you type in a configuration file to make a variable false.
-            if value == "0" or value.lower() == "false":
-                return False
-            else: return self.type(value)
-        elif self.type in (int, str):
-            return self.type(value)
-        elif self.type == list and isinstance(value, str):
-            values = [x.strip(" \t") for x in value.split(",")]
-            return [x for x in values if len(x) > 0]
-        else:
+        try:
+            if self.type == bool:
+                # bool("0") or bool("False") are True, but we want them to be false as this is what you type in a configuration file to make a variable false.
+                if value == "0" or value.lower() == "false":
+                    return False
+                else: return bool(value)
+            elif self.type in (int, str):
+                return self.type(value)
+            elif self.type == list and isinstance(value, str):
+                values = [x.strip(" \t") for x in value.split(",")]
+                return [x for x in values if len(x) > 0]
+            else: error = True
+        except ValueError as e:
+            error = True
+        if error:
             raise ConfigError("{} has type {} which does not match type {} of this option and can't be converted"
                                  .format(value,type(value),self.type))
 
@@ -206,7 +210,9 @@ class StorageOption(Option):
 
 
 class ConfigSection:
-    """A section of the configuration. It may contain options and other sections (its "members") which can be accessed via attribute- or item-access (e.g. ``main.collection`` or ``main['collection']``. The parameter *storage* holds whether this section is from the storage file."""
+    """A section of the configuration. It may contain options and other sections (its "members")
+    which can be accessed via attribute- or item-access (e.g. ``main.collection`` or ``main['collection']``.
+    The parameter *storage* holds whether this section is from the storage file."""
     def __init__(self,name,storage,members):
         self._name = name
         self._storage = storage
