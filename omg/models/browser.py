@@ -11,7 +11,7 @@ import itertools
 from PyQt4 import QtCore
 from PyQt4.QtCore import Qt
 
-from omg import config, models, search, database as db, tags, logging
+from omg import config, models, search, database as db, tags, logging, utils
 import omg
 from omg.models import rootedtreemodel, mimedata
 
@@ -25,11 +25,11 @@ def initSearchEngine():
     if searchEngine is None:
         searchEngine = search.SearchEngine()
         smallResult = searchEngine.createResultTable("browser_small")
-        
 
 class BrowserModel(rootedtreemodel.RootedTreeModel):
     showHiddenValues = False
     _ignoreSearchFinished = False
+    time = None
     
     def __init__(self,table,layers,browser):
         """Initialize this model. It will contain only elements from <table>, group them according to <layers> and will use <smallResult> as temporary search table (BrowserModels perform internal searches when CriterionNodes are expanded for the first time."""
@@ -37,6 +37,7 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
         self.table = table
         self.browser = browser
         self.layers = layers
+        self.time = []
         
         if searchEngine is None:
             initSearchEngine()
@@ -93,8 +94,6 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
             # Collect the criteria in this node and its parents and put the search results into smallResult
             searchEngine.search(self.table,smallResult,node._collectCriteria(),owner=node,parent=self.browser,data=self,lockTable=True)
     
-    
-    
     def _handleSearchStopped(self,stopRequest):
         if stopRequest.owner is self.browser:
             self._ignoreSearchFinished = False
@@ -118,7 +117,7 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
         
         # Get all values and corresponding ids of the given tag appearing in at least one toplevel result.
         result = db.query("""
-            SELECT DISTINCT t.tag_id,v.id,v.value,v.hide
+            SELECT DISTINCT t.tag_id,v.id,v.value,v.hide,v.sort_value
             FROM {1} AS res JOIN {0}tags AS t ON res.id = t.element_id
                      JOIN {0}values_varchar AS v ON t.tag_id = v.tag_id AND t.value_id = v.id
             WHERE res.toplevel = 1 AND t.tag_id IN ({2})
@@ -130,13 +129,16 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
         values = set()
     
         for row in result:
-            tagId,valueId,value,hide = row
+            tagId,valueId,value,hide,sortValue = row
+            if db.isNull(sortValue):
+                sortValue = None
+                
             if self.showHiddenValues or not hide:
                 theList = valueNodes
             else: theList = hiddenNodes
             
             if value not in values:
-                theList.append(ValueNode(node,self,value,{tagId:valueId}))
+                theList.append(ValueNode(node,self,value,{tagId:valueId},sortValue))
                 values.add(value)
             else:
                 # If there is already a value node with this value,
@@ -181,20 +183,30 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
 #            node.contents = valueNodes[0].contents
 
     def _loadContainerLayer(self,node,table):
-        """Load the contents of <node> into a container-layer, using elements from <table>. Note that this creates all children of <node> not only the next level of the tree-structure as _loadTagLayer does."""
+        """Load the contents of <node> into a container-layer, using elements from <table>. Note that this
+        creates all children of <node> not only the next level of the tree-structure as _loadTagLayer does."""
         result = db.query("SELECT id,file FROM {0} WHERE toplevel = 1".format(table))
         if node.hasContents():
             self.beginRemoveRows(self.getIndex(node),0,node.getContentsCount()-1)
             node.setContents([])
             self.endRemoveRows()
+        
         self.beginInsertRows(self.getIndex(node),0,len(result)-1)
         node.setContents([(models.File if file else models.Container).fromId(id) for id,file in result])
         for element in node.contents:
             element.parent = node
             if element.isContainer():
-                element.loadContents(True)
-            element.loadTags(True)
-        #node.contents.sort(key = lambda elem: elem.tags[tags.DATE][0] if tags.DATE in elem.tags else omg.FlexiDate(900))
+                # For performance reasons data of contents are not loaded until the delegate wants it.
+                element.loadContents(recursive=True,loadData=False)
+        
+        # Finally sort the contents
+        sortTag = node.getSortTag()
+        reverse = sortTag.type == tags.TYPE_DATE
+        p = utils.PointAtInfinity(not reverse)
+        node.contents.sort(
+            key = lambda el: el.tags[sortTag][0] if sortTag in el.tags else p,
+            reverse = reverse
+        )
         self.endInsertRows()
 
 
@@ -238,11 +250,12 @@ class CriterionNode(models.Node):
         # Always return True. The contents of a CriterionNode are loaded when getChildren or getChildrenCount is called for the first time. Prior to this call hasChildren=True will tell the view that the node is expandable and make the view draw a plus-sign in front of the node.
         return True
         
-    def getContentsCount(self):
+    def getContentsCount(self,recursive=False):
         if self.contents is None:
             self.model._startLoading(self)
+            self.contents = [LoadingNode(self)]
             return 1 # "Loading..."
-        return len(self.contents)
+        return super().getContentsCount(recursive)
         
     def getContents(self):
         if self.contents is None:
@@ -253,15 +266,29 @@ class CriterionNode(models.Node):
 
 class ValueNode(CriterionNode):
     """A ValueNode groups elements which have the same tag-value in one or more tags. Not that only the value must coincide, the tags need not be the same, but they must be in a given list. This enables BrowserViews display e.g. all artists and all composers in one tag-layer."""
-    def __init__(self,parent,model,value,valueIds):
+    def __init__(self,parent,model,value,valueIds,sortValue):
         """Initialize this ValueNode with the parent-node <parent> and the given model. <valueIds> is a dict mapping tags to value-ids of the tag. This node will contain elements having at least one of the value-ids in the corresponding tag. <value> is the value of the value-ids (which should be the same for all tags) and will be displayed on the node."""
         CriterionNode.__init__(self,parent,model)
         self.value = value
         self.valueIds = valueIds
+        self.sortValue = sortValue
     
+    def getDisplayValue(self):
+        if config.options.gui.browser_show_sort_values:
+            return self.sortValue if self.sortValue is not None else self.value
+        else: return self.value
+
     def getCriterion(self):
         return search.criteria.TagIdCriterion(self.valueIds)
-        
+    
+    def getSortTag(self):
+        sortTags = [tags.get(tagId) for tagId in db.query("SELECT sortKey FROM {}tagids WHERE id IN ({})"
+                               .format(db.prefix,",".join(str(key) for key in self.valueIds))).getSingleColumn()]
+        # If sortTags contains more than one tag, prefer title
+        if tags.TITLE in sortTags:
+            return tags.TITLE
+        else: return sortTags[0]
+
     def __str__(self):
         return "<ValueNode '{0}' ({1})>".format(self.value, ", ".join(map(str,self.valueIds)))
     
@@ -281,6 +308,14 @@ class VariousNode(CriterionNode):
 
     def getCriterion(self):
         return search.criteria.MissingTagCriterion(self.tagSet)
+    
+    def getSortTag(self):
+        sortTags = [tags.get(tagId) for tagId in db.query("SELECT sortKey FROM {}tagids WHERE id IN ({})"
+                          .format(db.prefix,",".join(str(tag.id) for tag in self.tagSet))).getSingleColumn()]
+        # If sortTags contains more than one tag, prefer title
+        if tags.TITLE in sortTags:
+            return tags.TITLE
+        else: return sortTags[0]
         
     def __str__(self):
         return "<VariousNode>"

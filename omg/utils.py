@@ -248,3 +248,65 @@ def getUniqueKey(prefix):
 def freeUniqueKey(key):
     """Free the given key, so that it may be returned again by getUniqueKey."""
     _usedKeys.discard(key)
+
+
+class PointAtInfinity:
+    """Depending on the parameter *plus* this object is either bigger or smaller than any other object,
+    except for other instances with the same parameter. This is useful in key-functions for list.sort."""
+    def __init__(self,plus=True):
+        self.plus = plus
+        
+    def __le__(self,other):
+        return not self.plus
+    
+    def __ge__(self,other):
+        return self.plus
+    
+    def __eq__(self,other):
+        return isinstance(other,PointAtInfinity) and other.plus == self.plus
+    
+    def __ne__(self,other):
+        return not isinstance(other,PointAtInfinity) or other.plus != self.plus
+
+    def __lt__(self,other):
+        return not self.plus and (not isinstance(other,PointAtInfinity) or other.plus)
+        
+    def __gt__(self,other):
+        return self.plus and (not isinstance(other,PointAtInfinity) or not other.plus)
+
+    def __str__(self):
+        return "{}{}".format('+' if self.plus else '-', '∞')
+
+ 
+class Memoized:
+     """Decorator that caches a function's return value each time it is called.
+     If called later with the same arguments, the cached value is returned, and
+     not re-evaluated.
+     
+    Confer http://wiki.python.org/moin/PythonDecoratorLibrary#Memoize
+     """
+     def __init__(self, func):
+         self.func = func
+         self.cache = {}
+         
+     def __call__(self, *args):
+         try:
+             return self.cache[args]
+         except KeyError:
+             value = self.func(*args)
+             if len(self.cache) >= 100000:
+                 self.cache = {}
+             self.cache[args] = value
+             return value
+         except TypeError:
+             # uncachable -- for instance, passing a list as an argument.
+             # Better to not cache than to blow up entirely.
+             return self.func(*args)
+             
+         def __repr__(self):
+             """Return the function's docstring."""
+             return self.func.__doc__
+             
+         def __get__(self, obj, objtype):
+             """Support instance methods."""
+             return functools.partial(self.__call__, obj)

@@ -296,7 +296,8 @@ def idFromHash(hash):
 
 
 # values_* tables
-#=======================================================================
+#=======================================================================         
+@utils.Memoized
 def valueFromId(tagSpec,valueId):
     """Return the value from the tag *tagSpec* with id *valueId* or raise an sql.EmptyResultException if that id does not exist. Date tags will be returned as FlexiDate."""
     tag = tagsModule.get(tagSpec)
@@ -326,13 +327,9 @@ def idFromValue(tagSpec,value,insert=False):
 def tags(elid):
     result = tagsModule.Storage()
     for (tagId,value) in listTags(elid):
-        tag = tagsModule.get(tagId)
-        if tag not in result:
-            result[tag] = [value]
-        else:
-            result[tag].append(value)
+        result.add(tagId,value)
     return result
-    
+ 
 def listTags(elid,tagList=None):
     if tagList is not None:
         if isinstance(tagList,int) or isinstance(tagList,str) or isinstance(tagList,tagsModule.Tag):
@@ -347,13 +344,13 @@ def listTags(elid,tagList=None):
                 FROM {}tags
                 WHERE element_id = {} {}
                 """.format(prefix,elid,additionalWhereClause))
-    tags = set()
+    tags = []
     for tagid,valueid in result:
         tag = tagsModule.get(tagid)
         val = valueFromId(tag, valueid)
         if val is None:
             print('value for tag {} with id {} not found'.format(tag, valueid))
-        tags.add((tag,valueFromId(tag,valueid)))
+        else: tags.append((tag,val))
     return tags
 
 def tagValues(elid,tagList):

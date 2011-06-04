@@ -81,7 +81,7 @@ class BrowserDelegate(abstractdelegate.AbstractDelegate):
         node = self.model.data(index)
         
         if isinstance(node,browser.ValueNode):
-            self.addLine(node.value,"")
+            self.addLine(node.getDisplayValue(),"")
         elif isinstance(node,browser.VariousNode):
             self.addLine(self.tr("Unknown/Various"),style1=BR_SPECIAL_NODE_STYLE)
         elif isinstance(node,browser.HiddenValuesNode):
@@ -90,6 +90,8 @@ class BrowserDelegate(abstractdelegate.AbstractDelegate):
             self.addLine(self.tr("Loading..."),style1=BR_SPECIAL_NODE_STYLE)
         elif isinstance(node,models.Element):
             element = node
+            if element.tags is None:
+                element.loadTags()
             f = formatter.Formatter(element)
             if element.isFile():
                 # First find out whether the file has a cover (usually not...)

@@ -70,6 +70,7 @@ defaults = OrderedDict((
     "detail_cover_size": (int,160,"Cover size in details view."),
     "iconsize": (int,16,"Size of various icons."),
     "max_browser_views": (int,5,"The maximal number of views the browser will allow."),
+    "browser_show_sort_values": (bool,True,"Whether the browser should display sortvalues instead of real values (if present)."),
     "mime": (str,"application/x-omgelementlist","Mime-type used to copy and paste data within OMG."),
     "startTab": (str,"playlist","Either 'playlist' or 'editor' whatever you want to see on startup."),
 }),
