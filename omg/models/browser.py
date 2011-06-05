@@ -200,15 +200,14 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
                 element.loadContents(recursive=True,loadData=False)
         
         # Finally sort the contents
-        sortTag = node.getSortTag()
-        reverse = sortTag.type == tags.TYPE_DATE
-        p = utils.PointAtInfinity(not reverse)
-        node.contents.sort(
-            key = lambda el: el.tags[sortTag][0] if sortTag in el.tags else p,
-            reverse = reverse
-        )
+        for sortTag in reversed(node.getSortTags()):
+            reverse = sortTag.type == tags.TYPE_DATE
+            p = utils.PointAtInfinity(not reverse)
+            node.contents.sort(
+                key = lambda el: el.tags[sortTag][0] if sortTag in el.tags else p,
+                reverse = reverse
+            )
         self.endInsertRows()
-
 
 
 class HiddenValuesNode(models.Node):
@@ -281,13 +280,9 @@ class ValueNode(CriterionNode):
     def getCriterion(self):
         return search.criteria.TagIdCriterion(self.valueIds)
     
-    def getSortTag(self):
-        sortTags = [tags.get(tagId) for tagId in db.query("SELECT sortKey FROM {}tagids WHERE id IN ({})"
-                               .format(db.prefix,",".join(str(key) for key in self.valueIds))).getSingleColumn()]
-        # If sortTags contains more than one tag, prefer title
-        if tags.TITLE in sortTags:
-            return tags.TITLE
-        else: return sortTags[0]
+    def getSortTags(self):
+        # TODO: Do something if there are several tags with different sorttags
+        return tags.get(list(self.valueIds.keys())[0]).sortTags
 
     def __str__(self):
         return "<ValueNode '{0}' ({1})>".format(self.value, ", ".join(map(str,self.valueIds)))
@@ -309,13 +304,9 @@ class VariousNode(CriterionNode):
     def getCriterion(self):
         return search.criteria.MissingTagCriterion(self.tagSet)
     
-    def getSortTag(self):
-        sortTags = [tags.get(tagId) for tagId in db.query("SELECT sortKey FROM {}tagids WHERE id IN ({})"
-                          .format(db.prefix,",".join(str(tag.id) for tag in self.tagSet))).getSingleColumn()]
-        # If sortTags contains more than one tag, prefer title
-        if tags.TITLE in sortTags:
-            return tags.TITLE
-        else: return sortTags[0]
+    def getSortTags(self):
+        # TODO: Do something if there are several tags with different sorttags
+        return tags.get(list(self.tagSet)[0]).sortTags
         
     def __str__(self):
         return "<VariousNode>"

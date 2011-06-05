@@ -141,15 +141,17 @@ class Tag:
 
         Tags contain a tagname and compare equal if and only this tagname is equal. Tags may be used as dictionary keys.
     """
-    def __init__(self,id,name,valueType):
-        if not isinstance(id,int) or not isinstance(name,str) or not isinstance(valueType,ValueType):
-            raise TypeError("Invalid type (id,name,valueType): ({},{},{}) of types ({},{},{})"
-                                .format(id,name,valueType,type(id),type(name),type(valueType)))
+    def __init__(self,id,name,valueTypeName,sortTags,private=False):
+        if not isinstance(id,int) or not isinstance(name,str) or not isinstance(valueTypeName,str):
+            raise TypeError("Invalid type (id,name,valueTypeName): ({},{},{}) of types ({},{},{})"
+                                .format(id,name,valueTypeName,type(id),type(name),type(valueTypeName)))
         if not Tag.isValidTagname(name):
             raise ValueError("Invalid tagname '{}'".format(name))
         self.id = id
         self.name = name.lower()
-        self.type = valueType
+        self.type = ValueType.byName(valueTypeName)
+        self.sortTags = sortTags
+        self.private = private
 
     def isValid(self,value):
         """Return whether the given value is a valid tag-value for this tag (this depends only on the tag-type)."""
@@ -283,22 +285,40 @@ def addTag(name, type, sort = None, private = False):
 
 def init():
     """Initialize the variables of this module based on the information of the tagids-table and config-file. At program start or after changes of that table this method must be called to ensure the module has the correct tags and their IDs."""
-    global _tagsById,_tagsByName,tagList, _translation
+    global _tagsById,_tagsByName,tagList, _translation, TITLE,ALBUM
 
     # Initialize _tagsById, _tagsByName and tagList from the database
     from omg import database
     _tagsById = {}
     _tagsByName = {}
-    for row in database.query("SELECT id,tagname,tagtype FROM {}tagids".format(database.prefix)):
-        newTag = Tag(row[0],row[1],ValueType.byName(row[2]))
+    for row in database.query("SELECT id,tagname,tagtype,sorttags,private FROM {}tagids"
+                              .format(database.prefix)):
+        newTag = Tag(*row)
         _tagsById[newTag.id] = newTag
         _tagsByName[newTag.name] = newTag
-    
+        
     # tagList contains the tags in the order specified by tags->tag_order...
     tagList = [ _tagsByName[name] for name in config.options.tags.tag_order if name in _tagsByName ]
     # ...and then all remaining tags in arbitrary order
     tagList.extend(set(_tagsByName.values()) - set(tagList))
+            
+    # Init TITLE AND ALBUM
+    if config.options.tags.title_tag not in _tagsByName:
+        raise RuntimeError("Cannot find a '{}'-tag in the database.".format(config.options.tags.title_tag))
+    if config.options.tags.album_tag not in _tagsByName:
+        raise RuntimeError("Cannot find a '{}'-tag in the database.".format(config.options.tags.album_tag))
+    TITLE = _tagsByName[config.options.tags.title_tag]
+    ALBUM = _tagsByName[config.options.tags.album_tag]
 
+    # Replace comma separated list of sorttags-ids by tuples of tags. This cannot be done in Tag.__init__ as
+    # all tags need to be created already.
+    for tag in _tagsById.values():
+        try:
+            tag.sortTags = tuple(_tagsById[int(id)] for id in tag.sortTags.split(','))
+        except KeyError:
+            logger.error("Tag {} contains an invalid sortTag.".format(tag.name))
+            tag.sortTags = (TITLE,)
+            
     # Initialize _translation
     _translation = {}
     files = [os.path.join('i18n','tags.'+config.options.i18n.locale+'.xml'),
@@ -313,14 +333,6 @@ def init():
                 except xml.sax.SAXParseException as e:
                     logger.warning("I could not parse tag translation file '{}'. Error message: {}"
                                         .format(file,e.message()))
-    
-    global TITLE,ALBUM
-    if config.options.tags.title_tag not in _tagsByName:
-        raise RuntimeError("Cannot find a '{}'-tag in the database.".format(config.options.tags.title_tag))
-    if config.options.tags.album_tag not in _tagsByName:
-        raise RuntimeError("Cannot find a '{}'-tag in the database.".format(config.options.tags.album_tag))
-    TITLE = _tagsByName[config.options.tags.title_tag]
-    ALBUM = _tagsByName[config.options.tags.album_tag]
 
 
 class TagValueList(list):
