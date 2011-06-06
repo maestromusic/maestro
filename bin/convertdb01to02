@@ -12,6 +12,9 @@
 import sys
 from omg import database as db,config
 
+print("Before using this script please update it: sortkeys have changed")
+sys.exit(1)
+
 config.init({})
 
 prefix = config.options.database.prefix

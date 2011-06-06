@@ -21,8 +21,10 @@ from omg import config, logging, database
 mainWindow = None
 
 
-def init(cmdConfig = [],initTags=True,testDB=False):
-    """Initialize the application, translators, modules (config, logging, database and tags) but do not create a GUI or load any plugins. Return the QApplication instance. This is useful for scripts which need OMG's framework, but not its GUI and for testing (or playing around) in Python's shell::
+def init(app,cmdConfig = [],initTags=True,testDB=False):
+    """Initialize the application, modules (config, logging, database and tags) but do not create a GUI or
+    load any plugins. Return the QApplication instance. This is useful for scripts which need OMG's framework,
+    but not its GUI and for testing (or playing around) in Python's shell::
 
         >>> from omg import application, tags
         >>> application.init()
@@ -30,8 +32,10 @@ def init(cmdConfig = [],initTags=True,testDB=False):
         >>> tags.tagList
         ["title", "artist", "album", ...]
 
-    *cmdOptions* is a list of options given on the command line that will overwrite the corresponding option from the file or the default. Each list item has to be a string like ``main.collection=/var/music``.
-    If *testDB* is True, the database connection will be build using :func:`database.testConnect`. Warning: In this case the tags-module won't be initialized since the test database is usually empty.
+    *cmdOptions* is a list of options given on the command line that will overwrite the corresponding option
+    from the file or the default. Each list item has to be a string like ``main.collection=/var/music``.
+    If *testDB* is True, the database connection will be build using :func:`database.testConnect`.
+    Warning: In this case the tags-module won't be initialized since the test database is usually empty.
     """
     # Some Qt-classes need a running QApplication before they can be created
     app = QtGui.QApplication(sys.argv)
@@ -48,7 +52,7 @@ def init(cmdConfig = [],initTags=True,testDB=False):
     logger.debug("START")
     
     # Load translators
-    qtTranslator = QtCore.QTranslator() # Translator for Qt's own strings
+    qtTranslator = QtCore.QTranslator(app) # Translator for Qt's own strings
     translatorDir = QtCore.QLibraryInfo.location(QtCore.QLibraryInfo.TranslationsPath)
     translatorFile = "qt_" + QtCore.QLocale.system().name()
     if qtTranslator.load(translatorFile,translatorDir):
@@ -56,7 +60,7 @@ def init(cmdConfig = [],initTags=True,testDB=False):
     else: logger.warning("Unable to load Qt's translator file {} from directory {}."
                             .format(translatorFile,translatorDir))
 
-    translator = QtCore.QTranslator() # Translator for our strings
+    translator = QtCore.QTranslator(app) # Translator for our strings
     translatorDir = os.path.join(os.getcwd(),'i18n')
     translatorFile = 'omg.'+config.options.i18n.locale
     if translator.load(translatorFile,translatorDir):
@@ -72,12 +76,6 @@ def init(cmdConfig = [],initTags=True,testDB=False):
     if initTags:
         from omg import tags
         tags.init()
-    
-    # TODO
-    from omg import distributor 
-    distributor.init()
-    #~ from omg import search
-    #~ search.init()
 
     return app
 
@@ -86,8 +84,20 @@ def run(cmdConfig = []):
     """Run OMG. *cmdOptions* is a list of options given on the command line that will overwrite the corresponding option from the file or the default. Each list item has to be a string like ``main.collection=/var/music``.
     """
     app = init(cmdConfig)
+    
+    if os.path.dirname(__file__):
+        os.chdir(os.path.dirname(__file__))
+    os.chdir("../")
 
+    # Initialize config and logging
+    config.init(cmdConfig)
+    logging.init()
+    logger = logging.getLogger("omg")
+    logger.debug("START")
+    
     # Load remaining modules
+    from omg import distributor 
+    distributor.init()
     from omg import tags, search
     search.init()
 
@@ -104,7 +114,7 @@ def run(cmdConfig = []):
     global mainWindow
     mainWindow = mainwindow.MainWindow()
     plugins.mainWindowInit()
-    
+
     # Launch application
     mainWindow.show()
     returnValue = app.exec_()

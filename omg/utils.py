@@ -152,6 +152,8 @@ class FlexiDate(object):
         else: return "FlexiDate({})".format(self.year)
         
     def __lt__(self, other):
+        if not isinstance(other,FlexiDate):
+            return NotImplemented
         for a,b in ((self.year,other.year),(self.month,other.month),(self.day,other.day)):
             if a == b:
                 continue
@@ -163,6 +165,8 @@ class FlexiDate(object):
         else: return False # Equality
 
     def __gt__(self, other):
+        if not isinstance(other,FlexiDate):
+            return NotImplemented
         return other.__lt__(self)
     
     def __le__(self, other):
@@ -176,7 +180,6 @@ class FlexiDate(object):
             self.year == other.year and self.month == other.month and self.day == other.day
         
     def __ne__(self,other):
-        """Do something weird."""
         return not isinstance(other,FlexiDate) or\
             self.year != other.year or self.month != other.month or self.day != other.day
 

@@ -160,7 +160,7 @@ class DBAnalyzerDialog(QtGui.QDialog):
         for i,header in enumerate((self.tr("ID"),
                                    self.tr("Name"),
                                    self.tr("Type"),
-                                   self.tr("SortKey"),
+                                   self.tr("SortTags"),
                                    self.tr("Private"),
                                    self.tr("Values"),
                                    self.tr("Refs"))):
@@ -267,9 +267,18 @@ class DBAnalyzerDialog(QtGui.QDialog):
     def getTags(self):
         """Gather and return the data for the tags table."""
         tags = []
-        result = db.query("SELECT id,tagname,tagtype,sortkey,private FROM {}tagids ORDER BY id".format(db.prefix))
+        result = db.query("SELECT id,tagname,tagtype,sorttags,private FROM {}tagids ORDER BY id".format(db.prefix))
         for id,name,type,sort,private in result:
-            tuple = (id,name,type,tagsModule.get(sort),private,
+            sortTags = []
+            for sortId in sort.split(','):
+                try:
+                    sortTags.append(db.query("SELECT tagname FROM {}tagids WHERE id = {}"
+                                               .format(db.prefix,sortId)).getSingle())
+                except db.sql.EmptyResultException:
+                    sortTags.append('{} (INVALID!)'.format(sortId))
+            sortTags = ", ".join(sortTags) 
+                        
+            tuple = (id,name,type,sortTags,private,
                 db.query("SELECT COUNT(*) FROM {}values_{} WHERE tag_id={}".format(db.prefix,type,id)).getSingle(),
                 db.query("SELECT COUNT(*) FROM {}tags WHERE tag_id={}".format(db.prefix,id)).getSingle()
              )

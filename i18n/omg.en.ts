@@ -10,21 +10,6 @@
 </context>
 <context>
     <name>BrowserDelegate</name>
-    <message>
-        <location filename="../omg/gui/delegates.py" line="86"/>
-        <source>Unknown/Various</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../omg/gui/delegates.py" line="88"/>
-        <source>Hidden</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../omg/gui/delegates.py" line="90"/>
-        <source>Loading...</source>
-        <translation type="unfinished"></translation>
-    </message>
 </context>
 <context>
     <name>BrowserDialog</name>
@@ -72,139 +57,127 @@
 </context>
 <context>
     <name>CoverFetcher</name>
+</context>
+<context>
+    <name>DBAnalyzerDialog</name>
     <message>
-        <location filename="../omg/plugins/coverfetcher/__init__.py" line="31"/>
-        <source>Fetch cover from Last.fm</source>
+        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="30"/>
+        <source>DB Analyzer</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverfetcher/__init__.py" line="31"/>
-        <source>Load image file...</source>
+        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="83"/>
+        <source>Statistics</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverfetcher/__init__.py" line="31"/>
-        <source>Open URL...</source>
+        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="94"/>
+        <source>Tags</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverfetcher/__init__.py" line="31"/>
-        <source>Skip</source>
+        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="104"/>
+        <source>Problems</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverfetcher/__init__.py" line="31"/>
-        <source>Save cover</source>
+        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="124"/>
+        <source>Fix problem</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverfetcher/__init__.py" line="31"/>
-        <source>Cancel</source>
+        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="128"/>
+        <source>Refresh</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverfetcher/__init__.py" line="31"/>
-        <source>Open cover file</source>
+        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="134"/>
+        <source>Close</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverfetcher/__init__.py" line="31"/>
-        <source>Image files (*.png *.jpg *.bmp);;All files (*)</source>
+        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="160"/>
+        <source>ID</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverfetcher/__init__.py" line="31"/>
-        <source>Failed to open the file</source>
+        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="160"/>
+        <source>Name</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverfetcher/__init__.py" line="31"/>
-        <source>The file could not be opened.</source>
+        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="160"/>
+        <source>Type</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverfetcher/__init__.py" line="31"/>
-        <source>Open URL</source>
+        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="160"/>
+        <source>SortTags</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverfetcher/__init__.py" line="31"/>
-        <source>Please enter the cover&apos;s URL:</source>
+        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="160"/>
+        <source>Private</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverfetcher/__init__.py" line="31"/>
-        <source>Invalid URL</source>
+        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="160"/>
+        <source>Values</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverfetcher/__init__.py" line="31"/>
-        <source>The given URL is invalid.</source>
+        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="160"/>
+        <source>Refs</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverfetcher/__init__.py" line="31"/>
-        <source>Failed to fetch cover</source>
+        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="180"/>
+        <source>Check</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverfetcher/__init__.py" line="31"/>
-        <source>An error occurred during fetching the cover. Maybe Last.fm does not have a cover for this album. Or there was an error with the connection.</source>
+        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="181"/>
+        <source>Broken</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverfetcher/__init__.py" line="31"/>
-        <source>Cover from Last.fm</source>
+        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="223"/>
+        <source>OK</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverfetcher/__init__.py" line="31"/>
-        <source>Loading cover failed</source>
+        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="228"/>
+        <source>Details for check &apos;{}&apos;:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverfetcher/__init__.py" line="31"/>
-        <source>The cover could not be loaded.</source>
+        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="247"/>
+        <source>Elements</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverfetcher/__init__.py" line="31"/>
-        <source>pixel</source>
+        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="250"/>
+        <source>Files</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverfetcher/__init__.py" line="31"/>
-        <source>Previous cover</source>
+        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="253"/>
+        <source>Containers</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverfetcher/__init__.py" line="31"/>
-        <source>Overwrite file?</source>
+        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="256"/>
+        <source>Toplevel elements</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverfetcher/__init__.py" line="31"/>
-        <source>Should the existing cover be overriden?</source>
+        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="259"/>
+        <source>Content relations</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverfetcher/__init__.py" line="31"/>
-        <source>Saving cover failed</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../omg/plugins/coverfetcher/__init__.py" line="31"/>
-        <source>The cover could not be saved.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../omg/plugins/coverfetcher/__init__.py" line="31"/>
-        <source>Add cover...</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../omg/plugins/coverfetcher/__init__.py" line="31"/>
-        <source>Add cover</source>
+        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="262"/>
+        <source>Tag relations</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -390,6 +363,24 @@
             <numerusform>in {}/%n piece</numerusform>
             <numerusform>in {}/%n pieces</numerusform>
         </translation>
+    </message>
+</context>
+<context>
+    <name>SearchAnalyzer</name>
+    <message>
+        <location filename="../omg/plugins/searchanalyzer/__init__.py" line="30"/>
+        <source>Search Analyzer</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/searchanalyzer/__init__.py" line="99"/>
+        <source>Instant search</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/searchanalyzer/__init__.py" line="112"/>
+        <source>Close</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -610,35 +601,5 @@
 </context>
 <context>
     <name>VolumeLabel</name>
-    <message>
-        <location filename="../omg/gui/control.py" line="241"/>
-        <source>Click to unmute</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../omg/gui/control.py" line="243"/>
-        <source>Click to mute</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../omg/gui/control.py" line="252"/>
-        <source>muted</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../omg/gui/control.py" line="254"/>
-        <source>low</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../omg/gui/control.py" line="256"/>
-        <source>medium</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../omg/gui/control.py" line="258"/>
-        <source>high</source>
-        <translation type="unfinished"></translation>
-    </message>
 </context>
 </TS>

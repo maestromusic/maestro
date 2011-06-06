@@ -82,14 +82,13 @@ tables = [SQLTable(createQuery) for createQuery in (
     ) ENGINE InnoDB, CHARACTER SET 'utf8';
 """.format(db.prefix),
 """CREATE TABLE {0}tagids (
-        id      SMALLINT UNSIGNED             NOT NULL AUTO_INCREMENT,
-        tagname VARCHAR(63)                   NOT NULL,
-        tagtype ENUM('varchar','date','text') NOT NULL DEFAULT 'varchar',
-        sortkey SMALLINT UNSIGNED             NOT NULL,
-        private BOOLEAN                       NOT NULL,
+        id       SMALLINT UNSIGNED             NOT NULL AUTO_INCREMENT,
+        tagname  VARCHAR(63)                   NOT NULL,
+        tagtype  ENUM('varchar','date','text') NOT NULL DEFAULT 'varchar',
+        sorttags VARCHAR(20)                   NOT NULL,
+        private  BOOLEAN                       NOT NULL,
         PRIMARY KEY(id),
-        UNIQUE INDEX(tagname),
-        FOREIGN KEY(sortkey) REFERENCES {0}tagids(id) ON DELETE CASCADE
+        UNIQUE INDEX(tagname)
     ) ENGINE InnoDB, CHARACTER SET 'utf8';
 """.format(db.prefix),
 """CREATE TABLE {0}tags (
