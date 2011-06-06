@@ -1,3 +1,0 @@
-#!/bin/bash
-# This will generate the qm-files, which are necessary for a translated application.
-lrelease `dirname $0`"/omg.pro"
