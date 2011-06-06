@@ -11,10 +11,11 @@ SOURCES = ../omg/application.py\
 	  ../omg/gui/singletageditor.py\
 	  ../omg/gui/tageditor.py\
 	  ../omg/gui/tagwidgets.py\
-          ../omg/gui/treeview.py\
-\
-          ../omg/plugins/coverfetcher/__init__.py
+      ../omg/gui/treeview.py\
+	  ../omg/models/editor.py\
+      ../omg/plugins/coverfetcher/__init__.py\
+	  ../omg/plugins/configeditor/__init__.py
          
 
 
-TRANSLATIONS = omg.de.ts omg.en.ts
+TRANSLATIONS = omg.de.ts omg.en.ts omg.pfl.ts

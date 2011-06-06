@@ -3,8 +3,8 @@
 <context>
     <name>Browser</name>
     <message>
-        <location filename="../omg/gui/browser.py" line="43"/>
-        <source>Search: </source>
+        <location filename="../omg/gui/browser.py" line="32"/>
+        <source>Browser</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -15,27 +15,58 @@
         <source>Unknown/Various</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <location filename="../omg/gui/delegates.py" line="88"/>
+        <source>Hidden</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/delegates.py" line="90"/>
+        <source>Loading...</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>BrowserDialog</name>
     <message>
-        <location filename="../omg/gui/browserdialog.py" line="33"/>
-        <source>Browser configuration</source>
+        <location filename="../omg/gui/browserdialog.py" line="37"/>
+        <source>Flags</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/browserdialog.py" line="41"/>
+        <source>Options</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../omg/gui/browserdialog.py" line="43"/>
-        <source>Number of views: </source>
+        <source>Instant search</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/gui/browserdialog.py" line="62"/>
-        <source>Cancel</source>
+        <location filename="../omg/gui/browserdialog.py" line="48"/>
+        <source>Show hidden values</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/gui/browserdialog.py" line="65"/>
-        <source>OK</source>
+        <location filename="../omg/gui/browserdialog.py" line="53"/>
+        <source>Configure Views...</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>BrowserDock</name>
+    <message>
+        <location filename="../omg/gui/browser.py" line="24"/>
+        <source>Browser</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>ConfigSectionWidget</name>
+    <message>
+        <location filename="../omg/plugins/configeditor/__init__.py" line="106"/>
+        <source>reset to default</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -43,217 +74,204 @@
     <name>CoverFetcher</name>
     <message>
         <location filename="../omg/plugins/coverfetcher/__init__.py" line="31"/>
-        <source>Fetch cover...</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../omg/plugins/coverfetcher/__init__.py" line="52"/>
-        <source>Fetch cover</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../omg/plugins/coverfetcher/__init__.py" line="108"/>
         <source>Fetch cover from Last.fm</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverfetcher/__init__.py" line="117"/>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="31"/>
         <source>Load image file...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverfetcher/__init__.py" line="120"/>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="31"/>
         <source>Open URL...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverfetcher/__init__.py" line="127"/>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="31"/>
         <source>Skip</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverfetcher/__init__.py" line="130"/>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="31"/>
         <source>Save cover</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverfetcher/__init__.py" line="133"/>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="31"/>
         <source>Cancel</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverfetcher/__init__.py" line="143"/>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="31"/>
         <source>Open cover file</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverfetcher/__init__.py" line="143"/>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="31"/>
         <source>Image files (*.png *.jpg *.bmp);;All files (*)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverfetcher/__init__.py" line="150"/>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="31"/>
         <source>Failed to open the file</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverfetcher/__init__.py" line="150"/>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="31"/>
         <source>The file could not be opened.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverfetcher/__init__.py" line="157"/>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="31"/>
         <source>Open URL</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverfetcher/__init__.py" line="157"/>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="31"/>
         <source>Please enter the cover&apos;s URL:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverfetcher/__init__.py" line="162"/>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="31"/>
         <source>Invalid URL</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverfetcher/__init__.py" line="162"/>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="31"/>
         <source>The given URL is invalid.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverfetcher/__init__.py" line="187"/>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="31"/>
         <source>Failed to fetch cover</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverfetcher/__init__.py" line="187"/>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="31"/>
         <source>An error occurred during fetching the cover. Maybe Last.fm does not have a cover for this album. Or there was an error with the connection.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverfetcher/__init__.py" line="192"/>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="31"/>
         <source>Cover from Last.fm</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverfetcher/__init__.py" line="217"/>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="31"/>
         <source>Loading cover failed</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverfetcher/__init__.py" line="217"/>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="31"/>
         <source>The cover could not be loaded.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverfetcher/__init__.py" line="222"/>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="31"/>
         <source>pixel</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverfetcher/__init__.py" line="265"/>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="31"/>
         <source>Previous cover</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverfetcher/__init__.py" line="272"/>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="31"/>
         <source>Overwrite file?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverfetcher/__init__.py" line="272"/>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="31"/>
         <source>Should the existing cover be overriden?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverfetcher/__init__.py" line="278"/>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="31"/>
         <source>Saving cover failed</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverfetcher/__init__.py" line="278"/>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="31"/>
         <source>The cover could not be saved.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="31"/>
+        <source>Add cover...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/coverfetcher/__init__.py" line="31"/>
+        <source>Add cover</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
-    <name>EditorTreeWidget</name>
+    <name>Editor</name>
     <message>
-        <location filename="../omg/gui/editor.py" line="35"/>
-        <source>Merge</source>
+        <location filename="../omg/gui/editor.py" line="116"/>
+        <source>editor</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>EditorModel</name>
+    <message>
+        <location filename="../omg/models/editor.py" line="129"/>
+        <source>error</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/gui/editor.py" line="38"/>
-        <source>Commit</source>
+        <location filename="../omg/models/editor.py" line="129"/>
+        <source>You cannot put a container below itself in the hierarchy!</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/gui/editor.py" line="42"/>
-        <source>Flatten</source>
+        <location filename="../omg/models/editor.py" line="194"/>
+        <source>Importing {0} files...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/gui/editor.py" line="136"/>
-        <source>Undo</source>
+        <location filename="../omg/models/editor.py" line="212"/>
+        <source>new tag &#xc2;&#xbb;{0}&#xc2;&#xab; found</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/gui/editor.py" line="137"/>
-        <source>Redo</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../omg/gui/editor.py" line="143"/>
-        <source>Merge elements</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../omg/gui/editor.py" line="143"/>
-        <source>Name of new subcontainer:</source>
+        <location filename="../omg/models/editor.py" line="212"/>
+        <source>File &lt;{0}&gt; contains a so far unknown tag &#xc2;&#xbb;{1}&#xc2;&#xab;. What should its type be?</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
     <name>EditorWidget</name>
     <message>
-        <location filename="../omg/gui/editor.py" line="183"/>
-        <source>Commit</source>
+        <location filename="../omg/gui/editor.py" line="73"/>
+        <source>editor</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/gui/editor.py" line="189"/>
-        <source>Clear</source>
+        <location filename="../omg/gui/editor.py" line="104"/>
+        <source>new container</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/gui/editor.py" line="205"/>
-        <source>Calculating audio hashes...</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../omg/gui/editor.py" line="208"/>
-        <source>Accept</source>
+        <location filename="../omg/gui/editor.py" line="86"/>
+        <source>guess albums</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
     <name>ExpandLine</name>
     <message>
-        <location filename="../omg/gui/singletageditor.py" line="277"/>
+        <location filename="../omg/gui/singletageditor.py" line="281"/>
         <source>{} different</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
     <name>Formatter</name>
-    <message>
-        <location filename="../omg/gui/formatter.py" line="62"/>
-        <source>Formatter</source>
-        <comment>&lt;No title&gt;</comment>
-        <translation type="unfinished"></translation>
-    </message>
     <message numerus="yes">
         <location filename="../omg/gui/formatter.py" line="100"/>
         <source>%n piece(s)</source>
@@ -261,6 +279,11 @@
             <numerusform>%n piece</numerusform>
             <numerusform>%n pieces</numerusform>
         </translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/formatter.py" line="62"/>
+        <source>&lt;No title&gt;</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -274,61 +297,18 @@
 <context>
     <name>NewTagDialog</name>
     <message>
-        <location filename="../omg/gui/dialogs.py" line="17"/>
+        <location filename="../omg/gui/dialogs.py" line="19"/>
         <source>The tag &apos;{}&apos; occured for the first time. Please enter its type:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/gui/dialogs.py" line="21"/>
+        <location filename="../omg/gui/dialogs.py" line="23"/>
         <source>Ignore this tag</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/gui/dialogs.py" line="22"/>
+        <location filename="../omg/gui/dialogs.py" line="24"/>
         <source>Ok</source>
-        <translation type="unfinished"></translation>
-    </message>
-</context>
-<context>
-    <name>OmgMainWindow</name>
-    <message>
-        <location filename="../omg/application.py" line="34"/>
-        <source>&amp;Extras</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../omg/application.py" line="35"/>
-        <source>&amp;Help</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../omg/application.py" line="38"/>
-        <source>&amp;About</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../omg/application.py" line="58"/>
-        <source>Playback control</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../omg/application.py" line="65"/>
-        <source>Element browser</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../omg/application.py" line="73"/>
-        <source>Playlist</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../omg/application.py" line="79"/>
-        <source>Editor</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../omg/application.py" line="84"/>
-        <source>File browser</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -361,14 +341,37 @@
     </message>
 </context>
 <context>
+    <name>PreferencesDialog</name>
+    <message>
+        <location filename="../omg/plugins/configeditor/__init__.py" line="169"/>
+        <source>cancel</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/configeditor/__init__.py" line="171"/>
+        <source>save</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/configeditor/__init__.py" line="185"/>
+        <source>unsaved changes</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/configeditor/__init__.py" line="185"/>
+        <source>Do you want to save your changes before proceeding?</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>RecordEditor</name>
     <message>
-        <location filename="../omg/gui/singletageditor.py" line="226"/>
+        <location filename="../omg/gui/singletageditor.py" line="230"/>
         <source>except in {}</source>
         <translation type="unfinished"></translation>
     </message>
     <message numerus="yes">
-        <location filename="../omg/gui/singletageditor.py" line="227"/>
+        <location filename="../omg/gui/singletageditor.py" line="231"/>
         <source>except in {}/%n pieces</source>
         <translation>
             <numerusform>except in {}/%n piece</numerusform>
@@ -376,12 +379,12 @@
         </translation>
     </message>
     <message>
-        <location filename="../omg/gui/singletageditor.py" line="234"/>
+        <location filename="../omg/gui/singletageditor.py" line="237"/>
         <source>in {}</source>
         <translation type="unfinished"></translation>
     </message>
     <message numerus="yes">
-        <location filename="../omg/gui/singletageditor.py" line="235"/>
+        <location filename="../omg/gui/singletageditor.py" line="239"/>
         <source>in {}/%n pieces</source>
         <translation>
             <numerusform>in {}/%n piece</numerusform>
@@ -392,62 +395,62 @@
 <context>
     <name>TagDialog</name>
     <message>
-        <location filename="../omg/gui/tageditor.py" line="215"/>
+        <location filename="../omg/gui/tageditor.py" line="261"/>
         <source>Add tag value</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/gui/tageditor.py" line="228"/>
+        <location filename="../omg/gui/tageditor.py" line="274"/>
         <source>Cancel</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/gui/tageditor.py" line="230"/>
+        <location filename="../omg/gui/tageditor.py" line="276"/>
         <source>OK</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/gui/tageditor.py" line="239"/>
+        <location filename="../omg/gui/tageditor.py" line="285"/>
         <source>Type: </source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/gui/tageditor.py" line="242"/>
+        <location filename="../omg/gui/tageditor.py" line="288"/>
         <source>Value: </source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/gui/tageditor.py" line="244"/>
+        <location filename="../omg/gui/tageditor.py" line="290"/>
         <source>Elements: </source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/gui/tageditor.py" line="257"/>
+        <location filename="../omg/gui/tageditor.py" line="303"/>
         <source>Invalid tag name</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/gui/tageditor.py" line="257"/>
+        <location filename="../omg/gui/tageditor.py" line="303"/>
         <source>Invalid tag name. Tag name must contain only letters and digits.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/gui/tageditor.py" line="267"/>
+        <location filename="../omg/gui/tageditor.py" line="313"/>
         <source>Invalid value</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/gui/tageditor.py" line="267"/>
+        <location filename="../omg/gui/tageditor.py" line="313"/>
         <source>The given value is invalid.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/gui/tageditor.py" line="268"/>
+        <location filename="../omg/gui/tageditor.py" line="314"/>
         <source>No element selected</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/gui/tageditor.py" line="268"/>
+        <location filename="../omg/gui/tageditor.py" line="314"/>
         <source>You must select at lest one element.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -455,7 +458,7 @@
 <context>
     <name>TagEditorDialog</name>
     <message>
-        <location filename="../omg/gui/tageditor.py" line="23"/>
+        <location filename="../omg/gui/tageditor.py" line="25"/>
         <source>Edit tags</source>
         <translation type="unfinished"></translation>
     </message>
@@ -463,17 +466,17 @@
 <context>
     <name>TagEditorWidget</name>
     <message>
-        <location filename="../omg/gui/tageditor.py" line="42"/>
+        <location filename="../omg/gui/tageditor.py" line="44"/>
         <source>Undo</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/gui/tageditor.py" line="43"/>
+        <location filename="../omg/gui/tageditor.py" line="45"/>
         <source>Redo</source>
         <translation type="unfinished"></translation>
     </message>
     <message numerus="yes">
-        <location filename="../omg/gui/tageditor.py" line="50"/>
+        <location filename="../omg/gui/tageditor.py" line="52"/>
         <source>Edit tags of %n element(s).</source>
         <translation>
             <numerusform>Edit tags of %n element.</numerusform>
@@ -481,53 +484,88 @@
         </translation>
     </message>
     <message>
-        <location filename="../omg/gui/tageditor.py" line="58"/>
+        <location filename="../omg/gui/tageditor.py" line="60"/>
         <source>Add tag</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/gui/tageditor.py" line="200"/>
+        <location filename="../omg/gui/tageditor.py" line="203"/>
         <source>Remove selected</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/gui/tageditor.py" line="66"/>
+        <location filename="../omg/gui/tageditor.py" line="68"/>
         <source>Reset</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/gui/tageditor.py" line="69"/>
+        <location filename="../omg/gui/tageditor.py" line="71"/>
         <source>Cancel</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/gui/tageditor.py" line="72"/>
+        <location filename="../omg/gui/tageditor.py" line="74"/>
         <source>Save</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/gui/tageditor.py" line="184"/>
+        <location filename="../omg/gui/tageditor.py" line="187"/>
         <source>Invalid value</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/gui/tageditor.py" line="176"/>
+        <location filename="../omg/gui/tageditor.py" line="179"/>
         <source>At least one value is invalid for the new type.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/gui/tageditor.py" line="184"/>
+        <location filename="../omg/gui/tageditor.py" line="187"/>
         <source>At least one value is invalid.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/gui/tageditor.py" line="196"/>
+        <location filename="../omg/gui/tageditor.py" line="199"/>
         <source>Add tag...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/gui/tageditor.py" line="206"/>
+        <location filename="../omg/gui/tageditor.py" line="243"/>
         <source>Separate at &apos;{}&apos;</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/tageditor.py" line="208"/>
+        <source>Fancy stuff</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/tageditor.py" line="215"/>
+        <source>Extend to all elements</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/tageditor.py" line="219"/>
+        <source>Edit common start...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/tageditor.py" line="229"/>
+        <source>Remove common start (including numbers)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/tageditor.py" line="238"/>
+        <source>Remove common start</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/tageditor.py" line="251"/>
+        <source>Edit common start</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/tageditor.py" line="251"/>
+        <source>Insert a new text will replace the common start of all selected records:</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -538,37 +576,35 @@
         <source>Edit tags...</source>
         <translation type="unfinished"></translation>
     </message>
-    <message>
-        <location filename="../omg/gui/treeview.py" line="70"/>
-        <source>Edit tags recursively...</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../omg/gui/treeview.py" line="75"/>
-        <source>Read selected elements from files</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../omg/gui/treeview.py" line="80"/>
-        <source>Remove selected elements from database...</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../omg/gui/treeview.py" line="108"/>
-        <source>Remove elements</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../omg/gui/treeview.py" line="108"/>
-        <source>Should I really remove the selected elements from the database?</source>
-        <translation type="unfinished"></translation>
-    </message>
 </context>
 <context>
     <name>ViewConfiguration</name>
     <message>
-        <location filename="../omg/gui/browserdialog.py" line="101"/>
+        <location filename="../omg/gui/browserdialog.py" line="140"/>
         <source>View {}: </source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>ViewConfigurationDialog</name>
+    <message>
+        <location filename="../omg/gui/browserdialog.py" line="72"/>
+        <source>Browser configuration</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/browserdialog.py" line="82"/>
+        <source>Number of views: </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/browserdialog.py" line="101"/>
+        <source>Cancel</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/browserdialog.py" line="104"/>
+        <source>OK</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
