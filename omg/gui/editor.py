@@ -12,7 +12,6 @@ from PyQt4.QtCore import Qt
 from collections import OrderedDict
 from ..gui import mainwindow
 from ..models import editor, Container
-from ..config import options
 from . import treeview
 from .. import logging, modify, tags
 
@@ -30,14 +29,28 @@ class EditorTreeView(treeview.TreeView):
         self.setDefaultDropAction(Qt.MoveAction)
         self.setDropIndicatorShown(True)
         self.setModel(editor.EditorModel(name))
+        treeview.contextMenuProviders['all'].append(EditorTreeView.testTitleChange)
         self.viewport().setMouseTracking(True)
+        self.testAction = QtGui.QAction('test', self)
+        self.testAction.triggered.connect(self.test)
     
+    def test(self):
+        item = self.currentIndex().internalPointer()
+        item_copy = item.copy()
+        item_copy.tags[tags.TITLE] = ['omgwtf']
+        command = modify.ModifySingleElementUndoCommand(modify.EDITOR,  item.copy(), item_copy)
+        modify.pushEditorCommand(command)
+        
+    def testTitleChange(self, actions, currentIndex):
+        actions.append(self.testAction)
+        
     def dragEnterEvent(self, event):
         if event.source() is self:
             event.setDropAction(Qt.MoveAction)
         else:
             event.setDropAction(Qt.CopyAction)
         treeview.TreeView.dragEnterEvent(self, event)
+        
     def dragMoveEvent(self, event):
         if isinstance(event.source(), EditorTreeView):
             if event.keyboardModifiers() & Qt.ShiftModifier:
@@ -45,6 +58,7 @@ class EditorTreeView(treeview.TreeView):
             elif event.keyboardModifiers() & Qt.ControlModifier:
                 event.setDropAction(Qt.CopyAction)
         treeview.TreeView.dragMoveEvent(self, event)
+        
     def dropEvent(self, event):
         if isinstance(event.source(), EditorTreeView):
             if event.keyboardModifiers() & Qt.ShiftModifier:
@@ -64,11 +78,13 @@ class EditorTreeView(treeview.TreeView):
             keyEvent.accept()
         else:
             QtGui.QTreeView.keyPressEvent(self, keyEvent)
+            
     def removeSelected(self):
-        self.model().fireRemoveIndexes(self.selectedIndexes())
+        modify.pushEditorCommand(
+            modify.RemoveElementsCommand(modify.EDITOR, [s.internalPointer() for s in self.selectedIndexes()]))
                
 class EditorWidget(QtGui.QDockWidget):
-    def __init__(self, parent = None):
+    def __init__(self, parent = None, state = None):
         super().__init__(parent)
         self.setWindowTitle(self.tr('editor'))
         widget = QtGui.QWidget()
@@ -87,6 +103,11 @@ class EditorWidget(QtGui.QDockWidget):
         self.albumGuesserCheckbox.stateChanged.connect(self.editor.model().setGuessAlbums)
         self.albumGuesserCheckbox.setCheckState(Qt.Checked)
         hb.addWidget(self.albumGuesserCheckbox)
+        try:
+            self.nameField.setText(state[0])
+            self.albumGuesserCheckbox.setCheckState(state[1])
+        except:
+            pass
     
     def newContainerDialog(self):
         title, ok = QtGui.QInputDialog.getText(self, "Title", "Title of the container:")
@@ -106,12 +127,6 @@ class EditorWidget(QtGui.QDockWidget):
         
     def saveState(self):
         return (self.nameField.text(), self.albumGuesserCheckbox.checkState())
-    def restoreState(self, state):
-        try:
-            self.nameField.setText(state[0])
-            self.albumGuesserCheckbox.setCheckState(state[1])
-        except:
-            pass
 # register this widget in the main application
 eData = mainwindow.WidgetData(id = "editor",
                              name = translate("Editor","editor"),

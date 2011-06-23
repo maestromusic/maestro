@@ -9,8 +9,10 @@ SOURCES = ../omg/application.py\
 	  ../omg/gui/singletageditor.py\
 	  ../omg/gui/tageditor.py\
 	  ../omg/gui/tagwidgets.py\
+	  ../omg/gui/mainwindow.py\
       ../omg/gui/treeview.py\
 	  ../omg/models/editor.py\
+	  ../omg/modify/__init__.py\
       ../omg/plugins/dbanalyzer/__init__.py\
       ../omg/plugins/searchanalyzer/__init__.py\
       ../omg/plugins/configeditor/__init__.py
@@ -18,5 +20,5 @@ SOURCES = ../omg/application.py\
 
 
 
-TRANSLATIONS = omg.de.ts omg.en.ts omg.pfl.ts
+TRANSLATIONS = omg.de.ts omg.en.ts omg.de_LU.ts
 CODECFORTR = UTF-8

@@ -505,6 +505,64 @@
     </message>
 </context>
 <context>
+    <name>MainWindow</name>
+    <message>
+        <location filename="../omg/gui/mainwindow.py" line="84"/>
+        <source>OMG version {}</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/mainwindow.py" line="100"/>
+        <source>&amp;Edit</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/mainwindow.py" line="103"/>
+        <source>Ctrl+Z</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/mainwindow.py" line="104"/>
+        <source>Ctrl+Y</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/mainwindow.py" line="107"/>
+        <source>&amp;View</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/mainwindow.py" line="108"/>
+        <source>&amp;Extras</source>
+        <translation type="unfinished">&amp;Extras</translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/mainwindow.py" line="109"/>
+        <source>&amp;Help</source>
+        <translation type="unfinished">&amp;Hilfe</translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/mainwindow.py" line="112"/>
+        <source>&amp;About</source>
+        <translation type="unfinished">&amp;Über</translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/mainwindow.py" line="137"/>
+        <source>New dock widget</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/mainwindow.py" line="317"/>
+        <source>About OMG</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/mainwindow.py" line="317"/>
+        <source>This is OMG version {} by Martin Altmayer and Michael Helmling.</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>NewTagDialog</name>
     <message>
         <location filename="../omg/gui/dialogs.py" line="19"/>

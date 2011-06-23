@@ -10,7 +10,7 @@
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from omg import distributor, models, database as db
+from .. import models
 
 translate = QtGui.QApplication.translate
 

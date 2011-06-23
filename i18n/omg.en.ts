@@ -9,9 +9,6 @@
     </message>
 </context>
 <context>
-    <name>BrowserDelegate</name>
-</context>
-<context>
     <name>BrowserDialog</name>
     <message>
         <location filename="../omg/gui/browserdialog.py" line="37"/>
@@ -54,9 +51,6 @@
         <source>reset to default</source>
         <translation type="unfinished"></translation>
     </message>
-</context>
-<context>
-    <name>CoverFetcher</name>
 </context>
 <context>
     <name>DBAnalyzerDialog</name>
@@ -264,6 +258,64 @@
     <message>
         <location filename="../omg/gui/formatter.py" line="119"/>
         <source>External element</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>MainWindow</name>
+    <message>
+        <location filename="../omg/gui/mainwindow.py" line="84"/>
+        <source>OMG version {}</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/mainwindow.py" line="100"/>
+        <source>&amp;Edit</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/mainwindow.py" line="103"/>
+        <source>Ctrl+Z</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/mainwindow.py" line="104"/>
+        <source>Ctrl+Y</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/mainwindow.py" line="107"/>
+        <source>&amp;View</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/mainwindow.py" line="108"/>
+        <source>&amp;Extras</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/mainwindow.py" line="109"/>
+        <source>&amp;Help</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/mainwindow.py" line="112"/>
+        <source>&amp;About</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/mainwindow.py" line="137"/>
+        <source>New dock widget</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/mainwindow.py" line="317"/>
+        <source>About OMG</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/mainwindow.py" line="317"/>
+        <source>This is OMG version {} by Martin Altmayer and Michael Helmling.</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -598,8 +650,5 @@
         <source>OK</source>
         <translation type="unfinished"></translation>
     </message>
-</context>
-<context>
-    <name>VolumeLabel</name>
 </context>
 </TS>
