@@ -15,36 +15,56 @@ SEARCH_TAGS = set()
 
 
 class Criterion:
-    """A criterion matches a subset of elements. The search algorithm will take a list of criteria and search for all elements matching every criterion. This is only an abstract base."""
+    """A criterion matches a subset of elements. The search algorithm will take a list of criteria and search
+    for all elements matching every criterion. This is only an abstract base."""
     def getQuery(self,fromTable,columns=None):
-        """Create a MySQL query for this criterion, selecting the columns *columns* from *fromTable*. *columns* must not contain table names like in ''elements.id''. Check whether this criterion is valid before using this method!
+        """Create a MySQL query for this criterion, selecting the columns *columns* from *fromTable*.
+        *columns* must not contain table names like in ''elements.id''. Check whether this criterion is valid
+        before using this method!
 
-        This method will return a list containing the query (which may contain placeholders) and optional parameters that should be bound to the query such that MySQL will use them to replace the placeholders. Simply use::
+        This method will return a list containing the query (which may contain placeholders) and optional
+        parameters that should be bound to the query such that MySQL will use them to replace the
+        placeholders. Simply use::
 
             db.query(*criterion.getQuery(...))
 
         \ """
 
     def isValid(self):
-        """Return whether this criterion is valid. An invalid criterion cannot create a query and does not match any element."""
+        """Return whether this criterion is valid. An invalid criterion cannot create a query and does not
+        match any element."""
 
     def isNarrower(self,other):
-        """Return whether this criterion is narrower than *other*, i.e. if the set of elements matching this criterion is a subset (not necessarily strict) of the set of elements matching *other*."""
+        """Return whether this criterion is narrower than *other*, i.e. if the set of elements matching this
+        criterion is a subset (not necessarily strict) of the set of elements matching *other*."""
 
 
 class TextCriterion(Criterion):
-    """A TextCriterion matches if an element contains a tag ''t'' from *tagSet* and a value ''v'' for the tag ''t'' that contains the search string *value*. If *tagSet* is None, config.options.tags.search_tags will be used.
+    """A TextCriterion matches if an element contains a tag ''t'' from *tagSet* and a value ''v'' for the tag
+    ''t'' that contains the search string *value*. If *tagSet* is None, config.options.tags.search_tags will
+    be used.
 
-    If *tagSet* contains tags of type date they will only be searched if *value* is of the form ''1998'' or ''1700-1850'', where all numbers may have 1-4 digits and in the second case the first number must be less or equal than the second one. Note that, as usual the TextCriterion matches also if *value* is contained in a non-date search tag.
+    If *tagSet* contains tags of type date they will only be searched if *value* is of the form ''1998'' or
+    ''1700-1850'', where all numbers may have 1-4 digits and in the second case the first number must be less
+    or equal than the second one. Note that, as usual the TextCriterion matches also if *value* is contained
+    in a non-date search tag.
+    
+    If *tagSet* is None and value has the form [123,256,1933], the criterion will additionally match all
+    elements with one of these ids.
 
     A TextCriterion contains the following variables:
 
         - ''value'': The search value.
-        - ''tagSet'': a copy of *tagSet*. If *value* does not have one of the formats described above, all tags of type date will be removed. In this case this might be the empty set, in which case the criterion is invalid.
-        - ''years'': If *value* is ''1999'' this will be ''(1999,None)''; if *value* is ''1600-1700'', this will be ''(1600,1700)'' and if *value* has none of these formats, ''years'' will be None.
+        - ''tagSet'': a copy of *tagSet*. If *value* does not have one of the formats described above, all
+          tags of type date will be removed. In this case this might be the empty set, in which case the
+          criterion is invalid.
+        - ''years'': If *value* is ''1999'' this will be ''(1999,None)''; if *value* is ''1600-1700'', this
+          will be ''(1600,1700)'' and if *value* has none of these formats, ''years'' will be None.
+        - ''ids'': A list of ids if value has the form [123,256,1933] or None otherwise.
         
     \ """
     dateRegexp = re.compile("^(\d{1,4})(-\d{1,4})?$")
+    idRegexp = re.compile("^\[\d+(,\d*)*]$")
     
     def __init__(self,tagSet,value):
         if tagSet is None:
@@ -71,6 +91,13 @@ class TextCriterion(Criterion):
         if self.years is None:
             # Warning: This may result in an empty list
             self.tagSet = set(tag for tag in self.tagSet if tag.type != tags.TYPE_DATE)
+            
+        # Compute IDs if value is of the form [123,48]
+        valueWithoutJS = ''.join(c for c in value if not c.isspace())
+        if tagSet is None and self.idRegexp.match(valueWithoutJS) is not None:
+            # Remove the square brackets and empty strings (value could be "12,,234")
+            self.ids = [id for id in valueWithoutJS[1:-1].split(',') if len(id) > 0]
+        else: self.ids = None
 
     def getSearchTypes(self):
         """Return the set of types that appear in ''tagSet''."""
@@ -100,8 +127,12 @@ class TextCriterion(Criterion):
                     FROM {2} AS el JOIN {0}tags AS t ON el.id = t.element_id
                                    JOIN {0}values_{3} AS v ON t.tag_id = v.tag_id AND t.value_id = v.id
                     WHERE t.tag_id IN ({4}) AND {5}
-                )""".format(db.prefix,_formatColumns(columns,"el"),fromTable,valueType.name,tagIdList,whereClause))
+                )""".format(db.prefix,_formatColumns(columns,"el"),fromTable,
+                            valueType.name,tagIdList,whereClause))
 
+        if self.ids is not None:
+            subQueries.append("(SELECT DISTINCT {0} FROM {1} AS el WHERE id IN ({2}))"
+                                .format(_formatColumns(columns,"el"),fromTable,','.join(self.ids)))
         return [" UNION ".join(subQueries)] + parameters
             
 
@@ -110,7 +141,11 @@ class TextCriterion(Criterion):
             return False
         if not self.tagSet <= other.tagSet:
             return False
-        # Note that it is not possible to build strict narrower queries if other.years is not None, since the old string must be a substring of the new one.
+        # if self has ids, other must contain more
+        if self.ids is not None and (other.ids is None or not set(self.ids) <= other.ids):
+            return False
+        # Note that it is not possible to build strictly narrower queries if other.years is not None, since
+        # the old string must be a substring of the new one.
         return self.years == other.years and self.value.find(other.value) > -1
 
     def isInvalid(self):
@@ -129,7 +164,10 @@ class TextCriterion(Criterion):
         
 
 class TagIdCriterion(Criterion):
-    """A TagIdCriterion contains a dictionary mapping tag-ids to value-ids. It will be fulfilled for all elements having at least one of the tags with the corresponding value. For example {<genre-tag>: 1,<artist-tag>:2} will match all elements which have either the value of id 1 (in table tag_genre) as a genre-tag or the value of id 2 (in table tag_artist) as an artist-tag or both.
+    """A TagIdCriterion contains a dictionary mapping tag-ids to value-ids. It will be fulfilled for all
+    elements having at least one of the tags with the corresponding value. For example
+    ''{<genre-tag>: 1,<artist-tag>:2}'' will match all elements which have either the value of id 1 (in table
+    tag_genre) as a genre-tag or the value of id 2 (in table tag_artist) as an artist-tag or both.
     """
     def __init__(self,valueIds):
         """Initialize a new TagIdCriterion with the given dictionary mapping tags to value-ids."""
@@ -151,7 +189,8 @@ class TagIdCriterion(Criterion):
         return [tags.get(tagId) for tagId in self.valueIds.keys()]
         
     def add(self,valueIds):
-        """Add one or more tag=>id-mappings to this criterion. It will be fulfilled if a container contains at least one tag together with a value with the corresponding id."""
+        """Add one or more tag=>id-mappings to this criterion. It will be fulfilled if a container contains at
+        least one tag together with a value with the corresponding id."""
         self.valueIds.update(valueIds)
 
     def isNarrower(self,other):
@@ -173,7 +212,8 @@ class TagIdCriterion(Criterion):
 
 
 class MissingTagCriterion(Criterion):
-    """A MissingTagCriterion specifies a list of tags which a container must not have in order to match this criterion."""
+    """A MissingTagCriterion specifies a list of tags which a container must not have in order to match this
+    criterion."""
     
     def __init__(self,tags):
         """Initialize a new MissingTagCriterion with the given set of tags."""
@@ -189,7 +229,8 @@ class MissingTagCriterion(Criterion):
             SELECT {1}
             FROM {2} AS el LEFT JOIN {0}tags AS t ON el.id = t.element_id AND t.tag_id IN ({3})
             WHERE t.value_id IS NULL
-            """.format(db.prefix,_formatColumns(columns,'el'),fromTable,",".join([str(tag.id) for tag in self.tags]))]
+            """.format(db.prefix,_formatColumns(columns,'el'),fromTable,
+                       ",".join([str(tag.id) for tag in self.tags]))]
 
     def isNarrower(self,other):
         return isinstance(other,MissingTagCriterion) and self.tags >= other.tags
@@ -205,25 +246,29 @@ class MissingTagCriterion(Criterion):
 
 
 def isNarrower(aList,bList):
-    """Return whether the set of elements matching each criterion in *aList* is a subset of the elements matching each criterion in *bList*."""
+    """Return whether the set of elements matching each criterion in *aList* is a subset of the elements
+    matching each criterion in *bList*."""
     # :-) For each b \in bList there must be an a \in aList that is narrower than b
     return all(any(a.isNarrower(b) for a in aList) for b in bList)
 
 
 def reduce(criteria,processed):
-    """Filter criteria from *criteria* which must match every element that matches the criteria *processed* and return the rest. If for example *processed* contains 'hello', then 'hell' will be filtered away."""
+    """Filter criteria from *criteria* which must match every element that matches the criteria *processed*
+    and return the rest. If for example *processed* contains 'hello', then 'hell' will be filtered away."""
     return [c for c in criteria if not any(p.isNarrower(c) for p in processed)]
 
 
 def _formatColumns(columns,fromTable):
-    """Generate a string which can be used after SELECT and will select the given columns from the given table. A possible result would be "elements.id,elements.position,elements.elements"."""
+    """Generate a string which can be used after SELECT and will select the given columns from the given
+    table. A possible result would be "elements.id,elements.position,elements.elements"."""
     return ",".join("{0}.{1}".format(fromTable,column) for column in columns)
     
 
 def sortKey(criterion):
     """Compute a "complexity" value for a criterion.
     
-    This function is used to sort the complicated criteria to the front hoping that we get right from the beginning only a few results."""
+    This function is used to sort the complicated criteria to the front hoping that we get right from the
+    beginning only a few results."""
     if not isinstance(criterion,TextCriterion):
         return 0 # sort to the front
     else: return len(criterion.tagSet)
