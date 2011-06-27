@@ -115,6 +115,7 @@ class Browser(QtGui.QWidget):
         for view in self.views:
             view.model().setTable(self.table)
             view.model().reset()
+            view.startAutoExpand()
 
     def search(self):
         """Search for the value in the search-box. If it is empty, display all values."""
@@ -169,10 +170,12 @@ class Browser(QtGui.QWidget):
             for view in self.views:
                 view.model().setTable(self.table)
                 view.model().reset()
+                view.startAutoExpand()
 
 
 class BrowserTreeView(treeview.TreeView):
     """TreeView for the Browser."""
+    _autoExpanding = False
     
     def __init__(self,parent,layers):
         """Initialize this TreeView with the given parent (which must be the browser-widget) and the given layers. This also will create a BrowserModel for this treeview (Note that each view of the browser uses its own model). <layers> must be a list of tag-lists. For each entry in <layers> a tag-layer using the entry's tags is created. A BrowserTreeView initialized with [[tags.get('genre')],[tags.get('artist'),tags.get('composer')]] will group result first into differen genres and then into different artist/composer-values, before finally displaying the elements itself."""
@@ -181,3 +184,69 @@ class BrowserTreeView(treeview.TreeView):
         self.setModel(browsermodel.BrowserModel(parent.table,layers,parent))
         self.setItemDelegate(delegates.BrowserDelegate(self,self.model()))
         #self.doubleClicked.connect(self._handleDoubleClicked)
+    
+    def startAutoExpand(self):
+        print("startAutoExpand")
+        maxHeight = self.maximumViewportSize().height()
+        # Calculate the height of the first level
+        height = self._getHeightOfDepth(self.model().getRoot(),1,maxHeight)
+        if height is None or height < maxHeight:
+            self.depthHeights = [height]
+            self._autoExpanding = True
+            self.model().setAutoLoad(True)
+            self.model().nodeLoaded.connect(self.autoExpand)
+        else:
+            self._autoExpanding = False
+            self.model().setAutoLoad(False)
+    
+    def stopAutoExpand(self):
+        self._autoExpanding = False
+        self.model().setAutoLoad(False)
+        
+    def autoExpand(self):
+        if not self._autoExpanding or self.model().browser._ignoreSearchFinished:
+            return
+        print("autoExpand: {}".format(self.depthHeights))
+        maxHeight = self.maximumViewportSize().height()
+        print("maxHeight: {}".format(maxHeight))
+        while True:
+            # this is at least 2, since depthHeights is initialized with the height of depth 1 in
+            # startAutoExpand. 
+            depth = len(self.depthHeights)+1
+            height = self._getHeightOfDepth(self.model().getRoot(),depth,maxHeight-sum(self.depthHeights))
+            if height is None:
+                return # a node is not loaded yet, so wait for the next call
+            if height == 0: # We have reached the last level
+                self.stopAutoExpand()
+                return
+            self.depthHeights.append(height)
+            if sum(self.depthHeights) <= maxHeight:
+                print("Expanding to depth {}".format(depth))
+                # If two levels fit in the view, we want to expand up to depth 1. Qt counts from 0, thus -2.
+                self.expandToDepth(depth-2)
+            else:
+                self.stopAutoExpand()
+                return
+    
+    def _getHeightOfDepth(self,node,depth,maxHeight):
+        if not node.hasContents():
+            return 0
+        #print("Start calculating depthHeight for depth {}".format(depth))
+        print("depthCal: {} {} {}".format(depth,maxHeight,node))
+        if isinstance(node,browsermodel.CriterionNode) and not node.hasLoaded():
+            return None
+        height = 0
+        for child in node.getContents():
+            if depth == 1:
+                height += self.itemDelegate().sizeHint(None,self.model().getIndex(child)).height()
+            else:
+                if node.hasContents():
+                    newHeight = self._getHeightOfDepth(child, depth-1,maxHeight-height)
+                    if newHeight is None:
+                        return None # A node is not loaded yet
+                    else: height += newHeight
+            if height > maxHeight:
+                break
+        return height
+
+

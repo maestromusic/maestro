@@ -14,12 +14,17 @@ from . import Node, Element
 
 
 class RootedTreeModel(QtCore.QAbstractItemModel):
-    """The RootedTreeModel subclasses QAbstractItemModel to create a simple model for QTreeViews. It takes one root node which is not considered part of the data of this model (and is not displayed by QTreeViews). Nodes in a RootedTreeModel may have every type, but must implement the following methods:
-    - hasChildren(): return if a node has children
-    - getChildrenCount(): return the number of children of the node
-    - getChildren(): return the list of children of the node
-    - getParent(): return the node's parent. The root-node' getParent-method must return None.
-    The hasChildren-method allows to implement nodes that calculate the number of children not until the node is expanded the first time.
+    """The RootedTreeModel subclasses QAbstractItemModel to create a simple model for QTreeViews. It takes one
+    root node which is not considered part of the data of this model (and is not displayed by QTreeViews).
+    Nodes in a RootedTreeModel may have every type, but must implement the following methods:
+    
+        - hasChildren(): return if a node has children
+        - getChildrenCount(): return the number of children of the node
+        - getChildren(): return the list of children of the node
+        - getParent(): return the node's parent. The root-node' getParent-method must return None.
+        
+    The hasChildren-method allows to implement nodes that calculate the number of children not until the node
+    is expanded the first time.
     """
     
     # The root node. Use getRoot to retrieve it.
@@ -30,8 +35,12 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
         QtCore.QAbstractItemModel.__init__(self)
         self.root = root
     
+    def getRoot(self):
+        """Return the root node of this model."""
+        return self.root
+        
     def setRoot(self,root):
-        """Set the root of this model to <root> and reset (QTreeViews using this model will be reset, too)."""
+        """Set the root of this model to *root* and reset (QTreeViews using this model will be reset, too)."""
         self.root = root
         self.reset()
         
@@ -62,7 +71,10 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
             if self.root is None:
                 return False
             else: return self.root.hasContents()
-        else: return self.data(index).hasContents()
+        else: 
+            #if not hasattr(self.data(index),'hasContents'):
+            #    print(self.data(index))
+            return self.data(index).hasContents()
         
     def rowCount(self,parent):
         if parent.column() > 0:
@@ -81,7 +93,8 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
             return QtCore.QModelIndex()
         child = index.internalPointer()
         parent = child.getParent()
-        assert parent is not None # This method should never be called on the root-node because it is not displayed in the treeview.
+        # This method should never be called on the root-node because it is not displayed in the treeview.
+        assert parent is not None
         if parent == self.root:
             return QtCore.QModelIndex()
         else: return self.getIndex(parent)
@@ -105,14 +118,20 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
     
     def createIndex(self,row,column,internalPointer):
         if not isinstance(internalPointer,Node):
-            raise TypeError("Internal pointers in a RootedTreeModel must be subclasses of Node, but got {}".format(type(internalPointer)))
+            raise TypeError("Internal pointers in a RootedTreeModel must be subclasses of Node, but got {}"
+                               .format(type(internalPointer)))
         return QtCore.QAbstractItemModel.createIndex(self,row,column,internalPointer)
         
     def getIndex(self,node):
-        """Return the (Qt)-index of the given node. If <node> is the root of this model, return an invalid QModelIndex."""
+        """Return the (Qt)-index of the given node. If <node> is the root of this model, return an invalid
+        QModelIndex."""
         if node == self.root:
             return QtCore.QModelIndex()
         parent = node.getParent()
+        try:
+            parent.getContents().index(node)
+        except ValueError:
+            print("HASS: {} | {}".format(node,parent))
         return self.createIndex(parent.getContents().index(node),0,node)
 
     def getAllNodes(self):
@@ -120,6 +139,18 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
         for element in self.contents:
             for sub in element.getAllNodes():
                 yield sub
+    
+    def breadthFirstTraversal(self):
+        """Generator which will return all nodes contained in the tree in breadth-first-manner."""
+        # Warning: The autoLoad feature of BrowserModel depends on some implementation details of this method.
+        # (the problem is that CriterionNodes load their contents during the bfs.)
+        queue = [self.root]
+        while len(queue) > 0:
+            node = queue.pop(0)
+            for child in node.getContents():
+                if child.hasContents():
+                    queue.append(child)
+                yield child
 
 
 class EditableRootedTreeModel(RootedTreeModel):
@@ -153,16 +184,24 @@ class EditableRootedTreeModel(RootedTreeModel):
         self.remove(self.data(index))
 
     def move(self,sourceParent,sourceFirst,sourceLast,destParent,pos):
-        """Move the children of *sourceParent* with position *sourceFirst* up to and including *sourceLast* into *destParent* and insert them at position *pos*. Make sure that the move is valid or an exception is raised:
+        """Move the children of *sourceParent* with position *sourceFirst* up to and including *sourceLast*
+        into *destParent* and insert them at position *pos*. Make sure that the move is valid or an exception
+        is raised:
 
             - You must not move nodes into one of their children.
-            - If *sourceParent* equals *destParent*, *pos* must not be in the range *sourceFirst* ... *sourceLast*+1.
+            - If *sourceParent* equals *destParent*, *pos* must not be in the range
+              *sourceFirst* ... *sourceLast*+1.
 
-        In the latter case confer http://doc.qt.nokia.com/stable/qabstractitemmodel.html#beginMoveRows for the correct way to specify the positions (basically this function needs the old positions before anything has happened).
+        In the latter case confer http://doc.qt.nokia.com/stable/qabstractitemmodel.html#beginMoveRows for
+        the correct way to specify the positions (basically this function needs the old positions before
+        anything has happened).
         """
         if sourceParent == destParent and pos >= sourceFirst and pos <= sourceLast + 1:
-            raise ValueError("Invalid positions in move: pos ∈ [sourceFirst,sourceLast+1]. Exact values were (pos,sourceFirst,sourceLast) = ({},{},{}).".format(pos,sourceFirst,sourceLast))
-        ok = self.beginMoveRows(self.getIndex(sourceParent),sourceFirst,sourceLast,self.getIndex(destParent),pos)
+            raise ValueError("Invalid positions in move: pos ∈ [sourceFirst,sourceLast+1]. Exact values"
+                            + " were (pos,sourceFirst,sourceLast) = ({},{},{})."""
+                            .format(pos,sourceFirst,sourceLast))
+        ok = self.beginMoveRows(self.getIndex(sourceParent),sourceFirst,sourceLast,
+                                self.getIndex(destParent),pos)
         if not ok:
             raise ValueError("Cannot move nodes.")
             
@@ -192,7 +231,9 @@ class EditableRootedTreeModel(RootedTreeModel):
         self.remove(node)
 
     def split(self,node,pos):
-        """Split *node* at position *pos*: Insert a copy of *node* directly after it and insert all children of *node* with position *pos* or higher into the copy. If *pos* equals 0 or the number of children of node, do nothing and return False (you cannot split at the boundary). Otherwise return True."""
+        """Split *node* at position *pos*: Insert a copy of *node* directly after it and insert all children
+        of *node* with position *pos* or higher into the copy. If *pos* equals 0 or the number of children of
+        node, do nothing and return False (you cannot split at the boundary). Otherwise return True."""
         if node == self.root:
             raise ValueError("Cannot split root node.")
         if pos < 0 or pos > node.getContentsCount():
@@ -208,7 +249,9 @@ class EditableRootedTreeModel(RootedTreeModel):
         return True
 
     def insertParent(self,parent,startPos,endPos,newParent):
-        """Add a new node *newParent* between *parent* and some of its children. To be precise: Replace the children with positions *startPos* up to and including *endPos* by *newParent* and insert those nodes as children into *newParent* (at position 0).""" 
+        """Add a new node *newParent* between *parent* and some of its children. To be precise: Replace the
+        children with positions *startPos* up to and including *endPos* by *newParent* and insert those nodes
+        as children into *newParent* (at position 0).""" 
         if startPos < 0 or endPos < startPos or endPos >= parent.getContentsCount():
             raise ValueError("Invalid start or end position in insertParent ({} and {}).".format(startPos,endPos))
         if newParent == parent:

@@ -27,6 +27,7 @@ logger = logging.getLogger("omg.search")
 # An internal list to store all living engines and destroy them at the end.
 engines = []
 
+
 def init():
     """Initialize the search module."""
     criteriaModule.SEARCH_TAGS = set()
@@ -46,11 +47,15 @@ class SearchRequest:
         self.fromTable = fromTable
         self.resultTable = resultTable
         self.criteria = criteria
-        self.originalCriteria = criteria
         self.owner = owner
         self.parent = parent
         self.data = data
         self.lockTable = lockTable
+        
+    def __str__(self):
+        return "<SearchRequest: {}->{} for [{}] | ({},{},{},{})".format(self.fromTable,
+                 self.resultTable,",".join(str(c) for c in self.criteria),self.owner,
+                 self.parent,self.data,self.lockTable)
         
 
 class StopRequest:
@@ -105,12 +110,12 @@ class SearchEngine(QtCore.QObject):
             customColumns = customColumns + ','
         db.query("""
             CREATE TABLE {} (
-                id MEDIUMINT UNSIGNED,
+                id MEDIUMINT UNSIGNED NOT NULL,
                 {}
-                file BOOLEAN,
-                toplevel BOOLEAN DEFAULT 0,
-                direct BOOLEAN DEFAULT 1,
-                major BOOLEAN DEFAULT 0,
+                file BOOLEAN NOT NULL,
+                toplevel BOOLEAN NOT NULL DEFAULT 0,
+                direct BOOLEAN NOT NULL DEFAULT 1,
+                major BOOLEAN NOT NULL DEFAULT 0,
                 PRIMARY KEY(id))
                 ENGINE MEMORY;
             """.format(tableName,customColumns))
@@ -254,7 +259,7 @@ class SearchThread(threading.Thread):
                     # selects a subset of the stuff in the result table, so that we can keep the entries.
                     currentRequest = self.requests[0]
                     self.prepare(currentRequest)
-                
+
                 # Invalid criteria like 'date:foo' do not have results. Calling criterion.getQuery will fail.
                 if any(c.isInvalid() for c in currentRequest.criteria):
                     #print("Invalid criteria")
@@ -352,22 +357,36 @@ class SearchThread(threading.Thread):
           
     @staticmethod
     def _procContainer(processedIds,id):
+        """This is a help function for post processing. It will check if the container with id *id* has to be
+        added to the search result because it is major or has a major parent. It will return the result and
+        additionally store it in the dict *processedIds*. This dict will be used as cache to avoid doing the
+        computation twice for the same id. The dict maps the ids of processed containers to a tuple containing
+        the result (haveToAdd) in the first component and -- only if haveToAdd is true -- another tuple
+        (id,file,major) in the second component (This will be used by the post processing later."""
         parents = db.parents(id)
-        result = False
+        haveToAdd = False
         for pid in parents:
+            # If we have to add the parent, we also have to add this node.
             if pid not in processedIds:
                 if SearchThread._procContainer(processedIds,pid):
-                    result = True
+                    haveToAdd = True
             elif processedIds[pid][0]:
-                result = True
+                haveToAdd = True
         
         major = db.isMajor(id)
         if major:
-            result = True
-        processedIds[id] = (result,major)
-        return result
+            haveToAdd = True
+            
+        processedIds[id] = (haveToAdd,(id,db.isFile(id),major) if haveToAdd else None)
+        return haveToAdd
     
     def postProcessing(self,resultTable):
+        """Currently post processing
+        
+            - adds all parents of search results which are major or have a major parent to the search result
+            - sets the toplevel flags correctly.
+        
+        \ """
         result = db.query("""
                 SELECT DISTINCT {0}contents.container_id
                 FROM {1} JOIN {0}contents ON {1}.id = {0}contents.element_id
@@ -378,10 +397,10 @@ class SearchThread(threading.Thread):
             for id in result.getSingleColumn():
                 if not id in processedIds:
                     SearchThread._procContainer(processedIds, id)
-            args = [(id,tup[1]) for id,tup in processedIds.items() if tup[0]]
+            args = [data for haveToAdd,data in processedIds.values() if haveToAdd]
             if len(args) > 0:
                 db.multiQuery(
-                    "INSERT IGNORE INTO {} (id,major,direct) VALUES (?,?,0)"
+                    "INSERT IGNORE INTO {} (id,file,major,direct) VALUES (?,?,?,0)"
                     .format(resultTable),args)
 
         setTopLevelFlags(resultTable)

@@ -256,30 +256,51 @@ def isToplevel(elid):
     return query("SELECT toplevel FROM {}elements WHERE id = ?".format(prefix),elid).getSingle() == 1
     
 def elementCount(elid):
-    """Return the number of children of the element with id <elid> or raise an sql.EmptyResultException if that element does not exist."""
+    """Return the number of children of the element with id <elid> or raise an sql.EmptyResultException if
+    that element does not exist."""
     return query("SELECT elements FROM {}elements WHERE id  ?".format(prefix),elid).getSingle()
 
 
 # Files-Table
 #================================================
 def path(elid):
-    """Return the path of the file with id <elid> or raise an sql.EmptyResultException if that element does not exist.""" 
-    return query("SELECT path FROM {}files WHERE element_id=?".format(prefix),elid).getSingle()
+    """Return the path of the file with id *elid* or raise an sql.EmptyResultException if that element does 
+    not exist."""
+    try:
+        return query("SELECT path FROM {}files WHERE element_id=?".format(prefix),elid).getSingle()
+    except sql.EmptyResultException:
+        raise sql.EmptyResultException(
+                 "Element with id {} is not a file (or at least not in the files table).".format(elid))
 
 def hash(elid):
-    """Return the hash of the file with id <elid> or raise an sql.EmptyResultException if that element does not exist.""" 
-    return query("SELECT hash FROM {}files WHERE element_id=?".format(prefix),elid).getSingle()
+    """Return the hash of the file with id *elid* or raise an sql.EmptyResultException if that element does
+    not exist.""" 
+    try:
+        return query("SELECT hash FROM {}files WHERE element_id=?".format(prefix),elid).getSingle()
+    except sql.EmptyResultException:
+        raise sql.EmptyResultException(
+                 "Element with id {} is not a file (or at least not in the files table).".format(elid))
 
 def length(elid):
-    """Return the length of the file with id <elid> or raise an sql.EmptyResultException if that element does not exist.""" 
-    return query("SELECT length FROM {}files WHERE element_id=?".format(prefix),elid).getSingle()
+    """Return the length of the file with id *elid* or raise an sql.EmptyResultException if that element does 
+    not exist.""" 
+    try:
+        return query("SELECT length FROM {}files WHERE element_id=?".format(prefix),elid).getSingle()
+    except sql.EmptyResultException:
+        raise sql.EmptyResultException(
+                 "Element with id {} is not a file (or at least not in the files table).".format(elid))
 
 def verified(elid):
-    """Return the verified-timestamp of the file with id <elid> or raise an sql.EmptyResultException if that element does not exist.""" 
-    return query("SELECT verified FROM {}files WHERE element_id=?".format(prefix),elid).getSingle()
+    """Return the verified-timestamp of the file with id *elid* or raise an sql.EmptyResultException if that
+    element does not exist.""" 
+    try:
+        return query("SELECT verified FROM {}files WHERE element_id=?".format(prefix),elid).getSingle()
+    except sql.EmptyResultException:
+        raise sql.EmptyResultException(
+                 "Element with id {} is not a file (or at least not in the files table).".format(elid))
     
 def idFromPath(path):
-    """Return the element_id of a file from the given path or raise an sql.EmptyResultException if that element does not exist.""" 
+    """Return the element_id of a file from the given path or None if that element does not exist."""
     try:
         return query("SELECT element_id FROM {}files WHERE path=?".format(prefix),path).getSingle()
     except sql.EmptyResultException:

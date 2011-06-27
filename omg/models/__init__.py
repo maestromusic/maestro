@@ -93,11 +93,11 @@ class Node:
             yield parent
             parent = parent.getParent()
     
-    def getLevel(self):
-        """Return the level of this node in the current tree structure. The root node will have level 0."""
+    def getDepth(self):
+        """Return the depth of this node in the current tree structure. The root node will have level 0."""
         if self.getParent() is None:
             return 0
-        else: return 1 + self.getParent().getLevel()
+        else: return 1 + self.getParent().getDepth()
 
     def maxDepth(self):
         """Return the maximum depth of nodes below this node."""
@@ -131,7 +131,7 @@ class Node:
         for element in self.contents:
             for node in element.getAllNodes():
                 yield node
-        
+ 
     def getAllFiles(self):
         """Generator which will return all files contained in this node or in children of it (possibly including the node itself)."""
         assert self.getContents() is not None

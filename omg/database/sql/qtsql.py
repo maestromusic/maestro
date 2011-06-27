@@ -162,7 +162,8 @@ class SqlResultIterator:
 def _convertBindParameter(arg):
     """Convert *arg* before binding."""
     if arg is None:
-        # TODO: This is ugly! We need a type to create a QPyNullVariant, but we cannot know the type of the column this value will be bound to. Luckily it works regardless what type we choose...
+        # TODO: This is ugly! We need a type to create a QPyNullVariant, but we cannot know the type of the
+        # column this value will be bound to. Luckily it works regardless what type we choose...
         return QtCore.QPyNullVariant(int)
     elif isinstance(arg,utils.FlexiDate):
         return arg.toSql()

@@ -50,8 +50,8 @@ def absPath(file):
 
 def collectFiles(paths):
     """Return a list of absolute paths to all files in the given paths (which must be absolute, too).
-    That is, if a path in <paths> is a file, it will be contained in the resulting list, whereas if it is a directory,
-    all files within (recursively) will be contained in the result."""
+    That is, if a path in <paths> is a file, it will be contained in the resulting list, whereas if it is a
+    directory, all files within (recursively) will be contained in the result."""
     filePaths = []
     for path in paths:
         if os.path.isfile(path):
@@ -61,21 +61,32 @@ def collectFiles(paths):
     return filePaths
 
 def getIconPath(name,plugin=None):
+    """Return the path of the icon with the given name. If the icon belongs to a plugin, specify the name of
+    that plugin as second parameter."""
     if plugin is None:
         return os.path.join(constants.IMAGES, "icons", name)
     else: return os.path.join(constants.IMAGES,"plugins",plugin,"icons",name)
 
 
 def getIcon(name,plugin=None):
+    """Return a QIcon for the icon with the given name. If the icon belongs to a plugin, specify the name of
+    that plugin as second parameter."""
     return QtGui.QIcon(getIconPath(name,plugin))
 
 
 class FlexiDate(object):
-    """A FlexiDate is a date which can store a date consisting simply of a year or of a year and a month or of year, month and day. OMG uses this class to store tags of type date, where most users will only specify a year, but some may give month and day, too.
+    """A FlexiDate is a date which can store a date consisting simply of a year or of a year and a month or of
+    year, month and day. OMG uses this class to store tags of type date, where most users will only specify a
+    year, but some may give month and day, too.
 
-    Note that while MySQL's DATE type can store dates where day and month may be unspecified, neither datetime.date nor QDate can. Thus binding FlexiDates to SQL-queries does not work. For this reason FlexiDates are stored as integers in the DB (confer :meth:`FlexiDate.toSql` and :meth:`FlexiDate.fromSql`.
+    Note that while MySQL's DATE type can store dates where day and month may be unspecified, neither
+    datetime.date nor QDate can. Thus binding FlexiDates to SQL-queries does not work. For this reason
+    FlexiDates are stored as integers in the DB (confer :meth:`FlexiDate.toSql` and :meth:`FlexiDate.fromSql`.
 
-    The parameters may be anything that can be converted to :func:`int`. *month* and *day* may also be ``None``. If *month* or *day* are 0 or ``None`` they are regarded as unspecified. Note that you must not give a nonzero *day* if *month* is zero or ``None``. This method raises a :exc:`ValueException` if conversion to :func:`int` fails or if the date is invalid (confer :class:`datetime.date`).
+    The parameters may be anything that can be converted to :func:`int`. *month* and *day* may also be
+    ``None``. If *month* or *day* are 0 or ``None`` they are regarded as unspecified. Note that you must not
+    give a nonzero *day* if *month* is zero or ``None``. This method raises a :exc:`ValueException` if 
+    conversion to :func:`int` fails or if the date is invalid (confer :class:`datetime.date`).
     """
     def __init__(self, year, month = None, day = None):
         self.year = int(year)
@@ -96,7 +107,8 @@ class FlexiDate(object):
     
     @staticmethod
     def strptime(string):
-        """Parse FlexiDates from strings in one of the formats ``'YYYY-mm-dd'`` or ``'YYYY-mm'`` or ``'YYYY'``. Raise a :exc:`ValueError` if that fails."""
+        """Parse FlexiDates from strings in one of the formats ``'YYYY-mm-dd'`` or ``'YYYY-mm'`` or ``'YYYY'``.
+        Raise a :exc:`ValueError` if that fails."""
         if not isinstance(string,str):
             raise TypeError("Argument must be a string.")
         try:
@@ -188,9 +200,12 @@ class FlexiDate(object):
     
     
 class OrderedDict(dict):
-    """Ordered subclass of :class:`dict` which allows inserting key-value-mappings at arbitrary positions -- in contrast to :class:`collections.OrderedDict`. By default new mappings will be appended at the end of the order. Use the insert*-methods to insert somewhere else.
+    """Ordered subclass of :class:`dict` which allows inserting key-value-mappings at arbitrary positions --
+    in contrast to :class:`collections.OrderedDict`. By default new mappings will be appended at the end of
+    the order. Use the insert*-methods to insert somewhere else.
     
-    Note that currently the views returned by :meth:`keys <dict.keys>`, :meth:`values <dict.values>` and :meth:`items <dict.items>` do not respect the order."""
+    Note that currently the views returned by :meth:`keys <dict.keys>`, :meth:`values <dict.values>` and
+    :meth:`items <dict.items>` do not respect the order."""
     def __init__(self):
         dict.__init__(self)
         self._keyList = []
@@ -237,6 +252,7 @@ class OrderedDict(dict):
         self.insert(self.index(posKey),key,value)
 
 
+# Stores the assigned unique keys generated by getUniqueKey
 _usedKeys = set()
 
 def getUniqueKey(prefix):
@@ -254,8 +270,9 @@ def freeUniqueKey(key):
 
 
 class PointAtInfinity:
-    """Depending on the parameter *plus* this object is either bigger or smaller than any other object,
-    except for other instances with the same parameter. This is useful in key-functions for list.sort."""
+    """Depending on the parameter *plus* this object is either bigger or smaller than any other object
+    (except for other instances of PointAtInfinity with the same parameter). This is useful in key-functions
+    for list.sort."""
     def __init__(self,plus=True):
         self.plus = plus
         
