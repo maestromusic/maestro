@@ -336,6 +336,7 @@ class SearchThread(threading.Thread):
             
     def processCriterion(self,fromTable,resultTable,criterion):
         """This is where the actual search happens."""
+        print("Search: processing criterion {}".format(criterion))
         if len(self.tables[resultTable][1]) == 0:
             # We firstly search for the direct results of the first query... 
             #print("Starting search...")

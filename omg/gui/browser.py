@@ -183,6 +183,7 @@ class BrowserTreeView(treeview.TreeView):
         #self.doubleClicked.connect(self._handleDoubleClicked)
     
     def startAutoExpand(self):
+        return
         print("startAutoExpand")
         maxHeight = self.maximumViewportSize().height()
         # Calculate the height of the first level
@@ -245,5 +246,3 @@ class BrowserTreeView(treeview.TreeView):
             if height > maxHeight:
                 break
         return height
-
-

@@ -132,7 +132,6 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
             searchEngine.search(self.table,smallResult,node._collectCriteria(),owner=node,parent=self.browser.searchRequest,data=self,lockTable=True)
             
     def _handleSearchFinished(self,searchRequest):
-        print("searchFinished: {}".format(searchRequest))
         if searchRequest.data is self and searchRequest.owner is not None and not searchRequest.isStopped():
             # Determine whether to load a tag-layer or the container-layer at the bottom of the tree.
             node = searchRequest.owner
@@ -219,7 +218,7 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
 #            node.contents = valueNodes[0].contents
 
     def _loadContainerLayer(self,node,table):
-        """Load the contents of <node> into a container-layer, using elements from <table>. Note that this
+        """Load the contents of <node> into a container-layer, using toplevel elements from <table>. Note that this
         creates all children of <node> not only the next level of the tree-structure as _loadTagLayer does."""
         result = db.query("SELECT id,file FROM {0} WHERE toplevel = 1".format(table))
         if node.hasContents():
@@ -236,7 +235,7 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
             element.parent = node
             if element.isContainer():
                 # For performance reasons data of contents are not loaded until the delegate wants it.
-                element.loadContents(recursive=True,table=table,loadData=False)
+                element.loadContents(recursive=True,table=self.table,loadData=False)
         
         # Finally sort the contents
         for sortTag in reversed(node.getSortTags()):
