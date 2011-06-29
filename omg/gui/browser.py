@@ -52,7 +52,8 @@ class Browser(QtGui.QWidget):
     _dialog = None
     _lastDialogTabIndex = 0
     
-    _ignoreSearchFinished = False
+    # The current search request
+    searchRequest = None
     
     def __init__(self,parent = None,state = None):
         """Initialize a new Browser with the given parent."""
@@ -63,7 +64,6 @@ class Browser(QtGui.QWidget):
             browsermodel.initSearchEngine()
             
         browsermodel.searchEngine.searchFinished.connect(self._handleSearchFinished)
-        browsermodel.searchEngine.searchStopped.connect(self._handleSearchStopped)
         self.bigResult = browsermodel.searchEngine.createResultTable("browser_big")
         
         # Layout
@@ -122,15 +122,12 @@ class Browser(QtGui.QWidget):
         criteria = self.searchBox.getCriteria()
         if len(criteria) > 0:
             self.table = self.bigResult
-            browsermodel.searchEngine.search(db.prefix+"elements",self.bigResult,criteria,owner=self)
+            self.searchRequest = browsermodel.searchEngine.search(db.prefix+"elements",self.bigResult,
+                                                                  criteria,owner=self)
         else:
-            self._ignoreSearchFinished = True
-            browsermodel.searchEngine.stopSearch(self)
-            # Wait until the search stopped
-            
-    def _handleSearchStopped(self,stopRequest):
-        if stopRequest.owner is self:
-            self._ignoreSearchFinished = False
+            if self.searchRequest is not None:
+                self.searchRequest.stop()
+                self.searchRequest = None
             self.showElements()
     
     def createViews(self,layersList):
@@ -166,7 +163,7 @@ class Browser(QtGui.QWidget):
         self._dialog = None
         
     def _handleSearchFinished(self,request):
-        if not self._ignoreSearchFinished and request.owner is self:
+        if request is self.searchRequest and not request.isStopped():
             for view in self.views:
                 view.model().setTable(self.table)
                 view.model().reset()
@@ -204,7 +201,7 @@ class BrowserTreeView(treeview.TreeView):
         self.model().setAutoLoad(False)
         
     def autoExpand(self):
-        if not self._autoExpanding or self.model().browser._ignoreSearchFinished:
+        if not self._autoExpanding:
             return
         print("autoExpand: {}".format(self.depthHeights))
         maxHeight = self.maximumViewportSize().height()

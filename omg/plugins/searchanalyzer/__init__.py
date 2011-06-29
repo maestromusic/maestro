@@ -68,17 +68,13 @@ def _openDialog():
 
 class SearchAnalyzer(QtGui.QDialog):
     """Display search result tables and allow the user to search the database."""
-    
-    # If the user clears the search field, it may happen that the last searchFinished signal arrives after, we
-    # have cleared the table due to the empty search field. This flag is used to ignore such late signals. 
-    _ignoreSearchFinished = False
+    searchRequest = None
     
     def __init__(self,parent=None,dialog=False):
         QtGui.QDialog.__init__(self,parent)
 
         self.engine = search.SearchEngine()
         self.engine.searchFinished.connect(self._handleSearchFinished)
-        self.engine.searchStopped.connect(self._handleSearchStopped)
         self.resultTable = self.engine.createResultTable("analyzer",
                 "name VARCHAR({}) NULL".format(constants.TAG_VARCHAR_LENGTH))
         
@@ -112,16 +108,9 @@ class SearchAnalyzer(QtGui.QDialog):
             closeButton = QtGui.QPushButton(QtGui.QIcon.fromTheme('window-close'),self.tr("Close"))
             closeButton.clicked.connect(self.close)
             buttonLayout.addWidget(closeButton,0)
-
-    def _handleSearchStopped(self,stopRequest):
-        self._ignoreSearchFinished = False
-        self.table.clear()
-        self.table.setRowCount(0)
-        self.table.setColumnCount(0)
-        self.table.setEnabled(True)
         
     def _handleSearchFinished(self,searchRequest):
-        if not self._ignoreSearchFinished:
+        if searchRequest is self.searchRequest and not searchRequest.isStopped():
             self.updateTable()
 
     def updateTable(self):
@@ -153,12 +142,15 @@ class SearchAnalyzer(QtGui.QDialog):
     def _handleCriteriaChanged(self):
         criteria = self.searchBox.getCriteria()
         if len(criteria) == 0:
-            self._ignoreSearchFinished = True
-            self.engine.stopSearch(owner=self)
-            # Wait until the search is stopped
+            self.searchRequest.stop()
+            self.table.clear()
+            self.table.setRowCount(0)
+            self.table.setColumnCount(0)
+            self.table.setEnabled(True)
         else:
             self.table.setEnabled(False)
-            self.engine.search("{}elements".format(db.prefix),self.resultTable,criteria,owner=self)
+            self.searchRequest = self.engine.search("{}elements".format(db.prefix),
+                                                    self.resultTable,criteria,owner=self)
             
     def _handleOptionButton(self):
         dialog = OptionDialog(self)
