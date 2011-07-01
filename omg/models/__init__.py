@@ -402,7 +402,7 @@ class File(Element):
             raise ValueError("path must be either None or a string. I got {}".format(id))
         self.path = path
     
-    
+    @staticmethod
     @staticmethod
     def fromId(id, *, tags=None, path=None, length=None, position=None, parentId=None, loadData=True):
         if loadData:
