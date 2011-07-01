@@ -38,42 +38,32 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
         """React on an incoming ChangeEvent by applying all changes that affect the
         current model."""
         logger.info("incoming change event at {}".format(self.name))
-        for id,elem in event.changes.items():
+        for id in event.ids():
             if id == self.root.id:
-                self.setRoot(event.changes[id].copy())
+                event.applyTo(self.root)
+                self.setRoot(self.root)
             else:
                 allNodes = self.root.getAllNodes()
-                next(allNodes) # skip root node
+                next(allNodes)
                 for node in allNodes:
                     if node.id == id:
-                        elemcopy = elem.copy()
-                        parent = node.parent
-                        index = node.parent.index(node)
-                        self.remove(node)
-                        self.insert(parent, index, elemcopy)
-
-    def fireRemoveIndexes(self, elements):
-        """Creates and pushes an UndoCommand that removes the selected elements from this model (and all other
-        editor models containing them). Elements must be an iterable of either QModelIndexes or Nodes.
-        """ 
-        if len(elements) == 0:
-            return
-        if isinstance(elements[0], QtCore.QModelIndex):
-            elements = [self.data(i, Qt.EditRole) for i in elements]
-        for i in reversed(elements):
-            for p in i.getParents():
-                if p in elements:
-                    elements.remove(i)
-        changes = OrderedDict()
-        affectedParents = set(i.parent for i in elements)
-        for p in affectedParents:
-            oldParent = p.copy()
-            newParent = p.copy()
-            for child in sorted((i for i in elements if i.parent == p), key = lambda i: i.parent.index(i), reverse = True):
-                del newParent.contents[child.parent.index(child)]
-            changes[p.id] = (oldParent, newParent)
-        command = modify.UndoCommand(level = modify.EDITOR, changes = changes, contentsChanged = True)
-        modify.pushEditorCommand(command)
+                        print('changing {}'.format(id))
+                        modelIndex = self.getIndex(node)
+                        if event.contentsChanged:
+                            self.beginRemoveRows(modelIndex, 0, node.getContentsCount())
+                            temp = node.contents
+                            node.contents = []
+                            self.endRemoveRows()
+                            node.contents = temp
+                            self.beginInsertRows(modelIndex, 0, event.getNewContentsCount(node))
+                            event.applyTo(node)
+                            self.endInsertRows()
+                        else:
+                            event.applyTo(node)
+                        self.dataChanged.emit(modelIndex, modelIndex)
+                        if isinstance(event, modify.ModifySingleElementEvent):
+                            return
+        return
            
     def setContents(self,contents):
         """Set the contents of this playlist and set their parent to self.root.
@@ -252,7 +242,7 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
             elif tags.ALBUM in t:
                 album = ", ".join(t[tags.ALBUM])
                 if not album in albumsFoundByName:
-                    albumsFoundByName[album] = Container(tags = tags.Storage(), position = None, id = modify.newEditorId())
+                    albumsFoundByName[album] = Container(id = modify.newEditorId(), contents = None, tags = tags.Storage(), position = None)
                 file.parent = albumsFoundByName[album]
                 albumsFoundByName[album].contents.append(file)
                 if file.position is None:

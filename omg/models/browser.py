@@ -129,16 +129,16 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
             else: self._loadContainerLayer(node,self.table)
         else:
             # Collect the criteria in this node and its parents and put the search results into smallResult
-            searchEngine.search(self.table,smallResult,node._collectCriteria(),owner=node,parent=self.browser.searchRequest,data=self,lockTable=True)
+            searchEngine.search(self.table,smallResult,node._collectCriteria(),parent=self.browser.searchRequest,owner=self,data=node,lockTable=True)
             
     def _handleSearchFinished(self,searchRequest):
-        if searchRequest.data is self and searchRequest.owner is not None and not searchRequest.isStopped():
+        if searchRequest.owner is self and not searchRequest.isStopped():
             # Determine whether to load a tag-layer or the container-layer at the bottom of the tree.
-            node = searchRequest.owner
+            node = searchRequest.data
             if node.layerIndex+1 < len(self.layers):
                 self._loadTagLayer(node,smallResult)
             else: self._loadContainerLayer(node,smallResult)
-            searchEngine.releaseTable(smallResult)
+            searchRequest.releaseTable()
             self.nodeLoaded.emit()
             if self._autoLoadEnabled:
                 self._autoLoad() # Continue auto loading

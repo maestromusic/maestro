@@ -11,18 +11,12 @@ import threading
 from PyQt4 import QtCore
 from PyQt4.QtCore import Qt
 
-from .. import database as db, tags, config, logging
-from . import searchparser
+from .. import database as db, tags, config
 from . import criteria as criteriaModule
 
 # Name of the temporary search table
 # The table is created in the search thread and temporary, so that it does not conflict with other threads.
 TT_HELP = 'tmp_help'
-
-# Commands that are used by the main thread to control the search thread.
-SEARCH,QUIT = 0,1
-
-logger = logging.getLogger("omg.search")
 
 # An internal list to store all living engines and destroy them at the end.
 engines = []
@@ -43,59 +37,71 @@ def shutdown():
 
 
 class SearchRequest:
+    """A search request contains data about what to search and between which tables. A search request may only
+    be used with a single search engine. 
+    
+    You may always read all attributes of SearchRequest, but never write to them! If you need to search for a
+    changed request, then copy this request, stop it and search for the copy.
+    
+    The attributes are:
+    
+        - ''engine'': the SearchEngine
+        - ''fromTable'': table name where you want to search
+        - ''resultTable'': table name where the results should be stored. This table must be created by the
+            SearchEngine's createResultTable method.
+        - ''criteria'': The criteria the search results must match. Consider the criteria module.
+        - ''parent'': Another SearchRequest. If that request is stopped, this request will also be stopped.
+        - ''owner'': This is not used by the search engine. It may be used to store the instance that
+            triggered the search. In the searchFinished slot this allows to determine which signals should be
+            processed.
+        - ''data'': This is also not used and may contain any other data needed to process the searchFinished
+            signal.
+        - ''lockTable'': If True the resultTable will be locked after the search and every other search to
+            that table will wait until you call releaseTable.
+            
+    \ """
     def __init__(self,engine,fromTable,resultTable,criteria,owner=None,parent=None,data=None,lockTable=False):
         self.fromTable = fromTable
         self.resultTable = resultTable
         self.criteria = criteria
         self.owner = owner
+        if parent is not None and not isinstance(parent,SearchRequest):
+            raise TypeError("Parent must be a SearchRequest.")
         self.parent = parent
         self.data = data
         self.lockTable = lockTable
         self._stopped = False
         self.engine = engine
-        self.finished = False
     
     def copy(self):
+        """Return a copy of this request with the same data. The new request won't be stopped even if this
+        request is.
+        """
         request = SearchRequest(self.engine,self.fromTable,self.resultTable,self.criteria,self.owner,
                                 self.parent,self.data,self.lockTable)
-        request._stopped = self._stopped
         return request
         
     def isStopped(self):
+        """Determines whether this request or its parent has been stopped."""
         return self._stopped or (self.parent is not None and self.parent._stopped)
     
     def stop(self):
+        """Stop this request and all requests that have this one as parent."""
         with self.engine._thread.lock:
             if not self._stopped:
-                print("Search: Stopping request {}".format(self))
+                #print("Search: Stopping request {}".format(self))
                 self._stopped = True
-                if not self.finished and self.resultTable in self.engine._thread.lockedTables:
-                    print("Search: Releasing table {}".format(self.resultTable))
-                    self.engine._thread.lockedTables.remove(self.resultTable)
-                self.engine._thread.requests = [r for r in self.engine._thread.requests if not r.isStopped()]
                 self.engine._thread.searchEvent.set()
-            
-    def changeChriteria(self,newCriteria):
-        with self.engine._thread.lock:
-            print("Search: Changing criteria of {}".format(self))
-            copy = self.copy()
-            copy.criteria = newCriteria
-            self._stopped = True
-            requests = self.engine._thread.requests
-            if self in requests:
-                requests[requests.index(self)] = copy
-            else: requests.append(self)
-            self.engine._thread.requests = [r for r in requests if not r.isStopped()]
-            self.engine._thread.searchEvent.set()
-            return copy
 
     def releaseTable(self):
-        with self._thread.lock:
-            if not self.finished and table in self.engine._thread.lockedTables:
-                print("Releasing table {}".format(self.resultTable))
-                self.engine._thread.lockedTables.remove(self.resultTable)
+        """Release the table of this request if it is locked by this request.""" 
+        with self.engine._thread.lock:
+            if self.resultTable in self.engine._thread.lockedTables \
+                    and self.engine._thread.lockedTables[self.resultTable] is self:
+                #print("Releasing table {}".format(self.resultTable))
+                del self.engine._thread.lockedTables[self.resultTable]
                 self.engine._thread.searchEvent.set()
-                
+            
     def __str__(self):
         return "<SearchRequest: {}->{} for [{}] | ({},{},{},{})".format(self.fromTable,
                  self.resultTable,",".join(str(c) for c in self.criteria),self.owner,
@@ -104,70 +110,77 @@ class SearchRequest:
 
 class SearchEngine(QtCore.QObject):
     """A SearchEngine controls a worker thread that can perform searches in the database. If you want to
-    search, create a SearchEngine, use createResultTable and then use runSearch."""
-    _thread = None      # Search thread
+    search, create a SearchEngine, use createResultTable and then use search.
+    """
+    # Static! This lock is used to create unique names for result tables across different search engines.
+    _resultTableLock = None
+    
+    _thread = None # Search thread
     
     searchFinished = QtCore.pyqtSignal(SearchRequest)
     
     def __init__(self):
         QtCore.QObject.__init__(self)
+        if SearchEngine._resultTableLock is None:
+            SearchEngine._resultTableLock = threading.Lock()
+        self._tables = []
         self._thread = SearchThread(self)
         self._thread.start()
         engines.append(self)
+        
 
     def createResultTable(self,part,customColumns=""):
-        """Create a MySQL table that can hold search results and return its name. The table will be created
-        in memory. *part* must be a string which is unique among all result tables of any engine.
+        """Create a MySQL table that can hold search results and return its (unique) name. The table will be
+        created in memory. *part* will be a part of the table name and may be used to remember who created the
+        table.
         
-        All tables created with this method belong to this engine and will be dropped when this engine is
-        shut down.
-        
-        Warning: Do not change the set of elements in the result table, unless you are not going to use it for
-        a search again.
+        All tables created with this method belong to this engine and will be dropped when it is shut down.
         """
-        tableName = "{}tmp_search_{}".format(db.prefix,part)
-        # TODO: Use lock to create a unique table name
-        if tableName in db.listTables():
-            logger.warning("Table '{}' does already exist. I will drop it.".format(tableName))
-            db.query("DROP TABLE {}".format(tableName))
         if len(customColumns) > 0 and customColumns[-1] != ',':
             customColumns = customColumns + ','
-        db.query("""
-            CREATE TABLE {} (
-                id MEDIUMINT UNSIGNED NOT NULL,
-                {}
-                file BOOLEAN NOT NULL,
-                toplevel BOOLEAN NOT NULL DEFAULT 0,
-                direct BOOLEAN NOT NULL DEFAULT 1,
-                major BOOLEAN NOT NULL DEFAULT 0,
-                PRIMARY KEY(id))
-                ENGINE MEMORY;
-            """.format(tableName,customColumns))
+        tableName = "{}tmp_search_{}".format(db.prefix,part)
+        with SearchEngine._resultTableLock:
+            i = 1
+            while "{}_{}".format(tableName,i) in db.listTables():
+                i += 1
+            db.query("""
+                CREATE TABLE {} (
+                    id MEDIUMINT UNSIGNED NOT NULL,
+                    {}
+                    file BOOLEAN NOT NULL,
+                    toplevel BOOLEAN NOT NULL DEFAULT 0,
+                    direct BOOLEAN NOT NULL DEFAULT 1,
+                    major BOOLEAN NOT NULL DEFAULT 0,
+                    PRIMARY KEY(id))
+                    ENGINE MEMORY;
+                """.format(tableName,customColumns))
+        self._thread.tables[tableName] = None
         return tableName
         
     def search(self,*args,**kargs):
+        """Perform a search. The arguments are the same as in SearchRequest.__init__ except that the engine
+        parameter must not be given (it is set to this engine).
+        """
         request = SearchRequest(self,*args,**kargs)
         self.addRequest(request)
         return request
 
     def addRequest(self,request):
+        """Search for *request*."""
         assert request.engine is self
         with self._thread.lock:
-            if request in self._thread.requests:
+            if request in self._thread.requests or request.isStopped():
+                # The latter happens in particular if the parent request was stopped just befor this method
+                # was called.
                 return
+            #print("Search: Got new request {}".format(request))
             self._thread.requests.append(request)
         self._thread.searchEvent.set()
-    
-    def releaseTable(self,table):
-        with self._thread.lock:
-            if table in self._thread.lockedTables:
-                print("Releasing table {}".format(table))
-                self._thread.lockedTables.remove(table)
-                self._thread.searchEvent.set()
 
     def shutdown(self):
         """Shut down this engine. In particular terminate the search thread and drop all result tables
-        associated with this engine."""
+        associated with this engine.
+        """
         engines.remove(self)
         with self._thread.lock:
             self._thread.quit = True
@@ -175,10 +188,13 @@ class SearchEngine(QtCore.QObject):
         self._thread.searchEvent.set()
         # Wait for the thread to finish before dropping the tables
         self._thread.join()
+        for table in self._thread.tables:
+            db.query("DROP TABLE {}".format(table))
         self._thread = None
 
 
 class SearchThread(threading.Thread):
+    """Each SearchEngine controls a SearchThread that does the actual searching."""
     # A reference to the search engine controlling this thread
     engine = None
     
@@ -189,7 +205,8 @@ class SearchThread(threading.Thread):
     lock = None
     
     # The search thread keeps track of what it has inserted into result tables: This dict maps the names
-    # of all result tables used so far by this thread to tuples consisting of
+    # of all result tables created by the engine's createResultTable method to None (no information available)
+    # or a tuple consisting of
     # - the name of the table where the records came from
     # - the criteria that have been used to filter the records
     # This information sometimes allows the search thread to save work (e.g. if we've searched for 'beet'
@@ -202,10 +219,10 @@ class SearchThread(threading.Thread):
     # This is set to True when the main thread wants the search thread to terminate.
     quit = False
     
-    # Set of table names which are locked
+    # Dict mapping names of locked tables to the request that locked the table. Only that request may release
+    # the table.
     lockedTables = None
     
-    """Each SearchEngine controls a SearchThread that does the actual searching."""
     def __init__(self,engine):
         threading.Thread.__init__(self)
         self.daemon = True # Confer threading.Thread
@@ -215,30 +232,37 @@ class SearchThread(threading.Thread):
         self.searchEvent = threading.Event()
         self.tables = {}
         self.requests = []
-        self.lockedTables = set()
+        self.lockedTables = {}
 
     def run(self):
         """This method contains the search algorithm. It works like this::
         
-            while True:
-                if len(requests) == 0: wait for something to do
+            while True: (LOOP_START)
                 
-                copy data from the main thread (_command,_newRequests)
+                - acquire the lock
                 
-                if _command == QUIT: quit
+                - if quit: terminate
                 
-                if len(newRequests):
-                    add them to requests (append requests without key, replace existing keys, delete requests
-                    when a request matches their delKey; confer processNewRequests)
+                - tidy up some variables (remove stopped requests and release their result tables)
                 
-                if currentRequest != self.requests[0]: # This means that we start processing the next request
-                                                         or that the current request has changed.
-                    self.prepare() # prepare result table and the request's criteria
-    
-                if len(currentRequest.criteria) == 0:
-                    search request finished -> emit signal
-                else:
-                    process currentRequest.criteria[0]
+                - if len(requests) == 0: wait for something to do (then goto LOOP_START)
+                - if requests[0].resultTable is locked: wait until it is released (then goto LOOP_START)
+
+                - release the lock
+                
+                - decide whether we have to truncate resultTable to perform the search for criteria or whether
+                  the set of elements matching all criteria is a subset of the elements in resultTable
+                  (e.g. if criteria are 'beethoven' and resultTable already contains all results matching
+                  'beeth').
+                
+                - if any criterion is invalid (e.g. date:Foo): search finished with no search results;
+                  goto LOOP_START
+                
+                - remove redundant criteria
+                
+                - no criteria left: search finished; goto LOOP_START
+                
+                - process the first criterion
                     
         """        
         # -*- coding: utf-8 -*-
@@ -249,40 +273,47 @@ class SearchThread(threading.Thread):
                 value MEDIUMINT UNSIGNED NULL)
                 CHARACTER SET 'utf8';
             """.format(TT_HELP))
-          
-            currentRequest = None
         
             while True:
                 self.lock.acquire()
                 if self.quit:
-                    for tableName in self.tables:
-                        db.query("DROP TABLE {}".format(tableName))
                     self.lock.release()
                     return # Terminate the search thread
                 
-                if len(self.requests) == 0 or (self.requests[0] is not None 
-                                                and self.requests[0].resultTable in self.lockedTables):
+                # Tidy up
+                # (Remove stopped requests and release tables whose locking request was stopped).
+                currentRequest = None
+                while len(self.requests) > 0 and self.requests[0].isStopped():
+                    self.requests.pop(0)
+                releaseTables = [table for table,request in self.lockedTables.items() if request.isStopped()]
+                for table in releaseTables:
+                    #print("Search: Releasing table {}".format(table))
+                    del self.lockedTables[table]
+                    
+                if len(self.requests) == 0 or self.requests[0].resultTable in self.lockedTables:
                     # Wait for something to do or until the result table is not locked anymore
-                    print("Search: Waiting{}".format(" (no requests)" if len(self.requests) == 0 
-                                                                      else " (table locked)"))
+                    #print("Search: Waiting{}".format(" (no requests)" if len(self.requests) == 0 
+                    #                                                  else " (table locked)"))
                     self.lock.release()
                     self.searchEvent.wait()
                     self.searchEvent.clear()
                     continue # start from above (maybe quit is now true or the result table is still locked.)
                 
                 currentRequest = self.requests[0]
-                # Stopped requests should be immediately removed
+                # Stopped requests are removed above
                 assert not currentRequest.isStopped()
                 
-                # Copy the data so we can release the lock
-                fromTable = currentRequest.fromTable
-                resultTable = currentRequest.resultTable
-                assert resultTable.startswith("{}tmp_search_".format(db.prefix))
-                criteria = currentRequest.criteria
                 self.lock.release()
                 
+                # Copy the data in handy variables
+                fromTable = currentRequest.fromTable
+                resultTable = currentRequest.resultTable
+                assert resultTable in self.tables
+                assert resultTable.startswith("{}tmp_search_".format(db.prefix))
+                criteria = currentRequest.criteria
+                
                 # Check the status of the result table
-                if resultTable not in self.tables or fromTable != self.tables[resultTable][0]:
+                if self.tables[resultTable] is None or fromTable != self.tables[resultTable][0]:
                     # This is a new search to a new table or to a table that already contains search results,
                     # but from a different fromTable.
                     db.query("TRUNCATE TABLE {}".format(resultTable))
@@ -296,47 +327,48 @@ class SearchThread(threading.Thread):
                 
                 # Invalid criteria like 'date:foo' do not have results. Calling criterion.getQuery will fail.
                 if any(c.isInvalid() for c in criteria):
-                    print("Search: Invalid criterion")
+                    #print("Search: Invalid criterion")
                     db.query("TRUNCATE TABLE {}".format(resultTable))                                                                    
                     self.tables[resultTable][1] = []  
                     self.finishRequest(currentRequest)
                     continue
-                        
-                criteria = criteriaModule.reduce(criteria,self.tables[resultTable][1])
+                    
+                # Remove redundant criteria
+                criterion = criteriaModule.getNonRedundantCriterion(criteria,self.tables[resultTable][1])
                 
-                if len(criteria) == 0:
+                if criterion is None:
                     # This happens if we finished the search in the last loop or if reduce finds that
                     # all remaining criteria are redundant.
-                    print("Search: Starting post-processing...")
+                    #print("Search: Starting post-processing...")
                     self.postProcessing(resultTable)
                     # After post processing forget the data we collected about this table.
                     # Any other search going to this table must first truncate it.
-                    del self.tables[resultTable]
+                    self.tables[resultTable] = None
                     self.finishRequest(currentRequest)
                     continue
  
                 # Finally do some work and process a criterion:
-                self.processCriterion(fromTable,resultTable,criteria[0])
-                self.tables[resultTable][1].append(criteria[0])
-                # It may be that the search is finished now. But instead of emitting the signal directly, we
-                # start the loop again and check for changed criteria. If the criteria did indeed change
-                # (e.g. the user types fast), then emitting the signal would just make the main thread do
-                # unnecessary work blocking the search.
+                self.processCriterion(fromTable,resultTable,criterion)
+                self.tables[resultTable][1].append(criterion)
+                # Maybe the search is finished now. But instead of emitting the signal directly, we start the
+                # loop again and check for changed criteria. If the criteria did indeed change (e.g. the user
+                # types fast), then emitting the signal would just make the main thread do unnecessary work
+                # blocking the search.
     
     def finishRequest(self,request):
+        """Finish *request*: lock the table, emit the signal..."""
         with self.lock:
             if not request.isStopped():
                 if request.lockTable:
-                    print("Search: Add to locked tables: {}".format(request.resultTable))
-                    self.lockedTables.add(request.resultTable)
+                    #print("Search: Add to locked tables: {}".format(request.resultTable))
+                    self.lockedTables[request.resultTable] = request
                 self.requests.remove(request)
-                request.finished = True
-                print("Search: Finished request {}".format(request))
+                #print("Search: Finished request {}".format(request))
                 self.engine.searchFinished.emit(request)
             
     def processCriterion(self,fromTable,resultTable,criterion):
-        """This is where the actual search happens."""
-        print("Search: processing criterion {}".format(criterion))
+        """Process a criterion. This is where the actual search happens."""
+        #print("Search: processing criterion {}".format(criterion))
         if len(self.tables[resultTable][1]) == 0:
             # We firstly search for the direct results of the first query... 
             #print("Starting search...")
@@ -385,10 +417,10 @@ class SearchThread(threading.Thread):
         return haveToAdd
     
     def postProcessing(self,resultTable):
-        """Currently post processing
+        """Currently post processing...
         
-            - adds all parents of search results which are major or have a major parent to the search result
-            - sets the toplevel flags correctly.
+            - adds to the search result all parents of search results which are major or have a major parent 
+            - and sets the toplevel flags correctly.
         
         \ """
         result = db.query("""
@@ -411,6 +443,8 @@ class SearchThread(threading.Thread):
 
 
 def setTopLevelFlags(table):
+    """Set the toplevel flags in *table* to 1 if and only if the element has no parent in *table*. Of course
+    *table* must have at least the columns ''id'' and ''toplevel''."""
     db.query("TRUNCATE TABLE {0}".format(TT_HELP))
     if table == db.prefix + "elements":
         db.query("""

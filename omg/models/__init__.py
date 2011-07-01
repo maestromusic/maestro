@@ -222,7 +222,10 @@ class RootNode(Node):
     def __repr__(self):
         return 'RootNode[{}] with {} children'.format(self.id, len(self.contents))
 
-        
+    def copyFrom(self, other, copyContents = False):
+        if copyContents:
+            self.setContents([c.copy() for c in other.contents])
+        self.id = other.id    
 class Element(Node):
     """Abstract base class for elements (files or containers) in playlists, browser, etc.. Contains methods to load tags and contents from the database or from files."""
     tags = None # tags.Storage to store the tags. None until they are loaded
@@ -258,6 +261,17 @@ class Element(Node):
             newNode.tags = self.tags.copy()
         return newNode
     
+    def copyFrom(self, other, copyContents = False):
+        if copyContents:
+            self.setContents([c.copy() for c in other.contents])
+        if self.tags != other.tags:
+            self.tags = other.tags.copy()
+        self.position = other.position
+        if self.isFile():
+            self.path = other.path
+        self.length = other.length
+        self.id = other.id
+        
     def loadTags(self,recursive=False,fromFS=False): 
         """Delete the stored tags and load them again. If this element is contained in the DB, tags will be
         loaded from there. Otherwise if this is a file, tags will be loaded from that file or no tags will be
@@ -377,6 +391,7 @@ class Container(Element):
 
 
 class File(Element):
+    
     def __init__(self, id, tags, path, length, position):
         """Initialize this element with the given id, which must be an integer or None (for external files). Optionally you may specify a tags.Storage object holding the tags of this element and/or a file path."""
         self.id = id
@@ -386,6 +401,7 @@ class File(Element):
         if path is not None and not isinstance(path,str):
             raise ValueError("path must be either None or a string. I got {}".format(id))
         self.path = path
+    
     
     @staticmethod
     def fromId(id, *, tags=None, path=None, length=None, position=None, parentId=None, loadData=True):

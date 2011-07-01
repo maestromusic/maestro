@@ -252,23 +252,17 @@ def isNarrower(aList,bList):
     return all(any(a.isNarrower(b) for a in aList) for b in bList)
 
 
-def reduce(criteria,processed):
+def getNonRedundantCriterion(criteria,processed):
     """Filter criteria from *criteria* which must match every element that matches the criteria *processed*
-    and return the rest. If for example *processed* contains 'hello', then 'hell' will be filtered away."""
-    return [c for c in criteria if not any(p.isNarrower(c) for p in processed)]
+    and return the first remaining criterion. If no criterion remained, return None. If for example
+    *processed* contains 'hello', then 'hell' will be filtered away."""
+    for c in criteria:
+        if not any(p.isNarrower(c) for p in processed):
+            return c
+    return None
 
 
 def _formatColumns(columns,fromTable):
     """Generate a string which can be used after SELECT and will select the given columns from the given
     table. A possible result would be "elements.id,elements.position,elements.elements"."""
     return ",".join("{0}.{1}".format(fromTable,column) for column in columns)
-    
-
-def sortKey(criterion):
-    """Compute a "complexity" value for a criterion.
-    
-    This function is used to sort the complicated criteria to the front hoping that we get right from the
-    beginning only a few results."""
-    if not isinstance(criterion,TextCriterion):
-        return 0 # sort to the front
-    else: return len(criterion.tagSet)

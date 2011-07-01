@@ -119,16 +119,16 @@ class Browser(QtGui.QWidget):
 
     def search(self):
         """Search for the value in the search-box. If it is empty, display all values."""
+        if self.searchRequest is not None:
+            self.searchRequest.stop()
         criteria = self.searchBox.getCriteria()
         if len(criteria) > 0:
             self.table = self.bigResult
-            self.searchRequest = browsermodel.searchEngine.search(db.prefix+"elements",self.bigResult,
-                                                                  criteria,owner=self)
+            self.searchRequest = browsermodel.searchEngine.search(
+                                                        db.prefix+"elements",self.bigResult,criteria)
         else:
-            if self.searchRequest is not None:
-                self.searchRequest.stop()
-                self.searchRequest = None
             self.showElements()
+            self.searchRequest = None
     
     def createViews(self,layersList):
         """Destroy all existing views and create views according to <layersList>: For each entry of <layersList> a BrowserTreeView using the entry as layers is created. Therefore each entry of <layersList> must be a list of tag-lists (confer BrowserTreeView.__init__)."""
@@ -183,7 +183,6 @@ class BrowserTreeView(treeview.TreeView):
         #self.doubleClicked.connect(self._handleDoubleClicked)
     
     def startAutoExpand(self):
-        return
         print("startAutoExpand")
         maxHeight = self.maximumViewportSize().height()
         # Calculate the height of the first level
@@ -204,9 +203,7 @@ class BrowserTreeView(treeview.TreeView):
     def autoExpand(self):
         if not self._autoExpanding:
             return
-        print("autoExpand: {}".format(self.depthHeights))
         maxHeight = self.maximumViewportSize().height()
-        print("maxHeight: {}".format(maxHeight))
         while True:
             # this is at least 2, since depthHeights is initialized with the height of depth 1 in
             # startAutoExpand. 
@@ -219,7 +216,6 @@ class BrowserTreeView(treeview.TreeView):
                 return
             self.depthHeights.append(height)
             if sum(self.depthHeights) <= maxHeight:
-                print("Expanding to depth {}".format(depth))
                 # If two levels fit in the view, we want to expand up to depth 1. Qt counts from 0, thus -2.
                 self.expandToDepth(depth-2)
             else:
@@ -229,8 +225,6 @@ class BrowserTreeView(treeview.TreeView):
     def _getHeightOfDepth(self,node,depth,maxHeight):
         if not node.hasContents():
             return 0
-        #print("Start calculating depthHeight for depth {}".format(depth))
-        print("depthCal: {} {} {}".format(depth,maxHeight,node))
         if isinstance(node,browsermodel.CriterionNode) and not node.hasLoaded():
             return None
         height = 0

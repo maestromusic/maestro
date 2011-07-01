@@ -149,8 +149,7 @@ class SearchAnalyzer(QtGui.QDialog):
             self.table.setEnabled(True)
         else:
             self.table.setEnabled(False)
-            self.searchRequest = self.engine.search("{}elements".format(db.prefix),
-                                                    self.resultTable,criteria,owner=self)
+            self.searchRequest = self.engine.search("{}elements".format(db.prefix),self.resultTable,criteria)
             
     def _handleOptionButton(self):
         dialog = OptionDialog(self)
