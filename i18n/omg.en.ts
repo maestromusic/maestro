@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!DOCTYPE TS><TS version="1.1" language="en">
+<!DOCTYPE TS><TS version="2.0" language="en" sourcelanguage="">
 <context>
     <name>Browser</name>
     <message>
@@ -91,31 +91,6 @@
     </message>
     <message>
         <location filename="../omg/plugins/dbanalyzer/__init__.py" line="160"/>
-        <source>ID</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="160"/>
-        <source>Name</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="160"/>
-        <source>Type</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="160"/>
-        <source>SortTags</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="160"/>
-        <source>Private</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="160"/>
         <source>Values</source>
         <translation type="unfinished"></translation>
     </message>
@@ -125,52 +100,52 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="180"/>
+        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="175"/>
         <source>Check</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="181"/>
+        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="176"/>
         <source>Broken</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="223"/>
+        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="218"/>
         <source>OK</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="228"/>
+        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="223"/>
         <source>Details for check &apos;{}&apos;:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="247"/>
+        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="242"/>
         <source>Elements</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="250"/>
+        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="245"/>
         <source>Files</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="253"/>
+        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="248"/>
         <source>Containers</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="256"/>
+        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="251"/>
         <source>Toplevel elements</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="259"/>
+        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="254"/>
         <source>Content relations</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="262"/>
+        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="257"/>
         <source>Tag relations</source>
         <translation type="unfinished"></translation>
     </message>
@@ -178,7 +153,7 @@
 <context>
     <name>Editor</name>
     <message>
-        <location filename="../omg/gui/editor.py" line="116"/>
+        <location filename="../omg/gui/editor.py" line="131"/>
         <source>editor</source>
         <translation type="unfinished"></translation>
     </message>
@@ -186,27 +161,27 @@
 <context>
     <name>EditorModel</name>
     <message>
-        <location filename="../omg/models/editor.py" line="129"/>
+        <location filename="../omg/models/editor.py" line="119"/>
         <source>error</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/models/editor.py" line="129"/>
+        <location filename="../omg/models/editor.py" line="119"/>
         <source>You cannot put a container below itself in the hierarchy!</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/models/editor.py" line="194"/>
+        <location filename="../omg/models/editor.py" line="184"/>
         <source>Importing {0} files...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/models/editor.py" line="212"/>
+        <location filename="../omg/models/editor.py" line="202"/>
         <source>new tag &#xc2;&#xbb;{0}&#xc2;&#xab; found</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/models/editor.py" line="212"/>
+        <location filename="../omg/models/editor.py" line="202"/>
         <source>File &lt;{0}&gt; contains a so far unknown tag &#xc2;&#xbb;{1}&#xc2;&#xab;. What should its type be?</source>
         <translation type="unfinished"></translation>
     </message>
@@ -214,17 +189,17 @@
 <context>
     <name>EditorWidget</name>
     <message>
-        <location filename="../omg/gui/editor.py" line="73"/>
+        <location filename="../omg/gui/editor.py" line="89"/>
         <source>editor</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/gui/editor.py" line="104"/>
+        <location filename="../omg/gui/editor.py" line="125"/>
         <source>new container</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/gui/editor.py" line="86"/>
+        <location filename="../omg/gui/editor.py" line="102"/>
         <source>guess albums</source>
         <translation type="unfinished"></translation>
     </message>
@@ -425,12 +400,12 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/searchanalyzer/__init__.py" line="99"/>
+        <location filename="../omg/plugins/searchanalyzer/__init__.py" line="95"/>
         <source>Instant search</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/searchanalyzer/__init__.py" line="112"/>
+        <location filename="../omg/plugins/searchanalyzer/__init__.py" line="108"/>
         <source>Close</source>
         <translation type="unfinished"></translation>
     </message>

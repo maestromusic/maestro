@@ -157,13 +157,8 @@ class DBAnalyzerDialog(QtGui.QDialog):
         # Tags
         tags = self.getTags()
         self.tagTable.setRowCount(len(tags))
-        for i,header in enumerate((self.tr("ID"),
-                                   self.tr("Name"),
-                                   self.tr("Type"),
-                                   self.tr("SortTags"),
-                                   self.tr("Private"),
-                                   self.tr("Values"),
-                                   self.tr("Refs"))):
+        for i,header in enumerate(("id","tagname","tagtype","sorttags","private",
+                                   self.tr("Values"),self.tr("Refs"))):
             self.tagTable.setHorizontalHeaderItem(i,QtGui.QTableWidgetItem(header))
         for i,tuple in enumerate(tags):
             for j,data in enumerate(tuple):
