@@ -403,7 +403,6 @@ class File(Element):
         self.path = path
     
     @staticmethod
-    @staticmethod
     def fromId(id, *, tags=None, path=None, length=None, position=None, parentId=None, loadData=True):
         if loadData:
             if tags is None:

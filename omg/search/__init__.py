@@ -34,6 +34,10 @@ def shutdown():
     """Shutdown the search module. This will destroy all result tables that are still existent!"""
     for engine in engines[:]:
         engine.shutdown()
+    # Drop remaining search tables (maybe the last run of OMG crashed and did not remove them).
+    for table in db.listTables():
+        if table.startswith("{}tmp_search_".format(db.prefix)):
+            db.query("DROP TABLE {}".format(table))
 
 
 class SearchRequest:
@@ -143,6 +147,7 @@ class SearchEngine(QtCore.QObject):
             i = 1
             while "{}_{}".format(tableName,i) in db.listTables():
                 i += 1
+            tableName = "{}_{}".format(tableName,i)
             db.query("""
                 CREATE TABLE {} (
                     id MEDIUMINT UNSIGNED NOT NULL,
