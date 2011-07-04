@@ -11,17 +11,20 @@ import itertools
 from PyQt4 import QtCore
 from PyQt4.QtCore import Qt
 
-from omg import config, models, search, database as db, tags, logging, utils
-import omg
-from omg.models import rootedtreemodel, mimedata
+from .. import config, models, search, database as db, tags, logging, utils
+from ..models import rootedtreemodel, mimedata, Element
 
 logger = logging.getLogger("omg.gui.browser")
 
-searchEngine = None
+searchEngine = None # The search engine used by all browsers
+
+# This result table is used when a CriterionNode is expanded. It is common to all browsers, in contrast to the
+# bigResult-table of a browser in which it will store the results of user searches.
 smallResult = None
 
 
 def initSearchEngine():
+    """Initialize the single search engine used by all browsers."""
     global searchEngine, smallResult
     if searchEngine is None:
         searchEngine = search.SearchEngine()
@@ -29,17 +32,21 @@ def initSearchEngine():
 
 
 class BrowserModel(rootedtreemodel.RootedTreeModel):
+    """ItemModel for the BrowserTreeViews (Thus a browser may have several models)."""
     showHiddenValues = False
     
-    _autoLoadEnabled = False
-    _autoLoadGen = None
-    nodeLoaded = QtCore.pyqtSignal()
+    _autoLoadEnabled = False # While enabled AutoLoading loads the contents of all nodes.
+    _autoLoadGen = None # Generator that produces elements that have to be loaded.
     
-    def __init__(self,table,layers,browser):
-        """Initialize this model. It will contain only elements from <table>, group them according to <layers> and will use <smallResult> as temporary search table (BrowserModels perform internal searches when CriterionNodes are expanded for the first time."""
+    def __init__(self,table,layers,browser,view):
+        """Initialize this model. It will contain only elements from <table>, group them according to <layers>
+        and will use <smallResult> as temporary search table (BrowserModels perform internal searches when
+        CriterionNodes are expanded for the first time.
+        """
         rootedtreemodel.RootedTreeModel.__init__(self,RootNode(self))
         self.table = table
         self.browser = browser
+        self.view = view
         self.layers = layers
         
         if searchEngine is None:
@@ -82,17 +89,36 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
         return self.table
     
     def getShowHiddenValues(self):
+        """Return whether the browser-view with this model should display ValueNodes where the hidden-flag in
+        values_varchar is set."""
         return self.showHiddenValues
     
     def setShowHiddenValues(self,showHiddenValues):
+        """Show or hide ValueNodes where the hidden-flag in values_varchar is set."""
         if showHiddenValues != showHiddenValues:
             self.showHiddenValues = showHiddenValues
             self.reset()
+            
+    def flags(self,index):
+        defaultFlags = rootedtreemodel.RootedTreeModel.flags(self,index)
+        if index.isValid():
+            return defaultFlags | Qt.ItemIsDragEnabled
+        else: return defaultFlags
     
+    def mimeTypes(self):
+        return [config.options.gui.mime]
+        
+    def mimeData(self,indexes):
+        return BrowserMimeData.fromIndexes(self,indexes)
+
     def isAutoLoadEnabled(self):
+        """Return whether AutoLoad is enabled."""
         return self.autoLoadEnabled
 
     def setAutoLoad(self,autoLoad):
+        """Enable or disable AutoLoad. While enabled the BrowserModel will load the contents of all nodes, one
+        by one.
+        """
         if autoLoad and not self._autoLoadEnabled:
             self._autoLoadEnabled = True
             self._autoLoadGen = self.breadthFirstTraversal()
@@ -102,6 +128,9 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
             self._autoLoadGen = None
 
     def _autoLoad(self):
+        """If AutoLoad is enabled, load the contents of the next node produced by self._autoLoadGen. To be
+        precise: Only start loading them and delay the actual loading to the searchFinished-event.
+        """
         if not self._autoLoadEnabled or self._autoLoadGen is None:
             # The latter means that all nodes have been loaded already.
             return
@@ -109,15 +138,18 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
             while True:
                 node = next(self._autoLoadGen)
                 if isinstance(node,CriterionNode) and not node.hasLoaded():
-                    print("Autoloading node {}".format(str(node)))
                     node.loadContents()
                     # Wait for the contents to be loaded, _autoLoad will be called again in _searchFinished.
                     break 
         except StopIteration:
             self._autoLoadGen = None
 
-    def _startLoading(self,node):
-        """Load the contents of <node>, which must be either root or a CriterionNode (The contents of Elements are loaded via Element.loadContents)."""
+    def _startLoading(self,node,wait=False):
+        """Start loading the contents of *node*, which must be either root or a CriterionNode (The contents of
+        containers are loaded via Container.loadContents). For CriterionNodes start a search for the contents.
+        The actual loading will be done in the searchFinished event. Only the rootnode is loaded directly. If
+        *wait* is True this method will wait until the node is loaded. 
+        """
         assert node == self.root or isinstance(node,CriterionNode)
         
         if node == self.root:
@@ -128,10 +160,24 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
                     self._autoLoad()
             else: self._loadContainerLayer(node,self.table)
         else:
+            method = searchEngine.search if not wait else searchEngine.searchAndWait
             # Collect the criteria in this node and its parents and put the search results into smallResult
-            searchEngine.search(self.table,smallResult,node._collectCriteria(),parent=self.browser.searchRequest,owner=self,data=node,lockTable=True)
+            searchRequest = method(self.table,smallResult,node._collectCriteria(),
+                                parent=self.browser.searchRequest,
+                                owner=self,
+                                data=node,
+                                lockTable=True)
+            if wait:
+                # Search is finished.
+                self._handleSearchFinished(searchRequest,noAutoLoad=True)
+            # else: Wait for searchFinished...somewhat paradoxical :-)
             
-    def _handleSearchFinished(self,searchRequest):
+    def _handleSearchFinished(self,searchRequest,noAutoLoad=False):
+        """Handle the searchFinished-event for *searchRequest*: Load the contents of the node
+        ''searchRequest.data''. If AutoLoading is enabled, call self.view.autoExpand to check whether it 
+        should be disabled. If that is not the case, call self._autoLoad to keep AutoLoad running. If the 
+        parameter *noAutoLoad* is True this behaviour is deactivated. AutoLoad is not disabled, though.
+        """
         if searchRequest.owner is self and not searchRequest.isStopped():
             # Determine whether to load a tag-layer or the container-layer at the bottom of the tree.
             node = searchRequest.data
@@ -139,8 +185,10 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
                 self._loadTagLayer(node,smallResult)
             else: self._loadContainerLayer(node,smallResult)
             searchRequest.releaseTable()
-            self.nodeLoaded.emit()
-            if self._autoLoadEnabled:
+            if self._autoLoadEnabled and not noAutoLoad:
+                self.view.autoExpand()
+                # When AutoExpand fails, the view will disable AutoLoad. 
+            if self._autoLoadEnabled and not noAutoLoad:
                 self._autoLoad() # Continue auto loading
     
     def _loadTagLayer(self,node,table):
@@ -183,7 +231,6 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
                         aNode.valueIds[tagId] = valueId
                         break
 
-        
         # Check whether a VariousNode is necessary
         result = db.query("""
             SELECT t.value_id
@@ -210,24 +257,22 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
             self.endInsertRows()
             
         # Tag-layers containing only one CriterionNode are not helpful, so if this happens load the contents
-        # of the only CriterionNode and put them into node, removing the original CriterionNode.
-#        if len(valueNodes) == 1:
-#            self._startLoading(valueNodes[0])
-#            for n in valueNodes[0].contents:
-#                n.parent = node
-#            node.contents = valueNodes[0].contents
+        # of the only CriterionNode. There is no need to search because it would give the same results.
+        if len(valueNodes) == 1:
+            if node.layerIndex+2 < len(self.layers):
+                self._loadTagLayer(valueNodes[0],table)
+            else: self._loadContainerLayer(valueNodes[0],table)
 
     def _loadContainerLayer(self,node,table):
-        """Load the contents of <node> into a container-layer, using toplevel elements from <table>. Note that this
-        creates all children of <node> not only the next level of the tree-structure as _loadTagLayer does."""
+        """Load the contents of *node* into a container-layer, using toplevel elements from *table*. Note that
+        this creates all children of *node* and not only the next level of the tree-structure as _loadTagLayer
+        does. For performance reasons this method does not load the data (''Element.fromId(loadData=False)'').
+        """
         result = db.query("SELECT id,file FROM {0} WHERE toplevel = 1".format(table))
         if node.hasContents():
-            try:
-                self.beginRemoveRows(self.getIndex(node),0,node.getContentsCount()-1)
-                node.setContents([])
-                self.endRemoveRows()
-            except ValueError:
-                print("""HASS""")
+            self.beginRemoveRows(self.getIndex(node),0,node.getContentsCount()-1)
+            node.setContents([])
+            self.endRemoveRows()
         
         self.beginInsertRows(self.getIndex(node),0,len(result)-1)
         node.setContents([(models.File if file else models.Container).fromId(id) for id,file in result])
@@ -248,20 +293,10 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
         self.endInsertRows()
 
 
-class HiddenValuesNode(models.Node):
-    def __init__(self,parent,valueNodes):
-        self.parent = parent
-        self.setContents(valueNodes)
-        
-    def __str__(self):
-        return "<HiddenValues>"
-        
-    def toolTipText(self):
-        return None
-
-
 class CriterionNode(models.Node):
-    """CriterionNode is the base class for nodes used to group elements according to a criterion (confer search.criteria) in a BrowserModel."""
+    """CriterionNode is the base class for nodes used to group elements according to a criterion (confer 
+    search.criteria) in a BrowserModel. The level below this node will contain all elements of this level
+    that match the criterion."""
     def __init__(self,parent,model):
         """Initialize this CriterionNode with the parent-node <parent> and the given model and criterion."""
         self.parent = parent
@@ -271,7 +306,8 @@ class CriterionNode(models.Node):
         self._loading = False
     
     def _collectCriteria(self):
-        """Return a list containing the criteria of this node and of all of its parent nodes (as long as they are of type CriterionNode)."""
+        """Return a list containing the criteria of this node and of all of its parent nodes (as long as they
+        are of type CriterionNode)."""
         result = [self.getCriterion()]
         parent = self.getParent()
         while parent is not None:
@@ -302,26 +338,42 @@ class CriterionNode(models.Node):
                 self.loadContents()
         return self.contents
     
-    def loadContents(self):
+    def loadContents(self,wait=False):
+        """If they are not loaded yet, start to load the contents of this node. The actual loading is done
+        by the model when it reacts to the searchFinished event. If *wait* is True, the contents are loaded
+        directly, i.e. the method waits for the search to finish.
+        """
         if self.contents is None:
-            self.contents = [LoadingNode(self)]
-            self.model._startLoading(self)
-            # The contents will be added in BrowserModel.searchFinished
+            if not wait:
+                self.contents = [LoadingNode(self)]
+                self.model._startLoading(self)
+                # The contents will be added in BrowserModel.searchFinished
+            else:
+                self.model._startLoading(self,wait=True) # block until the contents are loaded
     
     def hasLoaded(self):
         return self.contents is not None and (len(self.contents) == 0 
                                                or not isinstance(self.contents[0],LoadingNode))
 
+
 class ValueNode(CriterionNode):
-    """A ValueNode groups elements which have the same tag-value in one or more tags. Not that only the value must coincide, the tags need not be the same, but they must be in a given list. This enables BrowserViews display e.g. all artists and all composers in one tag-layer."""
+    """A ValueNode groups elements which have the same tag-value in one or more tags. Not that only the value
+    must coincide, the tags need not be the same, but they must be in a given list. This enables BrowserViews
+    display e.g. all artists and all composers in one tag-layer.
+    """
     def __init__(self,parent,model,value,valueIds,sortValue):
-        """Initialize this ValueNode with the parent-node <parent> and the given model. <valueIds> is a dict mapping tags to value-ids of the tag. This node will contain elements having at least one of the value-ids in the corresponding tag. <value> is the value of the value-ids (which should be the same for all tags) and will be displayed on the node."""
+        """Initialize this ValueNode with the parent-node <parent> and the given model. <valueIds> is a dict
+        mapping tags to value-ids of the tag. This node will contain elements having at least one of the
+        value-ids in the corresponding tag. <value> is the value of the value-ids (which should be the same
+        for all tags) and will be displayed on the node.
+        """
         CriterionNode.__init__(self,parent,model)
         self.value = value
         self.valueIds = valueIds
         self.sortValue = sortValue
     
     def getDisplayValue(self):
+        """Return the value that should be displayed for this node."""
         if config.options.gui.browser_show_sort_values:
             return self.sortValue if self.sortValue is not None else self.value
         else: return self.value
@@ -330,6 +382,7 @@ class ValueNode(CriterionNode):
         return search.criteria.TagIdCriterion(self.valueIds)
     
     def getSortTags(self):
+        """Return the tags that should be used to sort the nodes below this one."""
         # TODO: Do something if there are several tags with different sorttags
         return tags.get(list(self.valueIds.keys())[0]).sortTags
 
@@ -344,9 +397,11 @@ class ValueNode(CriterionNode):
 
 
 class VariousNode(CriterionNode):
-    """A VariousNode groups elements in a tag-layer which have no tag in any of the tags in the tag-layer's tagset."""
+    """A VariousNode groups elements in a tag-layer which have no tag in any of the tags in the tag-layer's
+    tagset."""
     def __init__(self,parent,model,tagSet):
-        """Initialize this VariousNode with the parent-node <parent>, the given model and the tag-layer's tagset <tagSet>."""
+        """Initialize this VariousNode with the parent-node <parent>, the given model and the tag-layer's
+        tagset <tagSet>."""
         CriterionNode.__init__(self,parent,model)
         self.tagSet = tagSet
 
@@ -354,6 +409,7 @@ class VariousNode(CriterionNode):
         return search.criteria.MissingTagCriterion(self.tagSet)
     
     def getSortTags(self):
+        """Return the tags that should be used to sort the nodes below this one."""
         # TODO: Do something if there are several tags with different sorttags
         return tags.get(list(self.tagSet)[0]).sortTags
         
@@ -364,16 +420,31 @@ class VariousNode(CriterionNode):
         return None
 
 
+class HiddenValuesNode(models.Node):
+    """A node that contains hidden value nodes."""
+    def __init__(self,parent,valueNodes):
+        self.parent = parent
+        self.setContents(valueNodes)
+        
+    def __str__(self):
+        return "<HiddenValues>"
+        
+    def toolTipText(self):
+        return None
+        
+        
 class RootNode(models.RootNode):
     """Rootnode of the Browser-TreeModel."""
     def __init__(self,model):
-        """Initialize this Rootnode with the given model."""
         models.RootNode.__init__(self)
         self.model = model
         self.layerIndex = -1
         
 
 class LoadingNode(models.Node):
+    """This is a placeholder whenever we must wait for a search to terminate before we can display the real
+    contents. The delegate will draw the string "Loading...".
+    """
     def __init__(self,parent):
         self.parent = parent
     
@@ -385,4 +456,49 @@ class LoadingNode(models.Node):
         
     def toolTipText(self):
         None
-        
+    
+    
+class BrowserMimeData(mimedata.MimeData):
+    """This is the subclass of mimedata.MimeData that is used by the browser. The main differences are that
+    the browser contains nodes that are no elements and that they may not have loaded their contents yet.   
+    """  
+    def __init__(self,nodeList):
+        mimedata.MimeData.__init__(self,None) # The element list will be computed when it is needed.
+        self.nodeList = nodeList
+
+    def getElements(self):
+        if self.elementList is not None:
+            return self.elementList
+        # self.elementList may contain CriterionNodes or (unlikely) LoadingNodes.
+        self.elementList = itertools.chain.from_iterable(self._getElementsInstantly(node)
+                                                            for node in self.nodeList)
+        self.nodeList = None # Save memory
+        return self.elementList
+                                          
+    def _getElementsInstantly(self,node):
+        """If *node* is a CriterionNode return all (toplevel) elements contained in it. If contents have to
+        be loaded, wait for the search to finish. If *node* is an element return ''[node]''.
+        """
+        if isinstance(node,Element):
+            return [node]
+        if isinstance(node,CriterionNode):
+            node.loadContents(wait=True)
+            return itertools.chain.from_iterable(self._getElementsInstantly(child)
+                                                    for child in node.getContents())
+        else: return [] # Should be a LoadingNode
+    
+    def paths(self):
+        """Return a list of absolute paths to all files contained in this MimeData-instance."""
+        # The browser doesn't load the paths.
+        return [utils.absPath(db.path(file.id)) for file in self.getFiles()]
+
+    @staticmethod
+    def fromIndexes(model,indexList):
+        """Generate a MimeData instance from the indexes in *indexList*. *model* must be the model containing
+        these indexes. This method will remove an index when an ancestor is contained in *indexList*, too.
+        """
+        nodes = [model.data(index,role=Qt.EditRole) for index in indexList]
+        # Filter away nodes if a parent as also contained in the indexList. 
+        nodes = [n for n in nodes if not any(parent in nodes for parent in n.getParents())]
+        return BrowserMimeData(nodes)
+    

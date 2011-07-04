@@ -12,11 +12,14 @@ from PyQt4 import QtCore
 from PyQt4.QtCore import Qt
 
 from ..utils import absPath
-from .. import models 
-from ..config import options
+from .. import config, models
+
 
 class MimeData(QtCore.QMimeData):
-    """Subclass of QMimeData specialized to transport a tree of elements. It supports two MimeTypes: The first one is used internally by omg and stores the tree-structure. Its name is stored in the config variable "gui->mime". The second one is "text/uri-list" and contains a list of URLs to all files in the tree. This type is used by applications like Amarok and Dolphin."""
+    """Subclass of QMimeData specialized to transport a tree of elements. It supports two MimeTypes: The first
+    one is used internally by omg and stores the tree-structure. Its name is stored in the config variable 
+    "gui->mime". The second one is "text/uri-list" and contains a list of URLs to all files in the tree. This
+    type is used by applications like Amarok and Dolphin."""
     def __init__(self,elementList):
         QtCore.QMimeData.__init__(self)
         self.elementList = elementList
@@ -25,37 +28,41 @@ class MimeData(QtCore.QMimeData):
         return format in self.formats()
     
     def formats(self):
-        return [options.gui.mime,"text/uri-list"]
+        return [config.options.gui.mime,"text/uri-list"]
     
     def hasUrls(self):
         return True
         
     def retrieveData(self,mimeType,type=None):
-        if mimeType == options.gui.mime:
-            return self.elementList
+        if mimeType == config.options.gui.mime:
+            return self.getElements()
         elif mimeType == "text/uri-list":
             return self.urls()
         else:
             # return a null variant of the given type (confer the documentation of retrieveData)
             return QtCore.QVariant(type) if type is not None else QtCore.QVariant()
 
+    def getElements(self):
+        """Return the list of elements stored in this MimeData instance."""
+        return self.elementsList
+    
+    def getFiles(self):
+        """Return all files contained in the elements stored in this MimeData instance."""
+        return itertools.chain.from_iterable(element.getAllFiles() for element in self.getElements())
+        
     def paths(self):
         """Return a list of absolute paths to all files contained in this MimeData-instance."""
-        files = itertools.chain.from_iterable(element.getAllFiles() for element in self.elementList)
-        return [absPath(file.path) for file in files]
+        return [absPath(file.path) for file in self.getFiles()]
         
     def urls(self):
         return [QtCore.QUrl("file://"+path) for path in self.paths()]
 
-
-def createFromIndexes(model,indexList):
-    """Create a MimeData-instance containing the elements represented by the given indexes in <model>."""
-    #TODO: Filter the index list for elements whose parents are contained, too (don't drag them twice)
-    nodes = [model.data(index, role = Qt.EditRole) for index in indexList]
-    from . import browser
-    if isinstance(model,browser.BrowserModel):
-        # Add either the node or invoke getElements recursively
-        return MimeData(itertools.chain.from_iterable(
-                        [node] if isinstance(node,models.Element) else node.getElements() for node in nodes))
-    else:
+    @staticmethod
+    def fromIndexes(model,indexList):
+        """Generate a MimeData instance from the indexes in *indexList*. *model* must be the model containing
+        these indexes. This method will remove an index when an ancestor is contained in *indexList*, too.
+        """
+        nodes = [model.data(index,role=Qt.EditRole) for index in indexList]
+        # Filter away nodes if a parent as also contained in the indexList. 
+        nodes = [n for n in nodes if not any(parent in nodes for parent in n.getParents())]
         return MimeData(nodes)

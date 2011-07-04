@@ -64,7 +64,18 @@ class SearchRequest:
             that table will wait until you call releaseTable.
             
     \ """
+    
+    # This means that the Request was stopped and should be ignored by all receivers of the searchFinished
+    # signal (it happens that the request is stopped when the event is already emitted, but not processed
+    # yet).
+    _stopped = False
+    
+    # Usually when the search is finished a searchFinished signal is emitted, but if _fireEvent is set to
+    # True the engine's _finishedEvent is set instead (threading.Event). This is only used by searchAndWait.
+    _fireEvent = False
+    
     def __init__(self,engine,fromTable,resultTable,criteria,owner=None,parent=None,data=None,lockTable=False):
+        self.engine = engine
         self.fromTable = fromTable
         self.resultTable = resultTable
         self.criteria = criteria
@@ -74,9 +85,7 @@ class SearchRequest:
         self.parent = parent
         self.data = data
         self.lockTable = lockTable
-        self._stopped = False
-        self.engine = engine
-    
+        
     def copy(self):
         """Return a copy of this request with the same data. The new request won't be stopped even if this
         request is.
@@ -121,6 +130,8 @@ class SearchEngine(QtCore.QObject):
     
     _thread = None # Search thread
     
+    _finishedEvent = None # This threading.Event is used for searchAndWait
+    
     searchFinished = QtCore.pyqtSignal(SearchRequest)
     
     def __init__(self):
@@ -130,6 +141,7 @@ class SearchEngine(QtCore.QObject):
         self._tables = []
         self._thread = SearchThread(self)
         self._thread.start()
+        self._finishedEvent = threading.Event()
         engines.append(self)
         
 
@@ -164,18 +176,30 @@ class SearchEngine(QtCore.QObject):
         
     def search(self,*args,**kargs):
         """Perform a search. The arguments are the same as in SearchRequest.__init__ except that the engine
-        parameter must not be given (it is set to this engine).
+        parameter must not be given (it is set to this engine). Return the generated SearchRequest.
         """
         request = SearchRequest(self,*args,**kargs)
         self.addRequest(request)
         return request
 
+    def searchAndWait(self,*args,**kargs):
+        """Perform a search and wait until it is finished. The arguments are the same as in
+        SearchRequest.__init__ except that the engine parameter must not be given (it is set to this engine).
+        Return the generated SearchRequest.
+        """
+        request = SearchRequest(self,*args,**kargs)
+        request._fireEvent = True
+        self._finishedEvent.clear()
+        self.addRequest(request)
+        self._finishedEvent.wait()
+        return request
+        
     def addRequest(self,request):
         """Search for *request*."""
         assert request.engine is self
         with self._thread.lock:
             if request in self._thread.requests or request.isStopped():
-                # The latter happens in particular if the parent request was stopped just befor this method
+                # The latter happens in particular if the parent request was stopped just before this method
                 # was called.
                 return
             #print("Search: Got new request {}".format(request))
@@ -369,7 +393,9 @@ class SearchThread(threading.Thread):
                     self.lockedTables[request.resultTable] = request
                 self.requests.remove(request)
                 #print("Search: Finished request {}".format(request))
-                self.engine.searchFinished.emit(request)
+                if request._fireEvent:
+                    self.engine._finishedEvent.set()
+                else: self.engine.searchFinished.emit(request)
             
     def processCriterion(self,fromTable,resultTable,criterion):
         """Process a criterion. This is where the actual search happens."""

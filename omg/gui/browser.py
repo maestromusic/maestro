@@ -19,6 +19,7 @@ translate = QtCore.QCoreApplication.translate
 
 
 class BrowserDock(QtGui.QDockWidget):
+    """DockWidget containing the Browser."""
     def __init__(self,parent=None,state=None):
         QtGui.QDockWidget.__init__(self,parent)
         self.setWindowTitle(self.tr("Browser"))
@@ -41,11 +42,16 @@ mainwindow.addWidgetData(mainwindow.WidgetData(
 
 
 class Browser(QtGui.QWidget):
-    """Browser-widget to search the music collection. The browser contains a searchbox, a button to open the configuration-dialog and one or more views. Depending on whether a search value is entered or not, the browser displayes results from TT_BIG_RESULT or 'elements' (the correct table is stored in self.table). Each view has a list of tag-sets ('layers') and will group the contents of self.table according to the layers."""
-    
+    """Browser to search the music collection. The browser contains a searchbox, a button to open the
+    configuration-dialog and one or more views. Depending on whether a search value is entered or not, the 
+    browser displays results from its bigResult-table or 'elements' (table currently used is stored in
+    self.table). Each view has a list of tag-sets ('layers') and will group the contents of self.table
+    according to the layers.
+    """
     views = None # List of BrowserTreeViews
     table = db.prefix + "elements" # The MySQL-table whose contents are currently displayed
     
+    # Whether or not hidden values should be displayed.
     showHiddenValues = False
     
     # The option dialog if it is open, and the index of the tab that was active when the dialog was closed
@@ -111,6 +117,7 @@ class Browser(QtGui.QWidget):
         }
     
     def showElements(self):
+        """Use elements as table (instead of self.bigResult) and reset all models."""
         self.table = db.prefix + "elements"
         for view in self.views:
             view.model().setTable(self.table)
@@ -131,7 +138,10 @@ class Browser(QtGui.QWidget):
             self.searchRequest = None
     
     def createViews(self,layersList):
-        """Destroy all existing views and create views according to <layersList>: For each entry of <layersList> a BrowserTreeView using the entry as layers is created. Therefore each entry of <layersList> must be a list of tag-lists (confer BrowserTreeView.__init__)."""
+        """Destroy all existing views and create views according to *layersList*: For each entry of
+        *layersList* a BrowserTreeView using the entry as layers is created. Therefore each entry of
+        *layersList* must be a list of tag-lists (confer BrowserTreeView.__init__).
+        """
         for view in self.views:
             view.setParent(None)
         self.views = []
@@ -141,14 +151,18 @@ class Browser(QtGui.QWidget):
             self.splitter.addWidget(newView)
 
     def getShowHiddenValues(self):
+        """Return whether this browser should display ValueNodes where the hidden-flag in values_varchar is
+        set."""
         return self.showHiddenValues
     
     def setShowHiddenValues(self,showHiddenValues):
+        """Show or hide ValueNodes where the hidden-flag in values_varchar is set."""
         self.showHiddenValues = showHiddenValues
         for view in self.views:
             view.setShowHiddenValues(showHiddenValues)
         
     def _handleOptionButton(self):
+        """Open the option dialog."""
         if self._dialog is None:
             self._dialog = browserdialog.BrowserDialog(self)
             self._dialog.tabWidget.setCurrentIndex(self._lastDialogTabIndex)
@@ -158,11 +172,13 @@ class Browser(QtGui.QWidget):
             self._dialog.show()
     
     def _handleDialogClosed(self):
+        """Close the option dialog."""
         # Note: This is called by the dialog and not by a signal
         self._lastDialogTabIndex = self._dialog.tabWidget.currentIndex()
         self._dialog = None
         
     def _handleSearchFinished(self,request):
+        """React to searchFinished signals: Set the table to self.bigResult and reset the model."""
         if request is self.searchRequest and not request.isStopped():
             for view in self.views:
                 view.model().setTable(self.table)
@@ -171,19 +187,34 @@ class Browser(QtGui.QWidget):
 
 
 class BrowserTreeView(treeview.TreeView):
-    """TreeView for the Browser."""
+    """TreeView for the Browser. A browser may contain more than one view each using its own model."""
     _autoExpanding = False
     
     def __init__(self,parent,layers):
-        """Initialize this TreeView with the given parent (which must be the browser-widget) and the given layers. This also will create a BrowserModel for this treeview (Note that each view of the browser uses its own model). <layers> must be a list of tag-lists. For each entry in <layers> a tag-layer using the entry's tags is created. A BrowserTreeView initialized with [[tags.get('genre')],[tags.get('artist'),tags.get('composer')]] will group result first into differen genres and then into different artist/composer-values, before finally displaying the elements itself."""
+        """Initialize this TreeView with the given parent (which must be the browser-widget) and the given
+        layers. This also will create a BrowserModel for this treeview (Note that each view of the browser
+        uses its own model). <layers> must be a list of tag-lists. For each entry in <layers> a tag-layer
+        using the entry's tags is created. A BrowserTreeView initialized with
+        [[tags.get('genre')],[tags.get('artist'),tags.get('composer')]]
+        will group result first into differen genres and then into different artist/composer-values, before
+        finally displaying the elements itself.
+        """
         treeview.TreeView.__init__(self,parent)
         self.contextMenuProviderCategory = 'browser'
-        self.setModel(browsermodel.BrowserModel(parent.table,layers,parent))
+        self.setModel(browsermodel.BrowserModel(parent.table,layers,parent,self))
         self.setItemDelegate(delegates.BrowserDelegate(self,self.model()))
         #self.doubleClicked.connect(self._handleDoubleClicked)
     
     def startAutoExpand(self):
-        print("startAutoExpand")
+        """Start AutoExpand: Calculate the height of all nodes with depth 1. If they fit into the view and
+        there is still place left, load the contents of those nodes (using the AutoLoad feature of
+        BrowserModel) until all nodes of depth 2 are loaded or the height of the loaded nodes together with
+        all nodes of depth 1 exceeds the height of the view. In the first case expand all nodes of depth 1 and
+        continue with the next level. In the second case it is clear that we cannot display all nodes of
+        depth 2, so stop AutoExpand and AutoLoad.
+        
+        Because loading contents involves searches
+        """ 
         maxHeight = self.maximumViewportSize().height()
         # Calculate the height of the first level
         height = self._getHeightOfDepth(self.model().getRoot(),1,maxHeight)
@@ -191,16 +222,26 @@ class BrowserTreeView(treeview.TreeView):
             self.depthHeights = [height]
             self._autoExpanding = True
             self.model().setAutoLoad(True)
-            self.model().nodeLoaded.connect(self.autoExpand)
         else:
-            self._autoExpanding = False
-            self.model().setAutoLoad(False)
+            # Even the already visible nodes don't fit into the browser...no chance to autoexpand.
+            self.stopAutoExpand()
     
     def stopAutoExpand(self):
+        """Stop AutoExpand and AutoLoad."""
         self._autoExpanding = False
         self.model().setAutoLoad(False)
         
     def autoExpand(self):
+        """This is called at the start of AutoExpand and (by the model) whenever the contents of a node has
+        been loaded. The method will calculate the height of all nodes of the visible depths and of the
+        nodes whose contents are already loaded on the next level and
+        
+            - stop AutoExpand and AutoLoad if the next level doesn't fit into the view
+            - expand to the next level if all nodes are loaded and it does fit
+            - load a node if the next level may fit into the view and we need the contents to find out.
+              autoExpand will be called again from BrowserModel._handleSearchFinished.
+            
+        \ """
         if not self._autoExpanding:
             return
         maxHeight = self.maximumViewportSize().height()
@@ -223,6 +264,9 @@ class BrowserTreeView(treeview.TreeView):
                 return
     
     def _getHeightOfDepth(self,node,depth,maxHeight):
+        """Caculate the height of all nodes of depth *depth* relative to their ancestor *node*. Stop when
+        *maxHeight* is exceeded. If a node has not loaded its contents yet, return None.
+        """
         if not node.hasContents():
             return 0
         if isinstance(node,browsermodel.CriterionNode) and not node.hasLoaded():

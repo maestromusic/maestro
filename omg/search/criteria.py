@@ -142,7 +142,7 @@ class TextCriterion(Criterion):
         if not self.tagSet <= other.tagSet:
             return False
         # if self has ids, other must contain more
-        if self.ids is not None and (other.ids is None or not set(self.ids) <= other.ids):
+        if self.ids is not None and (other.ids is None or not set(self.ids) <= set(other.ids)):
             return False
         # Note that it is not possible to build strictly narrower queries if other.years is not None, since
         # the old string must be a substring of the new one.
