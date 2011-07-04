@@ -396,9 +396,10 @@ class Container(Element):
 
 
 class File(Element):
-    
     def __init__(self, id, tags, path, length, position):
-        """Initialize this element with the given id, which must be an integer or None (for external files). Optionally you may specify a tags.Storage object holding the tags of this element and/or a file path."""
+        """Initialize this element with the given id, which must be an integer or None (for external files).
+        Optionally you may specify a tags.Storage object holding the tags of this element and/or a file path.
+        """
         self.id = id
         self.tags = tags
         self.length = length
@@ -451,5 +452,3 @@ class File(Element):
      
     def __repr__(self):
         return "File[{}] {}".format(self.id, self.path)
-
-
