@@ -55,6 +55,11 @@ class Node:
         self.contents = contents
         for element in self.contents:
             element.setParent(self)
+    
+    def insertContents(self, index, nodes):
+        for n in nodes:
+            n.setParent(self)
+        self.contents[index:index] = nodes
         
     def isFile(self):
         """Return whether this node holds a file. Note that this is in general not the opposite of isContainer
@@ -225,7 +230,7 @@ class RootNode(Node):
     def copyFrom(self, other, copyContents = False):
         if copyContents:
             self.setContents([c.copy() for c in other.contents])
-        self.id = other.id    
+        self.id = other.id
 class Element(Node):
     """Abstract base class for elements (files or containers) in playlists, browser, etc.. Contains methods to load tags and contents from the database or from files."""
     tags = None # tags.Storage to store the tags. None until they are loaded

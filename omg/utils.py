@@ -10,6 +10,7 @@ import datetime, os, functools
 from omg import config
 from omg import constants
 from PyQt4 import QtGui
+from difflib import SequenceMatcher
 
 def mapRecursively(f,aList):
     """Take *aList* which may contain (recursively) further lists and apply *f* to each element in these lists (except the lists). Return a copy of *aList* with the results::
@@ -24,6 +25,11 @@ def mapRecursively(f,aList):
             result.append(mapRecursively(f,item))
         else: result.append(f(item))
     return result
+ 
+def longestSubstring(a, b):
+    sm = SequenceMatcher(None, a, b)
+    result = sm.find_longest_match(0, len(a), 0, len(b))
+    return a[result[0]:result[0]+result[2]]
 
 def hasKnownExtension(file):
     """Return True if the given path has a known extension (i.e., appears in options.main.extension).

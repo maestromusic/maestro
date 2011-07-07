@@ -3,8 +3,11 @@
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
+from .. import tags
+
 from collections import OrderedDict
 import copy
+translate = QtCore.QCoreApplication.translate
 
 REAL = 1
 EDITOR = 2
@@ -42,7 +45,8 @@ class ModifySingleElementEvent(ModifyEvent):
         element.copyFrom(self.element, copyContents = False)
 
 class InsertElementsEvent(ModifyEvent):
-    """A specialized modify event for the insertion of elements."""
+    """A specialized modify event for the insertion of elements. <insertions> is a dict mapping parentId -> iterable of
+    (position, elementList) tuples."""
     def __init__(self, level, insertions):
         self.insertions = insertions
         self.level = level
@@ -52,16 +56,18 @@ class InsertElementsEvent(ModifyEvent):
         return self.insertions.keys()
     
     def getNewContentsCount(self, element):
-        return element.getContentsCount() + len(self.insertions[element.id])
+        return element.getContentsCount() + sum(map(len, tup[1]) for tup in self.insertions[element.id])
     
     def applyTo(self, element):
-        for i, elem in sorted(self.insertions[element.id]):
-            elem2 = elem.copy()
-            element.contents.insert(i, elem2)
-            elem2.setParent(element)
+        for i, elems in self.insertions[element.id]:
+            element.insertContents((e.copy() for e in elems))
+            
 
 class RemoveElementsEvent(ModifyEvent):
-    """A specialized modify event for the removal of elements."""
+    """A specialized modify event for the removal of elements. Removals is a dict mapping parent ids to an iterable of
+    (position, number) tuples, meaning that parent.contents[position,position+number] will be removed. The caller must
+    make sure that it is feasable to remove elements in the order they appear in the iterable – i.e. they should be sorted
+    decreasing."""
     def __init__(self, level, removals):
         self.removals = removals
         self.level = level
@@ -71,11 +77,11 @@ class RemoveElementsEvent(ModifyEvent):
         return self.removals.keys()
     
     def getNewContentsCount(self, element):
-        return element.getContentsCount() + len(self.removals[element.id])
+        return element.getContentsCount() - sum(tup[1] for tup in self.removals[element.id])
     
     def applyTo(self, element):
-        for index in sorted(self.removals[element.id], reverse = True):
-            del element.contents[index]
+        for index, count in self.removals[element.id]:
+            del element.contents[index:index+count]
             
          
 class ChangeEventDispatcher(QtCore.QObject):
@@ -120,7 +126,7 @@ class UndoCommand(QtGui.QUndoCommand):
         redoEvent = ModifyEvent(self.level, newChanges, contentsChanged = self.contentsChanged)
         dispatcher.changes.emit(redoEvent)
 
-class ModifySingleElementUndoCommand(UndoCommand):
+class ModifySingleElementCommand(UndoCommand):
     """A specialized undo command for the modification of a single element (tags, position, ..., but no 
     contents)."""
     
@@ -135,7 +141,22 @@ class ModifySingleElementUndoCommand(UndoCommand):
         dispatcher.changes.emit(ModifySingleElementEvent(self.level, self.after))
     def undo(self):
         dispatcher.changes.emit(ModifySingleElementEvent(self.level, self.before))
-        
+
+def createRanges(tuples):
+        previous = None
+        start = None
+        elements = []
+        for i, elem in sorted(tuples):
+            if previous is None:
+                previous = start = i
+            if i > previous + 1:
+                # emit previous range
+                yield start, elements
+                start = i
+                elements = []
+            previous = i
+            elements.append(elem)
+        yield start, elements
 class RemoveElementsCommand(UndoCommand):
     """A specialized undo command for the removal of elements."""
     
@@ -152,22 +173,66 @@ class RemoveElementsCommand(UndoCommand):
             for p in i.getParents():
                 if p in elements:
                     elements.remove(i)
-        self.changes = {}
+        changes = {} # map of parent id -> set of (index, elementId) tuples
         self.elementPool = {}
         for elem in elements:
             parent = elem.parent
-            if parent.id not in self.changes:
-                self.changes[parent.id] = set()
-            self.changes[parent.id].add((parent.index(elem), elem.id))
+            if parent.id not in changes:
+                changes[parent.id] = set()
+            changes[parent.id].add((parent.index(elem), elem.id))
             self.elementPool[elem.id] = elem.copy()
-            
+        # now create index ranges from the unordered sets
+        self.removals = {}
+        for parentId, changeSet in changes.items():
+            self.removals[parentId] = []
+            for tuple in createRanges(changeSet):
+                self.removals[parentId].append( tuple )
+                 
     def redo(self):
         dispatcher.changes.emit(RemoveElementsEvent(
-             self.level, dict((pid, [tup[0] for tup in elemSet]) for pid,elemSet in self.changes.items())))
+             self.level, dict((pid, [ ( tup[0], len(tup[1]) ) for tup in reversed(elemSet)]) for pid,elemSet in self.removals.items())))
     
     def undo(self):
         dispatcher.changes.emit(InsertElementsEvent(
-             self.level, dict((pid, [ (tup[0], self.elementPool[tup[1]]) for tup in elemSet ] ) for pid, elemSet in self.changes.items())))
+             self.level, dict((pid, [ (tup[0], [self.elementPool[i] for i in tup[1]]) for tup in elemSet ] ) for pid, elemSet in self.removals.items())))
+
+class InsertElementsCommand(UndoCommand):
+    def __init__(self, level, insertions, text=''):
+        super().__init__(level, insertions, text)
+        self.level = level
+        self.insertions = insertions
+    
+    def redo(self):
+        dispatcher.changes.emit(InsertElementsEvent(
+              self.level, self.insertions))
+    def undo(self):
+        dispatcher.changes.emit(RemoveElementsEvent(
+              self.level, dict((pid, [ (tup[0], len(tup[1]) ) for tup in reversed(elemSet)]) for pid,elemSet in self.insertions.items())))
+    
+        
+def merge(elements, level, newTitle, removeString):
+    from ..models import Container
+    if stack.state() == REAL:
+        stack.setActiveStack(stack.editorStack)
+    stack.editorStack.beginMacro(translate('modify', 'merge elements'))
+    removeCommand = RemoveElementsCommand(EDITOR, elements)
+    insertPosition = removeCommand.removals[elements[0].parent.id][0][0]
+    pushEditorCommand(removeCommand)
+    copies = []
+    for element in elements:
+        elemC = element.copy()
+        copies.append(elemC)
+        elemC.position = len(copies)
+        elemC.tags[tags.TITLE] = [ t.replace(removeString, '') for t in elemC.tags[tags.TITLE] ]
+        pushEditorCommand(ModifySingleElementCommand(EDITOR, element, elemC))
+    t = tags.Storage()
+    t[tags.TITLE] = [newTitle]
+    newContainer = Container(id = newEditorId(), contents = copies, tags = t, position = insertPosition)
+    insertions = { elements[0].parent.id : [(insertPosition, [newContainer])] }
+    pushEditorCommand(InsertElementsCommand(EDITOR, insertions))
+    stack.editorStack.endMacro()
+    
+
 _currentEditorId = 0
 
 _fileEditorIds = {}

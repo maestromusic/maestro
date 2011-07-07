@@ -14,11 +14,11 @@ from .. import logging, modify, database as db, tags
 from . import mimedata
 from ..models import rootedtreemodel, RootNode, File, Container
 from ..config import options
-from ..utils import hasKnownExtension, collectFiles
+from ..utils import hasKnownExtension, collectFiles, longestSubstring
 
 from collections import OrderedDict
 from functools import reduce
-import re
+import re, string
 
 logger = logging.getLogger("models.editor")
 
@@ -37,7 +37,7 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
     def handleChangeEvent(self, event):
         """React on an incoming ChangeEvent by applying all changes that affect the
         current model."""
-        logger.info("incoming change event at {}".format(self.name))
+        logger.info("incoming modify event at {}, type {}".format(self.name, event.__class__.__name__))
         for id in event.ids():
             if id == self.root.id:
                 event.applyTo(self.root)
@@ -47,23 +47,34 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
                 next(allNodes)
                 for node in allNodes:
                     if node.id == id:
-                        print('changing {}'.format(id))
                         modelIndex = self.getIndex(node)
-                        if event.contentsChanged:
-                            self.beginRemoveRows(modelIndex, 0, node.getContentsCount())
-                            temp = node.contents
-                            node.contents = []
-                            self.endRemoveRows()
-                            node.contents = temp
-                            self.beginInsertRows(modelIndex, 0, event.getNewContentsCount(node))
-                            event.applyTo(node)
-                            self.endInsertRows()
-                        else:
-                            event.applyTo(node)
-                        self.dataChanged.emit(modelIndex, modelIndex)
                         if isinstance(event, modify.ModifySingleElementEvent):
-                            return
-        return
+                            event.applyTo(node)
+                            self.dataChanged.emit(modelIndex, modelIndex)
+                            return # single element event -> no more IDs to check
+                        elif isinstance(event, modify.InsertElementsEvent):
+                            for pos, newElements in event.insertions[id]:
+                                self.beginInsertRows(modelIndex, pos, pos + len(newElements) - 1)
+                                node.insertContents(pos, [e.copy() for e in newElements])
+                                self.endInsertRows()
+                        elif isinstance(event, modify.RemoveElementsEvent):
+                            for pos, num in event.removals[id]:
+                                self.beginRemoveRows(modelIndex, pos, pos + num - 1)
+                                del node.contents[pos:pos+num]
+                                self.endRemoveRows()
+                        else:
+                            if event.contentsChanged:
+                                self.beginRemoveRows(modelIndex, 0, node.getContentsCount())
+                                temp = node.contents
+                                node.contents = []
+                                self.endRemoveRows()
+                                node.contents = temp
+                                self.beginInsertRows(modelIndex, 0, event.getNewContentsCount(node))
+                                event.applyTo(node)
+                                self.endInsertRows()
+                            else:
+                                event.applyTo(node)
+                        self.dataChanged.emit(modelIndex, modelIndex)
            
     def setContents(self,contents):
         """Set the contents of this playlist and set their parent to self.root.
@@ -185,7 +196,6 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
         progress.setRange(0, len(files))
         progress.setMinimumDuration(1500)
         progress.setWindowModality(Qt.WindowModal)
-        print(len(files))
         elementList = []
         for i,f in enumerate(files):
             progress.setValue(i+1)
@@ -272,7 +282,7 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
                 if discname_reduced in metaContainers:
                     metaContainer = metaContainers[discname_reduced]
                 else:
-                    metaContainer = Container(tags.Storage(), None, modify.newEditorId(), None)
+                    metaContainer = Container(id = modify.newEditorId(), contents = None, tags = tags.Storage(), position = None)
                     metaContainers[discname_reduced] = metaContainer
                 metaContainer.contents.append(album)
                 album.position = discnumber
@@ -303,8 +313,15 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
                 elif commonTagValues[tag] != t[tag]:
                     differentTags.add(tag)
         sameTags = commonTags - differentTags
+        print(album.tags)
         album.tags.clear()
         for tag in sameTags:
             album.tags[tag] = commonTagValues[tag]
         if tags.ALBUM in album.tags:
             album.tags[tags.TITLE] = album.tags[tags.ALBUM]
+            
+    def createMergeHint(self, indices):
+        hintRemove = reduce(longestSubstring,
+                   ( ", ".join(ind.internalPointer().tags[tags.TITLE]) for ind in indices )
+                 )
+        return hintRemove.strip(string.punctuation + string.whitespace), hintRemove

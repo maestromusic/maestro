@@ -8,8 +8,6 @@ IMAGES = "images"
 
 YES_ANSWERS = ["y", "Y", ""]
 
-FILL_CHARACTERS = "-–—•.,:;/ "
-
 #VERSION = '0.2alpha'
 VERSION = '0.2.1' # major, minor, revision
 def compareVersion(v):

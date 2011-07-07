@@ -20,7 +20,7 @@ translate = QtCore.QCoreApplication.translate
 logger = logging.getLogger("gui.editor")
 
 class EditorTreeView(treeview.TreeView):
-    def __init__(self, parent = None, name='default'):
+    def __init__(self, name='default', parent = None):
         treeview.TreeView.__init__(self, parent)
         self.setContextMenuPolicy(Qt.DefaultContextMenu)
         self.setSelectionMode(self.ExtendedSelection)
@@ -29,21 +29,16 @@ class EditorTreeView(treeview.TreeView):
         self.setDefaultDropAction(Qt.MoveAction)
         self.setDropIndicatorShown(True)
         self.setModel(editor.EditorModel(name))
-        treeview.contextMenuProviders['all'].append(EditorTreeView.testTitleChange)
         self.viewport().setMouseTracking(True)
-        self.testAction = QtGui.QAction('test', self)
-        self.testAction.triggered.connect(self.test)
+        self.mergeAction = QtGui.QAction(self.tr('Merge...'), self)
+        self.mergeAction.triggered.connect(self.mergeSelected)
     
-    def test(self):
-        item = self.currentIndex().internalPointer()
-        item_copy = item.copy()
-        item_copy.tags[tags.TITLE] = ['omgwtf']
-        command = modify.ModifySingleElementUndoCommand(modify.EDITOR,  item.copy(), item_copy)
-        modify.pushEditorCommand(command)
-        
-    def testTitleChange(self, actions, currentIndex):
-        actions.append(self.testAction)
-        
+    def contextMenuProvider(self, actions, currentIndex):
+        s = set( index.parent() for index in self.selectedIndexes() )
+        if len(s) == 1:
+            actions.append(self.mergeAction)
+        super().contextMenuProvider(actions,currentIndex)
+
     def dragEnterEvent(self, event):
         if event.source() is self:
             event.setDropAction(Qt.MoveAction)
@@ -82,6 +77,13 @@ class EditorTreeView(treeview.TreeView):
     def removeSelected(self):
         modify.pushEditorCommand(
             modify.RemoveElementsCommand(modify.EDITOR, [s.internalPointer() for s in self.selectedIndexes()]))
+        
+    def mergeSelected(self):
+        hintTitle, hintRemove = self.model().createMergeHint(self.selectedIndexes())
+        dialog = MergeDialog(hintTitle, hintRemove, self)
+        if dialog.exec_() == QtGui.QDialog.Accepted:
+            modify.merge([p.internalPointer() for p in self.selectedIndexes()], modify.EDITOR, dialog.newTitle(), dialog.removeString())
+            
                
 class EditorWidget(QtGui.QDockWidget):
     def __init__(self, parent = None, state = None):
@@ -90,24 +92,26 @@ class EditorWidget(QtGui.QDockWidget):
         widget = QtGui.QWidget()
         self.setWidget(widget)
         vb = QtGui.QVBoxLayout(widget)
-        self.editor = EditorTreeView()
+        try:
+            name = state[0]
+            checkState = state[1]
+        except:
+            name = 'default'
+            checkState = True
+        self.editor = EditorTreeView(name)
         vb.addWidget(self.editor)
         hb = QtGui.QHBoxLayout()
         vb.addLayout(hb)
         self.newContainerButton = QtGui.QPushButton(self.tr("new container"))
         self.newContainerButton.clicked.connect(self.newContainerDialog)
         hb.addWidget(self.newContainerButton)
-        self.nameField = QtGui.QLineEdit('an Editor')
+        self.nameField = QtGui.QLineEdit(name)
         hb.addWidget(self.nameField)
         self.albumGuesserCheckbox = QtGui.QCheckBox(self.tr('guess albums'))
         self.albumGuesserCheckbox.stateChanged.connect(self.editor.model().setGuessAlbums)
-        self.albumGuesserCheckbox.setCheckState(Qt.Checked)
+        self.albumGuesserCheckbox.setCheckState(checkState)
         hb.addWidget(self.albumGuesserCheckbox)
-        try:
-            self.nameField.setText(state[0])
-            self.albumGuesserCheckbox.setCheckState(state[1])
-        except:
-            pass
+
     
     def newContainerDialog(self):
         title, ok = QtGui.QInputDialog.getText(self, "Title", "Title of the container:")
@@ -138,3 +142,39 @@ eData = mainwindow.WidgetData(id = "editor",
                              preferredDockArea = Qt.RightDockWidgetArea)
 mainwindow.addWidgetData(eData)
     
+class MergeDialog(QtGui.QDialog):
+    def __init__(self, hintTitle, hintRemove, parent = None):
+        super().__init__(parent)
+        layout = QtGui.QVBoxLayout()
+        hLayout = QtGui.QHBoxLayout()
+        label = QtGui.QLabel(self.tr('Title of new container:'))
+        hLayout.addWidget(label)
+        hLayout.addStretch()
+        self.titleEdit = QtGui.QLineEdit(hintTitle)
+        hLayout.addWidget(self.titleEdit)        
+        layout.addLayout(hLayout)
+        
+        hLayout = QtGui.QHBoxLayout()
+        self.checkBox = QtGui.QCheckBox(self.tr('Remove from titles:'))
+        self.checkBox.setChecked(True) 
+        hLayout.addWidget(self.checkBox)
+        hLayout.addStretch()
+        self.removeEdit = QtGui.QLineEdit(hintRemove)
+        hLayout.addWidget(self.removeEdit)
+        self.checkBox.toggled.connect(self.removeEdit.setEnabled)
+        layout.addLayout(hLayout)
+        
+        hLayout = QtGui.QHBoxLayout()
+        self.cancelButton = QtGui.QPushButton(self.tr('Cancel'))
+        self.okButton = QtGui.QPushButton(self.tr('OK'))
+        self.cancelButton.clicked.connect(self.reject)
+        self.okButton.clicked.connect(self.accept)
+        hLayout.addStretch()
+        hLayout.addWidget(self.cancelButton)
+        hLayout.addWidget(self.okButton)
+        layout.addLayout(hLayout)
+        self.setLayout(layout)
+    def newTitle(self):
+        return self.titleEdit.text()
+    def removeString(self):
+        return self.removeEdit.text() if self.checkBox.isChecked() else ''

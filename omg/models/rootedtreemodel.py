@@ -9,7 +9,7 @@
 from PyQt4 import QtCore
 from PyQt4.QtCore import Qt
 
-from . import Node, Element
+from . import Node, Element, RootNode
 #from omg.gui import formatter
 
 
