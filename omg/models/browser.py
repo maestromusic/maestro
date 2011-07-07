@@ -138,6 +138,7 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
             while True:
                 node = next(self._autoLoadGen)
                 if isinstance(node,CriterionNode) and not node.hasLoaded():
+                    #print("AutoLoading node {} {}".format(id(node),node))
                     node.loadContents()
                     # Wait for the contents to be loaded, _autoLoad will be called again in _searchFinished.
                     break 
@@ -183,7 +184,15 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
             node = searchRequest.data
             if node.layerIndex+1 < len(self.layers):
                 self._loadTagLayer(node,smallResult)
-            else: self._loadContainerLayer(node,smallResult)
+            else:
+                try:
+                    self._loadContainerLayer(node,smallResult)
+                except ValueError:
+                    print("I searched from {} to {}. The criteria were ")
+                    for c in searchRequest.criteria:
+                        print(c)
+                    
+                    return
             searchRequest.releaseTable()
             if self._autoLoadEnabled and not noAutoLoad:
                 self.view.autoExpand()
@@ -246,16 +255,18 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
         if len(hiddenNodes) > 0:
             valueNodes.append(HiddenValuesNode(node,hiddenNodes))
         
-        if node.hasContents():
-            self.beginRemoveRows(self.getIndex(node),0,node.getContentsCount()-1)
+        if node.contents is not None: # Confer the corresponding comment in _loadContainerLayer
+            self.beginRemoveRows(self.getIndex(node),0,len(node.contents)-1)
             node.setContents([])
             self.endRemoveRows()
-        
-        if len(valueNodes) > 0:
-            self.beginInsertRows(self.getIndex(node),0,len(valueNodes)-1)
+            if len(valueNodes) > 0:
+                self.beginInsertRows(self.getIndex(node),0,len(valueNodes)-1)
+                node.setContents(valueNodes)
+                self.endInsertRows()
+        elif len(valueNodes) > 0:
             node.setContents(valueNodes)
-            self.endInsertRows()
-            
+        
+        # Directload shortcut
         # Tag-layers containing only one CriterionNode are not helpful, so if this happens load the contents
         # of the only CriterionNode. There is no need to search because it would give the same results.
         if len(valueNodes) == 1:
@@ -269,12 +280,18 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
         does. For performance reasons this method does not load the data (''Element.fromId(loadData=False)'').
         """
         result = db.query("SELECT id,file FROM {0} WHERE toplevel = 1".format(table))
-        if node.hasContents():
-            self.beginRemoveRows(self.getIndex(node),0,node.getContentsCount()-1)
+        if node.contents is not None:
+            # Only use beginRemoveRows and friends if there are already contents. If we are going to add the
+            # first contents to node (this happens thanks to the directload shortcut), we must not call
+            # those methods as Qt will then try to access the contents...resulting in _startLoading.
+            contentsNone = True
+            self.beginRemoveRows(self.getIndex(node),0,len(node.contents)-1)
             node.setContents([])
             self.endRemoveRows()
+        else: contentsNone = False
         
-        self.beginInsertRows(self.getIndex(node),0,len(result)-1)
+        if contentsNone:
+            self.beginInsertRows(self.getIndex(node),0,len(result)-1)
         node.setContents([(models.File if file else models.Container).fromId(id) for id,file in result])
         for element in node.contents:
             element.parent = node
@@ -290,7 +307,8 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
                 key = lambda el: el.tags[sortTag][0] if sortTag in el.tags else p,
                 reverse = reverse
             )
-        self.endInsertRows()
+        if contentsNone:
+            self.endInsertRows()
 
 
 class CriterionNode(models.Node):
@@ -303,7 +321,6 @@ class CriterionNode(models.Node):
         self.model = model
         self.layerIndex = parent.layerIndex + 1
         self.contents = None
-        self._loading = False
     
     def _collectCriteria(self):
         """Return a list containing the criteria of this node and of all of its parent nodes (as long as they
@@ -328,14 +345,12 @@ class CriterionNode(models.Node):
         
     def getContentsCount(self,recursive=False):
         if self.contents is None:
-            if not self._loading:
-                self.loadContents()
+            self.loadContents()
         return super().getContentsCount(recursive)
         
     def getContents(self):
         if self.contents is None:
-            if not self._loading:
-                self.loadContents()
+            self.loadContents()
         return self.contents
     
     def loadContents(self,wait=False):
@@ -352,7 +367,7 @@ class CriterionNode(models.Node):
                 self.model._startLoading(self,wait=True) # block until the contents are loaded
     
     def hasLoaded(self):
-        return self.contents is not None and (len(self.contents) == 0 
+        return self.contents is not None and (len(self.contents) != 1 
                                                or not isinstance(self.contents[0],LoadingNode))
 
 
@@ -375,8 +390,14 @@ class ValueNode(CriterionNode):
     def getDisplayValue(self):
         """Return the value that should be displayed for this node."""
         if config.options.gui.browser_show_sort_values:
-            return self.sortValue if self.sortValue is not None else self.value
-        else: return self.value
+            value = self.sortValue if self.sortValue is not None else self.value
+        else: value = self.value
+        if not hasattr(self,'additionalValues'):
+            return value
+        else:
+            values = [value] + self.additionalValues
+            sort(values)
+            return ", ".join(values)
 
     def getCriterion(self):
         return search.criteria.TagIdCriterion(self.valueIds)
@@ -386,6 +407,13 @@ class ValueNode(CriterionNode):
         # TODO: Do something if there are several tags with different sorttags
         return tags.get(list(self.valueIds.keys())[0]).sortTags
 
+    def addValue(self,value,sortValue):
+        if not hasattr(self,'additionalValues'):
+            self.additionalValues = [] 
+        if config.options.gui.browser_show_sort_values:
+            self.additionalValues.append(sortValue if sortValues is not None else value)
+        else: self.additionalValues.append(value)
+        
     def __str__(self):
         return "<ValueNode '{0}' ({1})>".format(self.value, ", ".join(map(str,self.valueIds)))
     

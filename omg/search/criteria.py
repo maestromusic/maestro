@@ -166,11 +166,11 @@ class TextCriterion(Criterion):
 class TagIdCriterion(Criterion):
     """A TagIdCriterion contains a dictionary mapping tag-ids to value-ids. It will be fulfilled for all
     elements having at least one of the tags with the corresponding value. For example
-    ''{<genre-tag>: 1,<artist-tag>:2}'' will match all elements which have either the value of id 1 (in table
-    tag_genre) as a genre-tag or the value of id 2 (in table tag_artist) as an artist-tag or both.
+    ''{<id of genre-tag>: 1,<id of artist-tag>:2}'' will match all elements which have either the value of id
+    1 as a genre-tag or the value of id 2 as an artist-tag or both.
     """
     def __init__(self,valueIds):
-        """Initialize a new TagIdCriterion with the given dictionary mapping tags to value-ids."""
+        """Initialize a new TagIdCriterion with the given dictionary mapping tags-ids to value-ids."""
         assert isinstance(valueIds,dict)
         self.valueIds = valueIds
         
@@ -209,6 +209,8 @@ class TagIdCriterion(Criterion):
     def __ne__(self,other):
         return not isinstance(other,TagIdCriterion) or other.valueIds != self.valueIds
 
+    def __str__(self):
+        return "<TagIdCriterion {}>".format(self.valueIds)
 
 
 class MissingTagCriterion(Criterion):

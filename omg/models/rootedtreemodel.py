@@ -71,10 +71,7 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
             if self.root is None:
                 return False
             else: return self.root.hasContents()
-        else: 
-            #if not hasattr(self.data(index),'hasContents'):
-            #    print(self.data(index))
-            return self.data(index).hasContents()
+        else: return self.data(index).hasContents()
         
     def rowCount(self,parent):
         if parent.column() > 0:
@@ -131,9 +128,11 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
         try:
             parent.getContents().index(node)
         except ValueError:
-            print("Cannot create an index for node {} because it is not contained in its alleged parent {}."
-                    .format(node,parent))
+            raise RuntimeError("Cannot create an index for node {} because "
+                               + "it is not contained in its alleged parent {}.".format(node,parent))
+            
         return self.createIndex(parent.getContents().index(node),0,node)
+            
 
     def getAllNodes(self):
         """Generator which will return all nodes contained in the tree in depth-first-manner."""

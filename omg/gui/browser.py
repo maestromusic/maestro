@@ -222,6 +222,7 @@ class BrowserTreeView(treeview.TreeView):
             self.depthHeights = [height]
             self._autoExpanding = True
             self.model().setAutoLoad(True)
+            self.autoExpand()
         else:
             # Even the already visible nodes don't fit into the browser...no chance to autoexpand.
             self.stopAutoExpand()
@@ -230,6 +231,8 @@ class BrowserTreeView(treeview.TreeView):
         """Stop AutoExpand and AutoLoad."""
         self._autoExpanding = False
         self.model().setAutoLoad(False)
+        if hasattr(self,'depthHeights'):
+            del self.depthHeights
         
     def autoExpand(self):
         """This is called at the start of AutoExpand and (by the model) whenever the contents of a node has
