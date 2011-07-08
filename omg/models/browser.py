@@ -236,7 +236,7 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
                 # If there is already a value node with this value,
                 # add tagId -> valueId to that node
                 for aNode in theList:
-                    if aNode.value == value:
+                    if value in aNode.values:
                         aNode.valueIds[tagId] = valueId
                         break
 
@@ -383,21 +383,16 @@ class ValueNode(CriterionNode):
         for all tags) and will be displayed on the node.
         """
         CriterionNode.__init__(self,parent,model)
-        self.value = value
         self.valueIds = valueIds
-        self.sortValue = sortValue
-    
-    def getDisplayValue(self):
-        """Return the value that should be displayed for this node."""
+        self.values = [value]
         if config.options.gui.browser_show_sort_values:
-            value = self.sortValue if self.sortValue is not None else self.value
-        else: value = self.value
-        if not hasattr(self,'additionalValues'):
-            return value
-        else:
-            values = [value] + self.additionalValues
-            sort(values)
-            return ", ".join(values)
+            self.sortValues = [sortValue if sortValue is not None else value]
+    
+    def getDisplayValues(self):
+        """Return the values that should be displayed for this node."""
+        if config.options.gui.browser_show_sort_values:
+            return self.values
+        else: return self.sortValues
 
     def getCriterion(self):
         return search.criteria.TagIdCriterion(self.valueIds)
@@ -407,21 +402,28 @@ class ValueNode(CriterionNode):
         # TODO: Do something if there are several tags with different sorttags
         return tags.get(list(self.valueIds.keys())[0]).sortTags
 
-    def addValue(self,value,sortValue):
-        if not hasattr(self,'additionalValues'):
-            self.additionalValues = [] 
+    def addValues(self,other):
+        """Add the values (and sortValues) of *other* to this node. This won't affect the contents of this
+        node, so be sure to call this node only when it makes sense.
+        """
+        self.values.extend(other.values)
+        self.values.sort()
         if config.options.gui.browser_show_sort_values:
-            self.additionalValues.append(sortValue if sortValues is not None else value)
-        else: self.additionalValues.append(value)
+            self.sortValues.extend(other.sortValues)
+            self.sortValues.sort()
+        qtIndex = self.model.getIndex(self)
+        self.model.dataChanged.emit(qtIndex,qtIndex)
         
     def __str__(self):
         return "<ValueNode '{0}' ({1})>".format(self.value, ", ".join(map(str,self.valueIds)))
     
     def toolTipText(self):
         if config.options.misc.show_ids: # Display the value-ids
-            idString = ", ".join("{} {}".format(tags.get(tagId).name,valueId) for tagId,valueId in self.valueIds.items())
-            return "{} [{}]".format(self.value,idString)
-        else: return self.value
+            lines = ["[{}]".format(", ".join("{}->{}".format(tags.get(tagId).name,valueId)
+                                    for tagId,valueId in self.valueIds.items()))]
+            lines.extend(self.getDisplayValues())
+        else: lines = self.getDisplayValues()
+        return '\n'.join(lines)
 
 
 class VariousNode(CriterionNode):

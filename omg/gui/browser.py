@@ -13,7 +13,7 @@ from PyQt4.QtCore import Qt
 from .. import database as db, config, search, constants, utils, tags
 from ..search import searchbox
 from . import mainwindow, treeview, browserdialog, delegates
-from ..models import browser as browsermodel
+from ..models import browser as browsermodel, Element
                          
 translate = QtCore.QCoreApplication.translate
 
@@ -215,6 +215,7 @@ class BrowserTreeView(treeview.TreeView):
         
         Because loading contents involves searches
         """ 
+        self._autoExpandDepth = 0
         maxHeight = self.maximumViewportSize().height()
         # Calculate the height of the first level
         height = self._getHeightOfDepth(self.model().getRoot(),1,maxHeight)
@@ -233,6 +234,7 @@ class BrowserTreeView(treeview.TreeView):
         self.model().setAutoLoad(False)
         if hasattr(self,'depthHeights'):
             del self.depthHeights
+        self._optimize()
         
     def autoExpand(self):
         """This is called at the start of AutoExpand and (by the model) whenever the contents of a node has
@@ -260,6 +262,8 @@ class BrowserTreeView(treeview.TreeView):
                 return
             self.depthHeights.append(height)
             if sum(self.depthHeights) <= maxHeight:
+                self._autoExpandDepth = depth
+                #print("Expanding to depth {}".format(depth-2))
                 # If two levels fit in the view, we want to expand up to depth 1. Qt counts from 0, thus -2.
                 self.expandToDepth(depth-2)
             else:
@@ -287,3 +291,49 @@ class BrowserTreeView(treeview.TreeView):
             if height > maxHeight:
                 break
         return height
+
+    def _optimize(self):
+        # As long as there is only one node on each level, expand them. This is not necessarily done by
+        # AutoExpand because afterwards a vertical scrollbar might be necessary.
+        node = self.model().getRoot()
+        while (not isinstance(node,browsermodel.CriterionNode) or node.hasLoaded) \
+                    and node.getContentsCount() == 1:
+            node = node.getContents()[0]
+            self.expand(self.model().getIndex(node))
+            
+        if self._autoExpandDepth > len(self.model().getLayers()):
+            self._mergeNodesOptimization(self.model().getRoot())
+    
+    def _mergeNodesOptimization(self,node):
+        #if depth < len(self.model().getLayers()):
+            # First optimize child nodes
+            # Copy the list because the contents may be modified
+         #   for child in node.getContents()[:]:
+         #       self._mergeNodesOptimization(child,depth+1)
+        model = self.model()
+
+        contentDict = {}
+        contentIds = set()
+        for child in node.getContents()[:]:
+            if isinstance(child,Element):
+                contentIds.add(child.id)
+                continue
+            elif not isinstance(child,browsermodel.ValueNode):
+                continue
+                
+            if not child.hasLoaded():
+                return None
+            subContentIds = self._mergeNodesOptimization(child)
+            contentHash = hash(tuple(sorted(subContentIds)))
+            if contentHash not in contentDict:
+                contentDict[contentHash] = child
+                contentIds.update(subContentIds)
+            else:
+                # Yeah! We found two children with the same contents
+                contentDict[contentHash].addValues(child)
+                position = node.index(child)
+                model.beginRemoveRows(model.getIndex(node),position,position)
+                del node.contents[position]
+                model.endRemoveRows()
+        return contentIds
+        

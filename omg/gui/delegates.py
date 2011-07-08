@@ -81,7 +81,8 @@ class BrowserDelegate(abstractdelegate.AbstractDelegate):
         node = self.model.data(index)
         
         if isinstance(node,browser.ValueNode):
-            self.addLine(node.getDisplayValue(),"")
+            for value in node.getDisplayValues():
+                self.addLine(value,"")
         elif isinstance(node,browser.VariousNode):
             self.addLine(self.tr("Unknown/Various"),style1=BR_SPECIAL_NODE_STYLE)
         elif isinstance(node,browser.HiddenValuesNode):
