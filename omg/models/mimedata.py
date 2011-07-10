@@ -35,7 +35,7 @@ class MimeData(QtCore.QMimeData):
         
     def retrieveData(self,mimeType,type=None):
         if mimeType == config.options.gui.mime:
-            return self.getElements()
+            return self.elementList
         elif mimeType == "text/uri-list":
             return self.urls()
         else:
@@ -44,7 +44,7 @@ class MimeData(QtCore.QMimeData):
 
     def getElements(self):
         """Return the list of elements stored in this MimeData instance."""
-        return self.elementsList
+        return self.elementList
     
     def getFiles(self):
         """Return all files contained in the elements stored in this MimeData instance."""
