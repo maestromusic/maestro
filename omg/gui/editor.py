@@ -79,10 +79,18 @@ class EditorTreeView(treeview.TreeView):
             modify.RemoveElementsCommand(modify.EDITOR, [s.internalPointer() for s in self.selectedIndexes()]))
         
     def mergeSelected(self):
-        hintTitle, hintRemove = self.model().createMergeHint(self.selectedIndexes())
-        dialog = MergeDialog(hintTitle, hintRemove, self)
+        mergeIndexes = self.selectedIndexes()
+        hintTitle, hintRemove = self.model().createMergeHint(mergeIndexes)
+        mergePositions = sorted(idx.row() for idx in mergeIndexes)
+        numSiblings = self.model().rowCount(mergeIndexes[0].parent())
+        dialog = MergeDialog(hintTitle, hintRemove, len(mergePositions) < numSiblings, self)
         if dialog.exec_() == QtGui.QDialog.Accepted:
-            modify.merge([p.internalPointer() for p in self.selectedIndexes()], modify.EDITOR, dialog.newTitle(), dialog.removeString())
+            modify.merge(modify.EDITOR,
+                         mergeIndexes[0].internalPointer().parent,
+                         mergePositions,
+                         dialog.newTitle(),
+                         dialog.removeString(),
+                         dialog.adjustPositions())
             
                
 class EditorWidget(QtGui.QDockWidget):
@@ -99,6 +107,7 @@ class EditorWidget(QtGui.QDockWidget):
             name = 'default'
             checkState = True
         self.editor = EditorTreeView(name)
+        self.editor.model().setGuessAlbums(checkState)
         vb.addWidget(self.editor)
         hb = QtGui.QHBoxLayout()
         vb.addLayout(hb)
@@ -143,7 +152,9 @@ eData = mainwindow.WidgetData(id = "editor",
 mainwindow.addWidgetData(eData)
     
 class MergeDialog(QtGui.QDialog):
-    def __init__(self, hintTitle, hintRemove, parent = None):
+    """This dialog is shown if the user requests to merge some children into a new intermediate container."""
+    
+    def __init__(self, hintTitle, hintRemove, askForPositionAdjusting, parent = None):
         super().__init__(parent)
         layout = QtGui.QVBoxLayout()
         hLayout = QtGui.QHBoxLayout()
@@ -164,6 +175,10 @@ class MergeDialog(QtGui.QDialog):
         self.checkBox.toggled.connect(self.removeEdit.setEnabled)
         layout.addLayout(hLayout)
         
+        if askForPositionAdjusting:
+            self.positionCheckBox = QtGui.QCheckBox(self.tr('Auto-adjust positions'))
+            self.positionCheckBox.setChecked(True)
+            layout.addWidget(self.positionCheckBox)
         hLayout = QtGui.QHBoxLayout()
         self.cancelButton = QtGui.QPushButton(self.tr('Cancel'))
         self.okButton = QtGui.QPushButton(self.tr('OK'))
@@ -178,3 +193,8 @@ class MergeDialog(QtGui.QDialog):
         return self.titleEdit.text()
     def removeString(self):
         return self.removeEdit.text() if self.checkBox.isChecked() else ''
+    def adjustPositions(self):
+        if hasattr(self, 'positionCheckBox'):
+            return self.positionCheckBox.isChecked()
+        else:
+            return False

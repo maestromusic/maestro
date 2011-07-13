@@ -60,7 +60,7 @@ class InsertElementsEvent(ModifyEvent):
     
     def applyTo(self, element):
         for i, elems in self.insertions[element.id]:
-            element.insertContents((e.copy() for e in elems))
+            element.insertContents(i, [e.copy() for e in elems])
             
 
 class RemoveElementsEvent(ModifyEvent):
@@ -133,8 +133,8 @@ class ModifySingleElementCommand(UndoCommand):
     def __init__(self, level, before, after, text=''):
         QtGui.QUndoCommand.__init__(self)
         self.level = level
-        self.before = before
-        self.after = after
+        self.before = before.copy()
+        self.after = after.copy()
         self.setText(text)
     
     def redo(self):
@@ -209,26 +209,42 @@ class InsertElementsCommand(UndoCommand):
         dispatcher.changes.emit(RemoveElementsEvent(
               self.level, dict((pid, [ (tup[0], len(tup[1]) ) for tup in reversed(elemSet)]) for pid,elemSet in self.insertions.items())))
     
-        
-def merge(elements, level, newTitle, removeString):
+def changePosition(level, element, position):
+    elemOld = element.copy()
+    elemNew = element.copy()
+    elemNew.position = position
+    
+    stack.activeStack().push(ModifySingleElementCommand(level, elemOld, elemNew, translate('modify', 'change position'))) # TODO: richtigen Stack auswählen        
+    
+def merge(level, parent, positions, newTitle, removeString, adjustPositions):
     from ..models import Container
+    if level == REAL:
+        raise NotImplementedError('Maddin, tu was!')
     if stack.state() == REAL:
         stack.setActiveStack(stack.editorStack)
+
     stack.editorStack.beginMacro(translate('modify', 'merge elements'))
-    removeCommand = RemoveElementsCommand(EDITOR, elements)
-    insertPosition = removeCommand.removals[elements[0].parent.id][0][0]
-    pushEditorCommand(removeCommand)
     copies = []
-    for element in elements:
-        elemC = element.copy()
-        copies.append(elemC)
-        elemC.position = len(copies)
-        elemC.tags[tags.TITLE] = [ t.replace(removeString, '') for t in elemC.tags[tags.TITLE] ]
-        pushEditorCommand(ModifySingleElementCommand(EDITOR, element, elemC))
-    t = tags.Storage()
+    insertPosition = positions[0]
+    insertElementPosition = parent.contents[insertPosition].position
+    print(parent)
+    removeCommand = RemoveElementsCommand(EDITOR, [parent.contents[i] for i in positions])
+    
+    for i,element in enumerate(parent.contents[insertPosition:], start=insertPosition):
+        if i in positions:
+            elemC = parent.contents[i].copy()
+            copies.append(elemC)
+            elemC.position = len(copies)
+            if tags.TITLE in elemC.tags:
+                elemC.tags[tags.TITLE] = [ t.replace(removeString, '') for t in elemC.tags[tags.TITLE] ]
+            pushEditorCommand(ModifySingleElementCommand(EDITOR, element, elemC))
+        elif adjustPositions:
+            changePosition(EDITOR, element, element.position - len(copies) + 1)
+    pushEditorCommand(removeCommand)        
+    t = tags.findCommonTags(copies, True)
     t[tags.TITLE] = [newTitle]
-    newContainer = Container(id = newEditorId(), contents = copies, tags = t, position = insertPosition)
-    insertions = { elements[0].parent.id : [(insertPosition, [newContainer])] }
+    newContainer = Container(id = newEditorId(), contents = copies, tags = t, position = insertElementPosition)
+    insertions = { parent.id : [(insertPosition, [newContainer])] }
     pushEditorCommand(InsertElementsCommand(EDITOR, insertions))
     stack.editorStack.endMacro()
     

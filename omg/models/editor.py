@@ -40,8 +40,9 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
         logger.info("incoming modify event at {}, type {}".format(self.name, event.__class__.__name__))
         for id in event.ids():
             if id == self.root.id:
+                print('root element affected at {}'.format(self.name))
                 event.applyTo(self.root)
-                self.setRoot(self.root)
+                self.reset()
             else:
                 allNodes = self.root.getAllNodes()
                 next(allNodes)
@@ -99,7 +100,7 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
         return [options.gui.mime,"text/uri-list"]
     
     def mimeData(self,indexes):
-        return mimedata.createFromIndexes(self,indexes)
+        return mimedata.MimeData.fromIndexes(self,indexes)
     
     def dropMimeData(self,mimeData,action,row,column,parentIndex):
         """This function does all the magic that happens if elements are dropped onto this editor."""
@@ -205,7 +206,9 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
             readOk = False
             while not readOk:
                 try:
-                    elementList.append(File.fromFilesystem(f))
+                    theFile = File.fromFilesystem(f)
+                    print('bla - {}'.format(theFile.tags[tags.TITLE]))
+                    elementList.append(theFile)
                     readOk = True
                 except tags.UnknownTagError as e:
                     descMap = {'{n} ({d})'.format(n = t.name, d = t.description):t for t in tags.TYPES}
@@ -301,22 +304,7 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
         if album.isFile():
             return
         album.contents.sort(key=lambda x : x.position or -1)
-        commonTags = set(x for x in reduce(lambda x,y: x & y, [set(elem.tags.keys()) for elem in album.getAllNodes(skipSelf = True)]))
-        commonTagValues = {}
-        differentTags=set()
-        
-        for element in album.getAllNodes(skipSelf = True):
-            t = element.tags
-            for tag in commonTags:
-                if tag not in commonTagValues:
-                    commonTagValues[tag] = t[tag]
-                elif commonTagValues[tag] != t[tag]:
-                    differentTags.add(tag)
-        sameTags = commonTags - differentTags
-        print(album.tags)
-        album.tags.clear()
-        for tag in sameTags:
-            album.tags[tag] = commonTagValues[tag]
+        album.tags = tags.findCommonTags(album.contents, True)
         if tags.ALBUM in album.tags:
             album.tags[tags.TITLE] = album.tags[tags.ALBUM]
             

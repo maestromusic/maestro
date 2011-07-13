@@ -20,7 +20,7 @@ This module provides methods to store tags, convert them between different value
 \ """
 import os.path, xml.sax
 from collections import Sequence
-from xml.sax.handler import ContentHandler
+from functools import reduce
 
 from omg import config, constants, logging
 from omg.utils import FlexiDate, getIconPath
@@ -419,6 +419,30 @@ class Storage(dict):
         for tag,valueList in other.items():
             self.removeValues(tag,*valueList)
 
+def findCommonTags(elements, recursive = True):
+    """Returns a Storage object containig all tags that are equal in all of the elements. If recursive is True, also all children
+    of the elements are considered."""
+    if recursive:
+        elems = set()
+        for e in elements:
+            elems.update(e.getAllNodes(skipSelf = False))
+        elements = elems
+    commonTags = set(reduce(lambda x,y: x & y, [set(elem.tags.keys()) for elem in elements ]))
+    commonTagValues = {}
+    differentTags=set()
+    
+    for element in elements:
+        t = element.tags
+        for tag in commonTags:
+            if tag not in commonTagValues:
+                commonTagValues[tag] = t[tag]
+            elif commonTagValues[tag] != t[tag]:
+                differentTags.add(tag)
+    sameTags = commonTags - differentTags
+    tags = Storage()
+    for tag in sameTags:
+        tags[tag] = commonTagValues[tag]
+    return tags
 
 class TranslationFileHandler(xml.sax.handler.ContentHandler):
     """Content handler for tag translation files. When it parses a file it will store all translations in the internal module variable ``_translation``."""
