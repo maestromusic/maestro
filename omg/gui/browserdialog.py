@@ -12,7 +12,8 @@ from PyQt4.QtCore import Qt
 from .. import config, tags, utils
 from . import dialogs
 
-# Layers that can be selected in BrowserDialog's comboboxes. Each item in the list is a list containing for each layer a list of the tagnames in that layer.
+# Layers that can be selected in BrowserDialog's comboboxes. Each item in the list is a list containing for
+# each layer a list of the tagnames in that layer.
 selectableLayers = utils.mapRecursively(tags.get,[
      [['composer','artist','performer']],
      [['genre'],['composer','artist','performer']],
@@ -28,6 +29,7 @@ selectableLayers = utils.mapRecursively(tags.get,[
 
 
 class BrowserDialog(dialogs.FancyTabbedPopup):
+    """Popup dialog that allows to configure the Browser."""
     def __init__(self,browser):
         dialogs.FancyTabbedPopup.__init__(self,browser.window())
         self.browser = browser
@@ -65,7 +67,7 @@ class BrowserDialog(dialogs.FancyTabbedPopup):
 
 
 class ViewConfigurationDialog(QtGui.QDialog):
-    """The BrowserDialog allows you to configure the views and their layers of a browser."""
+    """The BrowserDialog allows you to configure the views of a browser and their layers."""
     def __init__(self,parent):
         """Initialize with the given parent, which must be the browser to configure."""
         QtGui.QDialog.__init__(self,parent)
@@ -144,7 +146,9 @@ class ViewConfiguration(QtGui.QWidget):
         layout.addWidget(self.comboBox)
         
     def setLayers(self,layers):
-        """Set the currently selected layers to <layers>. If this is not contained in browserdialog.selectableLayers, nothing is selected."""
+        """Set the currently selected layers to <layers>. If this is not contained in
+        browserdialog.selectableLayers, nothing is selected.
+        """
         try:
             self.comboBox.setCurrentIndex(selectableLayers.index(layers))
         except ValueError:

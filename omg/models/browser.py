@@ -39,9 +39,8 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
     _autoLoadGen = None # Generator that produces elements that have to be loaded.
     
     def __init__(self,table,layers,browser,view):
-        """Initialize this model. It will contain only elements from <table>, group them according to <layers>
-        and will use <smallResult> as temporary search table (BrowserModels perform internal searches when
-        CriterionNodes are expanded for the first time.
+        """Initialize this model. It will contain only elements from *table* and group them according to
+        *layers*. *browser* and *view* must be the browser and its view that uses this model.
         """
         rootedtreemodel.RootedTreeModel.__init__(self,RootNode(self))
         self.table = table
@@ -184,15 +183,7 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
             node = searchRequest.data
             if node.layerIndex+1 < len(self.layers):
                 self._loadTagLayer(node,smallResult)
-            else:
-                try:
-                    self._loadContainerLayer(node,smallResult)
-                except ValueError:
-                    print("I searched from {} to {}. The criteria were ")
-                    for c in searchRequest.criteria:
-                        print(c)
-                    
-                    return
+            else: self._loadContainerLayer(node,smallResult)
             searchRequest.releaseTable()
             if self._autoLoadEnabled and not noAutoLoad:
                 self.view.autoExpand()
@@ -328,7 +319,7 @@ class CriterionNode(models.Node):
         result = [self.getCriterion()]
         parent = self.getParent()
         while parent is not None:
-            if isinstance(parent,CriterionNode):
+            if isinstance(parent,CriterionNode): # Skip HiddenValuesNodes
                 result.append(parent.getCriterion())
             parent = parent.getParent()
         return result
@@ -353,6 +344,11 @@ class CriterionNode(models.Node):
             self.loadContents()
         return self.contents
     
+    def hasLoaded(self):
+        """Return whether this CriterionNode did already load its contents."""
+        return self.contents is not None and (len(self.contents) != 1 
+                                               or not isinstance(self.contents[0],LoadingNode))
+                                               
     def loadContents(self,wait=False):
         """If they are not loaded yet, start to load the contents of this node. The actual loading is done
         by the model when it reacts to the searchFinished event. If *wait* is True, the contents are loaded
@@ -366,9 +362,6 @@ class CriterionNode(models.Node):
             else:
                 self.model._startLoading(self,wait=True) # block until the contents are loaded
     
-    def hasLoaded(self):
-        return self.contents is not None and (len(self.contents) != 1 
-                                               or not isinstance(self.contents[0],LoadingNode))
 
 
 class ValueNode(CriterionNode):
@@ -472,8 +465,8 @@ class RootNode(models.RootNode):
         
 
 class LoadingNode(models.Node):
-    """This is a placeholder whenever we must wait for a search to terminate before we can display the real
-    contents. The delegate will draw the string "Loading...".
+    """This is a placeholder for those moments when we must wait for a search to terminate before we can
+    display the real contents. The delegate will draw the string "Loading...".
     """
     def __init__(self,parent):
         self.parent = parent

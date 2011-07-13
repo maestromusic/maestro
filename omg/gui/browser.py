@@ -44,9 +44,35 @@ mainwindow.addWidgetData(mainwindow.WidgetData(
 class Browser(QtGui.QWidget):
     """Browser to search the music collection. The browser contains a searchbox, a button to open the
     configuration-dialog and one or more views. Depending on whether a search value is entered or not, the 
-    browser displays results from its bigResult-table or 'elements' (table currently used is stored in
+    browser displays results from its bigResult-table or 'elements' (the table currently used is stored in
     self.table). Each view has a list of tag-sets ('layers') and will group the contents of self.table
-    according to the layers.
+    according to the layers: For each tag-set the view will contain a level of ValueNodes ('taglayer') that
+    contain only elements with this value. After these taglayers the browser displays the contents in the
+    usual tree structure ('container layer'). Currently only tags of type varchar may be used in the
+    taglayers.
+    
+    ValueNodes will load their contents only when they are requested for the first time and to do so they
+    will need to search from self.table to the smallResult-table used by all browsermodels together.
+    
+    More features:
+    
+        - Hidden values: Values from values_varchar with the hidden flag are stuffed into HiddenValueNodes
+          (unless the showHiddenValues option is set to True).
+        - Elements that don't have a value in any of the tags used in a taglayer are stuffed into a
+          VariousNode (if a container has no artist-tag the reason ist most likely that its children have
+          different artists).
+    
+    Some of the more fancy features that only affect how nodes are displayed, include
+
+         - AutoExpand: As long as the next level of (still unexpanded and not visible) nodes fits into the
+           view, they are loaded automatically (using the model's AutoLoad feature). If the whole next level 
+           fits into the view, it is expanded.
+         - DirectLoad Shortcut: If a layer of ValueNodes happens to have only one value, this value is
+           directly expanded without doing a new search (would give the same search results anyway)'
+         - Merge ValueNodes Optimization: After AutoExpand (we need the contents to be loaded at least to the
+           first layer of Elements) check whether there are ValueNodes containing the same elements and merge
+           them.  
+ 
     """
     views = None # List of BrowserTreeViews
     table = db.prefix + "elements" # The MySQL-table whose contents are currently displayed
@@ -54,7 +80,7 @@ class Browser(QtGui.QWidget):
     # Whether or not hidden values should be displayed.
     showHiddenValues = False
     
-    # The option dialog if it is open, and the index of the tab that was active when the dialog was closed
+    # The option dialog if it is open, and the index of the tab that was active when the dialog was closed.
     _dialog = None
     _lastDialogTabIndex = 0
     
@@ -64,7 +90,6 @@ class Browser(QtGui.QWidget):
     def __init__(self,parent = None,state = None):
         """Initialize a new Browser with the given parent."""
         QtGui.QWidget.__init__(self,parent)
-        self.browserKey = utils.getUniqueKey("browser")
         
         if browsermodel.searchEngine is None:
             browsermodel.initSearchEngine()
@@ -105,24 +130,22 @@ class Browser(QtGui.QWidget):
         self.views = []
         # Convert tag names to tags, leaving the nested list structure unchanged
         self.createViews(utils.mapRecursively(tags.get,viewsToRestore))
-        
-    def __del__(self):
-        utils.freeUniqueKey(self.browserKey)
 
     def saveState(self):
         return {
             'instant': self.searchBox.getInstantSearch(),
             'showHiddenValues': self.showHiddenValues,
-            'views': utils.mapRecursively(lambda tag: tag.name,[view.model().getLayers() for view in self.views])
+            'views': utils.mapRecursively(lambda tag: tag.name,[view.model().getLayers()
+                                                         for view in self.views])
         }
     
     def showElements(self):
         """Use elements as table (instead of self.bigResult) and reset all models."""
         self.table = db.prefix + "elements"
         for view in self.views:
-            view.model().setTable(self.table)
-            view.model().reset()
-            view.startAutoExpand()
+            if self.table != view.model().getTable():
+                view.model().setTable(self.table)
+                view.startAutoExpand()
 
     def search(self):
         """Search for the value in the search-box. If it is empty, display all values."""
@@ -193,10 +216,10 @@ class BrowserTreeView(treeview.TreeView):
     def __init__(self,parent,layers):
         """Initialize this TreeView with the given parent (which must be the browser-widget) and the given
         layers. This also will create a BrowserModel for this treeview (Note that each view of the browser
-        uses its own model). <layers> must be a list of tag-lists. For each entry in <layers> a tag-layer
+        uses its own model). *layers* must be a list of tag-lists. For each entry in *layers* a tag-layer
         using the entry's tags is created. A BrowserTreeView initialized with
         [[tags.get('genre')],[tags.get('artist'),tags.get('composer')]]
-        will group result first into differen genres and then into different artist/composer-values, before
+        will group result first into different genres and then into different artist/composer-values, before
         finally displaying the elements itself.
         """
         treeview.TreeView.__init__(self,parent)
@@ -213,7 +236,8 @@ class BrowserTreeView(treeview.TreeView):
         continue with the next level. In the second case it is clear that we cannot display all nodes of
         depth 2, so stop AutoExpand and AutoLoad.
         
-        Because loading contents involves searches
+        Because loading contents involves searches the _autoExpand-method needs to be called repeatedly after
+        each search.
         """ 
         self._autoExpandDepth = 0
         maxHeight = self.maximumViewportSize().height()
@@ -234,7 +258,20 @@ class BrowserTreeView(treeview.TreeView):
         self.model().setAutoLoad(False)
         if hasattr(self,'depthHeights'):
             del self.depthHeights
-        self._optimize()
+            
+        # As long as there is only one node on each level, expand them. This is not necessarily done by
+        # AutoExpand because afterwards a vertical scrollbar might be necessary.
+        node = self.model().getRoot()
+        while (not isinstance(node,browsermodel.CriterionNode) or node.hasLoaded()) \
+                    and node.getContentsCount() == 1:
+            node = node.getContents()[0]
+            self.expand(self.model().getIndex(node))
+        
+        # If we have loaded enough layers so that the toplevel Elements are visible, then start the Merge
+        # ValueNodes Optimization.
+        if self._autoExpandDepth > len(self.model().getLayers()):
+            self._mergeValueNodesOptimization(self.model().getRoot())
+        
         
     def autoExpand(self):
         """This is called at the start of AutoExpand and (by the model) whenever the contents of a node has
@@ -291,40 +328,50 @@ class BrowserTreeView(treeview.TreeView):
             if height > maxHeight:
                 break
         return height
-
-    def _optimize(self):
-        # As long as there is only one node on each level, expand them. This is not necessarily done by
-        # AutoExpand because afterwards a vertical scrollbar might be necessary.
-        node = self.model().getRoot()
-        while (not isinstance(node,browsermodel.CriterionNode) or node.hasLoaded) \
-                    and node.getContentsCount() == 1:
-            node = node.getContents()[0]
-            self.expand(self.model().getIndex(node))
-            
-        if self._autoExpandDepth > len(self.model().getLayers()):
-            self._mergeNodesOptimization(self.model().getRoot())
     
-    def _mergeNodesOptimization(self,node):
-        #if depth < len(self.model().getLayers()):
-            # First optimize child nodes
-            # Copy the list because the contents may be modified
-         #   for child in node.getContents()[:]:
-         #       self._mergeNodesOptimization(child,depth+1)
+    def _mergeValueNodesOptimization(self,node):
+        """After AutoExpand (we need the contents to be loaded at least to the first layer of Elements) check
+        whether there are ValueNodes containing the same elements and merge them.
+        
+        This method optimizes the ValueNodes below *node* and returns the toplevel element contents of *node*
+        as set. If any node below *node* has not loaded its contents, this method returns None.
+        """
         model = self.model()
-
-        contentDict = {}
+        
+        # Later this set will contain the element-ids of all toplevel elements that are recursively
+        # contained in this node (it will only contain elements whose direct parent is a ValueNode).
         contentIds = set()
-        for child in node.getContents()[:]:
+        
+        # This maps hashes of contents (ordered tuples of contentIds to be precise) to the child of *node*
+        # containing those contents.
+        contentDict = {}
+        
+        # Set to false if a child has not fully loaded its contents.
+        loaded = True
+        
+        # Copy the list as contents may change.
+        for child in node.getContents()[:]: 
             if isinstance(child,Element):
                 contentIds.add(child.id)
                 continue
-            elif not isinstance(child,browsermodel.ValueNode):
+            if not isinstance(child,browsermodel.ValueNode):
+                # TODO: Handle VariousNodes, HiddenValuesNodes
+                continue
+            if not child.hasLoaded():
+                loaded = False
+                continue
+            
+            # First optimize the nodes below child and get the contents
+            subContentIds = self._mergeValueNodesOptimization(child)
+            if subContentIds is None: # child has not fully loaded its contents
+                loaded = False
                 continue
                 
-            if not child.hasLoaded():
-                return None
-            subContentIds = self._mergeNodesOptimization(child)
+            # Calculate the hash used to compare contents. It is important to sort the ids because often the
+            # children are sorted differently depending on the value of node (e.g. when using a layer with
+            # artist and composer tags, having sorttags date for artist and title for composer).
             contentHash = hash(tuple(sorted(subContentIds)))
+            
             if contentHash not in contentDict:
                 contentDict[contentHash] = child
                 contentIds.update(subContentIds)
@@ -335,5 +382,7 @@ class BrowserTreeView(treeview.TreeView):
                 model.beginRemoveRows(model.getIndex(node),position,position)
                 del node.contents[position]
                 model.endRemoveRows()
-        return contentIds
-        
+            
+        if loaded:
+            return contentIds
+        else: return None
