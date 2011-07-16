@@ -92,6 +92,10 @@ class MainWindow(QtGui.QMainWindow):
         
         global mainWindow
         mainWindow = self
+        
+        #TODO: Replace this hack by something clever.
+        browserShortcut = QtGui.QShortcut(QtGui.QKeySequence(self.tr("Ctrl+F")),self,
+                                          self._handleBrowserShortcut)
 
     def initMenus(self):
         """Initialize menus except the view menu which cannot be initialized before all widgets have been
@@ -352,6 +356,20 @@ class MainWindow(QtGui.QMainWindow):
             self._setUniqueDockActionEnabled(object.objectName(),True)
         return False # don't stop the event
 
+    def _handleBrowserShortcut(self):
+        """Set the focus to the next browser' searchbox (By pressing the browser shortcut repeatedly
+        the focus will run through all browsers).
+        """ 
+        for widgetData,widgets in self._dockWidgets.items():
+            if widgetData.theClass.__name__ == 'BrowserDock':
+                for i,widget in enumerate(widgets):
+                    if widget.widget().searchBox.hasFocus():
+                        nextIndex = (i+1) % len(widgets)
+                        widgets[nextIndex].widget().searchBox.setFocus(Qt.OtherFocusReason)
+                        return
+                widgets[0].widget().searchBox.setFocus(Qt.ShortcutFocusReason)
+                break
+                
 
 class WidgetData:
     """A WidgetData instance stores information about one type of widget (central and/or dock). It contains
