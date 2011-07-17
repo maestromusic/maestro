@@ -65,6 +65,60 @@ def removeWidgetData(id):
         mainWindow._widgetDataRemoved(data)
 
 
+class WidgetData:
+    """A WidgetData instance stores information about one type of widget (central and/or dock). It contains
+    the following information:
+
+        - id: a unique string to identify the WidgetData. This string is used to store the widgets
+          persistently.
+        - name: a nice name which will be displayed in the View menu.
+        - theClass: the class that must be instantiated to create a widget of this type. Remember that this
+          must be a subclass of QDockWidget if central is False.
+        - central: Whether this widget may be used in the center.
+        - dock: Whether this widget may be used as dock widget.
+        - default: Whether this widget should be displayed if no information from the last application run is
+          present (e.g. at the very first launch).
+        - unique: Only relevant for dock widgets. It stores whether there may be more than one instance of
+          this widget.
+        - preferredDockArea: Only relevant for dock widgets. Contains the dock area where this widget will be
+          placed when it is newly created. One of the values of Qt.DockWidgetAreas.
+        - icon: Optional. An icon which is displayed in tabs or docks for this widget.
+
+    """
+    def __init__(self,id,name,theClass,central,dock,default,unique=False,preferredDockArea=None,icon=None):
+        if not (central or dock):
+            raise ValueError("Either central or dock must be True.")
+        self.id = id
+        self.name = name
+        self.theClass = theClass
+        self.central = central
+        self.dock = dock
+        self.default = default
+        self.unique = unique
+        self.preferredDockArea = preferredDockArea
+        self.icon = icon
+
+    def __eq__(self,other):
+        return self.id == other.id
+
+    def __ne__(self,other):
+        return self.id != other.id
+
+    def __hash__(self):
+        return hash(self.id)
+        
+    def __str__(self):
+        return "<WidgetData({},{},{})>".format(self.id,self.name,self.theClass.__name__)
+
+    @staticmethod
+    def fromId(id):
+        """Get the registered WidgetData with the given id. Return None if such data cannot be found."""
+        for data in _widgetData:
+            if data.id == id:
+                return data
+        else: return None
+
+
 class MainWindow(QtGui.QMainWindow):
     """The main window of OMG. It contains a QTabWidget as actual central widget (in Qt sense) so that using
     tabs several widgets can be displayed as central widgets (in OMG's sense)."""
@@ -77,6 +131,8 @@ class MainWindow(QtGui.QMainWindow):
     # Dict mapping WidgetData instances to lists of corresponding dock widgets. As above this dict may contain
     # hidden docks.
     _dockWidgets = None
+    
+    widgetCreated = QtCore.pyqtSignal(WidgetData,QtGui.QWidget)
     
     def __init__(self,parent=None):
         QtGui.QMainWindow.__init__(self, parent)
@@ -113,6 +169,12 @@ class MainWindow(QtGui.QMainWindow):
         aboutAction.triggered.connect(self.showAboutDialog)
         self.menus['help'].addAction(aboutAction)
 
+    def getCentralWidgets(self):
+        return self._centralWidgets
+    
+    def getDockWidgets(self):
+        return self._dockWidgets
+    
     def updateViewMenu(self):
         """Update the view menu whenever the list of registered widgets has changed."""
         self.menus['view'].clear()
@@ -163,12 +225,13 @@ class MainWindow(QtGui.QMainWindow):
     def addCentralWidget(self,data,state=None):
         """Add a central widget corresponding to the given WidgetData. If a widget of this type existed and
         was hidden once, simply show it again. Otherwise create a new widget. In this case *state* will be
-        passed to the constructor, if the class has a ''saveState''-method."""
+        passed to the constructor, if the class has a ''saveState''-method. Return the widget."""
         if data not in self._centralWidgets:
             if hasattr(data.theClass,'saveState'):
                 widget = data.theClass(self,state)
             else: widget = data.theClass(self)
             self._centralWidgets[data] = widget
+            self.widgetCreated.emit(data,widget)
         else:
             widget = self._centralWidgets[data]
             index = self.centralWidget().indexOf(widget)
@@ -182,7 +245,7 @@ class MainWindow(QtGui.QMainWindow):
 
     def addDockWidget(self,data,objectName=None):
         """Add a dock widget corresponding to the given WidgetData. If there is a hidden dock widget of this
-        type, simply show it again. Otherwise create a new widget."""
+        type, simply show it again. Otherwise create a new widget. Return the widget."""
         if data in self._dockWidgets:
             # First try to simply unhide an existing dock of this type
             for widget in self._dockWidgets[data]:
@@ -190,9 +253,9 @@ class MainWindow(QtGui.QMainWindow):
                     widget.setVisible(True)
                     if data.unique:
                         self._setUniqueDockActionEnabled(data.id,False)
-                    return # This was easy
+                    return widget # This was easy
         # If that did not work, create a new widget
-        self._createDockWidget(data)
+        return self._createDockWidget(data)
 
     def _createDockWidget(self,data,objectName=None,state=None):
         """Create a new dock widget for the given WidgetData and set its objectName to *objectName*. If that
@@ -226,6 +289,7 @@ class MainWindow(QtGui.QMainWindow):
             # This is used to enable the corresponding action again if the single instance is hidden (closed)
             widget.installEventFilter(self)
 
+        self.widgetCreated.emit(data,widget)
         return widget
         
     def restoreLayout(self):
@@ -351,57 +415,3 @@ class MainWindow(QtGui.QMainWindow):
             # The event filter is only installed on unique docks.
             self._setUniqueDockActionEnabled(object.objectName(),True)
         return False # don't stop the event
-
-
-class WidgetData:
-    """A WidgetData instance stores information about one type of widget (central and/or dock). It contains
-    the following information:
-
-        - id: a unique string to identify the WidgetData. This string is used to store the widgets
-          persistently.
-        - name: a nice name which will be displayed in the View menu.
-        - theClass: the class that must be instantiated to create a widget of this type. Remember that this
-          must be a subclass of QDockWidget if central is False.
-        - central: Whether this widget may be used in the center.
-        - dock: Whether this widget may be used as dock widget.
-        - default: Whether this widget should be displayed if no information from the last application run is
-          present (e.g. at the very first launch).
-        - unique: Only relevant for dock widgets. It stores whether there may be more than one instance of
-          this widget.
-        - preferredDockArea: Only relevant for dock widgets. Contains the dock area where this widget will be
-          placed when it is newly created. One of the values of Qt.DockWidgetAreas.
-        - icon: Optional. An icon which is displayed in tabs or docks for this widget.
-
-    """
-    def __init__(self,id,name,theClass,central,dock,default,unique=False,preferredDockArea=None,icon=None):
-        if not (central or dock):
-            raise ValueError("Either central or dock must be True.")
-        self.id = id
-        self.name = name
-        self.theClass = theClass
-        self.central = central
-        self.dock = dock
-        self.default = default
-        self.unique = unique
-        self.preferredDockArea = preferredDockArea
-        self.icon = icon
-
-    def __eq__(self,other):
-        return self.id == other.id
-
-    def __ne__(self,other):
-        return self.id != other.id
-
-    def __hash__(self):
-        return hash(self.id)
-        
-    def __str__(self):
-        return "<WidgetData({},{},{})>".format(self.id,self.name,self.theClass.__name__)
-
-    @staticmethod
-    def fromId(id):
-        """Get the registered WidgetData with the given id. Return None if such data cannot be found."""
-        for data in _widgetData:
-            if data.id == id:
-                return data
-        else: return None
