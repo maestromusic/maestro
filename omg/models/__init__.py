@@ -231,6 +231,8 @@ class RootNode(Node):
         if copyContents:
             self.setContents([c.copy() for c in other.contents])
         self.id = other.id
+        
+        
 class Element(Node):
     """Abstract base class for elements (files or containers) in playlists, browser, etc.. Contains methods to load tags and contents from the database or from files."""
     tags = None # tags.Storage to store the tags. None until they are loaded
@@ -263,7 +265,7 @@ class Element(Node):
         this node's tags.Storage-instance. Otherwise the tags will be copied by reference."""
         newNode = Node.copy(self,contents)
         if copyTags:
-            newNode.tags = self.tags.copy()
+            newNode.tags = self.tags.copy() if self.tags is not None else None
         return newNode
     
     def copyFrom(self, other, copyContents = False):

@@ -110,6 +110,7 @@ def run(cmdConfig = []):
     import omg.gui.filesystembrowser
     import omg.gui.editor
     import omg.gui.browser
+    import omg.gui.tageditor
     from omg.gui import mainwindow
     global mainWindow
     mainWindow = mainwindow.MainWindow()

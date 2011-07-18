@@ -10,12 +10,38 @@ from PyQt4.QtCore import Qt
 
 import itertools
 
-from omg import constants, tags, getIcon, strutils
-from omg.models import tageditormodel, simplelistmodel
-from omg.gui import formatter, singletageditor, dialogs, tagwidgets
-from omg.gui.misc import widgetlist, editorwidget, dynamicgridlayout
+from .. import constants, tags, strutils, utils
+from ..models import tageditormodel, simplelistmodel
+from ..gui import formatter, singletageditor, dialogs, tagwidgets, mainwindow
+from ..gui.misc import widgetlist, editorwidget, dynamicgridlayout
+
+translate = QtCore.QCoreApplication.translate
 
 
+class TagEditorDock(QtGui.QDockWidget):
+    """DockWidget containing the Browser."""
+    def __init__(self,parent=None,state=None):
+        QtGui.QDockWidget.__init__(self,parent)
+        self.setWindowTitle(self.tr("Tageditor"))
+        self.setWidget(TagEditorWidget())
+        
+        mainwindow.mainWindow.globalSelectionChanged.connect(self._handleSelectionChanged)
+        
+    def _handleSelectionChanged(self,elements):
+        self.widget().model.setElements(elements)
+
+
+mainwindow.addWidgetData(mainwindow.WidgetData(
+        id="tageditor",
+        name=translate("Tageditor","Tageditor"),
+        theClass = TagEditorDock,
+        central=False,
+        dock=True,
+        default=True,
+        unique=True,
+        preferredDockArea=Qt.BottomDockWidgetArea))
+    
+    
 class TagEditorDialog(QtGui.QDialog):
     def __init__(self, parent, elements):
         QtGui.QDialog.__init__(self,parent)
@@ -57,10 +83,10 @@ class TagEditorWidget(QtGui.QWidget):
         buttonBarLayout = QtGui.QHBoxLayout()
         self.layout().addLayout(buttonBarLayout,0)
 
-        addButton = QtGui.QPushButton(QtGui.QIcon(getIcon("add.png")),self.tr("Add tag"))
+        addButton = QtGui.QPushButton(utils.getIcon("add.png"),self.tr("Add tag"))
         addButton.clicked.connect(self._handleAddRecord)
         buttonBarLayout.addWidget(addButton)
-        removeButton = QtGui.QPushButton(QtGui.QIcon(getIcon("remove.png")),self.tr("Remove selected"))
+        removeButton = QtGui.QPushButton(utils.getIcon("remove.png"),self.tr("Remove selected"))
         removeButton.clicked.connect(self._handleRemoveSelected)
         buttonBarLayout.addWidget(removeButton)
         buttonBarLayout.addStretch(1)

@@ -10,7 +10,7 @@ import itertools
 from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
-from omg import constants, models, tags, FlexiDate, db, distributor, utils, strutils
+from omg import constants, models, tags, utils, strutils
 from . import simplelistmodel
 
 RATIO = 0.75
@@ -200,6 +200,10 @@ class TagEditorModel(QtCore.QObject):
 
     def getElements(self):
         return self.inner.elements
+    
+    def setElements(self,elements):
+        self.inner.elements = [element.copy(copyTags=False) for element in elements]
+        self.reset()
         
     def reset(self):
         self.inner.createTags()

@@ -7,6 +7,8 @@
 # published by the Free Software Foundation
 #
 
+import functools
+
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
@@ -23,12 +25,27 @@ class BrowserDock(QtGui.QDockWidget):
     def __init__(self,parent=None,state=None):
         QtGui.QDockWidget.__init__(self,parent)
         self.setWindowTitle(self.tr("Browser"))
-        self.browser = Browser(self,state)
-        self.setWidget(self.browser)
+        browser = Browser(self,state)
+        browser.selectionChanged.connect(self._handleSelectionChanged)
+        self.setWidget(browser)
         
     def saveState(self):
-        return self.browser.saveState()
-
+        return self.widget().saveState()
+    
+    def _handleSelectionChanged(self,selectionModel,selected,deselected):
+        """Change the global selection if some any elements are selected in any views."""
+        globalSelection = []
+        for index in selectionModel.selectedIndexes():
+            node = selectionModel.model().data(index)
+            # The browser does not load tags automatically
+            for n in node.getAllNodes():
+                if n.tags is None:
+                    n.loadTags()
+            if isinstance(node,Element):
+                globalSelection.append(node)
+        if len(globalSelection):
+            mainwindow.setGlobalSelection(globalSelection)
+            
 
 mainwindow.addWidgetData(mainwindow.WidgetData(
         id="browser",
@@ -86,6 +103,10 @@ class Browser(QtGui.QWidget):
     
     # The current search request
     searchRequest = None
+    
+    # Called when the selection changes in any of the views
+    selectionChanged = QtCore.pyqtSignal(QtGui.QItemSelectionModel,
+                                         QtGui.QItemSelection, QtGui.QItemSelection)
     
     def __init__(self,parent = None,state = None):
         """Initialize a new Browser with the given parent."""
@@ -171,6 +192,8 @@ class Browser(QtGui.QWidget):
         for layers in layersList:
             newView = BrowserTreeView(self,layers)
             self.views.append(newView)
+            newView.selectionModel().selectionChanged.connect(
+                                    functools.partial(self.selectionChanged.emit,newView.selectionModel()))
             self.splitter.addWidget(newView)
 
     def getShowHiddenValues(self):

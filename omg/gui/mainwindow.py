@@ -45,6 +45,9 @@ logger = logging.getLogger("omg.gui.mainwindow")
 # Data about the available widgets
 _widgetData = []
 
+# Global selection
+_globalSelection = None
+
 
 def addWidgetData(data):
     """Add widget data to the list of registered widgets."""
@@ -65,6 +68,17 @@ def removeWidgetData(id):
         mainWindow._widgetDataRemoved(data)
 
 
+def getGlobalSelection():
+    return _globalSelection
+
+
+def setGlobalSelection(elements):
+    global _globalSelection
+    _globalSelection = elements
+    if mainWindow is not None:
+        mainWindow.globalSelectionChanged.emit(elements)
+        
+    
 class WidgetData:
     """A WidgetData instance stores information about one type of widget (central and/or dock). It contains
     the following information:
@@ -132,7 +146,7 @@ class MainWindow(QtGui.QMainWindow):
     # hidden docks.
     _dockWidgets = None
     
-    widgetCreated = QtCore.pyqtSignal(WidgetData,QtGui.QWidget)
+    globalSelectionChanged = QtCore.pyqtSignal(list)
     
     def __init__(self,parent=None):
         QtGui.QMainWindow.__init__(self, parent)
@@ -141,13 +155,16 @@ class MainWindow(QtGui.QMainWindow):
         self.setCentralWidget(QtGui.QTabWidget())
         self.initMenus()
         self.statusBar()
-
-        self.restoreLayout()
-
-        self.updateViewMenu()
         
         global mainWindow
         mainWindow = self
+        
+        self.restoreLayout()
+        self.updateViewMenu()
+        
+        #TODO: Replace this hack by something clever.
+        browserShortcut = QtGui.QShortcut(QtGui.QKeySequence(self.tr("Ctrl+F")),self,
+                                          self._handleBrowserShortcut)
 
     def initMenus(self):
         """Initialize menus except the view menu which cannot be initialized before all widgets have been
@@ -231,7 +248,6 @@ class MainWindow(QtGui.QMainWindow):
                 widget = data.theClass(self,state)
             else: widget = data.theClass(self)
             self._centralWidgets[data] = widget
-            self.widgetCreated.emit(data,widget)
         else:
             widget = self._centralWidgets[data]
             index = self.centralWidget().indexOf(widget)
@@ -289,7 +305,6 @@ class MainWindow(QtGui.QMainWindow):
             # This is used to enable the corresponding action again if the single instance is hidden (closed)
             widget.installEventFilter(self)
 
-        self.widgetCreated.emit(data,widget)
         return widget
         
     def restoreLayout(self):
@@ -415,3 +430,18 @@ class MainWindow(QtGui.QMainWindow):
             # The event filter is only installed on unique docks.
             self._setUniqueDockActionEnabled(object.objectName(),True)
         return False # don't stop the event
+
+    def _handleBrowserShortcut(self):
+        """Set the focus to the next browser' searchbox (By pressing the browser shortcut repeatedly
+        the focus will run through all browsers).
+        """ 
+        for widgetData,widgets in self._dockWidgets.items():
+            if widgetData.theClass.__name__ == 'BrowserDock':
+                for i,widget in enumerate(widgets):
+                    if widget.widget().searchBox.hasFocus():
+                        nextIndex = (i+1) % len(widgets)
+                        widgets[nextIndex].widget().searchBox.setFocus(Qt.OtherFocusReason)
+                        return
+                widgets[0].widget().searchBox.setFocus(Qt.ShortcutFocusReason)
+                break
+            

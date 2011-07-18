@@ -10,7 +10,7 @@ import os, datetime
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from omg import models, constants, FlexiDate, getIcon, tags
+from omg import models, constants, tags, utils
 from omg.models import simplelistmodel, tageditormodel
 from omg.gui import formatter, tagwidgets
 from omg.gui.misc import listview, widgetlist
@@ -283,8 +283,8 @@ class ExpandLine(QtGui.QWidget):
 
 class ExpandButton(QtGui.QPushButton):
     """Special button that displays an arrow pointing up (expanded-state) or down (not expanded). After it has been clicked by the user it will change its state and emit the triggered-signal with the new state."""
-    expandIcon = QtGui.QIcon(getIcon("expand.png"))
-    collapseIcon = QtGui.QIcon(getIcon("collapse.png"))
+    expandIcon = utils.getIcon("expand.png")
+    collapseIcon = utils.getIcon("collapse.png")
 
     triggered = QtCore.pyqtSignal(bool) # Emitted when the button is clicked. The parameter will be True if the button is in expanded-state _after_ changing its state due to the click.
     

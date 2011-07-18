@@ -8,15 +8,19 @@
 from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
-from omg import tags, FlexiDate, db
-from omg.gui.misc import editorwidget
+from .. import tags, utils, database as db
+from ..gui.misc import editorwidget
 
 class TagLabel(QtGui.QLabel):
-    """Specialized label which can contain arbitrary text, but displays the corresponding icons next to the name when showing tagnames."""
+    """Specialized label which can contain arbitrary text, but displays the corresponding icons next to the
+    name when showing tagnames.
+    """
     iconSize = QtCore.QSize(24,24) # Size of the icon
     
     def __init__(self,tag=None,parent=None):
-        """Initialize a new TagLabel. You may specify a tag which is displayed at the beginning and a parent."""
+        """Initialize a new TagLabel. You may specify a tag which is displayed at the beginning and a
+        parent.
+        """
         QtGui.QLabel.__init__(self,parent)
         self.setTag(tag)
 
@@ -35,19 +39,22 @@ class TagLabel(QtGui.QLabel):
         return self.tag
         
     def setTag(self,tag):
-        """Set the tag which is shown by this label. If <tag> is None, clear the label."""
+        """Set the tag which is shown by this label. If *tag* is None, clear the label."""
         self.tag = tag
         if tag is None:
             self.clear()
         else:
             if tag.iconPath() is not None:
                 QtGui.QLabel.setText(self,'<img src="{}" widht="{}" height="{}"> {}'
-                                    .format(tag.iconPath(),self.iconSize.width(),self.iconSize.height(),tag.translated()))
+                                    .format(tag.iconPath(),self.iconSize.width(),
+                                            self.iconSize.height(),tag.translated()))
             else: QtGui.QLabel.setText(self,tag.translated())
 
 
 class TagTypeBox(QtGui.QComboBox):
-    """Combobox to choose an indexed tag (from those in the database). If the box is editable the user may insert an arbitrary text and getTag may return OtherTags, too (confer getTag)."""
+    """Combobox to choose a tag. If the box is editable the user may insert an arbitrary text and getTag may return OtherTags, too (confer getTag).
+    """
+    #TODO: There are no OtherTags anymore. Create a new tag or raise an error when the user enters something unknown.
     def __init__(self,defaultTag = None,parent=None):
         """Initialize a TagTypeBox. You may specify a tag that is selected at the beginning and a parent."""
         QtGui.QComboBox.__init__(self,parent)
@@ -64,8 +71,15 @@ class TagTypeBox(QtGui.QComboBox):
                 self.setCurrentIndex(self.count()-1)
                 
     def getTag(self):
-        """Return the tag that is currently selected. This method uses tags.fromTranslation to get a tag from the text in the combobox: If the tag is the translation of a tagname, that tag will be returned. Otherwise tags.get will be used. If the user really wants to create a tag with a name that is the translation of another tag into his language (e.g. he wants to create a 'titel'-tag that is not the usual 'title'-tag), he has to quote the tagname (using " or '): inserting "titel" into the combobox will do the job.
-        Note that the case of the entered text does not matter; all tags have lowercase names. This method returns None if no tag can be generated, because e.g. the text is not a valid tagname."""
+        """Return the tag that is currently selected. This method uses tags.fromTranslation to get a tag 
+        from the text in the combobox: If the tag is the translation of a tagname, that tag will be returned.
+        Otherwise tags.get will be used. If the user really wants to create a tag with a name that is the 
+        translation of another tag into his language (e.g. he wants to create a 'titel'-tag that is not the
+        usual 'title'-tag), he has to quote the tagname (using " or '): inserting "titel" into the combobox 
+        will do the job.
+        Note that the case of the entered text does not matter; all tags have lowercase names. This method 
+        returns None if no tag can be generated, because e.g. the text is not a valid tagname.
+        """
         text = self.currentText().strip()
         try:
             if text[0] == text[-1] and text[0] in ['"',"'"]: # Don't translate if the text is quoted
@@ -80,7 +94,8 @@ class TagValidator(QtGui.QValidator): #TODO remove if useless
         QtGui.QValidator.__init__(self)
         self.tag = tag
 
-    def validate(self,value,pos): # Pos allows to change the caret position (and is a reference parameter in C++)
+    def validate(self,value,pos):
+        # Pos allows to change the caret position (and is a reference parameter in C++)
         if self.tag.isValid(value):
             return (QtGui.QValidator.Acceptable,value,pos)
         else: return (QtGui.QValidator.Intermediate,value,pos)
@@ -105,7 +120,9 @@ class EnhancedTextEdit(QtGui.QTextEdit):
 
 
 class TagValueEditor(QtGui.QWidget):
-    # Dictionary mapping tags to all the values which have been entered in a TagLineEdit during this application. Will be used in the completer.
+    #TODO: Comments
+    # Dictionary mapping tags to all the values which have been entered in a TagLineEdit during this
+    # application. Will be used in the completer.
     insertedValues = {}
 
     tagChanged = QtCore.pyqtSignal(tags.Tag)
@@ -145,7 +162,9 @@ class TagValueEditor(QtGui.QWidget):
                 self._createEditor(tag)
                 self.layout().addWidget(self.editor)
                 self.tag = tag
-        else: # It may happen that the current value interpreted as value of the new tag should be displayed differently. Therefore after changing the tag we invoke setValue with the current value.
+        else:
+            # It may happen that the current value interpreted as value of the new tag should be displayed
+            # differently. Therefore after changing the tag we invoke setValue with the current value.
             text = self.getText()
             self.tag = tag
             if setValue:
@@ -157,7 +176,7 @@ class TagValueEditor(QtGui.QWidget):
                 completionStrings = self.insertedValues[tag][:] # copy the list
             else: completionStrings = []
 
-            if tag != tags.TITLE and tag.isIndexed():
+            if tag != tags.TITLE:
                 ext = [str(value) for value in db.allTagValues(tag) if str(value) not in completionStrings]
                 completionStrings.extend(ext)
 
@@ -201,8 +220,8 @@ class TagValueEditor(QtGui.QWidget):
         else: return self.tag.type.valueFromString(self.getText())
         
     def setValue(self,value):
-        if self.tag.type == tags.TYPE_DATE and isinstance(value,FlexiDate):
-            text = FlexiDate.strftime(value)
+        if self.tag.type == tags.TYPE_DATE and isinstance(value,utils.FlexiDate):
+            text = utils.FlexiDate.strftime(value)
         else: text = str(value)
         
         if text != self.getText():
@@ -231,7 +250,8 @@ class TagValueEditor(QtGui.QWidget):
                 if self.tag not in self.insertedValues:
                     self.insertedValues[self.tag] = []
                 if self.getText() not in self.insertedValues[self.tag]:
-                    # insert at the beginning, so that the most recent values will be at the top of the completer's list.
+                    # insert at the beginning, so that the most recent values will be at the top of the
+                    # completer's list.
                     self.insertedValues[self.tag].insert(0,self.getText())
             self.valueChanged.emit()
         else:
