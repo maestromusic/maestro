@@ -16,6 +16,8 @@ defaults and defaultStorage are dicts mapping section names to other dicts which
 
 """
 
+import os, logging, sys
+
 from PyQt4 import QtCore
 from collections import OrderedDict
 
@@ -84,6 +86,40 @@ defaults = OrderedDict((
 
 # The default values must be stored in tuples of length 1, since dicts will start a new section
 storage = OrderedDict((
+("main", {
+    # Configuration for logging.config.dictConfig.
+    # Confer http://docs.python.org/py3k/library/logging.config.html#logging-config-dictschema
+    # To change logging temporarily, copy this into your storage file and change it.
+    'logging': ({
+        "version": 1,
+        "formatters": {
+            "consoleFormatter": {"format": "%(levelname)s - %(name)s - %(message)s"},
+            "fileFormatter": {"format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s}"},
+        },
+        "handlers": {
+            "consoleHandler": {
+                "class": "logging.StreamHandler",
+                "level": "DEBUG",
+                "formatter": "consoleFormatter",
+                "stream": sys.stdout,
+            },
+            "fileHandler": {
+                "class": "logging.handlers.RotatingFileHandler",
+                "level": "DEBUG",
+                "formatter": "fileFormatter",
+                "filename": os.path.join(os.path.expanduser("~"),".config", "omg","omg.log"),
+                "mode": 'a',
+                "maxBytes": 2000,
+                "backupCount": 2
+            }
+        },
+        "root": {
+            "level": "DEBUG",
+            "handlers": ["consoleHandler","fileHandler"]
+        }
+      },
+    ),
+}),
 ("gui", {
     'central_widgets': ([],),
     'dock_widgets': ([],),

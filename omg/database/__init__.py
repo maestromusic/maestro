@@ -39,7 +39,7 @@ Each thread must have its own connection object. This module stores all connecti
 
 \ """
 
-import sys, threading
+import sys, threading, functools
 
 from omg import strutils, config, logging, utils, tags as tagsModule, constants
 from . import sql
@@ -318,7 +318,7 @@ def idFromHash(hash):
 
 # values_* tables
 #=======================================================================         
-@utils.Memoized
+@functools.lru_cache(10000)
 def valueFromId(tagSpec,valueId):
     """Return the value from the tag *tagSpec* with id *valueId* or raise an sql.EmptyResultException if that id does not exist. Date tags will be returned as FlexiDate."""
     tag = tagsModule.get(tagSpec)

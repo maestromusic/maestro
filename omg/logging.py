@@ -69,35 +69,22 @@ def getLogger(name=None):
 
 
 def init():
-    """Initialize logging from the logging configuration file and the config file. You must initialize the config module first."""
+    """Initialize logging from the logging configuration file and the config file. You must initialize the
+    config module first.
+    """
     from omg import config
-    if os.path.exists(os.path.join(config.CONFDIR,"logging")):
-        logConfFile = os.path.join(config.CONFDIR,"logging")
-    else: logConfFile = "logging.conf"
+    
+    logging.config.dictConfig(config.storage.main.logging)
+    
+    if config.options.misc.consoleLogLevel:
+        logging.config.dictConfig({
+                "version": 1,
+                "incremental": True,
+                "handlers": {"consoleHandler": {"level": config.options.misc.consoleLogLevel}}
+            })
 
-    try:
-        # trying to open a nonexistent file with logging.fileconfig leads to the least helpful error message ever...
-        if not os.path.exists(logConfFile): 
-            raise IOError("File not found")
-            
-        if not config.options.misc.consoleLogLevel:
-            logging.config.fileConfig(logConfFile)
-        else:
-            # If we must change the configuration from logging.conf, things are ugly: We have to read the file using a ConfigParser, then change the configuration and write it into an io.StringIO-buffer which is finally passed to fileConfig.
-            import io, configparser
-            logConf = configparser.ConfigParser()
-            logConf.read(logConfFile)
-            logConf.set('handler_consoleHandler','level',config.options.misc.consoleLogLevel)
-            fileLike = io.StringIO()
-            logConf.write(fileLike)
-            fileLike.seek(0)
-            logging.config.fileConfig(fileLike)
-            fileLike.close()
-    except Exception as e:
-        print("ERROR: Could not read logging configuration file '{}'. I will print everything to console. The error message was: {}".format(logConfFile,e))
-    else:
-        global configured
-        configured = True
+    global configured
+    configured = True
 
 
 def shutdown():
