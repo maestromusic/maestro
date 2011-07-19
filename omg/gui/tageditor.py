@@ -8,10 +8,10 @@
 from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
-import itertools
+import itertools, os.path
 
-from .. import constants, tags, strutils, utils
-from ..models import tageditormodel, simplelistmodel
+from .. import constants, tags, strutils, utils, config
+from ..models import tageditormodel, simplelistmodel, File
 from ..gui import formatter, singletageditor, dialogs, tagwidgets, mainwindow
 from ..gui.misc import widgetlist, editorwidget, dynamicgridlayout
 
@@ -24,13 +24,29 @@ class TagEditorDock(QtGui.QDockWidget):
         QtGui.QDockWidget.__init__(self,parent)
         self.setWindowTitle(self.tr("Tageditor"))
         self.setWidget(TagEditorWidget())
+        self.setAcceptDrops(True)
         
         mainwindow.mainWindow.globalSelectionChanged.connect(self._handleSelectionChanged)
         
     def _handleSelectionChanged(self,elements):
         self.widget().model.setElements(elements)
+        
+    def dragEnterEvent(self,event):
+        if event.mimeData().hasFormat(config.options.gui.mime) or event.mimeData().hasUrls():
+            event.acceptProposedAction()
 
-
+    def dropEvent(self,event):
+        mimeData = event.mimeData()
+        if mimeData.hasFormat(config.options.gui.mime):
+            self.widget().model.setElements(mimeData.getElements())
+        elif mimeData.hasUrls():
+            elements = [File.fromFilesystem(url.toLocalFile()) for url in event.mimeData().urls()
+                           if url.isValid() and url.scheme() == 'file' and os.path.exists(url.toLocalFile())]
+            self.widget().model.setElements(elements)
+        else: assert False
+        event.acceptProposedAction()
+        
+        
 mainwindow.addWidgetData(mainwindow.WidgetData(
         id="tageditor",
         name=translate("Tageditor","Tageditor"),

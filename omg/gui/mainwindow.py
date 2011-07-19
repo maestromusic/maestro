@@ -152,6 +152,7 @@ class MainWindow(QtGui.QMainWindow):
         QtGui.QMainWindow.__init__(self, parent)
         self.setDockNestingEnabled(True)
         self.setWindowTitle(self.tr('OMG version {}').format(constants.VERSION))
+        self.setWindowIcon(QtGui.QIcon("images/omg.png"))
         self.setCentralWidget(QtGui.QTabWidget())
         self.initMenus()
         self.statusBar()

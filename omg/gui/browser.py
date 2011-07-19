@@ -38,10 +38,10 @@ class BrowserDock(QtGui.QDockWidget):
         for index in selectionModel.selectedIndexes():
             node = selectionModel.model().data(index)
             # The browser does not load tags automatically
-            for n in node.getAllNodes():
-                if n.tags is None:
-                    n.loadTags()
             if isinstance(node,Element):
+                for n in node.getAllNodes():
+                    if n.tags is None:
+                        n.loadTags()
                 globalSelection.append(node)
         if len(globalSelection):
             mainwindow.setGlobalSelection(globalSelection)
