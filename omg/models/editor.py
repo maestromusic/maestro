@@ -122,7 +122,7 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
         changes = OrderedDict()
         if mimeData.hasFormat(options.gui.mime):
             # first case: OMG mime data -> nodes from an editor, browser etc.
-            orig_nodes = mimeData.retrieveData(options.gui.mime)
+            orig_nodes = list(mimeData.getElements())
             for o in orig_nodes:
                 # check for recursion error
                 for n in o.getAllNodes():

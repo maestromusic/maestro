@@ -91,8 +91,8 @@ class TagEditorWidget(QtGui.QWidget):
         self.selectionManager.isSelectable = lambda wList,widget: not isinstance(widget,singletageditor.ExpandLine)
         
         self.setLayout(QtGui.QVBoxLayout())
-        label = QtGui.QLabel(self.tr("Edit tags of %n element(s).","",len(elements)))
-        self.layout().addWidget(label)
+        self.label = QtGui.QLabel(self.tr("Edit tags of %n element(s).","",len(elements)))
+        self.layout().addWidget(self.label)
         self.scrollArea = QtGui.QScrollArea()
         self.scrollArea.setWidgetResizable(True)
         self.layout().addWidget(self.scrollArea)
@@ -170,6 +170,7 @@ class TagEditorWidget(QtGui.QWidget):
             self._removeSingleTagEditor(tag)
         for tag in self.model.getTags():
             self._insertSingleTagEditor(len(self.singleTagEditors),tag)
+        self.label.setText(self.tr("Edit tags of %n element(s).","",len(self.model.getElements())))
         
     def _handleAddRecord(self,tag=None):
         dialog = TagDialog(self,self.model.getElements(),tag)
