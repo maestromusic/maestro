@@ -11,7 +11,7 @@ from PyQt4.QtCore import Qt
 
 from collections import OrderedDict
 from ..gui import mainwindow
-from ..models import editor, Container
+from ..models import editor, Container, Element
 from . import treeview
 from .. import logging, modify, tags
 
@@ -32,7 +32,20 @@ class EditorTreeView(treeview.TreeView):
         self.viewport().setMouseTracking(True)
         self.mergeAction = QtGui.QAction(self.tr('Merge...'), self)
         self.mergeAction.triggered.connect(self.mergeSelected)
+
+        self.selectionModel().selectionChanged.connect(self._handleSelectionChanged)
     
+    def _handleSelectionChanged(self, selected, deselected):
+        """Change the global selection if some any elements are selected in any views."""
+        globalSelection = []
+        for index in self.selectionModel().selectedIndexes():
+            node = self.model().data(index)
+            # The browser does not load tags automatically
+            if isinstance(node,Element):
+                globalSelection.append(node)
+        if len(globalSelection):
+            mainwindow.setGlobalSelection(globalSelection)
+             
     def contextMenuProvider(self, actions, currentIndex):
         s = set( index.parent() for index in self.selectedIndexes() )
         if len(s) == 1:
@@ -156,29 +169,22 @@ class MergeDialog(QtGui.QDialog):
     
     def __init__(self, hintTitle, hintRemove, askForPositionAdjusting, parent = None):
         super().__init__(parent)
-        layout = QtGui.QVBoxLayout()
-        hLayout = QtGui.QHBoxLayout()
+        layout = QtGui.QGridLayout()
         label = QtGui.QLabel(self.tr('Title of new container:'))
-        hLayout.addWidget(label)
-        hLayout.addStretch()
+        layout.addWidget(label, 0, 0)
         self.titleEdit = QtGui.QLineEdit(hintTitle)
-        hLayout.addWidget(self.titleEdit)        
-        layout.addLayout(hLayout)
-        
-        hLayout = QtGui.QHBoxLayout()
+        layout.addWidget(self.titleEdit, 0, 1)
         self.checkBox = QtGui.QCheckBox(self.tr('Remove from titles:'))
-        self.checkBox.setChecked(True) 
-        hLayout.addWidget(self.checkBox)
-        hLayout.addStretch()
+        self.checkBox.setChecked(True)
+        layout.addWidget(self.checkBox, 1, 0)
         self.removeEdit = QtGui.QLineEdit(hintRemove)
-        hLayout.addWidget(self.removeEdit)
+        layout.addWidget(self.removeEdit, 1, 1)
         self.checkBox.toggled.connect(self.removeEdit.setEnabled)
-        layout.addLayout(hLayout)
         
         if askForPositionAdjusting:
             self.positionCheckBox = QtGui.QCheckBox(self.tr('Auto-adjust positions'))
             self.positionCheckBox.setChecked(True)
-            layout.addWidget(self.positionCheckBox)
+            layout.addWidget(self.positionCheckBox, 2, 0, 1, 2)
         hLayout = QtGui.QHBoxLayout()
         self.cancelButton = QtGui.QPushButton(self.tr('Cancel'))
         self.okButton = QtGui.QPushButton(self.tr('OK'))
@@ -187,7 +193,8 @@ class MergeDialog(QtGui.QDialog):
         hLayout.addStretch()
         hLayout.addWidget(self.cancelButton)
         hLayout.addWidget(self.okButton)
-        layout.addLayout(hLayout)
+        layout.addLayout(hLayout, 3 if askForPositionAdjusting else 2, 0, 1, 2)
+        layout.setColumnStretch(1, 1)
         self.setLayout(layout)
     def newTitle(self):
         return self.titleEdit.text()
