@@ -4,18 +4,21 @@
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 3 as
+# published by the Free Software Foundation
 #
 from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
 import itertools, os.path
 
-from .. import constants, tags, strutils, utils, config
+from .. import constants, tags, strutils, utils, config, logging
 from ..models import tageditormodel, simplelistmodel, File
 from ..gui import formatter, singletageditor, dialogs, tagwidgets, mainwindow
 from ..gui.misc import widgetlist, editorwidget, dynamicgridlayout
 
 translate = QtCore.QCoreApplication.translate
+
+logger = logging.getLogger("tageditor")
 
 
 class TagEditorDock(QtGui.QDockWidget):
@@ -39,12 +42,14 @@ class TagEditorDock(QtGui.QDockWidget):
         mimeData = event.mimeData()
         if mimeData.hasFormat(config.options.gui.mime):
             self.widget().model.setElements(mimeData.getElements())
+            event.acceptProposedAction()
         elif mimeData.hasUrls():
             elements = [File.fromFilesystem(url.toLocalFile()) for url in event.mimeData().urls()
                            if url.isValid() and url.scheme() == 'file' and os.path.exists(url.toLocalFile())]
             self.widget().model.setElements(elements)
-        else: assert False
-        event.acceptProposedAction()
+            event.acceptProposedAction()
+        else:
+            logger.warning("Invalid drop event (supports only {})".format(", ".join(mimeData.formats())))
         
         
 mainwindow.addWidgetData(mainwindow.WidgetData(
@@ -73,22 +78,24 @@ class TagEditorWidget(QtGui.QWidget):
     
     saved = QtCore.pyqtSignal()
     
-    def __init__(self,elements = [],parent = None,dialog=None):
+    def __init__(self,elements = [],parent = None,dialog=None,saveDirectly=True):
         QtGui.QWidget.__init__(self,parent)
         style = QtGui.QApplication.style()
         
-        self.model = tageditormodel.TagEditorModel(elements)
+        self.model = tageditormodel.TagEditorModel(elements,saveDirectly)
         self.model.tagInserted.connect(self._handleTagInserted)
         self.model.tagRemoved.connect(self._handleTagRemoved)
         self.model.tagChanged.connect(self._handleTagChanged)
         self.model.resetted.connect(self._handleReset)
 
-        self.undoAction = self.model.undoStack.createUndoAction(self,self.tr("Undo"))
-        self.redoAction = self.model.undoStack.createRedoAction(self,self.tr("Redo"))
+        #TODO
+        #self.undoAction = self.model.undoStack.createUndoAction(self,self.tr("Undo"))
+        #self.redoAction = self.model.undoStack.createRedoAction(self,self.tr("Redo"))
 
         self.selectionManager = widgetlist.SelectionManager()
         # Do not allow the user to select ExpandLines
-        self.selectionManager.isSelectable = lambda wList,widget: not isinstance(widget,singletageditor.ExpandLine)
+        self.selectionManager.isSelectable = \
+            lambda wList,widget: not isinstance(widget,singletageditor.ExpandLine)
         
         self.setLayout(QtGui.QVBoxLayout())
         label = QtGui.QLabel(self.tr("Edit tags of %n element(s).","",len(elements)))
@@ -106,17 +113,21 @@ class TagEditorWidget(QtGui.QWidget):
         removeButton.clicked.connect(self._handleRemoveSelected)
         buttonBarLayout.addWidget(removeButton)
         buttonBarLayout.addStretch(1)
-        if dialog is not None:
-            resetButton = QtGui.QPushButton(style.standardIcon(QtGui.QStyle.SP_DialogResetButton),self.tr("Reset"))
+        if dialog is not None or not saveDirectly:
+            resetButton = QtGui.QPushButton(style.standardIcon(QtGui.QStyle.SP_DialogResetButton),
+                                            self.tr("Reset"))
             resetButton.clicked.connect(self.model.reset)
             buttonBarLayout.addWidget(resetButton)
-            cancelButton = QtGui.QPushButton(style.standardIcon(QtGui.QStyle.SP_DialogCancelButton),self.tr("Cancel"))
-            cancelButton.clicked.connect(dialog.reject)
+            if dialog is not None:
+                cancelButton = QtGui.QPushButton(style.standardIcon(QtGui.QStyle.SP_DialogCancelButton),
+                                                 self.tr("Cancel"))
+                cancelButton.clicked.connect(dialog.reject)
             buttonBarLayout.addWidget(cancelButton)
-            saveButton = QtGui.QPushButton(style.standardIcon(QtGui.QStyle.SP_DialogSaveButton),self.tr("Save"))
+            saveButton = QtGui.QPushButton(style.standardIcon(QtGui.QStyle.SP_DialogSaveButton),
+                                           self.tr("Save"))
             saveButton.clicked.connect(self._handleSave)
             buttonBarLayout.addWidget(saveButton)
-
+            
         self.viewport = QtGui.QWidget()
         self.viewport.setLayout(QtGui.QVBoxLayout())
         self.tagEditorLayout = dynamicgridlayout.DynamicGridLayout()

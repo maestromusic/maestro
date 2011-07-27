@@ -306,3 +306,14 @@ def pushEditorCommand(command):
     if stack.state() == REAL:
         stack.setActiveStack(stack.editorStack)
     stack.activeStack().push(command)
+    
+def beginEditorMacro(name):
+    if stack.state() == REAL:
+        stack.setActiveStack(stack.editorStack)
+    stack.activeStack().beginMacro(name)
+    
+def endEditorMacro():
+    assert stack.state() == EDITOR
+    stack.editorStack.endMacro()
+    
+    

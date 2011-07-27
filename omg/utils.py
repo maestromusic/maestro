@@ -291,3 +291,4 @@ class PointAtInfinity:
 
     def __str__(self):
         return "{}{}".format('+' if self.plus else '-', '∞')
+    

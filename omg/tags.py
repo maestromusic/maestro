@@ -227,12 +227,14 @@ def exists(identifier):
         raise RuntimeError("Identifier's type is neither int nor string: {} of type {}"
                                 .format(identifier,type(identifier)))
         
+        
 class UnknownTagError(RuntimeError):
-    tagname = None
     def __init__(self, tagname):
         self.tagname = tagname
+        
     def __str__(self):
-        return 'unknown tag {}'.format(self.tagname)
+        return 'Unknown tag {}'.format(self.tagname)
+
 
 def get(identifier):
     """Return the tag identified by *identifier*. If *identifier* is an integer return the tag with this id.
@@ -245,8 +247,7 @@ def get(identifier):
         identifier = identifier.lower()
         if identifier in _tagsByName:
             return _tagsByName[identifier]
-        else:
-            raise UnknownTagError(identifier)
+        else: raise UnknownTagError(identifier)
     elif isinstance(identifier, Tag):
         return identifier
     else:
@@ -264,7 +265,8 @@ def fromTranslation(translation):
 
 
 def addTag(name, type, sort = None, private = False):
-    """Adds a new tag named <name> of type <type> to the database. The parameter <sort> is the tag by which elements should
+    """Adds a new tag named *name* of type *type* to the database. The parameter *sort* is the tag by which
+    elements should
     be sorted if displayed below a ValueNode of this new tag; this defaults to the TITLE tag.
     If private is True, a private tag is created.""" 
     if name in _tagsByName:
@@ -284,7 +286,10 @@ def addTag(name, type, sort = None, private = False):
 
 
 def init():
-    """Initialize the variables of this module based on the information of the tagids-table and config-file. At program start or after changes of that table this method must be called to ensure the module has the correct tags and their IDs."""
+    """Initialize the variables of this module based on the information of the tagids-table and config-file.
+    At program start or after changes of that table this method must be called to ensure the module has the
+    correct tags and their IDs.
+    """
     global _tagsById,_tagsByName,tagList, _translation, TITLE,ALBUM
 
     # Initialize _tagsById, _tagsByName and tagList from the database
@@ -336,7 +341,10 @@ def init():
 
 
 class TagValueList(list):
-    """List to store tags in a :class:`omg.tags.Storage`-object. The only difference to a usual python list is that a TagValueList stores a reference to the Storage-object and will notify the storage if the list is empty. The storage will then remove the list."""
+    """List to store tags in a :class:`omg.tags.Storage`-object. The only difference to a usual python list
+    is that a TagValueList stores a reference to the Storage-object and will notify the storage if the list
+    is empty. The storage will then remove the list.
+    """
     def __init__(self,storage,aList=None):
         list.__init__(self,aList if aList is not None else [])
         self.storage = storage
@@ -351,7 +359,10 @@ class TagValueList(list):
 
 
 class Storage(dict):
-    """"Dictionary subclass used to store tags. As an element may have several values for the same tag, Storage maps tags to lists of tag-values. The class ensures that an instance never contains an empty list and adds a few useful functions to deal with such datastructures."""
+    """"Dictionary subclass used to store tags. As an element may have several values for the same tag,
+    Storage maps tags to lists of tag-values. The class ensures that an instance never contains an empty
+    list and adds a few useful functions to deal with such datastructures.
+    """
     def __init__(self,*args):
         dict.__init__(self,*args)
     
@@ -383,11 +394,14 @@ class Storage(dict):
         else: self[tag].extend(values)
 
     def addUnique(self,tag,*values):
-        """Add one or more values to the list of the given tag. If a value is already contained in the list, do not add it again."""
+        """Add one or more values to the list of the given tag. If a value is already contained in the list,
+        do not add it again.
+        """
         if not isinstance(tag,Tag):
             tag = get(tag)
         if tag not in self:
-            # Values may contain repetitions, so we need to filter them away. Remember that self[tag] = [] won't work
+            # Values may contain repetitions, so we need to filter them away.
+            # Remember that self[tag] = [] won't work.
             newList = []
             for value in values:
                 if value not in newList:
@@ -398,8 +412,10 @@ class Storage(dict):
                 if value not in self[tag]:
                     self[tag].append(value)
                 
-    def removeValues(self,tag,*values):
-        """Remove one or more values from the list of the given tag. If a value is not contained in this Storage just skip it."""
+    def remove(self,tag,*values):
+        """Remove one or more values from the list of the given tag. If a value is not contained in this
+        Storage just skip it.
+        """
         if not isinstance(tag,Tag):
             tag = get(tag)
         for value in values:
@@ -408,20 +424,42 @@ class Storage(dict):
             except ValueError: pass 
         if not self[tag]:
             del self[tag]
+        
+    #TODO: Deprecated. Remove it :-)
+    removeValues = remove
             
+    def replace(self,tag,oldValue,newValue):
+        """Replace a value of *tag*. Because *newValue* will be at the same position where *oldValue* was,
+        this might look nicer in displays, than simply removing *oldValue* and appending *newValue*.
+        """
+        if not isinstance(tag,Tag):
+            tag = get(tag)
+        for i,value in enumerate(self[tag]):
+            if value == oldValue:
+                self[tag][i] = newValue
+                return
+    
     def merge(self,other):
-        """Add all tags from *other* to this storage. *other* may be another :class:`omg.tags.Storage`-instance or a :func:`dict` mapping tags to value-lists. This method won't add already existing values again."""
+        """Add all tags from *other* to this storage. *other* may be another :class:`omg.tags.Storage`
+        instance or a :func:`dict` mapping tags to value-lists. This method won't add already existing
+        values again.
+        """
         for tag,valueList in other.items():
             self.addUnique(tag,*valueList)
                 
     def removeTags(self,other):
-        """Remove all values from *other* from this storage. *other* may be another :class:`omg.tags.Storage`-instance or a :func:`dict` mapping tags to value-lists. If *other* contains tags and values which are not contained in this storage, they will be skipped."""
+        """Remove all values from *other* from this storage. *other* may be another :class:`omg.tags.Storage`
+        instance or a :func:`dict` mapping tags to value-lists. If *other* contains tags and values which are
+        not contained in this storage, they will be skipped.
+        """
         for tag,valueList in other.items():
             self.removeValues(tag,*valueList)
 
+
 def findCommonTags(elements, recursive = True):
-    """Returns a Storage object containig all tags that are equal in all of the elements. If recursive is True, also all children
-    of the elements are considered."""
+    """Returns a Storage object containing all tags that are equal in all of the elements. If recursive is
+    True, also all children of the elements are considered.
+    """
     if recursive:
         elems = set()
         for e in elements:
@@ -444,8 +482,11 @@ def findCommonTags(elements, recursive = True):
         tags[tag] = commonTagValues[tag]
     return tags
 
+
 class TranslationFileHandler(xml.sax.handler.ContentHandler):
-    """Content handler for tag translation files. When it parses a file it will store all translations in the internal module variable ``_translation``."""
+    """Content handler for tag translation files. When it parses a file it will store all translations in
+    the internal module variable ``_translation``.
+    """
     def startElement(self,name,attributes):
         if name == 'tag':
             if 'key' not in attributes:
