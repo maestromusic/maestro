@@ -108,7 +108,7 @@ class TagEditorWidget(QtGui.QWidget):
         self.model.resetted.connect(self._handleReset)
 
         self.undoAction = modify.createUndoAction(level,self,self.tr("Undo"))
-        self.redoAction = modify.createUndoAction(level,self,self.tr("Redo"))
+        self.redoAction = modify.createRedoAction(level,self,self.tr("Redo"))
 
         self.selectionManager = widgetlist.SelectionManager()
         # Do not allow the user to select ExpandLines
@@ -277,35 +277,37 @@ class TagEditorWidget(QtGui.QWidget):
         selectedRecords = [editor.getRecord() for editor in self.selectionManager.getSelectedWidgets()]
 
         if len(selectedRecords) > 0:
-            commonPrefix = strutils.commonPrefix(str(record.value) for record in selectedRecords)
-            
             if not all(record.isCommon() for record in selectedRecords):
                 action = fancyMenu.addAction(self.tr("Extend to all elements"))
                 action.triggered.connect(lambda: self.model.extendRecords(selectedRecords))
             
-            if len(commonPrefix) > 0:
-                action = fancyMenu.addAction(self.tr("Edit common start..."))
-                action.triggered.connect(self._editCommonStart)
-
-            if len(commonPrefix) > 0:
-                if commonPrefix[-1].upper() == "I":
-                    # Bugfix: If up to four pieces using roman numbers are selected, the commonPrefix will contain an 'I'. Consequently the 'I' is missing in the rest and numberFromPrefix won't find a number in the first piece.
-                    prefixLength = len(commonPrefix) - 1
-                else: prefixLength = len(commonPrefix)
-                rests = [str(record.value)[prefixLength:] for record in selectedRecords]
-                if any(strutils.numberFromPrefix(rest)[0] is not None for rest in rests):
-                    action = fancyMenu.addAction(self.tr("Remove common start (including numbers)"))
-                    newValues = []
-                    for record,rest in zip(selectedRecords,rests):
-                        number,prefix = strutils.numberFromPrefix(rest)
-                        if number is not None:
-                            newValues.append(record.value[prefixLength+len(prefix):])
-                        else: newValues.append(record.value[prefixLength])
-                    action.triggered.connect(lambda: self.model.editMany(selectedRecords,newValues))
-                else:
-                    action = fancyMenu.addAction(self.tr("Remove common start"))
-                    newValues = [record.value[len(commonPrefix):] for record in selectedRecords]
-                    action.triggered.connect(lambda: self.model.editMany(selectedRecords,newValues))
+            if len(selectedRecords) > 1 and all(r.tag().type == tags.TYPE_VARCHAR for r in selectedRecords):
+                commonPrefix = strutils.commonPrefix(str(record.value) for record in selectedRecords)
+                
+                if len(commonPrefix) > 0:
+                    action = fancyMenu.addAction(self.tr("Edit common start..."))
+                    action.triggered.connect(self._editCommonStart)
+                    
+                    if commonPrefix[-1].upper() == "I":
+                        # Bugfix: If up to four pieces using roman numbers are selected, the commonPrefix
+                        # will contain an 'I'. Consequently the 'I' is missing in the rest and
+                        # numberFromPrefix won't find a number in the first piece.
+                        prefixLength = len(commonPrefix) - 1
+                    else: prefixLength = len(commonPrefix)
+                    rests = [str(record.value)[prefixLength:] for record in selectedRecords]
+                    if any(strutils.numberFromPrefix(rest)[0] is not None for rest in rests):
+                        action = fancyMenu.addAction(self.tr("Remove common start (including numbers)"))
+                        newValues = []
+                        for record,rest in zip(selectedRecords,rests):
+                            number,prefix = strutils.numberFromPrefix(rest)
+                            if number is not None:
+                                newValues.append(record.value[prefixLength+len(prefix):])
+                            else: newValues.append(record.value[prefixLength])
+                        action.triggered.connect(lambda: self.model.editMany(selectedRecords,newValues))
+                    else:
+                        action = fancyMenu.addAction(self.tr("Remove common start"))
+                        newValues = [record.value[len(commonPrefix):] for record in selectedRecords]
+                        action.triggered.connect(lambda: self.model.editMany(selectedRecords,newValues))
                 
             for separator in self.model.getPossibleSeparators(selectedRecords):
                 action = fancyMenu.addAction(self.tr("Separate at '{}'").format(separator))

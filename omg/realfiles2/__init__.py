@@ -92,7 +92,7 @@ class UFile(RealFile):
     def _ensureFileIsLoaded(self):
         if self._f is None:
             self._f = cutags.File(self.path)
-            print(self._f.tags)
+            #print(self._f.tags)
     def read(self):
         self._ensureFileIsLoaded()
         self.tags = tags.Storage()

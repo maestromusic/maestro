@@ -217,7 +217,7 @@ class UndoCommand(QtGui.QUndoCommand):
             
     def undo(self):
         # First modify the inner model
-        self.undoMethod(*self.params)
+        self.undoMethod(*self.undoParams)
         # Then modify the editor or the database
         if self.model.saveDirectly:
             self._modify(False)

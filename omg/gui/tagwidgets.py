@@ -243,7 +243,7 @@ class TagValueEditor(QtGui.QWidget):
                 completionStrings = self.insertedValues[tag][:] # copy the list
             else: completionStrings = []
 
-            if tag != tags.TITLE:
+            if tag.type == tags.TYPE_VARCHAR and tag != tags.TITLE:
                 ext = [str(value) for value in db.allTagValues(tag) if str(value) not in completionStrings]
                 completionStrings.extend(ext)
 
