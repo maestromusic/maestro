@@ -13,8 +13,6 @@ from . import dispatcher, events
 # Use these methods only from an UndoCommand that knows how to undo them.
 def addTagValue(tag,value,elements): 
     assert isinstance(tag,tags.Tag) and len(elements) > 0
-    dispatcher.realChanges.emit(events.TagValueAddedEvent(tag,value,elements))
-    return #TODO Reenable the parte below when cutags is fixed.
 
     valueId = db.idFromValue(tag,value,insert=True)
     db.multiQuery("INSERT INTO {}tags (element_id,tag_id,value_id) VALUES (?,{},{})"
@@ -34,8 +32,7 @@ def addTagValue(tag,value,elements):
     
 def removeTagValue(tag,value,elements):
     assert isinstance(tag,tags.Tag) and len(elements) > 0
-    dispatcher.realChanges.emit(events.TagValueRemovedEvent(tag,value,elements))
-    return #TODO Reenable the parte below when cutags is fixed.
+    
     valueId = db.idFromValue(tag,value)
     db.query("DELETE FROM {}tags WHERE tag_id = {} AND value_id = {} AND element_id IN ({})"
                     .format(db.prefix,tag.id,valueId,','.join(str(element.id) for element in elements)))
@@ -53,10 +50,9 @@ def removeTagValue(tag,value,elements):
     
 def changeTagValue(tag,oldValue,newValue,elements):
     assert isinstance(tag,tags.Tag) and len(elements) > 0
-    dispatcher.realChanges.emit(events.TagValueChangedEvent(tag,oldValue,newValue,elements))
-    return #TODO Reenable the parte below when cutags is fixed.
-    oldValueId = db.idFromValue(tag,value)
-    newValueId = db.idFromValue(tag,value,insert=True)
+    
+    oldValueId = db.idFromValue(tag,oldValue)
+    newValueId = db.idFromValue(tag,newValue,insert=True)
     db.query("UPDATE {}tags SET value_id = {} WHERE tag_id = {} AND value_id = {} AND element_id IN ({})"
                .format(db.prefix,newValueId,tag.id,oldValueId,','.join(str(el.id) for el in elements)))
     for element in elements:
@@ -68,5 +64,6 @@ def changeTagValue(tag,oldValue,newValue,elements):
             real.read()
             real.tags.replace(tag,oldValue,newValue)
             real.saveTags()
+            
     dispatcher.realChanges.emit(events.TagValueChangedEvent(tag,oldValue,newValue,elements))
     
