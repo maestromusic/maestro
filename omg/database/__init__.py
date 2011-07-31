@@ -379,8 +379,10 @@ def tagValues(elid,tagList):
     return [value for tag,value in listTags(elid,tagList)] # return only the second tuple part
 
 def allTagValues(tagSpec):
-    """Return all tag values in the db for the given tag."""
-    return query("SELECT value FROM tag_{}".format(tagsModule.get(tagSpec).name)).getSingleColumn()
+    """Return all tag values in the database for the given tag."""
+    tag = tagsModule.get(tagSpec)
+    return query("SELECT value FROM {}values_{} WHERE tag_id = {}"
+                 .format(prefix,tag.type.name,tag.id)).getSingleColumn()
     
 
 # Help methods

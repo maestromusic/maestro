@@ -47,6 +47,7 @@ _widgetData = []
 
 # Global selection
 _globalSelection = None
+_globalSelectionSource = None
 
 
 def addWidgetData(data):
@@ -69,14 +70,15 @@ def removeWidgetData(id):
 
 
 def getGlobalSelection():
-    return _globalSelection
+    return _globalSelection,_globalSelectionSource
 
 
-def setGlobalSelection(elements):
+def setGlobalSelection(elements,source):
     global _globalSelection
     _globalSelection = elements
+    _globalSelectionSource = source
     if mainWindow is not None:
-        mainWindow.globalSelectionChanged.emit(elements)
+        mainWindow.globalSelectionChanged.emit(elements,source)
         
     
 class WidgetData:
@@ -146,7 +148,7 @@ class MainWindow(QtGui.QMainWindow):
     # hidden docks.
     _dockWidgets = None
     
-    globalSelectionChanged = QtCore.pyqtSignal(list)
+    globalSelectionChanged = QtCore.pyqtSignal(list,QtCore.QObject)
     
     def __init__(self,parent=None):
         QtGui.QMainWindow.__init__(self, parent)

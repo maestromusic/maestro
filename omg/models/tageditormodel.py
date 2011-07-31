@@ -187,22 +187,28 @@ class UndoCommand(QtGui.QUndoCommand):
                 tag,oldRecord,newRecord = self.params
             else: tag,newRecord,oldRecord = self.params
         
-            oldElements = set(oldRecord.elementsWithValue)
-            newElements = set(newRecord.elementsWithValue)
-            removeList = list(oldElements - newElements)
-            addList = list(newElements - oldElements)
-            result = []
-            if len(removeList):
-                result.append(events.TagValueRemovedEvent(oldRecord.tag,oldRecord.value,removeList))
-            if len(addList):
-                result.append(events.TagValueAddedEvent(newRecord.tag,newRecord.value,addList))
-                
-            if oldRecord.value != newRecord.value:
-                changeList = list(newElements.intersection(oldElements))
-                if len(changeList):
-                    result.append(events.TagValueChangedEvent(oldRecord.tag,oldRecord.value,
-                                                              newRecord.value,changeList))
-            return result
+            if oldRecord.tag != newRecord.tag:
+                return [
+                    events.TagValueRemovedEvent(oldRecord.tag,oldRecord.value,oldRecord.elementsWithValue),
+                    events.TagValueAddedEvent(newRecord.tag,newRecord.value,newRecord.elementsWithValue)
+                  ]
+            else:
+                oldElements = set(oldRecord.elementsWithValue)
+                newElements = set(newRecord.elementsWithValue)
+                removeList = list(oldElements - newElements)
+                addList = list(newElements - oldElements)
+                result = []
+                if len(removeList):
+                    result.append(events.TagValueRemovedEvent(oldRecord.tag,oldRecord.value,removeList))
+                if len(addList):
+                    result.append(events.TagValueAddedEvent(newRecord.tag,newRecord.value,addList))
+                    
+                if oldRecord.value != newRecord.value:
+                    changeList = list(newElements.intersection(oldElements))
+                    if len(changeList):
+                        result.append(events.TagValueChangedEvent(oldRecord.tag,oldRecord.value,
+                                                                  newRecord.value,changeList))
+                return result
         else: return [] # The remaining commands affect only the tageditor
         
     def redo(self):

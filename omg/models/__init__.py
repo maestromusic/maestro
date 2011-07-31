@@ -242,7 +242,7 @@ class Element(Node):
     
     def __init__(self):
         raise RuntimeError(
-                "Cannot instantiate abstract base class Element. Use Container, File or models.createElement.")
+                "Cannot instantiate abstract base class Element. Use Element.fromId.")
     
     @staticmethod
     def fromId(id, *, position=None, parentId=None, loadData=True):

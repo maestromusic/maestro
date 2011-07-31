@@ -87,6 +87,7 @@ class RemoveElementsEvent(ModifyEvent):
 class ChangeEventDispatcher(QtCore.QObject):
     
     changes = QtCore.pyqtSignal(ModifyEvent)
+    newTagAdded = QtCore.pyqtSignal(tags.Tag)
     
     def __init__(self):
         QtCore.QObject.__init__(self)
@@ -315,5 +316,14 @@ def beginEditorMacro(name):
 def endEditorMacro():
     assert stack.state() == EDITOR
     stack.editorStack.endMacro()
-    
+
+def createUndoAction(level,parent,prefix):
+    if level == REAL:
+        return stack.editorStack.createUndoAction(parent,prefix)
+    else: return stack.mainStack.createUndoAction(parent,prefix)
+
+def createRedoAction(level,parent,prefix):
+    if level == REAL:
+        return stack.editorStack.createRedoAction(parent,prefix)
+    else: return stack.mainStack.createRedoAction(parent,prefix)
     
