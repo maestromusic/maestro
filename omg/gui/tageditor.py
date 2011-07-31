@@ -101,7 +101,7 @@ class TagEditorWidget(QtGui.QWidget):
         if dialog is not None:
             saveDirectly = False
         
-        self.model = tageditormodel.TagEditorModel(elements,saveDirectly)
+        self.model = tageditormodel.TagEditorModel(level,elements,saveDirectly)
         self.model.tagInserted.connect(self._handleTagInserted)
         self.model.tagRemoved.connect(self._handleTagRemoved)
         self.model.tagChanged.connect(self._handleTagChanged)

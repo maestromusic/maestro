@@ -13,7 +13,7 @@ from ..config import options
 import cutags
 cutags.setVerbosity(100)
 
-logger = logging.getLogger("realfiles2")
+logger = logging.getLogger(__name__)
 
 def get(path):
     """Create a RealFile-instance for the given path, which may be a relative or absolute path."""

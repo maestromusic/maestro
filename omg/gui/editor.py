@@ -44,7 +44,7 @@ class EditorTreeView(treeview.TreeView):
             if isinstance(node,Element):
                 globalSelection.append(node)
         if len(globalSelection):
-            mainwindow.setGlobalSelection(globalSelection)
+            mainwindow.setGlobalSelection(globalSelection,self)
              
     def contextMenuProvider(self, actions, currentIndex):
         s = set( index.parent() for index in self.selectedIndexes() )

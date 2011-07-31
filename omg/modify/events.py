@@ -28,6 +28,9 @@ class TagValueAddedEvent(TagModifyEvent):
         assert element.id in self.ids()
         if element.tags is not None:
             element.tags.add(self.tag,self.value)
+            
+    def __str__(self):
+        return "Add: {} {} {}".format(self.tag,self.value,self.elements)
     
     
 class TagValueRemovedEvent(TagModifyEvent):
@@ -40,6 +43,8 @@ class TagValueRemovedEvent(TagModifyEvent):
         if element.tags is not None:
             element.tags.remove(self.tag,self.value)
         
+    def __str__(self):
+        return "Remove: {} {} {}".format(self.tag,self.value,self.elements)
         
 class TagValueChangedEvent(TagModifyEvent):
     def __init__(self,tag,oldValue,newValue,elements):
@@ -51,4 +56,7 @@ class TagValueChangedEvent(TagModifyEvent):
         assert element.id in self.ids()
         if element.tags is not None:
             element.tags.replace(self.tag,self.oldValue,self.newValue)
+            
+    def __str__(self):
+        return "Change: {} {}->{} {}".format(self.tag,self.oldValue,self.newValue,self.elements)
 

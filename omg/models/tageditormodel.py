@@ -12,7 +12,7 @@ from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
 from .. import constants, models, tags, utils, strutils, modify
-from ..modify import events
+from ..modify import events, db as modifydb
 from . import simplelistmodel
 
 translate = QtCore.QCoreApplication.translate
@@ -171,17 +171,15 @@ class UndoCommand(QtGui.QUndoCommand):
             self.undoMethod = model.inner.changeTag
             self.undoParams = [newTag,oldTag]
 
-    def _getEvents(self,redo):
+    def _getActions(self,redo):
         if self.method.__name__ == 'insertRecord':
             pos,record = self.params
-            if redo:
-                return [events.TagValueAddedEvent(record.tag,record.value,record.elementsWithValue)]
-            else: return [events.TagValueRemovedEvent(record.tag,record.value,record.elementsWithValue)]
+            action = ('add' if redo else 'remove',record.tag,record.value,record.elementsWithValue)
+            return [action]
         elif self.method.__name__ == 'removeRecord':
             record = self.params[0] # 'record, = self.params' would work, too.
-            if redo:
-                return [events.TagValueRemovedEvent(record.tag,record.value,record.elementsWithValue)]
-            else: return [events.TagValueAddedEvent(record.tag,record.value,record.elementsWithValue)]
+            action = ('remove' if redo else 'add',record.tag,record.value,record.elementsWithValue)
+            return [action]
         elif self.method.__name__ == 'changeRecord':
             if redo:
                 tag,oldRecord,newRecord = self.params
@@ -189,50 +187,71 @@ class UndoCommand(QtGui.QUndoCommand):
         
             if oldRecord.tag != newRecord.tag:
                 return [
-                    events.TagValueRemovedEvent(oldRecord.tag,oldRecord.value,oldRecord.elementsWithValue),
-                    events.TagValueAddedEvent(newRecord.tag,newRecord.value,newRecord.elementsWithValue)
+                    ('remove',oldRecord.tag,oldRecord.value,oldRecord.elementsWithValue),
+                    ('add',   newRecord.tag,newRecord.value,newRecord.elementsWithValue)
                   ]
             else:
                 oldElements = set(oldRecord.elementsWithValue)
                 newElements = set(newRecord.elementsWithValue)
                 removeList = list(oldElements - newElements)
                 addList = list(newElements - oldElements)
-                result = []
+                actions = []
                 if len(removeList):
-                    result.append(events.TagValueRemovedEvent(oldRecord.tag,oldRecord.value,removeList))
+                    actions.append(('remove',oldRecord.tag,oldRecord.value,removeList))
                 if len(addList):
-                    result.append(events.TagValueAddedEvent(newRecord.tag,newRecord.value,addList))
+                    actions.append(('add',   newRecord.tag,newRecord.value,addList))
                     
                 if oldRecord.value != newRecord.value:
                     changeList = list(newElements.intersection(oldElements))
                     if len(changeList):
-                        result.append(events.TagValueChangedEvent(oldRecord.tag,oldRecord.value,
-                                                                  newRecord.value,changeList))
-                return result
+                        actions.append(('change',oldRecord.tag,oldRecord.value,newRecord.value,changeList))
+                return actions
         else: return [] # The remaining commands affect only the tageditor
         
     def redo(self):
+        # First modify the inner model
         self.method(*self.params)
-        if self.model.level == modify.EDITOR:
-            for event in self._getEvents(True):
-                modify.dispatcher.changes.emit(event)
-
+        # Then modify the editor or the database
+        if self.model.saveDirectly:
+            self._modify(True)
+            
     def undo(self):
-        self.undoMethod(*self.undoParams)
+        # First modify the inner model
+        self.undoMethod(*self.params)
+        # Then modify the editor or the database
+        if self.model.saveDirectly:
+            self._modify(False)
+
+    def _modify(self,redo):
+        actions = self._getActions(redo)
         if self.model.level == modify.EDITOR:
-            for event in self._getEvents(False):
-                modify.dispatcher.changes.emit(event)
+            for action in actions:
+                if action[0] == 'add':
+                    event = events.TagValueAddedEvent(*action[1:])
+                elif action[0] == 'remove':
+                    event = events.TagValueRemovedEvent(*action[1:])
+                elif action[0] == 'change':
+                    event = events.TagValueChangedEvent(*action[1:])
+                modify.dispatcher.editorChanges.emit(event)
+        else: # level == REAL
+            for action in actions:
+                if action[0] == 'add':
+                    modifydb.addTagValue(*action[1:])
+                elif action[0] == 'remove':
+                    modifydb.removeTagValue(*action[1:])
+                elif action[0] == 'change':
+                    modifydb.changeTagValue(*action[1:])
 
 
 class TagEditorModel(QtCore.QObject):
     resetted = QtCore.pyqtSignal()
     commonChanged = QtCore.pyqtSignal(Record)
     
-    def __init__(self,elements,saveDirectly):
+    def __init__(self,level,elements,saveDirectly):
         QtCore.QObject.__init__(self)
         
+        self.level = level
         self.saveDirectly = saveDirectly
-        self.level = modify.EDITOR
         
         self.inner = InnerModel(elements)
         self.tagInserted = self.inner.tagInserted
