@@ -12,7 +12,7 @@ from ..utils import absPath
 from ..config import options
 import cutags
 
-logger = logging.getLogger("realfiles2")
+logger = logging.getLogger(__name__)
 
 def get(path):
     """Create a RealFile-instance for the given path, which may be a relative or absolute path."""
@@ -91,7 +91,7 @@ class UFile(RealFile):
     def _ensureFileIsLoaded(self):
         if self._f is None:
             self._f = cutags.File(self.path)
-
+    
     def read(self):
         self._ensureFileIsLoaded()
         self.tags = tags.Storage()
@@ -113,11 +113,11 @@ class UFile(RealFile):
             if tag.name.upper() not in self._f.tags:
                 self._f.tags[tag.name.upper()] = values
             else: self._f.tags[tag.name.upper()].extend(values) # May happen if there exist an IndexedTag and an OtherTag with the same name...actually this should never happen
-        self._f.store()
+        self._f.save()
     def savePosition(self):
         self._ensureFileIsLoaded()
         self._f.tags["TRACKNUMBER"] = str(self.position)
-        self._f.store()
+        self._f.save()
     def remove(self, tags):
         self._ensureFileIsLoaded()
         changed = False
@@ -126,7 +126,7 @@ class UFile(RealFile):
                 del self._f.tags[t.name.upper()]
                 changed = True
         if changed:
-            self._f.store()
+            self._f.save()
             
                 
         

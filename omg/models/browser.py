@@ -14,7 +14,7 @@ from PyQt4.QtCore import Qt
 from .. import config, models, search, database as db, tags, logging, utils
 from ..models import rootedtreemodel, mimedata, Element
 
-logger = logging.getLogger("omg.gui.browser")
+logger = logging.getLogger(__name__)
 
 searchEngine = None # The search engine used by all browsers
 

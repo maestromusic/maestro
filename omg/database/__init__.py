@@ -9,7 +9,9 @@
 """
 The database module establishes the database connection and provides many functions to fetch data.
 
-The actual database drivers which connect to the database using a third party connector can be found in the :mod:`SQL package <omg.database.sql>`. The definitions of OMG's tables can be found in the :mod:`tables-module <omg.database.tables>`.
+The actual database drivers which connect to the database using a third party connector can be found in the
+:mod:`SQL package <omg.database.sql>`. The definitions of OMG's tables can be found in the
+:mod:`tables-module <omg.database.tables>`.
 
 The easiest way to use this package is::
 
@@ -25,7 +27,10 @@ or, if the connection was already established in another module::
 
 Threading
 ========================================================================
-Each thread must have its own connection object. This module stores all connection objects and methods like ``query`` automatically choose the correct connection. However you have to initialize the connection for each thread and use a ``with`` statement to ensure the connection is finally closed again. Typically the ``run``-method of your thread will look like this::
+Each thread must have its own connection object. This module stores all connection objects and methods like
+``query`` automatically choose the correct connection. However you have to initialize the connection for
+each thread and use a ``with`` statement to ensure the connection is finally closed again. Typically the
+``run``-method of your thread will look like this::
 
     from omg import database as db
     
@@ -57,7 +62,9 @@ connections = {}
 # Connection and maintenance methods
 #=======================================================================
 class ConnectionContextManager:
-    """Connection manager that ensures that connections in threads other than the main thread are closed and removed from the dict ``connections`` when the thread terminates."""
+    """Connection manager that ensures that connections in threads other than the main thread are closed and
+    removed from the dict ``connections`` when the thread terminates.
+    """
     def __enter__(self):
         return None
 
@@ -67,10 +74,15 @@ class ConnectionContextManager:
 
 
 def connect():
-    """Connect to the database server with information from the config file. The drivers specified in ``config.options.database.drivers`` are tried in the given order. This method must be called exactly once for each thread that wishes to access the database. It returns a :class:`ConnectionContextManager` that will automatically close the connection if used in a ``with`` statement."""
+    """Connect to the database server with information from the config file. The drivers specified in
+    ``config.options.database.drivers`` are tried in the given order. This method must be called exactly
+    once for each thread that wishes to access the database. It returns a :class:`ConnectionContextManager`
+    that will automatically close the connection if used in a ``with`` statement.
+    """
     threadId = threading.current_thread().ident
     if threadId in connections:
-        logger.warning("database.connect has been called although a connection for this thread was already open.")
+        logger.warning(
+            "database.connect has been called although a connection for this thread was already open.")
         return connections[threadId]
 
     global prefix
@@ -81,12 +93,18 @@ def connect():
         
 
 def testConnect(driver=None):
-    """Connect to the database server using the test connection information (config.options.database.test_*). If any of these options is empty, the standard option will be used instead (config.options.database.mysql_*). The table prefix will in be config.options.database.test_prefix even if it is empty. For safety this method will abort the program if prefix, db-name and host coincide with the standard values used by connect.
+    """Connect to the database server using the test connection information (config.options.database.test_*).
+    If any of these options is empty, the standard option will be used instead 
+    (config.options.database.mysql_*). The table prefix will in be config.options.database.test_prefix even
+    if it is empty. For safety this method will abort the program if prefix, db-name and host coincide with
+    the standard values used by connect.
 
-    As :func:`connect`, this method returns a :class:`ConnectionContextManager`."""
+    As :func:`connect`, this method returns a :class:`ConnectionContextManager`.
+    """
     threadId = threading.current_thread().ident
     if threadId in connections:
-        logger.warning("database.testConnect has been called although a connection for this thread was already open.")
+        logger.warning(
+            "database.testConnect has been called although a connection for this thread was already open.")
         return connections[threadId]
         
     authValues = []
@@ -131,7 +149,9 @@ def _connect(drivers,authValues):
     
 
 def close():
-    """Close the database connection of this thread. If you use the context manager returned by :func:`connect`, this method is called automatically."""
+    """Close the database connection of this thread. If you use the context manager returned by
+    :func:`connect`, this method is called automatically.
+    """
     threadId = threading.current_thread().ident
     connection = connections[threading.current_thread().ident]
     del connections[threading.current_thread().ident]
@@ -201,11 +221,16 @@ def isNull(value):
 # contents-table
 #=======================================================================
 def contents(elids,recursive=False):
-    """Return the ids of all children of the elements with ids *elids* as a set. *elids* may be a list of element ids or a single id. If *recursive* is True, all descendants will be included. In any case the result list won't contain duplicates."""
+    """Return the ids of all children of the elements with ids *elids* as a set. *elids* may be a list of
+    element ids or a single id. If *recursive* is True, all descendants will be included. In any case the
+    result list won't contain duplicates.
+    """
     return _contentsParentsHelper(elids,recursive,"element_id","container_id")
 
 def parents(elids,recursive = False):
-    """Return a set containing the ids of all parents of the elements with ids *elids* (which may be a list or a single id). If *recursive* is True all ancestors will be added recursively."""
+    """Return a set containing the ids of all parents of the elements with ids *elids* (which may be a list
+    or a single id). If *recursive* is True all ancestors will be added recursively.
+    """
     return _contentsParentsHelper(elids,recursive,"container_id","element_id")
 
 def _contentsParentsHelper(elids,recursive,selectColumn,whereColumn):
@@ -216,10 +241,10 @@ def _contentsParentsHelper(elids,recursive,selectColumn,whereColumn):
     resultSet = set()
     while len(newSet) > 0:
         newSet = set(query("""
-                SELECT {}
-                FROM {}contents
-                WHERE {} IN ({})
-                """.format(selectColumn,prefix,whereColumn,",".join(str(n) for n in newSet))).getSingleColumn())
+            SELECT {}
+            FROM {}contents
+            WHERE {} IN ({})
+            """.format(selectColumn,prefix,whereColumn,",".join(str(n) for n in newSet))).getSingleColumn())
         if not recursive:
             return newSet
         newSet = newSet - resultSet
@@ -229,10 +254,12 @@ def _contentsParentsHelper(elids,recursive,selectColumn,whereColumn):
 
 
 def position(parentId,elementId):
-    """Return the position of the element with id *elementId* within the container with id *parentId*. If the element is not contained in the container, a ValueException is raised."""
+    """Return the position of the element with id *elementId* within the container with id *parentId*.
+    If the element is not contained in the container, a ValueException is raised.
+    """
     try:
-        return query("SELECT position FROM {}contents WHERE container_id = ? AND element_id = ?".format(prefix),
-                        parentId,elementId).getSingle()
+        return query("SELECT position FROM {}contents WHERE container_id = ? AND element_id = ?"
+                        .format(prefix),parentId,elementId).getSingle()
     except sql.EmptyResultException:
         raise ValueError("Element with ID {} is not contained in container {}.".format(elementId,parentId))
 
@@ -320,7 +347,9 @@ def idFromHash(hash):
 #=======================================================================         
 @functools.lru_cache(10000)
 def valueFromId(tagSpec,valueId):
-    """Return the value from the tag *tagSpec* with id *valueId* or raise an sql.EmptyResultException if that id does not exist. Date tags will be returned as FlexiDate."""
+    """Return the value from the tag *tagSpec* with id *valueId* or raise an sql.EmptyResultException if
+    that id does not exist. Date tags will be returned as FlexiDate.
+    """
     tag = tagsModule.get(tagSpec)
     value = query("SELECT value FROM {}values_{} WHERE tag_id = ? AND id = ?"
                     .format(prefix,tag.type), tag.id,valueId).getSingle()
@@ -330,7 +359,10 @@ def valueFromId(tagSpec,valueId):
 
 
 def idFromValue(tagSpec,value,insert=False):
-    """Return the id of the given value in the tagtable of tag *tagSpec*. If the value does not exist, raise an sql.EmptyResultException, unless the optional parameter *insert* is set to True. In that case insert the value into the table and return its id."""
+    """Return the id of the given value in the tag-table of tag *tagSpec*. If the value does not exist,
+    raise an sql.EmptyResultException, unless the optional parameter *insert* is set to True. In that case
+    insert the value into the table and return its id.
+    """
     tag = tagsModule.get(tagSpec)
     value = _encodeValue(tag.type,value)
     try:
@@ -338,7 +370,8 @@ def idFromValue(tagSpec,value,insert=False):
                         .format(prefix,tag.type),tag.id,value).getSingle()
     except sql.EmptyResultException as e:
         if insert:
-            result = query("INSERT INTO {}values_{} SET tag_id = ?,value = ?".format(prefix,tag.type),tag.id,value)
+            result = query("INSERT INTO {}values_{} SET tag_id = ?,value = ?"
+                             .format(prefix,tag.type),tag.id,value)
             return result.insertId()
         else: raise e
 
@@ -375,12 +408,16 @@ def listTags(elid,tagList=None):
     return tags
 
 def tagValues(elid,tagList):
-    """Return all values which the element with id *elid* possesses in any of the tags in tagList (which may be a list of tag-specifiers or simply a single tag-specifier)."""
+    """Return all values which the element with id *elid* possesses in any of the tags in tagList (which may
+    be a list of tag-specifiers or simply a single tag-specifier).
+    """
     return [value for tag,value in listTags(elid,tagList)] # return only the second tuple part
 
 def allTagValues(tagSpec):
-    """Return all tag values in the db for the given tag."""
-    return query("SELECT value FROM tag_{}".format(tagsModule.get(tagSpec).name)).getSingleColumn()
+    """Return all tag values in the database for the given tag."""
+    tag = tagsModule.get(tagSpec)
+    return query("SELECT value FROM {}values_{} WHERE tag_id = {}"
+                 .format(prefix,tag.type.name,tag.id)).getSingleColumn()
     
 
 # Help methods

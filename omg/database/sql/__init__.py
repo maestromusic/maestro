@@ -8,7 +8,9 @@
 #
 
 """
-This module contains an abstraction layer for MySQL databases. It provides a common API to several third party MySQL connector modules so that the actual connector can be exchanged without changing the project code.
+This module contains an abstraction layer for MySQL databases. It provides a common API to several third
+party MySQL connector modules so that the actual connector can be exchanged without changing the project
+code.
 
 Currently the following drivers are supported:
 
@@ -31,7 +33,8 @@ The following example shows basic usage of the module::
     number = db.query("SELECT COUNT(*) FROM persons").getSingle()
     # Note that this will raise an EmptyResultException if the query does return an empty result.
 
-The main class of the module is :class:`AbstractSQL <omg.database.sql.AbstractSQL>` which is subclassed by every driver.
+The main class of the module is :class:`AbstractSQL <omg.database.sql.AbstractSQL>` which is subclassed by
+every driver.
 """
 
 from PyQt4 import QtCore
@@ -45,7 +48,9 @@ AUTH_OPTIONS = ["user","password","db","host","port"]
 
 
 class DBException(Exception):
-    """This exception is raised if something goes wrong with the database connection, or if an invalid query is executed."""
+    """This exception is raised if something goes wrong with the database connection, or if an invalid query
+    is executed.
+    """
     def __init__(self,message,query=None,args=None):
         Exception.__init__(self)
         self.message = message
@@ -61,12 +66,17 @@ class DBException(Exception):
 
 
 class EmptyResultException(Exception):
-    """This exception is executed if :meth:`getSingle`, :meth:`getSingleRow` or :meth:`getSingleColumn` are performed on a result which does not contain any row."""
+    """This exception is executed if :meth:`getSingle`, :meth:`getSingleRow` or :meth:`getSingleColumn` are
+    performed on a result which does not contain any row.
+    """
 
 
 def newConnection(drivers=["qtsql"]):
-    """Create a new database connection object. *drivers* is a list of driver-module names which will be tried in the given order until one is loaded successfully. If no driver can be loaded, a :exc:`DBException <omg.database.sql.DBException>` is raised. This method does not actually open a connection, but only sets up the t
-    connection object."""
+    """Create a new database connection object. *drivers* is a list of driver-module names which will be
+    tried in the given order until one is loaded successfully. If no driver can be loaded, a
+    :exc:`DBException <omg.database.sql.DBException>` is raised. This method does not actually open a
+    connection, but only sets up the the connection object.
+    """
     for driver in drivers:
         try:
             if driver not in _modules:
@@ -82,7 +92,9 @@ def newConnection(drivers=["qtsql"]):
 class AbstractSql:
     """Abstract base class for an SQL connection object.
     
-    This class encapsulates a connection to a database. To create instances of AbstractSql use :func:`newConnection <omg.database.sql.newConnection>` which will create a non-abstract subclass of this depending on the driver.
+    This class encapsulates a connection to a database. To create instances of AbstractSql use
+    :func:`newConnection <omg.database.sql.newConnection>` which will create a non-abstract subclass of
+    this depending on the driver.
     """
     def connect(self,username,password,database,host="localhost",port=3306):
         """Connect to a database using the given information."""
@@ -90,7 +102,10 @@ class AbstractSql:
     def query(self,queryString,*args):
         """Perform a query in the database.
         
-        Execute the query *queryString* and return an :class:``AbstractSqlResult`` which yields the result's rows in tuples. *queryString* may contain ``'?'`` as placeholders which are replaced by the *args*-parameters in the given order. Note that you must not use quotation marks around string parameters::
+        Execute the query *queryString* and return an :class:``AbstractSqlResult`` which yields the result's
+        rows in tuples. *queryString* may contain ``'?'`` as placeholders which are replaced by the
+        *args*-parameters in the given order. Note that you must not use quotation marks around string
+        parameters::
 
             SELECT id FROM table WHERE name = ?
 
@@ -111,7 +126,8 @@ class AbstractSql:
             for parameters in args:
                 self.query(queryString,*parameters)
 
-        In some drivers :func:`multiQuery` may be faster than this loop because the query has to be sent to the server and parsed only once.
+        In some drivers :func:`multiQuery` may be faster than this loop because the query has to be sent to
+        the server and parsed only once.
 
         Finally one example::
 
@@ -131,7 +147,8 @@ class AbstractSql:
         """Rollback a transaction."""
 
     def isNull(value):
-        """Return whether *value* represents a NULL value from a MySQL table. What is returned for NULL values depends on the driver."""
+        """Return whether *value* represents a NULL value from a MySQL table. What is returned for NULL
+        values depends on the driver."""
 
     def close():
         """Close this driver."""
@@ -140,34 +157,50 @@ class AbstractSql:
 class AbstractSqlResult:
     """Abstract base class for classes which encapsulate a query result set.
     
-    This class (or rather driver-dependent subclasses of it) encapsulates the result of the execution of an SQL query. It may contain selected rows from the database or information like the number of affected rows. :class:`AbstractSqlResult`-subclasses implement ``__iter__`` so they may be used in ``for``-loops to retrieve all rows as tuples from the result set. A short way to retrieve a single value from the database is getSingle.
+    This class (or rather driver-dependent subclasses of it) encapsulates the result of the execution of an
+    SQL query. It may contain selected rows from the database or information like the number of affected
+    rows. :class:`AbstractSqlResult`-subclasses implement ``__iter__`` so they may be used in ``for``-loops
+    to retrieve all rows as tuples from the result set. A short way to retrieve a single value from the
+    database is getSingle.
 
     .. warning::
-        Be careful not to mix different access methods like getSingle, getSingleColumn and iterator methods (e.g. next) since they all may change internal cursors and could interfere with each other.
+        Be careful not to mix different access methods like getSingle, getSingleColumn and iterator methods
+        (e.g. next) since they all may change internal cursors and could interfere with each other.
     """
     def size(self):
-        """Returns the number of rows selected in a select query. You can also use the built-in :func:`len`-method."""
+        """Returns the number of rows selected in a select query. You can also use the built-in
+        :func:`len`-method.
+        """
     
     def next(self):
-        """Yields the next row from the result set or raises a :exc:`StopIteration` if there is no such row."""
+        """Yields the next row from the result set or raises a :exc:`StopIteration` if there is no such
+        row."""
         
     def executedQuery(self):
-        """Return the query which produced this SqlResult. The query won't contain placeholders but the actual values used when executing."""
+        """Return the query which produced this SqlResult. The query won't contain placeholders but the
+        actual values used when executing."""
         
     def affectedRows(self):
         """Return the number of rows affected by the query producing this :class:`AbstracSqlResult`."""
     
     def insertId(self):
-        """Return the last value which was used in an ``AUTO_INCREMENT``-column when this AbstractSqlResult was created."""
+        """Return the last value which was used in an ``AUTO_INCREMENT``-column when this AbstractSqlResult
+        was created."""
     
     def getSingle(self):
-        """Return the first value from the first row of the result set. Use this as a shorthand method if the result contains only one value. If the result set does not contain any row, an :exc:`EmptyResultException` is raised."""
+        """Return the first value from the first row of the result set. Use this as a shorthand method if
+        the result contains only one value. If the result set does not contain any row, an
+        :exc:`EmptyResultException` is raised.
+        """
         
     def getSingleColumn(self):
-        """Return a generator for the first column of the result set. Use this as a shorthand method if the result contains only one column. Contrary to getSingeRow, this method does not raise an :exc:`EmptyResultException` if the result set is empty."""
+        """Return a generator for the first column of the result set. Use this as a shorthand method if the
+        result contains only one column. Contrary to getSingeRow, this method does not raise an
+        :exc:`EmptyResultException` if the result set is empty."""
         
     def getSingleRow(self):
-        """Return the first row of the result set or raise an :exc:`EmptyResultException` if the result does not contain any rows. Use this as a shorthand if there is only one row in the result set."""
+        """Return the first row of the result set or raise an :exc:`EmptyResultException` if the result does
+        not contain any rows. Use this as a shorthand if there is only one row in the result set."""
         if self.size() == 0:
             raise EmptyResultException()
         else: return self.next()

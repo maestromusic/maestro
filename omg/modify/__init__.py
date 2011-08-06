@@ -3,12 +3,15 @@
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from .. import tags
+from .. import tags, logging
 
 from collections import OrderedDict
 import copy
 translate = QtCore.QCoreApplication.translate
 
+logger = logging.getLogger(__name__)
+
+# Levels
 REAL = 1
 EDITOR = 2
 
@@ -84,14 +87,30 @@ class RemoveElementsEvent(ModifyEvent):
             del element.contents[index:index+count]
             
          
+def _debugReal(event):
+    logger.debug("REAL: " + str(event))
+    
+def _debugEditor(event):
+    logger.debug("EDITOR: " + str(event))
+    
 class ChangeEventDispatcher(QtCore.QObject):
     
-    changes = QtCore.pyqtSignal(ModifyEvent)
+    realChanges = QtCore.pyqtSignal(ModifyEvent)
+    editorChanges = QtCore.pyqtSignal(ModifyEvent)
+    
+    # TODO: deprecated
+    changes = editorChanges
+    
+    # New tags are added outside the redo/undo framework and have their own signal.
+    newTagAdded = QtCore.pyqtSignal(tags.Tag)
     
     def __init__(self):
         QtCore.QObject.__init__(self)
 
 dispatcher = ChangeEventDispatcher()
+dispatcher.editorChanges.connect(_debugEditor)
+dispatcher.realChanges.connect(_debugReal)
+
 
 class UndoCommand(QtGui.QUndoCommand):
     """A generic undo command for arbitrary changes. The constructor gets an OrderedDict mapping
@@ -306,3 +325,24 @@ def pushEditorCommand(command):
     if stack.state() == REAL:
         stack.setActiveStack(stack.editorStack)
     stack.activeStack().push(command)
+    
+def beginEditorMacro(name):
+    if stack.state() == REAL:
+        stack.setActiveStack(stack.editorStack)
+    stack.activeStack().beginMacro(name)
+    
+def endEditorMacro():
+    assert stack.state() == EDITOR
+    stack.editorStack.endMacro()
+
+def createUndoAction(level,parent,prefix):
+    if level == REAL:
+        return stack.editorStack.createUndoAction(parent,prefix)
+    else: return stack.mainStack.createUndoAction(parent,prefix)
+
+def createRedoAction(level,parent,prefix):
+    if level == REAL:
+        return stack.editorStack.createRedoAction(parent,prefix)
+    else: return stack.mainStack.createRedoAction(parent,prefix)
+
+    

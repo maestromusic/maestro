@@ -12,27 +12,30 @@ from omg import tags, utils
 
 
 class NewTagDialog(QtGui.QDialog):
-
-    def __init__(self, tagname, parent = None):
+    def __init__(self, tagname, parent = None,text=None):
         QtGui.QDialog.__init__(self, parent)
         self.setWindowModality(QtCore.Qt.WindowModal)
-        label = QtGui.QLabel(self.tr("The tag '{}' occured for the first time. Please enter its type:").format(tagname))
+        layout = QtGui.QVBoxLayout(self)
+        
+        if text is None:
+            text = self.tr("The tag '{}' occured for the first time. Please enter its type:").format(tagname)
+        label = QtGui.QLabel(text)
+        layout.addWidget(label)
+            
         self.combo = QtGui.QComboBox(self)
         self.combo.addItems([type.name for type in tags.TYPES])
+        layout.addWidget(self.combo)
         
-        self.ignoreButton = QtGui.QPushButton(self.tr("Ignore this tag"))
+        self.abortButton = QtGui.QPushButton(self.tr("Abort"))
         self.okButton = QtGui.QPushButton(self.tr("Ok"))
         
-        layout = QtGui.QVBoxLayout(self)
-        layout.addWidget(label)
-        layout.addWidget(self.combo)
         buttonLayout = QtGui.QHBoxLayout()
         buttonLayout.addStretch()
-        buttonLayout.addWidget(self.ignoreButton)
+        buttonLayout.addWidget(self.abortButton)
         buttonLayout.addWidget(self.okButton)
         layout.addLayout(buttonLayout)
         
-        self.ignoreButton.clicked.connect(self.reject)
+        self.abortButton.clicked.connect(self.reject)
         self.okButton.clicked.connect(self.accept)
         
     def selectedType(self):
@@ -41,14 +44,16 @@ class NewTagDialog(QtGui.QDialog):
     @staticmethod
     def queryTagType(name, parent = None):
         d = NewTagDialog(name, parent)
-        if d.exec() == QtGui.QDialog.Accepted:
+        if d.exec_() == QtGui.QDialog.Accepted:
             return d.selectedType()
-        return None
+        else: return None
 
 
 class FancyTabbedPopup(QtGui.QFrame):
     def __init__(self,parent = None):
         QtGui.QFrame.__init__(self,parent)
+        self.setWindowFlags(self.windowFlags() | Qt.ToolTip)
+        parent.installEventFilter(self)
         
         # Create components
         self.setLayout(QtGui.QVBoxLayout())
@@ -59,7 +64,7 @@ class FancyTabbedPopup(QtGui.QFrame):
         closeButton = QtGui.QToolButton()
         closeButton.setIcon(utils.getIcon('close_button.png'))
         closeButton.setStyleSheet(
-            "QToolButton { border: None } QToolButton:hover { border: 1px solid white; }")
+            "QToolButton { border: None; margin-bottom: 1px; } QToolButton:hover { border: 1px solid white; }")
         closeButton.clicked.connect(self.close)
         self.tabWidget.setCornerWidget(closeButton)
         
@@ -82,4 +87,9 @@ class FancyTabbedPopup(QtGui.QFrame):
         effect.setOffset(0,0)
         effect.setBlurRadius(20)
         self.setGraphicsEffect(effect)
+        
+    def eventFilter(self,object,event):
+        if event.type() == QtCore.QEvent.Enter:
+            self.close()
+        return False
         

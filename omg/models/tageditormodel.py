@@ -4,14 +4,18 @@
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 3 as
+# published by the Free Software Foundation
 #
 import itertools
 
 from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
-from omg import constants, models, tags, utils, strutils
+from .. import constants, models, tags, utils, strutils, modify
+from ..modify import events, db as modifydb
 from . import simplelistmodel
+
+translate = QtCore.QCoreApplication.translate
 
 RATIO = 0.75
 
@@ -53,10 +57,10 @@ class Record:
         if self.isCommon():
             return str(self.value)
         elif len(self.elementsWithValue) == 1:
-            return "{} in {}".format(self.value,self.elementsWithValue[0])
+            return translate("TagEditor","{} in {}").format(self.value,self.elementsWithValue[0])
         elif len(self.getExceptions()) == 1:
-            return "{} außer in {}".format(self.value,self.getExceptions()[0])
-        else: return "{} in {} Stücken".format(self.value,len(self.elementsWithValue))
+            return translate("TagEditor","{} except in {}").format(self.value,self.getExceptions()[0])
+        else: return translate("TagEditor","{} in {} pieces").format(self.value,len(self.elementsWithValue))
 
 
 class InnerModel(QtCore.QObject):
@@ -145,7 +149,6 @@ class UndoCommand(QtGui.QUndoCommand):
             pos = model.inner.tags[record.tag].index(record)
             self.undoMethod = model.inner.insertRecord
             self.undoParams = [pos,record]
-            
         elif method.__name__ == 'changeRecord':
             tag,oldRecord,newRecord = params
             self.undoMethod = model.inner.changeRecord
@@ -168,19 +171,88 @@ class UndoCommand(QtGui.QUndoCommand):
             self.undoMethod = model.inner.changeTag
             self.undoParams = [newTag,oldTag]
 
+    def _getActions(self,redo):
+        if self.method.__name__ == 'insertRecord':
+            pos,record = self.params
+            action = ('add' if redo else 'remove',record.tag,record.value,record.elementsWithValue)
+            return [action]
+        elif self.method.__name__ == 'removeRecord':
+            record = self.params[0] # 'record, = self.params' would work, too.
+            action = ('remove' if redo else 'add',record.tag,record.value,record.elementsWithValue)
+            return [action]
+        elif self.method.__name__ == 'changeRecord':
+            if redo:
+                tag,oldRecord,newRecord = self.params
+            else: tag,newRecord,oldRecord = self.params
+        
+            if oldRecord.tag != newRecord.tag:
+                return [
+                    ('remove',oldRecord.tag,oldRecord.value,oldRecord.elementsWithValue),
+                    ('add',   newRecord.tag,newRecord.value,newRecord.elementsWithValue)
+                  ]
+            else:
+                oldElements = set(oldRecord.elementsWithValue)
+                newElements = set(newRecord.elementsWithValue)
+                removeList = list(oldElements - newElements)
+                addList = list(newElements - oldElements)
+                actions = []
+                if len(removeList):
+                    actions.append(('remove',oldRecord.tag,oldRecord.value,removeList))
+                if len(addList):
+                    actions.append(('add',   newRecord.tag,newRecord.value,addList))
+                    
+                if oldRecord.value != newRecord.value:
+                    changeList = list(newElements.intersection(oldElements))
+                    if len(changeList):
+                        actions.append(('change',oldRecord.tag,oldRecord.value,newRecord.value,changeList))
+                return actions
+        else: return [] # The remaining commands affect only the tageditor
+        
     def redo(self):
+        # First modify the inner model
         self.method(*self.params)
-
+        # Then modify the editor or the database
+        if self.model.saveDirectly:
+            self._modify(True)
+            
     def undo(self):
+        # First modify the inner model
         self.undoMethod(*self.undoParams)
+        # Then modify the editor or the database
+        if self.model.saveDirectly:
+            self._modify(False)
+
+    def _modify(self,redo):
+        actions = self._getActions(redo)
+        if self.model.level == modify.EDITOR:
+            for action in actions:
+                if action[0] == 'add':
+                    event = events.TagValueAddedEvent(*action[1:])
+                elif action[0] == 'remove':
+                    event = events.TagValueRemovedEvent(*action[1:])
+                elif action[0] == 'change':
+                    event = events.TagValueChangedEvent(*action[1:])
+                modify.dispatcher.editorChanges.emit(event)
+        else: # level == REAL
+            for action in actions:
+                if action[0] == 'add':
+                    modifydb.addTagValue(*action[1:])
+                elif action[0] == 'remove':
+                    modifydb.removeTagValue(*action[1:])
+                elif action[0] == 'change':
+                    modifydb.changeTagValue(*action[1:])
 
 
 class TagEditorModel(QtCore.QObject):
     resetted = QtCore.pyqtSignal()
     commonChanged = QtCore.pyqtSignal(Record)
     
-    def __init__(self,elements):
+    def __init__(self,level,elements,saveDirectly):
         QtCore.QObject.__init__(self)
+        
+        self.level = level
+        self.saveDirectly = saveDirectly
+        
         self.inner = InnerModel(elements)
         self.tagInserted = self.inner.tagInserted
         self.tagRemoved = self.inner.tagRemoved
@@ -189,8 +261,9 @@ class TagEditorModel(QtCore.QObject):
         self.recordRemoved = self.inner.recordRemoved
         self.recordChanged = self.inner.recordChanged
         self.recordMoved = self.inner.recordMoved
-
-        self.undoStack = QtGui.QUndoStack(self)
+    
+        if not saveDirectly:
+            self.undoStack = QtGui.QUndoStack(self)
 
     def getTags(self):
         return list(self.inner.tags.keys())
@@ -207,20 +280,36 @@ class TagEditorModel(QtCore.QObject):
         
     def reset(self):
         self.inner.createTags()
-        self.undoStack.clear()
+        if not self.saveDirectly:
+            self.undoStack.clear()
         self.resetted.emit()
 
+    def _beginMacro(self,name):
+        if self.saveDirectly:
+            modify.beginEditorMacro(name)
+        else: self.undoStack.beginMacro(name)
+    
+    def _push(self,command):
+        if self.saveDirectly:
+            modify.pushEditorCommand(command)
+        else: self.undoStack.push(command)
+        
+    def _endMacro(self):
+        if self.saveDirectly:
+            modify.endEditorMacro()
+        else: self.undoStack.endMacro()
+        
     def addRecord(self,record):
-        self.undoStack.beginMacro("Add Record")
+        self._beginMacro("Add Record")
         result = self._insertRecord(None,record)
-        self.undoStack.endMacro()
+        self._endMacro()
         return result
 
     def _insertRecord(self,pos,record):
         if record.tag not in self.inner.tags:
             # Add the missing tag
             command = UndoCommand(self,self.inner.insertTag,len(self.inner.tags),record.tag)
-            self.undoStack.push(command)
+            self._push(command)
 
         # Does there already exist a record with the same tag and value?
         existingRecord = self.inner.getRecord(record.tag,record.value)
@@ -232,45 +321,47 @@ class TagEditorModel(QtCore.QObject):
                 else: pos = len(self.inner.tags[record.tag])
             else: assert pos <= len(self.inner.tags[record.tag])
             command = UndoCommand(self,self.inner.insertRecord,pos,record)
-            self.undoStack.push(command)
+            self._push(command)
             return True
         else:
-            # Now things get complicated: Add the record's elements to those of (a copy of) the existing record
+            # Now things get complicated: Add the record's elements to those of (a copy of)
+            # the existing record.
             copy = existingRecord.copy()
             copy.extend(record.elementsWithValue)
             command = UndoCommand(self,self.inner.changeRecord,record.tag,existingRecord,copy)
-            self.undoStack.push(command)
-            # Now here's a problem: If the changed record is common, whereas the old one is not, we have to keep the sorting (common records to the top).
+            self._push(command)
+            # Now here's a problem: If the changed record is common, whereas the old one is not, we have
+            # to ensure correct sorting (common records to the top).
             if existingRecord.isCommon() != copy.isCommon():
-                # As we add elements, it must be this way:
+                # Because we add elements, it must be this way:
                 assert not existingRecord.isCommon() and copy.isCommon()
                 pos = self.inner.tags[record.tag].index(existingRecord)
                 newPos = self._commonCount(record.tag)
                 if pos != newPos:
                     command = UndoCommand(self,self.inner.moveRecord,pos,newPos)
-                    self.undoStack.push(command)
+                    self._push(command)
                 self.commonChanged.emit(copy)
             return False
             
     def removeRecord(self,record):
-        self.undoStack.beginMacro("Remove record")
+        self._beginMacro("Remove record")
         command = UndoCommand(self,self.inner.removeRecord,record)
-        self.undoStack.push(command)
+        self._push(command)
         if len(self.inner.tags[record.tag]) == 0:
             # Remove the empty tag
             command = UndoCommand(self,self.inner.removeTag,record.tag)
-            self.undoStack.push(command)
-        self.undoStack.endMacro()
+            self._push(command)
+        self._endMacro()
 
     def removeRecords(self,records):
         if len(records) > 0:
-            self.undoStack.beginMacro("Einträge entfernen" if len(records) > 1 else "Eintrag entfernen")
+            self._beginMacro("Einträge entfernen" if len(records) > 1 else "Eintrag entfernen")
             for record in records:
                 self.removeRecord(record)
-            self.undoStack.endMacro()
+            self._endMacro()
 
     def changeRecord(self,oldRecord,newRecord):
-        self.undoStack.beginMacro("Change record")
+        self._beginMacro("Change record")
 
         # If the tag has changed or the new value does already exist, we simply remove the old and add the new record. Otherwise we really change the record so that its position stays the same because this is what the user expects.
         if oldRecord.tag != newRecord.tag or self.inner.getRecord(newRecord.tag,newRecord.value) is not None:
@@ -280,27 +371,27 @@ class TagEditorModel(QtCore.QObject):
             # I am not sure, but the order of changing, moving end emitting commonChanged maybe important
             # Change the record
             command = UndoCommand(self,self.inner.changeRecord,oldRecord.tag,oldRecord,newRecord)
-            self.undoStack.push(command)
+            self._push(command)
             # Maybe we have to move the record as the common records are sorted to the top
             if oldRecord.isCommon() != newRecord.isCommon():
                 pos = self.inner.tags[oldRecord.tag].index(oldRecord)
                 newPos = self._commonCount(oldRecord.tag) # Move to the border
                 if pos != newPos:
                     command = UndoCommand(self,self.inner.moveRecord,pos,newPos)
-                    self.undoStack.push(command)
+                    self._push(command)
                 self.commonChanged.emit(newRecord)
-        self.undoStack.endMacro()
+        self._endMacro()
 
     def removeTag(self,tag):
-        self.undoStack.beginMacro("Remove tag")
+        self._beginMacro("Remove tag")
         # First remove all records
         for record in self.inner.tags[tag]:
             command = UndoCommand(self,self.inner.removeRecord,record)
-            self.undoStack.push(command)
+            self._push(command)
         # Remove the empty tag
         command = UndoCommand(self,self.inner.removeTag,record.tag)
-        self.undoStack.push(command)
-        self.undoStack.endMacro()
+        self._push(command)
+        self._endMacro()
 
     def changeTag(self,oldTag,newTag):
         # First check whether the existing values in oldTag are convertible to newTag
@@ -309,7 +400,7 @@ class TagEditorModel(QtCore.QObject):
                 oldTag.type.convertValue(newTag.type,record.value)
         except ValueError:
             return False # conversion not possible
-        self.undoStack.beginMacro("Change Tag")
+        self._beginMacro("Change Tag")
 
         if newTag not in self.inner.tags:
             # First change all records:
@@ -318,10 +409,10 @@ class TagEditorModel(QtCore.QObject):
                 newRecord.tag = newTag
                 newRecord.value = oldTag.type.convertValue(newTag.type,record.value)
                 command = UndoCommand(self,self.inner.changeRecord,oldTag,record,newRecord)
-                self.undoStack.push(command)
+                self._push(command)
             # Finally change the tag itself
             command = UndoCommand(self,self.inner.changeTag,oldTag,newTag)
-            self.undoStack.push(command)
+            self._push(command)
         else: # Now we have to add all converted records to the existing tag
             # The easiest way to do this is to remove all records and add the converted records again
             for record in self.inner.tags[oldTag]:
@@ -332,11 +423,15 @@ class TagEditorModel(QtCore.QObject):
             # Finally remove the old tag
             self.removeTag(oldTag)
 
-        self.undoStack.endMacro()
+        self._endMacro()
             
         return True
 
     def save(self):
+        if saveDirectly:
+            raise RuntimeError("You must not call save in a TagEditorModel that saves directly.")
+        
+        raise NotImplementedError()
         # Remove the stored elements
         for element in self.inner.elements:
             element.oldTags = element.tags
@@ -403,39 +498,39 @@ class TagEditorModel(QtCore.QObject):
             
         # Now here starts the split
         pos = self.inner.tags[record.tag].index(record)
-        self.undoStack.beginMacro("Split")
+        self._beginMacro("Split")
         # First remove the old value
         command = UndoCommand(self,self.inner.removeRecord,record)
-        self.undoStack.push(command)
+        self._push(command)
         # Now create new records and insert them at pos
         for value in splittedValues:
             newRecord = record.copy()
             newRecord.value = value
             if self._insertRecord(pos,newRecord): # This is false if the record was added to an already existing one
                 pos = pos + 1
-        self.undoStack.endMacro()
+        self._endMacro()
         return True
 
     def splitMany(self,records,separator):
         return any(self.split(record,separator) for record in records)
 
     def editMany(self,records,newValues):
-        self.undoStack.beginMacro("Edit many")
+        self._beginMacro("Edit many")
         for record, value in zip(records,newValues):
             newRecord = record.copy()
             newRecord.value = value
             command = UndoCommand(self,self.inner.changeRecord,record.tag,record,newRecord)
-            self.undoStack.push(command)
-        self.undoStack.endMacro()
+            self._push(command)
+        self._endMacro()
 
     def extendRecords(self,records):
-        self.undoStack.beginMacro("Extend records")
+        self._beginMacro("Extend records")
         for record in records:
             newRecord = record.copy()
             newRecord.elementsWithValue = self.inner.elements[:] # copy the list!
             command = UndoCommand(self,self.inner.changeRecord,record.tag,record,newRecord)
-            self.undoStack.push(command)
-        self.undoStack.endMacro()
+            self._push(command)
+        self._endMacro()
 
     def _commonCount(self,tag):
         c = 0

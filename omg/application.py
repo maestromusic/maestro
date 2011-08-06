@@ -7,7 +7,8 @@
 #
 
 """
-This module controls the startup and finishing process of OMG. :func:`run` runs the application while :func:`init` only initializes the most basic modules without starting a graphical interface.
+This module controls the startup and finishing process of OMG. :func:`run` runs the application while
+:func:`init` only initializes the most basic modules without starting a graphical interface.
 """
 
 import sys, os
@@ -21,7 +22,7 @@ from omg import config, logging, database
 mainWindow = None
 
 
-def init(app,cmdConfig = [],initTags=True,testDB=False):
+def init(cmdConfig = [],initTags=True,testDB=False):
     """Initialize the application, modules (config, logging, database and tags) but do not create a GUI or
     load any plugins. Return the QApplication instance. This is useful for scripts which need OMG's framework,
     but not its GUI and for testing (or playing around) in Python's shell::
@@ -34,8 +35,9 @@ def init(app,cmdConfig = [],initTags=True,testDB=False):
 
     *cmdOptions* is a list of options given on the command line that will overwrite the corresponding option
     from the file or the default. Each list item has to be a string like ``main.collection=/var/music``.
+    If *initTags* is False, the tag module will not be initialized.
     If *testDB* is True, the database connection will be build using :func:`database.testConnect`.
-    Warning: In this case the tags-module won't be initialized since the test database is usually empty.
+    Warning: In this case you may want to set *initTags* to False because the test database is usually empty.
     """
     # Some Qt-classes need a running QApplication before they can be created
     app = QtGui.QApplication(sys.argv)
@@ -81,7 +83,9 @@ def init(app,cmdConfig = [],initTags=True,testDB=False):
 
 
 def run(cmdConfig = []):
-    """Run OMG. *cmdOptions* is a list of options given on the command line that will overwrite the corresponding option from the file or the default. Each list item has to be a string like ``main.collection=/var/music``.
+    """Run OMG. *cmdOptions* is a list of options given on the command line that will overwrite the
+    corresponding option from the file or the default. Each list item has to be a string like
+    ``main.collection=/var/music``.
     """
     app = init(cmdConfig)
     

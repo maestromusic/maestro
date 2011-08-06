@@ -12,9 +12,9 @@ import functools
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
-from .. import database as db, config, search, constants, utils, tags
+from .. import database as db, config, search, constants, utils, tags, modify
 from ..search import searchbox
-from . import mainwindow, treeview, browserdialog, delegates
+from . import mainwindow, treeview, browserdialog, delegates, tageditor
 from ..models import browser as browsermodel, Element
                          
 translate = QtCore.QCoreApplication.translate
@@ -44,7 +44,7 @@ class BrowserDock(QtGui.QDockWidget):
                         n.loadTags()
                 globalSelection.append(node)
         if len(globalSelection):
-            mainwindow.setGlobalSelection(globalSelection)
+            mainwindow.setGlobalSelection(globalSelection,self.widget())
             
 
 mainwindow.addWidgetData(mainwindow.WidgetData(
@@ -251,6 +251,25 @@ class BrowserTreeView(treeview.TreeView):
         self.setItemDelegate(delegates.BrowserDelegate(self,self.model()))
         #self.doubleClicked.connect(self._handleDoubleClicked)
     
+    def editTags(self,recursive):
+        """Open a dialog to edit the tags of the currently selected elements (and the children, if
+        *recursive* is True. This is called by the edit tags actions in the contextmenu.
+        """
+        if not recursive:
+            # Just remove nodes which don't have tags
+            elements = [node for node in self.getSelectedNodes() if isinstance(node,Element)]
+        else:
+            selectedNodes = self.getSelectedNodes(onlyToplevel=True)
+            elements = []
+            ids = set()
+            for node in selectedNodes:
+                for child in node.getAllNodes():
+                    if isinstance(child,Element) and child.id not in ids:
+                        ids.add(child.id)
+                        elements.append(Element.fromId(child.id))
+        dialog = tageditor.TagEditorDialog(modify.REAL,elements,self)
+        dialog.exec_()
+            
     def startAutoExpand(self):
         """Start AutoExpand: Calculate the height of all nodes with depth 1. If they fit into the view and
         there is still place left, load the contents of those nodes (using the AutoLoad feature of
