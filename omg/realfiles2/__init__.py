@@ -11,7 +11,6 @@ from .. import tags, logging
 from ..utils import absPath
 from ..config import options
 import cutags
-cutags.setVerbosity(100)
 
 logger = logging.getLogger("realfiles2")
 
@@ -92,7 +91,7 @@ class UFile(RealFile):
     def _ensureFileIsLoaded(self):
         if self._f is None:
             self._f = cutags.File(self.path)
-            print(self._f.tags)
+
     def read(self):
         self._ensureFileIsLoaded()
         self.tags = tags.Storage()
