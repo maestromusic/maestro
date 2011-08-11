@@ -212,9 +212,6 @@ class Browser(QtGui.QWidget):
         if self._dialog is None:
             self._dialog = browserdialog.BrowserDialog(self)
             self._dialog.tabWidget.setCurrentIndex(self._lastDialogTabIndex)
-            pos = QtCore.QPoint(self.optionButton.x(),
-                                self.optionButton.y()+self.optionButton.frameGeometry().height())
-            self._dialog.move(self.mapTo(self.window(),pos))
             self._dialog.show()
     
     def _handleDialogClosed(self):

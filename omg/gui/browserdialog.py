@@ -31,7 +31,7 @@ selectableLayers = utils.mapRecursively(tags.get,[
 class BrowserDialog(dialogs.FancyTabbedPopup):
     """Popup dialog that allows to configure the Browser."""
     def __init__(self,browser):
-        dialogs.FancyTabbedPopup.__init__(self,browser.window())
+        dialogs.FancyTabbedPopup.__init__(self,browser.optionButton)
         self.browser = browser
         self.viewConfigurations = []
                 
