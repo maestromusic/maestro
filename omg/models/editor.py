@@ -207,7 +207,6 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
             while not readOk:
                 try:
                     theFile = File.fromFilesystem(f)
-                    print('bla - {}'.format(theFile.tags[tags.TITLE]))
                     elementList.append(theFile)
                     readOk = True
                 except tags.UnknownTagError as e:
