@@ -8,33 +8,37 @@
 
 """
 This package handles OMG's configuration. There are five sources where configuration may come from:
-Three files in the configuration directory, the default options which are hard coded into the defaultconfig module
-(and into plugins) and finally the command line where arbitrary config options may be overwritten using the -c option.
+Three files in the configuration directory, the default options which are hard coded into the defaultconfig
+module (and into plugins) and finally the command line where arbitrary config options may be overwritten
+using the -c option.
 The three files are:
     - config. This is the main configuration file and the one that is mainly edited by the user.
     But it may be written from the program, too. It contains several sections which may contain options
-    and nested sections. Options must have a type (str,int or list) and a default value stored in defaultconfig.
-    To get the option “size” from the section “gui” simply use “config.options.gui.size”.
+    and nested sections. Options must have a type (str,int or list) and a default value stored in
+    defaultconfig. To get the option “size” from the section “gui” simply use “config.options.gui.size”.
     This will directly return the option's value. In the rare cases you need the option itself as
-    ConfigOption-instance use “config.optionObject.gui.size”. Instead of attribute access you may also use item
-    access: “config.options['gui']['size']”. Both types of access allow to write values via assignment. Note
-    that values will not be written to the file before the application terminates, though.
+    ConfigOption-instance use “config.optionObject.gui.size”. Instead of attribute access you may also use
+    item access: “config.options['gui']['size']”. Both types of access allow to write values via assignment.
+    Note that values will not be written to the file before the application terminates, though.
 
     - storage. This file holds persistent information and is mainly written by the program. But it is human
     readable and can thus be edited by the user, too. The most important difference to config is that this
     file uses ConfigObj's unrepr-mode. Therefore you may store any combination of Python's standard types
-    including lists and dicts. Access works like for config, but with the variables “config.storage” and “config.storageObject”.
+    including lists and dicts. Access works like for config, but with the variables “config.storage” and
+    “config.storageObject”.
 
-    - binary. The last file contains simply a pickled dict to store arbitrary binary data. During the application this
-    dict can be accessed via config.binary which really is simply a dict, so there are no sections or attribute access
-    like for config and storage. Take care that your keys don't conflict with other modules!
+    - binary. The last file contains simply a pickled dict to store arbitrary binary data. During the
+    application this dict can be accessed via config.binary which really is simply a dict, so there are no
+    sections or attribute access like for config and storage. Take care that your keys don't conflict with
+    other modules!
 
-    Both config and storage may only contain options which are defined in the defaultconfig module or in the default configuration
-    of a plugin that is returned by its defaultConfig or defaultStorage method (to be precise they may contain sections which are
-    not defined. OMG will assume that they belong to a plugin that is not loaded).
+    Both config and storage may only contain options which are defined in the defaultconfig module or in the
+    default configuration of a plugin that is returned by its defaultConfig or defaultStorage method (to be
+    precise they may contain sections which are not defined. OMG will assume that they belong to a plugin
+    that is not loaded).
 
-    Call init at application start to read options and call shutdown at the end to write the options. Use loadPlugins and
-    removePlugins to add or remove plugin configuration.
+    Call init at application start to read options and call shutdown at the end to write the options. Use
+    loadPlugins and removePlugins to add or remove plugin configuration.
 """
 
 import os, sys, pickle
@@ -57,7 +61,10 @@ logger = logging.getLogger("config")
 
 
 def init(cmdOptions = []):
-    """Initialize the config-module: Read the config files and create the module variables. *cmdOptions* is a list of options given on the command line that will overwrite the corresponding option from the file or the default. Each list item has to be a string like ``main.collection=/var/music``."""
+    """Initialize the config-module: Read the config files and create the module variables. *cmdOptions* is a
+    list of options given on the command line that will overwrite the corresponding option from the file or
+    the default. Each list item has to be a string like ``main.collection=/var/music``.
+    """
     
     # Find the config directory and ensure that it exists
     global CONFDIR
@@ -108,7 +115,8 @@ class Option:
             * “default”: the default value,
             * “fileValue”: the value in the config file or “None“ if the file does not contain this option,
             * “value”:  “None” or a value set from the program which will overwrite fileValue during runtime,
-              but will not be written to the config file (this is used when options are specified on the command line).
+              but will not be written to the config file (this is used when options are specified on the
+              command line).
             * description (optional): A short text describing the option.
             
     \ """
@@ -120,7 +128,8 @@ class Option:
         self.description = description
     
     def getValue(self):
-        """Return the current value of this option. The value is the first of the attributes ``value``, ``fileValue`` which is not ``None`` or ``default`` if both are ``None``.
+        """Return the current value of this option. The value is the first of the attributes ``value``,
+        ``fileValue`` which is not ``None`` or ``default`` if both are ``None``.
         """
         if self.value is not None:
             return self.value
@@ -130,19 +139,22 @@ class Option:
 
     
 class ConfigOption(Option):
-    """Subclass of :class:`Option` which has additionally a type. This class is used for the options in the config file."""
+    """Subclass of :class:`Option` which has additionally a type. This class is used for the options in the
+    config file."""
     def __init__(self,name,type,default,description=""):
         Option.__init__(self,name,default,description)
         self.type = type
 
     def _import(self,value):
-        """Convert the string *value* (from the config file) into the type of this option. Raise a :class:`ConfigError` if that fails."""
+        """Convert the string *value* (from the config file) into the type of this option. Raise a
+        :class:`ConfigError` if that fails."""
         if isinstance(value,self.type):
             return value
 
         try:
             if self.type == bool:
-                # bool("0") or bool("False") are True, but we want them to be false as this is what you type in a configuration file to make a variable false.
+                # bool("0") or bool("False") are True, but we want them to be false as this is what you
+                # type in a configuration file to make a variable false.
                 if value == "0" or value.lower() == "false":
                     return False
                 else: return bool(value)
@@ -169,14 +181,18 @@ class ConfigOption(Option):
         else: return str(value)
 
     def updateValue(self,value,fileValue):
-        """Set the value of this option to *value*. If *fileValue* is true, the value will be written to the config file at application end."""
+        """Set the value of this option to *value*. If *fileValue* is true, the value will be written to the
+        config file at application end."""
         if fileValue:
             self.fileValue = self._import(value)
             self.value = None # Otherwise getValue would return self.value
         else: self.value = self._import(value)
 
     def _write(self,fileSection):
-        """Write the ``fileValue`` of this option in *fileSection* which must be a ``confobj.Section``-instance. If ``fileValue`` is ``None`` the option will be deleted from *fileSection*."""
+        """Write the ``fileValue`` of this option in *fileSection* which must be a
+        ``confobj.Section``-instance. If ``fileValue`` is ``None`` the option will be deleted from
+        *fileSection*.
+        """
         if self.name in fileSection:
             # Do not remove the value from the file even if it is the default.
             if self.fileValue is None:
@@ -190,17 +206,24 @@ class ConfigOption(Option):
     def updateFileValue(self,value):
         self.value = self.getValue() # Store the old value, so that the effective value does not change
         self.fileValue = self._import(value)
+        
+        
 class StorageOption(Option):
-    """Subclass of :class:`Option` for options in the Storage file. These options do not have a type but may store dicts, list, tuples of basic datatypes."""
+    """Subclass of :class:`Option` for options in the Storage file. These options do not have a type but may
+    store dicts, list, tuples of basic datatypes."""
     def updateValue(self,value,fileValue):
-        """Set the value of this option to *value*. If *fileValue* is true, the value will be written to the config file at application end."""
+        """Set the value of this option to *value*. If *fileValue* is true, the value will be written to the
+        config file at application end."""
         if fileValue:
             self.fileValue = value
             self.value = None # Otherwise getValue would return self.value
         else: self.value = value
         
     def _write(self,fileSection):
-        """Write the ``fileValue`` of this option in *fileSection* which must be a ``confobj.Section``-instance. If ``fileValue`` is ``None`` the option will be deleted from *fileSection*."""
+        """Write the ``fileValue`` of this option in *fileSection* which must be a
+        ``confobj.Section``-instance. If ``fileValue`` is ``None`` the option will be deleted from
+        *fileSection*.
+        """
         if self.name in fileSection:
             if self.fileValue is None or self.fileValue == self.default:
                 del fileSection[self.name]
@@ -227,10 +250,13 @@ class ConfigSection:
 
     def __getitem__(self,member):
         return self._members[member]
+    
     def __len__(self):
         return len(self._members)
+    
     def __iter__(self):
         return self._members.__iter__()
+    
     def __getattr__(self,member):
         if member in self._members:
             return self._members[member]
@@ -243,7 +269,11 @@ class ConfigSection:
         return self._name
 
     def updateFromFile(self,fileSection,path):
-        """Read the *fileSection* (of type ``configobj.Section``) and update this section (options and subsections) with the values from the file. If *fileSection* contains an unknown option, skip it and log a warning. The parameter *path* is only used for these warnings and should contain the path to the config file."""
+        """Read the *fileSection* (of type ``configobj.Section``) and update this section (options and
+        subsections) with the values from the file. If *fileSection* contains an unknown option, skip it and
+        log a warning. The parameter *path* is only used for these warnings and should contain the path to
+        the config file.
+        """
         for name,member in fileSection.items():
             if isinstance(member,configobj.Section):
                 if name not in self._members:
@@ -265,7 +295,8 @@ class ConfigSection:
                     self._members[name].updateValue(member,fileValue=True)
 
     def _write(self,fileSection):
-        """Write this section and its options and subsections into *fileSection* (of type ``configobj.Section``). This will not really write the file."""
+        """Write this section and its options and subsections into *fileSection* (of type
+        ``configobj.Section``). This will not really write the file."""
         if self._name not in fileSection or not isinstance(fileSection[self._name],configobj.Section):
             fileSection[self._name] = {}
         for name,member in self._members.items():
@@ -277,8 +308,8 @@ class Config(ConfigSection):
     It is itself a section with the name “<Default>”. Upon creation this class will read the defaults
     and then the config/storage-file.The parameters are:
 
-        * *cmdOptions*: a list of strings of the form “main.collection=/var/music”. The options given in these
-          strings will overwrite the options from the file or the defaults.
+        * *cmdOptions*: a list of strings of the form “main.collection=/var/music”. The options given in
+          these strings will overwrite the options from the file or the defaults.
         * *storage*: whether this object corresponds to a storage file (confer module documentation).
 
     \ """
@@ -318,7 +349,8 @@ class Config(ConfigSection):
                 logger.error("Invalid config option on command line '{}'.".format(line))
 
     def _openFile(self):
-        """Open the file this object corresponds to and store a ``configobj.ConfigObj``-object in ``self._configObj``."""
+        """Open the file this object corresponds to and store a ``configobj.ConfigObj``-object in
+        ``self._configObj``."""
         self._configObj = configobj.ConfigObj(self._path,encoding='UTF-8',
                                               write_empty_values=True,
                                               create_empty=True,unrepr=self._storage)
@@ -326,11 +358,16 @@ class Config(ConfigSection):
     def _addSection(self,name,options):
         """Add a section with the given name and options."""
         if name in self._members:
-            raise ConfigError("Error in config file '{}': Cannot add section '{}' twice.".format(self._path,name))
+            raise ConfigError("Error in config file '{}': Cannot add section '{}' twice."
+                               .format(self._path,name))
         else: self._members[name] = ConfigSection(name,self._storage,options)
 
     def loadPlugins(self,sections):
-        """Load plugin configuration. *sections* stores the default configuration of the plugins. It is a dict mapping section names (usually the plugin name) to a section dict like in the defaultconfig module. After storing this default configuration check if these sections exist in the config and storage file and read them."""
+        """Load plugin configuration. *sections* stores the default configuration of the plugins. It is a
+        dict mapping section names (usually the plugin name) to a section dict like in the defaultconfig
+        module. After storing this default configuration check if these sections exist in the config and
+        storage file and read them.
+        """
         for name,section in sections.items():
             self._addSection(name,section)
             if self._configObj is None: # This is the case if plugins are loaded during runtime
@@ -340,10 +377,12 @@ class Config(ConfigSection):
         self._configObj = None
 
     def removePlugins(self,sectionNames):
-        """Remove the plugin configuration of one or more plugins. *sectionNames* contains the names of the sections used by the plugins that should be removed."""
+        """Remove the plugin configuration of one or more plugins. *sectionNames* contains the names of the
+        sections used by the plugins that should be removed."""
         for name in sectionNames:
             if name not in self._members:
-                raise ConfigError("Cannot remove plugin section '{}' from config because it doesn't exist.".format(name))
+                raise ConfigError("Cannot remove plugin section '{}' from config because it doesn't exist."
+                                  .format(name))
             del self._members[name]
 
     def write(self):
@@ -404,7 +443,8 @@ class ValueSection:
 
 
 def _getPath(fileName):
-    """Get the path to a configugation file. *fileName* may be ``'config'`` or ``'storage'`` or``'binary'``."""
+    """Get the path to a configugation file. *fileName* may be ``'config'`` or ``'storage'`` or``'binary'``.
+    """
     path = os.path.join(CONFDIR,fileName)
     if os.path.exists("{}.{}".format(path,constants.VERSION)):
         return "{}.{}".format(path,constants.VERSION) # Load version specific config

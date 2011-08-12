@@ -7,12 +7,17 @@
 #
 
 """
-This module stores the default configuration of OMG' core. Plugin default configuration is returned by the plugin's defaultConfig and defaultStorage methods. The return values of these methods use the same format as the dicts in this module:
+This module stores the default configuration of OMG' core. Plugin default configuration is returned by the
+plugin's defaultConfig and defaultStorage methods. The return values of these methods use the same format as
+the dicts in this module:
 
-defaults and defaultStorage are dicts mapping section names to other dicts which store the options and nested sections of that section (using their names as keys again). Nested sections are again dicts, of course. Options are tuples consisting of:
+defaults and defaultStorage are dicts mapping section names to other dicts which store the options and nested
+sections of that section (using their names as keys again). Nested sections are again dicts, of course.
+Options are tuples consisting of:
 
     - For default: type (one of str,list or int),default value and optionally a description string.
-    - For defaultStorage: default value and optionally a description string. If you don't specify a description you must use tuples with only one element!
+    - For defaultStorage: default value and optionally a description string. If you don't specify a
+      description you must use tuples with only one element!
 
 """
 
