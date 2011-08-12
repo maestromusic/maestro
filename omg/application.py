@@ -11,7 +11,7 @@ This module controls the startup and finishing process of OMG. :func:`run` runs 
 :func:`init` only initializes the most basic modules without starting a graphical interface.
 """
 
-import sys, os
+import sys, os, fcntl
 
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
@@ -21,6 +21,7 @@ from omg import config, logging, database
 # The application's main window
 mainWindow = None
 
+global logger
 
 def init(cmdConfig = [],initTags=True,testDB=False):
     """Initialize the application, modules (config, logging, database and tags) but do not create a GUI or
@@ -50,6 +51,7 @@ def init(cmdConfig = [],initTags=True,testDB=False):
     # Initialize config and logging
     config.init(cmdConfig)
     logging.init()
+    global logger
     logger = logging.getLogger("omg")
     logger.debug("START")
     
@@ -89,16 +91,20 @@ def run(cmdConfig = []):
     """
     app = init(cmdConfig)
     
-    if os.path.dirname(__file__):
-        os.chdir(os.path.dirname(__file__))
-    os.chdir("../")
-
-    # Initialize config and logging
-    config.init(cmdConfig)
-    logging.init()
-    logger = logging.getLogger("omg")
-    logger.debug("START")
-    
+    # Lock the lockfile to prevent a second OMG-instance from starting.
+    # Confer http://packages.python.org/tendo/_modules/tendo/singleton.html#SingleInstance
+    lockFile = os.path.join(config.CONFDIR,'lock')
+    try:
+        fileDescriptor = open(lockFile,'w')
+    except IOError:
+        logger.error("Cannot open lock file {}".format(lockFile))
+        sys.exit(-1)
+    try:
+        fcntl.lockf(fileDescriptor,fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except IOError:
+        logger.error("Another instance is already running, quitting.")
+        sys.exit(-1)
+        
     # Load remaining modules
     from omg import distributor 
     distributor.init()
@@ -131,4 +137,5 @@ def run(cmdConfig = []):
     #sync.shutdown()
     config.shutdown()
     logging.shutdown()
+
     sys.exit(returnValue)
