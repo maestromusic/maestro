@@ -14,7 +14,7 @@ import itertools, os.path
 from .. import constants, tags, strutils, utils, config, logging, modify
 from ..models import tageditormodel, simplelistmodel, File
 from ..gui import formatter, singletageditor, dialogs, tagwidgets, mainwindow, editor
-from ..gui.misc import widgetlist, dynamicgridlayout, dockwidgettitlebutton
+from ..gui.misc import widgetlist, dynamicgridlayout #, dockwidgettitlebutton
 
 translate = QtCore.QCoreApplication.translate
 
