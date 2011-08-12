@@ -209,7 +209,7 @@ class TagEditorWidget(QtGui.QWidget):
                 widget.setEnabled(count > 0)
         
     def _handleAddRecord(self,tag=None):
-        dialog = TagDialog(self,self.model.getElements(),tag)
+        dialog = TagDialog(self,self.model.getElements(),defaultTag=tag)
         if dialog.exec_() == QtGui.QDialog.Accepted:
             self.model.addRecord(dialog.getRecord())
 
@@ -217,7 +217,7 @@ class TagEditorWidget(QtGui.QWidget):
         records = [re.getRecord() for re in self.selectionManager.getSelectedWidgets() if re.isVisible()]
         if len(records) > 0:
             self.model.removeRecords(records)
-
+          
     # Note that the following _handle-functions only add new SingleTagEditors or remove SingleTagEditors which have become empty. Unless they are newly created or removed, the editors are updated in their own _handle-functions.
     def _handleTagInserted(self,pos,tag):
         self._insertSingleTagEditor(pos,tag)
@@ -260,7 +260,7 @@ class TagEditorWidget(QtGui.QWidget):
             self.model.save()
             self.saved.emit()
         
-    def contextMenuEvent(self,contextMenuEvent,tag=None):
+    def contextMenuEvent(self,contextMenuEvent,record=None):
         menu = QtGui.QMenu(self)
 
         menu.addAction(self.undoAction)
@@ -275,6 +275,11 @@ class TagEditorWidget(QtGui.QWidget):
         removeSelectedAction.triggered.connect(self._handleRemoveSelected)
         menu.addAction(removeSelectedAction)
 
+        if record is not None:
+            editRecordAction = QtGui.QAction(self.tr("Edit record..."),self)
+            editRecordAction.triggered.connect(lambda: self._handleEditRecord(record))
+            menu.addAction(editRecordAction)
+            
         # Fancy stuff
         fancyMenu = menu.addMenu(self.tr("Fancy stuff"))
         selectedRecords = [editor.getRecord() for editor in self.selectionManager.getSelectedWidgets()]
@@ -326,25 +331,47 @@ class TagEditorWidget(QtGui.QWidget):
         if ok:
             newValues = [text+record.value[len(commonStart):] for record in selectedRecords]
             self.model.editMany(selectedRecords,newValues)
-        
+    
+    def _handleEditRecord(self,record):
+        dialog = RecordDialog(self,self.model.getElements(),record=record)
+        if dialog.exec_() == QtGui.QDialog.Accepted:
+            self.model.changeRecord(record,dialog.getRecord())
 
-class TagDialog(QtGui.QDialog):
-    def __init__(self,parent,elements,tag=None):
+
+class RecordDialog(QtGui.QDialog):
+    """Dialog to edit a single record. Parameters are:
+    
+        - *parent*: The parent widget
+        - *elements*: The list of elements that can be selected in the dialog
+        - *record*: If set the dialog will be initialized with the tag, value and selected elements from
+          the record.
+        - *tag*: If set and *record* is None, this tag will be displayed at the beginning.
+    
+    \ """
+    def __init__(self,parent,elements,record=None,defaultTag=None):
         QtGui.QDialog.__init__(self,parent)
         self.setWindowTitle(self.tr("Add tag value"))
         assert len(elements) > 0
         
-        self.typeEditor = tagwidgets.TagTypeBox(defaultTag=tag)
+        if record is not None:
+            defaultTag = record.tag
+        self.typeEditor = tagwidgets.TagTypeBox(defaultTag=defaultTag)
         self.typeEditor.tagChanged.connect(self._handleTagChanged)
+        
         self.valueEditor = tagwidgets.TagValueEditor(self.typeEditor.getTag())
+        if record is not None:
+            self.valueEditor.setValue(record.value)
+            
         self.elementsBox = QtGui.QListView(self)
         # Use a formatter to print the title of the elements
         self.elementsBox.setModel(simplelistmodel.SimpleListModel(elements,
                                                     lambda el: formatter.Formatter(el).title()))
         self.elementsBox.setSelectionMode(QtGui.QAbstractItemView.MultiSelection)
-        for i in range(len(elements)):
-            self.elementsBox.selectionModel().select(self.elementsBox.model().index(i,0),
-                                                     QtGui.QItemSelectionModel.Select)
+        for i,element in enumerate(elements):
+            if record is None or element in record.elementsWithValue:
+                self.elementsBox.selectionModel().select(self.elementsBox.model().index(i,0),
+                                                         QtGui.QItemSelectionModel.Select)
+                
         abortButton = QtGui.QPushButton(self.tr("Cancel"),self)
         abortButton.clicked.connect(self.reject)
         okButton = QtGui.QPushButton(self.tr("OK"),self)
@@ -370,6 +397,7 @@ class TagDialog(QtGui.QDialog):
         layout.addLayout(lastLineLayout)
     
     def _handleOkButton(self):
+        """Check whether at least one element is selected and the current value is valid and if so, exit."""
         if self.elementsBox.selectionModel().hasSelection():
             if self.valueEditor.getValue() is not None:
                 self.accept()
@@ -378,10 +406,12 @@ class TagDialog(QtGui.QDialog):
                                         self.tr("You must select at lest one element."))
         
     def getRecord(self):
+        """Return a record with the data from the dialog."""
         allElements = self.elementsBox.model().getItems()
         selectedElements = [allElements[i] for i in range(len(allElements))
                                 if self.elementsBox.selectionModel().isRowSelected(i,QtCore.QModelIndex())]
         return tageditormodel.Record(self.typeEditor.getTag(),self.valueEditor.getValue(),allElements,selectedElements)
 
     def _handleTagChanged(self,tag):
+        """Change the tag of the ValueEditor."""
         self.valueEditor.setTag(tag)
