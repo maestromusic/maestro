@@ -14,7 +14,7 @@ import itertools, os.path
 from .. import constants, tags, strutils, utils, config, logging, modify
 from ..models import tageditormodel, simplelistmodel, File
 from ..gui import formatter, singletageditor, dialogs, tagwidgets, mainwindow, editor
-from ..gui.misc import widgetlist, dynamicgridlayout, dockwidgettitlebutton
+from ..gui.misc import widgetlist, dynamicgridlayout
 
 translate = QtCore.QCoreApplication.translate
 
@@ -185,7 +185,10 @@ class TagEditorWidget(QtGui.QWidget):
         self.tagEditorLayout.removeRow(row)
 
         # Tidy up
-        self.tagBoxes[tag].setParent(None)
+        # When changing a tag via the tagbox we are about to remove the widget having the current focus.
+        # This leads to errors (Underlying C++ object has been deleted in focusOutEvent). Fortunately this
+        # is fixed using deleteLater.
+        self.tagBoxes[tag].deleteLater()
         del self.tagBoxes[tag]
         tagEditor = self.singleTagEditors[tag]
         tagEditor.widgetList.setSelectionManager(None)
