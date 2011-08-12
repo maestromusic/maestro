@@ -492,6 +492,7 @@ class BrowserMimeData(mimedata.MimeData):
     def getElements(self):
         if self.elementList is not None:
             return self.elementList
+        
         # self.elementList may contain CriterionNodes or (unlikely) LoadingNodes.
         self.elementList = itertools.chain.from_iterable(self._getElementsInstantly(node)
                                                             for node in self.nodeList)
@@ -503,17 +504,25 @@ class BrowserMimeData(mimedata.MimeData):
         be loaded, wait for the search to finish. If *node* is an element return ''[node]''.
         """
         if isinstance(node,Element):
+            # Load all the data that is not usually loaded by the browser.
+            if node.tags is None:
+                node.loadTags()
+            if node.isFile() and node.path is None:
+                node.path = db.path(node.id)
+            if node.isFile() and node.length is None:
+                node.length = db.lenght(node.id)
+            if node.position is None and isinstance(node.getParent(),Element):
+                position = db.position(node.getParent().id,node.id)
             return [node]
         if isinstance(node,CriterionNode):
-            node.loadContents(wait=True)
+            node.loadContents(wait=True) # This does not load element data
             return itertools.chain.from_iterable(self._getElementsInstantly(child)
                                                     for child in node.getContents())
         else: return [] # Should be a LoadingNode
     
     def paths(self):
         """Return a list of absolute paths to all files contained in this MimeData-instance."""
-        # The browser doesn't load the paths.
-        return [utils.absPath(db.path(file.id)) for file in self.getFiles()]
+        return [utils.absPath(file.path) for file in self.getFiles()]
 
     @staticmethod
     def fromIndexes(model,indexList):
@@ -521,7 +530,7 @@ class BrowserMimeData(mimedata.MimeData):
         these indexes. This method will remove an index when an ancestor is contained in *indexList*, too.
         """
         nodes = [model.data(index,role=Qt.EditRole) for index in indexList]
-        # Filter away nodes if a parent as also contained in the indexList. 
+        # Filter away nodes if a parent is also contained in the indexList. 
         nodes = [n for n in nodes if not any(parent in nodes for parent in n.getParents())]
         return BrowserMimeData(nodes)
     
