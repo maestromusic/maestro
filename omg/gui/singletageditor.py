@@ -153,7 +153,15 @@ class SingleTagEditor(QtGui.QWidget):
         return sum(isinstance(widget,RecordEditor) and not widget.getRecord().isCommon() for widget in self.widgetList)
 
     def contextMenuEvent(self,contextMenuEvent):
-        self.tagEditor.contextMenuEvent(contextMenuEvent,self.tag)
+        record = None
+        # Figure out on what record editor the event did happen
+        pos = self.widgetList.mapTo(self,contextMenuEvent.pos())
+        for widget in self.widgetList:
+            if widget.geometry().contains(pos):
+                if isinstance(widget,RecordEditor):
+                    record = widget.getRecord()
+                break;
+        self.tagEditor.contextMenuEvent(contextMenuEvent,record)
 
 
 class RecordEditor(QtGui.QWidget):

@@ -75,8 +75,8 @@ class Node:
         """Return a copy of this node. All attributes will be copied by reference, with the exception of the
         list of contents: If this instance contains a content-attribute, the new node will contain a deep copy
         of it. Note that a shallow copy makes no sense, because the parent-attributes have to be adjusted. If
-        you do not want this behaviour, you may specify the parameter *contents* and the contents will be set
-        to that parameter. The parents of all elements of <contents> will be adjusted in this case, too."""
+        you do not want this behavior, you may specify the parameter *contents* and the contents will be set
+        to that parameter. The parents of all elements of *contents* will be adjusted in this case, too."""
         newNode = copy.copy(self)
         if contents is None:
             if hasattr(self,'contents'):
@@ -359,15 +359,19 @@ class Container(Element):
             if tags is None:
                 tags = db.tags(id)
             if position is None and parentId is not None:
-                position = db.position(parentId,position)
+                position = db.position(parentId,id)
         return Container(id,contents,tags,position)
 
     def isContainer(self):
         return True
     
     def loadContents(self,recursive=False,table=None,loadData=True):
-        """Delete the stored contents-list and fetch the contents from the database. You may use the <table>-parameter to restrict the child elements to a specific table: The table with name <table> must contain a column 'id' and this method will only fetch elements which appear in that column. If <recursive> is true loadContents will be called recursively for all child elements.
-        If this container is not contained in the DB, this method won't do anything (except the recursive call if <recursive> is True)."""
+        """Delete the stored contents-list and fetch the contents from the database. You may use the
+        *table*-parameter to restrict the child elements to a specific table: The table with name *table*
+        must contain a column 'id' and this method will only fetch elements which appear in that column.
+        If *recursive* is true loadContents will be called recursively for all child elements.
+        If this container is not contained in the DB, this method won't do anything (except the recursive
+        call if *recursive* is True)."""
         if self.isInDB():
             if table is None:
                 table = db.prefix + "elements"
