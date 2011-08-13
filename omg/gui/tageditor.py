@@ -209,7 +209,7 @@ class TagEditorWidget(QtGui.QWidget):
                 widget.setEnabled(count > 0)
         
     def _handleAddRecord(self,tag=None):
-        dialog = TagDialog(self,self.model.getElements(),defaultTag=tag)
+        dialog = RecordDialog(self,self.model.getElements(),defaultTag=tag)
         if dialog.exec_() == QtGui.QDialog.Accepted:
             self.model.addRecord(dialog.getRecord())
 

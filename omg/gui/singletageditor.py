@@ -99,8 +99,8 @@ class SingleTagEditor(QtGui.QWidget):
             newPos = self._correctPosition(newPos)
             self.widgetList.moveWidget(self.widgetList[oldPos],newPos)
 
-    def _handleCommonChanged(self,record):
-        if record.tag == self.tag:
+    def _handleCommonChanged(self,tag):
+        if tag == self.tag:
             self._checkExpandLine()
             
     def _isExLineNecessary(self):

@@ -451,3 +451,4 @@ def csIdList(objects):
     if hasattr(objects,'__iter__'):
         return ','.join(str(object.id) for object in objects)
     else: return str(objects.id)
+

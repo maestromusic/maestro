@@ -14,7 +14,8 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from .. import tags, logging
-from . import real
+
+# At the end of the file we will import the submodules real and events.
 
 translate = QtCore.QCoreApplication.translate
 
@@ -245,16 +246,20 @@ class TagUndoCommand(UndoCommand):
         UndoCommand.__init__(self,level,changes,contentsChanged=False,text=text)
         
     def redo(self):
-        changes = OrderedDict((k,v[1]) for k,v in self.changes.items())
+        # Note that real.changeTags and TagModifyEvent expect a different format for changes 
         if self.level == REAL:
-            real.changeTags(changes)
-        else: dispatcher.editorChanges.emit(events.ModifyEvent(changes))
+            real.changeTags(self.changes)
+        else:
+            changes = OrderedDict((k,v[1]) for k,v in self.changes.items())
+            dispatcher.editorChanges.emit(events.TagModifyEvent(changes))
 
     def undo(self):
-        changes = OrderedDict((k,v[0]) for k,v in self.changes.items())
+        # Note that real.changeTags and TagModifyEvent expect a different format for changes
         if self.level == REAL:
-            real.changeTags(changes)
-        else: dispatcher.editorChanges.emit(events.ModifyEvent(changes))
+            real.changeTags(self.changes)
+        else:
+            changes = OrderedDict((k,v[0]) for k,v in self.changes.items())
+            dispatcher.editorChanges.emit(events.TagModifyEvent(changes))
 
 
 def changePosition(level, element, position):
@@ -350,19 +355,18 @@ class UndoGroup(QtGui.QUndoGroup):
         self.setActiveStack(self.mainStack)
         
 stack = UndoGroup()
-def pushEditorCommand(command):
-    if stack.state() == REAL:
-        stack.setActiveStack(stack.editorStack)
-    stack.activeStack().push(command)
-    
-def beginEditorMacro(name):
-    if stack.state() == REAL:
-        stack.setActiveStack(stack.editorStack)
+
+def beginMacro(level,name):
+    stack.setActiveStack(stack.mainStack if level == REAL else stack.editorStack)
     stack.activeStack().beginMacro(name)
-    
-def endEditorMacro():
-    assert stack.state() == EDITOR
-    stack.editorStack.endMacro()
+
+def endMacro(level):
+    stack.setActiveStack(stack.mainStack if level == REAL else stack.editorStack)
+    stack.activeStack().endMacro()
+
+def push(level,command):
+    stack.setActiveStack(stack.mainStack if level == REAL else stack.editorStack)
+    stack.activeStack().push(command)
 
 def createUndoAction(level,parent,prefix):
     if level == REAL:
@@ -374,4 +378,6 @@ def createRedoAction(level,parent,prefix):
         return stack.editorStack.createRedoAction(parent,prefix)
     else: return stack.mainStack.createRedoAction(parent,prefix)
 
+
+from . import real, events
     

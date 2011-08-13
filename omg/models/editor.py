@@ -185,7 +185,7 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
             return False
 
         command = modify.UndoCommand(level = modify.EDITOR, changes = changes, contentsChanged = True)        
-        modify.pushEditorCommand(command)
+        modify.push(modify.EDITOR,command)
         return True
     
     def _handleUrlDrop(self, urls):

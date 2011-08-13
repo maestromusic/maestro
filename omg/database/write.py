@@ -29,7 +29,7 @@ def addTagValuesById(elids,tag,valueIds):
     """
     if not hasattr(elids,'__iter__'):
         elids = [elids]
-    db.multiQuery("INSERT INTO {}tags (element_id,tag_id,value_id) VALUES ({?,{},?)"
+    db.multiQuery("INSERT INTO {}tags (element_id,tag_id,value_id) VALUES (?,{},?)"
                    .format(db.prefix,tag.id),
                    itertools.product(elids,valueIds))
     
@@ -52,7 +52,7 @@ def removeAllTagValues(elids,tag):
 def removeTagValuesById(elids,tag,valueIds):
     """Remove some values of one tag from some elements. *elids* is either a single id or a list of ids,
     *tag* is the affected tag, *valueIds* is a list of value-ids of *tag*."""
-    db.query("DELETE FROM {}tags WHERE element_id IN ({}) AND tag_id = ? AND value_id IN ({})"
+    db.query("DELETE FROM {}tags WHERE element_id IN ({}) AND tag_id = {} AND value_id IN ({})"
                 .format(db.prefix,db.csList(elids),tag.id,db.csList(valueIds)))
     
 def removeTagValues(elids,tag,values):

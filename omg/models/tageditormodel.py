@@ -12,7 +12,6 @@ from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
 from .. import constants, models, tags, utils, strutils, modify
-from ..modify import events
 from . import simplelistmodel
 
 translate = QtCore.QCoreApplication.translate
@@ -20,6 +19,7 @@ translate = QtCore.QCoreApplication.translate
 # If ratio of elements that have the value of a record is higher than this constant, the record is regarded
 # as usual.
 RATIO = 0.75
+
 
 class Record:
     """The tageditor stores data not in the usual element/tags.Storage-structure but uses records consisting
@@ -312,11 +312,11 @@ class UndoCommand(QtGui.QUndoCommand):
         if self.model.level == modify.EDITOR:
             for action in actions:
                 if action[0] == 'add':
-                    event = events.TagValueAddedEvent(*action[1:])
+                    event = modify.events.TagValueAddedEvent(*action[1:])
                 elif action[0] == 'remove':
-                    event = events.TagValueRemovedEvent(*action[1:])
+                    event = modify.events.TagValueRemovedEvent(*action[1:])
                 elif action[0] == 'change':
-                    event = events.TagValueChangedEvent(*action[1:])
+                    event = modify.events.TagValueChangedEvent(*action[1:])
                 modify.dispatcher.editorChanges.emit(event)
         else: # level == REAL
             for action in actions:
@@ -331,7 +331,7 @@ class UndoCommand(QtGui.QUndoCommand):
 class TagEditorModel(QtCore.QObject):
     """The model of the tageditor."""
     resetted = QtCore.pyqtSignal()
-    commonChanged = QtCore.pyqtSignal(Record)
+    commonChanged = QtCore.pyqtSignal(tags.Tag)
     
     def __init__(self,level,elements,saveDirectly):
         QtCore.QObject.__init__(self)
@@ -378,19 +378,19 @@ class TagEditorModel(QtCore.QObject):
     def _beginMacro(self,name):
         """Start a macro with the given name on the correct UndoStack."""
         if self.saveDirectly:
-            modify.beginEditorMacro(name)
+            modify.beginMacro(self.level,name)
         else: self.undoStack.beginMacro(name)
     
     def _push(self,command):
         """Push the UndoCommand *command* to the correct UndoStack."""
         if self.saveDirectly:
-            modify.pushEditorCommand(command)
+            modify.push(self.level,command)
         else: self.undoStack.push(command)
         
     def _endMacro(self):
         """End a macro on the correct UndoStack."""
         if self.saveDirectly:
-            modify.endEditorMacro()
+            modify.endMacro(self.level)
         else: self.undoStack.endMacro()
         
     def addRecord(self,record):
@@ -434,11 +434,7 @@ class TagEditorModel(QtCore.QObject):
                 # Because we add elements, it must be this way:
                 assert not existingRecord.isCommon() and copy.isCommon()
                 pos = self.inner.tags[record.tag].index(existingRecord)
-                newPos = self._commonCount(record.tag)
-                if pos != newPos:
-                    command = UndoCommand(self,self.inner.moveRecord,pos,newPos)
-                    self._push(command)
-                self.commonChanged.emit(copy)
+                self.commonChanged.emit(copy.tag)
             return False
             
     def removeRecord(self,record):
@@ -485,7 +481,7 @@ class TagEditorModel(QtCore.QObject):
                 if pos != newPos:
                     command = UndoCommand(self,self.inner.moveRecord,pos,newPos)
                     self._push(command)
-                self.commonChanged.emit(newRecord)
+                self.commonChanged.emit(newRecord.tag)
         self._endMacro()
 
     def removeTag(self,tag):
@@ -602,7 +598,10 @@ class TagEditorModel(QtCore.QObject):
 
     def splitMany(self,records,separator):
         """Split each of the given records using *separator*. Return true if all splits were successful."""
-        return any(self.split(record,separator) for record in records)
+        self._beginMacro(self.tr("Split many"))
+        result = any(self.split(record,separator) for record in records)
+        self._endMacro()
+        return result
 
     def editMany(self,records,newValues):
         """Given a list of records and an equally long list of values change the value of the i-th record to
@@ -617,17 +616,33 @@ class TagEditorModel(QtCore.QObject):
 
     def extendRecords(self,records):
         """Make the given records common, i.e. set ''record.elementsWithValue'' to all elements."""
-        self._beginMacro("Extend records")
+        self._beginMacro(self.tr("Extend records"))
+        commonChangedTags = set() # Set of tags where the number of common records changed
         for record in records:
+            if record.isCommon():
+                continue
+            else: commonChangedTags.add(record.tag)
+            
+            # Maybe we have to change the record's position, since it is common afterwards
+            pos = self.inner.tags[record.tag].index(record)
+            newPos = self._commonCount(record.tag)
+            
             newRecord = record.copy()
             newRecord.elementsWithValue = self.inner.elements[:] # copy the list!
             command = UndoCommand(self,self.inner.changeRecord,record.tag,record,newRecord)
             self._push(command)
+            
+            if pos != newPos:
+                command = UndoCommand(self,self.inner.moveRecord,record.tag,pos,newPos)
+                self._push(command)
         self._endMacro()
+        
+        for tag in commonChangedTags:
+            self.commonChanged.emit(tag)
 
     def _commonCount(self,tag):
-        """Return the number of records of the given tag that are common (i.e. all elements have the record's
-        value."""
+        """Return the number of records of the given tag that are common (i.e. all elements have the
+        record's value)."""
         c = 0
         for record in self.inner.tags[tag]:
             if record.isCommon():
