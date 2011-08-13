@@ -12,7 +12,7 @@ from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
 from .. import constants, models, tags, utils, strutils, modify
-from ..modify import events, db as modifydb
+from ..modify import events
 from . import simplelistmodel
 
 translate = QtCore.QCoreApplication.translate
@@ -114,7 +114,7 @@ class InnerModel(QtCore.QObject):
 
     def __init__(self,elements):
         QtCore.QObject.__init__(self)
-        self.elements = [element.copy(copyTags=False) for element in elements]
+        self.elements = [element.copy(contents=[],copyTags=False) for element in elements]
         self.createTags()
 
     def createTags(self):
@@ -321,11 +321,11 @@ class UndoCommand(QtGui.QUndoCommand):
         else: # level == REAL
             for action in actions:
                 if action[0] == 'add':
-                    modifydb.addTagValue(*action[1:])
+                    modify.real.addTagValue(*action[1:])
                 elif action[0] == 'remove':
-                    modifydb.removeTagValue(*action[1:])
+                    modify.real.removeTagValue(*action[1:])
                 elif action[0] == 'change':
-                    modifydb.changeTagValue(*action[1:])
+                    modify.real.changeTagValue(*action[1:])
 
 
 class TagEditorModel(QtCore.QObject):
@@ -365,7 +365,7 @@ class TagEditorModel(QtCore.QObject):
     
     def setElements(self,elements):
         """Set the list of edited elements and reset the tageditor."""
-        self.inner.elements = [element.copy(copyTags=False) for element in elements]
+        self.inner.elements = [element.copy(contents=[],copyTags=False) for element in elements]
         self.reset()
         
     def reset(self):
@@ -540,59 +540,22 @@ class TagEditorModel(QtCore.QObject):
             
         return True
 
-    def save(self):
-        if saveDirectly:
-            raise RuntimeError("You must not call save in a TagEditorModel that saves directly.")
-        
-        raise NotImplementedError()
-        # Remove the stored elements
-        for element in self.inner.elements:
-            element.oldTags = element.tags
-            element.tags = tags.Storage()
-
-        # And store the changed tags
+    def getTagsOfElement(self,element):
+        result = tags.Storage()
         for tag,records in self.inner.tags.items():
             for record in records:
-                for element in record.elementsWithValue:
-                    element.tags.add(tag,record.value)
-
-        for element in self.inner.elements:
-            if element.isFile():
-                element.writeToFileSystem(tags=True)
+                if element in record.elementsWithValue:
+                    result.add(tag,record.value)
+        return result
+                    
+    def save(self):
+        if self.saveDirectly:
+            raise RuntimeError("You must not call save in a TagEditorModel that saves directly.")
             
-        # First remove values contained in the database, but not in self.inner.tags from the database.
-        # AND remove values which are already contained in the database and in self.inner.tags (that is,
-        # those tag-values where nothing has changed) from self.inner.tags so that they won't be added to
-        # the db later.
-        for tag in tags.tagList:
-            for element in self.inner.elements:
-                if not element.isInDB():
-                    continue
-                if tag not in element.oldTags:
-                    continue
-                for value in db.tagValues(element.id,tag):
-                    record = self.inner.getRecord(tag,value)
-                    if record is None or element not in record.elementsWithValue:
-                        # The value is contained in the db, but not in self.inner.tags => remove it
-                        db.removeTag(element.id,tag,value)
-                    else:
-                        # This value is already in the database, so there is no need to add it
-                        record.elementsWithValue.remove(element)
-
-        # In the second step add the tags which remained in self.tags to the database.
-        for tag in self.inner.tags:
-            # Ensure that the tag exists
-            if not tag.isIndexed():
-                tag = tags.addIndexedTag(tag.name,tag.type)
-            for record in self.inner.tags[tag]:
-                if len(record.elementsWithValue) > 0: # For unchanged tags this is []
-                    db.addTag([element.id for element in record.elementsWithValue if element.isInDB()],
-                              tag,record.value)
-
-        #TODO: This is not very accurate...
-        changedIds = [element.id for element in self.getElements() if element.isInDB()] 
-        if len(changedIds) > 0:
-            distributor.indicesChanged.emit(distributor.DatabaseChangeNotice(changedIds,tags=True))
+        changes = {element: (element.tags,self.getTagsOfElement(element))
+                        for element in self.inner.elements}
+        
+        self._push(modify.TagUndoCommand(self.level,changes,text=self.tr("Change tags")))
         
     def getPossibleSeparators(self,records):
         """Return all separators (from constants.SEPARATORS) that are present in every value of the given
@@ -671,3 +634,4 @@ class TagEditorModel(QtCore.QObject):
                 c = c + 1
             else: break
         return c
+    

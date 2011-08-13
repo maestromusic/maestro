@@ -7,10 +7,27 @@
 # published by the Free Software Foundation
 #
 
+from .. import tags
 from . import ModifyEvent
 
+
 class TagModifyEvent(ModifyEvent):
+    def __init__(self,changes):
+        self.changes = changes
+        self.contentsChanged = False
+        
+    def applyTo(self,element):
+        assert element in self.changes
+        if element.tags is not None:
+            element.tags = self.changes[element].copy()
+            
+    def __str__(self):
+        return "Modify tags of [{}]".format(",".join(str(k) for k in self.changes.keys()))
+
+            
+class SingleTagModifyEvent(TagModifyEvent):
     def __init__(self,tag,elements):
+        assert isinstance(tag,tags.Tag)
         self.tag = tag
         self.elements = elements
         self.contentsChanged = False
@@ -19,9 +36,9 @@ class TagModifyEvent(ModifyEvent):
         return [element.id for element in self.elements]
     
     
-class TagValueAddedEvent(TagModifyEvent):
+class TagValueAddedEvent(SingleTagModifyEvent):
     def __init__(self,tag,value,elements):
-        TagModifyEvent.__init__(self,tag,elements)
+        SingleTagModifyEvent.__init__(self,tag,elements)
         self.value = value
 
     def applyTo(self,element):
@@ -33,9 +50,9 @@ class TagValueAddedEvent(TagModifyEvent):
         return "Add: {} {} {}".format(self.tag,self.value,self.elements)
     
     
-class TagValueRemovedEvent(TagModifyEvent):
+class TagValueRemovedEvent(SingleTagModifyEvent):
     def __init__(self,tag,value,elements):
-        TagModifyEvent.__init__(self,tag,elements)
+        SingleTagModifyEvent.__init__(self,tag,elements)
         self.value = value
 
     def applyTo(self,element):
@@ -45,10 +62,11 @@ class TagValueRemovedEvent(TagModifyEvent):
         
     def __str__(self):
         return "Remove: {} {} {}".format(self.tag,self.value,self.elements)
-        
-class TagValueChangedEvent(TagModifyEvent):
+
+
+class TagValueChangedEvent(SingleTagModifyEvent):
     def __init__(self,tag,oldValue,newValue,elements):
-        TagModifyEvent.__init__(self,tag,elements)
+        SingleTagModifyEvent.__init__(self,tag,elements)
         self.oldValue = oldValue
         self.newValue = newValue
 
@@ -59,4 +77,3 @@ class TagValueChangedEvent(TagModifyEvent):
             
     def __str__(self):
         return "Change: {} {}->{} {}".format(self.tag,self.oldValue,self.newValue,self.elements)
-

@@ -39,9 +39,7 @@ class BrowserDock(QtGui.QDockWidget):
             node = selectionModel.model().data(index)
             # The browser does not load tags automatically
             if isinstance(node,Element):
-                for n in node.getAllNodes():
-                    if n.tags is None:
-                        n.loadTags()
+                browsermodel._loadData(node)
                 globalSelection.append(node)
         if len(globalSelection):
             mainwindow.setGlobalSelection(globalSelection,self.widget())
@@ -247,25 +245,6 @@ class BrowserTreeView(treeview.TreeView):
         self.setModel(browsermodel.BrowserModel(parent.table,layers,parent,self))
         self.setItemDelegate(delegates.BrowserDelegate(self,self.model()))
         #self.doubleClicked.connect(self._handleDoubleClicked)
-    
-    def editTags(self,recursive):
-        """Open a dialog to edit the tags of the currently selected elements (and the children, if
-        *recursive* is True. This is called by the edit tags actions in the contextmenu.
-        """
-        if not recursive:
-            # Just remove nodes which don't have tags
-            elements = [node for node in self.getSelectedNodes() if isinstance(node,Element)]
-        else:
-            selectedNodes = self.getSelectedNodes(onlyToplevel=True)
-            elements = []
-            ids = set()
-            for node in selectedNodes:
-                for child in node.getAllNodes():
-                    if isinstance(child,Element) and child.id not in ids:
-                        ids.add(child.id)
-                        elements.append(Element.fromId(child.id))
-        dialog = tageditor.TagEditorDialog(modify.REAL,elements,self)
-        dialog.exec_()
             
     def startAutoExpand(self):
         """Start AutoExpand: Calculate the height of all nodes with depth 1. If they fit into the view and

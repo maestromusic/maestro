@@ -504,15 +504,7 @@ class BrowserMimeData(mimedata.MimeData):
         be loaded, wait for the search to finish. If *node* is an element return ''[node]''.
         """
         if isinstance(node,Element):
-            # Load all the data that is not usually loaded by the browser.
-            if node.tags is None:
-                node.loadTags()
-            if node.isFile() and node.path is None:
-                node.path = db.path(node.id)
-            if node.isFile() and node.length is None:
-                node.length = db.lenght(node.id)
-            if node.position is None and isinstance(node.getParent(),Element):
-                position = db.position(node.getParent().id,node.id)
+            _loadData(node)
             return [node]
         if isinstance(node,CriterionNode):
             node.loadContents(wait=True) # This does not load element data
@@ -533,4 +525,20 @@ class BrowserMimeData(mimedata.MimeData):
         # Filter away nodes if a parent is also contained in the indexList. 
         nodes = [n for n in nodes if not any(parent in nodes for parent in n.getParents())]
         return BrowserMimeData(nodes)
-    
+
+
+def _loadData(element):
+    """Load the data of *element* that is not loaded directly by the browser. This method must be called
+    before an element leaves the browser."""
+    if element.tags is None:
+        element.loadTags()
+        
+    if element.position is None and isinstance(element.getParent(),Element):
+        position = db.position(element.getParent().id,element.id)
+        
+    if element.isFile():
+        if element.path is None:
+            element.path = db.path(element.id)
+        if element.length is None:
+            element.length = db.length(element.id)
+            

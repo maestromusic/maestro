@@ -19,6 +19,7 @@ from .. import logging, modify, tags
 translate = QtCore.QCoreApplication.translate
 logger = logging.getLogger("gui.editor")
 
+
 class EditorTreeView(treeview.TreeView):
     def __init__(self, name='default', parent = None):
         treeview.TreeView.__init__(self, parent)
@@ -104,6 +105,12 @@ class EditorTreeView(treeview.TreeView):
                          dialog.newTitle(),
                          dialog.removeString(),
                          dialog.adjustPositions())
+            
+    def editTags(self,recursive):
+        """Reimplement TreeView.editTags so that tags are edited on the EDITOR-level instead."""
+        from . import tageditor
+        dialog = tageditor.TagEditorDialog(modify.EDITOR,self.getSelectedElements(recursive),self)
+        dialog.exec_()
             
                
 class EditorWidget(QtGui.QDockWidget):

@@ -1,12 +1,21 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+# Copyright 2011 Martin Altmayer, Michael Helmling
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 3 as
+# published by the Free Software Foundation.
+#
 
+import copy
+from collections import OrderedDict
 
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from .. import tags, logging
+from . import real
 
-from collections import OrderedDict
-import copy
 translate = QtCore.QCoreApplication.translate
 
 logger = logging.getLogger(__name__)
@@ -142,8 +151,8 @@ class UndoCommand(QtGui.QUndoCommand):
 
     def undo(self):
         newChanges = OrderedDict(( (k,v[0]) for k,v in self.changes.items() ))
-        redoEvent = ModifyEvent(self.level, newChanges, contentsChanged = self.contentsChanged)
-        dispatcher.changes.emit(redoEvent)
+        undoEvent = ModifyEvent(self.level, newChanges, contentsChanged = self.contentsChanged)
+        dispatcher.changes.emit(undoEvent)
 
 class ModifySingleElementCommand(UndoCommand):
     """A specialized undo command for the modification of a single element (tags, position, ..., but no 
@@ -227,7 +236,27 @@ class InsertElementsCommand(UndoCommand):
     def undo(self):
         dispatcher.changes.emit(RemoveElementsEvent(
               self.level, dict((pid, [ (tup[0], len(tup[1]) ) for tup in reversed(elemSet)]) for pid,elemSet in self.insertions.items())))
-    
+
+
+class TagUndoCommand(UndoCommand):
+    """An UndoCommand that changes only tags. The difference to UndoCommand is that the dict *changes*
+    contains tuples of tags.Storage: the tags before and after the change."""
+    def __init__(self, level, changes, text = ''):
+        UndoCommand.__init__(self,level,changes,contentsChanged=False,text=text)
+        
+    def redo(self):
+        changes = OrderedDict((k,v[1]) for k,v in self.changes.items())
+        if self.level == REAL:
+            real.changeTags(changes)
+        else: dispatcher.editorChanges.emit(events.ModifyEvent(changes))
+
+    def undo(self):
+        changes = OrderedDict((k,v[0]) for k,v in self.changes.items())
+        if self.level == REAL:
+            real.changeTags(changes)
+        else: dispatcher.editorChanges.emit(events.ModifyEvent(changes))
+
+
 def changePosition(level, element, position):
     elemOld = element.copy()
     elemNew = element.copy()

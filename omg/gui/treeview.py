@@ -14,19 +14,22 @@ from .. import models
 
 translate = QtGui.QApplication.translate
 
-# Plugins may insert functions here to insert entries in the context menu. Each function must take three parameters:
+# Plugins may insert functions here to insert entries in the context menu. Each function must take three
+# parameters:
 # - the treeview where the context-menu is opened
 # - a list of actions and/or separators which will be inserted in the menu
 # - the current index, i.e. the index where the mouse was clicked (None if the mouse was not over an element)
 # To insert actions into the context menu, the function must modify the second parameter.
-# There are three lists (categories) where such function can be inserted: 'all' will be executed for all treeviews, 'playlist' and 'browser' only in playlists or browsers, respectively.
+# There are three lists (categories) where such function can be inserted: 'all' will be executed for all
+# treeviews, 'playlist' and 'browser' only in playlists or browsers, respectively.
 contextMenuProviders = {
 'all': [],
 'playlist': [],
 'browser': []
 }
 
-# SEPARATOR is a special value which can be inserted in the list of actions for a context-menu. TreeView.contextMenuEvent will insert a separator at that position.
+# SEPARATOR is a special value which can be inserted in the list of actions for a context-menu.
+# TreeView.contextMenuEvent will insert a separator at that position.
 class Separator: pass
 SEPARATOR = Separator()
 
@@ -61,7 +64,8 @@ class TreeView(QtGui.QTreeView):
             result = []
             for index in self.selectedIndexes():
                 node = model.data(index)
-                if not any(self.selectionModel().isSelected(model.getIndex(parent)) for parent in node.getParents()):
+                if not any(self.selectionModel().isSelected(model.getIndex(parent))
+                               for parent in node.getParents()):
                     result.append(node)
             return result
 
@@ -100,3 +104,30 @@ class TreeView(QtGui.QTreeView):
 
         menu.popup(event.globalPos() + QtCore.QPoint(2,2))
         event.accept()
+        
+    def getSelectedElements(self,recursive):
+        """Return all elements that are currently selected. If *onlyToplevel* is True, nodes will be excluded
+        if an ancestor is also selected. In any case duplicates will be removed."""
+        if not recursive:
+            # Just remove duplicates and nodes which don't have tags
+            return list(set(node for node in self.getSelectedNodes() if isinstance(node,models.Element)))
+        else:
+            selectedNodes = self.getSelectedNodes(onlyToplevel=True)
+            elements = []
+            ids = set()
+            for node in selectedNodes:
+                for child in node.getAllNodes():
+                    if isinstance(child,models.Element) and child.id not in ids:
+                        ids.add(child.id)
+                        elements.append(models.Element.fromId(child.id))
+            return elements
+    
+    def editTags(self,recursive):
+        """Open a dialog to edit the tags of the currently selected elements (and the children, if
+        *recursive* is True) on the REAL-level. This is called by the edit tags actions in the contextmenu.
+        """
+        from . import tageditor
+        from .. import modify
+        dialog = tageditor.TagEditorDialog(modify.REAL,self.getSelectedElements(recursive),self)
+        dialog.exec_()
+        
