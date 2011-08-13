@@ -106,8 +106,6 @@ def run(cmdConfig = []):
         sys.exit(-1)
         
     # Load remaining modules
-    from omg import distributor 
-    distributor.init()
     from omg import tags, search
     search.init()
 
