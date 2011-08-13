@@ -244,7 +244,7 @@ def _contentsParentsHelper(elids,recursive,selectColumn,whereColumn):
             SELECT {}
             FROM {}contents
             WHERE {} IN ({})
-            """.format(selectColumn,prefix,whereColumn,",".join(str(n) for n in newSet))).getSingleColumn())
+            """.format(selectColumn,prefix,whereColumn,csList(newSet))).getSingleColumn())
         if not recursive:
             return newSet
         newSet = newSet - resultSet
@@ -391,7 +391,7 @@ def listTags(elid,tagList=None):
             additionalWhereClause = " AND tag_id = {0}".format(tagid)
         else:
             tagList = [tagsModule.get(tag).id for tag in tagList]
-            additionalWhereClause = " AND tag_id IN ({0})".format(",".join(str(tag.id) for tag in tagList))
+            additionalWhereClause = " AND tag_id IN ({0})".format(csList(tagList))
     else: additionalWhereClause = ''
     result = query("""
                 SELECT tag_id,value_id 
@@ -435,3 +435,19 @@ def _encodeValue(tagType,value):
             return value.toSql()
         else: return utils.FlexiDate.strptime(value).toSql()
     else: raise ValueError("Unknown tag type '{}'.".format(tagType))
+    
+    
+def csList(values):
+    """Return a comma-separated list of the string-representation of the given values. If *values* is not
+    iterable, return simply its string representation."""
+    if hasattr(values,'__iter__'):
+        return ','.join(str(value) for value in values)
+    else: return str(values)
+
+
+def csIdList(objects):
+    """Return a comma-separated list of the string-representation of the ids of given *objects*. If *objects*
+    is not iterable, return simply its id (assuming it is a single object) as string."""
+    if hasattr(objects,'__iter__'):
+        return ','.join(str(object.id) for object in objects)
+    else: return str(objects.id)
