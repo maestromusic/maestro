@@ -125,6 +125,9 @@ storage = OrderedDict((
       },
     ),
 }),
+("editor", {
+    'format_string' : ("%{artist}/%{date} - %{album}/%{tracknumber} - %{title}.%{*}",),
+}),
 ("gui", {
     'central_widgets': ([],),
     'dock_widgets': ([],),

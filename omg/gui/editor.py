@@ -33,6 +33,9 @@ class EditorTreeView(treeview.TreeView):
         self.viewport().setMouseTracking(True)
         self.mergeAction = QtGui.QAction(self.tr('Merge...'), self)
         self.mergeAction.triggered.connect(self.mergeSelected)
+        
+        self.tagMatchAction = QtGui.QAction(self.tr('Match tags from filenames...'), self)
+        self.tagMatchAction.triggered.connect(self.openTagMatchDialog)
 
         self.selectionModel().selectionChanged.connect(self._handleSelectionChanged)
     
@@ -51,6 +54,7 @@ class EditorTreeView(treeview.TreeView):
         s = set( index.parent() for index in self.selectedIndexes() )
         if len(s) == 1:
             actions.append(self.mergeAction)
+        actions.append(self.tagMatchAction)
         super().contextMenuProvider(actions,currentIndex)
 
     def dragEnterEvent(self, event):
@@ -105,6 +109,11 @@ class EditorTreeView(treeview.TreeView):
                          dialog.newTitle(),
                          dialog.removeString(),
                          dialog.adjustPositions())
+    
+    def openTagMatchDialog(self):
+        from . import tagmatchdialog
+        dialog = tagmatchdialog.TagMatchDialog([s.internalPointer() for s in self.selectedIndexes()], self)
+        dialog.exec_()
             
     def editTags(self,recursive):
         """Reimplement TreeView.editTags so that tags are edited on the EDITOR-level instead."""
