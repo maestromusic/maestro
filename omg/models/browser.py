@@ -541,4 +541,9 @@ def _loadData(element):
             element.path = db.path(element.id)
         if element.length is None:
             element.length = db.length(element.id)
+    else:
+        for child in element.getContents():
+            _loadData(child)
+        
+    
             
