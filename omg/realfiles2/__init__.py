@@ -94,30 +94,35 @@ class UFile(RealFile):
     
     def read(self):
         self._ensureFileIsLoaded()
+        self.ignoredTags = dict()
         self.tags = tags.Storage()
         if "TRACKNUMBER" in self._f.tags:
             self.position = self._parsePosition(self._f.tags["TRACKNUMBER"][0])  # Further tracknumbers are ignored
         for key,values in self._f.tags.items():
             if key.lower() in ["tracknumber", "discnumber"]:
+                self.ignoredTags[key] = values
                 continue
             tag = tags.get(key.lower())
             values = [self._valueFromString(tag,value) for value in values]
             values = list(filter(lambda x: x is not None,values))
             if len(values) > 0:
                 self.tags.addUnique(tag, *values)
+    
     def saveTags(self):
         self._ensureFileIsLoaded()
         self._f.tags = dict()
+        for tag, values in self.ignoredTags.items():
+            self._f.tags[tag] = values
         for tag,values in self.tags.items():
             values = [str(value) for value in values]
-            if tag.name.upper() not in self._f.tags:
-                self._f.tags[tag.name.upper()] = values
-            else: self._f.tags[tag.name.upper()].extend(values) # May happen if there exist an IndexedTag and an OtherTag with the same name...actually this should never happen
+            self._f.tags[tag.name.upper()] = values
         self._f.save()
+    
     def savePosition(self):
         self._ensureFileIsLoaded()
         self._f.tags["TRACKNUMBER"] = str(self.position)
         self._f.save()
+    
     def remove(self, tags):
         self._ensureFileIsLoaded()
         changed = False
