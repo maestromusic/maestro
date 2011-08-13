@@ -9,8 +9,13 @@
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
+
 class EditorWidget(QtGui.QStackedWidget):
-    """An EditorWidget contains two child-widgets stacked upon each other: An editor (either a QLineEdit or a QComboBox or a QTextEdit) and a QLabel showing the editor's value. Usually the label is displayed, but when the user clicks on it, the editor appears and the value can be edited. When the editor looses focus, the label reappears."""
+    """An EditorWidget contains two child-widgets stacked upon each other: An editor (either a QLineEdit or
+    a QComboBox or a QTextEdit) and a QLabel showing the editor's value. Usually the label is displayed,
+    but when the user clicks on it, the editor appears and the value can be edited. When the editor looses
+    focus, the label reappears.
+    """
 
     valueChanged = QtCore.pyqtSignal()
     label = None
@@ -19,7 +24,8 @@ class EditorWidget(QtGui.QStackedWidget):
     fixed = False # If True, the currently active widget (editor and label) will remain active until fixed is set to false again. You may still use showEditor or showLabel to switch programmatically, though.
     
     def __init__(self,label=None,editor=None,parent=None):
-        """Create a new EditorWidget. You may specify a label, an editor and a parent. By default a QLabel and an empty QLineEdit are created."""
+        """Create a new EditorWidget. You may specify a label, an editor and a parent. By default a QLabel
+        and an empty QLineEdit are created."""
         QtGui.QStackedWidget.__init__(self,parent)
         self.setLabel(label)
         self.setEditor(editor)
@@ -30,7 +36,8 @@ class EditorWidget(QtGui.QStackedWidget):
         return self.label
     
     def setLabel(self,label):
-        """Set the label used in this EditorWidget. The label will be updated to hold the editor's value. If label is None, a QLabel is created and used."""
+        """Set the label used in this EditorWidget. The label will be updated to hold the editor's value. If
+        label is None, a QLabel is created and used."""
         if self.label is not None:
             self.removeWidget(self.label)
         self.label = label if label is not None else QtGui.QLabel()
@@ -51,7 +58,10 @@ class EditorWidget(QtGui.QStackedWidget):
         return self.editor
     
     def setEditor(self,editor):
-        """Set the editor used in this EditorWidget. The editor must either be a QLineEdit or a QComboBox or a QTextEdit or None in which case an empty QLineEdit is created. The label will be updated to hold the editor's value."""
+        """Set the editor used in this EditorWidget. The editor must either be a QLineEdit or a QComboBox or
+        a QTextEdit or None in which case an empty QLineEdit is created. The label will be updated to hold
+        the editor's value.
+        """
         assert (editor is None
                     or isinstance(editor,QtGui.QLineEdit)
                     or isinstance(editor,QtGui.QComboBox)
@@ -115,13 +125,18 @@ class EditorWidget(QtGui.QStackedWidget):
     
     def eventFilter(self,object,event):
         # We have to filter several events from the editor:
-        # - FocusOut: Hide the editor and show the label...except the focus switched to the editor's context-menu or item-view (if the editor is a combobox).
-        # - ContextMenu: Display the context-menu as usual but additionally store it in self.popup, so that when the editor looses its focus to the context-menu, we won't hide the editor in the FocusOut-event.
-        # - KeyPress: React to RETURN and ENTER (accept the value and display the label) and ESC (reset the editor to the label's value and display the label).
+        # - FocusOut: Hide the editor and show the label...except the focus switched to the editor's
+        #   context-menu or item-view (if the editor is a combobox).
+        # - ContextMenu: Display the context-menu as usual but additionally store it in self.popup, so that
+        #   when the editor looses its focus to the context-menu, we won't hide the editor in the
+        #   FocusOut-event.
+        # - KeyPress: React to RETURN and ENTER (accept the value and display the label) and ESC (reset the
+        #   editor to the label's value and display the label).
         if object == self.editor:
             if event.type() == QtCore.QEvent.FocusOut:
                 if (self.popup is None # No context-menu...so check for the view of a combobox
-                        and not (isinstance(self.editor,QtGui.QComboBox) and self.editor.view().isVisible())):
+                        and not (isinstance(self.editor,QtGui.QComboBox)
+                        and self.editor.view().isVisible())):
                     self.setValue(self._editorText())
                     if not self.fixed:
                         self.showLabel()
@@ -137,7 +152,9 @@ class EditorWidget(QtGui.QStackedWidget):
                 return True
             elif event.type() == QtCore.QEvent.KeyPress:
                 if event.key() == Qt.Key_Return or event.key() == Qt.Key_Enter:
-                    #TODO: Fix the following problem: If one uses an EditorWidget to change the value of one record in the tageditor to match that of another record, the EditorWidget will be removed as the two records will be merged. This leads to a crash...
+                    #TODO: Fix the following problem: If one uses an EditorWidget to change the value of one
+                    # record in the tageditor to match that of another record, the EditorWidget will be
+                    # removed as the two records will be merged. This leads to a crash...
                     self.setValue(self._editorText())
                     if not self.fixed:
                         self.showLabel()
@@ -150,7 +167,8 @@ class EditorWidget(QtGui.QStackedWidget):
         elif (isinstance(self.editor,QtGui.QTextEdit)
                     and object == self.editor.viewport()
                     and event.type() == QtCore.QEvent.ContextMenu):
-            # QTextEdit does not send ContextMenuEvents itself, but its viewport does. Therefore we installed an event filter on the viewport and filter events here
+            # QTextEdit does not send ContextMenuEvents itself, but its viewport does. Therefore we
+            # installed an event filter on the viewport and filter events here.
             self.popup = self.editor.createStandardContextMenu()
             action = self.popup.exec_(event.globalPos())
             self.popup = None
