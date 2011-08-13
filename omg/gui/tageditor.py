@@ -186,7 +186,7 @@ class TagEditorWidget(QtGui.QWidget):
 
         # Tidy up
         # When changing a tag via the tagbox we are about to remove the widget having the current focus.
-        # This leads to errors (Underlying C++ object has been deleted in focusOutEvent). Fortunately this
+        # This leads to errors ('Underlying C++ object has been deleted' in focusOutEvent). Fortunately this
         # is fixed using deleteLater.
         self.tagBoxes[tag].deleteLater()
         del self.tagBoxes[tag]

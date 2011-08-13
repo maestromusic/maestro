@@ -85,8 +85,10 @@ class WidgetList(QtGui.QWidget):
         """Remove *widget* from this WidgetList's children."""
         index = self.children.index(widget)
         self.layout().removeWidget(widget)
+        # Use deleteLater because the widget might have the focus and this leads to a crash
+        # ('Underlying C++ object has been deleted' in focusOutEvent).
+        widget.deleteLater()
         del self.children[index]
-        widget.setParent(None)
         self.widgetRemoved.emit(self,index,widget)
 
     def moveWidget(self,widget,pos):
