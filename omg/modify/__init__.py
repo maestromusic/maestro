@@ -102,6 +102,10 @@ def _debugReal(event):
     
 def _debugEditor(event):
     logger.debug("EDITOR: " + str(event))
+
+def _debugNewTagAdded(tag):
+    logger.debug("New Tag added: {}".format(tag))
+    
     
 class ChangeEventDispatcher(QtCore.QObject):
     
@@ -120,6 +124,7 @@ class ChangeEventDispatcher(QtCore.QObject):
 dispatcher = ChangeEventDispatcher()
 dispatcher.editorChanges.connect(_debugEditor)
 dispatcher.realChanges.connect(_debugReal)
+dispatcher.newTagAdded.connect(_debugNewTagAdded)
 
 
 class UndoCommand(QtGui.QUndoCommand):

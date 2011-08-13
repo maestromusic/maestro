@@ -8,7 +8,7 @@
 from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
-from .. import tags, utils, database as db
+from .. import tags, utils, database as db, modify
 from ..gui.misc import editorwidget
 from ..gui import dialogs
 
@@ -71,6 +71,10 @@ class TagTypeBox(QtGui.QStackedWidget):
     \ """
     tagChanged = QtCore.pyqtSignal(tags.Tag)
     
+    # This variable is used to prevent handling editingFinished twice (if _handleEditingFinished opens
+    # a dialog, the box will loose focus and emit the signal again).
+    _dialogOpen = False
+    
     def __init__(self,defaultTag = None,parent = None,editable=True,useCoverLabel=False):
         QtGui.QStackedWidget.__init__(self,parent)
         self.setSizePolicy(QtGui.QSizePolicy(QtGui.QSizePolicy.Minimum,QtGui.QSizePolicy.Fixed))
@@ -101,6 +105,8 @@ class TagTypeBox(QtGui.QStackedWidget):
         else: self.box.currentIndexChanged.connect(self._handleEditingFinished)
         
         self.addWidget(self.box)
+        
+        modify.dispatcher.newTagAdded.connect(self._handleNewTagAdded)
     
     def _addTagToBox(self,tag):
         """Add a tag to the box. Display icon and translation if available."""
@@ -162,6 +168,9 @@ class TagTypeBox(QtGui.QStackedWidget):
     def _handleEditingFinished(self):
         """Handle editingFinished signal from EnhancedComboBox if editable is True or the currentIndexChanged
         signal from QComboBox otherwise."""
+        if self._dialogOpen:
+            return
+        
         tag = self._parseTagFromBox()
         if tag is not None:
             self.setTag(tag)
@@ -171,11 +180,15 @@ class TagTypeBox(QtGui.QStackedWidget):
             if text[0] == text[-1] and text[0] in ['"',"'"]:
                 text = text[1:-1]
             if not tags.isValidTagname(text):
+                self.box.setEditText(self._tag.translated()) # Reset
+                self._dialogOpen = True
                 QtGui.QMessageBox.warning(self,self.tr("Invalid tagname"),
                                           self.tr("'{}' is not a valid tagname").format(text))
-                self.box.setEditText(self._tag.translated()) # Reset
+                self._dialogOpen = False
             else:
+                self._dialogOpen = True
                 type = dialogs.NewTagDialog.queryTagType(text)
+                self._dialogOpen = False
                 if type is not None:
                     newTag = tags.addTag(text,type)
                     self._addTagToBox(newTag)
@@ -183,7 +196,19 @@ class TagTypeBox(QtGui.QStackedWidget):
                     self.showLabel()
                 else:
                     self.box.setEditText(self._tag.translated()) # Reset
-        
+    
+    def keyPressEvent(self,keyEvent):
+        if keyEvent.key() == Qt.Key_Escape:
+            self.box.setEditText(self._tag.translated()) # Reset
+            self.showLabel()
+        else: QtGui.QStackedWidget.keyPressEvent(self,keyEvent)
+    
+    def _handleNewTagAdded(self,tag):
+        """React upon newTagAdded-signals from the dispatcher. Those are emitted when a new tag is added to
+        the database."""
+        if self.box.findText(tag.translated(),Qt.MatchFixedString) < 0:
+            self._addTagToBox(tag)
+
 
 class TagValueEditor(QtGui.QWidget):
     #TODO: Comments

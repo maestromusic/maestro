@@ -12,6 +12,8 @@ from omg import tags, utils
 
 
 class NewTagDialog(QtGui.QDialog):
+    """This dialog is opened when a new tagtype appears for the first time. The user is asked to enter a
+    tags.ValueType for the new tag."""
     def __init__(self, tagname, parent = None,text=None):
         QtGui.QDialog.__init__(self, parent)
         self.setWindowModality(QtCore.Qt.WindowModal)
@@ -39,10 +41,13 @@ class NewTagDialog(QtGui.QDialog):
         self.okButton.clicked.connect(self.accept)
         
     def selectedType(self):
+        """Return the tags.ValueType selected by the user."""
         return tags.ValueType.byName(self.combo.currentText())
     
     @staticmethod
     def queryTagType(name, parent = None):
+        """Open a NewTagDialog and return the selected tags.ValueType or None if the user aborted or closed
+        the dialog. *name* is the new tag's name."""
         d = NewTagDialog(name, parent)
         if d.exec_() == QtGui.QDialog.Accepted:
             return d.selectedType()
