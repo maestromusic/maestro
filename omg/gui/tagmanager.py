@@ -61,12 +61,13 @@ class TagManager(QtGui.QDialog):
             column = 0
             
             number = self._elementNumber(tag)
-                               
+            
             layout.addWidget(tagwidgets.TagLabel(tag),row,column)
             
             column += 1
             combo = tagwidgets.ValueTypeBox(tag.type)
             combo.disableMouseWheel = True
+            combo.typeChanged.connect(lambda type: self._handleValueTypeChanged(tag,type))
             if number > 0:
                 combo.setEnabled(False)
             layout.addWidget(combo,row,column)
@@ -74,15 +75,13 @@ class TagManager(QtGui.QDialog):
             column += 1
             check = QtGui.QCheckBox()
             check.setCheckState(Qt.Checked if tag.private else Qt.Unchecked)
+            check.stateChanged.connect(lambda state: self._handlePrivateChanged(tag,state))
             if number > 0:
                 check.setEnabled(False)
             layout.addWidget(check,row,column)
         
             column += 1
-            lineEdit = QtGui.QLineEdit(', '.join(t.name for t in tag.sortTags))
-            if number > 0:
-                lineEdit.setEnabled(False)
-            layout.addWidget(lineEdit,row,column)
+            layout.addWidget(QtGui.QLabel(', '.join(t.name for t in tag.sortTags)),row,column)
             
             column += 1
             layout.addWidget(QtGui.QLabel(str(number)))
@@ -117,6 +116,20 @@ class TagManager(QtGui.QDialog):
             tags.removeTagType(tag)
             self._loadTags()
 
+    def _handlePrivateChanged(self,tag,state):
+        if self._elementNumber(tag) > 0:
+            QtGui.QMessageBox.warning(self,self.tr("Cannot change tag"),
+                                      self.tr("Cannot change a tag that appears in elements."))
+            return
+        tags.changeTagType(tag,private= state == Qt.Checked)
+    
+    def _handleValueTypeChanged(self,tag,type):
+        if self._elementNumber(tag) > 0:
+            QtGui.QMessageBox.warning(self,self.tr("Cannot change tag"),
+                                      self.tr("Cannot change a tag that appears in elements."))
+            return
+        tags.changeTagType(tag,valueType=type)
+        
     def _elementNumber(self,tag):
         """Return the number of elements that contain a tag of the given type."""
         return db.query("SELECT COUNT(DISTINCT element_id) FROM {}tags WHERE tag_id = ?"

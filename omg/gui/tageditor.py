@@ -268,7 +268,7 @@ class TagEditorWidget(QtGui.QWidget):
         menu.addSeparator()
         
         addRecordAction = QtGui.QAction(self.tr("Add tag..."),self)
-        addRecordAction.triggered.connect(lambda: self._handleAddRecord(tag))
+        addRecordAction.triggered.connect(lambda: self._handleAddRecord(record.tag))
         menu.addAction(addRecordAction)
         
         removeSelectedAction = QtGui.QAction(self.tr("Remove selected"),self)

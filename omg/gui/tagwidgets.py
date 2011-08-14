@@ -57,6 +57,7 @@ class ValueTypeBox(QtGui.QComboBox):
     a ScrollArea and you expect the user to change the value of the box rarely but scroll often.
     """
     disableMouseWheel = False
+    typeChanged = QtCore.pyqtSignal(tags.ValueType)
     
     def __init__(self,valueType=None,parent=None):
         QtGui.QComboBox.__init__(self,parent)
@@ -64,6 +65,7 @@ class ValueTypeBox(QtGui.QComboBox):
             self.addItem(type.name,type)
         if valueType is not None:
             self.setType(valueType)
+        self.currentIndexChanged.connect(self._handleCurrentIndexChanged)
     
     def getType(self):
         """Return the currently selected value type."""
@@ -83,7 +85,10 @@ class ValueTypeBox(QtGui.QComboBox):
             wheelEvent.ignore() # Let the parent widget handle it
         else: QtGui.QComboBox.wheelEvent(self,wheelEvent)
     
-    
+    def _handleCurrentIndexChanged(self,index):
+        self.typeChanged.emit(self.getType())
+        
+        
 class TagTypeBox(QtGui.QStackedWidget):
     """A combobox to select a tagtype from those in the tagids table. By default the box will be editable
     and in this case the box will handle tag translations and if the entered tagname is unknown it will add
@@ -247,6 +252,15 @@ class TagTypeBox(QtGui.QStackedWidget):
                 if self.box.itemData(i) == event.tagtype:
                     self.box.removeItem(i)
                     return
+        elif event.action == modify.events.TagTypeChangedEvent.CHANGED:
+            for i in range(self.box.count()):
+                if self.box.itemData(i) == event.tagtype:
+                    self.box.setItemText(i,event.tagtype.translated())
+                    if event.tagtype.iconPath() is not None:
+                        self.box.setItemIcon(i,QtGui.QIcon(event.tagtype.iconPath()))
+                    # Do not change the tag because there is only one instance
+                    return
+            
 
 
 class TagValueEditor(QtGui.QWidget):

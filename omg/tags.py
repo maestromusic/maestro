@@ -4,7 +4,7 @@
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 3 as
-# published by the Free Software Foundation
+# published by the Free Software Foundation.
 #
 
 """Module for tag handling.
@@ -303,7 +303,7 @@ def addTagType(name, type, sort = None, private = False):
     by which elements should be sorted if displayed below a ValueNode of this new tag; this defaults to the
     title tag. If *private* is True, a private tag is created.
     
-    After creation the dispatcher's tagTypeAdded signal is emitted.
+    After creation the dispatcher's tagTypeChanged signal is emitted.
     """
     logger.info("Adding new tag '{}' of type '{}'.".format(name,type.name))
     name = name.lower()
@@ -330,7 +330,7 @@ def removeTagType(tag):
     """Remove a tagtype from the database, including all its values and relations. This will not touch any
     files though!
     
-    After removal the dispatcher's tagTypeRemoved signal is emitted.
+    After removal the dispatcher's tagTypeChanged signal is emitted.
     """
     logger.info("Removing tag '{}'.".format(tag.name))
     if tag == TITLE or tag == ALBUM:
@@ -349,6 +349,56 @@ def removeTagType(tag):
     dispatcher.tagTypeChanged.emit(events.TagTypeChangedEvent(events.TagTypeChangedEvent.DELETED,tag))
 
 
+def changeTagType(tag,name=None,valueType=None,private=None,sortTags=None):
+    """Change a tagtype. In particular update the instance *tag* (this is usually the only instance of this
+    tag) and the database. The other arguments determine what to change. Set them to None to leave a
+    property unchanged. This will not touch any files though!
+    
+    After removal the dispatcher's tagTypeChanged signal is emitted.
+    """
+    oldName = tag.name
+    assignments = []
+    params = []
+    
+    if name is not None and name != tag.name:
+        name = name.lower()
+        if not isValidTagName(name):
+            raise ValueError("'{}' is not a valid tagname.".format(name))
+        assignments.append('tagname = ?')
+        params.append(name)
+        tag.name = name
+    
+    if valueType is not None and name != tag.type:
+        if not isinstance(valueType,ValueType):
+            raise ValueError("'{}' is not a ValueType.".format(valueType))
+        assignments.append('tagtype = ?')
+        params.append(valueType.name)
+        tag.type = valueType
+        
+    if private is not None and bool(private) != tag.private:
+        assignments.append('private = 1' if private else 'private = 0')
+        tag.private = bool(private)
+        
+    if sortTags is not None and sortTags != tag.sortTags:
+        if not all(isinstance(sortTag,Tag) for sortTag in sortTags):
+            raise ValueError("SortTags must be a list of tags.")
+        assignments.append('sorttags = ?')
+        params.append(','.join(str(sortTag.id) for sortTag in sortTags))
+        tag.sortTags = sortTags
+    
+    if len(assignments) > 0:
+        if tag.name != oldName:
+            logger.info("Changing tag '{}' into {}.".format(oldName,tag.name))
+        else: logger.info("Changing tag '{}'.".format(tag.name))
+        from . import database
+        database.query("UPDATE {}tagids SET {} WHERE id = {}"
+                        .format(database.prefix,','.join(assignments),tag.id),
+                        *params)
+        
+        from .modify import dispatcher, events
+        dispatcher.tagTypeChanged.emit(events.TagTypeChangedEvent(events.TagTypeChangedEvent.CHANGED,tag))
+    
+    
 def init():
     """Initialize the variables of this module based on the information of the tagids-table and config-file.
     At program start or after changes of that table this method must be called to ensure the module has the
