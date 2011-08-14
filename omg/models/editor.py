@@ -219,7 +219,7 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
                     elif ret == dialog.Delete or ret == dialog.DeleteAlways:
                         
                         if ret == dialog.DeleteAlways:
-                            options.tags.always_delete.append(e.tagname)
+                            options.tags.always_delete = options.tags.always_delete + [e.tagname]
                         print(options.tags.always_delete)
                         logger.debug('REMOVE TAG {0} from {1}'.format(e.tagname, f))
                         real = realfiles2.get(f)
