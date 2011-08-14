@@ -10,12 +10,11 @@
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
-from .. import logging, modify, database as db, tags
+from .. import logging, modify, database as db, tags, realfiles2
 from . import mimedata
 from ..models import rootedtreemodel, RootNode, File, Container
 from ..config import options
 from ..utils import hasKnownExtension, collectFiles, longestSubstring
-
 from collections import OrderedDict
 from functools import reduce
 import re, string
@@ -210,16 +209,21 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
                     elementList.append(theFile)
                     readOk = True
                 except tags.UnknownTagError as e:
-                    descMap = {'{n} ({d})'.format(n = t.name, d = t.description):t for t in tags.TYPES}
-                    selection, ok = QtGui.QInputDialog.getItem(None,
-                       self.tr('new tag »{0}« found'.format(e.tagname)),
-                       self.tr('File <{0}> contains a so far unknown tag »{1}«. What should its type be?'.format(f, e.tagname)),
-                       list(descMap.keys()),
-                       0,
-                       False,
-                       QtCore.Qt.Dialog)
-                    if ok:
-                        tags.addTag(e.tagname, descMap[selection])
+                    from ..gui.dialogs import NewTagDialog
+                    dialog = NewTagDialog(e.tagname, text =
+                      self.tr('File "{0}" contains a so far unknown tag "{1}". What should its type be?'.format(f, e.tagname)),
+                      includeDeleteOption = True)
+                    ret = dialog.exec_()
+                    if ret == dialog.Accepted:
+                        tags.addTag(e.tagname, dialog.selectedType())
+                    elif ret == dialog.Delete or ret == dialog.DeleteAlways:
+                        
+                        if ret == dialog.DeleteAlways:
+                            options.tags.always_delete.append(e.tagname)
+                        print(options.tags.always_delete)
+                        logger.debug('REMOVE TAG {0} from {1}'.format(e.tagname, f))
+                        real = realfiles2.get(f)
+                        real.remove(e.tagname)
                     else:
                         progress.cancel()
                         return False

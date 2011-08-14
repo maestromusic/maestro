@@ -11,7 +11,6 @@ from .. import tags, logging
 from ..utils import absPath
 from ..config import options
 import cutags
-
 logger = logging.getLogger(__name__)
 
 def get(path):
@@ -94,19 +93,29 @@ class UFile(RealFile):
     
     def read(self):
         self._ensureFileIsLoaded()
-        self.ignoredTags = dict()
+        self.ignoredTags = dict() # dict storing tags which are ignored but not deleted by omg, i.e. {track,disc}number
         self.tags = tags.Storage()
         if "TRACKNUMBER" in self._f.tags:
             self.position = self._parsePosition(self._f.tags["TRACKNUMBER"][0])  # Further tracknumbers are ignored
         for key,values in self._f.tags.items():
-            if key.lower() in ["tracknumber", "discnumber"]:
+            key = key.lower()
+            if key in ["tracknumber", "discnumber"]:
                 self.ignoredTags[key] = values
-                continue
-            tag = tags.get(key.lower())
-            values = [self._valueFromString(tag,value) for value in values]
-            values = list(filter(lambda x: x is not None,values))
-            if len(values) > 0:
-                self.tags.addUnique(tag, *values)
+            elif key in options.tags.always_delete:
+                # remove question after some testing
+                from PyQt4.QtGui import QMessageBox
+                if QMessageBox.question(None, 'delete tag?', 'always_delete tag {0} found. Really delete?'.format(key)) == QMessageBox.Ok:
+                    print('OMG OK')
+                    #TODO: really delete
+            else:
+                tag = tags.get(key)
+                vals = []
+                for value in values:
+                    value = self._valueFromString(tag, value)
+                    if value is not None and value not in vals:
+                        vals.append(value)
+                if len(vals) > 0:
+                    self.tags.add(tag, *vals)
     
     def saveTags(self):
         self._ensureFileIsLoaded()
@@ -123,12 +132,14 @@ class UFile(RealFile):
         self._f.tags["TRACKNUMBER"] = str(self.position)
         self._f.save()
     
-    def remove(self, tags):
+    def remove(self, tagList):
+        if isinstance(tagList, str) or isinstance(tagList, tags.Tag):
+            tagList = [tagList]
         self._ensureFileIsLoaded()
         changed = False
-        for t in tags:
-            if self._f.tags.contains(t.name.upper()):
-                del self._f.tags[t.name.upper()]
+        for t in tagList:
+            if  str(t).upper() in self._f.tags:
+                del self._f.tags[str(t).upper()]
                 changed = True
         if changed:
             self._f.save()

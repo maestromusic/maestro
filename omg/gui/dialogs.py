@@ -12,7 +12,10 @@ from omg import tags, utils
 
 
 class NewTagDialog(QtGui.QDialog):
-    def __init__(self, tagname, parent = None,text=None):
+    
+    Delete = -1
+    DeleteAlways = -2
+    def __init__(self, tagname, parent = None,text=None, includeDeleteOption = False):
         QtGui.QDialog.__init__(self, parent)
         self.setWindowModality(QtCore.Qt.WindowModal)
         layout = QtGui.QVBoxLayout(self)
@@ -30,6 +33,13 @@ class NewTagDialog(QtGui.QDialog):
         self.okButton = QtGui.QPushButton(self.tr("Ok"))
         
         buttonLayout = QtGui.QHBoxLayout()
+        
+        if includeDeleteOption:
+            self.deleteCheckbox = QtGui.QCheckBox(self.tr('from all future files'))
+            self.deleteButton = QtGui.QPushButton(self.tr('delete'))
+            buttonLayout.addWidget(self.deleteButton)
+            buttonLayout.addWidget(self.deleteCheckbox)
+            self.deleteButton.clicked.connect(self._handleDeleteClicked)
         buttonLayout.addStretch()
         buttonLayout.addWidget(self.abortButton)
         buttonLayout.addWidget(self.okButton)
@@ -37,6 +47,10 @@ class NewTagDialog(QtGui.QDialog):
         
         self.abortButton.clicked.connect(self.reject)
         self.okButton.clicked.connect(self.accept)
+    
+    def _handleDeleteClicked(self):
+        #self.hide()
+        self.done(NewTagDialog.DeleteAlways if self.deleteCheckbox.isChecked() else NewTagDialog.Delete)
         
     def selectedType(self):
         return tags.ValueType.byName(self.combo.currentText())
