@@ -76,8 +76,9 @@ def changeTagValue(tag,oldValue,newValue,elements):
                 real.read()
                 real.tags.replace(tag,oldValue,newValue)
                 real.saveTags()
-            except:
-                logger.error("Could not change tags from '{}'.".format(element.path))
+            except e:
+                logger.error("Could not change tag value from '{}'.".format(element.path))
+                print(e)
                 continue
         successful.append(element)
         
