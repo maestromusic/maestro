@@ -1,5 +1,0 @@
-name=dbupdatedebugger
-author=Michael Helmling
-version=1
-description=Output database update notices.
-minomgversion=0.2.0

@@ -1,5 +1,0 @@
-name=dbinfo
-author=Michael Helmling
-version=1
-description=Show statistics about omg's database.
-maxomgversion=0.1.99
