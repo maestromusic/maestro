@@ -10,7 +10,7 @@
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from .. import tags, utils, database as db
+from .. import tags, utils, database as db, constants
 from . import tagwidgets
 
 
@@ -19,6 +19,7 @@ class TagManager(QtGui.QDialog):
     easy it only allows changing tagtypes which do not appear in any element."""
     def __init__(self,parent=None):
         QtGui.QDialog.__init__(self,parent)
+        self.setWindowTitle(self.tr("TagManager - OMG {}").format(constants.VERSION))
         self.setLayout(QtGui.QVBoxLayout())
         
         self.layout().addWidget(QtGui.QLabel(self.tr("Note that you cannot change or remove tags that already appear in elements.")))

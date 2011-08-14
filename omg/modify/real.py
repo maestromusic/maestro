@@ -83,7 +83,6 @@ def changeTagValue(tag,oldValue,newValue,elements):
                     real.saveTags()
                 except e:
                     logger.error("Could not change tag value from '{}'.".format(element.path))
-                    print(e)
                     continue
             successful.append(element)
     else: successful = elements

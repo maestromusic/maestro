@@ -69,7 +69,7 @@ class Plugin(object):
             if hasattr(self.module,'defaultStorage'):
                 config.storageObject.removePlugins([self.name])
             if self.name in config.options.main.plugins:
-                config.options.main.plugins.remove(self.name)
+                config.options.main.plugins = [n for n in config.options.main.plugins if n != self.name]
             self.enabled = False
         
     def shutdown(self):
