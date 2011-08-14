@@ -6,7 +6,8 @@
 # published by the Free Software Foundation
 #
 
-"""The DBAnalyzer displays statistics about the database, finds errors in it and allows the user to correct them. It is provided as central widget, dialog (in the extras menu) and standalone application (bin/dbanalyzer)."""
+"""UndoView provides a DockWidget that displays the active, real and editor-UndoStack using three
+QtGui.QUndoStacks."""
 
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
@@ -29,17 +30,24 @@ def disable():
 
 
 class UndoViewDock(QtGui.QDockWidget):
+    """UndoViewDock displays the active, real and editor-UndoStack using three QtGui.QUndoStacks."""
     def __init__(self,parent=None,state=None):
         QtGui.QDockWidget.__init__(self,parent)
         self.setWindowTitle(self.tr("UndoView"))
         
-        tabWidget = QtGui.QTabWidget()
-        self.setWidget(tabWidget)
+        self.tabWidget = QtGui.QTabWidget(self)
+        self.setWidget(self.tabWidget)
         
         activeView = QtGui.QUndoView(modify.stack)
         realView = QtGui.QUndoView(modify.stack.mainStack)
         editorView = QtGui.QUndoView(modify.stack.editorStack)
         
-        tabWidget.addTab(activeView,self.tr("Active"))
-        tabWidget.addTab(realView,self.tr("Real"))
-        tabWidget.addTab(editorView,self.tr("Editor"))
+        self.tabWidget.addTab(activeView,self.tr("Active"))
+        self.tabWidget.addTab(realView,self.tr("Real"))
+        self.tabWidget.addTab(editorView,self.tr("Editor"))
+        
+        if state is not None and isinstance(state,int) and 0 <= state < self.tabWidget.count():
+            self.tabWidget.setCurrentIndex(state)
+        
+    def saveState(self):
+        return self.tabWidget.currentIndex()
