@@ -7,61 +7,7 @@
 
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
-
-from omg import tags, utils
-
-
-class NewTagDialog(QtGui.QDialog):
-    
-    Delete = -1
-    DeleteAlways = -2
-    def __init__(self, tagname, parent = None,text=None, includeDeleteOption = False):
-        QtGui.QDialog.__init__(self, parent)
-        self.setWindowModality(QtCore.Qt.WindowModal)
-        layout = QtGui.QVBoxLayout(self)
-        
-        if text is None:
-            text = self.tr("The tag '{}' occured for the first time. Please enter its type:").format(tagname)
-        label = QtGui.QLabel(text)
-        layout.addWidget(label)
-            
-        self.combo = QtGui.QComboBox(self)
-        self.combo.addItems([type.name for type in tags.TYPES])
-        layout.addWidget(self.combo)
-        
-        self.abortButton = QtGui.QPushButton(self.tr("Abort"))
-        self.okButton = QtGui.QPushButton(self.tr("Ok"))
-        
-        buttonLayout = QtGui.QHBoxLayout()
-        
-        if includeDeleteOption:
-            self.deleteCheckbox = QtGui.QCheckBox(self.tr('from all future files'))
-            self.deleteButton = QtGui.QPushButton(self.tr('delete'))
-            buttonLayout.addWidget(self.deleteButton)
-            buttonLayout.addWidget(self.deleteCheckbox)
-            self.deleteButton.clicked.connect(self._handleDeleteClicked)
-        buttonLayout.addStretch()
-        buttonLayout.addWidget(self.abortButton)
-        buttonLayout.addWidget(self.okButton)
-        layout.addLayout(buttonLayout)
-        
-        self.abortButton.clicked.connect(self.reject)
-        self.okButton.clicked.connect(self.accept)
-    
-    def _handleDeleteClicked(self):
-        #self.hide()
-        self.done(NewTagDialog.DeleteAlways if self.deleteCheckbox.isChecked() else NewTagDialog.Delete)
-        
-    def selectedType(self):
-        return tags.ValueType.byName(self.combo.currentText())
-    
-    @staticmethod
-    def queryTagType(name, parent = None):
-        d = NewTagDialog(name, parent)
-        if d.exec_() == QtGui.QDialog.Accepted:
-            return d.selectedType()
-        else: return None
-
+from .. import utils
 
 class FancyTabbedPopup(QtGui.QFrame):
     """Fancy popup that looks like a tooltip. It is shown beneath its parent component (usually the button

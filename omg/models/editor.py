@@ -29,7 +29,7 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
         super().__init__(RootNode())
         self.contents = []
         self.name = name
-        modify.dispatcher.changes.connect(self.handleChangeEvent)
+        modify.dispatcher.editorChanges.connect(self.handleChangeEvent)
 
     
     
@@ -48,16 +48,16 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
                 for node in allNodes:
                     if node.id == id:
                         modelIndex = self.getIndex(node)
-                        if isinstance(event, modify.ModifySingleElementEvent):
+                        if isinstance(event, modify.events.ModifySingleElementEvent):
                             event.applyTo(node)
                             self.dataChanged.emit(modelIndex, modelIndex)
                             return # single element event -> no more IDs to check
-                        elif isinstance(event, modify.InsertElementsEvent):
+                        elif isinstance(event, modify.events.InsertElementsEvent):
                             for pos, newElements in event.insertions[id]:
                                 self.beginInsertRows(modelIndex, pos, pos + len(newElements) - 1)
                                 node.insertContents(pos, [e.copy() for e in newElements])
                                 self.endInsertRows()
-                        elif isinstance(event, modify.RemoveElementsEvent):
+                        elif isinstance(event, modify.events.RemoveElementsEvent):
                             for pos, num in event.removals[id]:
                                 self.beginRemoveRows(modelIndex, pos, pos + num - 1)
                                 del node.contents[pos:pos+num]
@@ -209,13 +209,13 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
                     elementList.append(theFile)
                     readOk = True
                 except tags.UnknownTagError as e:
-                    from ..gui.dialogs import NewTagDialog
-                    dialog = NewTagDialog(e.tagname, text =
+                    from ..gui.tagwidgets import NewTagTypeDialog
+                    dialog = NewTagTypeDialog(e.tagname, text =
                       self.tr('File "{0}" contains a so far unknown tag "{1}". What should its type be?'.format(f, e.tagname)),
                       includeDeleteOption = True)
                     ret = dialog.exec_()
                     if ret == dialog.Accepted:
-                        tags.addTag(e.tagname, dialog.selectedType())
+                        pass
                     elif ret == dialog.Delete or ret == dialog.DeleteAlways:
                         
                         if ret == dialog.DeleteAlways:

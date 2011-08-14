@@ -10,14 +10,14 @@ from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
 class IconLineEdit(QtGui.QLineEdit):
-    """This is simply a line edit that displays an icon inside the lineedit at the right end. In fact the icon
-    is a QToolButton that may be accessed via the attribute ''button''. The following will make the button
-    clear the text::
+    """This is simply a line edit that displays an icon inside the lineedit at the right end. In fact the
+    icon is a QToolButton that may be accessed via the attribute ''button''. The following will make the
+    button clear the text::
     
         iconLineEdit.button.clicked.connect(iconLineEdit.clear)
     
-    If the property ''hideIconWhenEmpty'' is set (default), the button will only be displayed, if the lineedit
-    is not empty.""" 
+    If the property ''hideIconWhenEmpty'' is set (default), the button will only be displayed, if the
+    lineedit is not empty.""" 
     hideIconWhenEmpty = None
     
     def __init__(self,icon,parent = None):

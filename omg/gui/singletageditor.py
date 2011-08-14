@@ -19,6 +19,19 @@ EXPAND_LIMIT = 2
 
 
 class SingleTagEditor(QtGui.QWidget):
+    """A SingleTagEditor is the part of an editor used to edit the values of a single tag. It consists of a 
+    misc.widgetlist.WidgetList that displays foreach record one RecordEditor wrapped in an
+    misc.editorwidget.EditorWidget. Additionally it may contain a ExpandLine that allows to expand/hide the
+    records which are not common (i.e. those whose value is not contained in all currently edited elements).
+    
+    Constructor parameters:
+    
+        - *tagEditor*: The tageditor that contains this SingleTagEditor
+        - *tag*: the tag whose records are managed by this SingleTagEditor
+        - *model*: the inner model of the tageditor
+        - *parent*: the parent widget 
+        
+    \ """
     EXPAND_LINE_LIMIT = 3
 
     def __init__(self,tagEditor,tag,model,parent=None):
@@ -58,9 +71,11 @@ class SingleTagEditor(QtGui.QWidget):
         self.tag = tag
 
     def isValid(self):
+        """Return whether all values in the RecordEditors are valid (as values of self.tag)."""
         return all(widget.isValid() for widget in self.widgetList if isinstance(widget,RecordEditor))
 
     def _insertRecord(self,pos,record):
+        """Helper method that inserts *record* at position *pos*."""
         recordEditor = RecordEditor(self.model,record)
         if self.expandLine is not None:
             # Calculate the correct position, taking the ExpandLine into account

@@ -14,7 +14,7 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from .. import tags, logging
-
+from . import events
 # At the end of the file we will import the submodules real and events.
 
 translate = QtCore.QCoreApplication.translate
@@ -25,76 +25,7 @@ logger = logging.getLogger(__name__)
 REAL = 1
 EDITOR = 2
 
-class ModifyEvent:
-    """A generic modify event for all sorts of modifications."""
-    def __init__(self, level, changes, contentsChanged = False):
-        self.changes = changes
-        self.level = level
-        self.contentsChanged = contentsChanged
-    
-    def ids(self):
-        return self.changes.keys()
-    
-    def getNewContentsCount(self, element):
-        return self.changes[element.id].getContentsCount()
-    
-    def applyTo(self, element):
-        element.copyFrom(self.changes[element.id], copyContents = self.contentsChanged)
 
-class ModifySingleElementEvent(ModifyEvent):
-    """A specialized modify event if only one element (tags, position, ...) is modified."""
-    def __init__(self, level, element):
-        self.element = element
-        self.level = level
-        self.contentsChanged = False
-        
-    def ids(self):
-        return self.element.id,
-    
-    def getNewContentsCount(self, element):
-        return 0
-    
-    def applyTo(self, element):
-        element.copyFrom(self.element, copyContents = False)
-
-class InsertElementsEvent(ModifyEvent):
-    """A specialized modify event for the insertion of elements. <insertions> is a dict mapping parentId -> iterable of
-    (position, elementList) tuples."""
-    def __init__(self, level, insertions):
-        self.insertions = insertions
-        self.level = level
-        self.contentsChanged = True
-        
-    def ids(self):
-        return self.insertions.keys()
-    
-    def getNewContentsCount(self, element):
-        return element.getContentsCount() + sum(map(len, tup[1]) for tup in self.insertions[element.id])
-    
-    def applyTo(self, element):
-        for i, elems in self.insertions[element.id]:
-            element.insertContents(i, [e.copy() for e in elems])
-            
-
-class RemoveElementsEvent(ModifyEvent):
-    """A specialized modify event for the removal of elements. Removals is a dict mapping parent ids to an iterable of
-    (position, number) tuples, meaning that parent.contents[position,position+number] will be removed. The caller must
-    make sure that it is feasable to remove elements in the order they appear in the iterable – i.e. they should be sorted
-    decreasing."""
-    def __init__(self, level, removals):
-        self.removals = removals
-        self.level = level
-        self.contentsChanged = True
-        
-    def ids(self):
-        return self.removals.keys()
-    
-    def getNewContentsCount(self, element):
-        return element.getContentsCount() - sum(tup[1] for tup in self.removals[element.id])
-    
-    def applyTo(self, element):
-        for index, count in self.removals[element.id]:
-            del element.contents[index:index+count]
             
          
 def _debugReal(event):
@@ -103,16 +34,14 @@ def _debugReal(event):
 def _debugEditor(event):
     logger.debug("EDITOR: " + str(event))
     
+    
 class ChangeEventDispatcher(QtCore.QObject):
     
-    realChanges = QtCore.pyqtSignal(ModifyEvent)
-    editorChanges = QtCore.pyqtSignal(ModifyEvent)
+    realChanges = QtCore.pyqtSignal(events.ModifyEvent)
+    editorChanges = QtCore.pyqtSignal(events.ModifyEvent)
     
-    # TODO: deprecated
-    changes = editorChanges
-    
-    # New tags are added outside the redo/undo framework and have their own signal.
-    newTagAdded = QtCore.pyqtSignal(tags.Tag)
+    # Changing tag-types is handled outside the redo/undo framework.
+    tagTypeChanged = QtCore.pyqtSignal(events.TagTypeChangedEvent)
     
     def __init__(self):
         QtCore.QObject.__init__(self)
@@ -147,13 +76,13 @@ class UndoCommand(QtGui.QUndoCommand):
         
     def redo(self):
         newChanges = OrderedDict(( (k,v[1]) for k,v in self.changes.items() ))
-        redoEvent = ModifyEvent(self.level, newChanges, contentsChanged = self.contentsChanged)
-        dispatcher.changes.emit(redoEvent)
+        redoEvent = events.ModifyEvent(self.level, newChanges, contentsChanged = self.contentsChanged)
+        dispatcher.editorChanges.emit(redoEvent)
 
     def undo(self):
         newChanges = OrderedDict(( (k,v[0]) for k,v in self.changes.items() ))
-        undoEvent = ModifyEvent(self.level, newChanges, contentsChanged = self.contentsChanged)
-        dispatcher.changes.emit(undoEvent)
+        undoEvent = events.ModifyEvent(self.level, newChanges, contentsChanged = self.contentsChanged)
+        dispatcher.editorChanges.emit(undoEvent)
 
 class ModifySingleElementCommand(UndoCommand):
     """A specialized undo command for the modification of a single element (tags, position, ..., but no 
@@ -167,9 +96,9 @@ class ModifySingleElementCommand(UndoCommand):
         self.setText(text)
     
     def redo(self):
-        dispatcher.changes.emit(ModifySingleElementEvent(self.level, self.after))
+        dispatcher.editorChanges.emit(events.ModifySingleElementEvent(self.level, self.after))
     def undo(self):
-        dispatcher.changes.emit(ModifySingleElementEvent(self.level, self.before))
+        dispatcher.editorChanges.emit(events.ModifySingleElementEvent(self.level, self.before))
 
 def createRanges(tuples):
         previous = None
@@ -218,11 +147,11 @@ class RemoveElementsCommand(UndoCommand):
                 self.removals[parentId].append( tuple )
                  
     def redo(self):
-        dispatcher.changes.emit(RemoveElementsEvent(
+        dispatcher.editorChanges.emit(events.RemoveElementsEvent(
              self.level, dict((pid, [ ( tup[0], len(tup[1]) ) for tup in reversed(elemSet)]) for pid,elemSet in self.removals.items())))
     
     def undo(self):
-        dispatcher.changes.emit(InsertElementsEvent(
+        dispatcher.editorChanges.emit(events.InsertElementsEvent(
              self.level, dict((pid, [ (tup[0], [self.elementPool[i] for i in tup[1]]) for tup in elemSet ] ) for pid, elemSet in self.removals.items())))
 
 class InsertElementsCommand(UndoCommand):
@@ -232,10 +161,10 @@ class InsertElementsCommand(UndoCommand):
         self.insertions = insertions
     
     def redo(self):
-        dispatcher.changes.emit(InsertElementsEvent(
+        dispatcher.editorChanges.emit(events.InsertElementsEvent(
               self.level, self.insertions))
     def undo(self):
-        dispatcher.changes.emit(RemoveElementsEvent(
+        dispatcher.editorChanges.emit(events.RemoveElementsEvent(
               self.level, dict((pid, [ (tup[0], len(tup[1]) ) for tup in reversed(elemSet)]) for pid,elemSet in self.insertions.items())))
 
 
@@ -379,5 +308,5 @@ def createRedoAction(level,parent,prefix):
     else: return stack.mainStack.createRedoAction(parent,prefix)
 
 
-from . import real, events
+from . import real
     

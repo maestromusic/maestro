@@ -4,7 +4,7 @@
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 3 as
-# published by the Free Software Foundation
+# published by the Free Software Foundation.
 #
 
 """Module for tag handling.
@@ -21,7 +21,7 @@ information in the ``tagids``-table and use one of the following ways to get tag
       (e.g. the title-tag) there exist constants (e.g. ``TITLE``). This allows to use tags.TITLE instead of
       ``tags.get(options.tags.title_tag``) as the user may decide to use another tagname than ``'title'``
       for his titles.
-    * To iterate over all indexed tags use the module variable ``tagList``.
+    * To iterate over all tags use the module variable ``tagList``.
     * Only in the case that the tag in question is not already in the database you should (and must) create
       the :class:`Tag`-instance using the constructor of :class:`Tag`.
     
@@ -43,7 +43,7 @@ logger = logging.getLogger("omg.tags")
 _tagsById = None
 _tagsByName = None
 
-# Dict mapping keys to their translations
+# Dict mapping tagnames to their translation
 _translation = None
 
 # Local reference to the database, will be created in init
@@ -298,10 +298,13 @@ def fromTranslation(translation):
     else: return get(translation)
 
     
-def addTag(name, type, sort = None, private = False):
+def addTagType(name, type, sort = None, private = False):
     """Adds a new tag named *name* of type *type* to the database. The parameter *sort* is a list of tags
     by which elements should be sorted if displayed below a ValueNode of this new tag; this defaults to the
-    title tag. If *private* is True, a private tag is created."""
+    title tag. If *private* is True, a private tag is created.
+    
+    After creation the dispatcher's tagTypeChanged signal is emitted.
+    """
     logger.info("Adding new tag '{}' of type '{}'.".format(name,type.name))
     name = name.lower()
     if name in _tagsByName:
@@ -309,7 +312,7 @@ def addTag(name, type, sort = None, private = False):
     if sort is None:
         sort = [TITLE]
     
-    from omg import database
+    from . import database
     id = database.query(
         "INSERT INTO {}tagids (tagname,tagtype, sorttags, private) VALUES (?, ?, ?, ?)"
               .format(database.prefix),
@@ -318,11 +321,84 @@ def addTag(name, type, sort = None, private = False):
     _tagsByName[name] = newTag
     _tagsById[id] = newTag
     tagList.append(newTag)
-    from .modify import dispatcher
-    dispatcher.newTagAdded.emit(newTag)
+    from .modify import dispatcher, events
+    dispatcher.tagTypeChanged.emit(events.TagTypeChangedEvent(events.TagTypeChangedEvent.ADDED,newTag))
     return newTag
 
 
+def removeTagType(tag):
+    """Remove a tagtype from the database, including all its values and relations. This will not touch any
+    files though!
+    
+    After removal the dispatcher's tagTypeChanged signal is emitted.
+    """
+    logger.info("Removing tag '{}'.".format(tag.name))
+    if tag == TITLE or tag == ALBUM:
+        raise ValueError("Cannot remove title or album tag.")
+    
+    from . import database
+    database.query("DELETE FROM {}tagids WHERE id=?".format(database.prefix),tag.id)
+    del _tagsByName[tag.name]
+    del _tagsById[tag.id]
+    if tag.name in _translation:
+        del _translation[tag.name]
+    tagList.remove(tag)
+    # TODO: The removed tag may still appear in the sorttags of other tags
+            
+    from .modify import dispatcher, events
+    dispatcher.tagTypeChanged.emit(events.TagTypeChangedEvent(events.TagTypeChangedEvent.DELETED,tag))
+
+
+def changeTagType(tag,name=None,valueType=None,private=None,sortTags=None):
+    """Change a tagtype. In particular update the instance *tag* (this is usually the only instance of this
+    tag) and the database. The other arguments determine what to change. Set them to None to leave a
+    property unchanged. This will not touch any files though!
+    
+    After removal the dispatcher's tagTypeChanged signal is emitted.
+    """
+    oldName = tag.name
+    assignments = []
+    params = []
+    
+    if name is not None and name != tag.name:
+        name = name.lower()
+        if not isValidTagName(name):
+            raise ValueError("'{}' is not a valid tagname.".format(name))
+        assignments.append('tagname = ?')
+        params.append(name)
+        tag.name = name
+    
+    if valueType is not None and name != tag.type:
+        if not isinstance(valueType,ValueType):
+            raise ValueError("'{}' is not a ValueType.".format(valueType))
+        assignments.append('tagtype = ?')
+        params.append(valueType.name)
+        tag.type = valueType
+        
+    if private is not None and bool(private) != tag.private:
+        assignments.append('private = 1' if private else 'private = 0')
+        tag.private = bool(private)
+        
+    if sortTags is not None and sortTags != tag.sortTags:
+        if not all(isinstance(sortTag,Tag) for sortTag in sortTags):
+            raise ValueError("SortTags must be a list of tags.")
+        assignments.append('sorttags = ?')
+        params.append(','.join(str(sortTag.id) for sortTag in sortTags))
+        tag.sortTags = sortTags
+    
+    if len(assignments) > 0:
+        if tag.name != oldName:
+            logger.info("Changing tag '{}' into {}.".format(oldName,tag.name))
+        else: logger.info("Changing tag '{}'.".format(tag.name))
+        from . import database
+        database.query("UPDATE {}tagids SET {} WHERE id = {}"
+                        .format(database.prefix,','.join(assignments),tag.id),
+                        *params)
+        
+        from .modify import dispatcher, events
+        dispatcher.tagTypeChanged.emit(events.TagTypeChangedEvent(events.TagTypeChangedEvent.CHANGED,tag))
+    
+    
 def init():
     """Initialize the variables of this module based on the information of the tagids-table and config-file.
     At program start or after changes of that table this method must be called to ensure the module has the
@@ -463,9 +539,6 @@ class Storage(dict):
             except ValueError: pass 
         if not self[tag]:
             del self[tag]
-        
-    #TODO: Deprecated. Remove it :-)
-    removeValues = remove
             
     def replace(self,tag,oldValue,newValue):
         """Replace a value of *tag*. Because *newValue* will be at the same position where *oldValue* was,
@@ -493,6 +566,13 @@ class Storage(dict):
         """
         for tag,valueList in other.items():
             self.removeValues(tag,*valueList)
+
+    def withoutPrivateTags(self):
+        """Return a Storage-object containing the same tags but without private tags. If there are no private
+        tags, return simply this object itself."""
+        if any(tag.private for tag in self):
+            return Storage({tag: l for tag,l in self.items() if not tag.private})
+        else: return self
 
 
 def findCommonTags(elements, recursive = True):

@@ -10,7 +10,10 @@ from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
 class ListView(QtGui.QListView):
-    """Listview which pays attention to its contents when calculating sizeHints and does not use scrollbars. The sizeHint-method of QListView is inherited all the way down from QAbstractScrollArea...and it returns the hard-coded value (256,192). Confer QTBUG-2273, QTBUG-6118 and QTBUG-2338."""
+    """Listview which pays attention to its contents when calculating sizeHints and does not use scrollbars.
+    The sizeHint-method of QListView is inherited all the way down from QAbstractScrollArea...and it returns
+    the hard-coded value (256,192). Confer QTBUG-2273, QTBUG-6118 and QTBUG-2338.
+    """
     def __init__(self,parent=None):
         QtGui.QListView.__init__(self,parent)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
@@ -19,7 +22,8 @@ class ListView(QtGui.QListView):
     def minimumSizeHint(self):
         extra = 2* self.frameWidth()
         
-        # The following code is from qabstractscrollarea.cpp, but it leads to a scrollarea that is slightly too large.
+        # The following code is from qabstractscrollarea.cpp,
+        # but it leads to a scrollarea that is slightly too large.
         opt = QtGui.QStyleOption()
         opt.initFrom(self)
         if (self.frameStyle() != QtGui.QFrame.NoFrame

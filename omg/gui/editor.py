@@ -93,7 +93,7 @@ class EditorTreeView(treeview.TreeView):
             QtGui.QTreeView.keyPressEvent(self, keyEvent)
             
     def removeSelected(self):
-        modify.pushEditorCommand(
+        modify.push(modify.EDITOR,
             modify.RemoveElementsCommand(modify.EDITOR, [s.internalPointer() for s in self.selectedIndexes()]))
         
     def mergeSelected(self):
@@ -165,7 +165,7 @@ class EditorWidget(QtGui.QDockWidget):
         container.setParent(newRoot)
         changes[oldRoot.id] = (oldRoot, newRoot)
         comm = modify.UndoCommand(modify.EDITOR, changes, contentsChanged = True, text=self.tr('new container'))
-        modify.pushEditorCommand(comm)
+        modify.push(modify.EDITOR,comm)
         
     def saveState(self):
         return (self.nameField.text(), self.albumGuesserCheckbox.checkState())
