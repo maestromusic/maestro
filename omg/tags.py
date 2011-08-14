@@ -21,7 +21,7 @@ information in the ``tagids``-table and use one of the following ways to get tag
       (e.g. the title-tag) there exist constants (e.g. ``TITLE``). This allows to use tags.TITLE instead of
       ``tags.get(options.tags.title_tag``) as the user may decide to use another tagname than ``'title'``
       for his titles.
-    * To iterate over all indexed tags use the module variable ``tagList``.
+    * To iterate over all tags use the module variable ``tagList``.
     * Only in the case that the tag in question is not already in the database you should (and must) create
       the :class:`Tag`-instance using the constructor of :class:`Tag`.
     
@@ -43,7 +43,7 @@ logger = logging.getLogger("omg.tags")
 _tagsById = None
 _tagsByName = None
 
-# Dict mapping keys to their translations
+# Dict mapping tagnames to their translation
 _translation = None
 
 # Local reference to the database, will be created in init
@@ -298,10 +298,13 @@ def fromTranslation(translation):
     else: return get(translation)
 
     
-def addTag(name, type, sort = None, private = False):
+def addTagType(name, type, sort = None, private = False):
     """Adds a new tag named *name* of type *type* to the database. The parameter *sort* is a list of tags
     by which elements should be sorted if displayed below a ValueNode of this new tag; this defaults to the
-    title tag. If *private* is True, a private tag is created."""
+    title tag. If *private* is True, a private tag is created.
+    
+    After creation the dispatcher's tagTypeAdded signal is emitted.
+    """
     logger.info("Adding new tag '{}' of type '{}'.".format(name,type.name))
     name = name.lower()
     if name in _tagsByName:
@@ -309,7 +312,7 @@ def addTag(name, type, sort = None, private = False):
     if sort is None:
         sort = [TITLE]
     
-    from omg import database
+    from . import database
     id = database.query(
         "INSERT INTO {}tagids (tagname,tagtype, sorttags, private) VALUES (?, ?, ?, ?)"
               .format(database.prefix),
@@ -318,9 +321,32 @@ def addTag(name, type, sort = None, private = False):
     _tagsByName[name] = newTag
     _tagsById[id] = newTag
     tagList.append(newTag)
-    from .modify import dispatcher
-    dispatcher.newTagAdded.emit(newTag)
+    from .modify import dispatcher, events
+    dispatcher.tagTypeChanged.emit(events.TagTypeChangedEvent(events.TagTypeChangedEvent.ADDED,newTag))
     return newTag
+
+
+def removeTagType(tag):
+    """Remove a tagtype from the database, including all its values and relations. This will not touch any
+    files though!
+    
+    After removal the dispatcher's tagTypeRemoved signal is emitted.
+    """
+    logger.info("Removing tag '{}'.".format(tag.name))
+    if tag == TITLE or tag == ALBUM:
+        raise ValueError("Cannot remove title or album tag.")
+    
+    from . import database
+    database.query("DELETE FROM {}tagids WHERE id=?".format(database.prefix),tag.id)
+    del _tagsByName[tag.name]
+    del _tagsById[tag.id]
+    if tag.name in _translation:
+        del _translation[tag.name]
+    tagList.remove(tag)
+    # TODO: The removed tag may still appear in the sorttags of other tags
+            
+    from .modify import dispatcher, events
+    dispatcher.tagTypeChanged.emit(events.TagTypeChangedEvent(events.TagTypeChangedEvent.DELETED,tag))
 
 
 def init():

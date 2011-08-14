@@ -184,6 +184,11 @@ class MainWindow(QtGui.QMainWindow):
         self.menus['extras'] = self.menuBar().addMenu(self.tr("&Extras"))
         self.menus['help'] = self.menuBar().addMenu(self.tr("&Help"))
         
+        tagManagerAction = QtGui.QAction(self)
+        tagManagerAction.setText(self.tr("Tagmanager..."))
+        tagManagerAction.triggered.connect(self.showTagManager)
+        self.menus['extras'].addAction(tagManagerAction)
+        
         aboutAction = QtGui.QAction(self)
         aboutAction.setText(self.tr("&About"))
         aboutAction.triggered.connect(self.showAboutDialog)
@@ -394,6 +399,11 @@ class MainWindow(QtGui.QMainWindow):
         config.binary["mainwindow_geometry"] = bytearray(self.saveGeometry())
         config.binary["mainwindow_state"] = bytearray(self.saveState())
 
+    def showTagManager(self):
+        from . import tagmanager
+        tagManager = tagmanager.TagManager(self)
+        tagManager.exec_()
+        
     def showAboutDialog(self):
         """Display the About dialog."""
         box = QtGui.QMessageBox(QtGui.QMessageBox.NoIcon,self.tr("About OMG"),

@@ -8,50 +8,7 @@
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
-from omg import tags, utils
-
-
-class NewTagDialog(QtGui.QDialog):
-    """This dialog is opened when a new tagtype appears for the first time. The user is asked to enter a
-    tags.ValueType for the new tag."""
-    def __init__(self, tagname, parent = None,text=None):
-        QtGui.QDialog.__init__(self, parent)
-        self.setWindowModality(QtCore.Qt.WindowModal)
-        layout = QtGui.QVBoxLayout(self)
-        
-        if text is None:
-            text = self.tr("The tag '{}' occured for the first time. Please enter its type:").format(tagname)
-        label = QtGui.QLabel(text)
-        layout.addWidget(label)
-            
-        self.combo = QtGui.QComboBox(self)
-        self.combo.addItems([type.name for type in tags.TYPES])
-        layout.addWidget(self.combo)
-        
-        self.abortButton = QtGui.QPushButton(self.tr("Abort"))
-        self.okButton = QtGui.QPushButton(self.tr("Ok"))
-        
-        buttonLayout = QtGui.QHBoxLayout()
-        buttonLayout.addStretch()
-        buttonLayout.addWidget(self.abortButton)
-        buttonLayout.addWidget(self.okButton)
-        layout.addLayout(buttonLayout)
-        
-        self.abortButton.clicked.connect(self.reject)
-        self.okButton.clicked.connect(self.accept)
-        
-    def selectedType(self):
-        """Return the tags.ValueType selected by the user."""
-        return tags.ValueType.byName(self.combo.currentText())
-    
-    @staticmethod
-    def queryTagType(name, parent = None):
-        """Open a NewTagDialog and return the selected tags.ValueType or None if the user aborted or closed
-        the dialog. *name* is the new tag's name."""
-        d = NewTagDialog(name, parent)
-        if d.exec_() == QtGui.QDialog.Accepted:
-            return d.selectedType()
-        else: return None
+from .. import utils
 
 
 class FancyTabbedPopup(QtGui.QFrame):
