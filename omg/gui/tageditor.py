@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 class TagEditorDock(QtGui.QDockWidget):
-    """DockWidget containing the Browser."""
+    """DockWidget containing the TagEditor."""
     def __init__(self,parent=None,state=None):
         QtGui.QDockWidget.__init__(self,parent)
         self.setWindowTitle(self.tr("Tageditor"))
@@ -94,6 +94,10 @@ class TagEditorDialog(QtGui.QDialog):
 class TagEditorWidget(QtGui.QWidget):
     
     saved = QtCore.pyqtSignal()
+        
+    # This hack is necessary to ignore changes in the tagboxes while changing the tag programmatically
+    # confer _handleTagChanged and _handleTagChangedByUser.
+    _ignoreHandleTagChangedByUser = False
     
     def __init__(self,level,elements = [],parent = None,dialog=None,saveDirectly=True):
         QtGui.QWidget.__init__(self,parent)
@@ -232,9 +236,13 @@ class TagEditorWidget(QtGui.QWidget):
             del adict[oldTag]
             assert newTag not in adict
             adict[newTag] = widget
+            self._ignoreHandleTagChangedByUser = True
             widget.setTag(newTag)
-
+            self._ignoreHandleTagChangedByUser = False
+    
     def _handleTagChangedByUser(self,changedTag):
+        if self._ignoreHandleTagChangedByUser:
+            return
         # First we have to get the tagBox responsible for this event and its tag
         tagBox = self.sender()
         oldTag = None
