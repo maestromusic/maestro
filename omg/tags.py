@@ -489,9 +489,6 @@ class Storage(dict):
             except ValueError: pass 
         if not self[tag]:
             del self[tag]
-        
-    #TODO: Deprecated. Remove it :-)
-    removeValues = remove
             
     def replace(self,tag,oldValue,newValue):
         """Replace a value of *tag*. Because *newValue* will be at the same position where *oldValue* was,
@@ -519,6 +516,13 @@ class Storage(dict):
         """
         for tag,valueList in other.items():
             self.removeValues(tag,*valueList)
+
+    def withoutPrivateTags(self):
+        """Return a Storage-object containing the same tags but without private tags. If there are no private
+        tags, return simply this object itself."""
+        if any(tag.private for tag in self):
+            return Storage({tag: l for tag,l in self.items() if not tag.private})
+        else: return self
 
 
 def findCommonTags(elements, recursive = True):

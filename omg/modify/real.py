@@ -23,18 +23,20 @@ def addTagValue(tag,value,elements):
     """Add a tag of type *tag* and value *value* to each element in *elements*."""
     assert isinstance(tag,tags.Tag) and len(elements) > 0
     
-    successful = []
-    for element in elements:
-        if element.isFile():
-            try:
-                real = realfiles2.get(element.path)
-                real.read()
-                real.tags.add(tag,value)
-                real.saveTags()
-            except:
-                logger.error("Could not add tags to '{}'.".format(element.path))
-                continue
-        successful.append(element)
+    if not tag.private:
+        successful = [] # list of elements where the file was written successfully
+        for element in elements:
+            if element.isFile():
+                try:
+                    real = realfiles2.get(element.path)
+                    real.read()
+                    real.tags.add(tag,value)
+                    real.saveTags()
+                except:
+                    logger.error("Could not add tags to '{}'.".format(element.path))
+                    continue
+            successful.append(element)
+    else: successful = elements
 
     if len(successful) > 0:
         dbwrite.addTagValues((element.id for element in successful),tag,[value])
@@ -45,18 +47,20 @@ def removeTagValue(tag,value,elements):
     """Remove the given value of tag *tag* from each element in *elements*."""
     assert isinstance(tag,tags.Tag) and len(elements) > 0
     
-    successful = []
-    for element in elements:
-        if element.isFile():
-            try:
-                real = realfiles2.get(element.path)
-                real.read()
-                real.tags.remove(tag,value)
-                real.saveTags()
-            except:
-                logger.error("Could not remove tags from '{}'.".format(element.path))
-                continue
-        successful.append(element)
+    if not tag.private:
+        successful = [] # list of elements where the file was written successfully
+        for element in elements:
+            if element.isFile():
+                try:
+                    real = realfiles2.get(element.path)
+                    real.read()
+                    real.tags.remove(tag,value)
+                    real.saveTags()
+                except:
+                    logger.error("Could not remove tags from '{}'.".format(element.path))
+                    continue
+            successful.append(element)
+    else: successful = elements
     
     if len(successful) > 0:                
         dbwrite.removeTagValues((element.id for element in successful),tag,[value])
@@ -68,19 +72,21 @@ def changeTagValue(tag,oldValue,newValue,elements):
     it. In any case add *newValue*."""
     assert isinstance(tag,tags.Tag) and len(elements) > 0
 
-    successful = []
-    for element in elements:
-        if element.isFile():
-            try:
-                real = realfiles2.get(element.path)
-                real.read()
-                real.tags.replace(tag,oldValue,newValue)
-                real.saveTags()
-            except e:
-                logger.error("Could not change tag value from '{}'.".format(element.path))
-                print(e)
-                continue
-        successful.append(element)
+    if not tag.private:
+        successful = [] # list of elements where the file was written successfully
+        for element in elements:
+            if element.isFile():
+                try:
+                    real = realfiles2.get(element.path)
+                    real.read()
+                    real.tags.replace(tag,oldValue,newValue)
+                    real.saveTags()
+                except e:
+                    logger.error("Could not change tag value from '{}'.".format(element.path))
+                    print(e)
+                    continue
+            successful.append(element)
+    else: successful = elements
         
     if len(successful) > 0:
         dbwrite.changeTagValue((element.id for element in successful),tag,oldValue,newValue)
@@ -90,7 +96,7 @@ def changeTagValue(tag,oldValue,newValue,elements):
 def changeTags(changes):
     """Change tags arbitrarily: *changes* is a dict mapping elements (not element-ids!) to tuples consisting
     of two tags.Storages - the tags before and after the change."""
-    successful = []
+    successful = [] # list of elements where the file was written successfully
     for element,changeTuple in changes.items():
         oldTags,newTags = changeTuple
         if oldTags == newTags:
@@ -100,7 +106,7 @@ def changeTags(changes):
             try:
                 real = realfiles2.get(element.path)
                 real.read()
-                real.tags = newTags
+                real.tags = newTags.withoutPrivateTags()
                 real.saveTags()
             except:
                 logger.error("Could not change tags of file '{}'.".format(element.path))
