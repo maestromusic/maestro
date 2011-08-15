@@ -7,6 +7,8 @@
 # published by the Free Software Foundation.
 #
 
+import functools
+
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
@@ -68,7 +70,7 @@ class TagManager(QtGui.QDialog):
             column += 1
             combo = tagwidgets.ValueTypeBox(tag.type)
             combo.disableMouseWheel = True
-            combo.typeChanged.connect(lambda type: self._handleValueTypeChanged(tag,type))
+            combo.typeChanged.connect(functools.partial(self._handleValueTypeChanged,tag))
             if number > 0:
                 combo.setEnabled(False)
             layout.addWidget(combo,row,column)
@@ -76,7 +78,7 @@ class TagManager(QtGui.QDialog):
             column += 1
             check = QtGui.QCheckBox()
             check.setCheckState(Qt.Checked if tag.private else Qt.Unchecked)
-            check.stateChanged.connect(lambda state: self._handlePrivateChanged(tag,state))
+            check.stateChanged.connect(functools.partial(self._handlePrivateChanged,tag))
             if number > 0:
                 check.setEnabled(False)
             layout.addWidget(check,row,column)
@@ -89,8 +91,9 @@ class TagManager(QtGui.QDialog):
             
             column += 1
             if number == 0:
-                removeButton = QtGui.QPushButton(utils.getIcon('delete.png'),'')
-                removeButton.clicked.connect(lambda: self._handleRemoveButton(tag))
+                removeButton = QtGui.QToolButton()
+                removeButton.setIcon(utils.getIcon('delete.png'))
+                removeButton.clicked.connect(functools.partial(self._handleRemoveButton,tag))
                 layout.addWidget(removeButton,row,column)
                 
         self.scrollArea.setWidget(self.scrollView)
