@@ -189,6 +189,11 @@ class MainWindow(QtGui.QMainWindow):
         tagManagerAction.triggered.connect(self.showTagManager)
         self.menus['extras'].addAction(tagManagerAction)
         
+        flagManagerAction = QtGui.QAction(self)
+        flagManagerAction.setText(self.tr("Flagmanager..."))
+        flagManagerAction.triggered.connect(self.showFlagManager)
+        self.menus['extras'].addAction(flagManagerAction)
+        
         aboutAction = QtGui.QAction(self)
         aboutAction.setText(self.tr("&About"))
         aboutAction.triggered.connect(self.showAboutDialog)
@@ -404,6 +409,11 @@ class MainWindow(QtGui.QMainWindow):
         tagManager = tagmanager.TagManager(self)
         tagManager.exec_()
         
+    def showFlagManager(self):
+        from . import flagmanager
+        flagManager = flagmanager.FlagManager(self)
+        flagManager.exec_()
+
     def showAboutDialog(self):
         """Display the About dialog."""
         box = QtGui.QMessageBox(QtGui.QMessageBox.NoIcon,self.tr("About OMG"),
