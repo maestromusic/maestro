@@ -321,8 +321,8 @@ def addTagType(name, type, sort = None, private = False):
     _tagsByName[name] = newTag
     _tagsById[id] = newTag
     tagList.append(newTag)
-    from .modify import dispatcher, events
-    dispatcher.tagTypeChanged.emit(events.TagTypeChangedEvent(events.TagTypeChangedEvent.ADDED,newTag))
+    from .modify import dispatcher, events, ADDED
+    dispatcher.tagTypeChanged.emit(events.TagTypeChangedEvent(ADDED,newTag))
     return newTag
 
 
@@ -345,8 +345,8 @@ def removeTagType(tag):
     tagList.remove(tag)
     # TODO: The removed tag may still appear in the sorttags of other tags
             
-    from .modify import dispatcher, events
-    dispatcher.tagTypeChanged.emit(events.TagTypeChangedEvent(events.TagTypeChangedEvent.DELETED,tag))
+    from .modify import dispatcher, events, DELETED
+    dispatcher.tagTypeChanged.emit(events.TagTypeChangedEvent(DELETED,tag))
 
 
 def changeTagType(tag,name=None,valueType=None,private=None,sortTags=None):
@@ -362,7 +362,7 @@ def changeTagType(tag,name=None,valueType=None,private=None,sortTags=None):
     
     if name is not None and name != tag.name:
         name = name.lower()
-        if not isValidTagName(name):
+        if not isValidTagname(name):
             raise ValueError("'{}' is not a valid tagname.".format(name))
         assignments.append('tagname = ?')
         params.append(name)
@@ -395,8 +395,8 @@ def changeTagType(tag,name=None,valueType=None,private=None,sortTags=None):
                         .format(database.prefix,','.join(assignments),tag.id),
                         *params)
         
-        from .modify import dispatcher, events
-        dispatcher.tagTypeChanged.emit(events.TagTypeChangedEvent(events.TagTypeChangedEvent.CHANGED,tag))
+        from .modify import dispatcher, events, CHANGED
+        dispatcher.tagTypeChanged.emit(events.TagTypeChangedEvent(CHANGED,tag))
     
     
 def init():
