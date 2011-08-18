@@ -120,37 +120,45 @@ class TagEditorWidget(QtGui.QWidget):
             lambda wList,widget: not isinstance(widget,singletageditor.ExpandLine)
         
         self.setLayout(QtGui.QVBoxLayout())
-        self.label = QtGui.QLabel()
-        self.layout().addWidget(self.label)
-        self.scrollArea = QtGui.QScrollArea()
-        self.scrollArea.setWidgetResizable(True)
-        self.layout().addWidget(self.scrollArea)
-        self.buttonBarLayout = QtGui.QHBoxLayout()
-        self.layout().addLayout(self.buttonBarLayout,0)
+        self.topLayout = QtGui.QHBoxLayout()
+        self.layout().addLayout(self.topLayout)
+        
+        iconLabel = QtGui.QLabel()
+        path = utils.getIconPath('real.png' if level == modify.REAL else 'editor.png')
+        iconLabel.setPixmap(QtGui.QPixmap(path))
+        iconLabel.setToolTip(self.tr("Real level") if level == modify.REAL else self.tr("Editor level"))
+        self.topLayout.addWidget(iconLabel)
 
         addButton = QtGui.QPushButton(utils.getIcon("add.png"),self.tr("Add tag"))
         addButton.clicked.connect(lambda: self._handleAddRecord(None))
-        self.buttonBarLayout.addWidget(addButton)
+        self.topLayout.addWidget(addButton)
         removeButton = QtGui.QPushButton(utils.getIcon("remove.png"),self.tr("Remove selected"))
         removeButton.clicked.connect(self._handleRemoveSelected)
-        self.buttonBarLayout.addWidget(removeButton)
-        self.buttonBarLayout.addStretch(1)
+        self.topLayout.addWidget(removeButton)
         
         style = QtGui.QApplication.style()
         if not saveDirectly:
             resetButton = QtGui.QPushButton(style.standardIcon(QtGui.QStyle.SP_DialogResetButton),
                                             self.tr("Reset"))
             resetButton.clicked.connect(self.model.reset)
-            self.buttonBarLayout.addWidget(resetButton)
+            self.topLayout.addWidget(resetButton)
             if dialog is not None:
                 cancelButton = QtGui.QPushButton(style.standardIcon(QtGui.QStyle.SP_DialogCancelButton),
                                                  self.tr("Cancel"))
                 cancelButton.clicked.connect(dialog.reject)
-            self.buttonBarLayout.addWidget(cancelButton)
+            self.topLayout.addWidget(cancelButton)
             saveButton = QtGui.QPushButton(style.standardIcon(QtGui.QStyle.SP_DialogSaveButton),
                                            self.tr("Save"))
             saveButton.clicked.connect(self._handleSave)
-            self.buttonBarLayout.addWidget(saveButton)
+            self.topLayout.addWidget(saveButton)
+        
+        self.label = QtGui.QLabel()
+        self.topLayout.addWidget(self.label)
+        self.topLayout.addStretch(1)
+        
+        self.scrollArea = QtGui.QScrollArea()
+        self.scrollArea.setWidgetResizable(True)
+        self.layout().addWidget(self.scrollArea)
             
         self.viewport = QtGui.QWidget()
         self.viewport.setLayout(QtGui.QVBoxLayout())
@@ -207,8 +215,8 @@ class TagEditorWidget(QtGui.QWidget):
         count = len(self.model.getElements())
         self.label.setText(self.tr("Edit tags of %n element(s).","",count))
         # Enable / disable buttons
-        for i in range(self.buttonBarLayout.count()):
-            widget = self.buttonBarLayout.itemAt(i).widget()
+        for i in range(1,self.topLayout.count()): # Skip the iconLabel
+            widget = self.topLayout.itemAt(i).widget()
             if widget is not None:
                 widget.setEnabled(count > 0)
         
