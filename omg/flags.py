@@ -25,6 +25,15 @@ class FlagType:
         
     def __str__(self):
         return self.name
+    
+    def __eq__(self,other):
+        return isinstance(other,FlagType) and self.id == other.id
+    
+    def __ne__(self,other):
+        return not isinstance(other,FlagType) or self.id != other.id
+    
+    def __hash__(self):
+        return self.id
         
 
 def get(identifier):
@@ -37,7 +46,7 @@ def get(identifier):
     elif isinstance(identifier,str):
         id = db.query("SELECT id FROM {}flag_names WHERE name = ?"
                         .format(db.prefix),identifier).getSingle()
-        return FlagType(identifier,name)
+        return FlagType(id,identifier)
     elif isinstance(identifier,FlagType):
         return identifier
     else: raise ValueError("identifier must be either int or string or FlagType.")

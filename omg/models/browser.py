@@ -12,7 +12,8 @@ from PyQt4 import QtCore
 from PyQt4.QtCore import Qt
 
 from .. import config, models, search, database as db, tags, logging, utils
-from ..models import rootedtreemodel, mimedata, Element
+from . import rootedtreemodel, mimedata, Element
+from ..search import criteriaModule
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +39,7 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
     _autoLoadEnabled = False # While enabled AutoLoading loads the contents of all nodes.
     _autoLoadGen = None # Generator that produces elements that have to be loaded.
     
-    def __init__(self,table,layers,browser,view):
+    def __init__(self,table,layers,flags,browser,view):
         """Initialize this model. It will contain only elements from *table* and group them according to
         *layers*. *browser* and *view* must be the browser and its view that uses this model.
         """
@@ -47,6 +48,7 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
         self.browser = browser
         self.view = view
         self.layers = layers
+        self.flags = flags
         
         if searchEngine is None:
             initSearchEngine()
@@ -77,6 +79,16 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
         """Return the layers of this model."""
         return self.layers
     
+    def getFlags(self):
+        """Return the flags set in this model."""
+        return self.flags
+    
+    def setFlags(self,flagList):
+        """Set the flags. The model will contain only elements with these flags."""
+        if flagList != self.flags:
+            self.flags = flagList
+            self.reset()
+            
     def setTable(self,table):
         """Set the table of this model. The model will only contain elements from <table>."""
         if table != self.table:
@@ -152,7 +164,7 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
         """
         assert node == self.root or isinstance(node,CriterionNode)
         
-        if node == self.root:
+        if node == self.root and len(self.flags) == 0:
             # No need to search...load directly
             if len(self.layers) > 0:
                 self._loadTagLayer(node,self.table)
@@ -161,8 +173,17 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
             else: self._loadContainerLayer(node,self.table)
         else:
             method = searchEngine.search if not wait else searchEngine.searchAndWait
-            # Collect the criteria in this node and its parents and put the search results into smallResult
-            searchRequest = method(self.table,smallResult,node._collectCriteria(),
+            if node == self.root:
+                criteria = [criteriaModule.FlagsCriterion(self.flags)]
+            else:
+                # Collect the criteria of this node and its parents
+                criteria = node._collectCriteria()
+                if len(self.flags) > 0:
+                    # insert the flag criterion at the beginning, so that it is executed first
+                    criteria.insert(0,criteriaModule.FlagsCriterion(self.flags))
+                    
+            # Search and put the search results into smallResult
+            searchRequest = method(self.table,smallResult,criteria,
                                 parent=self.browser.searchRequest,
                                 owner=self,
                                 data=node,
