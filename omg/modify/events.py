@@ -100,8 +100,9 @@ class TagChangeEvent(ElementChangeEvent):
 
             
 class SingleTagChangeEvent(TagChangeEvent):
-    def __init__(self,tag,elements):
+    def __init__(self,level,tag,elements):
         assert isinstance(tag,tags.Tag)
+        self.level = level
         self.tag = tag
         self.elements = elements
         self.contentsChanged = False
@@ -111,8 +112,8 @@ class SingleTagChangeEvent(TagChangeEvent):
     
     
 class TagValueAddedEvent(SingleTagChangeEvent):
-    def __init__(self,tag,value,elements):
-        SingleTagModifyEvent.__init__(self,tag,elements)
+    def __init__(self,level,tag,value,elements):
+        super().__init__(level,tag,elements)
         self.value = value
 
     def applyTo(self,element):
@@ -125,8 +126,8 @@ class TagValueAddedEvent(SingleTagChangeEvent):
     
     
 class TagValueRemovedEvent(SingleTagChangeEvent):
-    def __init__(self,tag,value,elements):
-        SingleTagModifyEvent.__init__(self,tag,elements)
+    def __init__(self,level,tag,value,elements):
+        super().__init__(level,tag,elements)
         self.value = value
 
     def applyTo(self,element):
@@ -139,8 +140,8 @@ class TagValueRemovedEvent(SingleTagChangeEvent):
 
 
 class TagValueChangedEvent(SingleTagChangeEvent):
-    def __init__(self,tag,oldValue,newValue,elements):
-        SingleTagModifyEvent.__init__(self,tag,elements)
+    def __init__(self,level,tag,oldValue,newValue,elements):
+        super().__init__(level,tag,elements)
         self.oldValue = oldValue
         self.newValue = newValue
 
