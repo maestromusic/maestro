@@ -322,7 +322,7 @@ def addTagType(name, type, sort = None, private = False):
     _tagsById[id] = newTag
     tagList.append(newTag)
     from .modify import dispatcher, events, ADDED
-    dispatcher.tagTypeChanged.emit(events.TagTypeChangedEvent(ADDED,newTag))
+    dispatcher.changes.emit(events.TagTypeChangedEvent(ADDED,newTag))
     return newTag
 
 
@@ -346,7 +346,7 @@ def removeTagType(tag):
     # TODO: The removed tag may still appear in the sorttags of other tags
             
     from .modify import dispatcher, events, DELETED
-    dispatcher.tagTypeChanged.emit(events.TagTypeChangedEvent(DELETED,tag))
+    dispatcher.changes.emit(events.TagTypeChangedEvent(DELETED,tag))
 
 
 def changeTagType(tag,name=None,valueType=None,private=None,sortTags=None):

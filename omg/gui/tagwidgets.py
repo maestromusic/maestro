@@ -243,23 +243,23 @@ class TagTypeBox(QtGui.QStackedWidget):
         """React upon tagTypeChanged-signals from the dispatcher."""
         if not isinstance(event, modify.events.TagTypeChangedEvent):
             return
-        if event.action == modify.events.TagTypeChangedEvent.ADDED:
+        if event.action == modify.ADDED:
             # Do not add twice
             for i in range(self.box.count()):
-                if self.box.itemData(i) == event.tagtype:
+                if self.box.itemData(i) == event.tagType:
                     return
-            else: self._addTagToBox(event.tagtype)
-        elif event.action == modify.events.TagTypeChangedEvent.DELETED:
+            else: self._addTagToBox(event.tagType)
+        elif event.action == modify.DELETED:
             for i in range(self.box.count()):
-                if self.box.itemData(i) == event.tagtype:
+                if self.box.itemData(i) == event.tagType:
                     self.box.removeItem(i)
                     return
-        elif event.action == modify.events.TagTypeChangedEvent.CHANGED:
+        elif event.action == modify.CHANGED:
             for i in range(self.box.count()):
-                if self.box.itemData(i) == event.tagtype:
-                    self.box.setItemText(i,event.tagtype.translated())
-                    if event.tagtype.iconPath() is not None:
-                        self.box.setItemIcon(i,QtGui.QIcon(event.tagtype.iconPath()))
+                if self.box.itemData(i) == event.tagType:
+                    self.box.setItemText(i,event.tagType.translated())
+                    if event.tagType.iconPath() is not None:
+                        self.box.setItemIcon(i,QtGui.QIcon(event.tagType.iconPath()))
                     # Do not change the tag because there is only one instance
                     return
             

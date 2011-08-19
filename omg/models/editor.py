@@ -36,6 +36,9 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
     def handleChangeEvent(self, event):
         """React on an incoming ChangeEvent by applying all changes that affect the
         current model."""
+        if not isinstance(event, modify.events.ElementChangeEvent):
+            logger.info('ignoring event {0}'.format(event))
+            return
         logger.info("incoming modify event at {}, type {}".format(self.name, event.__class__.__name__))
         for id in event.ids():
             if id == self.root.id:

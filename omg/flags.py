@@ -87,7 +87,7 @@ def removeFlagType(flagType):
     
     logger.info("Removing flag '{}'.".format(flagType))
     db.query("DELETE FROM {}flag_names WHERE id = ?".format(db.prefix),flagType.id)
-    modify.dispatcher.flagTypeChanged.emit(modify.events.FlagTypeChangedEvent(modify.DELETED,flagType))
+    modify.dispatcher.changes.emit(modify.events.FlagTypeChangedEvent(modify.DELETED,flagType))
 
 
 def changeFlagType(flagType,name):
@@ -101,6 +101,6 @@ def changeFlagType(flagType,name):
     logger.info("Changing flag '{}' to '{}'.".format(flagType.name,name))
     db.query("UPDATE {}flag_names SET name = ? WHERE id = ?".format(db.prefix),name,flagType.id)
     newFlagType = FlagType(flagType.id,name)
-    modify.dispatcher.flagTypeChanged.emit(modify.events.FlagTypeChangedEvent(modify.CHANGED,newFlagType))
+    modify.dispatcher.changes.emit(modify.events.FlagTypeChangedEvent(modify.CHANGED,newFlagType))
     return newFlagType
         
