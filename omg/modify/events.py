@@ -42,8 +42,11 @@ class NewElementChangeEvent(ElementChangeEvent):
 
 class ElementsDeletedEvent(ChangeEvent):
     """Special event that is sent when elements are completely deleted from the database."""
-    def __init__(self,elements):
-        self.elements = elements
+    def __init__(self,elids):
+        self.elids = elids
+        
+    def ids(self):
+        return self.elids
     
 class SingleElementChangeEvent(ElementChangeEvent):
     """A specialized modify event if only one element (tags, position, ...) is modified."""

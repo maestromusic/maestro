@@ -21,17 +21,23 @@ logger = logging.getLogger("omg.modify")
 
 def createNewElements(elements):
     result = {}
+    changedElements = {}
     for element in elements:
         assert element.id < 0
         params = (element.isFile(),element.toplevel,element.getContentsCount(),element.major)
-        result[element.id] = db.write.createNewElement(*params).getSingle()
-    dispatcher.emit(events.NewElementChangeEvent({element.id: element for element in elements}))
+        oldId = element.id
+        newId = db.write.createNewElement(*params).getSingle()
+        result[element.id] = newId
+        copy = element.copy()
+        copy.id = newId
+        changedElements[oldId] = copy
+    dispatcher.emit(events.NewElementChangeEvent(changedElements))
     return result
 
 
-def deleteElements(elements):
-    db.write.deleteElements((element.id for element in elements))
-    dispatcher.emit(events.ElementsDeletedEvent(elements))
+def deleteElements(elids):
+    db.write.deleteElements(elids)
+    dispatcher.emit(events.ElementsDeletedEvent(elids))
 
 
 def addTagValue(tag,value,elements): 
