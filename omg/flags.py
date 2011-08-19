@@ -76,7 +76,7 @@ def addFlagType(name):
     logger.info("Adding new flag '{}'.".format(name))
     id = db.query("INSERT INTO {}flag_names (name) VALUES (?)".format(db.prefix),name).insertId()
     newFlag = FlagType(id,name)
-    modify.dispatcher.flagTypeChanged.emit(modify.events.FlagTypeChangedEvent(modify.ADDED,newFlag))
+    modify.dispatcher.changes.emit(modify.events.FlagTypeChangedEvent(modify.ADDED,newFlag))
     return newFlag
 
 
