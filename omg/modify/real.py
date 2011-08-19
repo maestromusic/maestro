@@ -24,9 +24,8 @@ def createNewElements(elements):
     changedElements = {}
     for element in elements:
         assert element.id < 0
-        params = (element.isFile(),element.toplevel,element.getContentsCount(),element.major)
         oldId = element.id
-        newId = db.write.createNewElement(*params).getSingle()
+        newId = db.write.createNewElement(element.isFile(),element.major).insertId()
         result[element.id] = newId
         copy = element.copy()
         copy.id = newId
