@@ -458,13 +458,24 @@ class MainWindow(QtGui.QMainWindow):
         """Set the focus to the next browser' searchbox (By pressing the browser shortcut repeatedly
         the focus will run through all browsers).
         """ 
-        for widgetData,widgets in self._dockWidgets.items():
-            if widgetData.theClass.__name__ == 'BrowserDock':
-                for i,widget in enumerate(widgets):
-                    if widget.widget().searchBox.hasFocus():
-                        nextIndex = (i+1) % len(widgets)
-                        widgets[nextIndex].widget().searchBox.setFocus(Qt.OtherFocusReason)
-                        return
-                widgets[0].widget().searchBox.setFocus(Qt.ShortcutFocusReason)
+        browserDocks = self.getWidgets('browser')
+        for browserDock in browserDocks:
+            if browserDock.widget().searchBox.hasFocus():
+                nextIndex = (i+1) % len(browserDocks)
+                browserDocks[nextIndex].widget().searchBox.setFocus(Qt.OtherFocusReason)
+                return
+        browserDocks[0].widget().searchBox.setFocus(Qt.ShortcutFocusReason)
+    
+    def getWidgets(self,id):
+        """Given the id of a WidgetData-instance, return all widgets (central and dock) of that WidgetData."""
+        result = []
+        for widgetData,widgets in self._centralWidgets.items():
+            if widgetData.id == id:
+                result.extend(widgets)
                 break
-            
+        for widgetData,widgets in self._dockWidgets.items():
+            if widgetData.id == id:
+                result.extend(widgets)
+                break
+        return result
+        
