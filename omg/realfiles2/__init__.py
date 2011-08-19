@@ -116,6 +116,7 @@ class UFile(RealFile):
                         vals.append(value)
                 if len(vals) > 0:
                     self.tags.add(tag, *vals)
+        self.length = self._f.length
     
     def saveTags(self):
         self._ensureFileIsLoaded()

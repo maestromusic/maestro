@@ -75,7 +75,7 @@ class UndoCommand(QtGui.QUndoCommand):
         else:
             redoChanges = OrderedDict(( (k,v[1]) for k,v in self.changes.items() ))
             redoEvent = events.ElementChangeEvent(self.level, redoChanges, contentsChanged = self.contentsChanged)
-        dispatcher.changes.emit(redoEvent)
+            dispatcher.changes.emit(redoEvent)
 
     def undo(self):
         
@@ -83,8 +83,8 @@ class UndoCommand(QtGui.QUndoCommand):
             real.commit({id:(v[1],v[0]) for k,v in self.changes.items() })
         else:
             undoChanges = OrderedDict(( (k,v[0]) for k,v in self.changes.items() ))
-            undoEvent = events.ChangeEvent(self.level, undoChanges, contentsChanged = self.contentsChanged)
-        dispatcher.changes.emit(undoEvent)
+            undoEvent = events.ElementChangeEvent(self.level, undoChanges, contentsChanged = self.contentsChanged)
+            dispatcher.changes.emit(undoEvent)
 
 class ModifySingleElementCommand(UndoCommand):
     """A specialized undo command for the modification of a single element (tags, position, ..., but no 
@@ -100,9 +100,9 @@ class ModifySingleElementCommand(UndoCommand):
         self.setText(text)
     
     def redo(self):
-        dispatcher.changes.emit(events.ModifySingleElementEvent(self.level, self.after))
+        dispatcher.changes.emit(events.SingleElementChangeEvent(self.level, self.after))
     def undo(self):
-        dispatcher.changes.emit(events.ModifySingleElementEvent(self.level, self.before))
+        dispatcher.changes.emit(events.SingleElementChangeEvent(self.level, self.before))
 
 def createRanges(tuples):
         previous = None

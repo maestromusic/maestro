@@ -9,11 +9,6 @@ import re
 from PyQt4 import QtCore, QtGui
 from .. import tags, modify, config
 
-
-
-notRegexp = '(?:.*/)?' + re.sub('(.*?)(%\{.+?\})', lambda b: re.escape(b.group(1)) + b.group(2), defstring)
-theRegexp = re.sub('\%\{(\w+)\}','(?P<\g<1>>.+)', notRegexp).replace('%{*}', '.*')
-
 class ExtendedTableWidgetItem(QtGui.QTableWidgetItem):
     """A QTableWidgetItem with an additional internal object pointer."""
     def __init__(self, object, text = None):

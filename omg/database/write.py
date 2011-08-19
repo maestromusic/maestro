@@ -34,12 +34,12 @@ def setContents(data):
     db.query("DELETE FROM {}contents WHERE container_id IN ({})".format(db.prefix,db.csList(data.keys())))
     
     # Insert new contents
-    params = ((cid,el.position,el.id) for el in contents for cid,contents in data.items())  
+    params = ((cid,el.position,el.id) for cid,contents in data.items() for el in contents)  
     db.multiQuery("INSERT INTO {}contents (container_id,position,element_id) VALUES(?,?,?)"
                     .format(db.prefix),params)
                     
     # Update element counter of changed containers
-    db.updateElementsCounter(data.keys())
+    updateElementsCounter(data.keys())
 
     # Set toplevel flag of all contents to 0
     contents = [element.id for element in itertools.chain.from_iterable(data.values())]
@@ -47,14 +47,17 @@ def setContents(data):
                 .format(db.prefix,db.csList(contents)))
                 
     # Finally update the toplevel flag of elements that got removed from the contents
-    db.updateToplevelFlags((id for id in oldContents if not id in newContents))
+    updateToplevelFlags((id for id in oldContents if not id in newContents))
     
     db.commit()
 
 
 def updateElementsCounter(elids = None):
     if elids is not None:
-        whereClause = "WHERE id IN ({})".format(db.csList(elids))
+        cslist = db.csList(elids)
+        if cslist == '':
+            return
+        whereClause = "WHERE id IN ({})".format(cslist)
     else: whereClause = '' 
     db.query("""
         UPDATE {0}elements
@@ -65,7 +68,10 @@ def updateElementsCounter(elids = None):
         
 def updateToplevelFlags(elids = None):
     if elids is not None:
-        whereClause = "WHERE id IN ({})".format(db.csList(elids))
+        cslist = db.csList(elids)
+        if cslist == '':
+            return
+        whereClause = "WHERE id IN ({})".format(cslist)
     else: whereClause = '' 
     db.query("""
         UPDATE {0}elements

@@ -56,7 +56,7 @@ def commit(changes):
                     
     # Contents (including position)
     contents = {}
-    for id,changesTuple in changes.items:
+    for id,changesTuple in changes.items():
         oldElement,newElement = changesTuple
         cOld = oldElement.getContents()
         cNew = newElement.getContents()
@@ -69,7 +69,7 @@ def commit(changes):
     
     # TODO: major and flags
     
-    dispatcher.changes.emit(events.ElementChangeEvent(REAL,{id: tuple[0] for id,tuple in changes}))
+    dispatcher.changes.emit(events.ElementChangeEvent(REAL,{id: tuple[0] for id,tuple in changes.items()}))
 
 
 def addTagValue(tag,value,elements): 
@@ -145,7 +145,7 @@ def changeTagValue(tag,oldValue,newValue,elements):
         dispatcher.changes.emit(events.TagValueChangedEvent(REAL,tag,oldValue,newValue,successful))
 
 
-def changeTags(changes):
+def changeTags(changes, emitEvent = True):
     """Change tags arbitrarily: *changes* is a dict mapping elements (not element-ids!) to tuples consisting
     of two tags.Storages - the tags before and after the change."""
     successful = [] # list of elements where the file was written successfully
@@ -183,7 +183,7 @@ def changeTags(changes):
             if len(valuesToAdd) > 0:
                 db.write.addTagValues(element.id,tag,valuesToAdd)
             
-    if len(successful) > 0:
+    if len(successful) > 0 and emitEvent:
         if len(successful) < len(changes):
             changes = {element: changes for element,changes in changes.items() if element in successful}
         dispatcher.changes.emit(events.TagModifyEvent(REAL,changes))
