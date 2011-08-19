@@ -33,7 +33,7 @@ def commitEditors():
         else:
             if not element.id in newElements:
                 newElements[element.id] = element
-    newElementsCommand = modify.CreateNewElementsCommand(newElements)
+    newElementsCommand = modify.CreateNewElementsCommand(newElements.values())
     modify.push(modify.REAL, newElementsCommand)
     # new elements commited -> now all elements are in the DB. Add new ones to dbElements
     idMap = newElementsCommand.idMap
@@ -44,7 +44,7 @@ def commitEditors():
     # now we needte load the original states of the elements from the database, in order to be able
     # to undo the commit.
     originalElements = dict()
-    for element in dbElements:
+    for element in dbElements.values():
         origEl = Element.fromId(element.id, loadData = True)
         if origEl.isContainer():
             origEl.loadContents(recursive = False, loadData = False)

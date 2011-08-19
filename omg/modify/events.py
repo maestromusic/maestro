@@ -32,7 +32,7 @@ class NewElementChangeEvent(ElementChangeEvent):
     """This special event is used when new elements are added to the database. Its changes map ids to new
     elements."""
     def __init__(self,changes):
-        from .. import REAL
+        from . import REAL
         super().__init__(REAL,changes)
     
     def applyTo(self,element):

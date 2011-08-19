@@ -9,7 +9,7 @@
 import itertools
 from omg import database as db
 
-def createNewElement(file,toplevel,elementNumber,major):
+def createNewElement(file,major):
     return db.query("INSERT INTO {}elements (file,toplevel,elements,major) VALUES (?,1,0,?)"
                         .format(db.prefix),int(file),int(major)).insertId()
                         
