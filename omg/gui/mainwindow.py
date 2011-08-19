@@ -469,9 +469,9 @@ class MainWindow(QtGui.QMainWindow):
     def getWidgets(self,id):
         """Given the id of a WidgetData-instance, return all widgets (central and dock) of that WidgetData."""
         result = []
-        for widgetData,widgets in self._centralWidgets.items():
+        for widgetData,widget in self._centralWidgets.items():
             if widgetData.id == id:
-                result.extend(widgets)
+                result.append(widget)
                 break
         for widgetData,widgets in self._dockWidgets.items():
             if widgetData.id == id:
