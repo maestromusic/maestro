@@ -74,6 +74,11 @@ def updateToplevelFlags(elids = None):
         """.format(db.prefix,whereClause))
 
 
+def addFile(elid,path,hash,length):
+    db.query("INSERT INTO {}files (element_id,path,hash,length) VALUES (?,?,?,?)"
+                .format(db.prefix),elid,path,hash,length)
+                
+                
 def addTagValuesById(elids,tag,valueIds):
     """Add tag values given by their id to some elements. *elids* is either a single id or a list of ids,
     *tag* is the affected tag and *valueIds* is a list of values-ids for *tag*.

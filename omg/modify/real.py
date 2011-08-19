@@ -26,10 +26,14 @@ def createNewElements(elements):
         assert element.id < 0
         oldId = element.id
         newId = db.write.createNewElement(element.isFile(),element.major).insertId()
+        if element.isFile():
+            db.write.addFile(newId,element.path,None,element.length)
+        # Prepare result and changedElements
         result[element.id] = newId
         copy = element.copy()
         copy.id = newId
         changedElements[oldId] = copy
+        
     dispatcher.changes.emit(events.NewElementChangeEvent(changedElements))
     return result
 
