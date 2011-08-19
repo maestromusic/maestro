@@ -487,8 +487,8 @@ def setTopLevelFlags(table):
         db.query("""
             INSERT INTO {1} (id)
                 SELECT DISTINCT c.element_id
-                FROM contents AS c JOIN {2} AS parents ON c.container_id = parents.id
-                                   JOIN {2} AS children ON c.element_id = children.id
+                FROM {0}contents AS c JOIN {2} AS parents ON c.container_id = parents.id
+                                      JOIN {2} AS children ON c.element_id = children.id
                 """.format(db.prefix,TT_HELP,table))
 
     db.query("UPDATE {} SET toplevel = 1".format(table))
