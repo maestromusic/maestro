@@ -416,7 +416,8 @@ class NewTagTypeDialog(QtGui.QDialog):
     """This dialog is opened when a new tagtype appears for the first time. The user is asked to enter a
     tags.ValueType for the new tag."""
     Delete, DeleteAlways = -1, -2
-    def __init__(self,tagname,parent=None,text=None,tagnameEditable=False,privateEditable=False,includeDeleteOption = False):
+    def __init__(self,tagname,parent=None,text=None,tagnameEditable=False,
+                 privateEditable=False,includeDeleteOption = False):
         QtGui.QDialog.__init__(self, parent)
         self.setWindowModality(QtCore.Qt.WindowModal)
         self.setLayout(QtGui.QVBoxLayout(self))
@@ -467,15 +468,10 @@ class NewTagTypeDialog(QtGui.QDialog):
         
     def tagType(self):
         """Return the new tagtype selected by the user."""
-        if self._newTag is None:
-            self._newTag = tags.addTagType(self.tagname,self.combo.getType(),
-                                           private=self.privateBox.isChecked())
         return self._newTag
 
     def _handleOk(self):
-        if not self.tagnameEditable:
-            self.accept()
-        else:
+        if self.tagnameEditable:
             tagname = self.lineEdit.text()
             if tags.exists(tagname):
                 QtGui.QMessageBox.warning(self,self.tr("Tag exists already"),
@@ -486,7 +482,10 @@ class NewTagTypeDialog(QtGui.QDialog):
                                           self.tr("'{}' is not a valid tagname.").format(tagname))
                 return
             self.tagname = tagname
-            self.accept()
+        if self._newTag is None:
+            self._newTag = tags.addTagType(self.tagname,self.combo.getType(),
+                                           private=self.privateBox.isChecked())
+        self.accept()
         
     @staticmethod
     def createTagType(*args,**kargs):

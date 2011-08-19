@@ -31,13 +31,13 @@ def createNewElements(elements):
         copy = element.copy()
         copy.id = newId
         changedElements[oldId] = copy
-    dispatcher.emit(events.NewElementChangeEvent(changedElements))
+    dispatcher.changes.emit(events.NewElementChangeEvent(changedElements))
     return result
 
 
 def deleteElements(elids):
     db.write.deleteElements(elids)
-    dispatcher.emit(events.ElementsDeletedEvent(elids))
+    dispatcher.changes.emit(events.ElementsDeletedEvent(elids))
 
 
 def commit(changes):
@@ -69,7 +69,7 @@ def addTagValue(tag,value,elements):
 
     if len(successful) > 0:
         db.write.addTagValues((element.id for element in successful),tag,[value])
-        dispatcher.realChanges.emit(events.TagValueAddedEvent(tag,value,successful))
+        dispatcher.changes.emit(events.TagValueAddedEvent(tag,value,successful))
 
 
 def removeTagValue(tag,value,elements):
@@ -93,7 +93,7 @@ def removeTagValue(tag,value,elements):
     
     if len(successful) > 0:                
         db.write.removeTagValues((element.id for element in successful),tag,[value])
-        dispatcher.realChanges.emit(events.TagValueRemovedEvent(tag,value,successful))
+        dispatcher.changes.emit(events.TagValueRemovedEvent(tag,value,successful))
 
 
 def changeTagValue(tag,oldValue,newValue,elements):
@@ -118,7 +118,7 @@ def changeTagValue(tag,oldValue,newValue,elements):
         
     if len(successful) > 0:
         db.write.changeTagValue((element.id for element in successful),tag,oldValue,newValue)
-        dispatcher.realChanges.emit(events.TagValueChangedEvent(tag,oldValue,newValue,successful))
+        dispatcher.changes.emit(events.TagValueChangedEvent(tag,oldValue,newValue,successful))
 
 
 def changeTags(changes):
@@ -162,5 +162,5 @@ def changeTags(changes):
     if len(successful) > 0:
         if len(successful) < len(changes):
             changes = {element: changes for element,changes in changes.items() if element in successful}
-        dispatcher.realChanges.emit(events.TagModifyEvent(changes))
+        dispatcher.changes.emit(events.TagModifyEvent(changes))
         

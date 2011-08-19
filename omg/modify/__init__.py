@@ -69,17 +69,21 @@ class UndoCommand(QtGui.QUndoCommand):
         self.setText(text)
         
     def redo(self):
-        redoChanges = OrderedDict(( (k,v[1]) for k,v in self.changes.items() ))
+        
         if self.level == REAL:
-            real.commit(redoChanges)
-        redoEvent = events.ElementChangeEvent(self.level, redoChanges, contentsChanged = self.contentsChanged)
+            real.commit(self.changes)
+        else:
+            redoChanges = OrderedDict(( (k,v[1]) for k,v in self.changes.items() ))
+            redoEvent = events.ElementChangeEvent(self.level, redoChanges, contentsChanged = self.contentsChanged)
         dispatcher.changes.emit(redoEvent)
 
     def undo(self):
-        undoChanges = OrderedDict(( (k,v[0]) for k,v in self.changes.items() ))
+        
         if self.level == REAL:
-            real.commit(undoChanges)
-        undoEvent = events.ChangeEvent(self.level, undoChanges, contentsChanged = self.contentsChanged)
+            real.commit({id:(v[1],v[0]) for k,v in self.changes.items() })
+        else:
+            undoChanges = OrderedDict(( (k,v[0]) for k,v in self.changes.items() ))
+            undoEvent = events.ChangeEvent(self.level, undoChanges, contentsChanged = self.contentsChanged)
         dispatcher.changes.emit(undoEvent)
 
 class ModifySingleElementCommand(UndoCommand):
@@ -178,6 +182,7 @@ class CreateNewElementsCommand(UndoCommand):
     This command is always in the REAL layer and therefore has no *level* attribute."""
     def __init__(self, elements, text = 'create new elements'):
         """Initalize the command with a list of elements and an optional text describing the command."""
+        QtGui.QUndoCommand.__init__(self)
         self.elements = elements
     
     def redo(self):
