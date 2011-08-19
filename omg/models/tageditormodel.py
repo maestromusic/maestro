@@ -312,12 +312,12 @@ class UndoCommand(QtGui.QUndoCommand):
         if self.model.level == modify.EDITOR:
             for action in actions:
                 if action[0] == 'add':
-                    event = modify.events.TagValueAddedEvent(*action[1:])
+                    event = modify.events.TagValueAddedEvent(modify.EDITOR,*action[1:])
                 elif action[0] == 'remove':
-                    event = modify.events.TagValueRemovedEvent(*action[1:])
+                    event = modify.events.TagValueRemovedEvent(modify.EDITOR,*action[1:])
                 elif action[0] == 'change':
-                    event = modify.events.TagValueChangedEvent(*action[1:])
-                modify.dispatcher.editorChanges.emit(event)
+                    event = modify.events.TagValueChangedEvent(modify.EDITOR,*action[1:])
+                modify.dispatcher.changes.emit(event)
         else: # level == REAL
             for action in actions:
                 if action[0] == 'add':
