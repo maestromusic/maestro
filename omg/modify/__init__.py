@@ -69,13 +69,17 @@ class UndoCommand(QtGui.QUndoCommand):
         self.setText(text)
         
     def redo(self):
-        newChanges = OrderedDict(( (k,v[1]) for k,v in self.changes.items() ))
-        redoEvent = events.ElementChangeEvent(self.level, newChanges, contentsChanged = self.contentsChanged)
+        redoChanges = OrderedDict(( (k,v[1]) for k,v in self.changes.items() ))
+        if self.level == REAL:
+            real.commit(redoChanges)
+        redoEvent = events.ElementChangeEvent(self.level, redoChanges, contentsChanged = self.contentsChanged)
         dispatcher.changes.emit(redoEvent)
 
     def undo(self):
-        newChanges = OrderedDict(( (k,v[0]) for k,v in self.changes.items() ))
-        undoEvent = events.ChangeEvent(self.level, newChanges, contentsChanged = self.contentsChanged)
+        undoChanges = OrderedDict(( (k,v[0]) for k,v in self.changes.items() ))
+        if self.level == REAL:
+            real.commit(undoChanges)
+        undoEvent = events.ChangeEvent(self.level, undoChanges, contentsChanged = self.contentsChanged)
         dispatcher.changes.emit(undoEvent)
 
 class ModifySingleElementCommand(UndoCommand):
@@ -84,6 +88,8 @@ class ModifySingleElementCommand(UndoCommand):
     
     def __init__(self, level, before, after, text=''):
         QtGui.QUndoCommand.__init__(self)
+        if level != EDITOR:
+            raise NotImplementedError()
         self.level = level
         self.before = before.copy()
         self.after = after.copy()
@@ -109,6 +115,7 @@ def createRanges(tuples):
             previous = i
             elements.append(elem)
         yield start, elements
+        
 class RemoveElementsCommand(UndoCommand):
     """A specialized undo command for the removal of elements."""
     
@@ -118,6 +125,8 @@ class RemoveElementsCommand(UndoCommand):
         The constructor checks for redundancies in the list (e.g., if an item and its parent
         are both in the list, then the item itself is redundant)."""
         QtGui.QUndoCommand.__init__(self)
+        if level != EDITOR:
+            raise NotImplementedError()
         self.level = level
         if len(elements) == 0:
             return
@@ -151,6 +160,8 @@ class RemoveElementsCommand(UndoCommand):
 class InsertElementsCommand(UndoCommand):
     def __init__(self, level, insertions, text=''):
         super().__init__(level, insertions, text)
+        if level != EDITOR:
+            raise NotImplementedError()
         self.level = level
         self.insertions = insertions
     
@@ -162,6 +173,19 @@ class InsertElementsCommand(UndoCommand):
               self.level, dict((pid, [ (tup[0], len(tup[1]) ) for tup in reversed(elemSet)]) for pid,elemSet in self.insertions.items())))
 
 
+class CreateNewElementsCommand(UndoCommand):
+    """A command to create new elements in the database from editor elements with negative IDs.
+    This command is always in the REAL layer and therefore has no *level* attribute."""
+    def __init__(self, elements, text = 'create new elements'):
+        """Initalize the command with a list of elements and an optional text describing the command."""
+        self.elements = elements
+    
+    def redo(self):
+        self.idMap = real.createNewElements(self.elements)
+        
+    def undo(self):
+        real.deleteElements(self.idMap.values())
+        
 class TagUndoCommand(UndoCommand):
     """An UndoCommand that changes only tags. The difference to UndoCommand is that the dict *changes*
     contains tuples of tags.Storage: the tags before and after the change."""
