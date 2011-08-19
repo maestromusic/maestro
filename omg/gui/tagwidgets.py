@@ -544,4 +544,79 @@ class EnhancedComboBox(QtGui.QComboBox):
             self._popup = None
             return True
         return False # don't stop the event
+
+class TagValuePropertiesWidget(QtGui.QWidget):
+    """A widget that displays properties of tag values (sort tags, hidden status) and allows to change them."""
+    def __init__(self, parent = None):
+        super().__init__(parent)
+        layout = QtGui.QGridLayout()
+        self.label = QtGui.QLabel("")
+        self.label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(self.label, 0, 0, 1, 2)
+        self.changeValueCheckbox = QtGui.QCheckBox(self.tr('rename all occurences:'))
+        self.valueEdit = QtGui.QLineEdit()
+        self.changeValueCheckbox.toggled.connect(self.valueEdit.setEnabled)
+        layout.addWidget(self.changeValueCheckbox, 1, 0)
+        layout.addWidget(self.valueEdit, 1, 1)
+        
+        self.sortValueCheckbox = QtGui.QCheckBox(self.tr('distinguished sort value:'))
+
+        layout.addWidget(self.sortValueCheckbox, 2, 0)
+        self.sortEdit = QtGui.QLineEdit()
+        self.sortValueCheckbox.toggled.connect(self.sortEdit.setEnabled) 
+        layout.addWidget(self.sortEdit, 2, 1)
+        self.hiddenCheckbox = QtGui.QCheckBox(self.tr('value is hidden'))
+        layout.addWidget(self.hiddenCheckbox, 3, 0)
+        
+        self.setLayout(layout)
     
+    def setValue(self, tag, valueId):
+        self.tag = tag
+        self.valueId = valueId
+        self.orig_hidden = db.hidden(tag, valueId)
+        self.orig_sortValue = db.sortValue(tag, valueId)
+        self.orig_value = db.valueFromId(tag, valueId)
+        self.valueEdit.setEnabled(False)
+        self.changeValueCheckbox.setChecked(False)
+        self.valueEdit.setText(self.orig_value)
+        
+        self.label.setText(self.tr('editing {0} value: {1}'.format(tag, self.orig_value)))
+        if db.isNull(self.orig_sortValue):
+            self.sortEdit.setText("")
+            self.sortValueCheckbox.setChecked(False)
+            self.sortEdit.setEnabled(False)
+        else:
+            self.sortEdit.setText(self.orig_sortValue)
+            self.sortEdit.setEnabled(True)
+            self.sortValueCheckbox.setChecked(True)
+        self.hiddenCheckbox.setChecked(self.orig_hidden)
+        
+    def commit(self):
+        if self.changeValueCheckbox.isChecked() and self.valueEdit.text() != self.orig_value:
+            raise NotImplementedError('value renaming not yet possible')
+        if self.sortValueCheckbox.isChecked():
+            if self.sortEdit.text() != self.orig_sortValue:
+                # change sort value in DB
+                pass 
+    
+    @staticmethod
+    def showDialog(tag, valueId):
+        dialog = QtGui.QDialog()
+        dialog.setLayout(QtGui.QVBoxLayout())
+        
+        tvp = TagValuePropertiesWidget()
+        dialog.layout().addWidget(tvp)
+        
+        buttonLine = QtGui.QHBoxLayout()
+        cancelButton = QtGui.QPushButton(tvp.tr('Cancel'))
+        okButton = QtGui.QPushButton(tvp.tr('Ok'))
+        buttonLine.addStretch()
+        buttonLine.addWidget(cancelButton)
+        buttonLine.addWidget(okButton)
+        
+        dialog.layout().addLayout(buttonLine)
+        tvp.setValue(tag, valueId)
+        
+        okButton.clicked.connect(dialog.accept)
+        cancelButton.clicked.connect(dialog.reject)
+        dialog.exec_()

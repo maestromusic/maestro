@@ -13,7 +13,7 @@ from collections import OrderedDict
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from .. import tags, logging
+from .. import tags, logging, database as db
 from . import events
 # At the end of the file we will import the submodules real and events.
 
@@ -190,7 +190,21 @@ class TagUndoCommand(UndoCommand):
             changes = OrderedDict((k,v[0]) for k,v in self.changes.items())
             dispatcher.editorChanges.emit(events.TagModifyEvent(changes))
 
-
+class SortValueUndoCommand(UndoCommand):
+    """An UndoCommand that changes the sort value of a tag value."""
+    def __init__(self, tag, valueId, oldSort = None, newSort = None, text = ''):
+        QtGui.QUndoCommand.__init__(self)
+        self.tag = tag
+        self.valueId = valueId
+        self.oldSort = oldSort
+        self.newSort = newSort
+        self.setText(text)
+        
+    def redo(self):
+        db.write.changeSortValue(self.tag, self.valueId, self.newSort)
+    def undo(self):
+        db.write.changeSortValue(self.tag, self.valueId, self.oldSort)
+        
 def changePosition(level, element, position):
     elemOld = element.copy()
     elemNew = element.copy()

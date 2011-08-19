@@ -375,7 +375,25 @@ def idFromValue(tagSpec,value,insert=False):
             return result.insertId()
         else: raise e
 
+def hidden(tagSpec, valueId):
+    """Returns True iff the given tag value is set hidden."""
+    tag = tagsModule.get(tagSpec)
+    return query("SELECT hide FROM {}values_{} WHERE tag_id = ? AND id = ?".format(prefix, tag.type),
+                 tag.id, valueId).getSingle() 
 
+def sortValue(tagSpec, valueId, valueIfNone = False):
+    """Returns the sort value for the given tag value, or None if it is not set.
+    
+    If *valueIfNone=True*, the value itself is returned if no sort value is set."""
+    tag = tagsModule.get(tagSpec)
+    ans = query("SELECT sort_value FROM {}values_{} WHERE tag_id = ? AND id = ?".format(prefix, tag.type),
+                 tag.id, valueId).getSingle()
+    if not isNull(ans) or not valueIfNone:
+        return ans
+    elif valueIfNone:
+        return valueFromId(tag, valueId)
+    
+    
 # tags-Table
 #=======================================================================
 def tags(elid):

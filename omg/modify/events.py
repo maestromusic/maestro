@@ -151,7 +151,9 @@ class TagValueChangedEvent(SingleTagModifyEvent):
     def __str__(self):
         return "Change: {} {}->{} {}".format(self.tag,self.oldValue,self.newValue,self.elements)
 
-
+class SortValueChangedEvent:
+    def __init__(self, tag, valueId, oldValue, newValue):
+        self.tag, self.valueId, self.oldValue, self.newValue = tag, valueId, oldValue, newValue
 class TagTypeChangedEvent:
     """TagTypeChangedEvent are used when a tagtype (like artist, composer...) is added, changed or deleted.
     Contrary to ModifyEvents these events are sent over the tagTypeChanged-signal of the dispatcher.

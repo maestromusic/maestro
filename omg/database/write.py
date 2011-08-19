@@ -74,4 +74,7 @@ def changeTagValue(elids,tag,oldValue,newValue):
     oldId = db.idFromValue(tag,oldValue)
     newId = db.idFromValue(tag,newValue,insert=True)
     changeTagValueById(elids,tag,oldId,newId)
-    
+
+def changeSortValue(tag, valueId, sortValue):
+    db.query("UPDATE {}values_{} SET sort_value = ? WHERE tag_id = ? AND id = ?".format(db.prefix, tag.type),
+             sortValue, tag.id, valueId)
