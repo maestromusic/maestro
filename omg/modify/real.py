@@ -20,6 +20,13 @@ logger = logging.getLogger("omg.modify")
 
 
 def createNewElements(elements):
+    """Create new elements. *elements* is a list of preliminary elements (i.e. element instances with
+    negative ids). This method will insert new entries in the elements and file table and emit a
+    NewElementChangeEvent (mapping the old negative ids to copies of the elements with their shiny new
+    positive ids). It won't save any contents, tags or flags.
+    
+    This method will return a dict mapping old to new ids.
+    """
     result = {}
     changedElements = {}
     for element in elements:
@@ -40,6 +47,8 @@ def createNewElements(elements):
 
 
 def deleteElements(elids):
+    """Delete the elements with the given ids from the database. This will delete from elements and due to 
+    foreign keys also from files, tags, flags, contents and emit an ElementsDeletedEvent."""
     db.write.deleteElements(elids)
     dispatcher.changes.emit(events.ElementsDeletedEvent(elids))
 
