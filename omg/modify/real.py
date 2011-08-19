@@ -45,11 +45,27 @@ def commit(changes):
     After the commit, the elements in the database will look like those in the argument.
     If an element in changes.values() is a container, the contents must be loaded, but
     do not need to have any loaded data besides position and id."""
-    #contents,tags,(flags),major,position,
+    # Tags
     changeTags({oldElement: (oldElement.tags,newElement.tags)
                     for (oldElement,newElement) in changes.values()},emitEvent=False)
- 
+                    
+    # Contents (including position)
+    contents = {}
+    for id,changesTuple in changes.items:
+        oldElement,newElement = changesTuple
+        cOld = oldElement.getContents()
+        cNew = newElement.getContents()
+        if len(cOld) != len(cNew) or \
+                any(old.id != new.id or old.position != new.position for old,new in zip(cOld,cNew)):
+            contents[oldElement.id] = cNew
+            
+    if len(contents) > 0:
+        db.write.setContents(contents)
     
+    # TODO: major and flags
+    
+    dispatcher.changes.emit(events.ElementChangeEvent(REAL,{id: tuple[0] for id,tuple in changes}))
+
 
 def addTagValue(tag,value,elements): 
     """Add a tag of type *tag* and value *value* to each element in *elements*."""
