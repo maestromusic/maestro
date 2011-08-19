@@ -14,7 +14,7 @@ do any Undo-/Redo-stuff.
  
 from .. import database as db, tags, realfiles2, logging
 from ..database import write
-from . import dispatcher, events
+from . import dispatcher, events, REAL
 
 logger = logging.getLogger("omg.modify")
 
@@ -30,13 +30,13 @@ def createNewElements(elements):
         copy = element.copy()
         copy.id = newId
         changedElements[oldId] = copy
-    dispatcher.emit(events.NewElementChangeEvent(changedElements))
+    dispatcher.changes.emit(events.NewElementChangeEvent(changedElements))
     return result
 
 
 def deleteElements(elids):
     db.write.deleteElements(elids)
-    dispatcher.emit(events.ElementsDeletedEvent(elids))
+    dispatcher.changes.emit(events.ElementsDeletedEvent(elids))
 
 
 def commit(changes):
@@ -45,7 +45,11 @@ def commit(changes):
     After the commit, the elements in the database will look like those in the argument.
     If an element in changes.values() is a container, the contents must be loaded, but
     do not need to have any loaded data besides position and id."""
-    raise ResourceWarning('maddiiiiiin')
+    #contents,tags,(flags),major,position,
+    changeTags({oldElement: (oldElement.tags,newElement.tags)
+                    for (oldElement,newElement) in changes.values()},emitEvent=False)
+ 
+    
 
 def addTagValue(tag,value,elements): 
     """Add a tag of type *tag* and value *value* to each element in *elements*."""
@@ -68,7 +72,7 @@ def addTagValue(tag,value,elements):
 
     if len(successful) > 0:
         db.write.addTagValues((element.id for element in successful),tag,[value])
-        dispatcher.realChanges.emit(events.TagValueAddedEvent(tag,value,successful))
+        dispatcher.changes.emit(events.TagValueAddedEvent(REAL,tag,value,successful))
 
 
 def removeTagValue(tag,value,elements):
@@ -92,7 +96,7 @@ def removeTagValue(tag,value,elements):
     
     if len(successful) > 0:                
         db.write.removeTagValues((element.id for element in successful),tag,[value])
-        dispatcher.realChanges.emit(events.TagValueRemovedEvent(tag,value,successful))
+        dispatcher.changes.emit(events.TagValueRemovedEvent(REAL,tag,value,successful))
 
 
 def changeTagValue(tag,oldValue,newValue,elements):
@@ -117,7 +121,7 @@ def changeTagValue(tag,oldValue,newValue,elements):
         
     if len(successful) > 0:
         db.write.changeTagValue((element.id for element in successful),tag,oldValue,newValue)
-        dispatcher.realChanges.emit(events.TagValueChangedEvent(tag,oldValue,newValue,successful))
+        dispatcher.changes.emit(events.TagValueChangedEvent(REAL,tag,oldValue,newValue,successful))
 
 
 def changeTags(changes):
@@ -161,5 +165,4 @@ def changeTags(changes):
     if len(successful) > 0:
         if len(successful) < len(changes):
             changes = {element: changes for element,changes in changes.items() if element in successful}
-        dispatcher.realChanges.emit(events.TagModifyEvent(changes))
-        
+        dispatcher.changes.emit(events.TagModifyEvent(REAL,changes))
