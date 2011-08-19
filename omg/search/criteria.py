@@ -30,8 +30,8 @@ class Criterion:
 
         \ """
 
-    def isValid(self):
-        """Return whether this criterion is valid. An invalid criterion cannot create a query and does not
+    def isInvalid(self):
+        """Return whether this criterion is invalid. An invalid criterion cannot create a query and does not
         match any element."""
 
     def isNarrower(self,other):
@@ -132,7 +132,7 @@ class TextCriterion(Criterion):
 
         if self.ids is not None:
             subQueries.append("(SELECT DISTINCT {0} FROM {1} AS el WHERE id IN ({2}))"
-                                .format(_formatColumns(columns,"el"),fromTable,','.join(self.ids)))
+                                .format(_formatColumns(columns,"el"),fromTable,db.csList(self.ids)))
         return [" UNION ".join(subQueries)] + parameters
             
 
@@ -213,8 +213,50 @@ class TagIdCriterion(Criterion):
         return "<TagIdCriterion {}>".format(self.valueIds)
 
 
+class FlagsCriterion(Criterion):
+    """A FlagsCriterion specifies a list of flags and depending on the parameter *useAnd* an element must
+    have either all of these flags or at least one."""
+    def __init__(self,flags,useAnd = True):
+        assert len(flags) > 0
+        self.flags = set(flags)
+        self.useAnd = useAnd
+    
+    def getFlags(self):
+        """Return the set of flagtypes a container must have in order to match this criterion."""
+        return self.flags
+    
+    def isInvalid(self):
+        return False
+    
+    def getQuery(self,fromTable,columns):
+        if self.useAnd:
+            return ["""
+                SELECT {0}
+                FROM {1}elements AS el JOIN {1}flags AS fl ON el.id = fl.element_id
+                WHERE fl.flag_id IN ({2})
+                GROUP BY el.id
+                HAVING COUNT(fl.element_id) = {3}
+                """.format(_formatColumns(columns,'el'),db.prefix,db.csIdList(self.flags),len(self.flags))]
+        else: # use or
+            return ["""]
+                SELECT {0}
+                FROM {1}elements AS el JOIN {1}flags AS fl ON el.id = fl.element_id
+                WHERE fl.flag_id IN ({2})
+                GROUP BY el.id
+                """.format(_formatColumns(columns,'el'),db.prefix,db.csIdList(self.flags))]
+
+    def isNarrower(self,other):
+        return isinstance(other,FlagsCriterion) and self.flags <= other.flags
+    
+    def __eq__(self,other):
+        return isinstance(other,FlagsCriterion) and self.flags == other.flags
+    
+    def __ne__(self,other):
+        return not isinstance(other,FlagsCriterion) or self.flags != other.flags
+
+
 class MissingTagCriterion(Criterion):
-    """A MissingTagCriterion specifies a list of tags which a container must not have in order to match this
+    """A MissingTagCriterion specifies a list of tags which an element must not have in order to match this
     criterion."""
     
     def __init__(self,tags):
@@ -231,8 +273,7 @@ class MissingTagCriterion(Criterion):
             SELECT {1}
             FROM {2} AS el LEFT JOIN {0}tags AS t ON el.id = t.element_id AND t.tag_id IN ({3})
             WHERE t.value_id IS NULL
-            """.format(db.prefix,_formatColumns(columns,'el'),fromTable,
-                       ",".join([str(tag.id) for tag in self.tags]))]
+            """.format(db.prefix,_formatColumns(columns,'el'),fromTable,db.csIdList(self.tags))]
 
     def isNarrower(self,other):
         return isinstance(other,MissingTagCriterion) and self.tags >= other.tags

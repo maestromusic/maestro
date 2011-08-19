@@ -12,7 +12,7 @@ import functools
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
-from .. import database as db, config, search, constants, utils, tags, modify
+from .. import database as db, config, search, constants, utils, tags, modify, flags
 from ..search import searchbox
 from . import mainwindow, treeview, browserdialog, delegates, tageditor, tagwidgets
 from ..models import browser as browsermodel, Element
@@ -109,6 +109,7 @@ class Browser(QtGui.QWidget):
     def __init__(self,parent = None,state = None):
         """Initialize a new Browser with the given parent."""
         QtGui.QWidget.__init__(self,parent)
+        self.flags = []
         
         if browsermodel.searchEngine is None:
             browsermodel.initSearchEngine()
@@ -118,7 +119,7 @@ class Browser(QtGui.QWidget):
         
         # Layout
         layout = QtGui.QVBoxLayout(self)
-        self.setLayout(layout)    
+        self.setLayout(layout)   
         
         # ControlLine (containing searchBox and optionButton)
         controlLineLayout = QtGui.QHBoxLayout()
@@ -145,6 +146,8 @@ class Browser(QtGui.QWidget):
                 self.showHiddenValues = state['showHiddenValues']
             if 'views' in state:
                 viewsToRestore = state['views']
+            if 'flags' in state:
+                self.flags = [flags.get(name) for name in state['flags'] if flags.exists(name)]
                 
         self.views = []
         # Convert tag names to tags, leaving the nested list structure unchanged
@@ -155,7 +158,8 @@ class Browser(QtGui.QWidget):
             'instant': self.searchBox.getInstantSearch(),
             'showHiddenValues': self.showHiddenValues,
             'views': utils.mapRecursively(lambda tag: tag.name,[view.model().getLayers()
-                                                         for view in self.views])
+                                                         for view in self.views]),
+            'flags': [flagType.name for flagType in self.flags]
         }
     
     def showElements(self):
@@ -188,7 +192,7 @@ class Browser(QtGui.QWidget):
             view.setParent(None)
         self.views = []
         for layers in layersList:
-            newView = BrowserTreeView(self,layers)
+            newView = BrowserTreeView(self,layers,self.flags)
             self.views.append(newView)
             newView.selectionModel().selectionChanged.connect(
                                     functools.partial(self.selectionChanged.emit,newView.selectionModel()))
@@ -204,7 +208,14 @@ class Browser(QtGui.QWidget):
         self.showHiddenValues = showHiddenValues
         for view in self.views:
             view.setShowHiddenValues(showHiddenValues)
-        
+    
+    def setFlags(self,flagList):
+        if flagList != self.flags:
+            print("Test")
+            self.flags = flagList[:]
+            for view in self.views:
+                view.setFlags(self.flags)
+            
     def _handleOptionButton(self):
         """Open the option dialog."""
         if self._dialog is None:
@@ -245,7 +256,7 @@ class BrowserTreeView(treeview.TreeView):
     """TreeView for the Browser. A browser may contain more than one view each using its own model."""
     _autoExpanding = False
     
-    def __init__(self,parent,layers):
+    def __init__(self,parent,layers,flags):
         """Initialize this TreeView with the given parent (which must be the browser-widget) and the given
         layers. This also will create a BrowserModel for this treeview (Note that each view of the browser
         uses its own model). *layers* must be a list of tag-lists. For each entry in *layers* a tag-layer
@@ -256,7 +267,7 @@ class BrowserTreeView(treeview.TreeView):
         """
         treeview.TreeView.__init__(self,parent)
         self.contextMenuProviderCategory = 'browser'
-        self.setModel(browsermodel.BrowserModel(parent.table,layers,parent,self))
+        self.setModel(browsermodel.BrowserModel(parent.table,layers,flags,parent,self))
         self.setItemDelegate(delegates.BrowserDelegate(self,self.model()))
         #self.doubleClicked.connect(self._handleDoubleClicked)
     
@@ -274,6 +285,9 @@ class BrowserTreeView(treeview.TreeView):
         
         tagwidgets.TagValuePropertiesWidget.showDialog()
                 
+    def setFlags(self,flagList):
+        self.model().setFlags(flagList)
+
     def startAutoExpand(self):
         """Start AutoExpand: Calculate the height of all nodes with depth 1. If they fit into the view and
         there is still place left, load the contents of those nodes (using the AutoLoad feature of

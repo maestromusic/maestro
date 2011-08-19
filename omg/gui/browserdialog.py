@@ -9,7 +9,7 @@
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from .. import config, tags, utils
+from .. import config, tags, utils, database as db, flags
 from . import dialogs
 
 # Layers that can be selected in BrowserDialog's comboboxes. Each item in the list is a list containing for
@@ -32,11 +32,18 @@ class BrowserDialog(dialogs.FancyTabbedPopup):
     """Popup dialog that allows to configure the Browser."""
     def __init__(self,browser):
         dialogs.FancyTabbedPopup.__init__(self,browser.optionButton)
+        self.resize(300,170)
         self.browser = browser
         self.viewConfigurations = []
                 
         self.flagTab = QtGui.QWidget()
+        self.flagTab.setLayout(QtGui.QVBoxLayout())
         self.tabWidget.addTab(self.flagTab,self.tr("Flags"))
+        
+        self.flagView = FlagView(browser.flags)
+        self.flagView.selectionChanged.connect(self._handleSelectionChanged)
+        self.flagTab.layout().addWidget(self.flagView)
+        
         optionTab = QtGui.QWidget()
         optionLayout = QtGui.QVBoxLayout()
         optionTab.setLayout(optionLayout)
@@ -59,13 +66,87 @@ class BrowserDialog(dialogs.FancyTabbedPopup):
         
         optionLayout.addStretch(1)
         
-        self.adjustSize()
-        
     def close(self):
         self.browser._handleDialogClosed()
         dialogs.FancyTabbedPopup.close(self)
+        
+    def _handleSelectionChanged(self):
+        self.browser.setFlags(self.flagView.selectedFlagTypes)
 
 
+class FlagView(QtGui.QTableWidget):
+    selectionChanged = QtCore.pyqtSignal(list)
+    
+    def __init__(self,selectedFlagTypes,parent=None):
+        QtGui.QTableWidget.__init__(self,parent)
+        self.verticalHeader().hide()
+        self.horizontalHeader().hide()
+        self.verticalHeader().setDefaultSectionSize(self.verticalHeader().fontMetrics().height()+2)
+        self.itemChanged.connect(self._handleItemChanged)
+        self.setShowGrid(False)
+        
+        self.selectedFlagTypes = selectedFlagTypes[:]
+        self._loadFlags()
+        
+    def _loadFlags(self):
+        self.clear()
+        result = db.query("SELECT id,name FROM {}flag_names ORDER BY name".format(db.prefix))
+        
+        if result.size() > 5:
+            self.setColumnCount(2)
+            import math
+            rowCount = math.ceil(result.size()/2)
+            self.setRowCount(rowCount)
+        else:
+            self.setColumnCount(1)
+            self.setRowCount(result.size())
+    
+        for row,sqlRow in enumerate(result):
+            id,name = sqlRow
+            flagType = flags.FlagType(id,name)
+            column = 1 if row >= rowCount else 0
+            
+            item = QtGui.QTableWidgetItem()
+            item.setText(name)
+            item.setData(Qt.UserRole,flagType)
+            item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsUserCheckable)
+            item.setCheckState(Qt.Checked if flagType in self.selectedFlagTypes else Qt.Unchecked)
+            self.setItem(row % rowCount,column,item)
+        
+        self.resizeColumnsToContents()
+    
+    def selectFlagType(self,flagType):
+        if flagType not in self.selectedFlagTypes: 
+            self.selectedFlagTypes.append(flagType)
+            item = self.findItem(flagType)
+            if item is not None: # should always be true
+                item.setCheckState(Qt.Checked)
+            self.selectionChanged.emit(self.selectedFlagTypes)
+    
+    def unselectFlagType(self,flagType):
+        if flagType in self.selectedFlagTypes:
+            self.selectedFlagTypes.remove(flagType)
+            item = self.findItem(flagType)
+            if item is not None: # should always be true
+                item.setCheckState(Qt.Unchecked)
+            self.selectionChanged.emit(self.selectedFlagTypes)
+                
+    def _handleItemChanged(self,item):
+        flagType = item.data(Qt.UserRole)
+        if item.checkState() == Qt.Checked:
+            self.selectFlagType(flagType)
+        elif item.checkState() == Qt.Unchecked:
+            self.unselectFlagType(flagType)
+        
+    def findItem(self,flagType):
+        for row in range(self.rowCount()):
+            for column in range(self.columnCount()):
+                item = self.item(row,column)
+                if item is not None and item.data(Qt.UserRole) == flagType:
+                    return item
+        return None
+        
+        
 class ViewConfigurationDialog(QtGui.QDialog):
     """The BrowserDialog allows you to configure the views of a browser and their layers."""
     def __init__(self,parent):

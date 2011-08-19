@@ -158,9 +158,17 @@ class TagTypeChangedEvent:
     """TagTypeChangedEvent are used when a tagtype (like artist, composer...) is added, changed or deleted.
     Contrary to ModifyEvents these events are sent over the tagTypeChanged-signal of the dispatcher.
     """
-    ADDED,CHANGED,DELETED = range(1,4)
-    
-    def __init__(self,action,tagtype):
-        assert action in range(1,4)
+    def __init__(self,action,tagType):
+        assert action in range(1,4) # ADDED,CHANGED or DELETED
         self.action = action
-        self.tagtype = tagtype
+        self.tagType = tagType
+
+
+class FlagTypeChangedEvent:
+    """TagTypeChangedEvent are used when a flagtype is added, changed or deleted. Contrary to ModifyEvents
+    these events are sent over the tagTypeChanged-signal of the dispatcher.
+    """
+    def __init__(self,action,flagType):
+        assert action in range(1,4) # ADDED,CHANGED or DELETED
+        self.action = action
+        self.flagType = flagType

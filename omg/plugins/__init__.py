@@ -14,7 +14,7 @@ from omg import logging, config, constants
 from omg.gui import mainwindow
 
 translate = QtCore.QCoreApplication.translate
-logger = logging.getLogger("omg.plugins")
+logger = logging.getLogger(__name__)
 
 # Directory containing the plugins
 PLUGINDIR = os.path.join("omg", "plugins")

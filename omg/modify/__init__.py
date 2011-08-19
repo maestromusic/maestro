@@ -25,7 +25,9 @@ logger = logging.getLogger(__name__)
 REAL = 1
 EDITOR = 2
 
-
+# Type of a change
+ADDED,CHANGED,DELETED = range(1,4)
+    
             
          
 def _debugReal(event):
@@ -40,8 +42,9 @@ class ChangeEventDispatcher(QtCore.QObject):
     realChanges = QtCore.pyqtSignal(events.ModifyEvent)
     editorChanges = QtCore.pyqtSignal(events.ModifyEvent)
     
-    # Changing tag-types is handled outside the redo/undo framework.
+    # Changing structural stuff is handled outside the redo/undo framework.
     tagTypeChanged = QtCore.pyqtSignal(events.TagTypeChangedEvent)
+    flagTypeChanged = QtCore.pyqtSignal(events.FlagTypeChangedEvent)
     
     def __init__(self):
         QtCore.QObject.__init__(self)
@@ -313,13 +316,13 @@ def push(level,command):
 
 def createUndoAction(level,parent,prefix):
     if level == REAL:
-        return stack.editorStack.createUndoAction(parent,prefix)
-    else: return stack.mainStack.createUndoAction(parent,prefix)
+        return stack.mainStack.createUndoAction(parent,prefix)
+    else: return stack.editorStack.createUndoAction(parent,prefix)
 
 def createRedoAction(level,parent,prefix):
     if level == REAL:
-        return stack.editorStack.createRedoAction(parent,prefix)
-    else: return stack.mainStack.createRedoAction(parent,prefix)
+        return stack.mainStack.createRedoAction(parent,prefix)
+    else: return stack.editorStack.createRedoAction(parent,prefix)
 
 
 from . import real
