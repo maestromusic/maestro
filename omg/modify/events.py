@@ -28,6 +28,23 @@ class ElementChangeEvent(ChangeEvent):
         element.copyFrom(self.changes[element.id], copyContents = self.contentsChanged)
 
 
+class NewElementChangeEvent(ElementChangeEvent):
+    """This special event is used when new elements are added to the database. Its changes map ids to new
+    elements."""
+    def __init__(self,changes):
+        from .. import REAL
+        super().__init__(REAL,changes)
+    
+    def applyTo(self,element):
+        assert element.id in self.changes
+        element.id = self.changes[element.id].id
+
+
+class ElementsDeletedEvent(ChangeEvent):
+    """Special event that is sent when elements are completely deleted from the database."""
+    def __init__(self,elements):
+        self.elements = elements
+    
 class SingleElementChangeEvent(ElementChangeEvent):
     """A specialized modify event if only one element (tags, position, ...) is modified."""
     def __init__(self, level, element):

@@ -13,10 +13,25 @@ do any Undo-/Redo-stuff.
 """
  
 from .. import database as db, tags, realfiles2, logging
-from ..database import write as dbwrite
+from ..database import write
 from . import dispatcher, events
 
 logger = logging.getLogger("omg.modify")
+
+
+def createNewElements(elements):
+    result = {}
+    for element in elements:
+        assert element.id < 0
+        params = (element.isFile(),element.toplevel,element.getContentsCount(),element.major)
+        result[element.id] = db.write.createNewElement(*params).getSingle()
+    dispatcher.emit(events.NewElementChangeEvent({element.id: element for element in elements}))
+    return result
+
+
+def deleteElements(elements):
+    db.write.deleteElements((element.id for element in elements))
+    dispatcher.emit(events.ElementsDeletedEvent(elements))
 
 
 def addTagValue(tag,value,elements): 
@@ -39,7 +54,7 @@ def addTagValue(tag,value,elements):
     else: successful = elements
 
     if len(successful) > 0:
-        dbwrite.addTagValues((element.id for element in successful),tag,[value])
+        db.write.addTagValues((element.id for element in successful),tag,[value])
         dispatcher.realChanges.emit(events.TagValueAddedEvent(tag,value,successful))
 
 
@@ -63,7 +78,7 @@ def removeTagValue(tag,value,elements):
     else: successful = elements
     
     if len(successful) > 0:                
-        dbwrite.removeTagValues((element.id for element in successful),tag,[value])
+        db.write.removeTagValues((element.id for element in successful),tag,[value])
         dispatcher.realChanges.emit(events.TagValueRemovedEvent(tag,value,successful))
 
 
@@ -88,7 +103,7 @@ def changeTagValue(tag,oldValue,newValue,elements):
     else: successful = elements
         
     if len(successful) > 0:
-        dbwrite.changeTagValue((element.id for element in successful),tag,oldValue,newValue)
+        db.write.changeTagValue((element.id for element in successful),tag,oldValue,newValue)
         dispatcher.realChanges.emit(events.TagValueChangedEvent(tag,oldValue,newValue,successful))
 
 
@@ -115,11 +130,11 @@ def changeTags(changes):
         # First remove old values
         for tag in oldTags:
             if tag not in newTags:
-                dbwrite.removeAllTagValues(element.id,tag)
+                db.write.removeAllTagValues(element.id,tag)
             else:
                 valuesToRemove = [value for value in oldTags[tag] if value not in newTags[tag]]
                 if len(valuesToRemove) > 0:
-                    dbwrite.removeTagValues(element.id,tag,valuesToRemove)                 
+                    db.write.removeTagValues(element.id,tag,valuesToRemove)                 
         
         # Then add new value
         for tag in newTags:
@@ -128,7 +143,7 @@ def changeTags(changes):
             else:
                 valuesToAdd = [value for value in newTags[tag] if value not in oldTags[tag]]
             if len(valuesToAdd) > 0:
-                dbwrite.addTagValues(element.id,tag,valuesToAdd)
+                db.write.addTagValues(element.id,tag,valuesToAdd)
             
     if len(successful) > 0:
         if len(successful) < len(changes):

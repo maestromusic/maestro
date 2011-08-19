@@ -4,15 +4,26 @@
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 3 as
-# published by the Free Software Foundation
+# published by the Free Software Foundation.
 
 import itertools
 from omg import database as db
 
+def createNewElement(file,toplevel,elementNumber,major):
+    return db.query("INSERT INTO {}elements (file,toplevel,elements,major) VALUES (?,?,?,?)"
+                        .format(db.prefix),int(file),int(toplevel),elementNumber,int(major)).insertId()
+                        
+def deleteElements(ids):
+    db.query("DELETE FROM {}lelements WHERE id IN ({})".format(db.prefix,db.csList(ids)))
+
 def setContents(data):
     """Set contents of one or more elements. *data* is a dict mapping ids to lists of contents. The lists
     of contents must contain elements with an id. This method is not recursive."""
-    # TODO: Handle positions 
+    # TODO: Handle positions
+    db.transaction()
+    db.query("DELETE FORM {}contents WHERE container_id IN ({})".format(db.prefix,db.csList(data.keys())))
+    
+    db.query("INSERT INTO {}contents (container_id,position,element")
     db.multiQuery(
         "DELETE FROM {}contents WHERE container_id = ? AND position > ?".format(db.prefix),
         ((id,len(contents)) for id,contents in data.items()))
@@ -20,6 +31,7 @@ def setContents(data):
         "REPLACE INTO {}contents (container_id,position,element_id) VALUES (?,?,?)".format(db.prefix),
         ((id,pos,element.id) for pos,element in contents for id,contents in data.items()))
 
+    db.commit()
 
 def addTagValuesById(elids,tag,valueIds):
     """Add tag values given by their id to some elements. *elids* is either a single id or a list of ids,

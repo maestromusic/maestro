@@ -99,7 +99,8 @@ class FlagView(QtGui.QTableWidget):
             self.setRowCount(rowCount)
         else:
             self.setColumnCount(1)
-            self.setRowCount(result.size())
+            rowCount = result.size()
+            self.setRowCount(rowCount)
     
         for row,sqlRow in enumerate(result):
             id,name = sqlRow

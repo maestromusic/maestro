@@ -211,7 +211,6 @@ class Browser(QtGui.QWidget):
     
     def setFlags(self,flagList):
         if flagList != self.flags:
-            print("Test")
             self.flags = flagList[:]
             for view in self.views:
                 view.setFlags(self.flags)
