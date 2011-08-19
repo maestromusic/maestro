@@ -343,7 +343,7 @@ class Container(Element):
     contents = None
     
     """Element-subclass for containers."""
-    def __init__(self, id, contents, tags, position):
+    def __init__(self, id, contents, tags, position, major = True):
         """Initialize this container, optionally with a contents list.
         Note that the list won't be copied but the parents will be changed to this container."""
         self.id = id
@@ -352,6 +352,7 @@ class Container(Element):
         else: self.setContents(contents)
         self.tags = tags
         self.position = position
+        self.major = major
     
     @staticmethod
     def fromId(id, *, contents=None, tags=None, position=None, parentId=None, loadData=True):

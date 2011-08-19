@@ -40,6 +40,14 @@ def deleteElements(elids):
     dispatcher.emit(events.ElementsDeletedEvent(elids))
 
 
+def commit(changes):
+    """Commits all elements, given by an id->element dictionary, into the database.
+    
+    After the commit, the elements in the database will look like those in the argument.
+    If an element in changes.values() is a container, the contents must be loaded, but
+    do not need to have any loaded data besides position and id."""
+    raise ResourceWarning('maddiiiiiin')
+
 def addTagValue(tag,value,elements): 
     """Add a tag of type *tag* and value *value* to each element in *elements*."""
     assert isinstance(tag,tags.Tag) and len(elements) > 0

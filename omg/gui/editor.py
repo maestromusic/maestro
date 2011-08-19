@@ -14,7 +14,7 @@ from ..gui import mainwindow
 from ..models import editor, Container, Element
 from . import treeview
 from .. import logging, modify, tags
-
+from ..modify import commit
 
 translate = QtCore.QCoreApplication.translate
 logger = logging.getLogger("gui.editor")
@@ -151,6 +151,10 @@ class EditorWidget(QtGui.QDockWidget):
         self.albumGuesserCheckbox.stateChanged.connect(self.editor.model().setGuessAlbums)
         self.albumGuesserCheckbox.setCheckState(checkState)
         hb.addWidget(self.albumGuesserCheckbox)
+        hb.addStretch()
+        self.commitButton = QtGui.QPushButton(self.tr('commit all editors'))
+        hb.addWidget(self.commitButton)
+        self.commitButton.clicked.connect(commit.commitEditors)
 
     
     def newContainerDialog(self):
