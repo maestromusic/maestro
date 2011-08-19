@@ -30,28 +30,19 @@ ADDED,CHANGED,DELETED = range(1,4)
     
             
          
-def _debugReal(event):
-    logger.debug("REAL: " + str(event))
-    
-def _debugEditor(event):
-    logger.debug("EDITOR: " + str(event))
-    
+def _debugAll(event):
+    logger.debug("EVENT: " + str(event))
+
     
 class ChangeEventDispatcher(QtCore.QObject):
     
-    realChanges = QtCore.pyqtSignal(events.ModifyEvent)
-    editorChanges = QtCore.pyqtSignal(events.ModifyEvent)
-    
-    # Changing structural stuff is handled outside the redo/undo framework.
-    tagTypeChanged = QtCore.pyqtSignal(events.TagTypeChangedEvent)
-    flagTypeChanged = QtCore.pyqtSignal(events.FlagTypeChangedEvent)
+    changes = QtCore.pyqtSignal(events.ChangeEvent)
     
     def __init__(self):
         QtCore.QObject.__init__(self)
 
 dispatcher = ChangeEventDispatcher()
-dispatcher.editorChanges.connect(_debugEditor)
-dispatcher.realChanges.connect(_debugReal)
+dispatcher.changes.connect(_debugAll)
 
 
 class UndoCommand(QtGui.QUndoCommand):
@@ -79,13 +70,13 @@ class UndoCommand(QtGui.QUndoCommand):
         
     def redo(self):
         newChanges = OrderedDict(( (k,v[1]) for k,v in self.changes.items() ))
-        redoEvent = events.ModifyEvent(self.level, newChanges, contentsChanged = self.contentsChanged)
-        dispatcher.editorChanges.emit(redoEvent)
+        redoEvent = events.ElementChangeEvent(self.level, newChanges, contentsChanged = self.contentsChanged)
+        dispatcher.changes.emit(redoEvent)
 
     def undo(self):
         newChanges = OrderedDict(( (k,v[0]) for k,v in self.changes.items() ))
-        undoEvent = events.ModifyEvent(self.level, newChanges, contentsChanged = self.contentsChanged)
-        dispatcher.editorChanges.emit(undoEvent)
+        undoEvent = events.ChangeEvent(self.level, newChanges, contentsChanged = self.contentsChanged)
+        dispatcher.changes.emit(undoEvent)
 
 class ModifySingleElementCommand(UndoCommand):
     """A specialized undo command for the modification of a single element (tags, position, ..., but no 
@@ -99,9 +90,9 @@ class ModifySingleElementCommand(UndoCommand):
         self.setText(text)
     
     def redo(self):
-        dispatcher.editorChanges.emit(events.ModifySingleElementEvent(self.level, self.after))
+        dispatcher.changes.emit(events.ModifySingleElementEvent(self.level, self.after))
     def undo(self):
-        dispatcher.editorChanges.emit(events.ModifySingleElementEvent(self.level, self.before))
+        dispatcher.changes.emit(events.ModifySingleElementEvent(self.level, self.before))
 
 def createRanges(tuples):
         previous = None
@@ -150,11 +141,11 @@ class RemoveElementsCommand(UndoCommand):
                 self.removals[parentId].append( tuple )
                  
     def redo(self):
-        dispatcher.editorChanges.emit(events.RemoveElementsEvent(
+        dispatcher.changes.emit(events.RemoveElementsEvent(
              self.level, dict((pid, [ ( tup[0], len(tup[1]) ) for tup in reversed(elemSet)]) for pid,elemSet in self.removals.items())))
     
     def undo(self):
-        dispatcher.editorChanges.emit(events.InsertElementsEvent(
+        dispatcher.changes.emit(events.InsertElementsEvent(
              self.level, dict((pid, [ (tup[0], [self.elementPool[i] for i in tup[1]]) for tup in elemSet ] ) for pid, elemSet in self.removals.items())))
 
 class InsertElementsCommand(UndoCommand):
@@ -164,10 +155,10 @@ class InsertElementsCommand(UndoCommand):
         self.insertions = insertions
     
     def redo(self):
-        dispatcher.editorChanges.emit(events.InsertElementsEvent(
+        dispatcher.changes.emit(events.InsertElementsEvent(
               self.level, self.insertions))
     def undo(self):
-        dispatcher.editorChanges.emit(events.RemoveElementsEvent(
+        dispatcher.changes.emit(events.RemoveElementsEvent(
               self.level, dict((pid, [ (tup[0], len(tup[1]) ) for tup in reversed(elemSet)]) for pid,elemSet in self.insertions.items())))
 
 
@@ -183,7 +174,7 @@ class TagUndoCommand(UndoCommand):
             real.changeTags(self.changes)
         else:
             changes = OrderedDict((k,v[1]) for k,v in self.changes.items())
-            dispatcher.editorChanges.emit(events.TagModifyEvent(changes))
+            dispatcher.changes.emit(events.TagModifyEvent(changes))
 
     def undo(self):
         # Note that real.changeTags and TagModifyEvent expect a different format for changes
@@ -191,7 +182,7 @@ class TagUndoCommand(UndoCommand):
             real.changeTags(self.changes)
         else:
             changes = OrderedDict((k,v[0]) for k,v in self.changes.items())
-            dispatcher.editorChanges.emit(events.TagModifyEvent(changes))
+            dispatcher.changes.emit(events.TagModifyEvent(changes))
 
 class SortValueUndoCommand(UndoCommand):
     """An UndoCommand that changes the sort value of a tag value."""

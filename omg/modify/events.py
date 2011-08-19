@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # Copyright 2011 Martin Altmayer, Michael Helmling
 #
@@ -9,9 +8,11 @@
 
 from .. import tags
 
+class ChangeEvent:
+    pass
 
-class ModifyEvent:
-    """A generic modify event for all sorts of modifications."""
+class ElementChangeEvent(ChangeEvent):
+    """A generic change event for all sorts of element modifications."""
     def __init__(self, level, changes, contentsChanged = False):
         self.changes = changes
         self.level = level
@@ -27,7 +28,7 @@ class ModifyEvent:
         element.copyFrom(self.changes[element.id], copyContents = self.contentsChanged)
 
 
-class ModifySingleElementEvent(ModifyEvent):
+class SingleElementChangeEvent(ElementChangeEvent):
     """A specialized modify event if only one element (tags, position, ...) is modified."""
     def __init__(self, level, element):
         self.element = element
@@ -44,7 +45,7 @@ class ModifySingleElementEvent(ModifyEvent):
         element.copyFrom(self.element, copyContents = False)
 
 
-class InsertElementsEvent(ModifyEvent):
+class InsertElementsEvent(ElementChangeEvent):
     """A specialized modify event for the insertion of elements. <insertions> is a dict mapping parentId -> iterable of
     (position, elementList) tuples."""
     def __init__(self, level, insertions):
@@ -63,7 +64,7 @@ class InsertElementsEvent(ModifyEvent):
             element.insertContents(i, [e.copy() for e in elems])
             
 
-class RemoveElementsEvent(ModifyEvent):
+class RemoveElementsEvent(ElementChangeEvent):
     """A specialized modify event for the removal of elements. Removals is a dict mapping parent ids to an iterable of
     (position, number) tuples, meaning that parent.contents[position,position+number] will be removed. The caller must
     make sure that it is feasable to remove elements in the order they appear in the iterable – i.e. they should be sorted
@@ -84,7 +85,7 @@ class RemoveElementsEvent(ModifyEvent):
             del element.contents[index:index+count]
             
 
-class TagModifyEvent(ModifyEvent):
+class TagChangeEvent(ElementChangeEvent):
     def __init__(self,changes):
         self.changes = changes
         self.contentsChanged = False
@@ -98,7 +99,7 @@ class TagModifyEvent(ModifyEvent):
         return "Modify tags of [{}]".format(",".join(str(k) for k in self.changes.keys()))
 
             
-class SingleTagModifyEvent(TagModifyEvent):
+class SingleTagChangeEvent(TagChangeEvent):
     def __init__(self,tag,elements):
         assert isinstance(tag,tags.Tag)
         self.tag = tag
@@ -109,7 +110,7 @@ class SingleTagModifyEvent(TagModifyEvent):
         return [element.id for element in self.elements]
     
     
-class TagValueAddedEvent(SingleTagModifyEvent):
+class TagValueAddedEvent(SingleTagChangeEvent):
     def __init__(self,tag,value,elements):
         SingleTagModifyEvent.__init__(self,tag,elements)
         self.value = value
@@ -123,7 +124,7 @@ class TagValueAddedEvent(SingleTagModifyEvent):
         return "Add: {} {} {}".format(self.tag,self.value,self.elements)
     
     
-class TagValueRemovedEvent(SingleTagModifyEvent):
+class TagValueRemovedEvent(SingleTagChangeEvent):
     def __init__(self,tag,value,elements):
         SingleTagModifyEvent.__init__(self,tag,elements)
         self.value = value
@@ -137,7 +138,7 @@ class TagValueRemovedEvent(SingleTagModifyEvent):
         return "Remove: {} {} {}".format(self.tag,self.value,self.elements)
 
 
-class TagValueChangedEvent(SingleTagModifyEvent):
+class TagValueChangedEvent(SingleTagChangeEvent):
     def __init__(self,tag,oldValue,newValue,elements):
         SingleTagModifyEvent.__init__(self,tag,elements)
         self.oldValue = oldValue
@@ -150,11 +151,13 @@ class TagValueChangedEvent(SingleTagModifyEvent):
             
     def __str__(self):
         return "Change: {} {}->{} {}".format(self.tag,self.oldValue,self.newValue,self.elements)
+    
 
-class SortValueChangedEvent:
+class SortValueChangedEvent(ChangeEvent):
     def __init__(self, tag, valueId, oldValue, newValue):
         self.tag, self.valueId, self.oldValue, self.newValue = tag, valueId, oldValue, newValue
-class TagTypeChangedEvent:
+
+class TagTypeChangedEvent(ChangeEvent):
     """TagTypeChangedEvent are used when a tagtype (like artist, composer...) is added, changed or deleted.
     Contrary to ModifyEvents these events are sent over the tagTypeChanged-signal of the dispatcher.
     """
@@ -164,7 +167,7 @@ class TagTypeChangedEvent:
         self.tagType = tagType
 
 
-class FlagTypeChangedEvent:
+class FlagTypeChangedEvent(ChangeEvent):
     """TagTypeChangedEvent are used when a flagtype is added, changed or deleted. Contrary to ModifyEvents
     these events are sent over the tagTypeChanged-signal of the dispatcher.
     """

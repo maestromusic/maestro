@@ -142,7 +142,7 @@ class TagTypeBox(QtGui.QStackedWidget):
         
         self.addWidget(self.box)
         
-        modify.dispatcher.tagTypeChanged.connect(self._handleTagTypeChanged)
+        modify.dispatcher.changes.connect(self._handleTagTypeChanged)
     
     def _addTagToBox(self,tag):
         """Add a tag to the box. Display icon and translation if available."""
@@ -241,6 +241,8 @@ class TagTypeBox(QtGui.QStackedWidget):
     
     def _handleTagTypeChanged(self,event):
         """React upon tagTypeChanged-signals from the dispatcher."""
+        if not isinstance(event, modify.events.TagTypeChangedEvent):
+            return
         if event.action == modify.events.TagTypeChangedEvent.ADDED:
             # Do not add twice
             for i in range(self.box.count()):

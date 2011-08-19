@@ -29,7 +29,7 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
         super().__init__(RootNode())
         self.contents = []
         self.name = name
-        modify.dispatcher.editorChanges.connect(self.handleChangeEvent)
+        modify.dispatcher.changes.connect(self.handleChangeEvent)
 
     
     
@@ -48,7 +48,7 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
                 for node in allNodes:
                     if node.id == id:
                         modelIndex = self.getIndex(node)
-                        if isinstance(event, modify.events.ModifySingleElementEvent):
+                        if isinstance(event, modify.events.SingleElementChangeEvent):
                             event.applyTo(node)
                             self.dataChanged.emit(modelIndex, modelIndex)
                             return # single element event -> no more IDs to check

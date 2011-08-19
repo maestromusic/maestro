@@ -93,6 +93,8 @@ class EditorTreeView(treeview.TreeView):
             QtGui.QTreeView.keyPressEvent(self, keyEvent)
             
     def removeSelected(self):
+        if len(self.selectedIndexes()) == 0:
+            return
         modify.push(modify.EDITOR,
             modify.RemoveElementsCommand(modify.EDITOR, [s.internalPointer() for s in self.selectedIndexes()]))
         
@@ -158,7 +160,7 @@ class EditorWidget(QtGui.QDockWidget):
         changes = OrderedDict()
         c_tags = tags.Storage()
         c_tags[tags.TITLE] = [title]
-        container = Container(c_tags, None, modify.newEditorId())
+        container = Container(id = modify.newEditorId(), tags = c_tags, contents = None, position = None )
         oldRoot = self.editor.model().root
         newRoot = oldRoot.copy()
         newRoot.contents.append(container)
