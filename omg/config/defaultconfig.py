@@ -100,14 +100,14 @@ storage = OrderedDict((
         "version": 1,
         "formatters": {
             "consoleFormatter": {"format": "%(levelname)s - %(name)s - %(message)s"},
-            "fileFormatter": {"format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s}"},
+            "fileFormatter": {"format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s"},
         },
         "handlers": {
             "consoleHandler": {
                 "class": "logging.StreamHandler",
                 "level": "DEBUG",
                 "formatter": "consoleFormatter",
-                "stream": sys.stdout,
+                "stream": "ext://sys.stdout",
             },
             "fileHandler": {
                 "class": "logging.handlers.RotatingFileHandler",

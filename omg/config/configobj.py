@@ -1473,7 +1473,7 @@ class ConfigObj(Section):
             this_entry = section[entry]
             comment = self._handle_comment(section.inline_comments[entry])
             
-            if isinstance(this_entry, dict):
+            if isinstance(this_entry, Section):
                 # MODIFICATION
                 if len(this_entry) > 0 or len(comment) > 0: # Do not write empty sections
                     # END MODIFICATION
