@@ -99,7 +99,7 @@ storage = OrderedDict((
     'logging': ({
         "version": 1,
         "formatters": {
-            "consoleFormatter": {"format": "%(levelname)s - %(name)s - %(message)s"},
+            "consoleFormatter": {"format": "%(asctime)s: %(levelname)s - %(name)s - %(message)s"},
             "fileFormatter": {"format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s}"},
         },
         "handlers": {

@@ -210,6 +210,11 @@ class Node:
         if index is None:
             return None,None
         else: return self.getContents()[index],innerOffset
+        
+    def printStructure(self, indent = ''):
+        print(indent + str(self))
+        for child in self.getContents():
+            child.printStructure(indent + '  ')
 
 
 class RootNode(Node):

@@ -6,7 +6,6 @@
 # published by the Free Software Foundation
 #
 
-
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
@@ -39,23 +38,33 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
         if not isinstance(event, modify.events.ElementChangeEvent):
             logger.info('ignoring event {0}'.format(event))
             return
-        logger.info("incoming modify event at {}, type {}".format(self.name, event.__class__.__name__))
+        logger.info("incoming change event at {}, type {}".format(self.name, event.__class__.__name__))
+        if isinstance(event, modify.events.ElementChangeEvent):
+            self.handleElementChangeEvent(event)
+        else:
+            raise NotImplementedError('unknown event: {}'.format(event))
+            
+    def handleElementChangeEvent(self, event):
+        logger.debug('affected ids: {}'.format(event.ids()))
         for id in event.ids():
             if id == self.root.id:
-                print('root element affected at {}'.format(self.name))
+                logger.debug('root element affected at {}'.format(self.name))
                 event.applyTo(self.root)
                 self.reset()
+                #return
             else:
-                allNodes = self.root.getAllNodes()
-                next(allNodes)
+                allNodes = self.root.getAllNodes(skipSelf = True)
                 for node in allNodes:
                     if node.id == id:
+                        logger.debug('event match ID={0} at {1}'.format(id, self.name))
                         modelIndex = self.getIndex(node)
                         if isinstance(event, modify.events.SingleElementChangeEvent):
+                            logger.debug('single change')
                             event.applyTo(node)
                             self.dataChanged.emit(modelIndex, modelIndex)
                             return # single element event -> no more IDs to check
                         elif isinstance(event, modify.events.InsertElementsEvent):
+                            logger.debug('insert')
                             for pos, newElements in event.insertions[id]:
                                 self.beginInsertRows(modelIndex, pos, pos + len(newElements) - 1)
                                 node.insertContents(pos, [e.copy() for e in newElements])
@@ -106,7 +115,7 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
     
     def dropMimeData(self,mimeData,action,row,column,parentIndex):
         """This function does all the magic that happens if elements are dropped onto this editor."""
-        print("dropMimeData on {} row {}".format(self.data(parentIndex, Qt.EditRole), row))
+        logger.debug("dropMimeData on {} row {}".format(self.data(parentIndex, Qt.EditRole), row))
         QtGui.QApplication.changeOverrideCursor(Qt.ArrowCursor) # dont display the DnD cursor during the warning
         if action == Qt.IgnoreAction:
             return True
@@ -120,74 +129,49 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
         if row == -1:
             # if something is dropped on now item, append it to the end of the parent
             row = parent.getContentsCount()
-        parent_copy = parent.copy() # all changes will be performed on this copy
-        changes = OrderedDict()
         if mimeData.hasFormat(options.gui.mime):
             # first case: OMG mime data -> nodes from an editor, browser etc.
             orig_nodes = list(mimeData.getElements())
+            
+            # check for recursion error
             for o in orig_nodes:
-                # check for recursion error
                 for n in o.getAllNodes():
                     if n.id == parent.id:
                         
                         QtGui.QMessageBox.critical(None, self.tr('error'),self.tr('You cannot put a container below itself in the hierarchy!'))
                         return False
+            
             if action == Qt.CopyAction:
                 # the easy case: just add the copied nodes at the specified row
-                nodes = [n.copy() for n in orig_nodes]
-                parent_copy.contents[row:row] = nodes
-                for n in nodes:
-                    n.setParent(parent_copy)
-                changes[parent.id] = (parent.copy(), parent_copy)
+                insertions = { parent.id:[(row, orig_nodes)]}
+                insertCommand = modify.InsertElementsCommand(modify.EDITOR, insertions, 'drop->copy')
+                modify.push(modify.EDITOR, insertCommand)
             else:
-                # if nodes are moved, we must handle the case that nodes are moved inside the same parent in a special way.
-                # this may happen even if the parents are not the same python objects, because they can be moved between different
-                # editors that show the same container.
-                sameParentIndexes = [n.parent.index(n) for n in orig_nodes if n.parent.id == parent.id]
-                sameParentIndexes.sort(reverse = True)
-                sameParentNodes = [parent_copy.contents[i] for i in sameParentIndexes]
-                otherParentNodes = [n for n in orig_nodes if n.parent.id != parent.id]
-                print("sameParentIds: {}".format(sameParentIndexes))
-                otherParentIds = set(n.parent.id for n in otherParentNodes)
-                print("otherParentIds: {}".format(otherParentIds))
-                offset = 0
-                for i in sameParentIndexes:
-                    # remove the elements that were moved, and remember how much of them are moved before
-                    # the selected insertion row.
-                    del parent_copy.contents[i]
-                    if i < row:
-                        offset += 1
-                row -= offset
-                otherParentNodes_copy = [n.copy() for n in otherParentNodes]
-                # now insert the nodes (and possibly others from other parents
-                parent_copy.contents[row:row] = sameParentNodes + otherParentNodes_copy
-                for n in sameParentNodes + otherParentNodes_copy:
-                    n.setParent(parent_copy)
-                changes[parent.id] = (parent.copy(), parent_copy)
-                # create remove events for the nodes with different parents
-                for id in otherParentIds:
-                    children = [n for n in otherParentNodes if n.parent.id == id]
-                    children.sort(key = lambda n: n.parent.index(n), reverse = True)
-                    otherParent_before = children[0].parent.copy()
-                    otherParent_after = children[0].parent.copy()
-                    for c in children:
-                        del otherParent_after.contents[c.parent.index(c)]
-                    changes[id] = (otherParent_before, otherParent_after)
+                modify.beginMacro(modify.EDITOR, 'drag&drop (move)')
+                subtractFromRow = 0
+                for node in orig_nodes:
+                    if node.parent.id == parent.id:
+                        if node.parent.index(node) < row:
+                            subtractFromRow += 1
+                removeCommand = modify.RemoveElementsCommand(modify.EDITOR, orig_nodes, 'drop->remove')
+                modify.push(modify.EDITOR, removeCommand)
+                insertions = dict()
+                insertions[parent.id] = [(row, orig_nodes)]
+                insertCommand = modify.InsertElementsCommand(modify.EDITOR, insertions, 'drop->insert')
+                modify.push(modify.EDITOR, insertCommand)
+                modify.endMacro(modify.EDITOR)
                 
         elif mimeData.hasFormat("text/uri-list"):
             # easy case: files and/or folders are dropped from outside or from a filesystembrowser.
             nodes = self._handleUrlDrop(mimeData.urls())
             if nodes is False:
                 return False
-            parent_copy.contents[row:row] = nodes
-            for n in nodes:
-                n.setParent(parent_copy)
-            changes[parent.id] = (parent.copy(), parent_copy)
+            insertions = dict()
+            insertions[parent.id] = [(row, nodes)]
+            command = modify.InsertElementsCommand(modify.EDITOR, insertions, 'dropCopy->insert')
+            modify.push(modify.EDITOR, command)
         else: #unknown mimedata
             return False
-
-        command = modify.UndoCommand(level = modify.EDITOR, changes = changes, contentsChanged = True)        
-        modify.push(modify.EDITOR,command)
         return True
     
     def _handleUrlDrop(self, urls):
@@ -223,7 +207,6 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
                         
                         if ret == dialog.DeleteAlways:
                             options.tags.always_delete = options.tags.always_delete + [e.tagname]
-                        print(options.tags.always_delete)
                         logger.debug('REMOVE TAG {0} from {1}'.format(e.tagname, f))
                         real = realfiles2.get(f)
                         real.remove(e.tagname)

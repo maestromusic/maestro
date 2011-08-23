@@ -7,7 +7,8 @@
 #
 
 from .. import tags
-
+from .. import logging
+logger = logging.getLogger("modify.events")
 class ChangeEvent:
     pass
 
@@ -17,6 +18,9 @@ class ElementChangeEvent(ChangeEvent):
         self.changes = changes
         self.level = level
         self.contentsChanged = contentsChanged
+        for id in changes:
+            print('*********')
+            changes[id].printStructure()
     
     def ids(self):
         return self.changes.keys()
@@ -67,7 +71,7 @@ class SingleElementChangeEvent(ElementChangeEvent):
 
 class InsertElementsEvent(ElementChangeEvent):
     """A specialized modify event for the insertion of elements. <insertions> is a dict mapping parentId -> iterable of
-    (position, elementList) tuples."""
+    (index, elementList) tuples."""
     def __init__(self, level, insertions):
         self.insertions = insertions
         self.level = level
@@ -86,7 +90,7 @@ class InsertElementsEvent(ElementChangeEvent):
 
 class RemoveElementsEvent(ElementChangeEvent):
     """A specialized modify event for the removal of elements. Removals is a dict mapping parent ids to an iterable of
-    (position, number) tuples, meaning that parent.contents[position,position+number] will be removed. The caller must
+    (index, number) tuples, meaning that parent.contents[index,index+number] will be removed. The caller must
     make sure that it is feasable to remove elements in the order they appear in the iterable – i.e. they should be sorted
     decreasing."""
     def __init__(self, level, removals):

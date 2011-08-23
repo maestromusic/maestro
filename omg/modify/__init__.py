@@ -246,7 +246,6 @@ def merge(level, parent, positions, newTitle, removeString, adjustPositions):
     copies = []
     insertPosition = positions[0]
     insertElementPosition = parent.contents[insertPosition].position
-    print(parent)
     removeCommand = RemoveElementsCommand(EDITOR, [parent.contents[i] for i in positions])
     
     for i,element in enumerate(parent.contents[insertPosition:], start=insertPosition):
