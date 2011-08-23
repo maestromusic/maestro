@@ -11,7 +11,7 @@ from PyQt4.QtCore import Qt
 
 from .. import logging, modify, database as db, tags, realfiles2
 from . import mimedata
-from ..models import rootedtreemodel, RootNode, File, Container
+from ..models import rootedtreemodel, RootNode, File, Container, Element
 from ..config import options
 from ..utils import hasKnownExtension, collectFiles, longestSubstring
 from collections import OrderedDict
@@ -45,48 +45,39 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
             raise NotImplementedError('unknown event: {}'.format(event))
             
     def handleElementChangeEvent(self, event):
-        logger.debug('affected ids: {}'.format(event.ids()))
         for id in event.ids():
-            if id == self.root.id:
-                logger.debug('root element affected at {}'.format(self.name))
-                event.applyTo(self.root)
-                self.reset()
-                #return
-            else:
-                allNodes = self.root.getAllNodes(skipSelf = True)
-                for node in allNodes:
-                    if node.id == id:
-                        logger.debug('event match ID={0} at {1}'.format(id, self.name))
-                        modelIndex = self.getIndex(node)
-                        if isinstance(event, modify.events.SingleElementChangeEvent):
-                            logger.debug('single change')
-                            event.applyTo(node)
-                            self.dataChanged.emit(modelIndex, modelIndex)
-                            return # single element event -> no more IDs to check
-                        elif isinstance(event, modify.events.InsertElementsEvent):
-                            logger.debug('insert')
-                            for pos, newElements in event.insertions[id]:
-                                self.beginInsertRows(modelIndex, pos, pos + len(newElements) - 1)
-                                node.insertContents(pos, [e.copy() for e in newElements])
-                                self.endInsertRows()
-                        elif isinstance(event, modify.events.RemoveElementsEvent):
-                            for pos, num in event.removals[id]:
-                                self.beginRemoveRows(modelIndex, pos, pos + num - 1)
-                                del node.contents[pos:pos+num]
-                                self.endRemoveRows()
-                        else:
-                            if event.contentsChanged:
-                                self.beginRemoveRows(modelIndex, 0, node.getContentsCount())
-                                temp = node.contents
-                                node.contents = []
-                                self.endRemoveRows()
-                                node.contents = temp
-                                self.beginInsertRows(modelIndex, 0, event.getNewContentsCount(node))
-                                event.applyTo(node)
-                                self.endInsertRows()
-                            else:
-                                event.applyTo(node)
+            allNodes = self.root.getAllNodes(skipSelf = False)
+            for node in allNodes:
+                if node.id == id:
+                    logger.debug('event match ID={0} at {1}'.format(id, self.name))
+                    modelIndex = self.getIndex(node)
+                    if isinstance(event, modify.events.SingleElementChangeEvent):
+                        event.applyTo(node)
                         self.dataChanged.emit(modelIndex, modelIndex)
+                        return # single element event -> no more IDs to check
+                    elif isinstance(event, modify.events.InsertElementsEvent):
+                        for pos, newElements in event.insertions[id]:
+                            self.beginInsertRows(modelIndex, pos, pos + len(newElements) - 1)
+                            node.insertContents(pos, [e.copy() for e in newElements])
+                            self.endInsertRows()
+                    elif isinstance(event, modify.events.RemoveElementsEvent):
+                        for pos, num in event.removals[id]:
+                            self.beginRemoveRows(modelIndex, pos, pos + num - 1)
+                            del node.contents[pos:pos+num]
+                            self.endRemoveRows()
+                    else:
+                        if event.contentsChanged:
+                            self.beginRemoveRows(modelIndex, 0, node.getContentsCount())
+                            temp = node.contents
+                            node.contents = []
+                            self.endRemoveRows()
+                            node.contents = temp
+                            self.beginInsertRows(modelIndex, 0, event.getNewContentsCount(node))
+                            event.applyTo(node)
+                            self.endInsertRows()
+                        else:
+                            event.applyTo(node)
+                    self.dataChanged.emit(modelIndex, modelIndex)
            
     def setContents(self,contents):
         """Set the contents of this playlist and set their parent to self.root.
@@ -119,15 +110,14 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
         QtGui.QApplication.changeOverrideCursor(Qt.ArrowCursor) # dont display the DnD cursor during the warning
         if action == Qt.IgnoreAction:
             return True
-        if column > 0:
-            return False
+        assert column <= 0
         parent = self.data(parentIndex, Qt.EditRole)
+        # if something is dropped on a file, make it a sibling instead of a child of that file
         if parent is not self.root and parent.isFile():
-                # if something is dropped on a file, make it a sibling instead of a child of that file
                 parent = parent.parent
                 row = parentIndex.row() + 1
+        # if something is dropped on now item, append it to the end of the parent
         if row == -1:
-            # if something is dropped on now item, append it to the end of the parent
             row = parent.getContentsCount()
         if mimeData.hasFormat(options.gui.mime):
             # first case: OMG mime data -> nodes from an editor, browser etc.
@@ -140,26 +130,44 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
                         
                         QtGui.QMessageBox.critical(None, self.tr('error'),self.tr('You cannot put a container below itself in the hierarchy!'))
                         return False
-            
-            if action == Qt.CopyAction:
-                # the easy case: just add the copied nodes at the specified row
-                insertions = { parent.id:[(row, orig_nodes)]}
-                insertCommand = modify.InsertElementsCommand(modify.EDITOR, insertions, 'drop->copy')
-                modify.push(modify.EDITOR, insertCommand)
-            else:
-                modify.beginMacro(modify.EDITOR, 'drag&drop (move)')
+            modify.beginMacro(modify.EDITOR, 'drag&drop')
+            freedPositions = []
+            if action == Qt.MoveAction:
                 subtractFromRow = 0
                 for node in orig_nodes:
                     if node.parent.id == parent.id:
                         if node.parent.index(node) < row:
                             subtractFromRow += 1
+                            if isinstance(node.parent, Element):
+                                freedPositions.append(node.position)
                 removeCommand = modify.RemoveElementsCommand(modify.EDITOR, orig_nodes, 'drop->remove')
                 modify.push(modify.EDITOR, removeCommand)
-                insertions = dict()
-                insertions[parent.id] = [(row, orig_nodes)]
-                insertCommand = modify.InsertElementsCommand(modify.EDITOR, insertions, 'drop->insert')
-                modify.push(modify.EDITOR, insertCommand)
-                modify.endMacro(modify.EDITOR)
+            insert_nodes = [node.copy() for node in orig_nodes]
+            if isinstance(parent, RootNode):
+                for node in insert_nodes:
+                    node.position = None
+            else:
+                if row > parent.getContentsCount():
+                    row = parent.getContentsCount()
+                position = 1 if row == 0 else parent.contents[row-1].position + 1
+                for node in insert_nodes:
+                    node.position = position
+                    position += 1
+                if len(parent.contents) > row and parent.contents[row].position < position:
+                        # need to increase positions of elements behind insertion
+                        shift = position - parent.contents[row].position
+                        for element in parent.contents[:row-1:-1]:
+                            before = element.copy()
+                            after = element.copy()
+                            after.position += shift
+                            command = modify.ModifySingleElementCommand(modify.EDITOR,before,after,'change position')
+                            modify.push(modify.EDITOR, command)
+                             
+            insertions = dict()
+            insertions[parent.id] = [(row, insert_nodes)]
+            insertCommand = modify.InsertElementsCommand(modify.EDITOR, insertions, 'drop->insert')
+            modify.push(modify.EDITOR, insertCommand)
+            modify.endMacro(modify.EDITOR)
                 
         elif mimeData.hasFormat("text/uri-list"):
             # easy case: files and/or folders are dropped from outside or from a filesystembrowser.
@@ -171,6 +179,7 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
             command = modify.InsertElementsCommand(modify.EDITOR, insertions, 'dropCopy->insert')
             modify.push(modify.EDITOR, command)
         else: #unknown mimedata
+            logger.warning('unknown mime data dropped')
             return False
         return True
     
@@ -302,3 +311,40 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
                    ( ", ".join(ind.internalPointer().tags[tags.TITLE]) for ind in indices )
                  )
         return hintRemove.strip(string.punctuation + string.whitespace), hintRemove
+    
+    def shiftPositions(self, elements, delta):
+        '''Shift the positions of the given elements by *delta* (if valid).'''
+        #TODO: method only works for continuous selection
+        elements.sort(key = lambda el: el.position)
+        parent = elements[0].parent
+        if isinstance(parent, RootNode):
+            return
+        if delta > 0:
+            if parent.contents[-1] != elements[-1]:
+                # there are elements behind
+                lastIndex = parent.contents.index(elements[-1])
+                spaceBehind = parent.contents[lastIndex+1].position - elements[-1].position - 1
+                if spaceBehind < delta:
+                    raise NotImplementedError()
+            for element in reversed(elements):
+                before = element.copy()
+                after = element.copy()
+                after.position += delta
+                command = modify.ModifySingleElementCommand(modify.EDITOR, before, after, 'position shift')
+                modify.push(modify.EDITOR, command)
+        elif delta < 0:
+            if parent.contents[0] != elements[0]:
+                #there are elements before
+                firstIndex = parent.contents.index(elements[0])
+                spaceBefore = elements[0].position - parent.contents[firstIndex-1].position - 1
+                if spaceBefore < -delta:
+                    raise NotImplementedError()
+            elif elements[0].position <= -delta:
+                return # cannot decrease position 1
+            for element in elements:
+                before = element.copy()
+                after = element.copy()
+                after.position += delta
+                command = modify.ModifySingleElementCommand(modify.EDITOR, before, after, 'position shift')
+                modify.push(modify.EDITOR, command)
+            

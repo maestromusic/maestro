@@ -89,6 +89,10 @@ class EditorTreeView(treeview.TreeView):
         if keyEvent.key() == Qt.Key_Delete:
             self.removeSelected()
             keyEvent.accept()
+        elif keyEvent.key() == Qt.Key_Plus:
+            self.model().shiftPositions([index.internalPointer() for index in self.selectedIndexes()], 1)
+        elif keyEvent.key() == Qt.Key_Minus:
+            self.model().shiftPositions([index.internalPointer() for index in self.selectedIndexes()], -1)
         else:
             QtGui.QTreeView.keyPressEvent(self, keyEvent)
             
