@@ -19,11 +19,11 @@ from . import dispatcher, events, REAL
 logger = logging.getLogger("omg.modify")
 
 
-def createNewElements(elements):
+def createNewElements(elements,tagsAttribute='tags'):
     """Create new elements. *elements* is a list of preliminary elements (i.e. element instances with
     negative ids). This method will insert new entries in the elements and file table and emit a
     NewElementChangeEvent (mapping the old negative ids to copies of the elements with their shiny new
-    positive ids). It won't save any contents, tags or flags.
+    positive ids). It won't save any contents, tags or flags though.
     
     This method will return a dict mapping old to new ids.
     """
@@ -35,7 +35,10 @@ def createNewElements(elements):
         newId = db.write.createNewElement(element.isFile(),element.major if element.isContainer() else False)
         if element.isFile():
             db.write.addFile(newId,element.path,None,element.length)
-            
+        
+        if hasattr(element,tagsAttribute):
+            db.write.setTags(newId,getattr(element,tagsAttribute))
+        
         # Prepare result and changedElements
         result[element.id] = newId
         copy = element.copy()
@@ -47,8 +50,8 @@ def createNewElements(elements):
 
 
 def deleteElements(elids):
-    """Delete the elements with the given ids from the database. This will delete from elements and due to 
-    foreign keys also from files, tags, flags, contents and emit an ElementsDeletedEvent."""
+    """Delete the elements with the given ids from the database. This will delete from the elements table
+    and due to foreign keys also from files, tags, flags and contents and emit an ElementsDeletedEvent."""
     db.write.deleteElements(elids)
     dispatcher.changes.emit(events.ElementsDeletedEvent(elids))
 
@@ -59,9 +62,11 @@ def commit(changes):
     After the commit, the elements in the database will look like those in the argument.
     If an element in changes.values() is a container, the contents must be loaded, but
     do not need to have any loaded data besides position and id."""
+    logger.debug("Committing {} elements".format(len(changes)))
+    
     # Tags
     changeTags({oldElement: (oldElement.tags,newElement.tags)
-                    for (oldElement,newElement) in changes.values()},emitEvent=False)
+                    for oldElement,newElement in changes.values()},emitEvent=False)
                     
     # Contents (including position)
     contents = {}
@@ -157,6 +162,8 @@ def changeTagValue(tag,oldValue,newValue,elements):
 def changeTags(changes, emitEvent = True):
     """Change tags arbitrarily: *changes* is a dict mapping elements (not element-ids!) to tuples consisting
     of two tags.Storages - the tags before and after the change."""
+    abort = False
+        
     successful = [] # list of elements where the file was written successfully
     for element,changeTuple in changes.items():
         oldTags,newTags = changeTuple

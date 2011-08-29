@@ -104,7 +104,10 @@ def run(cmdConfig = []):
     except IOError:
         logger.error("Another instance is already running, quitting.")
         sys.exit(-1)
-        
+    
+    if database.prefix == 'new_':
+        database.query("DELETE FROM new_elements WHERE id > 2019")
+    
     # Load remaining modules
     from omg import tags, search
     search.init()
