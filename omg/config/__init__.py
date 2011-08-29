@@ -227,9 +227,13 @@ class StorageOption(Option):
         if self.name in fileSection:
             if self.fileValue is None or self.fileValue == self.default:
                 del fileSection[self.name]
+            elif isinstance(self.fileValue,dict):
+                fileSection.__setitem__(self.name,self.fileValue,unrepr=True)
             else: fileSection[self.name] = self.fileValue
         elif self.fileValue is not None and self.fileValue != self.default:
-            fileSection[self.name] = self.fileValue
+            if isinstance(self.fileValue,dict):
+                fileSection.__setitem__(self.name,self.fileValue,unrepr=True)
+            else: fileSection[self.name] = self.fileValue
 
 
 class ConfigSection:

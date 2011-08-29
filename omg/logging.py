@@ -7,8 +7,10 @@
 #
 
 """
-This module wraps Python's logging module in a way so that logging works even if that module is not yet configured.
-Simply use ``logging.getLogger(name)`` to get a Logger and use it like the usual loggers. Before logging is configured everything will be printed to the console, so call ``init`` as early as possible (but after the config module has been initialized).
+This module wraps Python's logging module in a way so that logging works even if that module is not yet
+configured. Simply use ``logging.getLogger(name)`` to get a Logger and use it like the usual loggers.
+Before logging is configured everything will be printed to the console, so call ``init`` as early as
+possible (but after the config module has been initialized).
 """
 
 import logging, logging.config, os, sys
@@ -17,7 +19,8 @@ configured = False # Whether logging has been configured (i.e. init has been suc
 
 
 class Logger:
-    """A logger prints log messages to stderr until logging is configured. Afterwards it wraps a usual Python Logger with the same name."""
+    """A logger prints log messages to stderr until logging is configured. Afterwards it wraps a usual Python
+    Logger with the same name."""
     def __init__(self,name):
         self.name = name
         if configured:
@@ -62,7 +65,8 @@ class Logger:
         
         
 def getLogger(name=None):
-    """Return a logger with the given name. If *name* is ``None`` use ``"omg"``. Note that this method works even if logging has not been initialized yet."""
+    """Return a logger with the given name. If *name* is ``None`` use ``"omg"``. Note that this method works
+    even if logging has not been initialized yet."""
     if name is None:
         name = "omg"
     return Logger(name)

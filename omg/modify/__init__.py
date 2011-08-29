@@ -13,7 +13,7 @@ from collections import OrderedDict
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from .. import tags, logging, database as db
+from .. import tags, logging, database as db, realfiles2
 from . import events
 # At the end of the file we will import the submodules real and events.
 
@@ -69,7 +69,6 @@ class UndoCommand(QtGui.QUndoCommand):
         self.setText(text)
         
     def redo(self):
-        
         if self.level == REAL:
             real.commit(self.changes)
         else:
@@ -78,9 +77,10 @@ class UndoCommand(QtGui.QUndoCommand):
             dispatcher.changes.emit(redoEvent)
 
     def undo(self):
-        
         if self.level == REAL:
-            real.commit({id:(v[1],v[0]) for k,v in self.changes.items() })
+            undoChanges = {k:(v[1],v[0]) for k,v in self.changes.items() }
+            assert len(undoChanges) > 0
+            real.commit(undoChanges)
         else:
             undoChanges = OrderedDict(( (k,v[0]) for k,v in self.changes.items() ))
             undoEvent = events.ElementChangeEvent(self.level, undoChanges, contentsChanged = self.contentsChanged)
@@ -183,10 +183,18 @@ class CreateNewElementsCommand(UndoCommand):
     def __init__(self, elements, text = 'create new elements'):
         """Initalize the command with a list of elements and an optional text describing the command."""
         QtGui.QUndoCommand.__init__(self)
-        self.elements = elements
+        self.elements = [element.copy() for element in elements]
+        for element in self.elements:
+            if element.isFile():
+                try:
+                    real = realfiles2.get(element.path)
+                    real.read()
+                    element.fileTags = real.tags
+                except realfiles2.TagIOError as e:
+                    logger.warning("Could not read tags from file {}: {}".format(element.path,e))
     
     def redo(self):
-        self.idMap = real.createNewElements(self.elements)
+        self.idMap = real.createNewElements(self.elements,tagsAttribute='fileTags')
         
     def undo(self):
         real.deleteElements(self.idMap.values())
@@ -208,7 +216,7 @@ class TagUndoCommand(UndoCommand):
     def undo(self):
         # Note that real.changeTags and TagModifyEvent expect a different format for changes
         if self.level == REAL:
-            real.changeTags(self.changes)
+            real.changeTags({k: (v[1],v[0]) for k,v in self.changes.items()})
         else:
             changes = OrderedDict((k,v[0]) for k,v in self.changes.items())
             dispatcher.changes.emit(events.TagModifyEvent(changes))

@@ -107,7 +107,7 @@ storage = OrderedDict((
                 "class": "logging.StreamHandler",
                 "level": "DEBUG",
                 "formatter": "consoleFormatter",
-                "stream": sys.stdout,
+                "stream": "ext://sys.stdout",
             },
             "fileHandler": {
                 "class": "logging.handlers.RotatingFileHandler",
