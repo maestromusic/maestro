@@ -21,6 +21,8 @@ def deleteElements(ids):
     flags. Due to the foreign keys in the database, this will also delete all tag, flag and content relations
     of the elements.
     """
+    if len(ids) == 0:
+        return
     db.transaction()
     parentIds = db.parents(ids)
     contentsIds = db.contents(ids)

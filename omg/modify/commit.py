@@ -17,7 +17,11 @@ def commitEditors():
     if len(models) == 0:
         # nothing to commit – no open editors!
         return
-    modify.beginMacro(modify.REAL, 'commit')
+    try:
+        modify.beginMacro(modify.REAL, 'commit')
+    except modify.StackChangeRejectedException:
+        logger.info('stack change rejected - not commiting')
+        return
     logger.debug("Copying nodes...")
     myRoot = models[0].root.copy()
     for model in models[1:]:
@@ -37,12 +41,15 @@ def commitEditors():
                
     logger.debug("newElementsCommand...")
     newElementsCommand = modify.CreateNewElementsCommand(newElements.values())
-    modify.push(modify.REAL, newElementsCommand)
+    modify.push(newElementsCommand)
     # new elements committed -> now all elements are in the DB. Add new ones to dbElements
     idMap = newElementsCommand.idMap
     for oldId, element in newElements.items():
         element.id = idMap[oldId]
         dbElements[element.id] = element
+    for element in dbElements.values():
+        if element.isContainer():
+            element.printStructure()
    
     # now we need to load the original states of the elements from the database, in order to be able
     # to undo the commit.
@@ -58,6 +65,6 @@ def commitEditors():
     #import pprint
     #pprint.pprint({id: (v[0].tags,v[1].tags) for id,v in changes.items()})
     bigUndoCommand = modify.UndoCommand(modify.REAL, changes, True, 'main commit command')
-    modify.push(modify.REAL, bigUndoCommand)
-    modify.endMacro(modify.REAL)
+    modify.push(bigUndoCommand)
+    modify.endMacro()
     logger.debug("end commit")

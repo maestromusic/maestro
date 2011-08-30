@@ -384,7 +384,7 @@ class TagEditorModel(QtCore.QObject):
     def _push(self,command):
         """Push the UndoCommand *command* to the correct UndoStack."""
         if self.saveDirectly:
-            modify.push(self.level,command)
+            modify.push(command)
         else: self.undoStack.push(command)
         
     def _endMacro(self):

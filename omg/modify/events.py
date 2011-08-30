@@ -18,9 +18,6 @@ class ElementChangeEvent(ChangeEvent):
         self.changes = changes
         self.level = level
         self.contentsChanged = contentsChanged
-        for id in changes:
-            print('*********')
-            changes[id].printStructure()
     
     def ids(self):
         return self.changes.keys()
@@ -37,7 +34,7 @@ class NewElementChangeEvent(ElementChangeEvent):
     elements."""
     def __init__(self,changes):
         from . import REAL
-        super().__init__(REAL,changes)
+        super().__init__(REAL,changes, False)
     
     def applyTo(self,element):
         assert element.id in self.changes

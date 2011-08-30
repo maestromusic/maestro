@@ -35,19 +35,18 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
     def handleChangeEvent(self, event):
         """React on an incoming ChangeEvent by applying all changes that affect the
         current model."""
-        if not isinstance(event, modify.events.ElementChangeEvent):
-            logger.info('ignoring event {0}'.format(event))
-            return
-        logger.info("incoming change event at {}, type {}".format(self.name, event.__class__.__name__))
         if isinstance(event, modify.events.ElementChangeEvent):
             self.handleElementChangeEvent(event)
+        elif isinstance(event, modify.events.ElementsDeletedEvent):
+            print('real event incoming -- resetting editor ...')
+            self.setRoot(RootNode())
         else:
-            raise NotImplementedError('unknown event: {}'.format(event))
+            print('WARNING UNKNOWN EVENT {}, RESETTING EDITOR'.format(event))
+            self.setRoot(RootNode())
             
     def handleElementChangeEvent(self, event):
         for id in event.ids():
-            allNodes = self.root.getAllNodes(skipSelf = False)
-            for node in allNodes:
+            for node in self.root.getAllNodes(skipSelf = False):
                 if node.id == id:
                     logger.debug('event match ID={0} at {1}'.format(id, self.name))
                     modelIndex = self.getIndex(node)
@@ -55,21 +54,26 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
                         event.applyTo(node)
                         self.dataChanged.emit(modelIndex, modelIndex)
                         return # single element event -> no more IDs to check
-                    elif isinstance(event, modify.events.PositionChangeEvent):
+                    
+                    elif isinstance(event, modify.events.PositionChangeEvent) or \
+                            isinstance(event, modify.events.NewElementChangeEvent):
                         event.applyTo(node)
                         self.dataChanged.emit(modelIndex.child(0, 0), modelIndex.child(len(node.contents)-1, 0))
+                        
                     elif isinstance(event, modify.events.InsertElementsEvent):
                         for pos, newElements in event.insertions[id]:
                             self.beginInsertRows(modelIndex, pos, pos + len(newElements) - 1)
                             node.insertContents(pos, [e.copy() for e in newElements])
                             self.endInsertRows()
+                            
                     elif isinstance(event, modify.events.RemoveElementsEvent):
                         for pos, num in event.removals[id]:
                             self.beginRemoveRows(modelIndex, pos, pos + num - 1)
                             del node.contents[pos:pos+num]
                             self.endRemoveRows()
-                    else:
-                        if event.contentsChanged:
+                            
+                    elif event.__class__ == modify.events.ElementChangeEvent:
+                        if event.contentsChanged and not node.isFile():
                             self.beginRemoveRows(modelIndex, 0, node.getContentsCount())
                             temp = node.contents
                             node.contents = []
@@ -80,6 +84,8 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
                             self.endInsertRows()
                         else:
                             event.applyTo(node)
+                    else:
+                        print('unknown element change event: {}'.format(event))
                     self.dataChanged.emit(modelIndex, modelIndex)
            
     def setContents(self,contents):
@@ -144,7 +150,7 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
                             if isinstance(node.parent, Element):
                                 freedPositions.append(node.position)
                 removeCommand = modify.RemoveElementsCommand(modify.EDITOR, orig_nodes, 'drop->remove')
-                modify.push(modify.EDITOR, removeCommand)
+                modify.push(removeCommand)
             insert_nodes = [node.copy() for node in orig_nodes]
             if isinstance(parent, RootNode):
                 for node in insert_nodes:
@@ -169,7 +175,7 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
             insertions = dict()
             insertions[parent.id] = [(row, insert_nodes)]
             insertCommand = modify.InsertElementsCommand(modify.EDITOR, insertions, 'drop->insert')
-            modify.push(modify.EDITOR, insertCommand)
+            modify.push(insertCommand)
             modify.endMacro(modify.EDITOR)
                 
         elif mimeData.hasFormat("text/uri-list"):
@@ -180,7 +186,7 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
             insertions = dict()
             insertions[parent.id] = [(row, nodes)]
             command = modify.InsertElementsCommand(modify.EDITOR, insertions, 'dropCopy->insert')
-            modify.push(modify.EDITOR, command)
+            modify.push(command)
         else: #unknown mimedata
             logger.warning('unknown mime data dropped')
             return False
@@ -205,12 +211,13 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
             while not readOk:
                 try:
                     theFile = File.fromFilesystem(f)
+                    theFile.fileTags = theFile.tags.copy()
                     elementList.append(theFile)
                     readOk = True
                 except tags.UnknownTagError as e:
                     from ..gui.tagwidgets import NewTagTypeDialog
-                    dialog = NewTagTypeDialog(e.tagname, text =
-                      self.tr('File "{0}" contains a so far unknown tag "{1}". What should its type be?'.format(f, e.tagname)),
+                    text = self.tr('File\n"{0}"\ncontains a so far unknown tag "{1}". What should its type be?').format(f, e.tagname)
+                    dialog = NewTagTypeDialog(e.tagname, text = text,
                       includeDeleteOption = True)
                     ret = dialog.exec_()
                     if ret == dialog.Accepted:
@@ -331,7 +338,7 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
                     raise NotImplementedError()
             positionChanges = [(element.position, element.position + delta) for element in reversed(elements)]
             command = modify.PositionChangeCommand(modify.EDITOR, parent.id, positionChanges, self.tr('position change'))
-            modify.push(modify.EDITOR, command)
+            modify.push(command)
         elif delta < 0:
             if parent.contents[0] != elements[0]:
                 #there are elements before
@@ -343,5 +350,5 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
                 return # cannot decrease position 1
             positionChanges = [(element.position, element.position + delta) for element in elements]
             command = modify.PositionChangeCommand(modify.EDITOR, parent.id, positionChanges, self.tr('position change'))
-            modify.push(modify.EDITOR, command)
+            modify.push(command)
             

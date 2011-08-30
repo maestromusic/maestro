@@ -274,7 +274,7 @@ class Element(Node):
         return newNode
     
     def copyFrom(self, other, copyContents = False):
-        if copyContents:
+        if copyContents and not self.isFile():
             self.setContents([c.copy() for c in other.contents])
         if self.tags != other.tags:
             self.tags = other.tags.copy()

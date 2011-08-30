@@ -88,6 +88,6 @@ class TagMatchDialog(QtGui.QDialog):
                     elementAfter.position = int(value)
                 else:
                     elementAfter.tags[tags.get(tag)] = [value]
-            modify.push(modify.EDITOR,modify.ModifySingleElementCommand(modify.EDITOR, element, elementAfter))
+            modify.push(modify.ModifySingleElementCommand(modify.EDITOR, element, elementAfter))
         modify.endEditorMacro()
         self.accept()

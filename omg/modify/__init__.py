@@ -198,26 +198,21 @@ class InsertElementsCommand(UndoCommand):
 
 class CreateNewElementsCommand(UndoCommand):
     """A command to create new elements in the database from editor elements with negative IDs.
-    This command is always in the REAL layer and therefore has no *level* attribute."""
+    This command is always in the REAL layer, therefore the constructor has no *level* argument."""
+    
+    level = REAL
+    
     def __init__(self, elements, text = 'create new elements'):
         """Initalize the command with a list of elements and an optional text describing the command."""
         QtGui.QUndoCommand.__init__(self)
         self.elements = [element.copy() for element in elements]
-        for element in self.elements:
-            if element.isFile():
-                try:
-                    real = realfiles2.get(element.path)
-                    real.read()
-                    element.fileTags = real.tags
-                except realfiles2.TagIOError as e:
-                    logger.warning("Could not read tags from file {}: {}".format(element.path,e))
     
     def redo(self):
         self.idMap = real.createNewElements(self.elements,tagsAttribute='fileTags')
         
     def undo(self):
         real.deleteElements(self.idMap.values())
-        
+
 class TagUndoCommand(UndoCommand):
     """An UndoCommand that changes only tags. The difference to UndoCommand is that the dict *changes*
     contains tuples of tags.Storage: the tags before and after the change."""
@@ -310,6 +305,8 @@ def newEditorId():
     _currentEditorId -= 1
     return _currentEditorId
 
+class StackChangeRejectedException(Exception):
+    pass
 
 class UndoGroup(QtGui.QUndoGroup):
     def __init__(self, parent = None):
@@ -322,13 +319,21 @@ class UndoGroup(QtGui.QUndoGroup):
         
         self._createEditorStack()
         self.setActiveStack(self.mainStack)
-        
+       
     def state(self):
         if self.activeStack() is self.editorStack:
             return EDITOR
         else:
             return REAL
 
+    def setState(self, level):
+        if level == REAL and self.state() == EDITOR:
+            ans = QtGui.QMessageBox.question(None, 'warning', 'you are about to switch from editor to real stack. The \
+    editor command history will be lost. Continue?', buttons = QtGui.QMessageBox.No | QtGui.QMessageBox.Yes)
+            if ans != QtGui.QMessageBox.Yes:
+                raise StackChangeRejectedException()
+        self.setActiveStack(self.mainStack if level == REAL else self.editorStack)
+            
     def _createEditorStack(self):
         if self.editorStack is not None:
             self.removeStack(self.editorStack)
@@ -345,19 +350,18 @@ class UndoGroup(QtGui.QUndoGroup):
     def clearEditorStack(self):
         self._createEditorStack()
         self.setActiveStack(self.mainStack)
-        
+    
 stack = UndoGroup()
 
 def beginMacro(level,name):
-    stack.setActiveStack(stack.mainStack if level == REAL else stack.editorStack)
+    stack.setState(level)
     stack.activeStack().beginMacro(name)
 
-def endMacro(level):
-    stack.setActiveStack(stack.mainStack if level == REAL else stack.editorStack)
+def endMacro():
     stack.activeStack().endMacro()
 
-def push(level,command):
-    stack.setActiveStack(stack.mainStack if level == REAL else stack.editorStack)
+def push(command):
+    stack.setState(command.level)
     stack.activeStack().push(command)
 
 def createUndoAction(level,parent,prefix):
