@@ -68,7 +68,28 @@ class SingleElementChangeEvent(ElementChangeEvent):
     def applyTo(self, element):
         element.copyFrom(self.element, copyContents = False)
 
-
+class PositionChangeEvent(ElementChangeEvent):
+    """An event for the case that the position of several elements below the same parent are changed."""
+    def __init__(self, level, parentId, positionMap):
+        '''Initializes the event. *positionMap* is a dict mapping old to new positions.'''
+        self.contentsChanged = True
+        self.parentId = parentId
+        self.positionMap = positionMap
+        
+    def ids(self):
+        return self.parentId,
+    
+    def getNewContentsCount(self, element):
+        return len(element.contents)
+    
+    def applyTo(self, element):
+        assert element.id == self.parentId
+        for elem in element.contents:
+            if elem.position in self.positionMap:
+                elem.position = self.positionMap[elem.position]
+        element.sortContents()
+        
+    
 class InsertElementsEvent(ElementChangeEvent):
     """A specialized modify event for the insertion of elements. <insertions> is a dict mapping parentId -> iterable of
     (index, elementList) tuples."""

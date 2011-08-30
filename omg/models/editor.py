@@ -55,6 +55,9 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
                         event.applyTo(node)
                         self.dataChanged.emit(modelIndex, modelIndex)
                         return # single element event -> no more IDs to check
+                    elif isinstance(event, modify.events.PositionChangeEvent):
+                        event.applyTo(node)
+                        self.dataChanged.emit(modelIndex.child(0, 0), modelIndex.child(len(node.contents)-1, 0))
                     elif isinstance(event, modify.events.InsertElementsEvent):
                         for pos, newElements in event.insertions[id]:
                             self.beginInsertRows(modelIndex, pos, pos + len(newElements) - 1)
@@ -326,12 +329,9 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
                 spaceBehind = parent.contents[lastIndex+1].position - elements[-1].position - 1
                 if spaceBehind < delta:
                     raise NotImplementedError()
-            for element in reversed(elements):
-                before = element.copy()
-                after = element.copy()
-                after.position += delta
-                command = modify.ModifySingleElementCommand(modify.EDITOR, before, after, 'position shift')
-                modify.push(modify.EDITOR, command)
+            positionChanges = [(element.position, element.position + delta) for element in reversed(elements)]
+            command = modify.PositionChangeCommand(modify.EDITOR, parent.id, positionChanges, self.tr('position change'))
+            modify.push(modify.EDITOR, command)
         elif delta < 0:
             if parent.contents[0] != elements[0]:
                 #there are elements before
@@ -341,10 +341,7 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
                     raise NotImplementedError()
             elif elements[0].position <= -delta:
                 return # cannot decrease position 1
-            for element in elements:
-                before = element.copy()
-                after = element.copy()
-                after.position += delta
-                command = modify.ModifySingleElementCommand(modify.EDITOR, before, after, 'position shift')
-                modify.push(modify.EDITOR, command)
+            positionChanges = [(element.position, element.position + delta) for element in elements]
+            command = modify.PositionChangeCommand(modify.EDITOR, parent.id, positionChanges, self.tr('position change'))
+            modify.push(modify.EDITOR, command)
             

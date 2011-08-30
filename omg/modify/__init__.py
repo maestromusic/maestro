@@ -104,6 +104,25 @@ class ModifySingleElementCommand(UndoCommand):
     def undo(self):
         dispatcher.changes.emit(events.SingleElementChangeEvent(self.level, self.before))
 
+class PositionChangeCommand(UndoCommand):
+    """An undo command for changing positions of elements below one single parent."""
+    
+    def __init__(self, level, parentId, positionChanges, text = ''):
+        QtGui.QUndoCommand.__init__(self)
+        if level != EDITOR:
+            raise NotImplementedEror()
+        self.level = level
+        self.parentId = parentId
+        self.positionChanges = positionChanges
+        
+    def redo(self):
+        dispatcher.changes.emit(events.PositionChangeEvent(self.level, self.parentId, 
+                                                           dict(self.positionChanges)))
+    
+    def undo(self):
+        dispatcher.changes.emit(events.PositionChangeEvent(self.level, self.parentId,
+                                                           dict(map(reversed,self.positionChanges))))
+        
 def createRanges(tuples):
         previous = None
         start = None

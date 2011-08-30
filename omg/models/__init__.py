@@ -402,7 +402,11 @@ class Container(Element):
         """Return the length of this element, i.e. the sum of the lengths of all contents."""
         # Skip elements of length None
         return sum(element.getLength(False) for element in self.contents if element.getLength() is not None)
-
+    
+    def sortContents(self):
+        """Sorts the contents according to their positions."""
+        self.contents.sort(key = lambda el: el.position)
+    
     def __repr__(self):
         return "Container[{}] with {} elements".format(self.id, len(self.contents))
 

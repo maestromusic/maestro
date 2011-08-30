@@ -11,7 +11,7 @@ from PyQt4.QtCore import Qt
 
 from collections import OrderedDict
 from ..gui import mainwindow
-from ..models import editor, Container, Element
+from ..models import editor, Container, Element, RootNode
 from . import treeview
 from .. import logging, modify, tags
 from ..modify import commit
@@ -36,7 +36,18 @@ class EditorTreeView(treeview.TreeView):
         
         self.tagMatchAction = QtGui.QAction(self.tr('Match tags from filenames...'), self)
         self.tagMatchAction.triggered.connect(self.openTagMatchDialog)
-
+        
+        self.removeSelectedAction = QtGui.QAction(self.tr('Remove'), self)
+        self.removeSelectedAction.triggered.connect(self.removeSelected)
+        self.removeSelectedAction.setShortcut(Qt.Key_Delete)
+        
+        self.increasePositionAction = QtGui.QAction(self.tr('Increase position(s)'), self)
+        self.increasePositionAction.triggered.connect(self.increasePositions)
+        self.increasePositionAction.setShortcut(Qt.Key_Plus)
+        
+        self.decreasePositionAction = QtGui.QAction(self.tr('Decrease position(s)'), self)
+        self.decreasePositionAction.triggered.connect(self.decreasePositions)
+        self.decreasePositionAction.setShortcut(Qt.Key_Minus)
         self.selectionModel().selectionChanged.connect(self._handleSelectionChanged)
     
     def _handleSelectionChanged(self, selected, deselected):
@@ -54,6 +65,10 @@ class EditorTreeView(treeview.TreeView):
         s = set( index.parent() for index in self.selectedIndexes() )
         if len(s) == 1:
             actions.append(self.mergeAction)
+            if tuple(s)[0].internalPointer() is not None:
+                actions.append(self.increasePositionAction)
+                actions.append(self.decreasePositionAction)
+        actions.append(self.removeSelectedAction)
         actions.append(self.tagMatchAction)
         super().contextMenuProvider(actions,currentIndex)
 
@@ -83,18 +98,12 @@ class EditorTreeView(treeview.TreeView):
             else:
                 event.setDropAction(Qt.CopyAction)
         treeview.TreeView.dropEvent(self, event)
-        logger.debug("dropEvent in treeview completed")
-        
-    def keyPressEvent(self, keyEvent):
-        if keyEvent.key() == Qt.Key_Delete:
-            self.removeSelected()
-            keyEvent.accept()
-        elif keyEvent.key() == Qt.Key_Plus:
-            self.model().shiftPositions([index.internalPointer() for index in self.selectedIndexes()], 1)
-        elif keyEvent.key() == Qt.Key_Minus:
-            self.model().shiftPositions([index.internalPointer() for index in self.selectedIndexes()], -1)
-        else:
-            QtGui.QTreeView.keyPressEvent(self, keyEvent)
+    
+    def increasePositions(self):
+        self.model().shiftPositions([index.internalPointer() for index in self.selectedIndexes()], 1)
+    
+    def decreasePositions(self):
+        self.model().shiftPositions([index.internalPointer() for index in self.selectedIndexes()], -1)
             
     def removeSelected(self):
         if len(self.selectedIndexes()) == 0:
