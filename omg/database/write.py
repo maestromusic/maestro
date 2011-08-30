@@ -10,17 +10,23 @@ import itertools
 from omg import database as db
 
 def createNewElement(file,major):
+    """Insert a new element into the database and return its id. Set the file and major flag as given in the
+    parameters and set the toplevel flag and elements counter to 1 and 0, respectively."""
     return db.query("INSERT INTO {}elements (file,toplevel,elements,major) VALUES (?,1,0,?)"
                         .format(db.prefix),int(file),int(major)).insertId()
                         
                         
 def deleteElements(ids):
+    """Delete the elements with the given ids from the database and update element counter and toplevel
+    flags. Due to the foreign keys in the database, this will also delete all tag, flag and content relations
+    of the elements.
+    """
     db.transaction()
     parentIds = db.parents(ids)
     contentsIds = db.contents(ids)
     db.query("DELETE FROM {}elements WHERE id IN ({})".format(db.prefix,db.csList(ids)))
-    updateElementsCounter(parents)
-    updateToplevelFlags(contents)
+    updateElementsCounter(parentIds)
+    updateToplevelFlags(contentsIds)
     db.commit()
 
 
@@ -33,18 +39,21 @@ def setContents(data):
     oldContents = db.contents(data.keys())
     db.query("DELETE FROM {}contents WHERE container_id IN ({})".format(db.prefix,db.csList(data.keys())))
     
+    newContents = [element.id for element in itertools.chain.from_iterable(data.values())]
+    
     # Insert new contents
-    params = ((cid,el.position,el.id) for cid,contents in data.items() for el in contents)  
-    db.multiQuery("INSERT INTO {}contents (container_id,position,element_id) VALUES(?,?,?)"
-                    .format(db.prefix),params)
+    if len(newContents):
+        params = ((cid,el.position,el.id) for cid,contents in data.items() for el in contents)  
+        db.multiQuery("INSERT INTO {}contents (container_id,position,element_id) VALUES(?,?,?)"
+                        .format(db.prefix),params)
                     
     # Update element counter of changed containers
     updateElementsCounter(data.keys())
 
     # Set toplevel flag of all contents to 0
-    contents = [element.id for element in itertools.chain.from_iterable(data.values())]
-    db.query("UPDATE {}elements SET toplevel = 0 WHERE id IN ({})"
-                .format(db.prefix,db.csList(contents)))
+    if len(newContents):
+        db.query("UPDATE {}elements SET toplevel = 0 WHERE id IN ({})"
+                    .format(db.prefix,db.csList(newContents)))
                 
     # Finally update the toplevel flag of elements that got removed from the contents
     updateToplevelFlags((id for id in oldContents if not id in newContents))
@@ -53,6 +62,8 @@ def setContents(data):
 
 
 def updateElementsCounter(elids = None):
+    """Update the elements counter. If *elids* is a list of elements-ids, the counters of those elements will
+    be updated. If *elids* is None, all counters will be set to their correct value."""
     if elids is not None:
         cslist = db.csList(elids)
         if cslist == '':
@@ -67,6 +78,8 @@ def updateElementsCounter(elids = None):
         
         
 def updateToplevelFlags(elids = None):
+    """Update the toplevel flags. If *elids* is a list of elements-ids, the flags of those elements will
+    be updated. If *elids* is None, all flags will be set to their correct value."""
     if elids is not None:
         cslist = db.csList(elids)
         if cslist == '':
@@ -81,6 +94,7 @@ def updateToplevelFlags(elids = None):
 
 
 def addFile(elid,path,hash,length):
+    """Add a file with the given data to the file table."""
     db.query("INSERT INTO {}files (element_id,path,hash,length) VALUES (?,?,?,?)"
                 .format(db.prefix),elid,path,hash,length)
                 
@@ -148,3 +162,13 @@ def changeTagValue(elids,tag,oldValue,newValue):
 def changeSortValue(tag, valueId, sortValue):
     db.query("UPDATE {}values_{} SET sort_value = ? WHERE tag_id = ? AND id = ?".format(db.prefix, tag.type),
              sortValue, tag.id, valueId)
+
+
+def setTags(elid,tags):
+    """Set the tags of the element with it *elid* to the tags.Storage-instance *tags*, removing all existing
+    tags of that element."""
+    db.query("DELETE FROM {}tags WHERE element_id = ?".format(db.prefix),elid)
+    for tag in tags:
+        db.multiQuery("INSERT INTO {}tags (element_id,tag_id,value_id) VALUES (?,?,?)".format(db.prefix),
+                      [(elid,tag.id,db.idFromValue(tag,value,insert=True)) for value in tags[tag]])
+            

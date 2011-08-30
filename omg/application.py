@@ -104,7 +104,7 @@ def run(cmdConfig = []):
     except IOError:
         logger.error("Another instance is already running, quitting.")
         sys.exit(-1)
-        
+    
     # Load remaining modules
     from omg import tags, search
     search.init()
