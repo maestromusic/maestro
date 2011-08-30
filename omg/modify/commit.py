@@ -47,9 +47,6 @@ def commitEditors():
     for oldId, element in newElements.items():
         element.id = idMap[oldId]
         dbElements[element.id] = element
-    for element in dbElements.values():
-        if element.isContainer():
-            element.printStructure()
    
     # now we need to load the original states of the elements from the database, in order to be able
     # to undo the commit.

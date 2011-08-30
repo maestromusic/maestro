@@ -64,11 +64,6 @@ def commit(changes):
     do not need to have any loaded data besides position and id."""
     logger.debug("Committing {} elements".format(len(changes)))
     
-    print('2')
-    for changesTuple in changes.values():
-        element = changesTuple[1]
-        if element.isContainer():
-            element.printStructure()
     # Tags
     changeTags({oldElement: (oldElement.tags,newElement.tags)
                     for oldElement,newElement in changes.values()},emitEvent=False)
@@ -85,12 +80,6 @@ def commit(changes):
             
     if len(contents) > 0:
         db.write.setContents(contents)
-    
-    print('3')
-    for changesTuple in changes.values():
-        element = changesTuple[1]
-        if element.isContainer():
-            element.printStructure()
     
     dispatcher.changes.emit(events.ElementChangeEvent(REAL,{id: tuple[1] for id,tuple in changes.items()}, True))
 
