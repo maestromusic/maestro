@@ -38,12 +38,12 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
         if isinstance(event, modify.events.ElementChangeEvent):
             self.handleElementChangeEvent(event)
         elif isinstance(event, modify.events.ElementsDeletedEvent):
-            print('real event incoming -- resetting editor ...')
+            # real event incoming -- resetting editor ...
             self.clear()
         elif isinstance(event, modify.events.TagTypeChangedEvent):
             pass
         else:
-            print('WARNING UNKNOWN EVENT {}, RESETTING EDITOR'.format(event))
+            logger.warning('WARNING UNKNOWN EVENT {}, RESETTING EDITOR'.format(event))
             self.clear()
             
     def handleElementChangeEvent(self, event):
@@ -58,7 +58,8 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
                         return # single element event -> no more IDs to check
                     
                     elif isinstance(event, modify.events.PositionChangeEvent) or \
-                            isinstance(event, modify.events.NewElementChangeEvent):
+                            isinstance(event, modify.events.NewElementChangeEvent) or \
+                            isinstance(event, modify.events.SingleTagChangeEvent):
                         event.applyTo(node)
                         self.dataChanged.emit(modelIndex.child(0, 0), modelIndex.child(node.getContentsCount()-1, 0))
                         
@@ -87,7 +88,7 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
                         else:
                             event.applyTo(node)
                     else:
-                        print('unknown element change event: {}'.format(event))
+                        logger.warning('unknown element change event: {}'.format(event))
                     self.dataChanged.emit(modelIndex, modelIndex)
            
     def setContents(self,contents):
@@ -172,7 +173,7 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
                             after = element.copy()
                             after.position += shift
                             command = modify.ModifySingleElementCommand(modify.EDITOR,before,after,'change position')
-                            modify.push(modify.EDITOR, command)
+                            modify.push(command)
                              
             insertions = dict()
             insertions[parent.id] = [(row, insert_nodes)]

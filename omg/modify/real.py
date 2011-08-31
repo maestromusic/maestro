@@ -21,22 +21,18 @@ logger = logging.getLogger("omg.modify")
 
 def createNewElements(elements):
     """Create new elements. *elements* is a list of preliminary elements (i.e. element instances with
-    negative ids). This method will insert new entries in the elements and file table and emit a
-    NewElementChangeEvent (mapping the old negative ids to copies of the elements with their shiny new
-    positive ids). It won't save any contents, tags or flags though.
+    negative ids). This method will insert new entries in the elements and file table. It won't save
+    any contents, tags or flags though.
     
     This method will return a dict mapping old to new ids.
     """
     result = {}
-    changedElements = {}
     for element in elements:
         assert element.id < 0
         oldId = element.id
         newId = db.write.createNewElement(element.isFile(),element.major if element.isContainer() else False)
         if element.isFile():
             db.write.addFile(newId,element.path,None,element.length)
-        
-        db.write.setTags(newId,element.tags)
         
         result[element.id] = newId
     return result
@@ -74,7 +70,7 @@ def commit(changes):
     if len(contents) > 0:
         db.write.setContents(contents)
     
-    #dispatcher.changes.emit(events.ElementChangeEvent(REAL,{id: tuple[1] for id,tuple in changes.items()}, True))
+    dispatcher.changes.emit(events.ElementChangeEvent(REAL,{id: tuple[1] for id,tuple in changes.items()}, True))
 
 
 def addTagValue(tag,value,elements): 
@@ -158,6 +154,9 @@ def changeTags(changes, emitEvent = True):
     successful = [] # list of elements where the file was written successfully
     for element,changeTuple in changes.items():
         oldTags,newTags = changeTuple
+        logger.debug('element: {}'.format(element))
+        logger.debug('old tags: {}'.format(oldTags))
+        logger.debug('new tags: {}'.format(newTags))
         if oldTags == newTags:
             continue
         

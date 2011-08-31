@@ -12,6 +12,7 @@ from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
 from .. import constants, models, tags, utils, strutils, modify
+from ..modify import REAL
 from . import simplelistmodel
 
 translate = QtCore.QCoreApplication.translate
@@ -207,12 +208,13 @@ class UndoCommand(QtGui.QUndoCommand):
         - text: a text for the UndoCommand (confer QtGui.QUndoCommand).
         
     \ """
-    def __init__(self,model,method,*params,text=None):
+    def __init__(self,model,method,*params,text=None, level = REAL):
         QtGui.QUndoCommand.__init__(self,text)
         #print("REDO: {} [{}]".format(method.__name__,", ".join(str(p) for p in params)))
         self.model = model
         self.method = method
         self.params = params
+        self.level = level
         if method.__name__ == 'insertRecord':
             pos,record = params
             self.undoMethod = model.inner.removeRecord
@@ -390,7 +392,7 @@ class TagEditorModel(QtCore.QObject):
     def _endMacro(self):
         """End a macro on the correct UndoStack."""
         if self.saveDirectly:
-            modify.endMacro(self.level)
+            modify.endMacro()
         else: self.undoStack.endMacro()
         
     def addRecord(self,record):
@@ -472,7 +474,7 @@ class TagEditorModel(QtCore.QObject):
         else:
             # I am not sure, but the order of changing, moving end emitting commonChanged maybe important
             # Change the record
-            command = UndoCommand(self,self.inner.changeRecord,oldRecord.tag,oldRecord,newRecord)
+            command = UndoCommand(self,self.inner.changeRecord,oldRecord.tag,oldRecord,newRecord, level = self.level)
             self._push(command)
             # Maybe we have to move the record as the common records are sorted to the top
             if oldRecord.isCommon() != newRecord.isCommon():
@@ -520,7 +522,7 @@ class TagEditorModel(QtCore.QObject):
                 command = UndoCommand(self,self.inner.changeRecord,oldTag,record,newRecord)
                 self._push(command)
             # Finally change the tag itself
-            command = UndoCommand(self,self.inner.changeTag,oldTag,newTag)
+            command = UndoCommand(self,self.inner.changeTag,oldTag,newTag, level = self.level)
             self._push(command)
         else: # Now we have to add all converted records to the existing tag
             # The easiest way to do this is to remove all records and add the converted records again
@@ -584,7 +586,7 @@ class TagEditorModel(QtCore.QObject):
         pos = self.inner.tags[record.tag].index(record)
         self._beginMacro(self.tr("Split"))
         # First remove the old value
-        command = UndoCommand(self,self.inner.removeRecord,record)
+        command = UndoCommand(self,self.inner.removeRecord,record, level = self.level)
         self._push(command)
         # Now create new records and insert them at pos
         for value in splittedValues:
@@ -610,7 +612,7 @@ class TagEditorModel(QtCore.QObject):
         for record, value in zip(records,newValues):
             newRecord = record.copy()
             newRecord.value = value
-            command = UndoCommand(self,self.inner.changeRecord,record.tag,record,newRecord)
+            command = UndoCommand(self,self.inner.changeRecord,record.tag,record,newRecord, level = self.level)
             self._push(command)
         self._endMacro()
 
@@ -629,7 +631,7 @@ class TagEditorModel(QtCore.QObject):
             
             newRecord = record.copy()
             newRecord.elementsWithValue = self.inner.elements[:] # copy the list!
-            command = UndoCommand(self,self.inner.changeRecord,record.tag,record,newRecord)
+            command = UndoCommand(self,self.inner.changeRecord,record.tag,record,newRecord, level = self.level)
             self._push(command)
             
             if pos != newPos:

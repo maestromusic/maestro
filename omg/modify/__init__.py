@@ -92,12 +92,13 @@ class CommitCommand(UndoCommand):
         QtGui.QUndoCommand.__init__(self)
         self.level = REAL
         self.setText('commit')
+        # store contents of all open editors in self.editorRoots
         from ..gui import mainwindow
         models = [dock.editor.model() for dock in mainwindow.mainWindow.getWidgets('editor')]
         self.editorRoots = [model.root.copy() for model in models]
         
-        self.newElements = dict()
-        self.dbElements = dict()
+        # save current state in the editors in dicts mapping id->element
+        self.newElements, self.dbElements = dict(), dict()
         for element in itertools.chain( *(root.getAllNodes(skipSelf = True) for root in self.editorRoots) ):
             if element.isInDB():
                 if not element.id in self.dbElements:
@@ -115,6 +116,13 @@ class CommitCommand(UndoCommand):
             originalElements[element.id] = origEl
         
     def redo(self):
+        """Perform the commit. This is done by the following steps:
+          - copy contents of all editors, clear them afterwards
+          - generate real IDs for new elements
+          - call real.commit() for all elements contained in the editors; this will also
+            invoke a ElementsChangeEvent for all the changes (new elements will have a negative
+            id as key in the dictionary)
+          - restore the (committed) content in the editors by an appropriate event"""
         from .. import models
         # clear all editors by event
         emptyRoots = [root.copy(contents = []) for root in self.editorRoots]
@@ -127,6 +135,8 @@ class CommitCommand(UndoCommand):
         for elem in itertools.chain( *(root.getAllNodes(skipSelf = True) for root in self.editorRoots) ):
             if not elem.isInDB():
                 elem.id = self.idMap[elem.id]
+                
+        # commit all the changes
         changes = {}
         for id, elem in self.newElements.items():
             changes[self.idMap[id]] = ( models.Element.fromId(self.idMap[id]), elem )
@@ -134,11 +144,16 @@ class CommitCommand(UndoCommand):
             changes[id] = ( self.originalElements[id], self.dbElements[id] )
         real.commit(changes)
         
+        # notify the editors to display the new commited content
         dispatcher.changes.emit(events.ElementChangeEvent(REAL, {root.id:root for root in self.editorRoots}, True))
         
         
     def undo(self):
-        
+        """Undo the commit. This is relatively easy:
+          - empty all editors
+          - revert the changes for elements which previously existed in the DB
+          - delete elements which didn't; if they are files, restore the original tags
+        """
         # clear the editors
         emptyRoots = [root.copy(contents = []) for root in self.editorRoots]
         dispatcher.changes.emit(events.ElementChangeEvent(REAL, {root.id:root for root in emptyRoots}, True))
@@ -331,7 +346,7 @@ def merge(level, parent, positions, newTitle, removeString, adjustPositions):
     if stack.state() == REAL:
         stack.setActiveStack(stack.editorStack)
 
-    stack.editorStack.beginMacro(translate('modify', 'merge elements'))
+    beginMacro(EDITOR, translate('modify', 'merge elements'))
     copies = []
     insertPosition = positions[0]
     insertElementPosition = parent.contents[insertPosition].position
@@ -344,16 +359,16 @@ def merge(level, parent, positions, newTitle, removeString, adjustPositions):
             elemC.position = len(copies)
             if tags.TITLE in elemC.tags:
                 elemC.tags[tags.TITLE] = [ t.replace(removeString, '') for t in elemC.tags[tags.TITLE] ]
-            pushEditorCommand(ModifySingleElementCommand(EDITOR, element, elemC))
+            push(ModifySingleElementCommand(EDITOR, element, elemC))
         elif adjustPositions:
             changePosition(EDITOR, element, element.position - len(copies) + 1)
-    pushEditorCommand(removeCommand)        
+    push(removeCommand)        
     t = tags.findCommonTags(copies, True)
     t[tags.TITLE] = [newTitle]
     newContainer = Container(id = newEditorId(), contents = copies, tags = t, position = insertElementPosition)
     insertions = { parent.id : [(insertPosition, [newContainer])] }
-    pushEditorCommand(InsertElementsCommand(EDITOR, insertions))
-    stack.editorStack.endMacro()
+    push(InsertElementsCommand(EDITOR, insertions))
+    endMacro()
     
 
 _currentEditorId = 0
@@ -406,18 +421,7 @@ class UndoGroup(QtGui.QUndoGroup):
         if self.editorStack is not None:
             self.removeStack(self.editorStack)
         self.editorStack = QtGui.QUndoStack()
-        #self.editorStack.indexChanged.connect(self._editorIndexChanged)
         self.addStack(self.editorStack)
-
-    def _editorIndexChanged(self, index):
-        if index == 0:
-            self.setActiveStack(self.mainStack)
-        else:
-            self.setActiveStack(self.editorStack)
-    
-    def clearEditorStack(self):
-        self._createEditorStack()
-        self.setActiveStack(self.mainStack)
     
 stack = UndoGroup()
 
