@@ -43,6 +43,11 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
         """Set the root of this model to *root* and reset (QTreeViews using this model will be reset, too)."""
         self.root = root
         self.reset()
+    
+    def clear(self):
+        self.beginResetModel()
+        self.root.contents = []
+        self.endResetModel()
         
     def data(self,index,role=Qt.EditRole):
         if not index.isValid():

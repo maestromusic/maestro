@@ -19,7 +19,7 @@ from . import dispatcher, events, REAL
 logger = logging.getLogger("omg.modify")
 
 
-def createNewElements(elements,tagsAttribute='tags'):
+def createNewElements(elements):
     """Create new elements. *elements* is a list of preliminary elements (i.e. element instances with
     negative ids). This method will insert new entries in the elements and file table and emit a
     NewElementChangeEvent (mapping the old negative ids to copies of the elements with their shiny new
@@ -36,16 +36,9 @@ def createNewElements(elements,tagsAttribute='tags'):
         if element.isFile():
             db.write.addFile(newId,element.path,None,element.length)
         
-        if hasattr(element,tagsAttribute):
-            db.write.setTags(newId,getattr(element,tagsAttribute))
+        db.write.setTags(newId,element.tags)
         
-        # Prepare result and changedElements
         result[element.id] = newId
-        copy = element.copy()
-        copy.id = newId
-        changedElements[oldId] = copy
-        
-    dispatcher.changes.emit(events.NewElementChangeEvent(changedElements))
     return result
 
 
@@ -81,7 +74,7 @@ def commit(changes):
     if len(contents) > 0:
         db.write.setContents(contents)
     
-    dispatcher.changes.emit(events.ElementChangeEvent(REAL,{id: tuple[1] for id,tuple in changes.items()}, True))
+    #dispatcher.changes.emit(events.ElementChangeEvent(REAL,{id: tuple[1] for id,tuple in changes.items()}, True))
 
 
 def addTagValue(tag,value,elements): 

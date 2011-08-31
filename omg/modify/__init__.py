@@ -7,7 +7,7 @@
 # published by the Free Software Foundation.
 #
 
-import copy
+import copy, itertools
 from collections import OrderedDict
 
 from PyQt4 import QtCore, QtGui
@@ -86,6 +86,91 @@ class UndoCommand(QtGui.QUndoCommand):
             undoEvent = events.ElementChangeEvent(self.level, undoChanges, contentsChanged = self.contentsChanged)
             dispatcher.changes.emit(undoEvent)
 
+class CommitCommand(UndoCommand):
+    
+    def __init__(self):
+        QtGui.QUndoCommand.__init__(self)
+        self.level = REAL
+        self.setText('commit')
+        from ..gui import mainwindow
+        models = [dock.editor.model() for dock in mainwindow.mainWindow.getWidgets('editor')]
+        self.editorRoots = [model.root.copy() for model in models]
+        
+        self.newElements = dict()
+        self.dbElements = dict()
+        for element in itertools.chain( *(root.getAllNodes(skipSelf = True) for root in self.editorRoots) ):
+            if element.isInDB():
+                if not element.id in self.dbElements:
+                    self.dbElements[element.id] = element
+            else:
+                if not element.id in self.newElements:
+                    self.newElements[element.id] = element
+        
+        #load original states of in-db elements (needed for undo)
+        self.originalElements = dict()
+        for element in self.dbElements.values():
+            origEl = Element.fromId(element.id, loadData = True)
+            if origEl.isContainer():
+                origEl.loadContents(recursive = False, loadData = False)
+            originalElements[element.id] = origEl
+        
+    def redo(self):
+        from .. import models
+        # clear all editors by event
+        emptyRoots = [root.copy(contents = []) for root in self.editorRoots]
+        dispatcher.changes.emit(events.ElementChangeEvent(REAL, {root.id:root for root in emptyRoots}, True))
+        
+        # assign new IDs to all elements which have editor IDs so far
+        self.idMap = real.createNewElements(self.newElements.values())
+        
+        # store new IDs in the editors (old ones are still available via self.idMap
+        for elem in itertools.chain( *(root.getAllNodes(skipSelf = True) for root in self.editorRoots) ):
+            if not elem.isInDB():
+                elem.id = self.idMap[elem.id]
+        changes = {}
+        for id, elem in self.newElements.items():
+            changes[self.idMap[id]] = ( models.Element.fromId(self.idMap[id]), elem )
+        for id, elem in self.dbElements.items():
+            changes[id] = ( self.originalElements[id], self.dbElements[id] )
+        real.commit(changes)
+        
+        dispatcher.changes.emit(events.ElementChangeEvent(REAL, {root.id:root for root in self.editorRoots}, True))
+        
+        
+    def undo(self):
+        
+        # clear the editors
+        emptyRoots = [root.copy(contents = []) for root in self.editorRoots]
+        dispatcher.changes.emit(events.ElementChangeEvent(REAL, {root.id:root for root in emptyRoots}, True))
+        
+        # undo changes to elements that were in the db before
+        changes = {}
+        for id, elem in self.dbElements.items():
+            changes[id] = ( self.dbElements[id], self.originalElements[id] )
+        real.commit(changes)
+        # write original tags to files which were newly added
+        tagChanges = {}
+        for elem in self.newElements.values():
+            if elem.isFile():
+                tagChanges[elem] = (elem.tags, elem.fileTags)
+        real.changeTags(tagChanges, emitEvent = False) 
+        
+        # delete all elements which had editorIDs before
+        real.deleteElements([el.id for el in self.newElements.values() ])
+        
+        # restore original element IDs
+        revIdMap = {b:a for (a,b) in self.idMap.items()}
+        for elem in itertools.chain( *(root.getAllNodes(skipSelf = True) for root in self.editorRoots) ):
+            elem.id = revIdMap[elem.id]
+
+def commitEditors():
+    command = CommitCommand()
+    try:
+        push(command)
+    except StackChangeRejectedException:
+        pass
+          
+        
 class ModifySingleElementCommand(UndoCommand):
     """A specialized undo command for the modification of a single element (tags, position, ..., but no 
     contents)."""
@@ -194,24 +279,6 @@ class InsertElementsCommand(UndoCommand):
     def undo(self):
         dispatcher.changes.emit(events.RemoveElementsEvent(
               self.level, dict((pid, [ (tup[0], len(tup[1]) ) for tup in reversed(elemSet)]) for pid,elemSet in self.insertions.items())))
-
-
-class CreateNewElementsCommand(UndoCommand):
-    """A command to create new elements in the database from editor elements with negative IDs.
-    This command is always in the REAL layer, therefore the constructor has no *level* argument."""
-    
-    level = REAL
-    
-    def __init__(self, elements, text = 'create new elements'):
-        """Initalize the command with a list of elements and an optional text describing the command."""
-        QtGui.QUndoCommand.__init__(self)
-        self.elements = [element.copy() for element in elements]
-    
-    def redo(self):
-        self.idMap = real.createNewElements(self.elements,tagsAttribute='fileTags')
-        
-    def undo(self):
-        real.deleteElements(self.idMap.values())
 
 class TagUndoCommand(UndoCommand):
     """An UndoCommand that changes only tags. The difference to UndoCommand is that the dict *changes*
@@ -332,6 +399,7 @@ class UndoGroup(QtGui.QUndoGroup):
     editor command history will be lost. Continue?', buttons = QtGui.QMessageBox.No | QtGui.QMessageBox.Yes)
             if ans != QtGui.QMessageBox.Yes:
                 raise StackChangeRejectedException()
+            self.editorStack.clear()
         self.setActiveStack(self.mainStack if level == REAL else self.editorStack)
             
     def _createEditorStack(self):

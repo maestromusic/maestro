@@ -39,10 +39,12 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
             self.handleElementChangeEvent(event)
         elif isinstance(event, modify.events.ElementsDeletedEvent):
             print('real event incoming -- resetting editor ...')
-            self.setRoot(RootNode())
+            self.clear()
+        elif isinstance(event, modify.events.TagTypeChangedEvent):
+            pass
         else:
             print('WARNING UNKNOWN EVENT {}, RESETTING EDITOR'.format(event))
-            self.setRoot(RootNode())
+            self.clear()
             
     def handleElementChangeEvent(self, event):
         for id in event.ids():
@@ -58,7 +60,7 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
                     elif isinstance(event, modify.events.PositionChangeEvent) or \
                             isinstance(event, modify.events.NewElementChangeEvent):
                         event.applyTo(node)
-                        self.dataChanged.emit(modelIndex.child(0, 0), modelIndex.child(len(node.contents)-1, 0))
+                        self.dataChanged.emit(modelIndex.child(0, 0), modelIndex.child(node.getContentsCount()-1, 0))
                         
                     elif isinstance(event, modify.events.InsertElementsEvent):
                         for pos, newElements in event.insertions[id]:
@@ -176,7 +178,7 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
             insertions[parent.id] = [(row, insert_nodes)]
             insertCommand = modify.InsertElementsCommand(modify.EDITOR, insertions, 'drop->insert')
             modify.push(insertCommand)
-            modify.endMacro(modify.EDITOR)
+            modify.endMacro()
                 
         elif mimeData.hasFormat("text/uri-list"):
             # easy case: files and/or folders are dropped from outside or from a filesystembrowser.

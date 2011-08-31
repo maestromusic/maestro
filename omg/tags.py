@@ -433,7 +433,7 @@ def init():
     # all tags need to be created already.
     for tag in _tagsById.values():
         try:
-            tag.sortTags = tuple(_tagsById[int(id)] for id in tag.sortTags.split(','))
+            tag.sortTags = tuple(_tagsById[int(id)] for id in tag.sortTags.split(',') if id != "")
         except KeyError:
             logger.error("Tag {} contains an invalid sortTag.".format(tag.name))
             tag.sortTags = (TITLE,)
