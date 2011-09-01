@@ -553,6 +553,9 @@ def _loadData(element):
     before an element leaves the browser."""
     if element.tags is None:
         element.loadTags()
+    
+    if element.flags is None:
+        element.flags = db.flags(element.id)
         
     if element.position is None and isinstance(element.getParent(),Element):
         position = db.position(element.getParent().id,element.id)

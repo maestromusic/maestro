@@ -267,10 +267,12 @@ class Element(Node):
         
     def copy(self,contents=None,copyTags=True):
         """Reimplementation of Node.copy: If *copyTags* is True, the element's copy will contain a copy of
-        this node's tags.Storage-instance. Otherwise the tags will be copied by reference."""
+        this node's tags.Storage-instance and its flaglist. Otherwise the tags and flags will be copied by
+        reference."""
         newNode = Node.copy(self,contents)
         if copyTags:
             newNode.tags = self.tags.copy() if self.tags is not None else None
+            newNode.flags = self.flags[:] if self.flags is not None else None
         return newNode
     
     def copyFrom(self, other, copyContents = False):
@@ -278,6 +280,8 @@ class Element(Node):
             self.setContents([c.copy() for c in other.contents])
         if self.tags != other.tags:
             self.tags = other.tags.copy()
+        if self.flags != other.flags:
+            self.flags = other.flags[:]
         self.position = other.position
         if self.isFile():
             self.path = other.path
@@ -301,7 +305,7 @@ class Element(Node):
         if recursive: 
             for element in self.getContents(): 
                 element.loadTags(recursive, fromFS) 
-         
+
     def hasCover(self):
         """Return whether this element has a cover."""
         return self.isInDB() and covers.hasCover(self.id)
@@ -333,9 +337,15 @@ class Element(Node):
         return formatter.Formatter(self).title()
     
     def toolTipText(self):
+        parts = []
         if self.tags is not None:
-            return '\n'.join( ('{t}: {v}'.format(t = tag.translated(), v = ', '.join(map(str, values))) for (tag,values) in self.tags.items() ))
-        return str(self)
+            parts.append('\n'.join('{}: {}'.format(tag.translated(),', '.join(map(str,values)))
+                                    for tag,values in self.tags.items()))
+        if self.flags is not None and len(self.flags) > 0:
+            parts.append('Flags: ' + ', '.join(flag.name for flag in self.flags))
+        if len(parts) > 0:
+            return '\n'.join(parts)
+        else: return str(self)
     
     def __str__(self):
         if self.tags is not None:
@@ -348,7 +358,7 @@ class Container(Element):
     contents = None
     
     """Element-subclass for containers."""
-    def __init__(self, id, contents, tags, position, major = True):
+    def __init__(self, id, contents, tags, flags, position, major = True):
         """Initialize this container, optionally with a contents list.
         Note that the list won't be copied but the parents will be changed to this container."""
         self.id = id
@@ -356,17 +366,20 @@ class Container(Element):
             self.contents = []
         else: self.setContents(contents)
         self.tags = tags
+        self.flags = flags
         self.position = position
         self.major = major
     
     @staticmethod
-    def fromId(id, *, contents=None, tags=None, position=None, parentId=None, loadData=True):
+    def fromId(id, *, contents=None, tags=None, flags=None, position=None, parentId=None, loadData=True):
         if loadData:
             if tags is None:
                 tags = db.tags(id)
+            if flags is None:
+                flags = db.flags(id)
             if position is None and parentId is not None:
                 position = db.position(parentId,id)
-        return Container(id,contents,tags,position)
+        return Container(id,contents,tags,flags,position)
 
     def isContainer(self):
         return True
@@ -412,12 +425,13 @@ class Container(Element):
 
 
 class File(Element):
-    def __init__(self, id, tags, path, length, position):
+    def __init__(self, id, tags, flags, path, length, position):
         """Initialize this element with the given id, which must be an integer or None (for external files).
         Optionally you may specify a tags.Storage object holding the tags of this element and/or a file path.
         """
         self.id = id
         self.tags = tags
+        self.flags = flags
         self.length = length
         self.position = position
         if path is not None and not isinstance(path,str):
@@ -425,17 +439,19 @@ class File(Element):
         self.path = path
     
     @staticmethod
-    def fromId(id, *, tags=None, path=None, length=None, position=None, parentId=None, loadData=True):
+    def fromId(id,*,tags=None,flags=None,path=None,length=None,position=None,parentId=None,loadData=True):
         if loadData:
             if tags is None:
                 tags = db.tags(id)
+            if flags is None:
+                flags = db.flags(id)
             if path is None:
                 path = db.path(id)
             if length is None:
                 length = db.length(id)
             if position is None and parentId is not None:
                 position = db.position(parentId,id)
-        return File(id,tags,path,length,position)
+        return File(id,tags,flags,path,length,position)
         
     @staticmethod
     def fromFilesystem(path):

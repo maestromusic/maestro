@@ -104,7 +104,7 @@ class FlagView(QtGui.QTableWidget):
     
         for row,sqlRow in enumerate(result):
             id,name = sqlRow
-            flagType = flags.FlagType(id,name)
+            flagType = flags.Flag(id,name)
             column = 1 if row >= rowCount else 0
             
             item = QtGui.QTableWidgetItem()

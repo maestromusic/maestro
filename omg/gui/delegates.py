@@ -92,7 +92,7 @@ class BrowserDelegate(abstractdelegate.AbstractDelegate):
         elif isinstance(node,models.Element):
             element = node
             if element.tags is None:
-                element.loadTags()
+                browser._loadData(element)
             f = formatter.Formatter(element)
             if element.isFile():
                 # First find out whether the file has a cover (usually not...)

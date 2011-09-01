@@ -12,7 +12,7 @@ from . import database as db, modify, logging
 logger = logging.getLogger(__name__)
 
 
-class FlagType:
+class Flag:
     """A flagtype with an id and a name. At first glance flags are like tags, but in fact they are much
     easier, because they have no values, valuetypes, translations and because they are not stored in files.
     
@@ -27,10 +27,10 @@ class FlagType:
         return self.name
     
     def __eq__(self,other):
-        return isinstance(other,FlagType) and self.id == other.id
+        return isinstance(other,Flag) and self.id == other.id
     
     def __ne__(self,other):
-        return not isinstance(other,FlagType) or self.id != other.id
+        return not isinstance(other,Flag) or self.id != other.id
     
     def __hash__(self):
         return self.id
@@ -42,11 +42,11 @@ def get(identifier):
     if isinstance(identifier,int):
         name = db.query("SELECT name FROM {}flag_names WHERE id = ?"
                         .format(db.prefix),identifier).getSingle()
-        return FlagType(identifier,name)
+        return Flag(identifier,name)
     elif isinstance(identifier,str):
         id = db.query("SELECT id FROM {}flag_names WHERE name = ?"
                         .format(db.prefix),identifier).getSingle()
-        return FlagType(id,identifier)
+        return Flag(id,identifier)
     elif isinstance(identifier,FlagType):
         return identifier
     else: raise ValueError("identifier must be either int or string or FlagType.")
@@ -75,7 +75,7 @@ def addFlagType(name):
     
     logger.info("Adding new flag '{}'.".format(name))
     id = db.query("INSERT INTO {}flag_names (name) VALUES (?)".format(db.prefix),name).insertId()
-    newFlag = FlagType(id,name)
+    newFlag = Flag(id,name)
     modify.dispatcher.changes.emit(modify.events.FlagTypeChangedEvent(modify.ADDED,newFlag))
     return newFlag
 
@@ -100,7 +100,7 @@ def changeFlagType(flagType,name):
     
     logger.info("Changing flag '{}' to '{}'.".format(flagType.name,name))
     db.query("UPDATE {}flag_names SET name = ? WHERE id = ?".format(db.prefix),name,flagType.id)
-    newFlagType = FlagType(flagType.id,name)
+    newFlagType = Flag(flagType.id,name)
     modify.dispatcher.changes.emit(modify.events.FlagTypeChangedEvent(modify.CHANGED,newFlagType))
     return newFlagType
         

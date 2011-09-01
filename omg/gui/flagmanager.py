@@ -66,7 +66,7 @@ class FlagManager(QtGui.QDialog):
             
         for i,row in enumerate(result):
             id,name,count = row
-            flagType = flags.FlagType(id,name)
+            flagType = flags.Flag(id,name)
             
             column = 0
             item = QtGui.QTableWidgetItem(name)
