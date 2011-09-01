@@ -13,7 +13,7 @@ from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
 from .. import database as db, config, search, constants, utils, tags, modify, flags
-from ..search import searchbox
+from ..search import searchbox, criteria as criteriaModule
 from . import mainwindow, treeview, browserdialog, delegates, tageditor, tagwidgets
 from ..models import browser as browsermodel, Element
                          
@@ -74,7 +74,7 @@ class Browser(QtGui.QWidget):
         - Hidden values: Values from values_varchar with the hidden flag are stuffed into HiddenValueNodes
           (unless the showHiddenValues option is set to True).
         - Elements that don't have a value in any of the tags used in a taglayer are stuffed into a
-          VariousNode (if a container has no artist-tag the reason ist most likely that its children have
+          VariousNode (if a container has no artist-tag the reason is most likely that its children have
           different artists).
     
     Some of the more fancy features that only affect how nodes are displayed, include
@@ -91,7 +91,7 @@ class Browser(QtGui.QWidget):
     """
     views = None # List of BrowserTreeViews
     table = db.prefix + "elements" # The MySQL-table whose contents are currently displayed
-    
+
     # Whether or not hidden values should be displayed.
     showHiddenValues = False
     
@@ -148,7 +148,10 @@ class Browser(QtGui.QWidget):
                 viewsToRestore = state['views']
             if 'flags' in state:
                 self.flags = [flags.get(name) for name in state['flags'] if flags.exists(name)]
-                
+        
+        if len(self.flags) > 0:
+            self.search()
+            
         self.views = []
         # Convert tag names to tags, leaving the nested list structure unchanged
         self.createViews(utils.mapRecursively(tags.get,viewsToRestore))
@@ -175,6 +178,9 @@ class Browser(QtGui.QWidget):
         if self.searchRequest is not None:
             self.searchRequest.stop()
         criteria = self.searchBox.getCriteria()
+        if len(self.flags) > 0:
+            # insert the flag criterion at the beginning, so that it is executed first
+            criteria = [criteriaModule.FlagsCriterion(self.flags)] + criteria
         if len(criteria) > 0:
             self.table = self.bigResult
             self.searchRequest = browsermodel.searchEngine.search(
@@ -192,7 +198,7 @@ class Browser(QtGui.QWidget):
             view.setParent(None)
         self.views = []
         for layers in layersList:
-            newView = BrowserTreeView(self,layers,self.flags)
+            newView = BrowserTreeView(self,layers)
             self.views.append(newView)
             newView.selectionModel().selectionChanged.connect(
                                     functools.partial(self.selectionChanged.emit,newView.selectionModel()))
@@ -210,10 +216,10 @@ class Browser(QtGui.QWidget):
             view.setShowHiddenValues(showHiddenValues)
     
     def setFlags(self,flagList):
+        """Set the flags the browser should search for."""
         if flagList != self.flags:
             self.flags = flagList[:]
-            for view in self.views:
-                view.setFlags(self.flags)
+            self.search()
             
     def _handleOptionButton(self):
         """Open the option dialog."""
@@ -236,12 +242,11 @@ class Browser(QtGui.QWidget):
                 view.model().reset()
                 view.startAutoExpand()
 
+
 class TagValueAction(QtGui.QAction):
-    
     tagActionTriggered = QtCore.pyqtSignal([object, int])
     
     def __init__(self, tag, valueId, parent):
-        
         super().__init__("", parent)
         super().setText(self.tr('edit value [as {0}]'.format(tag)))
         self.triggered.connect(self._handleAction)
@@ -250,12 +255,13 @@ class TagValueAction(QtGui.QAction):
     
     def _handleAction(self):
         self.tagActionTriggered.emit(self.tag, self.valueId)
-        
+
+
 class BrowserTreeView(treeview.TreeView):
     """TreeView for the Browser. A browser may contain more than one view each using its own model."""
     _autoExpanding = False
     
-    def __init__(self,parent,layers,flags):
+    def __init__(self,parent,layers):
         """Initialize this TreeView with the given parent (which must be the browser-widget) and the given
         layers. This also will create a BrowserModel for this treeview (Note that each view of the browser
         uses its own model). *layers* must be a list of tag-lists. For each entry in *layers* a tag-layer
@@ -266,7 +272,7 @@ class BrowserTreeView(treeview.TreeView):
         """
         treeview.TreeView.__init__(self,parent)
         self.contextMenuProviderCategory = 'browser'
-        self.setModel(browsermodel.BrowserModel(parent.table,layers,flags,parent,self))
+        self.setModel(browsermodel.BrowserModel(parent.table,layers,parent,self))
         self.setItemDelegate(delegates.BrowserDelegate(self,self.model()))
         #self.doubleClicked.connect(self._handleDoubleClicked)
     
@@ -281,11 +287,7 @@ class BrowserTreeView(treeview.TreeView):
         super().contextMenuProvider(actions, currentIndex)
     
     def _handleValueEditAction(self):
-        
         tagwidgets.TagValuePropertiesWidget.showDialog()
-                
-    def setFlags(self,flagList):
-        self.model().setFlags(flagList)
 
     def startAutoExpand(self):
         """Start AutoExpand: Calculate the height of all nodes with depth 1. If they fit into the view and
