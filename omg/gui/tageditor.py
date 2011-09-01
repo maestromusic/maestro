@@ -12,8 +12,8 @@ from PyQt4.QtCore import Qt
 import itertools, os.path
 
 from .. import constants, tags, strutils, utils, config, logging, modify
-from ..models import tageditormodel, simplelistmodel, File
-from ..gui import formatter, singletageditor, dialogs, tagwidgets, mainwindow, editor
+from ..models import tageditormodel, simplelistmodel, File, flageditor as flageditormodel
+from ..gui import formatter, singletageditor, dialogs, tagwidgets, mainwindow, editor, flageditor
 from ..gui.misc import widgetlist, dynamicgridlayout
 
 translate = QtCore.QCoreApplication.translate
@@ -39,10 +39,10 @@ class TagEditorDock(QtGui.QDockWidget):
         
     def _handleSelectionChanged(self,elements,source):
         if isinstance(source,editor.EditorTreeView):
-            self.editorEditorWidget.model.setElements(elements)
+            self.editorEditorWidget.setElements(elements)
             self.tabWidget.setCurrentWidget(self.editorEditorWidget)
         elif self.tabWidget.currentWidget() != self.editorEditorWidget:
-            self.realEditorWidget.model.setElements(elements)
+            self.realEditorWidget.setElements(elements)
         # else do nothing (if the user works in the editor, it would be annoying if each click e.g. in the 
         # browser would switch the tageditor to REAL-level.
         
@@ -111,6 +111,8 @@ class TagEditorWidget(QtGui.QWidget):
         self.model.tagChanged.connect(self._handleTagChanged)
         self.model.resetted.connect(self._handleReset)
 
+        self.flagModel = flageditormodel.FlagEditorModel(level,elements,saveDirectly)
+        
         self.undoAction = modify.createUndoAction(level,self,self.tr("Undo"))
         self.redoAction = modify.createRedoAction(level,self,self.tr("Redo"))
 
@@ -165,13 +167,23 @@ class TagEditorWidget(QtGui.QWidget):
         self.tagEditorLayout = dynamicgridlayout.DynamicGridLayout()
         self.tagEditorLayout.setColumnStretch(1,1) # Stretch the column holding the values
         self.viewport.layout().addLayout(self.tagEditorLayout)
+        flagEditorLayout = QtGui.QHBoxLayout()
+        self.viewport.layout().addLayout(flagEditorLayout)
+        flagEditorLayout.addWidget(QtGui.QLabel(self.tr("Flags: ")))
+        self.flagEditor = flageditor.FlagEditor(self.flagModel)
+        flagEditorLayout.addWidget(self.flagEditor)
+        flagEditorLayout.addStretch(1)
         self.viewport.layout().addStretch(1)
         self.scrollArea.setWidget(self.viewport)
 
         self.singleTagEditors = {}
         self.tagBoxes = {}
         self._handleReset()
-         
+        
+    def setElements(self,elements):
+        self.model.setElements(elements)
+        self.flagModel.setElements(elements)
+        
     def _insertSingleTagEditor(self,row,tag):
         self.tagEditorLayout.insertRow(row)
         

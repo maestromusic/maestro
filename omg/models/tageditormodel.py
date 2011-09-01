@@ -116,9 +116,9 @@ class InnerModel(QtCore.QObject):
     def __init__(self,elements):
         QtCore.QObject.__init__(self)
         self.elements = [element.copy(contents=[],copyTags=False) for element in elements]
-        self.createTags()
+        self.createRecords()
 
-    def createTags(self):
+    def createRecords(self):
         """Create the internal data structure from the list of elements stored in this model."""
         self.tags = utils.OrderedDict()
         for element in self.elements:
@@ -372,7 +372,7 @@ class TagEditorModel(QtCore.QObject):
         
     def reset(self):
         """Reset the tageditor."""
-        self.inner.createTags()
+        self.inner.createRecords()
         if not self.saveDirectly:
             self.undoStack.clear()
         self.resetted.emit()
