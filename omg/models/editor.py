@@ -266,7 +266,10 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
             elif tags.ALBUM in t:
                 album = ", ".join(t[tags.ALBUM])
                 if not album in albumsFoundByName:
-                    albumsFoundByName[album] = Container(id = modify.newEditorId(), contents = None, tags = tags.Storage(), position = None)
+                    albumsFoundByName[album] = Container(id = modify.newEditorId(),
+                                                         contents = None,
+                                                         tags = tags.Storage(),
+                                                         flags = None, position = None, major = True)
                 file.parent = albumsFoundByName[album]
                 albumsFoundByName[album].contents.append(file)
                 if file.position is None:

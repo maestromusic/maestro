@@ -461,7 +461,7 @@ class File(Element):
         if id is None:
             id = modify.editorIdForPath(rpath)
         real.read()
-        return File(tags = real.tags, length = real.length, path = rpath, position = real.position, id = id)
+        return File(tags = real.tags, flags = None, path = rpath, length = real.length, position = real.position, id = id)
 
     def hasContents(self):
         return False
