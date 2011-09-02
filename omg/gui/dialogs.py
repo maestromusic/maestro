@@ -85,3 +85,12 @@ class FancyTabbedPopup(QtGui.QFrame):
         if not self._entered:
             self.close()
         
+def question(title, text):
+    """Display a modal question dialog with the given *title* and *text*. Return True if the
+    user selected "Yes" and False otherwise."""
+    from . import mainwindow
+    ans = QtGui.QMessageBox.question(mainwindow.mainWindow,
+                                     title,
+                                     text,
+                                     buttons = QtGui.QMessageBox.No | QtGui.QMessageBox.Yes)
+    return ans == QtGui.QMessageBox.Yes

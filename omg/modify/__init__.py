@@ -410,9 +410,9 @@ class UndoGroup(QtGui.QUndoGroup):
 
     def setState(self, level):
         if level == REAL and self.state() == EDITOR:
-            ans = QtGui.QMessageBox.question(None, 'warning', 'you are about to switch from editor to real stack. The \
-    editor command history will be lost. Continue?', buttons = QtGui.QMessageBox.No | QtGui.QMessageBox.Yes)
-            if ans != QtGui.QMessageBox.Yes:
+            from ..gui.dialogs import question
+            if not question('warning', 'you are about to switch from editor to real stack. The \
+editor command history will be lost. Continue?'):
                 raise StackChangeRejectedException()
             self.editorStack.clear()
         self.setActiveStack(self.mainStack if level == REAL else self.editorStack)

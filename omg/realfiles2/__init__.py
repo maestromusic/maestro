@@ -97,18 +97,23 @@ class UFile(RealFile):
         self.tags = tags.Storage()
         if "TRACKNUMBER" in self._f.tags:
             self.position = self._parsePosition(self._f.tags["TRACKNUMBER"][0])  # Further tracknumbers are ignored
+        toDelete = []
         for key,values in self._f.tags.items():
             key = key.lower()
             if key in ["tracknumber", "discnumber"]:
                 self.ignoredTags[key] = values
-            elif key in options.tags.always_delete:
+            elif key in options.tags.always_delete and not key in toDelete:
                 # remove question after some testing
-                from PyQt4.QtGui import QMessageBox
-                if QMessageBox.question(None, 'delete tag?', 'always_delete tag {0} found. Really delete?'.format(key)) == QMessageBox.Ok:
-                    print('OMG OK')
-                    #TODO: really delete
+                from ..gui.dialogs import question
+                if question('really delete tag?', '"always_delete" tag *{0}* found in {1}. Really delete?'.format(key, self.path) ):
+                    toDelete.append(key)
             else:
-                tag = tags.get(key)
+                try:
+                    tag = tags.get(key)
+                except tags.UnknownTagError as e:
+                    e.values = values
+                    self.remove(toDelete)
+                    raise e
                 vals = []
                 for value in values:
                     value = self._valueFromString(tag, value)
@@ -117,6 +122,7 @@ class UFile(RealFile):
                 if len(vals) > 0:
                     self.tags.add(tag, *vals)
         self.length = self._f.length
+        self.remove(toDelete)
     
     def saveTags(self):
         self._ensureFileIsLoaded()
@@ -140,6 +146,7 @@ class UFile(RealFile):
         changed = False
         for t in tagList:
             if  str(t).upper() in self._f.tags:
+                logger.debug("removing tag {0} from {1}".format(t, self.path))
                 del self._f.tags[str(t).upper()]
                 changed = True
         if changed:
