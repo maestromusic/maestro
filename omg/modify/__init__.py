@@ -13,7 +13,7 @@ from collections import OrderedDict
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from .. import tags, logging, database as db, realfiles2
+from .. import tags, logging, database as db, realfiles2, models
 from . import events
 # At the end of the file we will import the submodules real and events.
 
@@ -94,8 +94,8 @@ class CommitCommand(UndoCommand):
         self.setText('commit')
         # store contents of all open editors in self.editorRoots
         from ..gui import mainwindow
-        models = [dock.editor.model() for dock in mainwindow.mainWindow.getWidgets('editor')]
-        self.editorRoots = [model.root.copy() for model in models]
+        editorModels = [dock.editor.model() for dock in mainwindow.mainWindow.getWidgets('editor')]
+        self.editorRoots = [model.root.copy() for model in editorModels]
         
         # save current state in the editors in dicts mapping id->element
         self.newElements, self.dbElements = dict(), dict()
@@ -110,10 +110,10 @@ class CommitCommand(UndoCommand):
         #load original states of in-db elements (needed for undo)
         self.originalElements = dict()
         for element in self.dbElements.values():
-            origEl = Element.fromId(element.id, loadData = True)
+            origEl = models.Element.fromId(element.id, loadData = True)
             if origEl.isContainer():
                 origEl.loadContents(recursive = False, loadData = False)
-            originalElements[element.id] = origEl
+            self.originalElements[element.id] = origEl
         
     def redo(self):
         """Perform the commit. This is done by the following steps:
@@ -129,8 +129,9 @@ class CommitCommand(UndoCommand):
         dispatcher.changes.emit(events.ElementChangeEvent(REAL, {root.id:root for root in emptyRoots}, True))
         
         # assign new IDs to all elements which have editor IDs so far
+        logger.debug('creating new elements ...')
         self.idMap = real.createNewElements(self.newElements.values())
-        
+        logger.debug('done creating new elements')
         # store new IDs in the editors (old ones are still available via self.idMap
         for elem in itertools.chain( *(root.getAllNodes(skipSelf = True) for root in self.editorRoots) ):
             if not elem.isInDB():
@@ -138,6 +139,7 @@ class CommitCommand(UndoCommand):
                 
         # commit all the changes
         changes = {}
+        logger.debug('preparing commit ...')
         for id, elem in self.newElements.items():
             oldElem = models.Element.fromId(self.idMap[id], loadData = False)
             if hasattr(elem, 'fileTags'):
@@ -146,6 +148,7 @@ class CommitCommand(UndoCommand):
             changes[self.idMap[id]] = ( oldElem, elem )
         for id, elem in self.dbElements.items():
             changes[id] = ( self.originalElements[id], self.dbElements[id] )
+        logger.debug('now invoking commit.')
         real.commit(changes)
         
         # notify the editors to display the new commited content
@@ -177,13 +180,16 @@ class CommitCommand(UndoCommand):
         # delete all elements which had editorIDs before
         real.deleteElements([el.id for el in self.newElements.values() ])
         
-        # restore original element IDs
+        # restore original element IDs (for next redo)
         revIdMap = {b:a for (a,b) in self.idMap.items()}
         for elem in itertools.chain( *(root.getAllNodes(skipSelf = True) for root in self.editorRoots) ):
-            elem.id = revIdMap[elem.id]
+            if elem.id in revIdMap:
+                elem.id = revIdMap[elem.id]
 
 def commitEditors():
+    logger.debug('creating commit command')
     command = CommitCommand()
+    logger.debug('created commit command. Pushing...')
     try:
         push(command)
     except StackChangeRejectedException:

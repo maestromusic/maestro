@@ -154,6 +154,11 @@ class EditorWidget(QtGui.QDockWidget):
         vb.addWidget(self.editor)
         hb = QtGui.QHBoxLayout()
         vb.addLayout(hb)
+        
+        self.clearButton = QtGui.QPushButton(self.tr("clear"))
+        self.clearButton.clicked.connect(self.editor.model().clear)
+        hb.addWidget(self.clearButton)
+        
         self.newContainerButton = QtGui.QPushButton(self.tr("new container"))
         self.newContainerButton.clicked.connect(self.newContainerDialog)
         hb.addWidget(self.newContainerButton)
