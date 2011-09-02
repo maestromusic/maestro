@@ -139,7 +139,11 @@ class CommitCommand(UndoCommand):
         # commit all the changes
         changes = {}
         for id, elem in self.newElements.items():
-            changes[self.idMap[id]] = ( models.Element.fromId(self.idMap[id]), elem )
+            oldElem = models.Element.fromId(self.idMap[id], loadData = False)
+            if hasattr(elem, 'fileTags'):
+                oldElem.fileTags = elem.fileTags
+            oldElem.tags = tags.Storage()
+            changes[self.idMap[id]] = ( oldElem, elem )
         for id, elem in self.dbElements.items():
             changes[id] = ( self.originalElements[id], self.dbElements[id] )
         real.commit(changes)

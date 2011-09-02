@@ -154,24 +154,25 @@ def changeTags(changes, emitEvent = True):
     successful = [] # list of elements where the file was written successfully
     for element,changeTuple in changes.items():
         oldTags,newTags = changeTuple
-        logger.debug('element: {}'.format(element))
-        logger.debug('old tags: {}'.format(oldTags))
-        logger.debug('new tags: {}'.format(newTags))
         if oldTags == newTags:
             continue
         
         if element.isFile():
-            try:
-                real = realfiles2.get(element.path)
-                real.read()
-                real.tags = newTags.withoutPrivateTags()
-                real.saveTags()
-            except:
-                logger.error("Could not change tags of file '{}'.".format(element.path))
-                continue
+            if hasattr(element, 'fileTags') and element.fileTags == newTags.withoutPrivateTags():
+                logger.debug('skipping realfile access (speedup...)')
+            else:
+                try:
+                    real = realfiles2.get(element.path)
+                    real.read()
+                    real.tags = newTags.withoutPrivateTags()
+                    real.saveTags()
+                except:
+                    logger.error("Could not change tags of file '{}'.".format(element.path))
+                    continue
         successful.append(element)
         
         # First remove old values
+        logger.debug('begin DB action')
         for tag in oldTags:
             if tag not in newTags:
                 db.write.removeAllTagValues(element.id,tag)
@@ -188,7 +189,7 @@ def changeTags(changes, emitEvent = True):
                 valuesToAdd = [value for value in newTags[tag] if value not in oldTags[tag]]
             if len(valuesToAdd) > 0:
                 db.write.addTagValues(element.id,tag,valuesToAdd)
-            
+        logger.debug('end DB action')    
     if len(successful) > 0 and emitEvent:
         if len(successful) < len(changes):
             changes = {element: changes for element,changes in changes.items() if element in successful}

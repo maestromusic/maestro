@@ -83,6 +83,7 @@ class RealFile:
         else: return None
         
 class UFile(RealFile):
+    """A RealFile implementation using cutags, the wrapper for UTagLib."""
     def __init__(self, path):
         RealFile.__init__(self, path)
         self._f = None
@@ -91,6 +92,16 @@ class UFile(RealFile):
         if self._f is None:
             self._f = cutags.File(self.path)
     
+    def _parseAndAdd(self, key, values):
+        tag = tags.get(key)
+        vals = []
+        for value in values:
+            value = self._valueFromString(tag, value)
+            if value is not None and value not in vals:
+                vals.append(value)
+        if len(vals) > 0:
+            self.tags.add(tag, *vals)
+            
     def read(self):
         self._ensureFileIsLoaded()
         self.ignoredTags = dict() # dict storing tags which are ignored but not deleted by omg, i.e. {track,disc}number
@@ -102,28 +113,22 @@ class UFile(RealFile):
             key = key.lower()
             if key in ["tracknumber", "discnumber"]:
                 self.ignoredTags[key] = values
-            elif key in options.tags.always_delete and not key in toDelete:
+            elif key in options.tags.always_delete:
                 # remove question after some testing
                 from ..gui.dialogs import question
-                if question('really delete tag?', '"always_delete" tag *{0}* found in {1}. Really delete?'.format(key, self.path) ):
+                if question('really delete tag?',
+                            '"always_delete" tag *{0}* found in {1}. Really delete?'.format(key, self.path)):
                     toDelete.append(key)
             else:
                 try:
-                    tag = tags.get(key)
+                    self._parseAndAdd(key, values)
                 except tags.UnknownTagError as e:
                     e.values = values
                     self.remove(toDelete)
                     raise e
-                vals = []
-                for value in values:
-                    value = self._valueFromString(tag, value)
-                    if value is not None and value not in vals:
-                        vals.append(value)
-                if len(vals) > 0:
-                    self.tags.add(tag, *vals)
+        self.remove(toDelete)        
         self.length = self._f.length
-        self.remove(toDelete)
-    
+        
     def saveTags(self):
         self._ensureFileIsLoaded()
         self._f.tags = dict()
