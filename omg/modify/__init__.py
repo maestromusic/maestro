@@ -375,7 +375,11 @@ def merge(level, parent, positions, newTitle, removeString, adjustPositions):
     push(removeCommand)        
     t = tags.findCommonTags(copies, True)
     t[tags.TITLE] = [newTitle]
-    newContainer = Container(id = newEditorId(), contents = copies, tags = t, position = insertElementPosition)
+    newContainer = Container(id = newEditorId(),
+                             contents = copies,
+                             tags = t,
+                             flags = None,
+                             position = insertElementPosition)
     insertions = { parent.id : [(insertPosition, [newContainer])] }
     push(InsertElementsCommand(EDITOR, insertions))
     endMacro()
