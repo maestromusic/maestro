@@ -109,4 +109,15 @@ class FancyTabbedPopup(FancyPopup):
         p = self.tabWidget.palette()
         p.setBrush(QtGui.QPalette.WindowText,self.parent().palette().windowText())
         self.tabWidget.setPalette(p)
-    
+        
+        
+def question(title, text):
+    """Display a modal question dialog with the given *title* and *text*. Return True if the
+    user selected "Yes" and False otherwise."""
+    from . import mainwindow
+    ans = QtGui.QMessageBox.question(mainwindow.mainWindow,
+                                     title,
+                                     text,
+                                     buttons = QtGui.QMessageBox.No | QtGui.QMessageBox.Yes)
+    return ans == QtGui.QMessageBox.Yes
+

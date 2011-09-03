@@ -29,6 +29,7 @@ class EditorTreeView(treeview.TreeView):
         self.setDefaultDropAction(Qt.MoveAction)
         self.setDropIndicatorShown(True)
         self.setModel(editor.EditorModel(name))
+        
         self.viewport().setMouseTracking(True)
         self.mergeAction = QtGui.QAction(self.tr('Merge...'), self)
         self.mergeAction.triggered.connect(self.mergeSelected)
@@ -98,6 +99,16 @@ class EditorTreeView(treeview.TreeView):
                 event.setDropAction(Qt.CopyAction)
         treeview.TreeView.dropEvent(self, event)
     
+    def _expandInsertedRows(self, parent, start, end):
+        for row in range(start, end+1):
+            child = self.model().index(row, 0, parent)
+            self.expand(child)
+    
+    def setAutoExpand(self, state):
+        if state:
+            self.model().rowsInserted.connect(self._expandInsertedRows)
+        else:
+            self.model().rowsInserted.disconnect(self._expandInsertedRows)
     def increasePositions(self):
         self.model().shiftPositions([index.internalPointer() for index in self.selectedIndexes()], 1)
     
@@ -115,7 +126,8 @@ class EditorTreeView(treeview.TreeView):
         hintTitle, hintRemove = self.model().createMergeHint(mergeIndexes)
         mergePositions = sorted(idx.row() for idx in mergeIndexes)
         numSiblings = self.model().rowCount(mergeIndexes[0].parent())
-        dialog = MergeDialog(hintTitle, hintRemove, len(mergePositions) < numSiblings, self)
+        belowRoot = isinstance(self.model().data(mergeIndexes[0].parent()), RootNode)
+        dialog = MergeDialog(hintTitle, hintRemove, len(mergePositions) < numSiblings and not belowRoot, self)
         if dialog.exec_() == QtGui.QDialog.Accepted:
             modify.merge(modify.EDITOR,
                          mergeIndexes[0].internalPointer().parent,
@@ -145,15 +157,23 @@ class EditorWidget(QtGui.QDockWidget):
         vb = QtGui.QVBoxLayout(widget)
         try:
             name = state[0]
-            checkState = state[1]
+            guess = state[1]
+            expand = state[2]
         except:
             name = 'default'
-            checkState = True
+            guess = True
+            expand = True
         self.editor = EditorTreeView(name)
-        self.editor.model().setGuessAlbums(checkState)
+        self.editor.model().setGuessAlbums(guess)
+        self.editor.setAutoExpand(expand)
         vb.addWidget(self.editor)
         hb = QtGui.QHBoxLayout()
         vb.addLayout(hb)
+        
+        self.clearButton = QtGui.QPushButton(self.tr("clear"))
+        self.clearButton.clicked.connect(self.editor.model().clear)
+        hb.addWidget(self.clearButton)
+        
         self.newContainerButton = QtGui.QPushButton(self.tr("new container"))
         self.newContainerButton.clicked.connect(self.newContainerDialog)
         hb.addWidget(self.newContainerButton)
@@ -161,8 +181,15 @@ class EditorWidget(QtGui.QDockWidget):
         hb.addWidget(self.nameField)
         self.albumGuesserCheckbox = QtGui.QCheckBox(self.tr('guess albums'))
         self.albumGuesserCheckbox.stateChanged.connect(self.editor.model().setGuessAlbums)
-        self.albumGuesserCheckbox.setCheckState(checkState)
+        self.albumGuesserCheckbox.setChecked(guess)
         hb.addWidget(self.albumGuesserCheckbox)
+        
+        self.autoExpandCheckbox = QtGui.QCheckBox(self.tr('auto expand'))
+        self.autoExpandCheckbox.setChecked(expand)
+        self.autoExpandCheckbox.stateChanged.connect(self.editor.setAutoExpand)
+        self.autoExpandCheckbox.setToolTip(self.tr('auto expand dropped containers'))
+        hb.addWidget(self.autoExpandCheckbox)
+        
         hb.addStretch()
         self.commitButton = QtGui.QPushButton(self.tr('commit all editors'))
         hb.addWidget(self.commitButton)
@@ -186,7 +213,7 @@ class EditorWidget(QtGui.QDockWidget):
         modify.push(comm)
         
     def saveState(self):
-        return (self.nameField.text(), self.albumGuesserCheckbox.checkState())
+        return (self.nameField.text(), self.albumGuesserCheckbox.isChecked(), self.autoExpandCheckbox.isChecked())
 # register this widget in the main application
 eData = mainwindow.WidgetData(id = "editor",
                              name = translate("Editor","editor"),

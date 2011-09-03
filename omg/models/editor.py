@@ -13,7 +13,7 @@ from .. import logging, modify, database as db, tags, realfiles2
 from . import mimedata
 from ..models import rootedtreemodel, RootNode, File, Container, Element
 from ..config import options
-from ..utils import hasKnownExtension, collectFiles, longestSubstring
+from ..utils import hasKnownExtension, collectFiles, longestSubstring, relPath
 from collections import OrderedDict
 from functools import reduce
 import re, string
@@ -219,7 +219,7 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
                     readOk = True
                 except tags.UnknownTagError as e:
                     from ..gui.tagwidgets import NewTagTypeDialog
-                    text = self.tr('File\n"{0}"\ncontains a so far unknown tag "{1}". What should its type be?').format(f, e.tagname)
+                    text = self.tr('Unknown tag\n{1}={2}\n found in \n{0}.\n What should its type be?').format(relPath(f), e.tagname, e.values)
                     dialog = NewTagTypeDialog(e.tagname, text = text,
                       includeDeleteOption = True)
                     ret = dialog.exec_()
@@ -266,7 +266,10 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
             elif tags.ALBUM in t:
                 album = ", ".join(t[tags.ALBUM])
                 if not album in albumsFoundByName:
-                    albumsFoundByName[album] = Container(id = modify.newEditorId(), contents = None, tags = tags.Storage(), position = None)
+                    albumsFoundByName[album] = Container(id = modify.newEditorId(),
+                                                         contents = None,
+                                                         tags = tags.Storage(),
+                                                         flags = None, position = None, major = True)
                 file.parent = albumsFoundByName[album]
                 albumsFoundByName[album].contents.append(file)
                 if file.position is None:
@@ -296,7 +299,7 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
                 if discname_reduced in metaContainers:
                     metaContainer = metaContainers[discname_reduced]
                 else:
-                    metaContainer = Container(id = modify.newEditorId(), contents = None, tags = tags.Storage(), position = None)
+                    metaContainer = Container(id = modify.newEditorId(), contents = None, tags = tags.Storage(), flags = None, position = None)
                     metaContainers[discname_reduced] = metaContainer
                 metaContainer.contents.append(album)
                 album.position = discnumber

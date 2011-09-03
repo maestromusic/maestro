@@ -8,7 +8,7 @@
 #
 import copy
 
-from omg import tags, logging, config, covers, realfiles2, modify, database as db
+from omg import tags, logging, config, covers, realfiles2, database as db
 from omg.utils import relPath
 
 logger = logging.getLogger(name="models")
@@ -220,6 +220,7 @@ class Node:
 class RootNode(Node):
     """Rootnode at the top of a RootedTreeModel."""
     def __init__(self):
+        from .. import modify
         self.contents = []
         self.id = modify.newEditorId()
     
@@ -459,9 +460,10 @@ class File(Element):
         rpath = relPath(path)
         id = db.idFromPath(rpath)
         if id is None:
+            from .. import modify
             id = modify.editorIdForPath(rpath)
         real.read()
-        return File(tags = real.tags, length = real.length, path = rpath, position = real.position, id = id)
+        return File(tags = real.tags, flags = None, path = rpath, length = real.length, position = real.position, id = id)
 
     def hasContents(self):
         return False
