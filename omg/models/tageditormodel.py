@@ -377,6 +377,18 @@ class TagEditorModel(QtCore.QObject):
             self.undoStack.clear()
         self.resetted.emit()
 
+    def createRedoAction(self,parent=None,prefix=""):
+        """Create an action redoing the last change in this model."""
+        if self.saveDirectly:
+            return modify.createRedoAction(self.level,parent,prefix)
+        else: return self.undoStack.createRedoAction(parent,prefix)
+    
+    def createUndoAction(self,parent=None,prefix=""):
+        """Create an action undoing the last change in this model."""
+        if self.saveDirectly:
+            return modify.createUndoAction(self.level,parent,prefix)
+        else: return self.undoStack.createUndoAction(parent,prefix)
+        
     def _beginMacro(self,name):
         """Start a macro with the given name on the correct UndoStack."""
         if self.saveDirectly:

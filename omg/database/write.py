@@ -9,6 +9,7 @@
 import itertools
 from omg import database as db
 
+
 def createNewElement(file,major):
     """Insert a new element into the database and return its id. Set the file and major flag as given in the
     parameters and set the toplevel flag and elements counter to 1 and 0, respectively."""
@@ -161,11 +162,6 @@ def changeTagValue(elids,tag,oldValue,newValue):
     changeTagValueById(elids,tag,oldId,newId)
 
 
-def changeSortValue(tag, valueId, sortValue):
-    db.query("UPDATE {}values_{} SET sort_value = ? WHERE tag_id = ? AND id = ?".format(db.prefix, tag.type),
-             sortValue, tag.id, valueId)
-
-
 def setTags(elid,tags):
     """Set the tags of the element with it *elid* to the tags.Storage-instance *tags*, removing all existing
     tags of that element."""
@@ -173,4 +169,31 @@ def setTags(elid,tags):
     for tag in tags:
         db.multiQuery("INSERT INTO {}tags (element_id,tag_id,value_id) VALUES (?,?,?)".format(db.prefix),
                       [(elid,tag.id,db.idFromValue(tag,value,insert=True)) for value in tags[tag]])
-            
+
+
+def changeSortValue(tag, valueId, sortValue):
+    """Set the sort-value of the value of *tag* with id *valueId* to *sortValue*."""
+    db.query("UPDATE {}values_{} SET sort_value = ? WHERE tag_id = ? AND id = ?".format(db.prefix, tag.type),
+             sortValue, tag.id, valueId)
+    
+
+def addFlag(elids,flag):
+    """Add the given flag to the elements with the given ids, ignoring elements that already have the
+    flag."""
+    values = ','.join('({},{})'.format(elid,flag.id) for elid in elids)
+    db.query("INSERT IGNORE INTO {}flags (element_id,flag_id) VALUES {}".format(db.prefix,values))
+    
+    
+def removeFlag(elids,flag):
+    """Remove a flag from the elements with the specified ids, ignoring elements that do not have the
+    flag."""
+    db.query("DELETE FROM {}flags WHERE flag_id = {} AND element_id IN ({})"
+                .format(db.prefix,flag.id,db.csList(elids)))
+    
+
+def setFlags(elid,flags):
+    """Give the element with the given id exactly the flags in the list *flags*."""
+    db.query("DELETE FROM {}flags WHERE element_id = ?".format(db.prefix),elid)
+    values = ["({},{})".format(elid,flag.id) for flag in flags]
+    db.query("INSERT INTO {}flags (element_id,flag_id) VALUES {}".format(db.prefix,','.join(values)))
+    

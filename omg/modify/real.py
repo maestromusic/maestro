@@ -193,3 +193,27 @@ def changeTags(changes, emitEvent = True):
         if len(successful) < len(changes):
             changes = {element: changes for element,changes in changes.items() if element in successful}
         dispatcher.changes.emit(events.TagModifyEvent(REAL,changes))
+
+
+def addFlag(flag,elements):
+    """Add *flag* to *elements* and emit a FlagAddedEvent."""
+    db.write.addFlag((el.id for el in elements),flag)
+    dispatcher.changes.emit(events.FlagAddedEvent(REAL,flag,elements))
+    
+
+def removeFlag(flag,elements):
+    """Remove *flag* from *elements* and emit a FlagRemovedEvent."""
+    db.write.removeFlag((el.id for el in elements),flag)
+    dispatcher.changes.emit(events.FlagRemovedEvent(REAL,flag,elements))
+    
+
+def changeFlags(changes):
+    """Change flags arbitrarily: *changes* is a dict mapping elements (not element-ids!) to tuples consisting
+    of two lists of flags - the flags before and after the change."""
+    for element,changeTuple in changes.items():
+        oldFlags,newFlags = changeTuple
+        # Compare the lists forgetting the order
+        if any(f not in oldFlags for f in newFlags) or any(f not in newFlags for f in oldFlags):
+            db.write.setFlags(element.id,newFlags)
+    dispatcher.changes.emit(events.FlagChangeEvent(changes))
+    

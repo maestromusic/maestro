@@ -15,6 +15,7 @@ from PyQt4.QtCore import Qt
 from .. import database as db, constants, utils, flags
 from .misc import iconbuttonbar
 
+translate = QtCore.QCoreApplication.translate
 
 class FlagManager(QtGui.QDialog):
     """The FlagManager allows to add, edit and remove flagtypes."""
@@ -93,26 +94,15 @@ class FlagManager(QtGui.QDialog):
         self.tableWidget.resizeColumnsToContents()
     
     def _handleAddButton(self):
-        name,ok = QtGui.QInputDialog.getText(self,self.tr("New Flag"),
-                                             self.tr("Please enter the name of the new flag"))
-        if not ok:
-            return
-        
-        if flags.exists(name):
-            QtGui.QMessageBox.warning(self,self.tr("Cannot create flag"),
-                                      self.tr("This flag does already exist."))
-        elif not flags.isValidFlagname(name):
-            QtGui.QMessageBox.warning(self,self.tr("Invalid flagname"),
-                                      self.tr("This is no a valid flagname."))
-        else:
-            flags.addFlagType(name)
+        """Create a new flag (querying the user for the flag's name) and reload the flags."""
+        if createNewFlagType(self) is not None:
             self._loadFlags()
     
     def _handleRemoveButton(self,flagType):
         """Ask the user if he really wants this and if so, remove the flag."""
         number = self._elementNumber(flagType)
         if number > 0:
-            question = self.tr("Do you really want to remove the flag '{}'? It will be removed from %n element(s).",number)
+            question = self.tr("Do you really want to remove the flag '{}'? It will be removed from %n element(s).",None,number)
         else: question = self.tr("Do you really want to remove the flag '{}'?")
         if (QtGui.QMessageBox.question(self,self.tr("Remove flag?"),
                                        question.format(flagType.name),
@@ -121,11 +111,13 @@ class FlagManager(QtGui.QDialog):
                 == QtGui.QMessageBox.Yes):
             if number > 0:
                 # TODO
-                pass
+                raise NotImplementedError()
             flags.removeFlagType(flagType)
             self._loadFlags()
 
     def _handleItemChanged(self,item):
+        """When an item has been changed, ask the user if he really wants this and if so perform the change
+        in the database and reload."""
         if item.column() != 0:
             return
         flagType = item.data(Qt.UserRole)
@@ -149,10 +141,10 @@ class FlagManager(QtGui.QDialog):
                 item.setText(oldName)
                 return
             else:
-                question = self.tr("A flag named '{}' does already exist. Shall I merge both flags? Remember that '{}' is used in %n elements.",'',number).format(newName,oldName)
+                question = self.tr("A flag named '{}' does already exist. Shall I merge both flags? Remember that '{}' is used in %n elements.",None,number).format(newName,oldName)
         else:                               
             if number > 0:
-                question = self.tr("Do you really want to change the flag '{}'? It will be changed in %n element(s).",number).format(oldName)
+                question = self.tr("Do you really want to change the flag '{}'? It will be changed in %n element(s).",None,number).format(oldName)
             else: question = self.tr("Do you really want to change the flag '{}'?").format(oldName)
         
         # Then pose the question
@@ -187,4 +179,23 @@ class FlagManager(QtGui.QDialog):
         return db.query("SELECT COUNT(element_id) FROM {}flags WHERE flag_id = ?"
                             .format(db.prefix),flagType.id).getSingle()        
     
+
+def createNewFlagType(parent = None):
+    """Ask the user to supply a name and then create a new flag with this name. Return the new flag or None
+    if no flag is created (e.g. if the user aborted the dialog or the supplied name was invalid)."""
+    name,ok = QtGui.QInputDialog.getText(parent,translate("FlagManager","New Flag"),
+                                         translate("FlagManager","Please enter the name of the new flag"))
+    if not ok:
+        return None
+    
+    if flags.exists(name):
+        QtGui.QMessageBox.warning(parent,translate("FlagManager","Cannot create flag"),
+                                  translate("FlagManager","This flag does already exist."))
+        return None
+    elif not flags.isValidFlagname(name):
+        QtGui.QMessageBox.warning(parent,translate("FlagManager","Invalid flagname"),
+                                  translate("FlagManager","This is no a valid flagname."))
+        return None
+    else:
+        return flags.addFlagType(name)
     

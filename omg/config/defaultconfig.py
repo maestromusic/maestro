@@ -81,6 +81,8 @@ defaults = OrderedDict((
     "browser_show_sort_values": (bool,True,"Whether the browser should display sortvalues instead of real values (if present)."),
     "mime": (str,"application/x-omgelementlist","Mime-type used to copy and paste data within OMG."),
     "startTab": (str,"playlist","Either 'playlist' or 'editor' whatever you want to see on startup."),
+    "flageditor_animation": (bool,True,"Enable/disable animations in the flageditor."),
+    "flageditor_maxtooltiplines": (int,5,"Maximum number of lines that will be shown in a tooltip in the flageditor."),
 }),
 
 ("misc", {

@@ -13,15 +13,17 @@ logger = logging.getLogger(__name__)
 
 
 class Flag:
-    """A flagtype with an id and a name. At first glance flags are like tags, but in fact they are much
-    easier, because they have no values, valuetypes, translations and because they are not stored in files.
+    """A flagtype with an id, a name an optionally an icon. At first glance flags are like tags, but in fact
+    they are much easier, because they have no values, valuetypes, translations and because they are not
+    stored in files.
     
     Note: Contrary to tags you should use the constructor of Flags. So while there will usually be only one
     instance for each tag, there may be many for each flagtype.
     """
-    def __init__(self,id,name):
+    def __init__(self,id,name,icon=None):
         self.id = id
         self.name = name
+        self.icon = icon
         
     def __str__(self):
         return self.name
@@ -63,9 +65,10 @@ def isValidFlagname(name):
     return len(name) > 0 and not name.isspace()
 
 
-def all():
-    """Return a list containing all flagnames from the database."""
-    return db.query("SELECT name FROM {}flag_names".format(db.prefix)).getSingleColumn()
+def allFlags():
+    """Return a list containing all flags in the database."""
+    return [Flag(*row) for row in db.query("SELECT id,name FROM {}flag_names ORDER BY name"
+                                                .format(db.prefix))]
 
 
 def addFlagType(name):

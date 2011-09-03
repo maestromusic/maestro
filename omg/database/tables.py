@@ -139,6 +139,7 @@ tables = [SQLTable(createQuery) for createQuery in (
 """CREATE TABLE {0}flags (
         element_id      MEDIUMINT UNSIGNED NOT NULL,
         flag_id         SMALLINT UNSIGNED NOT NULL,
+        UNIQUE INDEX flag_idx(element_id,flag_id),
         FOREIGN KEY(element_id) REFERENCES {0}elements(id) ON DELETE CASCADE,
         FOREIGN KEY(flag_id) REFERENCES {0}flag_names(id) ON DELETE CASCADE
 ) ENGINE InnoDB;

@@ -99,9 +99,11 @@ class TagEditorWidget(QtGui.QWidget):
     # confer _handleTagChanged and _handleTagChangedByUser.
     _ignoreHandleTagChangedByUser = False
     
-    def __init__(self,level,elements = [],parent = None,dialog=None,saveDirectly=True):
+    def __init__(self,level,elements=None,parent = None,dialog=None,saveDirectly=True):
         QtGui.QWidget.__init__(self,parent)
         self.level = level
+        if elements is None:
+            elements = []
         if dialog is not None:
             saveDirectly = False
         
@@ -111,10 +113,11 @@ class TagEditorWidget(QtGui.QWidget):
         self.model.tagChanged.connect(self._handleTagChanged)
         self.model.resetted.connect(self._handleReset)
 
-        self.flagModel = flageditormodel.FlagEditorModel(level,elements,saveDirectly)
-        
-        self.undoAction = modify.createUndoAction(level,self,self.tr("Undo"))
-        self.redoAction = modify.createRedoAction(level,self,self.tr("Redo"))
+        self.flagModel = flageditormodel.FlagEditorModel(level,elements,saveDirectly,
+                                                         self.model.undoStack if not saveDirectly else None)
+        self.flagModel.resetted.connect(self._checkFlagEditorVisibility)
+        self.flagModel.recordInserted.connect(self._checkFlagEditorVisibility)
+        self.flagModel.recordRemoved.connect(self._checkFlagEditorVisibility)
 
         self.selectionManager = widgetlist.SelectionManager()
         # Do not allow the user to select ExpandLines
@@ -138,6 +141,10 @@ class TagEditorWidget(QtGui.QWidget):
         removeButton.clicked.connect(self._handleRemoveSelected)
         self.topLayout.addWidget(removeButton)
         
+        self.addFlagButton = QtGui.QPushButton(utils.getIcon("flag_blue.png"),self.tr("Add flag"))
+        self.addFlagButton.clicked.connect(self._handleAddFlagButton)
+        self.topLayout.addWidget(self.addFlagButton)
+        
         style = QtGui.QApplication.style()
         if not saveDirectly:
             resetButton = QtGui.QPushButton(style.standardIcon(QtGui.QStyle.SP_DialogResetButton),
@@ -160,22 +167,33 @@ class TagEditorWidget(QtGui.QWidget):
         
         self.scrollArea = QtGui.QScrollArea()
         self.scrollArea.setWidgetResizable(True)
-        self.layout().addWidget(self.scrollArea)
+        self.layout().addWidget(self.scrollArea,1)
             
         self.viewport = QtGui.QWidget()
         self.viewport.setLayout(QtGui.QVBoxLayout())
         self.tagEditorLayout = dynamicgridlayout.DynamicGridLayout()
         self.tagEditorLayout.setColumnStretch(1,1) # Stretch the column holding the values
         self.viewport.layout().addLayout(self.tagEditorLayout)
-        flagEditorLayout = QtGui.QHBoxLayout()
-        self.viewport.layout().addLayout(flagEditorLayout)
-        flagEditorLayout.addWidget(QtGui.QLabel(self.tr("Flags: ")))
-        self.flagEditor = flageditor.FlagEditor(self.flagModel)
-        flagEditorLayout.addWidget(self.flagEditor)
-        flagEditorLayout.addStretch(1)
         self.viewport.layout().addStretch(1)
         self.scrollArea.setWidget(self.viewport)
 
+        self.flagWidget = QtGui.QWidget()
+        self.flagWidget.setLayout(QtGui.QHBoxLayout())
+        self.flagWidget.layout().setContentsMargins(0,0,0,0)
+        self.layout().addWidget(self.flagWidget)
+        label = QtGui.QLabel()
+        label.setPixmap(utils.getIcon("flag_blue.png").pixmap(16))
+        self.flagWidget.layout().addWidget(label)
+        self.flagWidget.layout().addWidget(QtGui.QLabel(self.tr("Flags: ")))
+        
+        flagScrollArea = QtGui.QScrollArea()
+        flagScrollArea.setWidgetResizable(True)
+        flagScrollArea.setMaximumHeight(40)
+        flagEditor = flageditor.FlagEditor(self.flagModel)
+        flagScrollArea.setWidget(flagEditor)
+        self.flagWidget.layout().addWidget(flagScrollArea,1)
+        self._checkFlagEditorVisibility()
+        
         self.singleTagEditors = {}
         self.tagBoxes = {}
         self._handleReset()
@@ -242,7 +260,14 @@ class TagEditorWidget(QtGui.QWidget):
         if len(records) > 0:
             self.model.removeRecords(records)
           
-    # Note that the following _handle-functions only add new SingleTagEditors or remove SingleTagEditors which have become empty. Unless they are newly created or removed, the editors are updated in their own _handle-functions.
+    def _handleAddFlagButton(self):
+        if not flageditor.AddFlagPopup.isActive(self.addFlagButton):
+            popup = flageditor.AddFlagPopup(self.flagModel,self.addFlagButton)
+            popup.show()
+            
+    # Note that the following _handle-functions only add new SingleTagEditors or remove SingleTagEditors
+    # which have become empty. Unless they are newly created or removed, the editors are updated in their
+    # own _handle-functions.
     def _handleTagInserted(self,pos,tag):
         self._insertSingleTagEditor(pos,tag)
         
@@ -282,17 +307,23 @@ class TagEditorWidget(QtGui.QWidget):
             tagBox.tagChanged.connect(self._handleTagChangedByUser)
         
     def _handleSave(self):
+        if self.model.saveDirectly:
+            raise RuntimeError("You must not call save in a TagEditor that saves directly.") 
+        
         if not all(singleTagEditor.isValid() for singleTagEditor in self.singleTagEditors.values()):
             QtGui.QMessageBox.warning(self,self.tr("Invalid value"),self.tr("At least one value is invalid."))
         else:
+            modify.beginMacro(self.level,self.tr("Changs tags/flags"))
             self.model.save()
+            self.flagModel.save()
+            modify.endMacro()
             self.saved.emit()
         
     def contextMenuEvent(self,contextMenuEvent,record=None):
         menu = QtGui.QMenu(self)
 
-        menu.addAction(self.undoAction)
-        menu.addAction(self.redoAction)
+        menu.addAction(self.model.createUndoAction(self,self.tr("Undo")))
+        menu.addAction(self.model.createRedoAction(self,self.tr("Redo")))
         menu.addSeparator()
         
         addRecordAction = QtGui.QAction(self.tr("Add tag..."),self)
@@ -364,6 +395,9 @@ class TagEditorWidget(QtGui.QWidget):
         dialog = RecordDialog(self,self.model.getElements(),record=record)
         if dialog.exec_() == QtGui.QDialog.Accepted:
             self.model.changeRecord(record,dialog.getRecord())
+
+    def _checkFlagEditorVisibility(self):
+        self.flagWidget.setVisible(not self.flagModel.isEmpty())
 
 
 class RecordDialog(QtGui.QDialog):

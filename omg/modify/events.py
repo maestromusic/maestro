@@ -9,8 +9,11 @@
 from .. import tags
 from .. import logging
 logger = logging.getLogger("modify.events")
+
 class ChangeEvent:
+    """Abstract super class for all changeevents."""
     pass
+
 
 class ElementChangeEvent(ChangeEvent):
     """A generic change event for all sorts of element modifications."""
@@ -159,7 +162,6 @@ class TagValueAddedEvent(SingleTagChangeEvent):
         self.value = value
 
     def applyTo(self,element):
-        assert element.id in self.ids()
         if element.tags is not None:
             element.tags.add(self.tag,self.value)
             
@@ -173,13 +175,12 @@ class TagValueRemovedEvent(SingleTagChangeEvent):
         self.value = value
 
     def applyTo(self,element):
-        assert element.id in self.ids()
         if element.tags is not None:
             element.tags.remove(self.tag,self.value)
         
     def __str__(self):
         return "Remove: {} {} {}".format(self.tag,self.value,self.elements)
-
+    
 
 class TagValueChangedEvent(SingleTagChangeEvent):
     def __init__(self,level,tag,oldValue,newValue,elements):
@@ -188,7 +189,6 @@ class TagValueChangedEvent(SingleTagChangeEvent):
         self.newValue = newValue
 
     def applyTo(self,element):
-        assert element.id in self.ids()
         if element.tags is not None:
             element.tags.replace(self.tag,self.oldValue,self.newValue)
             
@@ -196,12 +196,47 @@ class TagValueChangedEvent(SingleTagChangeEvent):
         return "Change: {} {}->{} {}".format(self.tag,self.oldValue,self.newValue,self.elements)
     
 
-class SortValueChangedEvent(ChangeEvent):
-    def __init__(self, tag, valueId, oldValue, newValue):
-        self.tag, self.valueId, self.oldValue, self.newValue = tag, valueId, oldValue, newValue
+class FlagChangeEvent(ElementChangeEvent):
+    def __init__(self,changes):
+        self.changes = changes
+        self.contentsChanged = False
+        
+    def applyTo(self,element):
+        assert element in self.changes
+        if element.flags is not None:
+            element.flags = self.changes[element][:]
+            
+    def __str__(self):
+        return "Modify flags"
+    
+    
+class SingleFlagChangeEvent(FlagChangeEvent):
+    """Abstract superclass for events where one flag changes in several elements."""
+    def __init__(self,level,flag,elements):
+        self.level = level
+        self.flag = flag
+        self.elements = elements
+        
+    def ids(self):
+        return [element.id for element in self.elements]
+        
+    
+class FlagAddedEvent(SingleFlagChangeEvent):
+    """FlagAddedEvents are used when a flag is added to one or more elements."""
+    def applyTo(self,element):
+        if element.flags is not None and self.flag not in element.flags:
+            element.flags.append(self.flag)
+        
+
+class FlagRemovedEvent(SingleFlagChangeEvent):
+    """FlagRemovedEvent are used when a flag is remove from one or more elements."""
+    def applyTo(self,element):
+        if element.flags is not None and self.flag in element.flags:
+            element.flags.remove(self.flag)
+
 
 class TagTypeChangedEvent(ChangeEvent):
-    """TagTypeChangedEvent are used when a tagtype (like artist, composer...) is added, changed or deleted.
+    """TagTypeChangedEvents are used when a tagtype (like artist, composer...) is added, changed or deleted.
     Contrary to ModifyEvents these events are sent over the tagTypeChanged-signal of the dispatcher.
     """
     def __init__(self,action,tagType):
@@ -211,10 +246,15 @@ class TagTypeChangedEvent(ChangeEvent):
 
 
 class FlagTypeChangedEvent(ChangeEvent):
-    """TagTypeChangedEvent are used when a flagtype is added, changed or deleted. Contrary to ModifyEvents
+    """TagTypeChangedEvents are used when a flagtype is added, changed or deleted. Contrary to ModifyEvents
     these events are sent over the tagTypeChanged-signal of the dispatcher.
     """
     def __init__(self,action,flagType):
         assert action in range(1,4) # ADDED,CHANGED or DELETED
         self.action = action
         self.flagType = flagType
+        
+        
+class SortValueChangedEvent(ChangeEvent):
+    def __init__(self, tag, valueId, oldValue, newValue):
+        self.tag, self.valueId, self.oldValue, self.newValue = tag, valueId, oldValue, newValue
