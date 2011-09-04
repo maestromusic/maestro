@@ -99,7 +99,8 @@ class CommitCommand(UndoCommand):
         
         # save current state in the editors in dicts mapping id->element
         self.newElements, self.dbElements = dict(), dict()
-        for element in itertools.chain( *(root.getAllNodes(skipSelf = True) for root in self.editorRoots) ):
+        for element in itertools.chain.from_iterable(
+                                            root.getAllNodes(skipSelf = True) for root in self.editorRoots):
             if element.isInDB():
                 if not element.id in self.dbElements:
                     self.dbElements[element.id] = element
@@ -182,7 +183,8 @@ class CommitCommand(UndoCommand):
         
         # restore original element IDs (for next redo)
         revIdMap = {b:a for (a,b) in self.idMap.items()}
-        for elem in itertools.chain( *(root.getAllNodes(skipSelf = True) for root in self.editorRoots) ):
+        for elem in itertools.chain.from_iterable(
+                                            root.getAllNodes(skipSelf = True) for root in self.editorRoots):
             if elem.id in revIdMap:
                 elem.id = revIdMap[elem.id]
 

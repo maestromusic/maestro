@@ -60,7 +60,7 @@ class SingleElementChangeEvent(ElementChangeEvent):
         self.contentsChanged = False
         
     def ids(self):
-        return self.element.id,
+        return [self.element.id]
     
     def getNewContentsCount(self, element):
         return 0
@@ -77,7 +77,7 @@ class PositionChangeEvent(ElementChangeEvent):
         self.positionMap = positionMap
         
     def ids(self):
-        return self.parentId,
+        return [self.parentId]
     
     def getNewContentsCount(self, element):
         return len(element.contents)
@@ -198,7 +198,8 @@ class TagValueChangedEvent(SingleTagChangeEvent):
     
 
 class FlagChangeEvent(ElementChangeEvent):
-    def __init__(self,changes):
+    def __init__(self,level,changes):
+        self.level = level
         self.changes = changes
         self.contentsChanged = False
         

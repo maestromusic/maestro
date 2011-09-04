@@ -157,7 +157,8 @@ def changeTags(changes, emitEvent = True):
         if oldTags == newTags:
             continue
         
-        if element.isFile() and element.fileTags != newTags.withoutPrivateTags():
+        if element.isFile() and \
+                (not hasattr(element,'fileTags') or element.fileTags != newTags.withoutPrivateTags()):
             try:
                 real = realfiles2.get(element.path)
                 real.read()
@@ -202,5 +203,5 @@ def changeFlags(changes):
         # Compare the lists forgetting the order
         if any(f not in oldFlags for f in newFlags) or any(f not in newFlags for f in oldFlags):
             db.write.setFlags(element.id,newFlags)
-    dispatcher.changes.emit(events.FlagChangeEvent(changes))
+    dispatcher.changes.emit(events.FlagChangeEvent(REAL,changes))
     
