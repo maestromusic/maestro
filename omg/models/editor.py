@@ -269,7 +269,7 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
                     albumsFoundByName[album] = Container(id = modify.newEditorId(),
                                                          contents = None,
                                                          tags = tags.Storage(),
-                                                         flags = None, position = None, major = True)
+                                                         flags = [], position = None, major = True)
                 file.parent = albumsFoundByName[album]
                 albumsFoundByName[album].contents.append(file)
                 if file.position is None:
@@ -299,7 +299,8 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
                 if discname_reduced in metaContainers:
                     metaContainer = metaContainers[discname_reduced]
                 else:
-                    metaContainer = Container(id = modify.newEditorId(), contents = None, tags = tags.Storage(), flags = None, position = None)
+                    metaContainer = Container(id = modify.newEditorId(), contents = None,
+                                              tags = tags.Storage(), flags = [], position = None)
                     metaContainers[discname_reduced] = metaContainer
                 metaContainer.contents.append(album)
                 album.position = discnumber

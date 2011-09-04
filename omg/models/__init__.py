@@ -441,7 +441,7 @@ class File(Element):
     
     @staticmethod
     def fromId(id,*,tags=None,flags=None,path=None,length=None,position=None,parentId=None,loadData=True):
-        if loadData:
+        if loadData and id > 0:
             if tags is None:
                 tags = db.tags(id)
             if flags is None:
@@ -462,8 +462,12 @@ class File(Element):
         if id is None:
             from .. import modify
             id = modify.editorIdForPath(rpath)
+            flags = []
+        else:
+            flags = db.flags(id)
+            # TODO: Load private tags!
         real.read()
-        return File(tags = real.tags, flags = None, path = rpath, length = real.length, position = real.position, id = id)
+        return File(tags=real.tags,flags=flags,path=rpath,length=real.length,position=real.position,id = id)
 
     def hasContents(self):
         return False
