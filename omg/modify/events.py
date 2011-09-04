@@ -131,7 +131,8 @@ class RemoveElementsEvent(ElementChangeEvent):
             
 
 class TagChangeEvent(ElementChangeEvent):
-    def __init__(self,changes):
+    def __init__(self,level,changes):
+        self.level = level
         self.changes = changes
         self.contentsChanged = False
         

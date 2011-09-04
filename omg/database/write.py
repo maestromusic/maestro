@@ -125,11 +125,12 @@ def addTagValues(elids,tag,values):
     addTagValuesById(elids,tag,[db.idFromValue(tag,value,insert=True) for value in values])
     
     
-def removeAllTagValues(elids,tag):
+def removeAllTagValues(elids,tags):
     """Remove all values of the given tag from some elements. *elids* is either a single id or a list of ids.
+    Analogously *tags* may be a single tag or a list of tags.
     """
-    db.query("DELETE FROM {}tags WHERE element_id IN ({}) AND tag_id = {}"
-               .format(db.prefix,db.csList(elids),tag.id))
+    db.query("DELETE FROM {}tags WHERE element_id IN ({}) AND tag_id IN ({})"
+               .format(db.prefix,db.csList(elids),db.csIdList(tags)))
 
 
 def removeTagValuesById(elids,tag,valueIds):

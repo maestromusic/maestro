@@ -157,43 +157,29 @@ def changeTags(changes, emitEvent = True):
         if oldTags == newTags:
             continue
         
-        if element.isFile():
-            if hasattr(element, 'fileTags') and element.fileTags == newTags.withoutPrivateTags():
-                logger.debug('skipping realfile access (speedup...)')
-            else:
-                try:
-                    real = realfiles2.get(element.path)
-                    real.read()
-                    real.tags = newTags.withoutPrivateTags()
-                    real.saveTags()
-                except:
-                    logger.error("Could not change tags of file '{}'.".format(element.path))
-                    continue
+        if element.isFile() and element.fileTags != newTags.withoutPrivateTags():
+            try:
+                real = realfiles2.get(element.path)
+                real.read()
+                real.tags = newTags.withoutPrivateTags()
+                real.saveTags()
+            except:
+                logger.error("Could not change tags of file '{}'.".format(element.path))
+                continue
         successful.append(element)
         
-        # First remove old values
-        logger.debug('begin DB action')
-        for tag in oldTags:
-            if tag not in newTags:
-                db.write.removeAllTagValues(element.id,tag)
-            else:
-                valuesToRemove = [value for value in oldTags[tag] if value not in newTags[tag]]
-                if len(valuesToRemove) > 0:
-                    db.write.removeTagValues(element.id,tag,valuesToRemove)                 
-        
-        # Then add new value
-        for tag in newTags:
-            if tag not in oldTags:
-                valuesToAdd = newTags[tag]
-            else:
-                valuesToAdd = [value for value in newTags[tag] if value not in oldTags[tag]]
-            if len(valuesToAdd) > 0:
-                db.write.addTagValues(element.id,tag,valuesToAdd)
-        logger.debug('end DB action')    
+        unchangedTags = [tag for tag in oldTags if tag in newTags and oldTags[tag] == newTags[tag]]
+        if len(unchangedTags) < len(oldTags):
+            db.write.removeAllTagValues(element.id,(tag for tag in oldTags if not tag in unchangedTags))
+        if len(unchangedTags) < len(newTags):
+            for tag in newTags:
+                if tag not in unchangedTags:
+                    db.write.addTagValues(element.id,tag,newTags[tag])
+  
     if len(successful) > 0 and emitEvent:
         if len(successful) < len(changes):
             changes = {element: changes for element,changes in changes.items() if element in successful}
-        dispatcher.changes.emit(events.TagModifyEvent(REAL,changes))
+        dispatcher.changes.emit(events.TagChangeEvent(REAL,changes))
 
 
 def addFlag(flag,elements):
