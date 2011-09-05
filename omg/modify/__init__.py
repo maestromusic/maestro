@@ -233,7 +233,7 @@ class PositionChangeCommand(UndoCommand):
     
     def undo(self):
         dispatcher.changes.emit(events.PositionChangeEvent(self.level, self.parentId,
-                                                           dict(map(reversed,self.positionChanges))))
+                                                           {b:a for (a,b) in self.positionChanges}))
         
 def createRanges(tuples):
         previous = None

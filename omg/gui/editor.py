@@ -108,7 +108,11 @@ class EditorTreeView(treeview.TreeView):
         if state:
             self.model().rowsInserted.connect(self._expandInsertedRows)
         else:
-            self.model().rowsInserted.disconnect(self._expandInsertedRows)
+            try:
+                self.model().rowsInserted.disconnect(self._expandInsertedRows)
+            except TypeError:
+                pass # was not connected
+            
     def increasePositions(self):
         self.model().shiftPositions([index.internalPointer() for index in self.selectedIndexes()], 1)
     
