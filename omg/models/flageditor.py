@@ -160,7 +160,7 @@ class FlagEditorModel(QtCore.QObject):
         changes = {element: (element.flags,self.getFlagsOfElement(element))
                         for element in self.elements}
         
-        self._push(modify.FlagUndoCommand(self.level,changes,text=self.tr("Change flags")))
+        self._push(modify.commands.FlagUndoCommand(self.level,changes,text=self.tr("Change flags")))
 
 
 class FlagEditorUndoCommand(QtGui.QUndoCommand):

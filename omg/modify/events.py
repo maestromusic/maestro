@@ -8,7 +8,9 @@
 
 from .. import tags
 from .. import logging
-logger = logging.getLogger("modify.events")
+
+logger = logging.getLogger(__name__)
+
 
 class ChangeEvent:
     """Abstract super class for all changeevents."""
@@ -32,18 +34,6 @@ class ElementChangeEvent(ChangeEvent):
         element.copyFrom(self.changes[element.id], copyContents = self.contentsChanged)
 
 
-class NewElementChangeEvent(ElementChangeEvent):
-    """This special event is used when new elements are added to the database. Its changes map ids to new
-    elements."""
-    def __init__(self,changes):
-        from . import REAL
-        super().__init__(REAL,changes, False)
-    
-    def applyTo(self,element):
-        assert element.id in self.changes
-        element.id = self.changes[element.id].id
-
-
 class ElementsDeletedEvent(ChangeEvent):
     """Special event that is sent when elements are completely deleted from the database."""
     def __init__(self,elids):
@@ -51,6 +41,7 @@ class ElementsDeletedEvent(ChangeEvent):
         
     def ids(self):
         return self.elids
+    
     
 class SingleElementChangeEvent(ElementChangeEvent):
     """A specialized modify event if only one element (tags, position, ...) is modified."""
@@ -67,6 +58,7 @@ class SingleElementChangeEvent(ElementChangeEvent):
     
     def applyTo(self, element):
         element.copyFrom(self.element, copyContents = False)
+
 
 class PositionChangeEvent(ElementChangeEvent):
     """An event for the case that the position of several elements below the same parent are changed."""
@@ -258,5 +250,7 @@ class FlagTypeChangedEvent(ChangeEvent):
         
         
 class SortValueChangedEvent(ChangeEvent):
-    def __init__(self, tag, valueId, oldValue, newValue):
-        self.tag, self.valueId, self.oldValue, self.newValue = tag, valueId, oldValue, newValue
+    """This flag is emitted when a sortvalue changes."""
+    def __init__(self,tag,valueId,oldValue,newValue):
+        self.tag,self.valueId,self.oldValue,self.newValue = tag,valueId,oldValue,newValue
+        
