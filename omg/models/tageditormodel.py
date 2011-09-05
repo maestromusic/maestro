@@ -565,7 +565,7 @@ class TagEditorModel(QtCore.QObject):
         changes = {element: (element.tags,self.getTagsOfElement(element))
                         for element in self.inner.elements}
         
-        self._push(modify.TagUndoCommand(self.level,changes,text=self.tr("Change tags")))
+        self._push(modify.commands.TagUndoCommand(self.level,changes,text=self.tr("Change tags")))
         
     def getPossibleSeparators(self,records):
         """Return all separators (from constants.SEPARATORS) that are present in every value of the given

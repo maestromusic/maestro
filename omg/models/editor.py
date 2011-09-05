@@ -13,6 +13,7 @@ from .. import logging, modify, database as db, tags, realfiles2
 from . import mimedata
 from ..models import rootedtreemodel, RootNode, File, Container, Element
 from ..config import options
+from ..modify import events, commands
 from ..utils import hasKnownExtension, collectFiles, longestSubstring, relPath
 from collections import OrderedDict
 from functools import reduce
@@ -77,12 +78,12 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
     def handleChangeEvent(self, event):
         """React on an incoming ChangeEvent by applying all changes that affect the
         current model."""
-        if isinstance(event, modify.events.ElementChangeEvent):
+        if isinstance(event, events.ElementChangeEvent):
             self.handleElementChangeEvent(event)
-        elif isinstance(event, modify.events.ElementsDeletedEvent):
+        elif isinstance(event, events.ElementsDeletedEvent):
             # real event incoming -- resetting editor ...
             self.clear()
-        elif isinstance(event, modify.events.TagTypeChangedEvent):
+        elif isinstance(event, events.TagTypeChangedEvent):
             pass #TODO: was macht man da??
         else:
             logger.warning('WARNING UNKNOWN EVENT {}, RESETTING EDITOR'.format(event))
@@ -100,23 +101,23 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
                 if not event.contentsChanged:
                     # this handles SingleElementChangeEvent, all TagChangeEvents, FlagChangeEvents, ...
                     event.applyTo(node)
-                elif isinstance(event, modify.events.PositionChangeEvent):
+                elif isinstance(event, events.PositionChangeEvent):
                     event.applyTo(node)
                     self.dataChanged.emit(modelIndex.child(0, 0), modelIndex.child(node.getContentsCount()-1, 0))
                     
-                elif isinstance(event, modify.events.InsertElementsEvent):
+                elif isinstance(event, events.InsertElementsEvent):
                     for pos, newElements in event.insertions[id]:
                         self.beginInsertRows(modelIndex, pos, pos + len(newElements) - 1)
                         node.insertContents(pos, [e.copy() for e in newElements])
                         self.endInsertRows()
                         
-                elif isinstance(event, modify.events.RemoveElementsEvent):
+                elif isinstance(event, events.RemoveElementsEvent):
                     for pos, num in event.removals[id]:
                         self.beginRemoveRows(modelIndex, pos, pos + num - 1)
                         del node.contents[pos:pos+num]
                         self.endRemoveRows()
                         
-                elif event.__class__ == modify.events.ElementChangeEvent:
+                elif event.__class__ == events.ElementChangeEvent:
                     if node.isFile():
                         event.applyTo(node)
                     else:
@@ -184,7 +185,7 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
                 return False
             insertions = dict()
             insertions[parent.id] = [(row, nodes)]
-            command = modify.InsertElementsCommand(modify.EDITOR, insertions, 'dropCopy->insert')
+            command = commands.InsertElementsCommand(modify.EDITOR, insertions, 'dropCopy->insert')
             modify.push(command)
             return True
     
@@ -205,7 +206,7 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
             for node in orig_nodes:
                 if node.parent.id == parent.id and node.parent.index(node) < row:
                     subtractFromRow += 1
-            removeCommand = modify.RemoveElementsCommand(modify.EDITOR, orig_nodes, 'drop->remove')
+            removeCommand = commands.RemoveElementsCommand(modify.EDITOR, orig_nodes, 'drop->remove')
             modify.push(removeCommand)
         insert_nodes = [node.copy() for node in orig_nodes]
         if isinstance(parent, RootNode):
@@ -223,12 +224,12 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
                 
                 shift = position - parent.contents[row].position
                 positionChanges = [(elem.position,elem.position+shift) for elem in reversed(parent.contents[row:]) ]
-                command = modify.PositionChangeCommand(modify.EDITOR, parent.id, positionChanges, self.tr('adjust positions'))
+                command = commands.PositionChangeCommand(modify.EDITOR, parent.id, positionChanges, self.tr('adjust positions'))
                 modify.push(command)
                          
         insertions = dict()
         insertions[parent.id] = [(row-subtractFromRow, insert_nodes)]
-        insertCommand = modify.InsertElementsCommand(modify.EDITOR, insertions, 'drop->insert')
+        insertCommand = commands.InsertElementsCommand(modify.EDITOR, insertions, 'drop->insert')
         modify.push(insertCommand)
         modify.endMacro()
         return True

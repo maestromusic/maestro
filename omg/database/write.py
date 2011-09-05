@@ -172,7 +172,7 @@ def setTags(elid,tags):
                       [(elid,tag.id,db.idFromValue(tag,value,insert=True)) for value in tags[tag]])
 
 
-def changeSortValue(tag, valueId, sortValue):
+def setSortValue(tag, valueId, sortValue):
     """Set the sort-value of the value of *tag* with id *valueId* to *sortValue*."""
     db.query("UPDATE {}values_{} SET sort_value = ? WHERE tag_id = ? AND id = ?".format(db.prefix, tag.type),
              sortValue, tag.id, valueId)

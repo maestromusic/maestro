@@ -14,6 +14,8 @@ from ..gui import mainwindow
 from ..models import editor, Container, Element, RootNode
 from . import treeview
 from .. import logging, modify, tags
+from ..modify import commands
+
 
 translate = QtCore.QCoreApplication.translate
 logger = logging.getLogger("gui.editor")
@@ -123,7 +125,7 @@ class EditorTreeView(treeview.TreeView):
         if len(self.selectedIndexes()) == 0:
             return
         modify.push(
-            modify.RemoveElementsCommand(modify.EDITOR, [s.internalPointer() for s in self.selectedIndexes()]))
+            commands.RemoveElementsCommand(modify.EDITOR, [s.internalPointer() for s in self.selectedIndexes()]))
         
     def mergeSelected(self):
         mergeIndexes = self.selectedIndexes()

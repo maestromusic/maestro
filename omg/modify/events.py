@@ -8,7 +8,9 @@
 
 from .. import tags
 from .. import logging
-logger = logging.getLogger("modify.events")
+
+logger = logging.getLogger(__name__)
+
 
 class ChangeEvent:
     """Abstract super class for all changeevents."""
@@ -39,6 +41,7 @@ class ElementsDeletedEvent(ChangeEvent):
     def ids(self):
         return self.elids
     
+    
 class SingleElementChangeEvent(ElementChangeEvent):
     """A specialized modify event if only one element (tags, position, ...) is modified."""
     def __init__(self, level, element):
@@ -54,6 +57,7 @@ class SingleElementChangeEvent(ElementChangeEvent):
     
     def applyTo(self, element):
         element.copyFrom(self.element, copyContents = False)
+
 
 class PositionChangeEvent(ElementChangeEvent):
     """An event for the case that the position of several elements below the same parent are changed."""
@@ -245,5 +249,7 @@ class FlagTypeChangedEvent(ChangeEvent):
         
         
 class SortValueChangedEvent(ChangeEvent):
-    def __init__(self, tag, valueId, oldValue, newValue):
-        self.tag, self.valueId, self.oldValue, self.newValue = tag, valueId, oldValue, newValue
+    """This flag is emitted when a sortvalue changes."""
+    def __init__(self,tag,valueId,oldValue,newValue):
+        self.tag,self.valueId,self.oldValue,self.newValue = tag,valueId,oldValue,newValue
+        

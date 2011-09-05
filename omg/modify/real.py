@@ -16,7 +16,7 @@ from .. import database as db, tags, realfiles2, logging
 from ..database import write
 from . import dispatcher, events, REAL
 
-logger = logging.getLogger("omg.modify")
+logger = logging.getLogger(__name__)
 
 
 def createNewElements(elements):
@@ -204,4 +204,15 @@ def changeFlags(changes):
         if any(f not in oldFlags for f in newFlags) or any(f not in newFlags for f in oldFlags):
             db.write.setFlags(element.id,newFlags)
     dispatcher.changes.emit(events.FlagChangeEvent(REAL,changes))
-    
+
+
+def setSortValue(tag,valueId,newValue,oldValue=-1):
+    """Change a sortvalue and emit a SortValueChangedEvent. *tag* and *valueId* specify the affected value,
+    *newValue* is the new value (None if the sortvalue should be deleted) and *oldValue* is used for the
+    event. It may be the oldValue (including None) or -1 (the default) in which case it is fetched from the
+    database.
+    """
+    if oldValue == -1:
+        oldValue = db.sortValue(tag,valueId)
+    db.write.setSortValue(tag,valueId,newValue)
+    dispatcher.changes.emit(events.SortValueChangedEvent(tag,valueId,oldValue,newValue))
