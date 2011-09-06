@@ -14,7 +14,7 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from .. import tags, logging, database as db, models
-from . import events, REAL, EDITOR, dispatcher
+from . import events, real, REAL, EDITOR, dispatcher
 
 
 logger = logging.getLogger(__name__)
@@ -296,7 +296,7 @@ class TagUndoCommand(UndoCommand):
             real.changeTags(self.changes)
         else:
             changes = OrderedDict((k,v[1]) for k,v in self.changes.items())
-            dispatcher.changes.emit(events.TagChangeEvent(changes))
+            dispatcher.changes.emit(events.TagChangeEvent(self.level, changes))
 
     def undo(self):
         # Note that real.changeTags and TagModifyEvent expect a different format for changes
@@ -304,7 +304,7 @@ class TagUndoCommand(UndoCommand):
             real.changeTags({k: (v[1],v[0]) for k,v in self.changes.items()})
         else:
             changes = OrderedDict((k,v[0]) for k,v in self.changes.items())
-            dispatcher.changes.emit(events.TagChangeEvent(changes))
+            dispatcher.changes.emit(events.TagChangeEvent(self.level, changes))
 
 
 class FlagUndoCommand(UndoCommand):
@@ -319,7 +319,7 @@ class FlagUndoCommand(UndoCommand):
             real.changeFlags(self.changes)
         else:
             changes = OrderedDict((k,v[1]) for k,v in self.changes.items())
-            dispatcher.changes.emit(events.FlagChangeEvent(changes))
+            dispatcher.changes.emit(events.FlagChangeEvent(self.level, changes))
 
     def undo(self):
         # Note that real.changeFlags and FlagChangeEvent expect a different format for changes
@@ -327,7 +327,7 @@ class FlagUndoCommand(UndoCommand):
             real.changeFlags({k: (v[1],v[0]) for k,v in self.changes.items()})
         else:
             changes = OrderedDict((k,v[0]) for k,v in self.changes.items())
-            dispatcher.changes.emit(events.FlagChangeEvent(changes))
+            dispatcher.changes.emit(events.FlagChangeEvent(self.level, changes))
             
             
 class SortValueUndoCommand(UndoCommand):

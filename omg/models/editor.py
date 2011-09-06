@@ -44,7 +44,7 @@ class DynamicElementTreeIterator:
         return True
     
     def skip(self):
-        if self.current.parent == self.previous:
+        if hasattr(self.current, 'parent') and self.current.parent == self.previous:
             self.current = self.previous
             self.proceed()
         
@@ -92,7 +92,6 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
     def handleElementChangeEvent(self, event):
         iter = DynamicElementTreeIterator(self.root)
         for node in iter:
-            print('at {}'.format(node))
             if node.id in event.ids():
                 id = node.id
                 logger.debug('event match ID={0} at {1}'.format(id, self.name))
