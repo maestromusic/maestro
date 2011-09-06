@@ -180,12 +180,12 @@ class FlagEditorUndoCommand(QtGui.QUndoCommand):
         - text: a text for the UndoCommand (confer QtGui.QUndoCommand).
         
     \ """
-    def __init__(self,model,method,*params,text=None,level=modify.REAL):
+    def __init__(self,model,method,*params,text=None):
         super().__init__(text)
         self.model = model
         self.method = method
         self.params = params
-        self.level = level
+        self.level = model.level
         if method.__name__ == '_insertRecord':
             pos,record = params
             self.undoMethod = model._removeRecord
