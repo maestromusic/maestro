@@ -17,49 +17,19 @@ from ..modify import events, commands
 from ..utils import hasKnownExtension, collectFiles, longestSubstring, relPath
 from collections import OrderedDict
 from functools import reduce
-import re, string
-import os
-os.walk(None, None, None)
+import re, string, itertools, os
 
 logger = logging.getLogger("models.editor")
 
-class DynamicElementTreeIterator:
-    
-    def __init__(self, root):
-        self.root = root
-        self.current = root
-        self.stopNext = False
-    
-    def __iter__(self):
-        return self
-    
-    def proceed(self):
-        cand = self.current.parent
-        while cand.getContentsCount() == cand.contents.index(self.current) + 1:
-            self.current = cand
-            if self.current == self.root:
-                return False
-            cand = cand.parent
-        self.current = cand.contents[cand.contents.index(self.current) + 1]
-        return True
-    
-    def skip(self):
-        if hasattr(self.current, 'parent') and self.current.parent == self.previous:
-            self.current = self.previous
-            self.proceed()
-        
-    def __next__(self):
-        if self.stopNext:
-            raise StopIteration()
-        self.previous = self.current
-        if self.current.hasContents():
-            self.current = self.current.contents[0]
-        else:
-            if self.current == self.root or not self.proceed():
-                self.stopNext = True
-        return self.previous
-            
-                
+def walk(element):
+    """A tree iterator for elements, inspired by os.walk: Returns a tuple (element, contents)
+    where contents may be modified in-place to influence further processing."""
+    contents = element.getContents()[:]
+    yield element, contents
+    for child in contents:
+        for x in walk(child):
+            yield x
+                    
 class EditorModel(rootedtreemodel.EditableRootedTreeModel):
     """Model class for the editors where users can edit elements before they are commited into
     the database."""
@@ -90,50 +60,60 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
             self.clear()
             
     def handleElementChangeEvent(self, event):
-        iter = DynamicElementTreeIterator(self.root)
-        for node in iter:
-            if node.id in event.ids():
-                id = node.id
-                logger.debug('event match ID={0} at {1}'.format(id, self.name))
-                modelIndex = self.getIndex(node)
-                
-                if not event.contentsChanged:
-                    # this handles SingleElementChangeEvent, all TagChangeEvents, FlagChangeEvents, ...
-                    event.applyTo(node)
-                elif isinstance(event, events.PositionChangeEvent):
-                    event.applyTo(node)
-                    self.dataChanged.emit(modelIndex.child(0, 0), modelIndex.child(node.getContentsCount()-1, 0))
-                    
-                elif isinstance(event, events.InsertElementsEvent):
-                    for pos, newElements in event.insertions[id]:
-                        self.beginInsertRows(modelIndex, pos, pos + len(newElements) - 1)
-                        node.insertContents(pos, [e.copy() for e in newElements])
-                        self.endInsertRows()
-                        
-                elif isinstance(event, events.RemoveElementsEvent):
-                    for pos, num in event.removals[id]:
-                        self.beginRemoveRows(modelIndex, pos, pos + num - 1)
-                        del node.contents[pos:pos+num]
-                        self.endRemoveRows()
-                        
-                elif event.__class__ == events.ElementChangeEvent:
-                    if node.isFile():
-                        event.applyTo(node)
-                    else:
-                        self.beginRemoveRows(modelIndex, 0, node.getContentsCount())
-                        temp = node.contents
-                        node.contents = []
-                        self.endRemoveRows()
-                        node.contents = temp
-                        self.beginInsertRows(modelIndex, 0, event.getNewContentsCount(node))
-                        event.applyTo(node)
-                        self.endInsertRows()
-                        iter.skip()
-                else:
-                    logger.warning('unknown element change event: {}'.format(event))
-                self.dataChanged.emit(modelIndex, modelIndex)
-                if len(event.ids()) == 1:
-                    return
+        if self.root.id in event.ids():
+            if self.applyChangesToNode(self.root, event):
+                return
+        for parent, children in walk(self.root):
+            toRemove = []
+            for i, node in enumerate(children): 
+                if node.id in event.ids():
+                    skip = self.applyChangesToNode(node, event)
+                    if skip:
+                        toRemove.append(i)
+            for i in reversed(toRemove):
+                del children[i]
+    
+    def applyChangesToNode(self, node, event):
+        id = node.id
+        logger.debug('event match ID={0} at {1}'.format(id, self.name))
+        modelIndex = self.getIndex(node)
+        if not event.contentsChanged:
+            # this handles SingleElementChangeEvent, all TagChangeEvents, FlagChangeEvents, ...
+            event.applyTo(node)
+            ret = True
+        elif isinstance(event, events.PositionChangeEvent):
+            event.applyTo(node)
+            self.dataChanged.emit(modelIndex.child(0, 0), modelIndex.child(node.getContentsCount()-1, 0))
+            ret = True
+        elif isinstance(event, events.InsertElementsEvent):
+            for pos, newElements in event.insertions[id]:
+                self.beginInsertRows(modelIndex, pos, pos + len(newElements) - 1)
+                node.insertContents(pos, [e.copy() for e in newElements])
+                self.endInsertRows()
+            ret = False   
+        elif isinstance(event, events.RemoveElementsEvent):
+            for pos, num in event.removals[id]:
+                self.beginRemoveRows(modelIndex, pos, pos + num - 1)
+                del node.contents[pos:pos+num]
+                self.endRemoveRows()
+            ret = False
+        elif event.__class__ == events.ElementChangeEvent:
+            if node.isFile():
+                event.applyTo(node)
+            else:
+                self.beginRemoveRows(modelIndex, 0, node.getContentsCount())
+                temp = node.contents
+                node.contents = []
+                self.endRemoveRows()
+                node.contents = temp
+                self.beginInsertRows(modelIndex, 0, event.getNewContentsCount(node))
+                event.applyTo(node)
+                self.endInsertRows()
+            ret = True
+        else:
+            logger.warning('unknown element change event: {}'.format(event))
+        self.dataChanged.emit(modelIndex, modelIndex)
+        return ret
            
     def setContents(self,contents):
         """Set the contents of this editor and set their parent to self.root.
@@ -188,48 +168,97 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
             modify.push(command)
             return True
     
+    def importNode(self, node):
+        """Helper function to import a node into the editor. Checks if a node with the same ID already
+        exists in some editor. If so, a copy of that is returned; otherwise the argument itself is returned."""
+        if self.dropFromOutside:
+            from ..gui import editor
+            for model in editor.activeEditorModels():
+                for e_node in model.root.getAllNodes(True):
+                    if node.id == e_node.id:
+                        return e_node.copy()                 
+        return node
+    
+    def importFile(self, path):
+        """The same as importNode, but for a file given by a path."""
+        if self.dropFromOutside:
+            from ..gui import editor
+            for model in editor.activeEditorModels():
+                for e_file in model.root.getAllFiles():
+                    if e_file.path == relPath(path):
+                        logger.debug('importing existing file ...')
+                        return e_file.copy()
+        file = File.fromFilesystem(path)
+        file.fileTags = file.tags.copy()
+        return file
+     
     def _dropOMGMime(self, mimeData, action, parent, row):
-        orig_nodes = list(mimeData.getElements())
-            
+        orig_nodes = {node.id:self.importNode(node) for node in mimeData.getElements() }
         # check for recursion error
-        for o in orig_nodes:
-            for n in o.getAllNodes():
-                if n.id == parent.id:
-                    QtGui.QMessageBox.critical(None, self.tr('error'),self.tr('You cannot put a container below itself!'))
-                    return False
-                
+        for node in itertools.chain.from_iterable( (o.getAllNodes() for o in orig_nodes.values() )):
+            if node.id == parent.id:
+                QtGui.QMessageBox.critical(None, self.tr('recursion error'),
+                                           self.tr('Cannot place a container below itself.'))
+                return False       
         modify.beginMacro(modify.EDITOR, self.tr('drop elements'))
-        
-        subtractFromRow = 0
-        if action == Qt.MoveAction:
-            for node in orig_nodes:
-                if node.parent.id == parent.id and node.parent.index(node) < row:
-                    subtractFromRow += 1
-            removeCommand = commands.RemoveElementsCommand(modify.EDITOR, orig_nodes, 'drop->remove')
-            modify.push(removeCommand)
-        insert_nodes = [node.copy() for node in orig_nodes]
-        if isinstance(parent, RootNode):
-            for node in insert_nodes:
-                node.position = None
-        else:
-            if row > parent.getContentsCount():
-                row = parent.getContentsCount()
-            position = 1 if row == 0 else parent.contents[row-1].position + 1
-            for node in insert_nodes:
-                node.position = position
-                position += 1
-            if len(parent.contents) > row and parent.contents[row].position < position:
-                # need to increase positions of elements behind insertion
+        move, insert_same, insert_other = dict(), dict(), dict()
+        for id, node in orig_nodes.items():
+            if hasattr(node.parent, 'id') and node.parent.id == parent.id:
+                if action == Qt.MoveAction:
+                    move[id] = node
+                else:
+                    insert_same[id] = node.copy()
+            else:
+                insert_other[id] = node.copy()
                 
-                shift = position - parent.contents[row].position
-                positionChanges = [(elem.position,elem.position+shift) for elem in reversed(parent.contents[row:]) ]
-                command = commands.PositionChangeCommand(modify.EDITOR, parent.id, positionChanges, self.tr('adjust positions'))
-                modify.push(command)
-                         
-        insertions = dict()
-        insertions[parent.id] = [(row-subtractFromRow, insert_nodes)]
-        insertCommand = commands.InsertElementsCommand(modify.EDITOR, insertions, 'drop->insert')
-        modify.push(insertCommand)
+        movedBefore = 0
+        positionChanges = []
+        currentPosition = 1
+        
+        for node in parent.contents[:row]:
+            if node.id in move: # node moved away
+                movedBefore += 1
+            elif not isinstance(parent, RootNode):
+                positionChanges.append( (node.position, node.position - movedBefore) )
+                currentPosition = node.position - movedBefore + 1
+
+        if isinstance(parent, RootNode):
+            if action == Qt.MoveAction:
+                removeCommand = commands.RemoveElementsCommand(modify.EDITOR,
+                                                               list(move.values()) + list(insert_other.values()))
+                modify.push(removeCommand)
+            insertions = dict()
+            insertions[parent.id] = [(row - movedBefore,
+                                      list(insert_same.values()) + list(move.values()) + list(insert_other.values()))]
+            for node in insertions[parent.id][0][1]:
+                node.position = None
+            insertCommand = commands.InsertElementsCommand(modify.EDITOR, insertions, 'drop->insert')
+            modify.push(insertCommand)
+        else:
+            for node in move.values():
+                positionChanges.append( (node.position, currentPosition) )
+                currentPosition += 1
+            for node in itertools.chain(insert_same.values(), insert_other.values()):
+                node.position = currentPosition
+                currentPosition += 1 
+            for node in parent.contents[row:]:
+                if node.id in move:
+                    pass
+                elif node.position < currentPosition:
+                    positionChanges.append( (node.position, currentPosition) )
+                    currentPosition += 1        
+            
+            if action == Qt.MoveAction and len(insert_other) > 0:    
+                removeCommand = commands.RemoveElementsCommand(modify.EDITOR, insert_other.values(), 'drop->remove')
+                modify.push(removeCommand)
+            
+            command = commands.PositionChangeCommand(modify.EDITOR, parent.id, positionChanges, self.tr('adjust positions'))
+            modify.push(command)
+                     
+            insertions = dict()
+            insertions[parent.id] = [(row - movedBefore, list(insert_same.values()) + list(insert_other.values()) )]
+            insertCommand = commands.InsertElementsCommand(modify.EDITOR, insertions, 'drop->insert')
+            modify.push(insertCommand)
         modify.endMacro()
         return True
         
@@ -245,14 +274,13 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
         elementList = []
         for i,f in enumerate(files):
             progress.setValue(i+1)
-            QtGui.QApplication.processEvents();
+            QtGui.QApplication.processEvents()
             if progress.wasCanceled():
                 return False
             readOk = False
             while not readOk:
                 try:
-                    theFile = File.fromFilesystem(f)
-                    theFile.fileTags = theFile.tags.copy()
+                    theFile = self.importFile(f)
                     elementList.append(theFile)
                     readOk = True
                 except tags.UnknownTagError as e:
