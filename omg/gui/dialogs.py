@@ -121,3 +121,7 @@ def question(title, text):
                                      buttons = QtGui.QMessageBox.No | QtGui.QMessageBox.Yes)
     return ans == QtGui.QMessageBox.Yes
 
+def warning(title, text):
+    """Display a modal warning dialog with the given *title* and *text*."""
+    from . import mainwindow
+    QtGui.QMessageBox.warning(mainwindow.mainWindow, title, text)

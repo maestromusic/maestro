@@ -397,31 +397,29 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
     
     def shiftPositions(self, elements, delta):
         '''Shift the positions of the given elements by *delta* (if valid).'''
-        #TODO: method only works for continuous selection
-        elements.sort(key = lambda el: el.position)
-        parent = elements[0].parent
-        if isinstance(parent, RootNode):
-            return
-        if delta > 0:
-            if parent.contents[-1] != elements[-1]:
-                # there are elements behind
-                lastIndex = parent.contents.index(elements[-1])
-                spaceBehind = parent.contents[lastIndex+1].position - elements[-1].position - 1
-                if spaceBehind < delta:
-                    raise NotImplementedError()
-            positionChanges = [(element.position, element.position + delta) for element in reversed(elements)]
-            command = modify.PositionChangeCommand(modify.EDITOR, parent.id, positionChanges, self.tr('position change'))
-            modify.push(command)
-        elif delta < 0:
-            if parent.contents[0] != elements[0]:
-                #there are elements before
-                firstIndex = parent.contents.index(elements[0])
-                spaceBefore = elements[0].position - parent.contents[firstIndex-1].position - 1
-                if spaceBefore < -delta:
-                    raise NotImplementedError()
-            elif elements[0].position <= -delta:
-                return # cannot decrease position 1
-            positionChanges = [(element.position, element.position + delta) for element in elements]
-            command = modify.PositionChangeCommand(modify.EDITOR, parent.id, positionChanges, self.tr('position change'))
+        elementsByParents = itertools.groupby(elements, key = lambda x: x.parent.id)
+        for key, group in elementsByParents:
+            elems = sorted(group, key = lambda x: x.position)
+            parent = elems[0].parent
+            if isinstance(parent, RootNode):
+                continue
+            if delta < 0 and elems[0].position + delta <= parent.contents.index(elems[0]):
+                from ..gui.dialogs import warning
+                warning('position below zero', 'not enough space before to decrease position')
+                continue
+            positionChanges = []
+            unit = (-1)**(delta<0) # -1 if delta < 0 else 1
+            currentPosition = parent.contents[-1+(delta>0)].position
+            print(currentPosition)
+            for elem in parent.contents[::unit]:
+                if elem in elems:
+                    positionChanges.append( (elem.position, elem.position+delta) )
+                    currentPosition = elem.position + delta + unit
+                else:
+                    if elem.position*unit < currentPosition*unit:
+                        positionChanges.append( (elem.position, currentPosition) )
+                    currentPosition += unit
+                    
+            command = commands.PositionChangeCommand(modify.EDITOR, parent.id, positionChanges, self.tr('position change'))
             modify.push(command)
             

@@ -50,6 +50,10 @@ class EditorTreeView(treeview.TreeView):
         self.decreasePositionAction = QtGui.QAction(self.tr('Decrease position(s)'), self)
         self.decreasePositionAction.triggered.connect(self.decreasePositions)
         self.decreasePositionAction.setShortcut(Qt.Key_Minus)
+        
+        self.majorAction = QtGui.QAction(self.tr('major'), self)
+        self.majorAction.setCheckable(True)
+        self.majorAction.triggered.connect(self.toggleSelectedMajor)
         self.selectionModel().selectionChanged.connect(self._handleSelectionChanged)
     
     def _handleSelectionChanged(self, selected, deselected):
@@ -64,12 +68,13 @@ class EditorTreeView(treeview.TreeView):
             mainwindow.setGlobalSelection(globalSelection,self)
              
     def contextMenuProvider(self, actions, currentIndex):
+        actions.append(self.majorAction)
+        self.majorAction.setChecked(self.currentIndex().internalPointer().major)
         s = set( index.parent() for index in self.selectedIndexes() )
         if len(s) == 1:
             actions.append(self.mergeAction)
-            if tuple(s)[0].internalPointer() is not None:
-                actions.append(self.increasePositionAction)
-                actions.append(self.decreasePositionAction)
+        actions.append(self.increasePositionAction)
+        actions.append(self.decreasePositionAction)
         actions.append(self.removeSelectedAction)
         actions.append(self.tagMatchAction)
         super().contextMenuProvider(actions,currentIndex)
@@ -127,7 +132,10 @@ class EditorTreeView(treeview.TreeView):
             return
         modify.push(
             commands.RemoveElementsCommand(modify.EDITOR, [s.internalPointer() for s in self.selectedIndexes()]))
-        
+    
+    def toggleSelectedMajor(self):
+        modify.push(commands.ChangeMajorFlagCommand(modify.EDITOR, self.currentIndex().internalPointer()))
+                    
     def mergeSelected(self):
         mergeIndexes = self.selectedIndexes()
         hintTitle, hintRemove = self.model().createMergeHint(mergeIndexes)

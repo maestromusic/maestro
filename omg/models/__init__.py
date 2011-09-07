@@ -350,8 +350,9 @@ class Element(Node):
     
     def __str__(self):
         if self.tags is not None:
-            return "({}) <{}[{}]> {}".format(self.position if self.position is not None else '', type(self).__name__,self.id, self.getTitle())
-        else: return "<{}[{}]>".format(type(self).__name__,self.id)
+            ret =  "({}) <{}[{}]> {}".format(self.position if self.position is not None else '', type(self).__name__,self.id, self.getTitle())
+        else: ret =  "<{}[{}]>".format(type(self).__name__,self.id)
+        return '*' + ret if self.major else ret
     
 
 class Container(Element):
@@ -359,7 +360,7 @@ class Container(Element):
     contents = None
     
     """Element-subclass for containers."""
-    def __init__(self, id, contents, tags, flags, position, major = True):
+    def __init__(self, id, contents, tags, flags, position, major):
         """Initialize this container, optionally with a contents list.
         Note that the list won't be copied but the parents will be changed to this container."""
         self.id = id
@@ -372,7 +373,7 @@ class Container(Element):
         self.major = major
     
     @staticmethod
-    def fromId(id, *, contents=None, tags=None, flags=None, position=None, parentId=None, loadData=True):
+    def fromId(id, *, contents=None, tags=None, flags=None, position=None, parentId=None, major = None, loadData=True):
         if loadData:
             if tags is None:
                 tags = db.tags(id)
@@ -380,7 +381,9 @@ class Container(Element):
                 flags = db.flags(id)
             if position is None and parentId is not None:
                 position = db.position(parentId,id)
-        return Container(id,contents,tags,flags,position)
+            if major is None:
+                major = db.isMajor(id)
+        return Container(id,contents,tags,flags,position, major)
 
     def isContainer(self):
         return True
@@ -426,7 +429,7 @@ class Container(Element):
 
 
 class File(Element):
-    def __init__(self, id, tags, flags, path, length, position):
+    def __init__(self, id, tags, flags, path, length, position, major = False):
         """Initialize this element with the given id, which must be an integer or None (for external files).
         Optionally you may specify a tags.Storage object holding the tags of this element and/or a file path.
         """
@@ -435,12 +438,13 @@ class File(Element):
         self.flags = flags
         self.length = length
         self.position = position
+        self.major = major
         if path is not None and not isinstance(path,str):
             raise ValueError("path must be either None or a string. I got {}".format(id))
         self.path = path
     
     @staticmethod
-    def fromId(id,*,tags=None,flags=None,path=None,length=None,position=None,parentId=None,loadData=True):
+    def fromId(id,*,tags=None,flags=None,path=None,length=None,position=None,parentId=None,major=False,loadData=True):
         if loadData and id > 0:
             if tags is None:
                 tags = db.tags(id)
@@ -452,6 +456,8 @@ class File(Element):
                 length = db.length(id)
             if position is None and parentId is not None:
                 position = db.position(parentId,id)
+            if major is None:
+                major = db.isMajor(id)
         return File(id,tags,flags,path,length,position)
         
     @staticmethod

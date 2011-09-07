@@ -58,6 +58,13 @@ class SingleElementChangeEvent(ElementChangeEvent):
     def applyTo(self, element):
         element.copyFrom(self.element, copyContents = False)
 
+class MajorFlagChangeEvent(SingleElementChangeEvent):
+    """A modify event for toggling the major flag of an element."""
+    def __init__(self, level, element):
+        super().__init__(level, element)
+        
+    def applyTo(self, element):
+        element.major = self.element.major
 
 class PositionChangeEvent(ElementChangeEvent):
     """An event for the case that the position of several elements below the same parent are changed."""
