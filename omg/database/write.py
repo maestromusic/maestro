@@ -195,8 +195,9 @@ def removeFlag(elids,flag):
 def setFlags(elid,flags):
     """Give the element with the given id exactly the flags in the list *flags*."""
     db.query("DELETE FROM {}flags WHERE element_id = ?".format(db.prefix),elid)
-    values = ["({},{})".format(elid,flag.id) for flag in flags]
-    db.query("INSERT INTO {}flags (element_id,flag_id) VALUES {}".format(db.prefix,','.join(values)))
+    if len(flags) > 0:
+        values = ["({},{})".format(elid,flag.id) for flag in flags]
+        db.query("INSERT INTO {}flags (element_id,flag_id) VALUES {}".format(db.prefix,','.join(values)))
     
 def setMajor(elid, major):
     db.query("UPDATE {}elements SET major = ? WHERE id = ?".format(db.prefix), major, elid)

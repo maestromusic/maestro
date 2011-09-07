@@ -103,7 +103,7 @@ class CommitCommand(UndoCommand):
         
         progress = QtGui.QProgressDialog(translate('modify.commands', "Commiting files..."),
                                          None, 0, 7)
-        progress.setMinimumDuration(1500)
+        progress.setMinimumDuration(300)
         progress.setWindowModality(Qt.WindowModal)
         from .. import models
         # clear all editors by event
