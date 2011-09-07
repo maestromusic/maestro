@@ -55,8 +55,11 @@ def commit(changes):
     
     # Tags
     changeTags({oldElement: (oldElement.tags,newElement.tags)
-                    for oldElement,newElement in changes.values()},emitEvent=False)
-                    
+                    for oldElement,newElement in changes.values()},emitEvent = False)
+    
+    # Flags
+    changeFlags({oldElement: (oldElement.flags, newElement.flags)
+                 for oldElement, newElement in changes.values()}, emitEvent = False)
     # Contents (including position)
     contents = {}
     for id,changesTuple in changes.items():
@@ -195,7 +198,7 @@ def removeFlag(flag,elements):
     dispatcher.changes.emit(events.FlagRemovedEvent(REAL,flag,elements))
     
 
-def changeFlags(changes):
+def changeFlags(changes, emitEvent = True):
     """Change flags arbitrarily: *changes* is a dict mapping elements (not element-ids!) to tuples consisting
     of two lists of flags - the flags before and after the change."""
     for element,changeTuple in changes.items():
@@ -203,7 +206,8 @@ def changeFlags(changes):
         # Compare the lists forgetting the order
         if any(f not in oldFlags for f in newFlags) or any(f not in newFlags for f in oldFlags):
             db.write.setFlags(element.id,newFlags)
-    dispatcher.changes.emit(events.FlagChangeEvent(REAL,changes))
+    if emitEvent:
+        dispatcher.changes.emit(events.FlagChangeEvent(REAL,changes))
 
 
 def setSortValue(tag,valueId,newValue,oldValue=-1):

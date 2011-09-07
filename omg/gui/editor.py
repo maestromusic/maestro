@@ -99,6 +99,7 @@ class EditorTreeView(treeview.TreeView):
                 event.setDropAction(Qt.MoveAction)
             else:
                 event.setDropAction(Qt.CopyAction)
+        self.model().dropFromOutside = not isinstance(event.source(), EditorTreeView)
         treeview.TreeView.dropEvent(self, event)
     
     def _expandInsertedRows(self, parent, start, end):
@@ -272,3 +273,8 @@ class MergeDialog(QtGui.QDialog):
             return self.positionCheckBox.isChecked()
         else:
             return False
+
+def activeEditorModels():
+    """Returns a list containing the models of all open editor models."""
+    return [dock.editor.model() for dock in mainwindow.mainWindow.getWidgets('editor')]
+    

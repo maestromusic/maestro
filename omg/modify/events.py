@@ -78,7 +78,8 @@ class PositionChangeEvent(ElementChangeEvent):
         for elem in element.contents:
             if elem.position in self.positionMap:
                 elem.position = self.positionMap[elem.position]
-        element.sortContents()
+        if hasattr(element, 'sortContents'):
+            element.sortContents()
         
     
 class InsertElementsEvent(ElementChangeEvent):

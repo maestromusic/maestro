@@ -14,9 +14,9 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from .. import tags, logging, database as db, models
-from . import events, REAL, EDITOR, dispatcher
+from . import events, real, REAL, EDITOR, dispatcher
 
-
+translate = QtCore.QCoreApplication.translate
 logger = logging.getLogger(__name__)
 
 
@@ -69,8 +69,8 @@ class CommitCommand(UndoCommand):
         self.level = REAL
         self.setText('commit')
         # store contents of all open editors in self.editorRoots
-        from ..gui import mainwindow
-        editorModels = [dock.editor.model() for dock in mainwindow.mainWindow.getWidgets('editor')]
+        from ..gui import editor
+        editorModels = editor.activeEditorModels()
         self.editorRoots = [model.root.copy() for model in editorModels]
         
         # save current state in the editors in dicts mapping id->element
@@ -100,15 +100,19 @@ class CommitCommand(UndoCommand):
             invoke a ElementsChangeEvent for all the changes (new elements will have a negative
             id as key in the dictionary)
           - restore the (committed) content in the editors by an appropriate event"""
+        
+        progress = QtGui.QProgressDialog(translate('modify.commands', "Commiting files..."),
+                                         None, 0, 7)
+        progress.setMinimumDuration(1500)
+        progress.setWindowModality(Qt.WindowModal)
         from .. import models
         # clear all editors by event
         emptyRoots = [root.copy(contents = []) for root in self.editorRoots]
         dispatcher.changes.emit(events.ElementChangeEvent(REAL, {root.id:root for root in emptyRoots}, True))
-        
+        progress.setValue(1)
         # assign new IDs to all elements which have editor IDs so far
-        logger.debug('creating new elements ...')
         self.idMap = real.createNewElements(self.newElements.values())
-        logger.debug('done creating new elements')
+        progress.setValue(2)
         # store new IDs in the editors (old ones are still available via self.idMap
         for elem in itertools.chain( *(root.getAllNodes(skipSelf = True) for root in self.editorRoots) ):
             if not elem.isInDB():
@@ -116,20 +120,22 @@ class CommitCommand(UndoCommand):
                 
         # commit all the changes
         changes = {}
-        logger.debug('preparing commit ...')
         for id, elem in self.newElements.items():
             oldElem = models.Element.fromId(self.idMap[id], loadData = False)
             if hasattr(elem, 'fileTags'):
                 oldElem.fileTags = elem.fileTags
             oldElem.tags = tags.Storage()
+            oldElem.flags = list()
             changes[self.idMap[id]] = ( oldElem, elem )
+        progress.setValue(3)
         for id, elem in self.dbElements.items():
             changes[id] = ( self.originalElements[id], self.dbElements[id] )
-        logger.debug('now invoking commit.')
+        progress.setValue(4)
         real.commit(changes)
-        
+        progress.setValue(5)
         # notify the editors to display the new commited content
         dispatcher.changes.emit(events.ElementChangeEvent(REAL, {root.id:root for root in self.editorRoots}, True))
+        progress.setValue(6)
         
         
     def undo(self):
@@ -189,6 +195,8 @@ class PositionChangeCommand(UndoCommand):
     """An undo command for changing positions of elements below one single parent."""
     
     def __init__(self, level, parentId, positionChanges, text = ''):
+        """Initialize the PositionChangeCommand. *positionChanges* is a list of tuples
+        mapping old to new positions."""
         QtGui.QUndoCommand.__init__(self)
         if level != EDITOR:
             raise NotImplementedEror()
@@ -232,6 +240,7 @@ class RemoveElementsCommand(UndoCommand):
         are both in the list, then the item itself is redundant)."""
         QtGui.QUndoCommand.__init__(self)
         if level != EDITOR:
+            logger.warning('tu was')
             raise NotImplementedError()
         self.level = level
         if len(elements) == 0:
@@ -296,7 +305,7 @@ class TagUndoCommand(UndoCommand):
             real.changeTags(self.changes)
         else:
             changes = OrderedDict((k,v[1]) for k,v in self.changes.items())
-            dispatcher.changes.emit(events.TagChangeEvent(changes))
+            dispatcher.changes.emit(events.TagChangeEvent(self.level, changes))
 
     def undo(self):
         # Note that real.changeTags and TagModifyEvent expect a different format for changes
@@ -304,7 +313,7 @@ class TagUndoCommand(UndoCommand):
             real.changeTags({k: (v[1],v[0]) for k,v in self.changes.items()})
         else:
             changes = OrderedDict((k,v[0]) for k,v in self.changes.items())
-            dispatcher.changes.emit(events.TagChangeEvent(changes))
+            dispatcher.changes.emit(events.TagChangeEvent(self.level, changes))
 
 
 class FlagUndoCommand(UndoCommand):
@@ -319,7 +328,7 @@ class FlagUndoCommand(UndoCommand):
             real.changeFlags(self.changes)
         else:
             changes = OrderedDict((k,v[1]) for k,v in self.changes.items())
-            dispatcher.changes.emit(events.FlagChangeEvent(changes))
+            dispatcher.changes.emit(events.FlagChangeEvent(self.level, changes))
 
     def undo(self):
         # Note that real.changeFlags and FlagChangeEvent expect a different format for changes
@@ -327,7 +336,7 @@ class FlagUndoCommand(UndoCommand):
             real.changeFlags({k: (v[1],v[0]) for k,v in self.changes.items()})
         else:
             changes = OrderedDict((k,v[0]) for k,v in self.changes.items())
-            dispatcher.changes.emit(events.FlagChangeEvent(changes))
+            dispatcher.changes.emit(events.FlagChangeEvent(self.level, changes))
             
             
 class SortValueUndoCommand(UndoCommand):
