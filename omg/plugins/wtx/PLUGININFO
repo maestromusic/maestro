@@ -2,4 +2,3 @@ name=WTX
 author=Martin Altmayer
 version=1.0
 description=Stores the tags and contents of containers in an XML-file.
-maxomgversion=0.1.99

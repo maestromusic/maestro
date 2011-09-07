@@ -217,6 +217,7 @@ class SingleFlagChangeEvent(FlagChangeEvent):
         self.level = level
         self.flag = flag
         self.elements = elements
+        self.contentsChanged = False
         
     def ids(self):
         return [element.id for element in self.elements]

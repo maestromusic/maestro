@@ -265,6 +265,7 @@ class FlagEditorUndoCommand(QtGui.QUndoCommand):
                     event = modify.events.FlagAddedEvent(modify.EDITOR,*action[1:])
                 elif action[0] == 'remove':
                     event = modify.events.FlagRemovedEvent(modify.EDITOR,*action[1:])
+            modify.dispatcher.changes.emit(event)
         else: # level == REAL
             for action in actions:
                 if action[0] == 'add':
