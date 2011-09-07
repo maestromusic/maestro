@@ -60,9 +60,11 @@ def commit(changes):
     # Flags
     changeFlags({oldElement: (oldElement.flags, newElement.flags)
                  for oldElement, newElement in changes.values()}, emitEvent = False)
+    
+    # Major
     for tup in changes.values():
         setMajor(tup[1], emitEvent = False)
-        print('set major {0}, {1}'.format(tup[1], tup[1].major))
+    
     # Contents (including position)
     contents = {}
     for id,changesTuple in changes.items():

@@ -262,17 +262,25 @@ def exists(identifier):
                                 .format(identifier,type(identifier)))
 
 
-def get(identifier):
+def get(identifier, createDialogIfNew = False):
     """Return the tag identified by *identifier*. If *identifier* is an integer return the tag with this id.
+    
     If *identifier* is a string return the tag with this name.
     If *identifier* is a Tag-instance, return *identifier*.
-    This method does not create new instances of the tags but returns always the same instance."""
+    This method does not create new instances of the tags but returns always the same instance.
+    
+    If *createDialogIfNew* is True, and there is no tag matching *identifier*, a dialog is popped up
+    to create the new tag."""
     if isinstance(identifier,int):
         return _tagsById[identifier]
     elif isinstance(identifier,str):
         identifier = identifier.lower()
         if identifier in _tagsByName:
             return _tagsByName[identifier]
+        elif createDialogIfNew:
+            from .gui.tagwidgets import NewTagTypeDialog
+            return NewTagTypeDialog.createTagType(identifier,
+                                           text = 'specify type of tag "{}"'.format(identifier))
         else: raise UnknownTagError(identifier)
     elif isinstance(identifier, Tag):
         return identifier
@@ -310,7 +318,10 @@ def addTagType(name, type, sort = None, private = False):
     if name in _tagsByName:
         raise RuntimeError("Requested creation of tag {} which is already there".format(name))
     if sort is None:
-        sort = [TITLE]
+        if TITLE is not None:
+            sort = [TITLE]
+        else:
+            sort = []
     
     from . import database
     id = database.query(
@@ -397,16 +408,10 @@ def changeTagType(tag,name=None,valueType=None,private=None,sortTags=None):
         
         from .modify import dispatcher, events, CHANGED
         dispatcher.tagTypeChanged.emit(events.TagTypeChangedEvent(CHANGED,tag))
-    
-    
-def init():
-    """Initialize the variables of this module based on the information of the tagids-table and config-file.
-    At program start or after changes of that table this method must be called to ensure the module has the
-    correct tags and their IDs.
-    """
-    global _tagsById,_tagsByName,tagList, _translation, TITLE,ALBUM
 
-    # Initialize _tagsById, _tagsByName and tagList from the database
+def loadTagTypesFromDB():
+    """Initialize _tagsById, _tagsByName and tagList from the database"""
+    global _tagsByName, _tagsById, tagList
     from omg import database
     _tagsById = {}
     _tagsByName = {}
@@ -420,12 +425,27 @@ def init():
     tagList = [ _tagsByName[name] for name in config.options.tags.tag_order if name in _tagsByName ]
     # ...and then all remaining tags in arbitrary order
     tagList.extend(set(_tagsByName.values()) - set(tagList))
-            
+    
+    
+def init():
+    """Initialize the variables of this module based on the information of the tagids-table and config-file.
+    At program start or after changes of that table this method must be called to ensure the module has the
+    correct tags and their IDs.
+    """
+    global TITLE,ALBUM, _translation 
+    loadTagTypesFromDB()
+    
     # Init TITLE AND ALBUM
     if config.options.tags.title_tag not in _tagsByName:
-        raise RuntimeError("Cannot find a '{}'-tag in the database.".format(config.options.tags.title_tag))
+        from .gui.tagwidgets import NewTagTypeDialog
+        NewTagTypeDialog.createTagType(config.options.tags.title_tag,
+                                       text = 'need TITLE-tag to start omg')
+        loadTagTypesFromDB()
     if config.options.tags.album_tag not in _tagsByName:
-        raise RuntimeError("Cannot find a '{}'-tag in the database.".format(config.options.tags.album_tag))
+        from .gui.tagwidgets import NewTagTypeDialog
+        NewTagTypeDialog.createTagType(config.options.tags.album_tag,
+                                       text = 'need ALBUM-tag to start omg')
+        loadTagTypesFromDB()
     TITLE = _tagsByName[config.options.tags.title_tag]
     ALBUM = _tagsByName[config.options.tags.album_tag]
 
