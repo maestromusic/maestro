@@ -33,6 +33,7 @@ class ElementChangeEvent(ChangeEvent):
     def applyTo(self, element):
         element.copyFrom(self.changes[element.id], copyContents = self.contentsChanged)
 
+
 class ElementsDeletedEvent(ChangeEvent):
     """Special event that is sent when elements are completely deleted from the database."""
     def __init__(self,elids):
@@ -198,7 +199,10 @@ class FlagChangeEvent(ElementChangeEvent):
     def applyTo(self,element):
         assert element in self.changes
         if element.flags is not None:
-            element.flags = self.changes[element][:]
+            element.flags = list(self.changes[element][1])
+            
+    def getElements(self):
+        return self.changes.keys()
             
     def __str__(self):
         return "Modify flags"
@@ -214,20 +218,29 @@ class SingleFlagChangeEvent(FlagChangeEvent):
         
     def ids(self):
         return [element.id for element in self.elements]
+    
+    def getElements(self):
+        return self.elements
         
     
 class FlagAddedEvent(SingleFlagChangeEvent):
     """FlagAddedEvents are used when a flag is added to one or more elements."""
     def applyTo(self,element):
-        if element.flags is not None and self.flag not in element.flags:
-            element.flags.append(self.flag)
+        if element.flags is not None:
+            if self.flag not in element.flags:
+                element.flags.append(self.flag)
+                return True
+            else: return False
         
 
 class FlagRemovedEvent(SingleFlagChangeEvent):
     """FlagRemovedEvent are used when a flag is remove from one or more elements."""
     def applyTo(self,element):
-        if element.flags is not None and self.flag in element.flags:
-            element.flags.remove(self.flag)
+        if element.flags is not None:
+            if self.flag in element.flags:
+                element.flags.remove(self.flag)
+                return True
+            else: return False
 
 
 class TagTypeChangedEvent(ChangeEvent):

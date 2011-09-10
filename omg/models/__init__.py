@@ -50,13 +50,15 @@ class Node:
     
     def setContents(self,contents):
         """Set the list of contents of this container to *contents*. Note that the list won't be copied and in
-        fact altered: the parents will be set to this container."""
+        fact altered: the parents will be set to this node."""
         assert isinstance(contents,list)
         self.contents = contents
         for element in self.contents:
             element.setParent(self)
     
     def insertContents(self, index, nodes):
+        """Insert *nodes* at position *index* into this node's contents. As with setContents the list won't
+        be copied and the parents will be set to this node."""
         for n in nodes:
             n.setParent(self)
         self.contents[index:index] = nodes
@@ -111,7 +113,8 @@ class Node:
         else: return 0
 
     def index(self,node):
-        """Return the index of <node> in this node's contents or raise a ValueError if the node is not found. See also find."""
+        """Return the index of *node* in this node's contents or raise a ValueError if *node* is not found.
+         See also find."""
         contents = self.getContents()
         for i in range(0,len(contents)):
             if contents[i].id == node.id:
@@ -119,7 +122,7 @@ class Node:
         raise ValueError("Node.index: Node {0} is not contained in element {1}.".format(node,self))
         
     def find(self,node):
-        """Return the index of <node> in this node's contents or -1 if the node is not found. See also index."""
+        """Return the index of *node* in this node's contents or -1 if *node* is not found. See also index."""
         contents = self.getContents()
         for i in range(0,len(contents)):
             if contents[i] == node:
@@ -127,8 +130,8 @@ class Node:
         return -1
 
     def getAllNodes(self, skipSelf = False):
-        """Generator which will return all nodes contained in this node or in children of it, including the node itself
-        if *skipSelf* is not set True."""
+        """Generator which will return all nodes contained in this node or in children of it, including the
+        node itself if *skipSelf* is not set True."""
         if not skipSelf:
             yield self
         if self.isFile():
@@ -138,7 +141,8 @@ class Node:
                 yield node
  
     def getAllFiles(self):
-        """Generator which will return all files contained in this node or in children of it (possibly including the node itself)."""
+        """Generator which will return all files contained in this node or in children of it
+        (possibly including the node itself)."""
         assert self.getContents() is not None
         if self.isFile():
             yield self
@@ -176,7 +180,8 @@ class Node:
         return offset
         
     def getFileAtOffset(self,offset):
-        """Get the file at the given <offset>. Note that <offset> is relative to this element, not to the whole playlist (unless the element is the rootnode)."""
+        """Get the file at the given <offset>. Note that <offset> is relative to this element, not to the
+        whole playlist (unless the element is the rootnode)."""
         assert self.getContents() is not None
         offset = int(offset)
         if offset == 0 and self.isFile():
@@ -188,8 +193,12 @@ class Node:
             else: return child.getFileAtOffset(innerOffset)
         
     def getChildIndexAtOffset(self,offset):
-        """Return a tuple: the index of the child C that contains the file F with the given offset (relative to this element) and the offset of F relative to C ("inner offset").
-        For example: If this element is the rootnode and the playlist contains an album with 13 songs and one with 12 songs, then getChildIndexAtOffset(17) will return (1,3), since the 18th file if the playlist (i.e. with offset 17), is contained in the second album (i.e with index 1) and it is the 4th song on that album (i.e. it has offset 3 relative to the album).
+        """Return a tuple: the index of the child C that contains the file F with the given offset (relative
+        to this element) and the offset of F relative to C ("inner offset").
+        For example: If this element is the rootnode and the playlist contains an album with 13 songs and one
+        with 12 songs, then getChildIndexAtOffset(17) will return (1,3), since the 18th file if the playlist
+        (i.e. with offset 17), is contained in the second album (i.e with index 1) and it is the 4th song on
+        that album (i.e. it has offset 3 relative to the album).
         """
         offset = int(offset)
         if offset < 0:
@@ -205,7 +214,10 @@ class Node:
         raise IndexError("Offset {0} is out of bounds".format(offset))
     
     def getChildAtOffset(self,offset):
-        """Return the child containing the file with the given (relative) offset, and the offset of that file relative to the child. This is a convenience-method for getChildren()[getChildIndexAtOffset(offset)[0]]. Confer getChildIndexAtOffset."""
+        """Return the child containing the file with the given (relative) offset, and the offset of that file
+        relative to the child. This is a convenience-method for
+        getChildren()[getChildIndexAtOffset(offset)[0]]. Confer getChildIndexAtOffset.
+        """
         index,innerOffset = self.getChildIndexAtOffset(offset)
         if index is None:
             return None,None
@@ -240,7 +252,8 @@ class RootNode(Node):
         
         
 class Element(Node):
-    """Abstract base class for elements (files or containers) in playlists, browser, etc.. Contains methods to load tags and contents from the database or from files."""
+    """Abstract base class for elements (files or containers) in playlists, browser, etc.. Contains methods
+    to load tags and contents from the database or from files."""
     tags = None # tags.Storage to store the tags. None until they are loaded
     position = None
     length = None
@@ -265,7 +278,39 @@ class Element(Node):
             return self.id > 0
         else:
             return self.id is not None and (self.isFile() or all(e.isInDB(True) for e in self.contents))
-        
+
+    def export(self,attributes,copyList=[],replace=[]):
+        if isinstance(self,Container):
+            result = Container(self.id,None,None,None,None,None)
+        else: result = File(self.id,None,None,None,None,None)
+        for attr in attributes:
+            if attr in replace:
+                setattr(result,attr,replace[attr])
+            elif not hasattr(self,attr) or getattr(self,attr) is None:
+                if attr == 'contents':
+                    if isinstance(result,Container):
+                        result.loadContents()
+                elif attr == 'tags':
+                    result.tags = db.tags(result.id)
+                elif attr == 'flags':
+                    result.flags = db.flags(result.id)
+                elif attr == 'path':
+                    if isinstance(result,File):
+                        path = db.path(result.id)
+                elif attr == 'length':
+                    if isinstance(result,File):
+                        path = db.length(result.id)
+                else: setattr(result,attr,None)
+            else:
+                if attr == 'contents' and 'contents' in copyList:
+                    result.setContents([child.export(attributes,copyList,replace) for child in self.contents])
+                if attr == 'tags' and 'tags' in copyList:
+                    result.tags = self.tags.copy()
+                elif attr == 'flags' and 'flags' in copyList:
+                    result.flags = self.flags[:]
+                else: setattr(result,attr,getattr(self,attr))
+        return result
+    
     def copy(self,contents=None,copyTags=True):
         """Reimplementation of Node.copy: If *copyTags* is True, the element's copy will contain a copy of
         this node's tags.Storage-instance and its flaglist. Otherwise the tags and flags will be copied by
@@ -277,6 +322,10 @@ class Element(Node):
         return newNode
     
     def copyFrom(self, other, copyContents = False):
+        """Set the data of this element to the data of *other*. This includes all data (even the id!) except
+        for the contents which are only touched if *copyContents* is True. Contents, tags and flags will be
+        copied deeply. This is used by ElementChangeEvent.applyTo.
+        """
         if copyContents and not self.isFile():
             self.setContents([c.copy() for c in other.contents])
         if self.tags != other.tags:
@@ -286,6 +335,7 @@ class Element(Node):
         self.position = other.position
         if self.isFile():
             self.path = other.path
+        else: self.major = other.major
         self.length = other.length
         self.id = other.id
         
@@ -352,6 +402,15 @@ class Element(Node):
         if self.tags is not None:
             return "({}) <{}[{}]> {}".format(self.position if self.position is not None else '', type(self).__name__,self.id, self.getTitle())
         else: return "<{}[{}]>".format(type(self).__name__,self.id)
+        
+    def __hash__(self):
+        return self.id
+    
+    def __eq__(self,other):
+        return self.id == other.id
+    
+    def __ne__(self,other):
+        return self.id != other.id
     
 
 class Container(Element):

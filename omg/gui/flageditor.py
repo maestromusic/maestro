@@ -50,7 +50,7 @@ class FlagEditor(QtGui.QWidget):
             self._flagWidgets.append(flagWidget)
     
     def _handleRecordInserted(self,pos,record):
-        """Insert a FlagWidget for the new record.""" 
+        """Insert a FlagWidget for the new record."""
         self._stopAnimation()
         flagWidget = FlagWidget(self.model,record)
         self.layout().insertWidget(self._mapToLayout(pos),flagWidget)
@@ -275,7 +275,7 @@ class FlagWidget(QtGui.QWidget):
                 newRecord = flageditormodel.Record(self.record.flag,self.record.allElements,
                                                    selectedElements)
                 self.model.changeRecord(self.record,newRecord)
-    
+
 
 class AddFlagPopup(dialogs.FancyPopup):
     """Fancy popup that displays a list of flags that do not appear in one of the edited elements. If the 

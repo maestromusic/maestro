@@ -99,9 +99,10 @@ class TagEditorWidget(QtGui.QWidget):
     # confer _handleTagChanged and _handleTagChangedByUser.
     _ignoreHandleTagChangedByUser = False
     
-    def __init__(self,level,elements=None,parent = None,dialog=None,saveDirectly=True):
+    def __init__(self,level,elements=None,parent = None,dialog=None,saveDirectly=True,vertical=False):
         QtGui.QWidget.__init__(self,parent)
         self.level = level
+        self.vertical = False
         if elements is None:
             elements = []
         if dialog is not None:
@@ -118,6 +119,8 @@ class TagEditorWidget(QtGui.QWidget):
         self.flagModel.resetted.connect(self._checkFlagEditorVisibility)
         self.flagModel.recordInserted.connect(self._checkFlagEditorVisibility)
         self.flagModel.recordRemoved.connect(self._checkFlagEditorVisibility)
+        
+        elements = None # ensure that these are not used anymore; the models will contain a copy
 
         self.selectionManager = widgetlist.SelectionManager()
         # Do not allow the user to select ExpandLines
@@ -145,8 +148,8 @@ class TagEditorWidget(QtGui.QWidget):
         self.addFlagButton.clicked.connect(self._handleAddFlagButton)
         self.topLayout.addWidget(self.addFlagButton)
         
-        style = QtGui.QApplication.style()
         if not saveDirectly:
+            style = QtGui.QApplication.style()
             resetButton = QtGui.QPushButton(style.standardIcon(QtGui.QStyle.SP_DialogResetButton),
                                             self.tr("Reset"))
             resetButton.clicked.connect(self.model.reset)
@@ -199,6 +202,7 @@ class TagEditorWidget(QtGui.QWidget):
         self._handleReset()
         
     def setElements(self,elements):
+        elements = [element.copy() for element in elements] # TODO: copytags?
         self.model.setElements(elements)
         self.flagModel.setElements(elements)
         
