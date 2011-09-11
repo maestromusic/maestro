@@ -236,14 +236,19 @@ class OrderedDict(dict):
         self._keyList.insert(pos,key)
         self.__setitem__(key,value)
 
-    def changeKey(self,oldKey,newKey):
-        """Change the key *oldKey* into *newKey*."""
-        if newKey in self:
+    def changeKey(self,oldKey,newKey,sameHash=False):
+        """Change the key *oldKey* into *newKey*. Usually this works only if *newKey* is not contained in
+        this dict yet. In particular this methods fails, if *oldKey* and *newKey* have the same hash as
+        *newKey* is then considered to be contained in the dict. If you set the optional parameter *sameHash*
+        to True, this method will replace the keys even if they have the same hash.
+        """
+        if newKey in self and not sameHash:
             raise ValueError("Key '{}' is already contained in the OrderedDict.")
         pos = self._keyList.index(oldKey)
         self._keyList[pos] = newKey
-        self[newKey] = self[oldKey]
+        value = self[oldKey]
         dict.__delitem__(self,oldKey) # Do not use del as it would try tor remove oldKey from _keyList
+        self[newKey] = value
 
     def index(self,key):
         """Return the position of *key*."""

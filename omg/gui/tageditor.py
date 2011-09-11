@@ -57,12 +57,12 @@ class TagEditorDock(QtGui.QDockWidget):
         else: editorWidget = self.realEditorWidget
         
         if mimeData.hasFormat(config.options.gui.mime):
-            editorWidget.model.setElements(mimeData.getElements())
+            editorWidget.setElements(mimeData.getElements())
             event.acceptProposedAction()
         elif mimeData.hasUrls():
             elements = [File.fromFilesystem(url.toLocalFile()) for url in event.mimeData().urls()
                            if url.isValid() and url.scheme() == 'file' and os.path.exists(url.toLocalFile())]
-            editorWidget.model.setElements(elements)
+            editorWidget.setElements(elements)
             event.acceptProposedAction()
         else:
             logger.warning("Invalid drop event (supports only {})".format(", ".join(mimeData.formats())))
@@ -120,7 +120,7 @@ class TagEditorWidget(QtGui.QWidget):
         self.flagModel.recordInserted.connect(self._checkFlagEditorVisibility)
         self.flagModel.recordRemoved.connect(self._checkFlagEditorVisibility)
         
-        elements = None # ensure that these are not used anymore; the models will contain a copy
+        elements = None # ensure that these are not used anymore; the models will contain copiesa copy
 
         self.selectionManager = widgetlist.SelectionManager()
         # Do not allow the user to select ExpandLines
@@ -202,7 +202,6 @@ class TagEditorWidget(QtGui.QWidget):
         self._handleReset()
         
     def setElements(self,elements):
-        elements = [element.copy() for element in elements] # TODO: copytags?
         self.model.setElements(elements)
         self.flagModel.setElements(elements)
         
@@ -247,7 +246,7 @@ class TagEditorWidget(QtGui.QWidget):
         for tag in self.model.getTags():
             self._insertSingleTagEditor(len(self.singleTagEditors),tag)
         count = len(self.model.getElements())
-        self.label.setText(self.tr("Edit tags of %n element(s).","",count))
+        self.label.setText(self.tr("Edit tags of %n element(s).",'',count))
         # Enable / disable buttons
         for i in range(1,self.topLayout.count()): # Skip the iconLabel
             widget = self.topLayout.itemAt(i).widget()
@@ -389,8 +388,9 @@ class TagEditorWidget(QtGui.QWidget):
     def _editCommonStart(self):
         selectedRecords = [editor.getRecord() for editor in self.selectionManager.getSelectedWidgets()]
         commonStart = strutils.commonPrefix(str(record.value) for record in selectedRecords)
-        text,ok = QtGui.QInputDialog.getText (self,self.tr("Edit common start"),
-                                              self.tr("Insert a new text will replace the common start of all selected records:"),text=commonStart)
+        text,ok = QtGui.QInputDialog.getText(self,self.tr("Edit common start"),
+                         self.tr("Insert a new text will replace the common start of all selected records:"),
+                         text=commonStart)
         if ok:
             newValues = [text+record.value[len(commonStart):] for record in selectedRecords]
             self.model.editMany(selectedRecords,newValues)
@@ -467,7 +467,8 @@ class RecordDialog(QtGui.QDialog):
         if self.elementsBox.selectionModel().hasSelection():
             if self.valueEditor.getValue() is not None:
                 self.accept()
-            else: QtGui.QMessageBox.warning(self,self.tr("Invalid value"),self.tr("The given value is invalid."))
+            else: QtGui.QMessageBox.warning(self,self.tr("Invalid value"),
+                                            self.tr("The given value is invalid."))
         else: QtGui.QMessageBox.warning(self,self.tr("No element selected"),
                                         self.tr("You must select at lest one element."))
         
@@ -476,7 +477,8 @@ class RecordDialog(QtGui.QDialog):
         allElements = self.elementsBox.model().getItems()
         selectedElements = [allElements[i] for i in range(len(allElements))
                                 if self.elementsBox.selectionModel().isRowSelected(i,QtCore.QModelIndex())]
-        return tageditormodel.Record(self.typeEditor.getTag(),self.valueEditor.getValue(),allElements,selectedElements)
+        return tageditormodel.Record(self.typeEditor.getTag(),self.valueEditor.getValue(),
+                                     allElements,selectedElements)
 
     def _handleTagChanged(self,tag):
         """Change the tag of the ValueEditor."""

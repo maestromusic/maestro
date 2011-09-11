@@ -19,10 +19,12 @@ class ChangeEvent:
 
 class ElementChangeEvent(ChangeEvent):
     """A generic change event for all sorts of element modifications."""
-    def __init__(self, level, changes, contentsChanged = False):
+    def __init__(self, level, changes, contentsChanged=False,tagsChanged=True,flagsChanged=True):
         self.changes = changes
         self.level = level
         self.contentsChanged = contentsChanged
+        self.tagsChanged = tagsChanged
+        self.flagsChanged = flagsChanged
     
     def ids(self):
         return self.changes.keys()
@@ -49,6 +51,8 @@ class SingleElementChangeEvent(ElementChangeEvent):
         self.element = element
         self.level = level
         self.contentsChanged = False
+        self.tagsChanged = True
+        self.flagsChanged = True
         
     def ids(self):
         return [self.element.id]
@@ -59,6 +63,14 @@ class SingleElementChangeEvent(ElementChangeEvent):
     def applyTo(self, element):
         element.copyFrom(self.element, copyContents = False)
 
+    def getTags(self,id):
+        assert id == self.element.id
+        return self.elment.tags
+    
+    def getFlags(self,id):
+        assert id == self.element.id
+        return self.elment.flags
+
 
 class PositionChangeEvent(ElementChangeEvent):
     """An event for the case that the position of several elements below the same parent are changed."""
@@ -67,6 +79,8 @@ class PositionChangeEvent(ElementChangeEvent):
         self.contentsChanged = True
         self.parentId = parentId
         self.positionMap = positionMap
+        self.tagsChanged = False
+        self.flagsChanged = False
         
     def ids(self):
         return [self.parentId]
@@ -81,6 +95,7 @@ class PositionChangeEvent(ElementChangeEvent):
                 elem.position = self.positionMap[elem.position]
         if hasattr(element, 'sortContents'):
             element.sortContents()
+
         
     
 class InsertElementsEvent(ElementChangeEvent):
@@ -90,6 +105,8 @@ class InsertElementsEvent(ElementChangeEvent):
         self.insertions = insertions
         self.level = level
         self.contentsChanged = True
+        self.tagsChanged = False
+        self.flagsChanged = False
         
     def ids(self):
         return self.insertions.keys()
@@ -111,6 +128,8 @@ class RemoveElementsEvent(ElementChangeEvent):
         self.removals = removals
         self.level = level
         self.contentsChanged = True
+        self.tagsChanged = False
+        self.flagsChanged = False
         
     def ids(self):
         return self.removals.keys()
@@ -124,18 +143,23 @@ class RemoveElementsEvent(ElementChangeEvent):
             
 
 class TagChangeEvent(ElementChangeEvent):
-    def __init__(self,level,changes):
+    def __init__(self,level,newTags):
         self.level = level
-        self.changes = changes
+        self.newTags = newTags
         self.contentsChanged = False
+        self.tagsChanged = True
+        self.flagsChanged = False
         
+    def ids(self):
+        return self.newTags.keys()
+    
     def applyTo(self,element):
-        assert element in self.changes
+        assert element.id in self.newTags
         if element.tags is not None:
-            element.tags = self.changes[element].copy()
-            
+            element.tags = self.newTags[element.id].copy()
+    
     def __str__(self):
-        return "Modify tags of [{}]".format(",".join(str(k) for k in self.changes.keys()))
+        return "Change tags of {} elements".format(len(self.newTags))
 
             
 class SingleTagChangeEvent(TagChangeEvent):
@@ -145,6 +169,8 @@ class SingleTagChangeEvent(TagChangeEvent):
         self.tag = tag
         self.elements = elements
         self.contentsChanged = False
+        self.tagsChanged = True
+        self.flagsChanged = False
         
     def ids(self):
         return [element.id for element in self.elements]
@@ -185,24 +211,26 @@ class TagValueChangedEvent(SingleTagChangeEvent):
     def applyTo(self,element):
         if element.tags is not None:
             element.tags.replace(self.tag,self.oldValue,self.newValue)
-            
+
     def __str__(self):
         return "Change: {} {}->{} {}".format(self.tag,self.oldValue,self.newValue,self.elements)
     
 
 class FlagChangeEvent(ElementChangeEvent):
-    def __init__(self,level,changes):
+    def __init__(self,level,newFlags):
         self.level = level
-        self.changes = changes
+        self.newFlags = newFlags
         self.contentsChanged = False
+        self.tagsChanged = False
+        self.flagsChanged = True
         
+    def ids(self):
+        return self.newFlags.keys()
+    
     def applyTo(self,element):
-        assert element in self.changes
+        assert element.id in self.newFlags
         if element.flags is not None:
-            element.flags = list(self.changes[element][1])
-            
-    def getElements(self):
-        return self.changes.keys()
+            element.flags = list(self.newFlags[element.id])
             
     def __str__(self):
         return "Modify flags"
@@ -215,12 +243,11 @@ class SingleFlagChangeEvent(FlagChangeEvent):
         self.flag = flag
         self.elements = elements
         self.contentsChanged = False
+        self.tagsChanged = False
+        self.flagsChanged = True
         
     def ids(self):
         return [element.id for element in self.elements]
-    
-    def getElements(self):
-        return self.elements
         
     
 class FlagAddedEvent(SingleFlagChangeEvent):

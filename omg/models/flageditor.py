@@ -57,16 +57,17 @@ class FlagEditorModel(QtCore.QObject):
         self.saveDirectly = saveDirectly
         self.undoStack = undoStack
         self.setElements(elements)
+        # This may be deactivated if the FlagEditor is run as a dialog...but it should not cause any harm.
         modify.dispatcher.changes.connect(self._handleDispatcher)
         
     def setElements(self,elements):
         """Reset the model to display and edit the tags of (a copy of) *elements*."""
         self.elements = [el.export(attributes=['tags','flags'],copyList=['tags']) for el in elements]
-        self.reset()
+        self.createRecords()
         
     def createRecords(self):
         """Create records reading the flags from self.elements. Afterwards set the elements' flags
-        attributes to None."""
+        attributes to None and emit a resetted-signal."""
         self.records = []
         for element in self.elements:
             for flag in element.flags:
@@ -76,6 +77,7 @@ class FlagEditorModel(QtCore.QObject):
                 else: existingRecord.elementsWithFlag.append(element)
             if self.saveDirectly:
                 element.flags = None
+        self.resetted.emit()
         
     def getRecord(self,flag):
         """Get the record for the given flag or None if there is no record for this flag."""
@@ -83,11 +85,6 @@ class FlagEditorModel(QtCore.QObject):
             if record.flag == flag:
                 return record
         return None 
-        
-    def reset(self):
-        """Reset the model creating new records from the elements."""
-        self.createRecords()
-        self.resetted.emit()
         
     def isEmpty(self):
         """Return whether there is at least one record/flag in one of the elements governed by this model."""
@@ -170,7 +167,7 @@ class FlagEditorModel(QtCore.QObject):
         if self.saveDirectly:
             raise RuntimeError("You must not call save in a FlagEditorModel that saves directly.")
             
-        changes = {element: (element.flags,self.getFlagsOfElement(element))
+        changes = {element.id: (element.flags,self.getFlagsOfElement(element))
                         for element in self.elements}
         
         self._push(modify.commands.FlagUndoCommand(self.level,changes,text=self.tr("Change flags")))
@@ -183,7 +180,7 @@ class FlagEditorModel(QtCore.QObject):
                 # All records store a reference to this list, so this will update them, too.
                 self.elements = [element for element in self.elements if element not in affectedElements]
                 if len(self.elements) == 0:
-                    self.reset()
+                    self.createRecords()
                     return
                 for record in self.records[:]: # list may change
                     remaining = [element for element in record.elementsWithFlag
@@ -195,7 +192,7 @@ class FlagEditorModel(QtCore.QObject):
             return
         
         elif isinstance(event,modify.events.FlagTypeChangedEvent):
-            if event.action == modify.CHANGED:
+            if event.action == modify.CHANGED: # ADDED and REMOVED don't affect us
                 # This finds the record using the flagtype's id and thus also works with the changed flag.
                 record = self.getRecord(event.flagType)
                 if record is not None:
@@ -204,7 +201,7 @@ class FlagEditorModel(QtCore.QObject):
                     self._changeRecord(record,newRecord)
             return
         
-        elif isinstance(event,modify.events.FlagChangeEvent) and event.level == self.level:
+        elif isinstance(event,modify.events.ElementChangeEvent) and event.level == self.level:
             if isinstance(event,modify.events.FlagAddedEvent):
                 record = self.getRecord(event.flag)
                 if record is None:
@@ -231,20 +228,24 @@ class FlagEditorModel(QtCore.QObject):
                     self._changeRecord(record,Record(record.flag,self.elements,remaining))
                 return
             
-            else:
-                # General FlagChangeEvent. Note that a flageditor emits these events only when run as dialog.
-                if not any(element in event.changes for element in self.elements):
+            elif event.flagsChanged:
+                # General ElementChangeEvent
+                if not any(element.id in event.ids() for element in self.elements):
                     return
                 # Contrary to the detailed event handling above, we do a very simple thing here: We store the
                 # flags in the elements and load them anew using createRecords.
                 # If saveDirectly is False this destroys the original flags stored for the UndoCommand.
                 # So make sure to use a flageditor either with saveDirectly or as a dialog.
                 for element in self.elements:
-                    if element in event.changes:
+                    if element.id in event.ids():
                         # No need to copy because the flags will be deleted in createRecords in a moment.
-                        element.flags = event.changes[element][1]
+                        if isinstance(event,modify.events.FlagChangeEvent):
+                            element.flags = event.newFlags[element.id]
+                        elif isinstance(event,modify.events.SingleElementChangeEvent):
+                            element.flags = event.element.flags
+                        else: element.flags = event.changes[element.id].flags
                     else: element.flags = self.getFlagsOfElement(element)
-                self.reset()
+                self.createRecords()
                 
 
 class FlagEditorUndoCommand(QtGui.QUndoCommand):

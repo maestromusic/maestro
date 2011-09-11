@@ -12,7 +12,7 @@ from PyQt4.QtCore import Qt
 
 from omg import models, constants, tags, utils
 from omg.models import simplelistmodel, tageditormodel
-from omg.gui import formatter, tagwidgets
+from omg.gui import tagwidgets
 from omg.gui.misc import listview, widgetlist
 
 EXPAND_LIMIT = 2
@@ -239,7 +239,7 @@ class RecordEditor(QtGui.QWidget):
                 if self.listView is None:
                     self.listView = listview.ListView()
                     self.secondLineLayout.addWidget(self.listView)
-                self.listView.setModel(simplelistmodel.SimpleListModel(elements,models.Element.getTitle))
+                self.listView.setModel(simplelistmodel.SimpleListModel(elements,lambda el: el.title))
                 self.setExpanded(len(elements) <= EXPAND_LIMIT)
 
     def _updateElementsLabel(self):
@@ -250,14 +250,15 @@ class RecordEditor(QtGui.QWidget):
             if self.record.isUsual():
                 elements = self.record.getExceptions()
                 if len(elements) == 1:
-                    self.elementsLabel.setText(self.tr("except in {}").format(elements[0].getTitle()))
+                    self.elementsLabel.setText(self.tr("except in {}").format(elements[0].title))
                 else: self.elementsLabel.setText(
-                            self.tr("except in {}/%n pieces","",len(self.record.allElements)).format(len(elements)))
+                           self.tr("except in {}/%n pieces","",len(self.record.allElements))
+                                    .format(len(elements)))
             else:
                 elements = self.record.elementsWithValue
                 if len(elements) == 1:
                     if self.record.tag != tags.TITLE:
-                        self.elementsLabel.setText(self.tr("in {}").format(elements[0].getTitle()))
+                        self.elementsLabel.setText(self.tr("in {}").format(elements[0].title))
                     else: pass # In this case we would display the elements own title which doesn't help 
                 else: self.elementsLabel.setText(
                             self.tr("in {}/%n pieces","",len(self.record.allElements)).format(len(elements)))

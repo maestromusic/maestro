@@ -157,8 +157,8 @@ class CommitCommand(UndoCommand):
         tagChanges = {}
         for elem in self.newElements.values():
             if elem.isFile():
-                tagChanges[elem] = (elem.tags, elem.fileTags)
-        real.changeTags(tagChanges, emitEvent = False) 
+                tagChanges[elem.id] = (elem.tags, elem.fileTags)
+        real.changeTags(tagChanges,self.newElements.values(),emitEvent = False) 
         
         # delete all elements which had editorIDs before
         real.deleteElements([el.id for el in self.newElements.values() ])
@@ -296,23 +296,23 @@ def _createRanges(tuples):
 class TagUndoCommand(UndoCommand):
     """An UndoCommand that changes only tags. The difference to UndoCommand is that the dict *changes*
     contains tuples of tags.Storage: the tags before and after the change."""
-    def __init__(self,level,changes,text = ''):
+    def __init__(self,level,changes,elements=None,text = ''):
         UndoCommand.__init__(self,level,changes,contentsChanged=False,text=text)
+        if level == REAL:
+            self.elements = [el.export(attributes=['path']) for el in elements]
         
     def redo(self):
-        # Note that real.changeTags and TagModifyEvent expect a different format for changes 
         if self.level == REAL:
-            real.changeTags(self.changes)
+            real.changeTags(self.changes,self.elements)
         else:
-            changes = OrderedDict((k,v[1]) for k,v in self.changes.items())
+            changes = {k: v[1] for k,v in self.changes.items()}
             dispatcher.changes.emit(events.TagChangeEvent(self.level, changes))
 
     def undo(self):
-        # Note that real.changeTags and TagModifyEvent expect a different format for changes
         if self.level == REAL:
-            real.changeTags({k: (v[1],v[0]) for k,v in self.changes.items()})
+            real.changeTags({k: (v[1],v[0]) for k,v in self.changes.items()},self.elements)
         else:
-            changes = OrderedDict((k,v[0]) for k,v in self.changes.items())
+            changes = {k: v[0] for k,v in self.changes.items()}
             dispatcher.changes.emit(events.TagChangeEvent(self.level, changes))
 
 
@@ -323,19 +323,17 @@ class FlagUndoCommand(UndoCommand):
         super().__init__(level,changes,contentsChanged=False,text=text)
         
     def redo(self):
-        # Note that real.changeFlags and FlagChangeEvent expect a different format for changes 
         if self.level == REAL:
             real.changeFlags(self.changes)
         else:
-            changes = OrderedDict((k,v[1]) for k,v in self.changes.items())
+            changes = {k: v[1] for k,v in self.changes.items()}
             dispatcher.changes.emit(events.FlagChangeEvent(self.level, changes))
 
     def undo(self):
-        # Note that real.changeFlags and FlagChangeEvent expect a different format for changes
         if self.level == REAL:
             real.changeFlags({k: (v[1],v[0]) for k,v in self.changes.items()})
         else:
-            changes = OrderedDict((k,v[0]) for k,v in self.changes.items())
+            changes = {k: v[0] for k,v in self.changes.items()}
             dispatcher.changes.emit(events.FlagChangeEvent(self.level, changes))
             
             

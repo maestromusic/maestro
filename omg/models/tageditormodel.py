@@ -4,7 +4,7 @@
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 3 as
-# published by the Free Software Foundation
+# published by the Free Software Foundation.
 #
 import itertools
 
@@ -18,7 +18,8 @@ from . import simplelistmodel
 translate = QtCore.QCoreApplication.translate
 
 # If ratio of elements that have the value of a record is higher than this constant, the record is regarded
-# as usual.
+# as "usual". This is used to decide which text should be displayed: "in these x elements:" or "except in
+# these x elements:".
 RATIO = 0.75
 
 
@@ -93,17 +94,14 @@ class InnerModel(QtCore.QObject):
     of records (similar to the tageditor's GUI). It provides a set of basic commands to change the data and
     will emit signals when doing so. Intentionally the commands of InnerModel are very basic, so that each
     command can be undone easily. In contrast to the TagEditorModel the inner model does not do any
-    Undo/Redo-stuff, but TagEditorModel splits its complicated actions into several calls of the methods of
-    InnerModel, puts each of these calls into an UndoCommand and pushes these commands as one macro on the
+    Undo/Redo-stuff. Instead, TagEditorModel splits its complicated actions into several calls of the methods
+    of InnerModel, puts each of these calls into an UndoCommand and pushes these commands as one macro on the
     stack.
     
     An effect of this design is that InnerModel may have states that would be inconsistent for TagEditorModel
     (e.g. a tag with empty record list, or records with tag A in ''self.tags[tag B]'').
     
     Another advantage of having only basic commands is that the GUI has only to react to basic signals.
-    
-    *elements* is the list of elements currently edited in the tageditor. The elements will be copied in the
-    constructor.
     """
     tagInserted = QtCore.pyqtSignal(int,tags.Tag)
     tagRemoved = QtCore.pyqtSignal(tags.Tag)
@@ -112,11 +110,6 @@ class InnerModel(QtCore.QObject):
     recordRemoved = QtCore.pyqtSignal(Record)
     recordChanged = QtCore.pyqtSignal(tags.Tag,Record,Record)
     recordMoved = QtCore.pyqtSignal(tags.Tag,int,int)
-
-    def __init__(self,elements):
-        QtCore.QObject.__init__(self)
-        self.elements = [element.copy(contents=[],copyTags=False) for element in elements]
-        self.createRecords()
 
     def createRecords(self):
         """Create the internal data structure from the list of elements stored in this model."""
@@ -331,9 +324,23 @@ class UndoCommand(QtGui.QUndoCommand):
 
 
 class TagEditorModel(QtCore.QObject):
-    """The model of the tageditor."""
+    """The model of the tageditor. It stores
+    
+        - a list of elements that are currently edited.
+        - a dict mapping tags to records of the tags. Each records stores a value and the sublist of
+          elements having this tag-value pair.
+    
+    Due to this different data structure, TagEditorModel will delete the tags in its copy of *elements* after
+    creating the records. Besides fewer memory consumption the main reason for deleting the tags is that we
+    want to update only one structure on ChangeEvents. In fact if saveDirectly is false, a backup of the tags
+    is kept in element.originalTags and used in the UndoCommand.
+    
+    Now the tageditor clearly needs some title to display for each element, so we store the (concatenated)
+    title in element.title and update it when necessary.
+    """
     resetted = QtCore.pyqtSignal()
     commonChanged = QtCore.pyqtSignal(tags.Tag)
+    titlesChanged = QtCore.pyqtSignal(list)
     
     def __init__(self,level,elements,saveDirectly):
         QtCore.QObject.__init__(self)
@@ -341,7 +348,7 @@ class TagEditorModel(QtCore.QObject):
         self.level = level
         self.saveDirectly = saveDirectly
         
-        self.inner = InnerModel(elements)
+        self.inner = InnerModel()
         self.tagInserted = self.inner.tagInserted
         self.tagRemoved = self.inner.tagRemoved
         self.tagChanged = self.inner.tagChanged
@@ -352,6 +359,11 @@ class TagEditorModel(QtCore.QObject):
     
         if not saveDirectly:
             self.undoStack = QtGui.QUndoStack(self)
+            
+        self.setElements(elements)
+        
+        # This may be deactivated if the FlagEditor is run as a dialog...but it should not cause any harm.
+        modify.dispatcher.changes.connect(self._handleDispatcher)
 
     def getTags(self):
         """Return the list of tags that are present in any of the elements currently edited."""
@@ -367,8 +379,20 @@ class TagEditorModel(QtCore.QObject):
     
     def setElements(self,elements):
         """Set the list of edited elements and reset the tageditor."""
-        self.inner.elements = [element.copy(contents=[],copyTags=False) for element in elements]
-        self.reset()
+        # Do not copy the tags as they will be deleted (unless saveDirectly is false)
+        self.inner.elements = [el.export(attributes=['tags','path']) for el in elements]
+        if not self.saveDirectly: # In this case we have to copy
+            for element in self.inner.elements:
+                element.originalTags = element.tags
+        self.createRecords()
+    
+    def createRecords(self):
+        self.inner.createRecords()
+        for element in self.inner.elements:
+            # Store the title because the tags will be removed
+            element.title = element.getTitle()
+            del element.tags
+        self.resetted.emit()
         
     def reset(self):
         """Reset the tageditor."""
@@ -551,6 +575,7 @@ class TagEditorModel(QtCore.QObject):
         return True
 
     def getTagsOfElement(self,element):
+        """Return the tags of the given element as stored in the records."""
         result = tags.Storage()
         for tag,records in self.inner.tags.items():
             for record in records:
@@ -559,14 +584,129 @@ class TagEditorModel(QtCore.QObject):
         return result
                     
     def save(self):
+        """Save the tags as stored in the records to the database/filesystem or to the editor. This method
+        may only be used if saveDirectly is False."""
         if self.saveDirectly:
             raise RuntimeError("You must not call save in a TagEditorModel that saves directly.")
             
-        changes = {element: (element.tags,self.getTagsOfElement(element))
+        changes = {element.id: (element.originalTags,self.getTagsOfElement(element))
                         for element in self.inner.elements}
         
-        self._push(modify.commands.TagUndoCommand(self.level,changes,text=self.tr("Change tags")))
+        self._push(modify.commands.TagUndoCommand(self.level,changes,self.inner.elements,
+                                                  text=self.tr("Change tags")))
+            
+    def _addElementsWithValue(self,tag,value,elements):
+        """Add *elements* to the record defined by *tag* and *value*. Create the record when necessary."""
+        if len(elements) == 0:
+            return
+        record = self.inner.getRecord(tag,value)
+        if record is None:
+            if tag not in self.inner.tags:
+                self.inner.insertTag(len(self.inner.tags),tag)
+            record = Record(tag,value,self.inner.elements,elements)
+            self.inner.insertRecord(len(self.inner.tags[tag]),record)
+        else:
+            newElementsWithValue = [el for el in self.inner.elements if el in record.elementsWithValue
+                                                                         or el in affected]
+            if len(newElementsWithValue) > len(record.elementsWithValue):
+                newRecord = record.copy()
+                newRecord.elementsWithValue = newElementsWithValue
+                self.inner.changeRecord(record.tag,record,newRecord)
+
+    def _removeElementsWithValue(self,tag,value,elements):
+        """Remove *elements* from the record defined by *tag* and *value*. Delete the record if it is
+        empty afterwards."""
+        if len(elements) == 0:
+            return
+        record = self.inner.getRecord(tag,value)
+        if record is not None: # otherwise there is nothing to do
+            remaining = [el for el in record.elementsWithValue if el not in elements]
+            if len(remaining) == 0:
+                self.inner.removeRecord(record)
+            elif len(remaining) < len(record.elementsWithValue):
+                newRecord = record.copy()
+                newRecord.elementsWithValue = remaining
+                self.inner.changeRecord(record.tag,record,newRecord)
+            
+    def _handleDispatcher(self,event):
+        """React to change events. We have to
         
+            - delete elements on ElementsDeletedEvents,
+            - change all affected records on TagTypeChangedEvent. Furthermore the tag is used as a key in
+              self.inner.tags and must be updated here, too.
+            - React to TagChangeEvents.
+             
+        \ """
+        if isinstance(event,modify.events.ElementsDeletedEvent):
+            affectedElements = [el for el in self.inner.elements if el.id in event.ids()]
+            if len(affectedElements) > 0:
+                # All records store a reference to this list, so this will update them, too.
+                self.inner.elements = [el for el in self.inner.elements if el not in affectedElements]
+                if len(self.inner.elements) == 0:
+                    self.createRecords()
+                    return
+                for tag in list(self.inner.tags.keys()): # dict may change
+                    for record in self.inner.tags[tag][:]: # list may change
+                        remaining = [element for element in record.elementsWithValue
+                                        if element not in affectedElements]
+                        if len(remaining) == 0:
+                            self.inner.removeRecord(record)
+                        elif len(remaining) < len(record.elementsWithFlag):
+                            self.inner.changeRecord(record.tag,record,
+                                            Record(record.tag,record.value,self.inner.elements,remaining))
+                    if len(self.inner.tags) == 0:
+                        self.inner.removeTag(tag)
+            return
+        
+        elif isinstance(event,modify.events.TagTypeChangedEvent):
+            if event.action == modify.CHANGED: # ADDED and REMOVED don't affect us
+                # This finds the record using the tagtype's id and thus also works with the changed tag.
+                if event.tagType in self.inner.tags:
+                    # This finds the old tagType by its hash (id), which equals the new id and replaces it.
+                    self.inner.tags.changeKey(event.tagType,event.tagType,sameHash=True)
+                    for record in self.inner.tags[event.tagType]:
+                        newRecord = Record(event.tagType,record.value,self.inner.elements,
+                                           record.elementsWithValue)
+                        self.inner.changeRecord(event.tagType,record,newRecord)
+            return
+        
+        elif isinstance(event,modify.events.ElementChangeEvent):
+            if event.level != self.level:
+                return
+            affected = [el for el in self.inner.elements if el.id in event.ids()]
+            if isinstance(event,modify.events.SingleTagChangeEvent):
+                if isinstance(event,modify.events.TagValueAddedEvent):
+                    self._addElementsWithValue(event.tag,event.value,affected)
+                elif isinstance(event,modify.events.TagValueRemovedEvent):
+                    self._removeElementsWithValue(event.tag,event.value,affected)
+                elif isinstance(event,modify.events.TagValueChangedEvent):
+                    self._removeElementsWithValue(event.tag,event.oldValue,affected)
+                    self._addElementsWithValue(event.tag,event.newValue,affected)
+                # Finally update the title attribute
+                if event.tag == tags.TITLE and len(affected) > 0:
+                    for element in affected:
+                        element.tags = self.getTagsOfElement(element)
+                        element.title = element.getTitle()
+                        del elment.tags
+                    self.titlesChanged.emit(affected)
+                    
+            elif event.tagsChanged:          
+                # General ElementChangeEvent
+                if not any(element.id in event.ids() for element in self.inner.elements):
+                    return
+                # Contrary to the detailed event handling above, we do a very simple thing here: We store the
+                # tags in the elements and load them anew using createRecords.
+                for element in self.inner.elements:
+                    if element.id in event.ids():
+                        # No need to copy because the tags will be deleted in createRecords in a moment.
+                        if isinstance(event,modify.events.TagChangeEvent):
+                            element.tags = event.newTags[element.id]
+                        elif isinstance(event,modify.events.SingleElementChangeEvent):
+                            element.tags = event.element.tags
+                        else: element.tags = event.changes[element.id].tags
+                    else: element.tags = self.getTagsOfElement(element)
+                self.createRecords() # This will directly remove the tags-attributes again   
+            
     def getPossibleSeparators(self,records):
         """Return all separators (from constants.SEPARATORS) that are present in every value of the given
         records."""
@@ -663,4 +803,3 @@ class TagEditorModel(QtCore.QObject):
                 c = c + 1
             else: break
         return c
-    

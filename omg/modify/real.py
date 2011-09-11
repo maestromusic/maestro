@@ -54,12 +54,16 @@ def commit(changes):
     logger.debug("Committing {} elements".format(len(changes)))
     
     # Tags
-    changeTags({oldElement: (oldElement.tags,newElement.tags)
-                    for oldElement,newElement in changes.values()},emitEvent = False)
+    changeTags({oldElement.id: (oldElement.tags,newElement.tags)
+                    for oldElement,newElement in changes.values()},
+               [oldElement for oldElement,newElement in changes.values()],
+               emitEvent = False)
     
     # Flags
-    changeFlags({oldElement: (oldElement.flags, newElement.flags)
-                 for oldElement, newElement in changes.values()}, emitEvent = False)
+    changeFlags({oldElement.id: (oldElement.flags, newElement.flags)
+                 for oldElement, newElement in changes.values()},
+                emitEvent = False)
+    
     # Contents (including position)
     contents = {}
     for id,changesTuple in changes.items():
@@ -89,8 +93,9 @@ def addTagValue(tag,value,elements):
                     real.read()
                     real.tags.add(tag,value)
                     real.saveTags()
-                except:
+                except realfiles2.TagIOError as e:
                     logger.error("Could not add tags to '{}'.".format(element.path))
+                    logger.error("Error was: {}".format(e))
                     continue
             successful.append(element)
     else: successful = elements
@@ -113,8 +118,9 @@ def removeTagValue(tag,value,elements):
                     real.read()
                     real.tags.remove(tag,value)
                     real.saveTags()
-                except:
+                except realfiles2.TagIOError as e:
                     logger.error("Could not remove tags from '{}'.".format(element.path))
+                    logger.error("Error was: {}".format(e))
                     continue
             successful.append(element)
     else: successful = elements
@@ -138,8 +144,9 @@ def changeTagValue(tag,oldValue,newValue,elements):
                     real.read()
                     real.tags.replace(tag,oldValue,newValue)
                     real.saveTags()
-                except e:
+                except realfiles2.TagIOError as e:
                     logger.error("Could not change tag value from '{}'.".format(element.path))
+                    logger.error("Error was: {}".format(e))
                     continue
             successful.append(element)
     else: successful = elements
@@ -149,40 +156,60 @@ def changeTagValue(tag,oldValue,newValue,elements):
         dispatcher.changes.emit(events.TagValueChangedEvent(REAL,tag,oldValue,newValue,successful))
 
 
-def changeTags(changes, emitEvent = True):
-    """Change tags arbitrarily: *changes* is a dict mapping elements (not element-ids!) to tuples consisting
-    of two tags.Storages - the tags before and after the change."""
+def _getPathAndFileTags(id,elements):
+    for element in elements:
+        if element.id == id:
+            if element.isFile():
+                path = getattr(element,'path',None)
+                if path is None:
+                    path = db.path(id)
+                fileTags = getattr(element,'fileTags',None)
+                return path,fileTags
+            else: return None,None
+    # Arriving here means that no element has the given id
+    if db.isFile(element.id):
+        return db.path(element.id),None
+    else: return None,None
+
+def changeTags(changes,elements=[],emitEvent = True):
+    """Change tags arbitrarily: *changes* is a dict mapping element ids to tuples consisting
+    of two tags.Storages - the tags before and after the change. *elements* is a list of affected elements
+    and is only used to determine whether an element is a file and to get its path. If an element is not
+    found in this list, that information is read from the database.
+    """
     abort = False
         
-    successful = [] # list of elements where the file was written successfully
-    for element,changeTuple in changes.items():
+    successful = [] # list of element ids whose file was written successfully
+    for id,changeTuple in changes.items():
         oldTags,newTags = changeTuple
         if oldTags == newTags:
             continue
         
-        if element.isFile() and \
-                (not hasattr(element,'fileTags') or element.fileTags != newTags.withoutPrivateTags()):
+        path,fileTags = _getPathAndFileTags(id,elements)
+              
+        if path is not None and (fileTags is None or fileTags != newTags.withoutPrivateTags()):
             try:
-                real = realfiles2.get(element.path)
+                real = realfiles2.get(path)
                 real.read()
                 real.tags = newTags.withoutPrivateTags()
                 real.saveTags()
-            except:
-                logger.error("Could not change tags of file '{}'.".format(element.path))
+            except realfiles2.TagIOError as e:
+                logger.error("Could not change tags of file '{}'.".format(path))
+                logger.error("Error was: {}".format(e))
+                # Do not write the database, if writing the file failed
                 continue
-        successful.append(element)
+        successful.append(id)
         
         unchangedTags = [tag for tag in oldTags if tag in newTags and oldTags[tag] == newTags[tag]]
         if len(unchangedTags) < len(oldTags):
-            db.write.removeAllTagValues(element.id,(tag for tag in oldTags if not tag in unchangedTags))
+            db.write.removeAllTagValues(id,(tag for tag in oldTags if not tag in unchangedTags))
         if len(unchangedTags) < len(newTags):
             for tag in newTags:
                 if tag not in unchangedTags:
-                    db.write.addTagValues(element.id,tag,newTags[tag])
+                    db.write.addTagValues(id,tag,newTags[tag])
   
     if len(successful) > 0 and emitEvent:
-        if len(successful) < len(changes):
-            changes = {element: changes for element,changes in changes.items() if element in successful}
+        changes = {k: v[1] for k,v in changes.items() if k in successful}
         dispatcher.changes.emit(events.TagChangeEvent(REAL,changes))
 
 
@@ -198,15 +225,16 @@ def removeFlag(flag,elements):
     dispatcher.changes.emit(events.FlagRemovedEvent(REAL,flag,elements))
     
 
-def changeFlags(changes, emitEvent = True):
-    """Change flags arbitrarily: *changes* is a dict mapping elements (not element-ids!) to tuples consisting
+def changeFlags(changes,emitEvent = True):
+    """Change flags arbitrarily: *changes* is a dict mapping element ids to tuples consisting
     of two lists of flags - the flags before and after the change."""
-    for element,changeTuple in changes.items():
+    for id,changeTuple in changes.items():
         oldFlags,newFlags = changeTuple
         # Compare the lists forgetting the order
         if any(f not in oldFlags for f in newFlags) or any(f not in newFlags for f in oldFlags):
-            db.write.setFlags(element.id,newFlags)
+            db.write.setFlags(id,newFlags)
     if emitEvent:
+        changes = {k: v[1] for k,v in changes.items()}
         dispatcher.changes.emit(events.FlagChangeEvent(REAL,changes))
 
 
