@@ -63,13 +63,16 @@ class SingleElementChangeEvent(ElementChangeEvent):
     def applyTo(self, element):
         element.copyFrom(self.element, copyContents = False)
 
-    def getTags(self,id):
-        assert id == self.element.id
-        return self.elment.tags
-    
-    def getFlags(self,id):
-        assert id == self.element.id
-        return self.elment.flags
+
+class MajorFlagChangeEvent(SingleElementChangeEvent):
+    """A modify event for toggling the major flag of an element."""
+    def __init__(self, level, element):
+        super().__init__(level, element)
+        self.tagsChanged = False
+        self.flagsChanged = False
+        
+    def applyTo(self, element):
+        element.major = self.element.major
 
 
 class PositionChangeEvent(ElementChangeEvent):

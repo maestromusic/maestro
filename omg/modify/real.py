@@ -46,7 +46,7 @@ def deleteElements(elids):
 
 
 def commit(changes):
-    """Commits all elements, given by an id->element dictionary, into the database.
+    """Commits all elements, given by an id->(oldElement,newElement) dictionary, into the database.
     
     After the commit, the elements in the database will look like those in the argument.
     If an element in changes.values() is a container, the contents must be loaded, but
@@ -63,6 +63,10 @@ def commit(changes):
     changeFlags({oldElement.id: (oldElement.flags, newElement.flags)
                  for oldElement, newElement in changes.values()},
                 emitEvent = False)
+    
+    # Major
+    for tup in changes.values():
+        setMajor(tup[1], emitEvent = False)
     
     # Contents (including position)
     contents = {}
@@ -238,6 +242,12 @@ def changeFlags(changes,emitEvent = True):
         dispatcher.changes.emit(events.FlagChangeEvent(REAL,changes))
 
 
+def setMajor(element, emitEvent = True):
+    """Set the 'major' flag of the element according to the element's attribute."""
+    db.write.setMajor(element.id, element.major)
+    if emitEvent:
+        dispatcher.changes.emit(events.MajorFlagChangeEvent(REAL, element))
+    
 def setSortValue(tag,valueId,newValue,oldValue=-1):
     """Change a sortvalue and emit a SortValueChangedEvent. *tag* and *valueId* specify the affected value,
     *newValue* is the new value (None if the sortvalue should be deleted) and *oldValue* is used for the

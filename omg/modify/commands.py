@@ -103,7 +103,7 @@ class CommitCommand(UndoCommand):
         
         progress = QtGui.QProgressDialog(translate('modify.commands', "Commiting files..."),
                                          None, 0, 7)
-        progress.setMinimumDuration(1500)
+        progress.setMinimumDuration(300)
         progress.setWindowModality(Qt.WindowModal)
         from .. import models
         # clear all editors by event
@@ -171,18 +171,17 @@ class CommitCommand(UndoCommand):
                 elem.id = revIdMap[elem.id]
                 
      
-class ModifySingleElementCommand(UndoCommand):
+class ChangeSingleElementCommand(UndoCommand):
     """A specialized undo command for the modification of a single element (tags, position, ..., but no 
     contents)."""
     
     def __init__(self, level, before, after, text=''):
-        QtGui.QUndoCommand.__init__(self)
+        QtGui.QUndoCommand.__init__(self, text)
         if level != EDITOR:
             raise NotImplementedError()
         self.level = level
         self.before = before.copy()
         self.after = after.copy()
-        self.setText(text)
     
     def redo(self):
         dispatcher.changes.emit(events.SingleElementChangeEvent(self.level, self.after))
@@ -191,6 +190,20 @@ class ModifySingleElementCommand(UndoCommand):
         dispatcher.changes.emit(events.SingleElementChangeEvent(self.level, self.before))
 
 
+class ChangeMajorFlagCommand(ChangeSingleElementCommand):
+    """A command to toggle the 'major' flag of a single element."""
+    def __init__(self, level, element, text = ''):
+        QtGui.QUndoCommand.__init__(self, text)
+        self.level = level
+        self.element = element.copy()
+        
+    def redo(self):
+        self.element.major = not self.element.major
+        if self.level == REAL:
+            real.setMajor(self.element, emitEvent = False)
+        dispatcher.changes.emit(events.MajorFlagChangeEvent(self.level, self.element))
+    
+    undo = redo
 class PositionChangeCommand(UndoCommand):
     """An undo command for changing positions of elements below one single parent."""
     

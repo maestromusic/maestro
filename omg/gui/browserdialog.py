@@ -11,10 +11,11 @@ from PyQt4.QtCore import Qt
 
 from .. import config, tags, utils, database as db, flags
 from . import dialogs
+from functools import partial
 
 # Layers that can be selected in BrowserDialog's comboboxes. Each item in the list is a list containing for
 # each layer a list of the tagnames in that layer.
-selectableLayers = utils.mapRecursively(tags.get,[
+selectableLayers = utils.mapRecursively(partial(tags.get, createDialogIfNew = True),[
      [['composer','artist','performer']],
      [['genre'],['composer','artist','performer']],
      [['composer','artist','performer'],['album']],

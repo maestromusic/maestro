@@ -101,7 +101,7 @@ def addFile(elid,path,hash,length):
     db.query("INSERT INTO {}files (element_id,path,hash,length) VALUES (?,?,?,?)"
                 .format(db.prefix),elid,path,hash,length)
                 
-                
+  
 def addTagValuesById(elids,tag,valueIds):
     """Add tag values given by their id to some elements. *elids* is either a single id or a list of ids,
     *tag* is the affected tag and *valueIds* is a list of values-ids for *tag*.
@@ -195,6 +195,9 @@ def removeFlag(elids,flag):
 def setFlags(elid,flags):
     """Give the element with the given id exactly the flags in the list *flags*."""
     db.query("DELETE FROM {}flags WHERE element_id = ?".format(db.prefix),elid)
-    values = ["({},{})".format(elid,flag.id) for flag in flags]
-    db.query("INSERT INTO {}flags (element_id,flag_id) VALUES {}".format(db.prefix,','.join(values)))
+    if len(flags) > 0:
+        values = ["({},{})".format(elid,flag.id) for flag in flags]
+        db.query("INSERT INTO {}flags (element_id,flag_id) VALUES {}".format(db.prefix,','.join(values)))
     
+def setMajor(elid, major):
+    db.query("UPDATE {}elements SET major = ? WHERE id = ?".format(db.prefix), major, elid)
