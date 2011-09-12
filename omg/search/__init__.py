@@ -346,13 +346,13 @@ class SearchThread(threading.Thread):
                     # This is a new search to a new table or to a table that already contains search results,
                     # but from a different fromTable.
                     db.query("TRUNCATE TABLE {}".format(resultTable))
-                    self.tables[resultTable] = (fromTable,[])
+                    self.tables[resultTable] = [fromTable,[] ]
                 else:
                     # Check whether the result table contains results that we can use or if we have to
                     # truncate it. 
                     if not criteriaModule.isNarrower(criteria,self.tables[resultTable][1]):
                         db.query("TRUNCATE TABLE {}".format(resultTable))
-                        self.tables[resultTable] = (fromTable,[])
+                        self.tables[resultTable] = [fromTable,[] ]
                 
                 # Invalid criteria like 'date:foo' do not have results. Calling criterion.getQuery will fail.
                 if any(c.isInvalid() for c in criteria):
