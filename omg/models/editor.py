@@ -9,7 +9,7 @@
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
-from .. import logging, modify, database as db, tags, realfiles2
+from .. import logging, modify, database as db, tags, realfiles
 from . import mimedata
 from ..models import rootedtreemodel, RootNode, File, Container, Element
 from ..config import options
@@ -269,7 +269,7 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
         progress = QtGui.QProgressDialog()
         progress.setLabelText(self.tr("Importing {0} files...").format(len(files)))
         progress.setRange(0, len(files))
-        progress.setMinimumDuration(1500)
+        progress.setMinimumDuration(800)
         progress.setWindowModality(Qt.WindowModal)
         elementList = []
         for i,f in enumerate(files):
@@ -296,7 +296,7 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
                         if ret == dialog.DeleteAlways:
                             options.tags.always_delete = options.tags.always_delete + [e.tagname]
                         logger.debug('REMOVE TAG {0} from {1}'.format(e.tagname, f))
-                        real = realfiles2.get(f)
+                        real = realfiles.get(f)
                         real.remove(e.tagname)
                     else:
                         progress.cancel()

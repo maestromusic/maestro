@@ -137,16 +137,16 @@ class EditorTreeView(treeview.TreeView):
         modify.push(commands.ChangeMajorFlagCommand(modify.EDITOR, self.currentIndex().internalPointer()))
                     
     def mergeSelected(self):
-        mergeIndexes = self.selectedIndexes()
-        hintTitle, hintRemove = self.model().createMergeHint(mergeIndexes)
-        mergePositions = sorted(idx.row() for idx in mergeIndexes)
-        numSiblings = self.model().rowCount(mergeIndexes[0].parent())
-        belowRoot = isinstance(self.model().data(mergeIndexes[0].parent()), RootNode)
-        dialog = MergeDialog(hintTitle, hintRemove, len(mergePositions) < numSiblings and not belowRoot, self)
+        mergeModelIndexes = self.selectedIndexes()
+        hintTitle, hintRemove = self.model().createMergeHint(mergeModelIndexes)
+        mergeIndices = sorted(idx.row() for idx in mergeModelIndexes)
+        numSiblings = self.model().rowCount(mergeModelIndexes[0].parent())
+        belowRoot = isinstance(self.model().data(mergeModelIndexes[0].parent()), RootNode)
+        dialog = MergeDialog(hintTitle, hintRemove, len(mergeIndices) < numSiblings and not belowRoot, self)
         if dialog.exec_() == QtGui.QDialog.Accepted:
             modify.merge(modify.EDITOR,
-                         mergeIndexes[0].internalPointer().parent,
-                         mergePositions,
+                         mergeModelIndexes[0].internalPointer().parent,
+                         mergeIndices,
                          dialog.newTitle(),
                          dialog.removeString(),
                          dialog.adjustPositions())

@@ -8,11 +8,11 @@
 #
 
 """
-This module will really modify database and filesystem (using database.write and realfiles2). It does not
+This module will really modify database and filesystem (using database.write and realfiles). It does not
 do any Undo-/Redo-stuff.
 """
  
-from .. import database as db, tags, realfiles2, logging
+from .. import database as db, tags, realfiles, logging
 from ..database import write
 from . import dispatcher, events, REAL
 
@@ -93,11 +93,11 @@ def addTagValue(tag,value,elements):
         for element in elements:
             if element.isFile():
                 try:
-                    real = realfiles2.get(element.path)
+                    real = realfiles.get(element.path)
                     real.read()
                     real.tags.add(tag,value)
                     real.saveTags()
-                except realfiles2.TagIOError as e:
+                except IOError as e:
                     logger.error("Could not add tags to '{}'.".format(element.path))
                     logger.error("Error was: {}".format(e))
                     continue
@@ -118,11 +118,11 @@ def removeTagValue(tag,value,elements):
         for element in elements:
             if element.isFile():
                 try:
-                    real = realfiles2.get(element.path)
+                    real = realfiles.get(element.path)
                     real.read()
                     real.tags.remove(tag,value)
                     real.saveTags()
-                except realfiles2.TagIOError as e:
+                except IOError as e:
                     logger.error("Could not remove tags from '{}'.".format(element.path))
                     logger.error("Error was: {}".format(e))
                     continue
@@ -144,11 +144,11 @@ def changeTagValue(tag,oldValue,newValue,elements):
         for element in elements:
             if element.isFile():
                 try:
-                    real = realfiles2.get(element.path)
+                    real = realfiles.get(element.path)
                     real.read()
                     real.tags.replace(tag,oldValue,newValue)
                     real.saveTags()
-                except realfiles2.TagIOError as e:
+                except IOError as e:
                     logger.error("Could not change tag value from '{}'.".format(element.path))
                     logger.error("Error was: {}".format(e))
                     continue
@@ -193,11 +193,11 @@ def changeTags(changes,elements=[],emitEvent = True):
               
         if path is not None and (fileTags is None or fileTags != newTags.withoutPrivateTags()):
             try:
-                real = realfiles2.get(path)
+                real = realfiles.get(path)
                 real.read()
                 real.tags = newTags.withoutPrivateTags()
                 real.saveTags()
-            except realfiles2.TagIOError as e:
+            except IOError as e:
                 logger.error("Could not change tags of file '{}'.".format(path))
                 logger.error("Error was: {}".format(e))
                 # Do not write the database, if writing the file failed

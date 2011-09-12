@@ -10,7 +10,7 @@ import logging
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
-from omg import config,mpclient,models, tags, db, strutils, distributor, realfiles2
+from omg import config,mpclient,models, tags, db, strutils, distributor
 from omg.models import playlist as playlistmodel
 from . import delegates, formatter, treeview, tageditor
 

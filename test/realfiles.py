@@ -7,7 +7,7 @@
 # published by the Free Software Foundation
 #
 
-"""Unittests for the realfiles2-package."""
+"""Unittests for the realfiles-package."""
 
 import unittest, shutil, os
 
@@ -20,7 +20,7 @@ if __name__ == "__main__":
     from omg import tags
     tags.init()
     
-    from omg import realfiles2, FlexiDate
+    from omg import realfiles, FlexiDate
     
     PATH_EMPTY = 'test/realfiles/empty'
     PATH_FULL = 'test/realfiles/full'
@@ -58,8 +58,8 @@ class OpenTest(BaseTest):
         shutil.copyfile(self.full,PATH_WITHOUT_EXT)
         
     def runTest(self):
-        self.file = realfiles2.get(self.full,absolute=True)
-        self.file = realfiles2.get(PATH_WITHOUT_EXT,absolute=True)
+        self.file = realfiles.get(self.full,absolute=True)
+        self.file = realfiles.get(PATH_WITHOUT_EXT,absolute=True)
 
     def tearDown(self):
         os.remove(PATH_WITHOUT_EXT)
@@ -67,7 +67,7 @@ class OpenTest(BaseTest):
 
 class ReadTest(BaseTest):
     def setUp(self):
-        self.file = realfiles2.get(self.full,absolute=True)
+        self.file = realfiles.get(self.full,absolute=True)
 
     def runTest(self):
         self.file.read()
@@ -82,7 +82,7 @@ class ReadTest(BaseTest):
 class RemoveTest(BaseTest):
     def setUp(self):
         shutil.copyfile(self.full,self.test)
-        self.file = realfiles2.get(self.test,absolute=True)
+        self.file = realfiles.get(self.test,absolute=True)
 
     def runTest(self):
         tagsToRemove = [tags.get(name) for name in ('artist','title','conductor','notexistent2')]
@@ -97,7 +97,7 @@ class RemoveTest(BaseTest):
 class EmptyFileTest(BaseTest):
     def setUp(self):
         shutil.copyfile(self.empty,self.test)
-        self.file = realfiles2.get(self.test,absolute=True)
+        self.file = realfiles.get(self.test,absolute=True)
 
     def runTest(self):
         self.file.tags[tags.get('artist')] = ['Someone','Everyone']
@@ -112,7 +112,7 @@ class EmptyFileTest(BaseTest):
 class WriteTest(BaseTest):
     def setUp(self):
         shutil.copyfile(self.full,self.test)
-        self.file = realfiles2.get(self.test,absolute=True)
+        self.file = realfiles.get(self.test,absolute=True)
 
     def runTest(self):
         self.file.tags = TAGS_TO_WRITE

@@ -51,15 +51,38 @@ def commitEditors():
         push(command)
     except StackChangeRejectedException:
         pass
-          
-def changePosition(level, element, position):
-    elemOld = element.copy()
-    elemNew = element.copy()
-    elemNew.position = position
+             
     
-    stack.activeStack().push(ModifySingleElementCommand(level, elemOld, elemNew, translate('modify', 'change position'))) # TODO: richtigen Stack auswählen        
+def merge(level, parent, indices, newTitle, removeString, adjustPositions):
+    """Merge creates a new container between *parent* and the children at the given *indices*.
+    Those child elements will be removed from *parent* and instead inserted as children of
+    the new container at indices[0]. The new container will contain all tags that are equal in
+    all of its new children; its TITLE tag will be set to *newTitle*.
     
-def merge(level, parent, positions, newTitle, removeString, adjustPositions):
+    removeString defines what to remove from the titles of the elements that are moved below the
+    new container; this will usually be similar to *newTitle* plus possibly some punctutaion.
+    If *adjustPositions* is True, the positions of items that are *not* removed are decreased
+    to fill the gaps arising from moved elements.
+    Example: Consider the following setting of an album containing a Sonata: 
+    
+    * parent
+    |- pos1: child0 (title = Sonata Nr. 5: Allegro)
+    |- pos2: child1 (tilte = Sonata Nr. 5: Adagio)
+    |- pos3: child2 (title = Sonata Nr. 5: Finale. Presto)
+    |- pos4: child3 (title = Nocturne Op. 13/37)
+    |- pos5: child4 (title = Prelude BWV 42)
+    
+    After a call to merge with *indices=(0,1,2)*, *newTitle='Sonata Nr. 5'*, *removeString='Sonata Nr. 5: '*,
+    *adjustPositions = True* the layout would be:
+    
+    * parent
+    |- * pos1: new container (title = Sonata Nr. 5)
+       |- pos1: child0 (title = Allegro)
+       |- pos2: child1 (title = Adagio)
+       |- pos3: child2 (title = Finale. Presto)
+    |- pos2: child3 (title = Nocturne Op. 13/37)
+    |- pos3: child4 (title = Prelude BWV 42)
+    """ 
     from ..models import Container
     if level == REAL:
         raise NotImplementedError('Maddin, tu was!')
@@ -67,36 +90,40 @@ def merge(level, parent, positions, newTitle, removeString, adjustPositions):
         stack.setActiveStack(stack.editorStack)
 
     beginMacro(EDITOR, translate('modify', 'merge elements'))
-    copies = []
-    insertPosition = positions[0]
-    insertElementPosition = parent.contents[insertPosition].position
-    removeCommand = RemoveElementsCommand(EDITOR, [parent.contents[i] for i in positions])
     
-    for i,element in enumerate(parent.contents[insertPosition:], start=insertPosition):
-        if i in positions:
-            elemC = parent.contents[i].copy()
-            copies.append(elemC)
-            elemC.position = len(copies)
-            if tags.TITLE in elemC.tags:
-                elemC.tags[tags.TITLE] = [ t.replace(removeString, '') for t in elemC.tags[tags.TITLE] ]
-            push(ModifySingleElementCommand(EDITOR, element, elemC))
+    insertIndex = indices[0]
+    insertPosition = parent.contents[insertIndex].position
+    newChildren = []
+    toRemove = []    
+    positionChanges = []
+    
+    for i, element in enumerate(parent.contents[insertIndex:], start = insertIndex):
+        if i in indices:
+            currentPosition = element.position
+            copy = parent.contents[i].copy()
+            if tags.TITLE in copy.tags:
+                copy.tags[tags.TITLE] = [ t.replace(removeString, '') for t in copy.tags[tags.TITLE] ]
+            copy.position = len(newChildren) + 1
+            newChildren.append(copy)
+            toRemove.append(parent.contents[i])
         elif adjustPositions:
-            changePosition(EDITOR, element, element.position - len(copies) + 1)
-    push(removeCommand)        
-    t = tags.findCommonTags(copies, True)
+            positionChanges.append( (element.position, element.position - len(newChildren) + 1) )
+    push(commands.RemoveElementsCommand(EDITOR, toRemove))
+    push(commands.PositionChangeCommand(EDITOR, parent.id, positionChanges))
+    t = tags.findCommonTags(newChildren, True)
     t[tags.TITLE] = [newTitle]
     newContainer = Container(id = newEditorId(),
-                             contents = copies,
+                             contents = newChildren,
                              tags = t,
                              flags = None,
-                             position = insertElementPosition)
-    insertions = { parent.id : [(insertPosition, [newContainer])] }
-    push(InsertElementsCommand(EDITOR, insertions))
+                             major = False,
+                             position = insertPosition)
+    insertions = { parent.id : [(insertIndex, [newContainer])] }
+    push(commands.InsertElementsCommand(EDITOR, insertions))
     endMacro()
     
 
 _currentEditorId = 0
-
 _fileEditorIds = {}
 # TODO: Liste wieder leeren?
 

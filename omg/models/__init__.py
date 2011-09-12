@@ -8,7 +8,7 @@
 #
 import copy
 
-from omg import tags, logging, config, covers, realfiles2, database as db
+from omg import tags, logging, config, covers, realfiles, database as db
 from omg.utils import relPath
 
 logger = logging.getLogger(name="models")
@@ -512,7 +512,8 @@ class File(Element):
         
     @staticmethod
     def fromFilesystem(path):
-        real = realfiles2.get(path)
+        real = realfiles.get(path)
+        real.read()
         rpath = relPath(path)
         id = db.idFromPath(rpath)
         if id is None:
@@ -522,7 +523,6 @@ class File(Element):
         else:
             flags = db.flags(id)
             # TODO: Load private tags!
-        real.read()
         return File(tags=real.tags,flags=flags,path=rpath,length=real.length,position=real.position,id = id)
 
     def hasContents(self):

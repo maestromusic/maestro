@@ -84,6 +84,7 @@ class PositionChangeEvent(ElementChangeEvent):
         self.positionMap = positionMap
         self.tagsChanged = False
         self.flagsChanged = False
+        self.level = level
         
     def ids(self):
         return [self.parentId]
