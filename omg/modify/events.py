@@ -11,13 +11,13 @@ from .. import logging
 
 logger = logging.getLogger(__name__)
 
-
 class ChangeEvent:
     """Abstract super class for all changeevents."""
     pass
 
 
 class ElementChangeEvent(ChangeEvent):
+    
     """A generic change event for all sorts of element modifications."""
     def __init__(self, level, changes, contentsChanged=False,tagsChanged=True,flagsChanged=True):
         self.changes = changes
@@ -295,7 +295,11 @@ class FlagTypeChangedEvent(ChangeEvent):
         
         
 class SortValueChangedEvent(ChangeEvent):
-    """This flag is emitted when a sortvalue changes."""
+    """This event is emitted when a sortvalue changes."""
     def __init__(self,tag,valueId,oldValue,newValue):
         self.tag,self.valueId,self.oldValue,self.newValue = tag,valueId,oldValue,newValue
         
+class HiddenAttributeChangedEvent(ChangeEvent):
+    """This event is emitted when the "hidden" attribute of a tag value changes."""
+    def __init__(self, tag, valueId, newState):
+        self.tag, self.valueId, self.newState = tag, valueId, newState

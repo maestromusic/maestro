@@ -55,6 +55,12 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
             self.clear()
         elif isinstance(event, events.TagTypeChangedEvent):
             pass #TODO: was macht man da??
+        elif isinstance(event, events.FlagTypeChangedEvent):
+            pass
+        elif isinstance(event, events.SortValueChangedEvent):
+            pass # editor contents are only sorted by hand
+        elif isinstance(event, events.HiddenAttributeChangedEvent):
+            pass # editor does not use this
         else:
             logger.warning('WARNING UNKNOWN EVENT {}, RESETTING EDITOR'.format(event))
             self.clear()
