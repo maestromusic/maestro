@@ -594,12 +594,19 @@ class TagValuePropertiesWidget(QtGui.QWidget):
         self.hiddenCheckbox.setChecked(self.orig_hidden)
         
     def commit(self):
+        from ..modify import commands 
         if self.changeValueCheckbox.isChecked() and self.valueEdit.text() != self.orig_value:
             raise NotImplementedError('value renaming not yet possible')
         if self.sortValueCheckbox.isChecked():
             if self.sortEdit.text() != self.orig_sortValue:
-                # change sort value in DB
-                pass 
+                command = commands.SortValueUndoCommand(self.tag, self.valueId, self.orig_sortValue, self.sortEdit.text())
+                modify.push(command)
+        else:
+            command = commands.SortValueUndoCommand(self.tag, self.valueId, self.orig_sortValue, None)
+            modify.push(command)
+        if self.hiddenCheckbox.isChecked() != self.orig_hidden:
+            command = commands.ValueHiddenUndoCommand(self. tag, self.valueId, self.hiddenCheckbox.isChecked())
+            modify.push(command)
     
     @staticmethod
     def showDialog(tag, valueId):
@@ -620,5 +627,8 @@ class TagValuePropertiesWidget(QtGui.QWidget):
         tvp.setValue(tag, valueId)
         
         okButton.clicked.connect(dialog.accept)
+        okButton.setDefault(True)
         cancelButton.clicked.connect(dialog.reject)
         dialog.exec_()
+        if dialog.result() == QtGui.QDialog.Accepted:
+            tvp.commit()

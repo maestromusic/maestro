@@ -7,7 +7,7 @@
 # published by the Free Software Foundation.
 
 import itertools
-from omg import database as db
+from omg import database as db, tags
 
 
 def createNewElement(file,major):
@@ -176,7 +176,12 @@ def setSortValue(tag, valueId, sortValue):
     """Set the sort-value of the value of *tag* with id *valueId* to *sortValue*."""
     db.query("UPDATE {}values_{} SET sort_value = ? WHERE tag_id = ? AND id = ?".format(db.prefix, tag.type),
              sortValue, tag.id, valueId)
-    
+
+def setHidden(tagSpec, valueId, state):
+    """Set the given tag value's "hidden" attribute to *state*."""
+    tag = tags.get(tagSpec)
+    db.query("UPDATE {}values_{} SET hide = ? WHERE tag_id = ? AND id = ?".format(db.prefix, tag.type),
+             state, tag.id, valueId) 
 
 def addFlag(elids,flag):
     """Add the given flag to the elements with the given ids, ignoring elements that already have the

@@ -27,6 +27,8 @@ class UndoCommand(QtGui.QUndoCommand):
     Whenever possible, use specialized undo commands (or create own subclasses) below which allow for
     a more efficient implementation and widget notification."""
     
+    level = REAL
+    
     def __init__(self, level, changes, contentsChanged = False, text = ''):
         """Creates an UndoCommand, i.e. an object that stores what has changed in one
         step of database editing.
@@ -66,7 +68,6 @@ class CommitCommand(UndoCommand):
     
     def __init__(self):
         QtGui.QUndoCommand.__init__(self)
-        self.level = REAL
         self.setText('commit')
         # store contents of all open editors in self.editorRoots
         from ..gui import editor
@@ -352,7 +353,7 @@ class FlagUndoCommand(UndoCommand):
             
 class SortValueUndoCommand(UndoCommand):
     """An UndoCommand that changes the sort value of a tag value."""
-    def __init__(self, tag, valueId, oldSort = None, newSort = None, text = ''):
+    def __init__(self, tag, valueId, oldSort = -1, newSort = None, text = translate('modify.commands','change sort value')):
         QtGui.QUndoCommand.__init__(self,text)
         self.tag = tag
         self.valueId = valueId
@@ -360,8 +361,25 @@ class SortValueUndoCommand(UndoCommand):
         self.newSort = newSort
         
     def redo(self):
-        real.changeSortValue(self.tag,self.valueId,self.newSort,self.oldSort)
+        real.setSortValue(self.tag,self.valueId,self.newSort,self.oldSort)
         
     def undo(self):
-        real.changeSortValue(self.tag,self.valueId,self.oldSort,self.newSort)
+        real.setSortValue(self.tag,self.valueId,self.oldSort,self.newSort)
+
+class ValueHiddenUndoCommand(UndoCommand):
+    """An UndoCommand to change the "hidden" attribute of a tag value."""
+    def __init__(self, tag, valueId, newState = None, text = translate('modify.commands', 'change hidden flag')):
+        """Create the command. If newState is None, then the old one will be fetched from the database
+        and the new one set to its negative.
+        Otherwise, this class assumes that the current state is (not newState), so don't call this
+        whith newState = oldState."""
+        QtGui.QUndoCommand.__init__(self, text)
+        self.tag = tag
+        self.valueId = valueId
+        self.newState = db.hidden(tag, valueId) if newState is None else newState
         
+    def redo(self):
+        real.setHidden(self.tag, self.valueId, self.newState)
+    
+    def undo(self):
+        real.setHidden(self.tag, self.valueId, not self.newState)      

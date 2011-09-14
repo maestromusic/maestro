@@ -258,3 +258,8 @@ def setSortValue(tag,valueId,newValue,oldValue=-1):
         oldValue = db.sortValue(tag,valueId)
     db.write.setSortValue(tag,valueId,newValue)
     dispatcher.changes.emit(events.SortValueChangedEvent(tag,valueId,oldValue,newValue))
+
+def setHidden(tag, valueId, newState):
+    """Set the "hidden" attribute of the given tag value to *newState* which must be a bool."""
+    db.write.setHidden(tag, valueId, newState)
+    dispatcher.changes.emit(events.HiddenAttributeChangedEvent(tag, valueId, newState))
