@@ -115,9 +115,8 @@ class Node:
     def index(self,node):
         """Return the index of *node* in this node's contents or raise a ValueError if *node* is not found.
          See also find."""
-        contents = self.getContents()
-        for i in range(0,len(contents)):
-            if contents[i].id == node.id:
+        for i,n in enumerate(self.getContents()):
+            if n == node:
                 return i
         raise ValueError("Node.index: Node {0} is not contained in element {1}.".format(node,self))
         
