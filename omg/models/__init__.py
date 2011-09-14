@@ -381,10 +381,12 @@ class Element(Node):
 
     # Misc
     #====================================================
-    def getTitle(self):
-        """Convenience method to get the formatted title of this element."""
+    def getTitle(self,titles=None):
+        """Convenience method to get the formatted title of this element. If a list of strings is given for
+        the optional argument *titles* those titles will be used (this is useful, if the element itself does
+        not have a tags-attribute)"""
         from omg.gui import formatter
-        return formatter.Formatter(self).title()
+        return formatter.Formatter(self).title(titles)
     
     def toolTipText(self):
         parts = []

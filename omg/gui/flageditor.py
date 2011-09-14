@@ -142,6 +142,7 @@ class FlagWidget(QtGui.QWidget):
         self.model = model
         self.record = record
         self.setRecord(record)
+        self.model.titlesChanged.connect(self._handleTitlesChanged)
     
     def getText(self):
         """Return the text displayed by this widget."""
@@ -159,21 +160,21 @@ class FlagWidget(QtGui.QWidget):
         if (record.flag.name != self.record.flag.name
                 or len(record.elementsWithFlag) != len(self.record.elementsWithFlag)):
             self.updateGeometry()
-            
         self.record = record
-        
-        # If the record is not common to all elements, display a tooltip containing the titles of those
-        # elements that have the flag. But do not use more than flageditor_maxtooltiplines lines.
-        if not record.isCommon():
-            maxLines = config.options.gui.flageditor_maxtooltiplines
-            if len(record.elementsWithFlag) > maxLines:
-                lines = [element.getTitle() for element in record.elementsWithFlag[:maxLines-1]]
-                lines.append(self.tr("(And %n other)",'',len(record.elementsWithFlag) - (maxLines-1)))
-            else: lines = [element.getTitle() for element in record.elementsWithFlag]
-            self.setToolTip("\n".join(lines))
-            
+        self.createToolTip()
         self.update()
     
+    def createToolTip(self):
+        # If the record is not common to all elements, display a tooltip containing the titles of those
+        # elements that have the flag. But do not use more than flageditor_maxtooltiplines lines.
+        if not self.record.isCommon():
+            maxLines = config.options.gui.flageditor_maxtooltiplines
+            if len(self.record.elementsWithFlag) > maxLines:
+                lines = [element.title for element in self.record.elementsWithFlag[:maxLines-1]]
+                lines.append(self.tr("(And %n other)",'',len(self.record.elementsWithFlag) - (maxLines-1)))
+            else: lines = [element.title for element in self.record.elementsWithFlag]
+            self.setToolTip("\n".join(lines))
+            
     def _sizes(self):
         """Return a tuple of sizes. These are e.g. necessary to draw the widget or to react correctly to
         mouse events."""
@@ -276,6 +277,11 @@ class FlagWidget(QtGui.QWidget):
                                                    selectedElements)
                 self.model.changeRecord(self.record,newRecord)
 
+    def _handleTitlesChanged(self,affected):
+        """React to titlesChanged signals: Reset the tooltip."""
+        if any(element in self.record.elementsWithFlag for element in affected):
+            self.createToolTip()
+            
 
 class AddFlagPopup(dialogs.FancyPopup):
     """Fancy popup that displays a list of flags that do not appear in one of the edited elements. If the 
@@ -338,7 +344,7 @@ class EditElementsDialog(QtGui.QDialog):
         self.elementsBox = QtGui.QListView(self)
         self.layout().addWidget(self.elementsBox,1)
         self.elementsBox.setModel(simplelistmodel.SimpleListModel(self.record.allElements,
-                                                                  lambda el: el.getTitle()))
+                                                                  lambda el: el.title))
         self.elementsBox.setSelectionMode(QtGui.QAbstractItemView.MultiSelection)
         for i,element in enumerate(self.record.allElements):
             if record is None or element in record.elementsWithFlag:

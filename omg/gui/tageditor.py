@@ -114,8 +114,7 @@ class TagEditorWidget(QtGui.QWidget):
         self.model.tagChanged.connect(self._handleTagChanged)
         self.model.resetted.connect(self._handleReset)
 
-        self.flagModel = flageditormodel.FlagEditorModel(level,elements,saveDirectly,
-                                                         self.model.undoStack if not saveDirectly else None)
+        self.flagModel = flageditormodel.FlagEditorModel(level,elements,saveDirectly,self.model)
         self.flagModel.resetted.connect(self._checkFlagEditorVisibility)
         self.flagModel.recordInserted.connect(self._checkFlagEditorVisibility)
         self.flagModel.recordRemoved.connect(self._checkFlagEditorVisibility)

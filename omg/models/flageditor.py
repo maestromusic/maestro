@@ -9,7 +9,7 @@
 from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
-from .. import modify
+from .. import modify, tags
 
 
 class Record:
@@ -42,27 +42,34 @@ class FlagEditorModel(QtCore.QObject):
         should contain tags and flags, otherwise they are loaded from the database. Of course the model will
         use a copy of the elements internally.
         - saveDirectly: whether changes in the model are applied directly.
-        - undoStack: the UndoStack that should be used if saveDirectly is False.
+        - tagEditorModel: The model of the tageditor in which this flageditor is contained. This is used to
+          react on titlesChanged signals and to choose the correct undostack if saveDirectly is False.
         
     \ """
     resetted = QtCore.pyqtSignal()
     recordInserted = QtCore.pyqtSignal(int,Record)
     recordRemoved = QtCore.pyqtSignal(Record)
     recordChanged = QtCore.pyqtSignal(Record,Record)
+    titlesChanged = QtCore.pyqtSignal(list)
     
-    def __init__(self,level,elements,saveDirectly,undoStack=None):
+    def __init__(self,level,elements,saveDirectly,tagEditorModel=None):
         super().__init__()
         
         self.level = level
         self.saveDirectly = saveDirectly
-        self.undoStack = undoStack
+        self.undoStack = tagEditorModel.undoStack if not saveDirectly else None
+        tagEditorModel.titlesChanged.connect(self._handleTitlesChanged)
         self.setElements(elements)
+            
         # This may be deactivated if the FlagEditor is run as a dialog...but it should not cause any harm.
         modify.dispatcher.changes.connect(self._handleDispatcher)
         
     def setElements(self,elements):
         """Reset the model to display and edit the tags of (a copy of) *elements*."""
         self.elements = [el.export(attributes=['tags','flags'],copyList=['tags']) for el in elements]
+        for new,old in zip(self.elements,elements):
+            # Generate a title using the tags from the old element
+            new.title = new.getTitle(old.tags[tags.TITLE])
         self.createRecords()
         
     def createRecords(self):
@@ -246,8 +253,18 @@ class FlagEditorModel(QtCore.QObject):
                         else: element.flags = event.changes[element.id].flags
                     else: element.flags = self.getFlagsOfElement(element)
                 self.createRecords()
-                
 
+    def _handleTitlesChanged(self,affected):
+        ownAffected = [] # Our copies of the affected elements
+        for affectedElement in affected:
+            for i,element in enumerate(self.elements):
+                if element.id == affectedElement.id:
+                    element.title = affectedElement.title
+                    ownAffected.append(element)
+                    break
+        self.titlesChanged.emit(ownAffected)
+
+                
 class FlagEditorUndoCommand(QtGui.QUndoCommand):
     """UndoCommand used by the FlagEditorModel. It stores one of the methods of the model and some arguments.
     On redo this method will be called with the arguments. When creating the command it will calculate the

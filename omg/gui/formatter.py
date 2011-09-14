@@ -52,9 +52,13 @@ class Formatter:
             return node.tags[tag]
         else: return []
         
-    def title(self):
-        """Return the title or the path or the path if the element contains no title or some dummy-title if it even doesn't contain a path."""
-        if tags.TITLE in self.element.tags:
+    def title(self,titles=None):
+        """Return the title or the path or the path if the element contains no title or some dummy-title if
+        it even doesn't contain a path. If a list of strings is given for the optional argument *titles*
+        those titles will be used (this is useful, if the element itself does not have a tags-attribute)."""
+        if titles is not None:
+            result = " - ".join(titles)
+        elif tags.TITLE in self.element.tags:
             result = " - ".join(self.element.tags[tags.TITLE])
         elif isinstance(self.element,models.File):
             result = self.element.path

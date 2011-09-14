@@ -607,7 +607,7 @@ class TagEditorModel(QtCore.QObject):
             self.inner.insertRecord(len(self.inner.tags[tag]),record)
         else:
             newElementsWithValue = [el for el in self.inner.elements if el in record.elementsWithValue
-                                                                         or el in affected]
+                                                                         or el in elements]
             if len(newElementsWithValue) > len(record.elementsWithValue):
                 newRecord = record.copy()
                 newRecord.elementsWithValue = newElementsWithValue
@@ -685,9 +685,9 @@ class TagEditorModel(QtCore.QObject):
                 # Finally update the title attribute
                 if event.tag == tags.TITLE and len(affected) > 0:
                     for element in affected:
-                        element.tags = self.getTagsOfElement(element)
-                        element.title = element.getTitle()
-                        del elment.tags
+                        print("Title before: {}".format(element.title))
+                        element.title = element.getTitle(self.getTagsOfElement(element)[tags.TITLE])
+                        print("Title after: {}".format(element.title))
                     self.titlesChanged.emit(affected)
                     
             elif event.tagsChanged:          

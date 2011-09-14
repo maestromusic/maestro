@@ -408,7 +408,7 @@ class ValueNode(CriterionNode):
         self.model.dataChanged.emit(qtIndex,qtIndex)
         
     def __str__(self):
-        return "<ValueNode '{0}' ({1})>".format(self.value, ", ".join(map(str,self.valueIds)))
+        return "<ValueNode {} ({})>".format(self.values, ", ".join(map(str,self.valueIds)))
     
     def toolTipText(self):
         if config.options.misc.show_ids: # Display the value-ids
