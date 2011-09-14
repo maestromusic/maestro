@@ -111,8 +111,11 @@ class TextCriterion(Criterion):
         for valueType in self.getSearchTypes():
             tagIdList = ",".join(str(tag.id) for tag in self.tagSet if tag.type == valueType)
             if valueType != tags.TYPE_DATE:
-                whereClause = "INSTR(v.value,?)"
-                parameters.append(self.value)
+                # INSTR does not respect the collation correctly: INSTR('a','ä') = 0, INSTR('ä','á') = 1
+                # whereClause = "INSTR(v.value,?)"
+                # Therefore we have to use LIKE '%...%' and this means escaping...
+                whereClause = "v.value LIKE CONCAT('%',?,'%')"
+                parameters.append(self.value.replace('\\','\\\\').replace('_','\\_').replace('%','\\%'))
             else:
                 assert self.years is not None
                 if self.years[1] is None:
