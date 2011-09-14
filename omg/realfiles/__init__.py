@@ -82,6 +82,7 @@ try:
         """A RealFile implementation using cutags, the wrapper for UTagLib."""
         def __init__(self, path):
             RealFile.__init__(self, path)
+            self._f = None
             
         def _ensureFileIsLoaded(self):
             if self._f is None:
@@ -151,7 +152,7 @@ try:
                     changed = True
             if changed:
                 self._f.save()
-    rfClass = cutags
+    rfClass = UFile
     logger.info('loaded UTagLib realfiles backend')
 except ImportError:
     pass
