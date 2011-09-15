@@ -383,3 +383,17 @@ class ValueHiddenUndoCommand(UndoCommand):
     
     def undo(self):
         real.setHidden(self.tag, self.valueId, not self.newState)      
+
+class RenameTagValueCommand(UndoCommand):
+    """A command to rename *all* occurences of a specific tag value, e.g. all "Frederic Chopin" to
+    "Frédéric Chopin"."""
+    def __init__(self, tag, valueId, newValue, text = None):
+        QtQui.QUndoCommand.__init__(self)
+        if text is None:
+            text = self.tr('change {}-tag value with id {} to {}'.format(tag, valueID, newValue))
+        self.setText(text)
+        
+        try:
+            existingID = db.idFromValue(tag, newValue)
+        except db.sql.EmptyResultException as e:
+            previous = tuple()

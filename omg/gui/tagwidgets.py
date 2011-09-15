@@ -565,13 +565,24 @@ class TagValuePropertiesWidget(QtGui.QWidget):
 
         layout.addWidget(self.sortValueCheckbox, 2, 0)
         self.sortEdit = QtGui.QLineEdit()
-        self.sortValueCheckbox.toggled.connect(self.sortEdit.setEnabled) 
+        self.sortValueCheckbox.toggled.connect(self.sortEdit.setEnabled)
+        self.sortValueCheckbox.toggled.connect(self._handleSortCheckboxToggled)
         layout.addWidget(self.sortEdit, 2, 1)
         self.hiddenCheckbox = QtGui.QCheckBox(self.tr('value is hidden'))
         layout.addWidget(self.hiddenCheckbox, 3, 0)
         
         self.setLayout(layout)
     
+    def _handleSortCheckboxToggled(self, checked):
+        """If the user enables the checkbox to set a custom sort value, this method
+        tries to guess the sort value by splitting the tag value at the last space
+        and exchanging the two parts."""
+        if checked:
+            if self.orig_sortValue is None and self.sortEdit.text() == "":
+                names = self.valueEdit.text().rsplit(' ', 1)
+                if len(names) == 2:
+                    self.sortEdit.setText(names[1] + ", " + names[0])
+                
     def setValue(self, tag, valueId):
         self.tag = tag
         self.valueId = valueId
@@ -583,7 +594,7 @@ class TagValuePropertiesWidget(QtGui.QWidget):
         self.valueEdit.setText(self.orig_value)
         
         self.label.setText(self.tr('editing {0} value: {1}'.format(tag, self.orig_value)))
-        if db.isNull(self.orig_sortValue):
+        if self.orig_sortValue is None:
             self.sortEdit.setText("")
             self.sortValueCheckbox.setChecked(False)
             self.sortEdit.setEnabled(False)

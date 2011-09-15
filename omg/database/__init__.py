@@ -388,7 +388,9 @@ def sortValue(tagSpec, valueId, valueIfNone = False):
     tag = tagsModule.get(tagSpec)
     ans = query("SELECT sort_value FROM {}values_{} WHERE tag_id = ? AND id = ?".format(prefix, tag.type),
                  tag.id, valueId).getSingle()
-    if not isNull(ans) or not valueIfNone:
+    if isNull(ans):
+        ans = None
+    if ans or not valueIfNone:
         return ans
     elif valueIfNone:
         return valueFromId(tag, valueId)
