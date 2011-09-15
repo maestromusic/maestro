@@ -112,12 +112,17 @@ class Node:
             return 1 + max(node.maxDepth() for node in self.getContents())
         else: return 0
 
-    def index(self,node):
+    def index(self,node, compareByID = False):
         """Return the index of *node* in this node's contents or raise a ValueError if *node* is not found.
          See also find."""
         for i,n in enumerate(self.getContents()):
-            if n == node:
-                return i
+            if compareByID:
+                if n.id == node.id:
+                    return i
+                
+            else:
+                if n == node:
+                    return i
         raise ValueError("Node.index: Node {0} is not contained in element {1}.".format(node,self))
         
     def find(self,node):

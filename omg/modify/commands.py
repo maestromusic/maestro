@@ -269,7 +269,7 @@ class RemoveElementsCommand(UndoCommand):
             parent = elem.parent
             if parent.id not in changes:
                 changes[parent.id] = set()
-            changes[parent.id].add((parent.index(elem), elem.id))
+            changes[parent.id].add((parent.index(elem, True), elem.id))
             self.elementPool[elem.id] = elem.copy()
         # now create index ranges from the unordered sets
         self.removals = {}

@@ -199,15 +199,17 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
         return file
      
     def _dropOMGMime(self, mimeData, action, parent, row):
-        orig_nodes = {node.id:self.importNode(node) for node in mimeData.getElements() }
+        orig_nodes = OrderedDict()
+        for node in mimeData.getElements():
+            orig_nodes[node.id] = self.importNode(node) 
         # check for recursion error
         for node in itertools.chain.from_iterable( (o.getAllNodes() for o in orig_nodes.values() )):
             if node.id == parent.id:
                 QtGui.QMessageBox.critical(None, self.tr('recursion error'),
                                            self.tr('Cannot place a container below itself.'))
                 return False       
-        modify.beginMacro(modify.EDITOR, self.tr('drop elements'))
-        move, insert_same, insert_other = dict(), dict(), dict()
+        
+        move, insert_same, insert_other = OrderedDict(), OrderedDict(), OrderedDict()
         for id, node in orig_nodes.items():
             if hasattr(node.parent, 'id') and node.parent.id == parent.id:
                 if action == Qt.MoveAction:
@@ -220,7 +222,7 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
         movedBefore = 0
         positionChanges = []
         currentPosition = 1
-        
+        commandsToPush = []
         for node in parent.contents[:row]:
             if node.id in move: # node moved away
                 movedBefore += 1
@@ -228,19 +230,23 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
                 positionChanges.append( (node.position, node.position - movedBefore) )
                 currentPosition = node.position - movedBefore + 1
 
+        
         if isinstance(parent, RootNode):
             if action == Qt.MoveAction:
                 removeCommand = commands.RemoveElementsCommand(modify.EDITOR,
                                                                list(move.values()) + list(insert_other.values()))
-                modify.push(removeCommand)
+                commandsToPush.append(removeCommand)
             insertions = dict()
             insertions[parent.id] = [(row - movedBefore,
                                       list(insert_same.values()) + list(move.values()) + list(insert_other.values()))]
             for node in insertions[parent.id][0][1]:
                 node.position = None
             insertCommand = commands.InsertElementsCommand(modify.EDITOR, insertions, 'drop->insert')
-            modify.push(insertCommand)
+            commandsToPush.append(insertCommand)
         else:
+            if action == Qt.MoveAction:
+                removeCommand = commands.RemoveElementsCommand(modify.EDITOR, list(insert_other.values()), 'drop->remove')
+                commandsToPush.append(removeCommand)
             for node in move.values():
                 positionChanges.append( (node.position, currentPosition) )
                 currentPosition += 1
@@ -254,17 +260,18 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
                     positionChanges.append( (node.position, currentPosition) )
                     currentPosition += 1        
             
-            if action == Qt.MoveAction and len(insert_other) > 0:    
-                removeCommand = commands.RemoveElementsCommand(modify.EDITOR, insert_other.values(), 'drop->remove')
-                modify.push(removeCommand)
+            
             
             command = commands.PositionChangeCommand(modify.EDITOR, parent.id, positionChanges, self.tr('adjust positions'))
-            modify.push(command)
+            commandsToPush.append(command)
                      
             insertions = dict()
             insertions[parent.id] = [(row - movedBefore, list(insert_same.values()) + list(insert_other.values()) )]
             insertCommand = commands.InsertElementsCommand(modify.EDITOR, insertions, 'drop->insert')
-            modify.push(insertCommand)
+            commandsToPush.append(insertCommand)
+        modify.beginMacro(modify.EDITOR, self.tr('drop elements'))
+        for command in commandsToPush:
+            modify.push(command)
         modify.endMacro()
         return True
         
@@ -372,7 +379,7 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
                     metaContainer = metaContainers[discname_reduced]
                 else:
                     metaContainer = Container(id = modify.newEditorId(), contents = None,
-                                              tags = tags.Storage(), flags = [], position = None)
+                                              tags = tags.Storage(), flags = [], major = True, position = None)
                     metaContainers[discname_reduced] = metaContainer
                 metaContainer.contents.append(album)
                 album.position = discnumber
