@@ -23,12 +23,14 @@ logger = logging.getLogger(__name__)
 
 class TagEditorDock(QtGui.QDockWidget):
     """DockWidget containing the TagEditor."""
-    def __init__(self,parent=None,state=None):
+    def __init__(self,parent=None,state=None,vertical=False):
         QtGui.QDockWidget.__init__(self,parent)
         self.setWindowTitle(self.tr("Tageditor"))
+        self.vertical = vertical
+        self.dockLocationChanged.connect(self._handleLocationChanged)
         self.tabWidget = QtGui.QTabWidget()
+        self.tabWidget.setTabPosition(QtGui.QTabWidget.North if vertical else QtGui.QTabWidget.East)
         self.setWidget(self.tabWidget)
-        self.tabWidget.setTabPosition(QtGui.QTabWidget.East)
         self.realEditorWidget = TagEditorWidget(modify.REAL)
         self.editorEditorWidget = TagEditorWidget(modify.EDITOR)
         self.tabWidget.addTab(self.realEditorWidget,self.tr("Real"))
@@ -36,6 +38,14 @@ class TagEditorDock(QtGui.QDockWidget):
         self.setAcceptDrops(True)
         
         mainwindow.mainWindow.globalSelectionChanged.connect(self._handleSelectionChanged)
+    
+    def _handleLocationChanged(self,area):
+        vertical = area in [Qt.LeftDockWidgetArea,Qt.RightDockWidgetArea]
+        if vertical != self.vertical:
+            self.vertical = vertical
+            self.tabWidget.setTabPosition(QtGui.QTabWidget.North if vertical else QtGui.QTabWidget.East)
+            self.realEditorWidget.setVertical(vertical)
+            self.editorEditorWidget.setVertical(vertical) 
         
     def _handleSelectionChanged(self,elements,source):
         if isinstance(source,editor.EditorTreeView):
@@ -102,7 +112,7 @@ class TagEditorWidget(QtGui.QWidget):
     def __init__(self,level,elements=None,parent = None,dialog=None,saveDirectly=True,vertical=False):
         QtGui.QWidget.__init__(self,parent)
         self.level = level
-        self.vertical = False
+        self.vertical = None # will be set in setVertical below
         if elements is None:
             elements = []
         if dialog is not None:
@@ -119,7 +129,7 @@ class TagEditorWidget(QtGui.QWidget):
         self.flagModel.recordInserted.connect(self._checkFlagEditorVisibility)
         self.flagModel.recordRemoved.connect(self._checkFlagEditorVisibility)
         
-        elements = None # ensure that these are not used anymore; the models will contain copiesa copy
+        elements = None # ensure that these are not used anymore; the models will contain copies
 
         self.selectionManager = widgetlist.SelectionManager()
         # Do not allow the user to select ExpandLines
@@ -136,32 +146,36 @@ class TagEditorWidget(QtGui.QWidget):
         iconLabel.setToolTip(self.tr("Real level") if level == modify.REAL else self.tr("Editor level"))
         self.topLayout.addWidget(iconLabel)
 
-        addButton = QtGui.QPushButton(utils.getIcon("add.png"),self.tr("Add tag"))
-        addButton.clicked.connect(lambda: self._handleAddRecord(None))
-        self.topLayout.addWidget(addButton)
-        removeButton = QtGui.QPushButton(utils.getIcon("remove.png"),self.tr("Remove selected"))
-        removeButton.clicked.connect(self._handleRemoveSelected)
-        self.topLayout.addWidget(removeButton)
+        # Texts will be set in _changeLayout
+        self.addButton = QtGui.QPushButton()
+        self.addButton.setIcon(utils.getIcon("add.png"))
+        self.addButton.clicked.connect(lambda: self._handleAddRecord(None))
+        self.topLayout.addWidget(self.addButton)
+        self.removeButton = QtGui.QPushButton()
+        self.removeButton.setIcon(utils.getIcon("remove.png"))
+        self.removeButton.clicked.connect(self._handleRemoveSelected)
+        self.topLayout.addWidget(self.removeButton)
         
-        self.addFlagButton = QtGui.QPushButton(utils.getIcon("flag_blue.png"),self.tr("Add flag"))
+        self.addFlagButton = QtGui.QPushButton()
+        self.addFlagButton.setIcon(utils.getIcon("flag_blue.png"))
         self.addFlagButton.clicked.connect(self._handleAddFlagButton)
         self.topLayout.addWidget(self.addFlagButton)
         
         if not saveDirectly:
             style = QtGui.QApplication.style()
-            resetButton = QtGui.QPushButton(style.standardIcon(QtGui.QStyle.SP_DialogResetButton),
-                                            self.tr("Reset"))
-            resetButton.clicked.connect(self.model.reset)
-            self.topLayout.addWidget(resetButton)
+            self.resetButton = QtGui.QPushButton()
+            self.resetButton.setIcon(style.standardIcon(QtGui.QStyle.SP_DialogResetButton))
+            self.resetButton.clicked.connect(self.model.reset)
+            self.topLayout.addWidget(self.resetButton)
             if dialog is not None:
-                cancelButton = QtGui.QPushButton(style.standardIcon(QtGui.QStyle.SP_DialogCancelButton),
-                                                 self.tr("Cancel"))
-                cancelButton.clicked.connect(dialog.reject)
-            self.topLayout.addWidget(cancelButton)
-            saveButton = QtGui.QPushButton(style.standardIcon(QtGui.QStyle.SP_DialogSaveButton),
-                                           self.tr("Save"))
-            saveButton.clicked.connect(self._handleSave)
-            self.topLayout.addWidget(saveButton)
+                self.cancelButton = QtGui.QPushButton()
+                self.cancelButton.setIcon(style.standardIcon(QtGui.QStyle.SP_DialogCancelButton))
+                self.cancelButton.clicked.connect(dialog.reject)
+                self.topLayout.addWidget(self.cancelButton)
+            self.saveButton = QtGui.QPushButton()
+            self.saveButton.setIcon(style.standardIcon(QtGui.QStyle.SP_DialogSaveButton))
+            self.saveButton.clicked.connect(self._handleSave)
+            self.topLayout.addWidget(self.saveButton)
         
         self.label = QtGui.QLabel()
         self.topLayout.addWidget(self.label)
@@ -198,8 +212,39 @@ class TagEditorWidget(QtGui.QWidget):
         
         self.singleTagEditors = {}
         self.tagBoxes = {}
-        self._handleReset()
         
+        self.setVertical(vertical)
+        self._handleReset()
+    
+    def setVertical(self,vertical):
+        if vertical == self.vertical:
+            return
+        if vertical:
+            for button in ['addButton','removeButton','addFlagButton']:
+                getattr(self,button).setText('')
+            for button in ['resetButton','cancelButton','saveButton']:
+                if hasattr(self,button):
+                    getattr(self,button).setText('')
+            if not self.vertical: # Not when this function is called for the first time
+                self.topLayout.removeWidget(self.label)
+            self.layout().insertWidget(1,self.label)
+        else:
+            self.addButton.setText(self.tr("Add tag"))
+            self.removeButton.setText(self.tr("Remove selected"))
+            self.addFlagButton.setText(self.tr("Add flag"))
+            
+            if hasattr(self,'resetButton'):
+                self.resetButton.setText(self.tr("Reset"))
+            if hasattr(self,'cancelButton'):
+                self.cancelButton.setText(self.tr("Cancel"))
+            if hasattr(self,'saveButton'):
+                self.saveButton.setText(self.tr("Save"))
+            if self.vertical: # Not when this function is called for the first time
+                self.layout().removeWidget(self.label)
+            self.topLayout.insertWidget(self.topLayout.count()-1,self.label) # -1 due to the stretch
+            
+        self.vertical = vertical
+            
     def setElements(self,elements):
         self.model.setElements(elements)
         self.flagModel.setElements(elements)

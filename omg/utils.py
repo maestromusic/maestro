@@ -243,7 +243,7 @@ class OrderedDict(dict):
         to True, this method will replace the keys even if they have the same hash.
         """
         if newKey in self and not sameHash:
-            raise ValueError("Key '{}' is already contained in the OrderedDict.")
+            raise ValueError("Key '{}' is already contained in the OrderedDict.".format(newKey))
         pos = self._keyList.index(oldKey)
         self._keyList[pos] = newKey
         value = self[oldKey]

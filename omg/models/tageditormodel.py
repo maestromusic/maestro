@@ -550,16 +550,17 @@ class TagEditorModel(QtCore.QObject):
         self._beginMacro(self.tr("Change Tag"))
 
         if newTag not in self.inner.tags:
-            # First change all records:
-            for record in self.inner.tags[oldTag]:
+            # First change the tag itself. This is necessary so that the tageditor can react to the
+            # recordChanged-signals below.
+            command = UndoCommand(self,self.inner.changeTag,oldTag,newTag)
+            self._push(command)
+            # Then change all records:
+            for record in self.inner.tags[newTag]:
                 newRecord = record.copy()
                 newRecord.tag = newTag
                 newRecord.value = oldTag.type.convertValue(newTag.type,record.value)
-                command = UndoCommand(self,self.inner.changeRecord,oldTag,record,newRecord)
+                command = UndoCommand(self,self.inner.changeRecord,newTag,record,newRecord)
                 self._push(command)
-            # Finally change the tag itself
-            command = UndoCommand(self,self.inner.changeTag,oldTag,newTag)
-            self._push(command)
         else: # Now we have to add all converted records to the existing tag
             # The easiest way to do this is to remove all records and add the converted records again
             for record in self.inner.tags[oldTag]:
@@ -685,9 +686,7 @@ class TagEditorModel(QtCore.QObject):
                 # Finally update the title attribute
                 if event.tag == tags.TITLE and len(affected) > 0:
                     for element in affected:
-                        print("Title before: {}".format(element.title))
                         element.title = element.getTitle(self.getTagsOfElement(element)[tags.TITLE])
-                        print("Title after: {}".format(element.title))
                     self.titlesChanged.emit(affected)
                     
             elif event.tagsChanged:          
