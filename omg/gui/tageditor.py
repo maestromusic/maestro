@@ -28,6 +28,7 @@ class TagEditorDock(QtGui.QDockWidget):
         self.setWindowTitle(self.tr("Tageditor"))
         self.vertical = vertical
         self.dockLocationChanged.connect(self._handleLocationChanged)
+        self.topLevelChanged.connect(self._handleLocationChanged)
         self.tabWidget = QtGui.QTabWidget()
         self.tabWidget.setTabPosition(QtGui.QTabWidget.North if vertical else QtGui.QTabWidget.East)
         self.setWidget(self.tabWidget)
@@ -40,13 +41,13 @@ class TagEditorDock(QtGui.QDockWidget):
         mainwindow.mainWindow.globalSelectionChanged.connect(self._handleSelectionChanged)
     
     def _handleLocationChanged(self,area):
-        vertical = area in [Qt.LeftDockWidgetArea,Qt.RightDockWidgetArea]
+        vertical = self.isFloating() or area in [Qt.LeftDockWidgetArea,Qt.RightDockWidgetArea]
         if vertical != self.vertical:
             self.vertical = vertical
             self.tabWidget.setTabPosition(QtGui.QTabWidget.North if vertical else QtGui.QTabWidget.East)
             self.realEditorWidget.setVertical(vertical)
             self.editorEditorWidget.setVertical(vertical) 
-        
+    
     def _handleSelectionChanged(self,elements,source):
         if isinstance(source,editor.EditorTreeView):
             self.editorEditorWidget.setElements(elements)
@@ -217,8 +218,12 @@ class TagEditorWidget(QtGui.QWidget):
         self._handleReset()
     
     def setVertical(self,vertical):
+        """Set whether this tageditor should be displayed in vertical model."""
         if vertical == self.vertical:
             return
+        for box in self.tagBoxes.values():
+            box.setIconOnly(vertical)
+            
         if vertical:
             for button in ['addButton','removeButton','addFlagButton']:
                 getattr(self,button).setText('')
@@ -253,7 +258,7 @@ class TagEditorWidget(QtGui.QWidget):
         self.tagEditorLayout.insertRow(row)
         
         # Create the tagbox
-        self.tagBoxes[tag] = tagwidgets.TagTypeBox(tag,useCoverLabel=True)
+        self.tagBoxes[tag] = SmallTagTypeBox(tag,self.vertical)
         self.tagBoxes[tag].tagChanged.connect(self._handleTagChangedByUser)
         self.tagEditorLayout.addWidget(self.tagBoxes[tag],row,0)
         
@@ -474,8 +479,7 @@ class RecordDialog(QtGui.QDialog):
             
         self.elementsBox = QtGui.QListView(self)
         # Use a formatter to print the title of the elements
-        self.elementsBox.setModel(simplelistmodel.SimpleListModel(elements,
-                                                    lambda el: formatter.Formatter(el).title()))
+        self.elementsBox.setModel(simplelistmodel.SimpleListModel(elements,lambda el: el.title))
         self.elementsBox.setSelectionMode(QtGui.QAbstractItemView.MultiSelection)
         for i,element in enumerate(elements):
             if record is None or element in record.elementsWithValue:
@@ -527,3 +531,25 @@ class RecordDialog(QtGui.QDialog):
     def _handleTagChanged(self,tag):
         """Change the tag of the ValueEditor."""
         self.valueEditor.setTag(tag)
+
+
+class SmallTagTypeBox(tagwidgets.TagTypeBox):
+    """Special TagTypeBox for the tageditor. Contrary to regular StackedWidgets it will consume only the
+    space necessary to display the current widget. Usually this is a TagLabel and thus much smaller than a
+    combobox. In the tageditor's vertical mode the labels' iconOnly-mode is used to save further space.
+    """
+    def __init__(self,tag,iconOnly,parent = None):
+        super().__init__(tag,parent,useCoverLabel=True)
+        self.currentChanged.connect(self.updateGeometry)
+        self.label.setIconOnly(iconOnly)
+    
+    def sizeHint(self):
+        return self.currentWidget().sizeHint()
+    
+    def minimumSizeHint(self):
+        return self.currentWidget().minimumSizeHint()
+    
+    def setIconOnly(self,iconOnly):
+        """Set whether the label should use its iconOnly-mode. Confer TagLabel.setIconOnly."""
+        self.label.setIconOnly(iconOnly)
+        

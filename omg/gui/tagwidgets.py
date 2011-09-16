@@ -13,16 +13,19 @@ from .. import tags, utils, database as db, modify
 
 
 class TagLabel(QtGui.QLabel):
-    """Specialized label which can contain arbitrary text, but displays the corresponding icons next to the
-    name when showing tagnames.
+    """Specialized label which can contain arbitrary text, but displays the corresponding icon next to the
+    name when showing a tagname. If *iconOnly* is True the label will display only the icon if there is one
+    (if the current tag does not have an icon or the label does not display a tagname, it will still show the
+    text).
     """
     iconSize = QtCore.QSize(24,24) # Size of the icon
     
-    def __init__(self,tag=None,parent=None):
+    def __init__(self,tag=None,parent=None,iconOnly=False):
         """Initialize a new TagLabel. You may specify a tag which is displayed at the beginning and a
         parent.
         """
         QtGui.QLabel.__init__(self,parent)
+        self.iconOnly = iconOnly
         self.setTag(tag)
 
     def text(self):
@@ -46,11 +49,21 @@ class TagLabel(QtGui.QLabel):
             self.clear()
         else:
             if tag.iconPath() is not None:
-                QtGui.QLabel.setText(self,'<img src="{}" widht="{}" height="{}"> {}'
-                                    .format(tag.iconPath(),self.iconSize.width(),
-                                            self.iconSize.height(),tag.translated()))
-            else: QtGui.QLabel.setText(self,tag.translated())
+                if self.iconOnly:
+                    super().setText('<img src="{}" widht="{}" height="{}">'
+                                      .format(tag.iconPath(),self.iconSize.width(),self.iconSize.height()))
+                else: super().setText('<img src="{}" widht="{}" height="{}"> {}'
+                                      .format(tag.iconPath(),self.iconSize.width(),
+                                              self.iconSize.height(),tag.translated()))
+            else: super().setText(tag.translated())
         
+    def setIconOnly(self,iconOnly):
+        """Set whether the label should use iconOnly-mode: When set it will only display the icon and no text,
+        if an icon is available."""
+        if iconOnly != self.iconOnly:
+            self.iconOnly = iconOnly
+            self.setTag(self.tag)
+            
 
 class ValueTypeBox(QtGui.QComboBox):
     """Combobox to choose a ValueType for tags. Additionally it has a property 'disableMouseWheel'. If this
