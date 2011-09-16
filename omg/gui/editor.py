@@ -22,7 +22,7 @@ logger = logging.getLogger("gui.editor")
 
 
 class EditorTreeView(treeview.TreeView):
-    def __init__(self, name='default', parent = None):
+    def __init__(self, parent = None):
         treeview.TreeView.__init__(self, parent)
         self.setContextMenuPolicy(Qt.DefaultContextMenu)
         self.setSelectionMode(self.ExtendedSelection)
@@ -30,7 +30,7 @@ class EditorTreeView(treeview.TreeView):
         self.setAcceptDrops(True)
         self.setDefaultDropAction(Qt.MoveAction)
         self.setDropIndicatorShown(True)
-        self.setModel(editor.EditorModel(name))
+        self.setModel(editor.EditorModel())
         
         self.viewport().setMouseTracking(True)
         self.mergeAction = QtGui.QAction(self.tr('Merge...'), self)
@@ -171,14 +171,11 @@ class EditorWidget(QtGui.QDockWidget):
         self.setWidget(widget)
         vb = QtGui.QVBoxLayout(widget)
         try:
-            name = state[0]
-            guess = state[1]
-            expand = state[2]
+            guess, expand = state
         except:
-            name = 'default'
             guess = True
             expand = True
-        self.editor = EditorTreeView(name)
+        self.editor = EditorTreeView()
         self.editor.model().setGuessAlbums(guess)
         self.editor.setAutoExpand(expand)
         vb.addWidget(self.editor)
@@ -192,8 +189,6 @@ class EditorWidget(QtGui.QDockWidget):
         self.newContainerButton = QtGui.QPushButton(self.tr("new container"))
         self.newContainerButton.clicked.connect(self.newContainerDialog)
         hb.addWidget(self.newContainerButton)
-        self.nameField = QtGui.QLineEdit(name)
-        hb.addWidget(self.nameField)
         self.albumGuesserCheckbox = QtGui.QCheckBox(self.tr('guess albums'))
         self.albumGuesserCheckbox.stateChanged.connect(self.editor.model().setGuessAlbums)
         self.albumGuesserCheckbox.setChecked(guess)
@@ -206,7 +201,7 @@ class EditorWidget(QtGui.QDockWidget):
         hb.addWidget(self.autoExpandCheckbox)
         
         hb.addStretch()
-        self.commitButton = QtGui.QPushButton(self.tr('commit all editors'))
+        self.commitButton = QtGui.QPushButton(self.tr('commit'))
         hb.addWidget(self.commitButton)
         self.commitButton.clicked.connect(modify.commitEditors)
 
@@ -228,7 +223,7 @@ class EditorWidget(QtGui.QDockWidget):
         modify.push(comm)
         
     def saveState(self):
-        return (self.nameField.text(), self.albumGuesserCheckbox.isChecked(), self.autoExpandCheckbox.isChecked())
+        return (self.albumGuesserCheckbox.isChecked(), self.autoExpandCheckbox.isChecked())
 # register this widget in the main application
 eData = mainwindow.WidgetData(id = "editor",
                              name = translate("Editor","editor"),

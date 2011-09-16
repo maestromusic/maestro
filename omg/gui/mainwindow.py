@@ -156,6 +156,7 @@ class MainWindow(QtGui.QMainWindow):
         self.setWindowTitle(self.tr('OMG version {}').format(constants.VERSION))
         self.setWindowIcon(QtGui.QIcon("images/omg.png"))
         self.setCentralWidget(QtGui.QTabWidget())
+        
         self.initMenus()
         self.statusBar()
         
