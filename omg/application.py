@@ -90,7 +90,6 @@ def run(cmdConfig = []):
     ``main.collection=/var/music``.
     """
     app = init(cmdConfig)
-    
     # Lock the lockfile to prevent a second OMG-instance from starting.
     # Confer http://packages.python.org/tendo/_modules/tendo/singleton.html#SingleInstance
     lockFile = os.path.join(config.CONFDIR,'lock')
