@@ -164,7 +164,7 @@ class EditorTreeView(treeview.TreeView):
             
                
 class EditorWidget(QtGui.QDockWidget):
-    def __init__(self, parent = None, state = None):
+    def __init__(self, parent = None, state = None, location = None):
         super().__init__(parent)
         self.setWindowTitle(self.tr('editor'))
         widget = QtGui.QWidget()
