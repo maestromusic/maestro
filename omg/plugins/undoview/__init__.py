@@ -31,7 +31,7 @@ def disable():
 
 class UndoViewDock(QtGui.QDockWidget):
     """UndoViewDock displays the active, real and editor-UndoStack using three QtGui.QUndoStacks."""
-    def __init__(self,parent=None,state=None):
+    def __init__(self,parent=None,state=None,location=None):
         QtGui.QDockWidget.__init__(self,parent)
         self.setWindowTitle(self.tr("UndoView"))
         

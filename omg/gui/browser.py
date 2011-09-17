@@ -22,7 +22,7 @@ translate = QtCore.QCoreApplication.translate
 
 class BrowserDock(QtGui.QDockWidget):
     """DockWidget containing the Browser."""
-    def __init__(self,parent=None,state=None):
+    def __init__(self,parent=None,state=None,location=None):
         QtGui.QDockWidget.__init__(self,parent)
         self.setWindowTitle(self.tr("Browser"))
         browser = Browser(self,state)

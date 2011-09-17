@@ -33,11 +33,36 @@ contextMenuProviders = {
 class Separator: pass
 SEPARATOR = Separator()
 
+class SelectionProperties:
+    
+    def __init__(self, model):
+        self.single = ...
+        self.singleParent = ...
+        
+class TreeAction(QtGui.QAction):
+    
+    def initialize(self, selectionProperties, treeview):
+        pass
+        
+        
 class TreeView(QtGui.QTreeView):
     """Base class for tree views that contain mainly elements. This class handles mainly the
     ContextMenuProvider system, that allows plugins to insert entries into the context menus of playlist and
     browser.
     """
+    
+    @staticmethod
+    def initContextMenu():
+        _contextMenu = []
+        _contextMenu.append(QAction('omg'))
+        
+    _contextMenu = None
+    @classmethod
+    def contextMenu(cls):
+        if not cls._contextMenu:
+            initContextMenu()
+        return cls._contextMenu
+        
     def __init__(self,parent):
         QtGui.QTreeView.__init__(self,parent)
         self.contextMenuProviderCategory = None
