@@ -11,7 +11,7 @@ from PyQt4.QtCore import Qt
 
 import itertools, os.path
 
-from .. import constants, tags, strutils, utils, config, logging, modify
+from .. import constants, tags, strutils, utils, config, logging, modify, constants
 from ..models import tageditormodel, simplelistmodel, File, flageditor as flageditormodel
 from ..gui import formatter, singletageditor, dialogs, tagwidgets, mainwindow, editor, flageditor
 from ..gui.misc import widgetlist, dynamicgridlayout
@@ -23,17 +23,19 @@ logger = logging.getLogger(__name__)
 
 class TagEditorDock(QtGui.QDockWidget):
     """DockWidget containing the TagEditor."""
-    def __init__(self,parent=None,state=None,vertical=False):
+    def __init__(self,parent=None,state=None,location=None):
         QtGui.QDockWidget.__init__(self,parent)
         self.setWindowTitle(self.tr("Tageditor"))
-        self.vertical = vertical
+        if location is not None:
+            vertical = location.floating or location.area in [Qt.LeftDockWidgetArea,Qt.RightDockWidgetArea]
+        else: vertical = False # Should not happen
         self.dockLocationChanged.connect(self._handleLocationChanged)
         self.topLevelChanged.connect(self._handleLocationChanged)
         self.tabWidget = QtGui.QTabWidget()
         self.tabWidget.setTabPosition(QtGui.QTabWidget.North if vertical else QtGui.QTabWidget.East)
         self.setWidget(self.tabWidget)
-        self.realEditorWidget = TagEditorWidget(modify.REAL)
-        self.editorEditorWidget = TagEditorWidget(modify.EDITOR)
+        self.realEditorWidget = TagEditorWidget(modify.REAL,vertical=vertical)
+        self.editorEditorWidget = TagEditorWidget(modify.EDITOR,vertical=vertical)
         self.tabWidget.addTab(self.realEditorWidget,self.tr("Real"))
         self.tabWidget.addTab(self.editorEditorWidget,self.tr("Editor"))
         self.setAcceptDrops(True)
@@ -42,11 +44,9 @@ class TagEditorDock(QtGui.QDockWidget):
     
     def _handleLocationChanged(self,area):
         vertical = self.isFloating() or area in [Qt.LeftDockWidgetArea,Qt.RightDockWidgetArea]
-        if vertical != self.vertical:
-            self.vertical = vertical
-            self.tabWidget.setTabPosition(QtGui.QTabWidget.North if vertical else QtGui.QTabWidget.East)
-            self.realEditorWidget.setVertical(vertical)
-            self.editorEditorWidget.setVertical(vertical) 
+        self.tabWidget.setTabPosition(QtGui.QTabWidget.North if vertical else QtGui.QTabWidget.East)
+        self.realEditorWidget.setVertical(vertical)
+        self.editorEditorWidget.setVertical(vertical) 
     
     def _handleSelectionChanged(self,elements,source):
         if isinstance(source,editor.EditorTreeView):
@@ -179,12 +179,11 @@ class TagEditorWidget(QtGui.QWidget):
             self.topLayout.addWidget(self.saveButton)
         
         self.label = QtGui.QLabel()
-        self.topLayout.addWidget(self.label)
         self.topLayout.addStretch(1)
         
-        self.scrollArea = QtGui.QScrollArea()
-        self.scrollArea.setWidgetResizable(True)
-        self.layout().addWidget(self.scrollArea,1)
+        scrollArea = QtGui.QScrollArea()
+        scrollArea.setWidgetResizable(True)
+        self.layout().addWidget(scrollArea,1)
             
         self.viewport = QtGui.QWidget()
         self.viewport.setLayout(QtGui.QVBoxLayout())
@@ -192,7 +191,7 @@ class TagEditorWidget(QtGui.QWidget):
         self.tagEditorLayout.setColumnStretch(1,1) # Stretch the column holding the values
         self.viewport.layout().addLayout(self.tagEditorLayout)
         self.viewport.layout().addStretch(1)
-        self.scrollArea.setWidget(self.viewport)
+        scrollArea.setWidget(self.viewport)
 
         self.flagWidget = QtGui.QWidget()
         self.flagWidget.setLayout(QtGui.QHBoxLayout())
@@ -206,7 +205,7 @@ class TagEditorWidget(QtGui.QWidget):
         flagScrollArea = QtGui.QScrollArea()
         flagScrollArea.setWidgetResizable(True)
         flagScrollArea.setMaximumHeight(40)
-        flagEditor = flageditor.FlagEditor(self.flagModel)
+        flagEditor = flageditor.FlagEditor(self.flagModel,vertical)
         flagScrollArea.setWidget(flagEditor)
         self.flagWidget.layout().addWidget(flagScrollArea,1)
         self._checkFlagEditorVisibility()
@@ -247,7 +246,7 @@ class TagEditorWidget(QtGui.QWidget):
             if self.vertical: # Not when this function is called for the first time
                 self.layout().removeWidget(self.label)
             self.topLayout.insertWidget(self.topLayout.count()-1,self.label) # -1 due to the stretch
-            
+        
         self.vertical = vertical
             
     def setElements(self,elements):

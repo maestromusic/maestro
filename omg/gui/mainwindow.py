@@ -19,7 +19,10 @@ be restored again.
 To work with this system central widgets or dock widget must follow some rules:
 
     - Data about them must be registered using addWidgetData.
-    - The widget must provide a constructor which takes a parent as first parameter and has default values for
+    - The widget must provide a constructor which takes a parent as first parameter, has a keyword parameter
+    'location' and has default values for all other parameters. When invoked 'location' will be a Location
+    object storing the last location of the dock. Note that the location will be restored after the widget
+    has been initialized and thus methods like isFloating do not provide valid information.
     all other parameters.
     - Dock widgets must be subclasses of QDockWidget.
     - Of course the generic system can only store the position and not the inner state of each widget. If a
@@ -285,9 +288,9 @@ class MainWindow(QtGui.QMainWindow):
                         self._setUniqueDockActionEnabled(data.id,False)
                     return widget # This was easy
         # If that did not work, create a new widget
-        return self._createDockWidget(data)
+        return self._createDockWidget(data,Location(data.preferredDockArea,False))
 
-    def _createDockWidget(self,data,objectName=None,state=None):
+    def _createDockWidget(self,data,location,objectName=None,state=None):
         """Create a new dock widget for the given WidgetData and set its objectName to *objectName*. If that
         is None, compute an unused objectName."""
         if data not in self._dockWidgets:
@@ -307,12 +310,12 @@ class MainWindow(QtGui.QMainWindow):
                 objectName = data.id + str(i)
         
         if hasattr(data.theClass,'saveState'):
-            widget = data.theClass(self,state=state)
-        else: widget = data.theClass(self)
+            widget = data.theClass(self,state=state,location=location)
+        else: widget = data.theClass(self,location=location)
         
         widget.setObjectName(objectName)
         self._dockWidgets[data].append(widget)
-        QtGui.QMainWindow.addDockWidget(self,data.preferredDockArea,widget)
+        QtGui.QMainWindow.addDockWidget(self,location.area,widget)
 
         if data.unique:
             self._setUniqueDockActionEnabled(data.id,False)
@@ -350,10 +353,10 @@ class MainWindow(QtGui.QMainWindow):
         
         # Restore dock widgets (create them with correct object names and use QMainWindow.restoreState)
         self._dockWidgets = {}
-        for id,objectName,options in config.storage.gui.dock_widgets:
+        for id,objectName,location,options in config.storage.gui.dock_widgets:
             data = WidgetData.fromId(id)
             if data is not None: # As above it may happen that data is None.
-                widget = self._createDockWidget(data,objectName,options)
+                widget = self._createDockWidget(data,Location(*location),objectName,options)
             else: logger.info("Could not load dock widget '{}' with object name '{}'".format(data,objectName))
 
         # Restore state
@@ -388,7 +391,8 @@ class MainWindow(QtGui.QMainWindow):
                     if hasattr(widget,"saveState"):
                         state = widget.saveState()
                     else: state = None
-                    dockWidgetList.append((data.id,widget.objectName(),state))
+                    location = (self.dockWidgetArea(widget),widget.isFloating())
+                    dockWidgetList.append((data.id,widget.objectName(),location,state))
                 else:
                     # TODO: The idea of this is that the state of dock widgets that have been closed should
                     # not be stored. But it does not work (even using the commented lines) which in my
@@ -479,4 +483,17 @@ class MainWindow(QtGui.QMainWindow):
                 result.extend(widgets)
                 break
         return result
+
+
+class Location:
+    """This small class stores location information for dockwidgets when the layout is saved/restored. Note
+    that during restoring the widgets are created before they are placed at their positions. Thus methods
+    like isFloating won't provide valid results. Thus in order to have the location information in the
+    dock's constructor we have to separately store and pass a Location object."""
+    def __init__(self,area,floating):
+        self.area = area
+        self.floating = floating
         
+    def __str__(self):
+        return "<Location {},{}>".format(self.area,self.floating)
+    

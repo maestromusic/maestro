@@ -20,8 +20,9 @@ class FlagEditor(QtGui.QWidget):
     # The animation running (if any). This is used to stop the animation if the model changes.
     _animation = None
     
-    def __init__(self,model,parent=None):
+    def __init__(self,model,vertical,parent=None):
         super().__init__(parent)
+        self.vertical = vertical
         
         self._flagWidgets = []
         self.model = model
@@ -30,11 +31,20 @@ class FlagEditor(QtGui.QWidget):
         self.model.recordRemoved.connect(self._handleRecordRemoved)
         self.model.recordChanged.connect(self._handleRecordChanged)
         
-        self.setLayout(QtGui.QHBoxLayout())
+        self.setLayout(QtGui.QBoxLayout(
+                                QtGui.QBoxLayout.TopToBottom if vertical else QtGui.QBoxLayout.LeftToRight))
         self.layout().setContentsMargins(5,3,5,3)
         self.layout().addStretch(1)
         self._handleReset()
-            
+    
+    def setVertical(self,vertical):
+        """Set whether this editor display the flags vertically."""
+        if vertical != self.vertical:
+            self._stopAnimation()
+            self.vertical = vertical
+            self.layout().setDirection(
+                            QtGui.QBoxLayout.TopToBottom if vertical else QtGui.QBoxLayout.LeftToRight)
+        
     def _handleReset(self):
         """Reset the FlagEditor."""
         self._stopAnimation()
@@ -69,9 +79,14 @@ class FlagEditor(QtGui.QWidget):
                 if config.options.gui.flageditor_animation and pos < len(self._flagWidgets):
                     size = flagWidget.sizeHint()
                     empty = QtGui.QWidget()
-                    empty.setMinimumWidth(size.width())
+                    if self.vertical:
+                        empty.setMinimumHeight(size.height())
+                        property = "minimumHeight"
+                    else:
+                        empty.setMinimumWidth(size.width())
+                        property = "minimumWidth"
                     self.layout().insertWidget(self._mapToLayout(pos),empty)
-                    self._animation = QtCore.QPropertyAnimation(empty,"minimumWidth",self)
+                    self._animation = QtCore.QPropertyAnimation(empty,property,self)
                     self._animation.setDuration(250)
                     self._animation.setEndValue(0)
                     self._animation.setEasingCurve(QtCore.QEasingCurve.InOutSine)
