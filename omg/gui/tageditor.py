@@ -197,15 +197,15 @@ class TagEditorWidget(QtGui.QWidget):
         self.flagWidget.setLayout(QtGui.QHBoxLayout())
         self.flagWidget.layout().setContentsMargins(0,0,0,0)
         self.layout().addWidget(self.flagWidget)
-        label = QtGui.QLabel()
-        label.setPixmap(utils.getIcon("flag_blue.png").pixmap(16))
-        self.flagWidget.layout().addWidget(label)
-        self.flagWidget.layout().addWidget(QtGui.QLabel(self.tr("Flags: ")))
+        
+        self.flagLabel = QtGui.QLabel() # Text will be set in setVertical
+        self.flagWidget.layout().addWidget(self.flagLabel)
         
         flagScrollArea = QtGui.QScrollArea()
         flagScrollArea.setWidgetResizable(True)
         flagScrollArea.setMaximumHeight(40)
-        flagEditor = flageditor.FlagEditor(self.flagModel,vertical)
+        # Vertical model of the flageditor is not used
+        flagEditor = flageditor.FlagEditor(self.flagModel,False)
         flagScrollArea.setWidget(flagEditor)
         self.flagWidget.layout().addWidget(flagScrollArea,1)
         self._checkFlagEditorVisibility()
@@ -232,6 +232,7 @@ class TagEditorWidget(QtGui.QWidget):
             if not self.vertical: # Not when this function is called for the first time
                 self.topLayout.removeWidget(self.label)
             self.layout().insertWidget(1,self.label)
+            self.flagLabel.setText('<img src="images/icons/flag_blue.png">')
         else:
             self.addButton.setText(self.tr("Add tag"))
             self.removeButton.setText(self.tr("Remove selected"))
@@ -246,7 +247,8 @@ class TagEditorWidget(QtGui.QWidget):
             if self.vertical: # Not when this function is called for the first time
                 self.layout().removeWidget(self.label)
             self.topLayout.insertWidget(self.topLayout.count()-1,self.label) # -1 due to the stretch
-        
+            self.flagLabel.setText('<img src="images/icons/flag_blue.png"> '+self.tr("Flags: "))
+            
         self.vertical = vertical
             
     def setElements(self,elements):
