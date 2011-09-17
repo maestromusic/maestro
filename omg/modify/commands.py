@@ -387,13 +387,31 @@ class ValueHiddenUndoCommand(UndoCommand):
 class RenameTagValueCommand(UndoCommand):
     """A command to rename *all* occurences of a specific tag value, e.g. all "Frederic Chopin" to
     "Frédéric Chopin"."""
-    def __init__(self, tag, valueId, newValue, text = None):
-        QtQui.QUndoCommand.__init__(self)
+    def __init__(self, tag, oldValue, newValue, text = None):
+        QtGui.QUndoCommand.__init__(self)
         if text is None:
-            text = self.tr('change {}-tag value with id {} to {}'.format(tag, valueID, newValue))
+            text = translate('modify.commands', 'change {}-tag value from {} to {}'.format(tag, oldValue, newValue))
         self.setText(text)
+        self.valueId = db.idFromValue(tag, oldValue)
+        self.oldValue = oldValue
+        self.newValue = newValue
+        self.tag = tag
+        # store elements that will be changed
+        changedIDs = set(db.elementsWithTagValue(tag, self.valueId))
         
+        # store elements that already have the new value
         try:
-            existingID = db.idFromValue(tag, newValue)
-        except db.sql.EmptyResultException as e:
-            previous = tuple()
+            existingIDs = set(db.elementsWithTagValue(tag, newValue))
+        except db.sql.EmptyResultException:
+            existingIDs = set()
+        
+        self.both = changedIDs & existingIDs
+        self.changeSimple = changedIDs - self.both
+    
+    def redo(self):
+        real.changeTagValue(self.tag, self.oldValue, self.newValue, self.changeSimple | self.both)
+        
+    def undo(self):
+        real.changeTagValue(self.tag, self.newValue, self.oldValue, self.changeSimple)
+        if len(self.both) > 0:
+            real.addTagValue(self.tag, self.oldValue, self.both)

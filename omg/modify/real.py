@@ -85,15 +85,17 @@ def commit(changes):
 
 
 def addTagValue(tag,value,elements): 
-    """Add a tag of type *tag* and value *value* to each element in *elements*."""
+    """Add a tag of type *tag* and value *value* to each element in *elements*, which is a list of either
+    elements or element IDs."""
     assert isinstance(tag,tags.Tag) and len(elements) > 0
     
     if not tag.private:
-        successful = [] # list of elements where the file was written successfully
+        successful = [] # list of element IDs where the file was written successfully
         for element in elements:
-            if element.isFile():
+            isID = isinstance(element, int)
+            if (isID and db.isFile(element)) or element.isFile():
                 try:
-                    real = realfiles.get(element.path)
+                    real = realfiles.get(db.path(element) if isID else element.path)
                     real.read()
                     real.tags.add(tag,value)
                     real.saveTags()
@@ -101,12 +103,12 @@ def addTagValue(tag,value,elements):
                     logger.error("Could not add tags to '{}'.".format(element.path))
                     logger.error("Error was: {}".format(e))
                     continue
-            successful.append(element)
-    else: successful = elements
+            successful.append(element if isID else element.id)
+    else: successful = [el if isinstance(el, int) else el.id for el in elements]
 
     if len(successful) > 0:
-        db.write.addTagValues((element.id for element in successful),tag,[value])
-        dispatcher.changes.emit(events.TagValueAddedEvent(REAL,tag,value,successful))
+        db.write.addTagValues(successful, tag,[value])
+        dispatcher.changes.emit(events.TagValueAddedEvent(REAL,tag,value, successful))
 
 
 def removeTagValue(tag,value,elements):
@@ -135,16 +137,17 @@ def removeTagValue(tag,value,elements):
 
 
 def changeTagValue(tag,oldValue,newValue,elements):
-    """For each element in *elements*: If element has a tag of type *tag* and value *oldValue* then remove
-    it. In any case add *newValue*."""
+    """For each element in *elements*, which is a list of either elements or element IDs:
+    If element has a tag of type *tag* and value *oldValue* then remove it.
+    In any case add *newValue*."""
     assert isinstance(tag,tags.Tag) and len(elements) > 0
-
     if not tag.private:
-        successful = [] # list of elements where the file was written successfully
+        successful = [] # list of element IDs where the file was written successfully
         for element in elements:
-            if element.isFile():
+            isID = isinstance(element, int)
+            if (isID and db.isFile(element)) or element.isFile():
                 try:
-                    real = realfiles.get(element.path)
+                    real = realfiles.get(db.path(element) if isID else element.path)
                     real.read()
                     real.tags.replace(tag,oldValue,newValue)
                     real.saveTags()
@@ -152,11 +155,11 @@ def changeTagValue(tag,oldValue,newValue,elements):
                     logger.error("Could not change tag value from '{}'.".format(element.path))
                     logger.error("Error was: {}".format(e))
                     continue
-            successful.append(element)
-    else: successful = elements
+            successful.append(element if isID else element.id)
+    else: successful = [el if isinstance(el, int) else el.id for el in elements]
         
     if len(successful) > 0:
-        db.write.changeTagValue((element.id for element in successful),tag,oldValue,newValue)
+        db.write.changeTagValue(successful,tag,oldValue,newValue)
         dispatcher.changes.emit(events.TagValueChangedEvent(REAL,tag,oldValue,newValue,successful))
 
 

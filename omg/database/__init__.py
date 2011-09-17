@@ -436,9 +436,18 @@ def tagValues(elid,tagList):
 def allTagValues(tagSpec):
     """Return all tag values in the database for the given tag."""
     tag = tagsModule.get(tagSpec)
-    return query("SELECT value FROM {}values_{} WHERE tag_id = {}"
-                 .format(prefix,tag.type.name,tag.id)).getSingleColumn()
+    return query("SELECT value FROM {}values_{} WHERE tag_id = ?"
+                 .format(prefix,tag.type.name), tag.id).getSingleColumn()
     
+def elementsWithTagValue(tagSpec, valueSpec):
+    """Return (as list) the IDs of all elements that have a tag given by *tagSpec* with a the given *valueSpec*."""
+    tag = tagsModule.get(tagSpec)
+    if isinstance(valueSpec, str):
+        valueID = idFromValue(tag, valueSpec)
+    else:
+        valueID = valueSpec
+    return query("SELECT element_id FROM {}tags WHERE tag_id = ? AND value_id = ?".format(prefix),
+                 tag.id, valueID).getSingleColumn()
 
 # flags table
 #=======================================================================

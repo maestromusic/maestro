@@ -607,12 +607,14 @@ class TagValuePropertiesWidget(QtGui.QWidget):
     def commit(self):
         from ..modify import commands 
         if self.changeValueCheckbox.isChecked() and self.valueEdit.text() != self.orig_value:
-            raise NotImplementedError('value renaming not yet possible')
+            #TODO: make sure that the new value is not an empty string  
+            command = commands.RenameTagValueCommand(self.tag, self.orig_value, self.valueEdit.text())
+            modify.push(command)
         if self.sortValueCheckbox.isChecked():
             if self.sortEdit.text() != self.orig_sortValue:
                 command = commands.SortValueUndoCommand(self.tag, self.valueId, self.orig_sortValue, self.sortEdit.text())
                 modify.push(command)
-        else:
+        elif self.orig_sortValue is not None:
             command = commands.SortValueUndoCommand(self.tag, self.valueId, self.orig_sortValue, None)
             modify.push(command)
         if self.hiddenCheckbox.isChecked() != self.orig_hidden:

@@ -167,22 +167,22 @@ class TagChangeEvent(ElementChangeEvent):
 
             
 class SingleTagChangeEvent(TagChangeEvent):
-    def __init__(self,level,tag,elements):
+    def __init__(self,level,tag,elementIDs):
         assert isinstance(tag,tags.Tag)
         self.level = level
         self.tag = tag
-        self.elements = elements
+        self.elementIDs = elementIDs
         self.contentsChanged = False
         self.tagsChanged = True
         self.flagsChanged = False
         
     def ids(self):
-        return [element.id for element in self.elements]
+        return self.elementIDs
     
     
 class TagValueAddedEvent(SingleTagChangeEvent):
-    def __init__(self,level,tag,value,elements):
-        super().__init__(level,tag,elements)
+    def __init__(self,level,tag,value,elementIDs):
+        super().__init__(level,tag,elementIDs)
         self.value = value
 
     def applyTo(self,element):
@@ -190,12 +190,12 @@ class TagValueAddedEvent(SingleTagChangeEvent):
             element.tags.add(self.tag,self.value)
             
     def __str__(self):
-        return "Add: {} {} {}".format(self.tag,self.value,self.elements)
+        return "Add: {} {} {}".format(self.tag,self.value,self.elementIDs)
     
     
 class TagValueRemovedEvent(SingleTagChangeEvent):
-    def __init__(self,level,tag,value,elements):
-        super().__init__(level,tag,elements)
+    def __init__(self,level,tag,value,elementIDs):
+        super().__init__(level,tag,elementIDs)
         self.value = value
 
     def applyTo(self,element):
@@ -203,12 +203,12 @@ class TagValueRemovedEvent(SingleTagChangeEvent):
             element.tags.remove(self.tag,self.value)
         
     def __str__(self):
-        return "Remove: {} {} {}".format(self.tag,self.value,self.elements)
+        return "Remove: {} {} {}".format(self.tag,self.value,self.elementIDs)
     
 
 class TagValueChangedEvent(SingleTagChangeEvent):
-    def __init__(self,level,tag,oldValue,newValue,elements):
-        super().__init__(level,tag,elements)
+    def __init__(self,level,tag,oldValue,newValue,elementIDs):
+        super().__init__(level,tag,elementIDs)
         self.oldValue = oldValue
         self.newValue = newValue
 
@@ -217,7 +217,7 @@ class TagValueChangedEvent(SingleTagChangeEvent):
             element.tags.replace(self.tag,self.oldValue,self.newValue)
 
     def __str__(self):
-        return "Change: {} {}->{} {}".format(self.tag,self.oldValue,self.newValue,self.elements)
+        return "Change: {} {}->{} {}".format(self.tag,self.oldValue,self.newValue,self.elementIDs)
     
 
 class FlagChangeEvent(ElementChangeEvent):
