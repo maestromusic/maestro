@@ -136,14 +136,11 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
             raise RuntimeError("Cannot create an index for node {} because "
                                + "it is not contained in its alleged parent {}.".format(node,parent))
             
-        return self.createIndex(parent.getContents().index(node),0,node)
-            
+        return self.createIndex(parent.getContents().index(node),0,node)     
 
     def getAllNodes(self):
         """Generator which will return all nodes contained in the tree in depth-first-manner."""
-        for element in self.contents:
-            for sub in element.getAllNodes():
-                yield sub
+        return self.root.getAllNodes()
     
     def breadthFirstTraversal(self):
         """Generator which will return all nodes contained in the tree in breadth-first-manner."""

@@ -37,6 +37,16 @@ class Criterion:
     def isNarrower(self,other):
         """Return whether this criterion is narrower than *other*, i.e. if the set of elements matching this
         criterion is a subset (not necessarily strict) of the set of elements matching *other*."""
+        
+    def getFlags(self):
+        """Return the list of flags used by this criterion. When the user changes the tags of some elements,
+        this is used to determine whether the result set of the criterion may have changed."""
+        return []
+    
+    def getTags(self):
+        """Return the list of tags used by this criterion. When the user changes the tags of some elements,
+        this is used to determine whether the result set of the criterion may have changed."""
+        return []
 
 
 class TextCriterion(Criterion):
@@ -100,9 +110,12 @@ class TextCriterion(Criterion):
         else: self.ids = None
 
     def getSearchTypes(self):
-        """Return the set of types that appear in ''tagSet''."""
+        """Return the set of tag types that appear in ''tagSet''."""
         return set(tag.type for tag in self.tagSet)
 
+    def getTags(self):
+        return self.tagSet
+    
     def getQuery(self,fromTable,columns):
         if len(self.tagSet) == 0:
             raise RuntimeError("Criterion {} is not valid.".format(self))
@@ -299,9 +312,9 @@ def isNarrower(aList,bList):
 
 
 def getNonRedundantCriterion(criteria,processed):
-    """Filter criteria from *criteria* which must match every element that matches the criteria *processed*
-    and return the first remaining criterion. If no criterion remained, return None. If for example
-    *processed* contains 'hello', then 'hell' will be filtered away."""
+    """Get the first criterion from *criteria* that is redundant on the set of elements matching the criteria
+    in *processed*. A criterion is regarded redundant when it matches every element in the result set of
+    *processed*. If for example *processed* contains 'hello', then 'hell' is redundant."""
     for c in criteria:
         if not any(p.isNarrower(c) for p in processed):
             return c

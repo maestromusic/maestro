@@ -16,7 +16,7 @@ from .. import database as db, config, search, constants, utils, tags, modify, f
 from ..search import searchbox, criteria as criteriaModule
 from . import mainwindow, treeview, browserdialog, delegates, tageditor, tagwidgets
 from ..models import browser as browsermodel, Element
-                         
+    
 translate = QtCore.QCoreApplication.translate
 
 
@@ -156,6 +156,7 @@ class Browser(QtGui.QWidget):
         # Convert tag names to tags, leaving the nested list structure unchanged
         self.createViews(utils.mapRecursively(tags.get,viewsToRestore))
 
+        modify.dispatcher.changes.connect(self._handleDispatcher)
         self.load()
 
     def saveState(self):
@@ -250,11 +251,26 @@ class Browser(QtGui.QWidget):
                 view.startAutoExpand()
                 
     def _handleDispatcher(self,event):
-        # TODO: Optimize to cases:
-        #if isinstance(event,modify.events.SingleTagEvent) and \
-        #                all(event.tag not in layer for layer in self.layers) \
-        #                and tag not in searchQuery:
-        #elif isinstance(event,modify.events.SingleFlagEvent) and flag not in query
+        # Optimize some cases in which we do not have to start a new search and reload everything.
+        if isinstance(event,modify.events.ElementChangeEvent) and event.level == modify.EDITOR:
+            return # Does not affect us
+        elif isinstance(event,modify.events.SingleTagChangeEvent) \
+                        and all(event.tag not in criterion.getTags() for criterion in self.searchCriteria) \
+                        and all(event.tag not in criterion.getTags() for criterion in self.criterionFilter):
+            for view in self.views:
+                view.model().applyEvent(event)
+                # If the tag is used in a layer of this view, we still have to reset the view.
+                if any(event.tag in layer for layer in view.model().getLayers()):
+                    view.model().reset()
+            return
+        elif isinstance(event,modify.events.SingleFlagChangeEvent) \
+                        and all(event.tag not in criterion.getFlags() for criterion in self.searchCriteria) \
+                        and all(event.tag not in criterion.getFlags() for criterion in self.criterionFilter):
+            for view in self.views:
+                view.model().applyEvent(event)
+            return
+
+        print("Complicated event: reloading browser")
         self.load()
         
 

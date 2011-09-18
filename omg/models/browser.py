@@ -299,6 +299,13 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
         if contentsNone:
             self.endInsertRows()
 
+    def applyEvent(self,event):
+        for node in self.getAllNodes():
+            if isinstance(node,Element) and node.id in event.ids():
+                event.applyTo(node)
+                index = self.getIndex(node)
+                self.dataChanged.emit(index,index)
+
 
 class CriterionNode(models.Node):
     """CriterionNode is the base class for nodes used to group elements according to a criterion (confer 
@@ -342,6 +349,13 @@ class CriterionNode(models.Node):
             self.loadContents()
         return self.contents
     
+    def getAllNodes(self):
+        if self.contents is None:
+            return
+        else: 
+            for node in super().getAllNodes():
+                yield node
+            
     def hasLoaded(self):
         """Return whether this CriterionNode did already load its contents."""
         return self.contents is not None and (len(self.contents) != 1 
