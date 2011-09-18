@@ -25,7 +25,7 @@ def mapRecursively(f,aList):
             result.append(mapRecursively(f,item))
         else: result.append(f(item))
     return result
- 
+
 def longestSubstring(a, b):
     sm = SequenceMatcher(None, a, b)
     result = sm.find_longest_match(0, len(a), 0, len(b))

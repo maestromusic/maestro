@@ -10,58 +10,236 @@
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from .. import models
+from .. import models, modify, logging, tags
+from . import mainwindow
 
 translate = QtGui.QApplication.translate
+logger = logging.getLogger(__name__)
 
-# Plugins may insert functions here to insert entries in the context menu. Each function must take three
-# parameters:
-# - the treeview where the context-menu is opened
-# - a list of actions and/or separators which will be inserted in the menu
-# - the current index, i.e. the index where the mouse was clicked (None if the mouse was not over an element)
-# To insert actions into the context menu, the function must modify the second parameter.
-# There are three lists (categories) where such function can be inserted: 'all' will be executed for all
-# treeviews, 'playlist' and 'browser' only in playlists or browsers, respectively.
-contextMenuProviders = {
-'all': [],
-'playlist': [],
-'browser': []
-}
+def makeUnique(iterable):
+    """Return a list that is a copy of *iterable* where all elements with the same ID appear only once."""
+    ret = []
+    ids = set()
+    for elem in iterable:
+        if hasattr(elem, 'id'):
+            if not elem.id in ids:
+                ids.add(elem.id)
+                ret.append(elem)
+        else:
+            ret.append(elem)
+    return ret
 
-# SEPARATOR is a special value which can be inserted in the list of actions for a context-menu.
-# TreeView.contextMenuEvent will insert a separator at that position.
-class Separator: pass
-SEPARATOR = Separator()
-
-class SelectionProperties:
+class NodeSelection:
+    """Objects of this class store a selection of nodes a TreeView. Different than a QItemSelectionModel,
+    a NodeSelection knows about Nodes, Elements etc and provides special methods to determine properties
+    of the selection. Actions can use this information to decide whether they are enabled or not.
     
+    Besides the methods defined below, the following attributes are available:
+    - nodes: A list of all selected nodes (both elements and other nodes)
+    - parents: A list of parents of selected elements (parents may or may not be elements themselves)
+    """
     def __init__(self, model):
-        self.single = ...
-        self.singleParent = ...
+        """Initialize with the given *model* (instance of QItemSelectionModel). Computes and stores
+        all attributes."""
+        indexes = model.selectedIndexes()
+        self._nodes = [ model.model().data(index) for index in indexes ]
+        self._elements = [ node for node in self._nodes if isinstance(node, models.Element) ]
+        self._parents = set(elem.parent for elem in self._elements)
+        self._model = model
+        logger.info('created selection properties: {}'.format(indexes))
+        logger.info('single = {}, singleParent = {}'.format(self.singleElement(), self.singleParent()))
+    
+    def nodes(self,onlyToplevel=False):
+        """Return all nodes that are currently selected. If *onlyToplevel* is True, nodes will be excluded
+        if an ancestor is also selected.
+        """
+        if not onlyToplevel:
+            return self._nodes
+        else:
+            result = []
+            for node in self._nodes:
+                if not any(self._model.isSelected(self._model.model().getIndex(parent))
+                               for parent in node.getParents()):
+                    result.append(node)
+            return result
+        
+    def elements(self, recursive = False, unique = True):
+        """Returns a list of all selected elements. If *recursive* is True, all children of selected elements
+        are also returned. If *unique* is True, the list does not contain more than one element with the same ID."""
+        if not recursive:
+            # Just remove duplicates and nodes which don't have tags
+            return makeUnique(self._elements) if unique else self._elements
+        else:
+            selectedNodes = self.selectedNodes(onlyToplevel=True)
+            elements = []
+            ids = set()
+            for node in selectedNodes:
+                for child in node.getAllNodes():
+                    if isinstance(child,models.Element):
+                        # if the element is inside the database, load it from there, because
+                        # browser stores incomplete elements
+                        # TODO: bääh
+                        elements.append(models.Element.fromId(child.id) if child.isInDB() else child)
+            return elements
+        
+    def singleElement(self):
+        """Returns True iff one single element is selected. This does not exclude that other non-element
+        nodes are selected too."""
+        return len(self._elements) == 1
+    
+    def singleParent(self, requireParentElement = False):
+        """Returns True iff all selected elements share the same parent. IF *requireParentElement* is True,
+        that parent must also be an element, otherwise False is returned."""
+        return len(self._parents) == 1 and \
+            (not requireParentElement or isinstance(next(iter(self._parents)), models.Element))
+    
+    def hasElements(self):
+        """True iff at least one element is selected."""
+        return len(self._elements) > 0
+    
+    def hasFiles(self):
+        """True iff at least one file is selected."""
+        return any(el.isFile() for el in self._elements)
         
 class TreeAction(QtGui.QAction):
     
-    def initialize(self, selectionProperties, treeview):
-        pass
+    text = 'changeme'
+    def __init__(self, text = None):
+        super().__init__(text or self.text, mainwindow.mainWindow)
+        self.triggered.connect(self.doAction)
         
+    def initialize(self, selectionProperties, treeview):
+        raise NotImplementedError()
+    
+    def doAction(self):
+        raise NotImplementedError()
+    
+class EditTagsAction(TreeAction):
+    
+    def __init__(self, recursive):
+        super().__init__(translate(__name__, 'edit tags (recursively)') if recursive
+                         else translate(__name__, 'edit tags'))
+        self.recursive = recursive
+    
+    def initialize(self, selection, treeview):
+        self.setEnabled(selection.hasElements())
+        self.selection = selection
+        self.treeview = treeview
+    
+    def doAction(self):
+        """Open a dialog to edit the tags of the currently selected elements (and the children, if
+        *recursive* is True). This is called by the edit tags actions in the contextmenu.
+        """
+        from . import tageditor
+        from .. import modify
+        dialog = tageditor.TagEditorDialog(self.treeview.level,
+                                           self.selection.elements(self.recursive),
+                                           self.treeview)
+        dialog.exec_()
+
+class DeleteAction(TreeAction):
+    """Action to remove selected elements."""
+    
+    text = translate(__name__, 'delete')
+    
+    def initialize(self, selection, treeview):
+        self.setEnabled(False)
+        #TODO: implement delete
+        
+class MergeAction(TreeAction):
+    """Action to merge selected elements into a new container."""
+    
+    text = translate(__name__, 'merge...')
+    
+    def initialize(self, selection, treeview):
+        self.setEnabled(selection.singleParent())
+        self.selection = selection
+        self.treeview = treeview
+    
+    @staticmethod    
+    def createMergeHint(elements):
+        from functools import reduce
+        from ..utils import longestSubstring
+        import string
+        
+        hintRemove = reduce(longestSubstring,
+                   ( ", ".join(elem.tags[tags.TITLE]) for elem in elements )
+                 )
+        return hintRemove.strip(string.punctuation + string.whitespace), hintRemove
+    
+    def doAction(self):
+        from .tagwidgets import MergeDialog
+        elements = self.selection.elements()
+        hintTitle, hintRemove = self.createMergeHint(elements)
+        mergeIndices = sorted(elem.parent.index(elem) for elem in elements)
+        numSiblings = len(elements[0].parent.contents)
+        belowRoot = isinstance(elements[0].parent, models.RootNode)
+        dialog = MergeDialog(hintTitle, hintRemove, len(mergeIndices) < numSiblings and not belowRoot, self.treeview)
+        if dialog.exec_() == QtGui.QDialog.Accepted:
+            modify.merge(self.treeview.level,
+                         elements[0].parent,
+                         mergeIndices,
+                         dialog.newTitle(),
+                         dialog.removeString(),
+                         dialog.adjustPositions())
+class MatchTagsFromFilenamesAction(TreeAction):
+    
+    text = translate(__name__, 'match tags from filename')
+    
+    def initialize(self, selection, treeview):
+        self.setEnabled(selection.hasFiles())
+        self.selection = selection
+        self.treeview = treeview
+        
+    def doAction(self):
+        """Open a TagMatchDialog for the selected elements."""
+        from . import tagmatchdialog
+        dialog = tagmatchdialog.TagMatchDialog(self.treeview.level, self.selection.elements(unique = True), self.treeview)
+        dialog.exec_()
+        
+class NamedList(list):
+    def __init__(self, name, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.name = name
         
 class TreeView(QtGui.QTreeView):
     """Base class for tree views that contain mainly elements. This class handles mainly the
     ContextMenuProvider system, that allows plugins to insert entries into the context menus of playlist and
     browser.
     """
-    
-    @staticmethod
-    def initContextMenu():
-        _contextMenu = []
-        _contextMenu.append(QAction('omg'))
+    level = modify.REAL
+    @classmethod
+    def initContextMenu(cls):
+        """Class method to initialize the context menu. This method should be overwritten in subclasses."""
+        menu = [ ]
+        tagsMenu = NamedList(translate(__name__, 'tags'), (EditTagsAction(False),
+                                                              EditTagsAction(True),
+                                                              MatchTagsFromFilenamesAction()) )
+        structureMenu = NamedList(translate(__name__, 'structure'), (DeleteAction(),
+                                                                     MergeAction()))
+        menu.append(tagsMenu)
+        menu.append(structureMenu)
         
-    _contextMenu = None
+        return menu
+        
+        
     @classmethod
     def contextMenu(cls):
-        if not cls._contextMenu:
-            initContextMenu()
+        if not '_contextMenu' in cls.__dict__:
+            if 'initContextMenu' in cls.__dict__:
+                # ensure that init is called only for subclasses defining their own init function
+                cls._contextMenu = cls.initContextMenu()
+            else:
+                cls._contextMenu = []
         return cls._contextMenu
+    
+    @classmethod
+    def contextMenus(cls):
+        for c in reversed(cls.mro()):
+            if issubclass(c, TreeView):
+                print('yielding context menu of {}: {}'.format(c, c.contextMenu()))
+                yield c.contextMenu()
+                
         
     def __init__(self,parent):
         QtGui.QTreeView.__init__(self,parent)
@@ -78,81 +256,32 @@ class TreeView(QtGui.QTreeView):
         palette.setColor(QtGui.QPalette.AlternateBase,QtGui.QColor(0xD9,0xD9,0xD9))
         self.setPalette(palette)
 
-    def getSelectedNodes(self,onlyToplevel=False):
-        """Return all nodes that are currently selected. If *onlyToplevel* is True, nodes will be excluded
-        if an ancestor is also selected.
-        """
-        model = self.model()
-        if not onlyToplevel:
-            return [model.data(index) for index in self.selectedIndexes()]
-        else:
-            result = []
-            for index in self.selectedIndexes():
-                node = model.data(index)
-                if not any(self.selectionModel().isSelected(model.getIndex(parent))
-                               for parent in node.getParents()):
-                    result.append(node)
-            return result
 
-    def contextMenuProvider(self,actions,currentIndex):
-        """This is the default ContextMenuProvider, which creates some standard entries. It will be
-        reimplemented in subclasses and complemented by plugins.
-        """
-        # Check whether at least one Element is selected
-        hasSelectedElements = any(isinstance(node,models.Element) for node in self.getSelectedNodes())
+    def _addContextMenuItem(self, item, menu):
+        """Adds the context menu part defined by *item* to the parent *menu*.
         
-        action = QtGui.QAction(self.tr("Edit tags..."),self)
-        action.setEnabled(hasSelectedElements)
-        action.triggered.connect(lambda: self.editTags(False))
-        actions.append(action)
-        
-        action = QtGui.QAction(self.tr("Edit tags recursively..."),self)
-        action.setEnabled(hasSelectedElements)
-        action.triggered.connect(lambda: self.editTags(True))
-        actions.append(action)
+        *item* must be either a TreeAction object or an iterable with a *name* attribute (e.g. a
+        NamedList) containing valid items."""
+        if isinstance(item, TreeAction):
+            item.initialize(self.nodeSelection, self)
+            menu.addAction(item)
+        else:
+            subMenu = QtGui.QMenu(item.name, menu)
+            menu.addMenu(subMenu)
+            for subItem in item:
+                self._addContextMenuItem(subItem, subMenu)
 
     def contextMenuEvent(self,event):
-        currentIndex = self.indexAt(event.pos())
-        actions = []
+        self.nodeSelection = NodeSelection(self.selectionModel())
         
-        # Invoke ContextMenuProviders to get the entries
-        self.contextMenuProvider(actions,currentIndex)
-        for f in contextMenuProviders['all']:
-            f(self,actions,currentIndex)
-        if self.contextMenuProviderCategory is not None:
-            for f in contextMenuProviders[self.contextMenuProviderCategory]:
-                f(self,actions,currentIndex)
-
+        contextMenus = list(self.contextMenus())
         menu = QtGui.QMenu(self)
-        for action in actions:
-            menu.addAction(action)
+        for i, cm in enumerate(contextMenus):
+            for item in cm:
+                self._addContextMenuItem(item, menu)
+            if i < len(contextMenus) -1:
+                menu.addSeparator()
 
         menu.popup(event.globalPos() + QtCore.QPoint(2,2))
         event.accept()
-        
-    def getSelectedElements(self,recursive):
-        """Return all elements that are currently selected. If *onlyToplevel* is True, nodes will be excluded
-        if an ancestor is also selected. In any case duplicates will be removed."""
-        if not recursive:
-            # Just remove duplicates and nodes which don't have tags
-            return list(set(node for node in self.getSelectedNodes() if isinstance(node,models.Element)))
-        else:
-            selectedNodes = self.getSelectedNodes(onlyToplevel=True)
-            elements = []
-            ids = set()
-            for node in selectedNodes:
-                for child in node.getAllNodes():
-                    if isinstance(child,models.Element) and child.id not in ids:
-                        ids.add(child.id)
-                        elements.append(models.Element.fromId(child.id))
-            return elements
-    
-    def editTags(self,recursive):
-        """Open a dialog to edit the tags of the currently selected elements (and the children, if
-        *recursive* is True) on the REAL-level. This is called by the edit tags actions in the contextmenu.
-        """
-        from . import tageditor
-        from .. import modify
-        dialog = tageditor.TagEditorDialog(modify.REAL,self.getSelectedElements(recursive),self)
-        dialog.exec_()
         

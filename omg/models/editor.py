@@ -14,10 +14,9 @@ from . import mimedata
 from ..models import rootedtreemodel, RootNode, File, Container, Element
 from ..config import options
 from ..modify import events, commands
-from ..utils import hasKnownExtension, collectFiles, longestSubstring, relPath
+from ..utils import hasKnownExtension, collectFiles, relPath
 from collections import OrderedDict
-from functools import reduce
-import re, string, itertools, os
+import re, itertools, os
 
 logger = logging.getLogger("models.editor")
 
@@ -401,12 +400,6 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
         album.tags = tags.findCommonTags(album.contents, True)
         if tags.ALBUM in album.tags:
             album.tags[tags.TITLE] = album.tags[tags.ALBUM]
-            
-    def createMergeHint(self, indices):
-        hintRemove = reduce(longestSubstring,
-                   ( ", ".join(ind.internalPointer().tags[tags.TITLE]) for ind in indices )
-                 )
-        return hintRemove.strip(string.punctuation + string.whitespace), hintRemove
     
     def shiftPositions(self, elements, delta):
         '''Shift the positions of the given elements by *delta* (if valid).'''

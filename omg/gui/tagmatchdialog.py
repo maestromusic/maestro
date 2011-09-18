@@ -16,9 +16,10 @@ class ExtendedTableWidgetItem(QtGui.QTableWidgetItem):
         self.internalPointer = object
         
 class TagMatchDialog(QtGui.QDialog):
-    def __init__(self, elements, parent = None):
+    def __init__(self, level, elements, parent = None):
         super().__init__(parent)
         self.setModal(True)
+        self.level = level
         self.setWindowTitle('Tag Match Dialog')
         firstLine = QtGui.QHBoxLayout()
         firstLine.addWidget(QtGui.QLabel('Format string:'))
@@ -45,6 +46,7 @@ class TagMatchDialog(QtGui.QDialog):
         self.table.resizeColumnsToContents()
         buttonLine = QtGui.QHBoxLayout()
         self.keepOtherTagsCheckbox = QtGui.QCheckBox(self.tr('keep other existing tags'))
+        self.keepOtherTagsCheckbox.setChecked(True)
         self.keepOtherTagsCheckbox.setToolTip(self.tr('If this is checked and the files already contain tags not appearing in the format '
          + 'string, these are kept. Otherwise all existing tags are deleted.'))
         okButton = QtGui.QPushButton('OK')
@@ -88,6 +90,6 @@ class TagMatchDialog(QtGui.QDialog):
                     elementAfter.position = int(value)
                 else:
                     elementAfter.tags[tags.get(tag)] = [value]
-            modify.push(modify.ModifySingleElementCommand(modify.EDITOR, element, elementAfter))
+            modify.push(modify.ModifySingleElementCommand(self.level, element, elementAfter))
         modify.endEditorMacro()
         self.accept()
