@@ -11,6 +11,8 @@ from PyQt4.QtCore import Qt
 
 from .. import config, tags, utils, database as db, flags
 from . import dialogs
+from ..search import criteria as criteriaModule
+
 from functools import partial
 
 # Layers that can be selected in BrowserDialog's comboboxes. Each item in the list is a list containing for
@@ -41,7 +43,11 @@ class BrowserDialog(dialogs.FancyTabbedPopup):
         self.flagTab.setLayout(QtGui.QVBoxLayout())
         self.tabWidget.addTab(self.flagTab,self.tr("Flags"))
         
-        self.flagView = FlagView(browser.flags)
+        flagList = []
+        for criterion in browser.criterionFilter:
+            if isinstance(criterion,criteriaModule.FlagsCriterion):
+                flagList.extend(criterion.flags)
+        self.flagView = FlagView(flagList)
         self.flagView.selectionChanged.connect(self._handleSelectionChanged)
         self.flagTab.layout().addWidget(self.flagView)
         
@@ -72,7 +78,9 @@ class BrowserDialog(dialogs.FancyTabbedPopup):
         dialogs.FancyTabbedPopup.close(self)
         
     def _handleSelectionChanged(self):
-        self.browser.setFlags(self.flagView.selectedFlagTypes)
+        if len(self.flagView.selectedFlagTypes) > 0:
+            self.browser.setCriterionFilter([criteriaModule.FlagsCriterion(self.flagView.selectedFlagTypes)])
+        else: self.browser.setCriterionFilter([])
 
 
 class FlagView(QtGui.QTableWidget):

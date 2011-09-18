@@ -38,12 +38,12 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
     _autoLoadEnabled = False # While enabled AutoLoading loads the contents of all nodes.
     _autoLoadGen = None # Generator that produces elements that have to be loaded.
     
-    def __init__(self,table,layers,browser,view):
+    def __init__(self,layers,browser,view):
         """Initialize this model. It will contain only elements from *table* and group them according to
         *layers*. *browser* and *view* must be the browser and its view that uses this model.
         """
         rootedtreemodel.RootedTreeModel.__init__(self,RootNode(self))
-        self.table = table
+        self.table = None
         self.browser = browser
         self.view = view
         self.layers = layers
@@ -52,20 +52,18 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
             initSearchEngine()
         
         searchEngine.searchFinished.connect(self._handleSearchFinished)
-        #distributor.indicesChanged.connect(self._handleIndicesChanged)
-        
-        if self._autoLoadEnabled:
-            # Start new autoLoading
-            self._autoLoadGen = self.breadthFirstTraversal()
-        self._startLoading(self.root)
     
-    def reset(self):
-        """Reset the model."""
-        if self._autoLoadEnabled:
-            # Start new autoLoading
-            self._autoLoadGen = self.breadthFirstTraversal()
-        self._startLoading(self.root)
-        rootedtreemodel.RootedTreeModel.reset(self)
+    def reset(self,table=None):
+        """Reset the model reloading all data from self.table. If *table* is given, first set self.table to
+        *table*."""
+        if table is not None:
+            self.table = table
+        if self.table is not None:
+            if self._autoLoadEnabled:
+                # Start new autoLoading
+                self._autoLoadGen = self.breadthFirstTraversal()
+            self._startLoading(self.root)
+            rootedtreemodel.RootedTreeModel.reset(self)
 
     def setLayer(self,layers):
         """Set the layers of the model and reset."""

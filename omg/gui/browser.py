@@ -109,7 +109,9 @@ class Browser(QtGui.QWidget):
     def __init__(self,parent = None,state = None):
         """Initialize a new Browser with the given parent."""
         QtGui.QWidget.__init__(self,parent)
-        self.flags = []
+        self.criterionFilter = []
+        self.searchCriteria = []
+        self.views = []
         
         if browsermodel.searchEngine is None:
             browsermodel.initSearchEngine()
@@ -147,47 +149,52 @@ class Browser(QtGui.QWidget):
             if 'views' in state:
                 viewsToRestore = state['views']
             if 'flags' in state:
-                self.flags = [flags.get(name) for name in state['flags'] if flags.exists(name)]
+                flagList = [flags.get(name) for name in state['flags'] if flags.exists(name)]
+                if len(flagList) > 0:
+                    self.criterionFilter.append(criteriaModule.FlagsCriterion(flagList))
         
-        if len(self.flags) > 0:
-            self.search()
-            
-        self.views = []
         # Convert tag names to tags, leaving the nested list structure unchanged
         self.createViews(utils.mapRecursively(tags.get,viewsToRestore))
 
+        self.load()
+
     def saveState(self):
+        # Get the flags from self.criterionFilter
+        # When a general criterionfilter is implemented we will store the filter itself as string
+        # (e.g. '{flag:piano} Concert') instead of a list of flags.
+        flags = []
+        for criterion in self.criterionFilter:
+            if isinstance(criterion,criteriaModule.FlagsCriterion):
+                flags.extend(criterion.flags)
         return {
             'instant': self.searchBox.getInstantSearch(),
             'showHiddenValues': self.showHiddenValues,
             'views': utils.mapRecursively(lambda tag: tag.name,[view.model().getLayers()
                                                          for view in self.views]),
-            'flags': [flagType.name for flagType in self.flags]
+            'flags': [flagType.name for flagType in flags]
         }
     
-    def showElements(self):
-        """Use elements as table (instead of self.bigResult) and reset all models."""
-        self.table = db.prefix + "elements"
-        for view in self.views:
-            if self.table != view.model().getTable():
-                view.model().setTable(self.table)
+    def load(self):
+        # search for the current criteria and reset all views
+        criteria = self.criterionFilter + self.searchCriteria
+        if len(criteria) > 0:
+            self.table = self.bigResult
+            self.searchRequest = browsermodel.searchEngine.search(
+                                                        db.prefix+"elements",self.bigResult,criteria)
+            # view.load will be called when the search is finished
+        else:
+            self.table = db.prefix + "elements"
+            self.searchRequest = None
+            for view in self.views:
+                view.model().reset(self.table)
                 view.startAutoExpand()
 
     def search(self):
         """Search for the value in the search-box. If it is empty, display all values."""
         if self.searchRequest is not None:
             self.searchRequest.stop()
-        criteria = self.searchBox.getCriteria()
-        if len(self.flags) > 0:
-            # insert the flag criterion at the beginning, so that it is executed first
-            criteria = [criteriaModule.FlagsCriterion(self.flags)] + criteria
-        if len(criteria) > 0:
-            self.table = self.bigResult
-            self.searchRequest = browsermodel.searchEngine.search(
-                                                        db.prefix+"elements",self.bigResult,criteria)
-        else:
-            self.showElements()
-            self.searchRequest = None
+        self.searchCriteria = self.searchBox.getCriteria()
+        self.load()
     
     def createViews(self,layersList):
         """Destroy all existing views and create views according to *layersList*: For each entry of
@@ -215,11 +222,12 @@ class Browser(QtGui.QWidget):
         for view in self.views:
             view.setShowHiddenValues(showHiddenValues)
     
-    def setFlags(self,flagList):
-        """Set the flags the browser should search for."""
-        if flagList != self.flags:
-            self.flags = flagList[:]
-            self.search()
+    def setCriterionFilter(self,criteria):
+        """Set the criterion filter. This is a list of criteria that will be prepended to the search criteria
+        from the searchbox and thus form a permanent filter."""
+        if criteria != self.criterionFilter:
+            self.criterionFilter = criteria[:]
+            self.load()
             
     def _handleOptionButton(self):
         """Open the option dialog."""
@@ -238,10 +246,17 @@ class Browser(QtGui.QWidget):
         """React to searchFinished signals: Set the table to self.bigResult and reset the model."""
         if request is self.searchRequest and not request.isStopped():
             for view in self.views:
-                view.model().setTable(self.table)
-                view.model().reset()
+                view.model().reset(self.table)
                 view.startAutoExpand()
-
+                
+    def _handleDispatcher(self,event):
+        # TODO: Optimize to cases:
+        #if isinstance(event,modify.events.SingleTagEvent) and \
+        #                all(event.tag not in layer for layer in self.layers) \
+        #                and tag not in searchQuery:
+        #elif isinstance(event,modify.events.SingleFlagEvent) and flag not in query
+        self.load()
+        
 
 class TagValueAction(QtGui.QAction):
     tagActionTriggered = QtCore.pyqtSignal([object, int])
@@ -272,7 +287,7 @@ class BrowserTreeView(treeview.TreeView):
         """
         treeview.TreeView.__init__(self,parent)
         self.contextMenuProviderCategory = 'browser'
-        self.setModel(browsermodel.BrowserModel(parent.table,layers,parent,self))
+        self.setModel(browsermodel.BrowserModel(layers,parent,self))
         self.setItemDelegate(delegates.BrowserDelegate(self,self.model()))
         #self.doubleClicked.connect(self._handleDoubleClicked)
     

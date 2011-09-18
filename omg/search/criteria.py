@@ -220,8 +220,8 @@ class FlagsCriterion(Criterion):
     """A FlagsCriterion specifies a list of flags and depending on the parameter *useAnd* an element must
     have either all of these flags or at least one."""
     def __init__(self,flags,useAnd = True):
-        assert len(flags) > 0
         self.flags = set(flags)
+        assert len(self.flags) > 0
         self.useAnd = useAnd
     
     def getFlags(self):
