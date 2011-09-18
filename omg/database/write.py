@@ -63,7 +63,24 @@ def setContents(data):
     
     db.commit()
 
+def addContents(data):
+    """Add contents relations to the database without touching existing ones. *data* is a list of
+    (parentID, position, elementID) tuples."""
+    db.multiQuery("INSERT INTO {}contents (container_id, position, element_id"
+                  .format(db.prefix), data)
+    
+def removeContents(data):
+    """Remove contents of one or more elements. *data* is a list of (parentID, position) tuples."""
+    db.multiQuery("DELETE FROM {}contents WHERE container_id = ? AND position = ?"
+                   .format(db.prefix), data)
 
+def changePositions(parentID, changes):
+    """Change the positions of children of *parentID* as given by *changes*, which is a list of (oldPos, newPos)
+    tuples."""
+    print(changes)
+    db.multiQuery("UPDATE {}elements SET position=? WHERE container_id=? AND position=?"
+                  .format(db.prefix), [(parentID,) + changeSet for changeSet in changes ])
+     
 def updateElementsCounter(elids = None):
     """Update the elements counter. If *elids* is a list of elements-ids, the counters of those elements will
     be updated. If *elids* is None, all counters will be set to their correct value."""

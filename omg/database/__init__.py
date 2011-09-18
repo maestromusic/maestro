@@ -253,13 +253,13 @@ def _contentsParentsHelper(elids,recursive,selectColumn,whereColumn):
     return(resultSet)
 
 
-def position(parentId,elementId):
-    """Return the position of the element with id *elementId* within the container with id *parentId*.
+def positions(parentId,elementId):
+    """Return the positions of the element with id *elementId* within the container with id *parentId*.
     If the element is not contained in the container, a ValueException is raised.
     """
     try:
         return query("SELECT position FROM {}contents WHERE container_id = ? AND element_id = ?"
-                        .format(prefix),parentId,elementId).getSingle()
+                        .format(prefix),parentId,elementId)
     except sql.EmptyResultException:
         raise ValueError("Element with ID {} is not contained in container {}.".format(elementId,parentId))
 

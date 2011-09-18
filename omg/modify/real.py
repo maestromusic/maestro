@@ -44,7 +44,27 @@ def deleteElements(elids):
     db.write.deleteElements(elids)
     dispatcher.changes.emit(events.ElementsDeletedEvent(elids))
 
+def addContents(changes):
+    """Add the given content relations to the database and emit a corresponding event.
+    
+    *changes* is a dict mapping parent IDs to a list of (position, element) tuples."""
+    print(changes)
+    db.write.addContents( [ (parentID,pair[0],pair[1].id) for parentID,pairs in changes.items() for pair in pairs ] )
+    dispatcher.changes.emit(events.InsertContentsEvent(REAL, changes))
+    
+def removeContents(changes):
+    """Remove the given content relations from the database and emit a corresponding event.
+    
+    *changes* should be a dict mapping parent IDs to lists of positions to remove."""
+    db.write.removeContents([ (parentID,p) for parentID,positions in changes.items() for p in positions ])
+    dispatcher.changes.emit(events.RemoveContentsEvent(REAL, changes))
 
+def changePositions(parentID, changes):
+    """Change positions of children of *parentID* according to *changes*, which is a list of tuples
+    (oldPosition, newPosition)."""
+    db.write.changePositions(parentID, changes)
+    dispatcher.changes.emit(events.PositionChangeEvent(REAL, parentID, dict(changes)))
+    
 def commit(changes):
     """Commits all elements, given by an id->(oldElement,newElement) dictionary, into the database.
     

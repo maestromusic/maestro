@@ -90,17 +90,32 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
             event.applyTo(node)
             self.dataChanged.emit(modelIndex.child(0, 0), modelIndex.child(node.getContentsCount()-1, 0))
             ret = True
-        elif isinstance(event, events.InsertElementsEvent):
-            for pos, newElements in event.insertions[id]:
-                self.beginInsertRows(modelIndex, pos, pos + len(newElements) - 1)
-                node.insertContents(pos, [e.copy() for e in newElements])
-                self.endInsertRows()
+        elif isinstance(event, events.InsertContentsEvent):
+            for pos, newElement in event.insertions[id]:
+                insertedElem = newElement.copy()
+                insertedElem.parent = element
+                inserted = False
+                for i, elem in enumerate(node.contents):
+                    if elem.position > pos:
+                        self.beginInsertRows(modelIndex, i, i)
+                        node.contents[i:i] = [insertedElem]
+                        self.endInsertRows()
+                        inserted = True
+                        break
+                if not inserted:
+                    self.beginInsertRows(modelIndex, len(node.contents), len(node.contents))
+                    node.contents.append(insertedElem)
+                    self.endInsertRows()
             ret = False   
-        elif isinstance(event, events.RemoveElementsEvent):
-            for pos, num in event.removals[id]:
-                self.beginRemoveRows(modelIndex, pos, pos + num - 1)
-                del node.contents[pos:pos+num]
-                self.endRemoveRows()
+        elif isinstance(event, events.RemoveContentsEvent):
+            print('remove elements commant -- {}'.format(event.removals))
+            for i, elem in reversed(list(enumerate(node.contents))):
+                print('{}, {}'.format(i, elem))
+                if elem.position in event.removals[id]:
+                    print('aeatren {}'.format(elem.position))
+                    self.beginRemoveRows(modelIndex, i, i)
+                    del node.contents[i]
+                    self.endRemoveRows()
             ret = False
         elif event.__class__ == events.ElementChangeEvent:
             if node.isFile():

@@ -84,12 +84,8 @@ def merge(level, parent, indices, newTitle, removeString, adjustPositions):
     |- pos3: child4 (title = Prelude BWV 42)
     """ 
     from ..models import Container
-    if level == REAL:
-        raise NotImplementedError('Maddin, tu was!')
-    if stack.state() == REAL:
-        stack.setActiveStack(stack.editorStack)
 
-    beginMacro(EDITOR, translate('modify', 'merge elements'))
+    beginMacro(level, translate('modify', 'merge elements'))
     
     insertIndex = indices[0]
     insertPosition = parent.contents[insertIndex].position
@@ -108,8 +104,9 @@ def merge(level, parent, indices, newTitle, removeString, adjustPositions):
             toRemove.append(parent.contents[i])
         elif adjustPositions:
             positionChanges.append( (element.position, element.position - len(newChildren) + 1) )
-    push(commands.RemoveElementsCommand(EDITOR, toRemove))
-    push(commands.PositionChangeCommand(EDITOR, parent.id, positionChanges))
+    push(commands.RemoveElementsCommand(level, toRemove, mode = commands.RemoveElementsCommand.CONTENTS))
+    if len(positionChanges) > 0:
+        push(commands.PositionChangeCommand(level, parent.id, positionChanges))
     t = tags.findCommonTags(newChildren, True)
     t[tags.TITLE] = [newTitle]
     newContainer = Container(id = newEditorId(),
@@ -118,8 +115,8 @@ def merge(level, parent, indices, newTitle, removeString, adjustPositions):
                              flags = None,
                              major = False,
                              position = insertPosition)
-    insertions = { parent.id : [(insertIndex, [newContainer])] }
-    push(commands.InsertElementsCommand(EDITOR, insertions))
+    insertions = { parent.id : [(insertPosition, newContainer)] }
+    push(commands.InsertElementsCommand(level, insertions))
     endMacro()
     
 

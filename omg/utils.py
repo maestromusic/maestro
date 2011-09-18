@@ -31,6 +31,25 @@ def longestSubstring(a, b):
     result = sm.find_longest_match(0, len(a), 0, len(b))
     return a[result[0]:result[0]+result[2]]
 
+
+def createRanges(tuples):
+    """Compresses the given list of iterables into ranges according to the first element of each list member.
+    Example: ranges( (1, 10), (2, 11), (3, 12), (5,13), (7,14), (8,15) ) will return
+    ( (1, [[10], [11], [12]]), (5, [[13]]), (7, [ [14], [15] ]) )"""
+    previous = None
+    start = None
+    ids = []
+    for i, *payload in sorted(tuples):
+        if previous is None:
+            previous = start = i
+        if i > previous + 1:
+            # emit previous range
+            yield start, ids
+            start = i
+            ids = []
+        previous = i
+        ids.append(payload)
+    yield start, ids
 def hasKnownExtension(file):
     """Return True if the given path has a known extension (i.e., appears in options.main.extension).
     Does _not_ check whether the file actually exists, is readable, etc."""
