@@ -69,7 +69,9 @@ class FlagEditorModel(QtCore.QObject):
         self.elements = [el.export(attributes=['tags','flags'],copyList=['tags']) for el in elements]
         for new,old in zip(self.elements,elements):
             # Generate a title using the tags from the old element
-            new.title = new.getTitle(old.tags[tags.TITLE])
+            if tags.TITLE in old.tags:
+                new.title = new.getTitle(old.tags[tags.TITLE])
+                #TODO: maddin, geht das so?
         self.createRecords()
         
     def createRecords(self):

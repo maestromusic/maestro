@@ -15,6 +15,7 @@ from ..models import rootedtreemodel, RootNode, File, Container, Element
 from ..config import options
 from ..modify import events, commands
 from ..utils import hasKnownExtension, collectFiles, relPath
+from ..constants import EDITOR, CONTENTS
 from collections import OrderedDict
 import re, itertools, os
 
@@ -93,10 +94,10 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
         elif isinstance(event, events.InsertContentsEvent):
             for pos, newElement in event.insertions[id]:
                 insertedElem = newElement.copy()
-                insertedElem.parent = element
+                insertedElem.parent = node
                 inserted = False
                 for i, elem in enumerate(node.contents):
-                    if elem.position > pos:
+                    if (elem.position and elem.position > pos) or i > pos:
                         self.beginInsertRows(modelIndex, i, i)
                         node.contents[i:i] = [insertedElem]
                         self.endInsertRows()
@@ -108,11 +109,9 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
                     self.endInsertRows()
             ret = False   
         elif isinstance(event, events.RemoveContentsEvent):
-            print('remove elements commant -- {}'.format(event.removals))
             for i, elem in reversed(list(enumerate(node.contents))):
-                print('{}, {}'.format(i, elem))
-                if elem.position in event.removals[id]:
-                    print('aeatren {}'.format(elem.position))
+                position = elem.position if not isinstance(node, RootNode) else node.index(elem)
+                if position in event.removals[id]:
                     self.beginRemoveRows(modelIndex, i, i)
                     del node.contents[i]
                     self.endRemoveRows()
@@ -182,8 +181,10 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
             nodes = self._handleUrlDrop(mimeData.urls())
             if nodes is False:
                 return False
-            insertions = dict()
-            insertions[parent.id] = [(row, nodes)]
+            ins = []
+            for index, node in enumerate(nodes, start = row):
+                ins.append( (index, node) )
+            insertions = {parent.id: ins}
             command = commands.InsertElementsCommand(modify.EDITOR, insertions, 'dropCopy->insert')
             modify.push(command)
             return True
@@ -223,64 +224,55 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
                                            self.tr('Cannot place a container below itself.'))
                 return False       
         
-        move, insert_same, insert_other = OrderedDict(), OrderedDict(), OrderedDict()
+        move = OrderedDict()
+        insert_same, insert_other = [], []
         for id, node in orig_nodes.items():
             if hasattr(node.parent, 'id') and node.parent.id == parent.id:
                 if action == Qt.MoveAction:
                     move[id] = node
                 else:
-                    insert_same[id] = node.copy()
+                    insert_same.append(node.copy())
             else:
-                insert_other[id] = node.copy()
-                
+                insert_other.append(node.copy())
         movedBefore = 0
         positionChanges = []
-        currentPosition = 1
+        currentPosition = 0 if isinstance(parent, RootNode) else 1
         commandsToPush = []
         for node in parent.contents[:row]:
             if node.id in move: # node moved away
                 movedBefore += 1
-            elif not isinstance(parent, RootNode):
-                positionChanges.append( (node.position, node.position - movedBefore) )
-                currentPosition = node.position - movedBefore + 1
-
+            else:
+                position = parent.index(node, True) if isinstance(parent, RootNode) else node.position
+                currentPosition = position - movedBefore + 1
+                if movedBefore > 0:
+                    positionChanges.append( (position, position - movedBefore) )
         
-        if isinstance(parent, RootNode):
-            if action == Qt.MoveAction:
-                removeCommand = commands.RemoveElementsCommand(modify.EDITOR,
-                                                               list(move.values()) + list(insert_other.values()))
-                commandsToPush.append(removeCommand)
-            insertions = dict()
-            insertions[parent.id] = [(row - movedBefore,
-                                      list(insert_same.values()) + list(move.values()) + list(insert_other.values()))]
-            for node in insertions[parent.id][0][1]:
-                node.position = None
-            insertCommand = commands.InsertElementsCommand(modify.EDITOR, insertions, 'drop->insert')
-            commandsToPush.append(insertCommand)
-        else:
-            if action == Qt.MoveAction:
-                removeCommand = commands.RemoveElementsCommand(modify.EDITOR, list(insert_other.values()), 'drop->remove')
-                commandsToPush.append(removeCommand)
-            for node in move.values():
-                positionChanges.append( (node.position, currentPosition) )
-                currentPosition += 1
-            for node in itertools.chain(insert_same.values(), insert_other.values()):
+        if action == Qt.MoveAction and len(insert_other) > 0:
+            removeCommand = commands.RemoveElementsCommand(EDITOR,
+                                                           insert_other,
+                                                           mode = CONTENTS,
+                                                           text = 'drop->remove')
+            commandsToPush.append(removeCommand)
+        for node in move.values():
+            positionChanges.append( (node.position, currentPosition) )
+            currentPosition += 1
+        insertions = { parent.id:[] }
+        for node in insert_same + insert_other:
+            insertions[parent.id].append( (currentPosition, node) )
+            if not isinstance(parent, RootNode):
                 node.position = currentPosition
-                currentPosition += 1 
-            for node in parent.contents[row:]:
-                if node.id in move:
-                    pass
-                elif node.position < currentPosition:
-                    positionChanges.append( (node.position, currentPosition) )
-                    currentPosition += 1        
+            currentPosition += 1
+        
+        # adjust positions behind
+        for node in parent.contents[row:]:
+            if node.id not in move and node.position < currentPosition:
+                positionChanges.append( (node.position, currentPosition) )
+                currentPosition += 1        
             
-            
-            
-            command = commands.PositionChangeCommand(modify.EDITOR, parent.id, positionChanges, self.tr('adjust positions'))
-            commandsToPush.append(command)
-                     
-            insertions = dict()
-            insertions[parent.id] = [(row - movedBefore, list(insert_same.values()) + list(insert_other.values()) )]
+        command = commands.PositionChangeCommand(EDITOR, parent.id, positionChanges, self.tr('adjust positions'))
+        commandsToPush.append(command)
+        
+        if len(insertions[parent.id]) > 0:
             insertCommand = commands.InsertElementsCommand(modify.EDITOR, insertions, 'drop->insert')
             commandsToPush.append(insertCommand)
         modify.beginMacro(modify.EDITOR, self.tr('drop elements'))
@@ -431,7 +423,6 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
             positionChanges = []
             unit = (-1)**(delta<0) # -1 if delta < 0 else 1
             currentPosition = parent.contents[-1+(delta>0)].position
-            print(currentPosition)
             for elem in parent.contents[::unit]:
                 if elem in elems:
                     positionChanges.append( (elem.position, elem.position+delta) )

@@ -259,7 +259,7 @@ def positions(parentId,elementId):
     """
     try:
         return query("SELECT position FROM {}contents WHERE container_id = ? AND element_id = ?"
-                        .format(prefix),parentId,elementId)
+                        .format(prefix),parentId,elementId).getSingleColumn()
     except sql.EmptyResultException:
         raise ValueError("Element with ID {} is not contained in container {}.".format(elementId,parentId))
 

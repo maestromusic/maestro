@@ -15,6 +15,7 @@ from ..models import editor, Container, Element, RootNode
 from . import treeview
 from .. import logging, modify, tags
 from ..modify import commands
+from ..constants import EDITOR
 
 
 translate = QtCore.QCoreApplication.translate
@@ -23,11 +24,10 @@ logger = logging.getLogger("gui.editor")
 
 class EditorTreeView(treeview.TreeView):
     
-    level = modify.EDITOR
+    level = EDITOR
     
     def __init__(self, parent = None):
         treeview.TreeView.__init__(self, parent)
-        self.setContextMenuPolicy(Qt.DefaultContextMenu)
         self.setSelectionMode(self.ExtendedSelection)
         self.setDragEnabled(True)
         self.setAcceptDrops(True)
@@ -36,23 +36,6 @@ class EditorTreeView(treeview.TreeView):
         self.setModel(editor.EditorModel())
         
         self.viewport().setMouseTracking(True)
-        
-        
-        self.removeSelectedAction = QtGui.QAction(self.tr('Remove'), self)
-        self.removeSelectedAction.triggered.connect(self.removeSelected)
-        self.removeSelectedAction.setShortcut(Qt.Key_Delete)
-        
-        self.increasePositionAction = QtGui.QAction(self.tr('Increase position(s)'), self)
-        self.increasePositionAction.triggered.connect(self.increasePositions)
-        self.increasePositionAction.setShortcut(Qt.Key_Plus)
-        
-        self.decreasePositionAction = QtGui.QAction(self.tr('Decrease position(s)'), self)
-        self.decreasePositionAction.triggered.connect(self.decreasePositions)
-        self.decreasePositionAction.setShortcut(Qt.Key_Minus)
-        
-        self.majorAction = QtGui.QAction(self.tr('major'), self)
-        self.majorAction.setCheckable(True)
-        self.majorAction.triggered.connect(self.toggleSelectedMajor)
         self.selectionModel().selectionChanged.connect(self._handleSelectionChanged)
     
     def _handleSelectionChanged(self, selected, deselected):
@@ -65,18 +48,6 @@ class EditorTreeView(treeview.TreeView):
                 globalSelection.append(node)
         if len(globalSelection):
             mainwindow.setGlobalSelection(globalSelection,self)
-             
-    def contextMenuProvider(self, actions, currentIndex):
-        actions.append(self.majorAction)
-        self.majorAction.setChecked(self.currentIndex().internalPointer().major)
-        s = set( index.parent() for index in self.selectedIndexes() )
-        if len(s) == 1:
-            actions.append(self.mergeAction)
-        actions.append(self.increasePositionAction)
-        actions.append(self.decreasePositionAction)
-        actions.append(self.removeSelectedAction)
-        actions.append(self.tagMatchAction)
-        super().contextMenuProvider(actions,currentIndex)
 
     def dragEnterEvent(self, event):
         if event.source() is self:
@@ -119,21 +90,6 @@ class EditorTreeView(treeview.TreeView):
                 self.model().rowsInserted.disconnect(self._expandInsertedRows)
             except TypeError:
                 pass # was not connected
-            
-    def increasePositions(self):
-        self.model().shiftPositions([index.internalPointer() for index in self.selectedIndexes()], 1)
-    
-    def decreasePositions(self):
-        self.model().shiftPositions([index.internalPointer() for index in self.selectedIndexes()], -1)
-            
-    def removeSelected(self):
-        if len(self.selectedIndexes()) == 0:
-            return
-        modify.push(
-            commands.RemoveElementsCommand(modify.EDITOR, [s.internalPointer() for s in self.selectedIndexes()]))
-    
-    def toggleSelectedMajor(self):
-        modify.push(commands.ChangeMajorFlagCommand(modify.EDITOR, self.currentIndex().internalPointer()))    
                
 class EditorWidget(QtGui.QDockWidget):
     def __init__(self, parent = None, state = None, location = None):

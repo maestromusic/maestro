@@ -13,8 +13,9 @@ from collections import OrderedDict
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from .. import tags, logging, database as db, models
-from . import events, real, REAL, EDITOR, dispatcher
+from .. import tags as tagsModule, logging, database as db, models
+from . import events, real, dispatcher
+from ..constants import *
 
 translate = QtCore.QCoreApplication.translate
 logger = logging.getLogger(__name__)
@@ -125,7 +126,7 @@ class CommitCommand(UndoCommand):
             oldElem = models.Element.fromId(self.idMap[id], loadData = False)
             if hasattr(elem, 'fileTags'):
                 oldElem.fileTags = elem.fileTags
-            oldElem.tags = tags.Storage()
+            oldElem.tags = tagsModule.Storage()
             oldElem.flags = list()
             changes[self.idMap[id]] = ( oldElem, elem )
         progress.setValue(3)
@@ -171,7 +172,7 @@ class CommitCommand(UndoCommand):
             if elem.id in revIdMap:
                 elem.id = revIdMap[elem.id]
                 
-     
+
 class ChangeSingleElementCommand(UndoCommand):
     """A specialized undo command for the modification of a single element (tags, position, ..., but no 
     contents)."""
@@ -241,36 +242,41 @@ class InsertElementsCommand(UndoCommand):
         position == insertedElement.position should hold. If the parent is a RootNode,
         then position is interpreted as the index at which the container is to be inserted."""
         QtGui.QUndoCommand.__init__(self, text)
+        for v in insertions.values():
+            assert len(v) > 0
         self.level = level
         self.insertions = insertions
     
     def redo(self):
         if self.level == REAL:
             real.addContents(self.insertions)
-        dispatcher.changes.emit(events.InsertElementsEvent(self.level, self.insertions))
+        else:
+            dispatcher.changes.emit(events.InsertContentsEvent(self.level, self.insertions))
         
     def undo(self):
-        dispatcher.changes.emit(events.RemoveElementsEvent(
-              self.level, dict((pid, [ (tup[0], len(tup[1]) ) for tup in reversed(elemSet)])
-                               for pid,elemSet in self.insertions.items())))
+        if self.level == REAL:
+            real.removeContents({parent:list(zip(*pairs))[0] for (parent,pairs) in self.insertions.items() })
+        else:
+            dispatcher.changes.emit(events.RemoveContentsEvent(EDITOR,
+                                      {parent:list(zip(*pairs))[0] for parent,pairs in self.insertions.items() }))
 
 
 class RemoveElementsCommand(UndoCommand):
     """A specialized undo command for the removal of elements. There are three types of removals:
-    - delete the file corresponding to an element on disk,
-    - remove an element from the database,
-    - remove the "is-child-of" relation between an element and its parent.
+    - DISK: delete the file corresponding to an element on disk,
+    - DB: remove an element from the database,
+    - CONTENTS: remove the "is-child-of" relation between an element and its parent.
     In EDITOR mode, the latter is the only valid remove operation. The operations above are ordered
     in such a way that any of them implies all of those below (e.g., if a file is deleted on the disk,
     it is automatically removed from the database and all parents)."""
     
-    DISK, DB, CONTENTS = range(3)
     
-    def __init__(self, level, elements, mode, text=''):
+    
+    def __init__(self, level, elements, mode = CONTENTS, text=''):
         """Creates the remove command. Elements must be an iterable of Element objects, mode
         one of DISK, DB, CONTENTS (see the class doc for details)."""
         QtGui.QUndoCommand.__init__(self, text)
-        DISK, DB, CONTENTS = self.DISK, self.DB, self.CONTENTS
+        
         if level == EDITOR and mode != CONTENTS:
             logger.error('cannot remove in mode other than CONTENTS in EDITOR mode -- please fix.')
             mode = CONTENTS
@@ -283,12 +289,13 @@ class RemoveElementsCommand(UndoCommand):
         # need to get, for each element, _all_ containers containing that element, in order to
         # be able to restore the content relations on undo.
         for element in elements:
-            self.elementPool[element.id] = element.copy()
+            if not element.id in self.elementPool:
+                self.elementPool[element.id] = element.copy()
             if mode == CONTENTS:
                 parentIDs = (element.parent.id,)
                 parentIsRoot = isinstance(element.parent, models.RootNode)
             else:
-                parentIDs = db.parents(element)
+                parentIDs = db.parents(element.id)
                 parentIsRoot = False
             
             for parentID in parentIDs:
@@ -301,9 +308,10 @@ class RemoveElementsCommand(UndoCommand):
                 for position in positions:
                     self.changes[parentID].add( (position, element.id) )
         self.positionOnlyChanges = {parent:tuple(zip(*tup))[0] for parent,tup in self.changes.items()}
+    
     def redo(self):
         if self.level == REAL:
-            if self.mode == self.CONTENTS:
+            if self.mode == CONTENTS:
                 real.removeContents(self.positionOnlyChanges)
             else:
                 real.deleteElements(list(self.elementPool.keys()))
@@ -311,12 +319,36 @@ class RemoveElementsCommand(UndoCommand):
             dispatcher.changes.emit(events.RemoveContentsEvent(self.level, self.positionOnlyChanges))
     
     def undo(self):
-        dispatcher.changes.emit(events.InsertElementsEvent(
-             self.level, dict((pid, [ (tup[0], [self.elementPool[i] for i in tup[1]]) for tup in elemSet ] )
-                               for pid, elemSet in self.removals.items())))
+        elementChanges = {}
+        for parent, values in self.changes.items():
+            changeList = elementChanges[parent] = []
+            for position, elementID in values:
+                changeList.append((position, self.elementPool[elementID]))
+        if self.level == REAL:
+            """Reinsert the elements. First we create them, then handle content relations."""
+            real.createNewElements(list(self.elementPool.values()))
+            real.addContents(elementChanges)
+        else:
+            dispatcher.changes.emit(events.InsertContentsEvent(EDITOR, elementChanges))
 
         
-
+class CreateContainerCommand(UndoCommand):
+    """A specialized command to create a single container in the database with the given
+    attributes, but without any content relations."""
+    
+    def __init__(self, tags = None, flags = None, major = True, text = translate(__name__, 'create container')):
+        QtGui.QUndoCommand.__init__(self, text)
+        self.tags = tags if tags else tagsModule.Storage()
+        self.flags = flags if flags else []
+        self.major = major
+        self.id = None
+        
+    def redo(self):
+        self.id = real.newContainer(self.tags, self.flags, self.major, self.id)
+        
+    def undo(self):
+        real.deleteElements([self.id])
+        
         
 class TagUndoCommand(UndoCommand):
     """An UndoCommand that changes only tags. The difference to UndoCommand is that the dict *changes*
@@ -327,6 +359,7 @@ class TagUndoCommand(UndoCommand):
             self.elements = [el.export(attributes=['path']) for el in elements]
         
     def redo(self):
+        logger.debug('TagUndoCommand -- redo (REAL:{})'.format(self.level == REAL))
         if self.level == REAL:
             real.changeTags(self.changes,self.elements)
         else:
@@ -334,6 +367,7 @@ class TagUndoCommand(UndoCommand):
             dispatcher.changes.emit(events.TagChangeEvent(self.level, changes))
 
     def undo(self):
+        logger.debug('TagUndoCommand -- undo (REAL:{})'.format(self.level == REAL))
         if self.level == REAL:
             real.changeTags({k: (v[1],v[0]) for k,v in self.changes.items()},self.elements)
         else:

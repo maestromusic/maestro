@@ -16,6 +16,7 @@ from .. import database as db, config, search, constants, utils, tags, modify, f
 from ..search import searchbox, criteria as criteriaModule
 from . import mainwindow, treeview, browserdialog, delegates, tageditor, tagwidgets
 from ..models import browser as browsermodel, Element
+from ..modify.treeactions import TagValueAction
                          
 translate = QtCore.QCoreApplication.translate
 
@@ -242,24 +243,14 @@ class Browser(QtGui.QWidget):
                 view.model().reset()
                 view.startAutoExpand()
 
-
-class TagValueAction(QtGui.QAction):
-    tagActionTriggered = QtCore.pyqtSignal([object, int])
-    
-    def __init__(self, tag, valueId, parent):
-        super().__init__("", parent)
-        super().setText(self.tr('edit value [as {0}]'.format(tag)))
-        self.triggered.connect(self._handleAction)
-        self.tag = tag
-        self.valueId = valueId
-    
-    def _handleAction(self):
-        self.tagActionTriggered.emit(self.tag, self.valueId)
-
-
 class BrowserTreeView(treeview.TreeView):
     """TreeView for the Browser. A browser may contain more than one view each using its own model."""
     _autoExpanding = False
+    
+    @classmethod
+    def initContextMenu(cls):
+        """Class method to initialize the context menu. This method should be overwritten in subclasses."""
+        return [ TagValueAction() ]
     
     def __init__(self,parent,layers):
         """Initialize this TreeView with the given parent (which must be the browser-widget) and the given
@@ -271,23 +262,9 @@ class BrowserTreeView(treeview.TreeView):
         finally displaying the elements itself.
         """
         treeview.TreeView.__init__(self,parent)
-        self.contextMenuProviderCategory = 'browser'
         self.setModel(browsermodel.BrowserModel(parent.table,layers,parent,self))
         self.setItemDelegate(delegates.BrowserDelegate(self,self.model()))
         #self.doubleClicked.connect(self._handleDoubleClicked)
-    
-    def contextMenuProvider(self, actions, currentIndex):
-        if currentIndex.isValid():
-            node = currentIndex.internalPointer()
-            if isinstance(node, browsermodel.ValueNode):
-                for tag, id in node.valueIds.items():
-                    action = TagValueAction(tags.get(tag), id, self)
-                    actions.append(action)
-                    action.tagActionTriggered.connect(tagwidgets.TagValuePropertiesWidget.showDialog)
-        super().contextMenuProvider(actions, currentIndex)
-    
-    def _handleValueEditAction(self):
-        tagwidgets.TagValuePropertiesWidget.showDialog()
 
     def startAutoExpand(self):
         """Start AutoExpand: Calculate the height of all nodes with depth 1. If they fit into the view and

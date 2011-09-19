@@ -66,10 +66,11 @@ class SingleElementChangeEvent(ElementChangeEvent):
 
 class MajorFlagChangeEvent(SingleElementChangeEvent):
     """A modify event for toggling the major flag of an element."""
+    
+    tagsChanged = False
+    flagsChanged = False
     def __init__(self, level, element):
         super().__init__(level, element)
-        self.tagsChanged = False
-        self.flagsChanged = False
         
     def applyTo(self, element):
         element.major = self.element.major

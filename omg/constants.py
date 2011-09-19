@@ -8,6 +8,9 @@ IMAGES = "images"
 
 YES_ANSWERS = ["y", "Y", ""]
 
+REAL, EDITOR = range(1,3) # Levels for commands and events
+DISK, DB, CONTENTS = range(3) # modes for removing elements
+
 #VERSION = '0.2alpha'
 VERSION = '0.2.1' # major, minor, revision
 def compareVersion(v):

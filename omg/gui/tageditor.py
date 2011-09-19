@@ -15,6 +15,7 @@ from .. import constants, tags, strutils, utils, config, logging, modify, consta
 from ..models import tageditormodel, simplelistmodel, File, flageditor as flageditormodel
 from ..gui import formatter, singletageditor, dialogs, tagwidgets, mainwindow, editor, flageditor
 from ..gui.misc import widgetlist, dynamicgridlayout
+from ..constants import REAL, EDITOR
 
 translate = QtCore.QCoreApplication.translate
 
@@ -34,8 +35,8 @@ class TagEditorDock(QtGui.QDockWidget):
         self.tabWidget = QtGui.QTabWidget()
         self.tabWidget.setTabPosition(QtGui.QTabWidget.North if vertical else QtGui.QTabWidget.East)
         self.setWidget(self.tabWidget)
-        self.realEditorWidget = TagEditorWidget(modify.REAL,vertical=vertical)
-        self.editorEditorWidget = TagEditorWidget(modify.EDITOR,vertical=vertical)
+        self.realEditorWidget = TagEditorWidget(REAL,vertical=vertical)
+        self.editorEditorWidget = TagEditorWidget(EDITOR,vertical=vertical)
         self.tabWidget.addTab(self.realEditorWidget,self.tr("Real"))
         self.tabWidget.addTab(self.editorEditorWidget,self.tr("Editor"))
         self.setAcceptDrops(True)
@@ -142,9 +143,9 @@ class TagEditorWidget(QtGui.QWidget):
         self.layout().addLayout(self.topLayout)
         
         iconLabel = QtGui.QLabel()
-        path = utils.getIconPath('real.png' if level == modify.REAL else 'editor.png')
+        path = utils.getIconPath('real.png' if level == REAL else 'editor.png')
         iconLabel.setPixmap(QtGui.QPixmap(path))
-        iconLabel.setToolTip(self.tr("Real level") if level == modify.REAL else self.tr("Editor level"))
+        iconLabel.setToolTip(self.tr("Real level") if level == REAL else self.tr("Editor level"))
         self.topLayout.addWidget(iconLabel)
 
         # Texts will be set in _changeLayout

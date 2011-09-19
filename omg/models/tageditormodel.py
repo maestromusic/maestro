@@ -12,7 +12,7 @@ from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
 from .. import constants, models, tags, utils, strutils, modify
-from ..modify import REAL
+from ..constants import REAL
 from . import simplelistmodel
 
 translate = QtCore.QCoreApplication.translate

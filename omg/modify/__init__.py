@@ -11,6 +11,7 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from .. import tags, logging, database as db
+from ..constants import REAL, EDITOR, CONTENTS
 from . import events
 # At the end of the file we will import the submodules real and events.
 
@@ -18,9 +19,7 @@ translate = QtCore.QCoreApplication.translate
 
 logger = logging.getLogger(__name__)
 
-# Levels
-REAL = 1
-EDITOR = 2
+
 
 # Type of a change
 ADDED,CHANGED,DELETED = range(1,4)
@@ -104,18 +103,26 @@ def merge(level, parent, indices, newTitle, removeString, adjustPositions):
             toRemove.append(parent.contents[i])
         elif adjustPositions:
             positionChanges.append( (element.position, element.position - len(newChildren) + 1) )
-    push(commands.RemoveElementsCommand(level, toRemove, mode = commands.RemoveElementsCommand.CONTENTS))
+    push(commands.RemoveElementsCommand(level, toRemove, mode = CONTENTS))
     if len(positionChanges) > 0:
         push(commands.PositionChangeCommand(level, parent.id, positionChanges))
     t = tags.findCommonTags(newChildren, True)
     t[tags.TITLE] = [newTitle]
-    newContainer = Container(id = newEditorId(),
-                             contents = newChildren,
-                             tags = t,
-                             flags = None,
-                             major = False,
-                             position = insertPosition)
+    if level == EDITOR:
+        newContainer = Container(id = newEditorId(),
+                                 contents = newChildren,
+                                 tags = t,
+                                 flags = None,
+                                 position = insertPosition,
+                                 major = False)
+    else:
+        createCommand = commands.CreateContainerCommand(t, None, False)
+        push(createCommand)
+        newContainer = Container.fromId(createCommand.id, loadData = True, position = insertPosition)
+
     insertions = { parent.id : [(insertPosition, newContainer)] }
+    if level == REAL:
+        insertions[newContainer.id] = [ (elem.position, elem) for elem in newChildren ]
     push(commands.InsertElementsCommand(level, insertions))
     endMacro()
     
@@ -143,11 +150,11 @@ class UndoGroup(QtGui.QUndoGroup):
         QtGui.QUndoGroup.__init__(self, parent)
         
         self.mainStack = QtGui.QUndoStack()
-        
         self.addStack(self.mainStack)
-        self.editorStack = None
         
-        self._createEditorStack()
+        self.editorStack = QtGui.QUndoStack()
+        self.addStack(self.editorStack)
+        
         self.setActiveStack(self.mainStack)
        
     def state(self):
@@ -164,13 +171,6 @@ editor command history will be lost. Continue?'):
                 raise StackChangeRejectedException()
             self.editorStack.clear()
         self.setActiveStack(self.mainStack if level == REAL else self.editorStack)
-            
-    def _createEditorStack(self):
-        if self.editorStack is not None:
-            self.removeStack(self.editorStack)
-        self.editorStack = QtGui.QUndoStack()
-        self.addStack(self.editorStack)
-    
 stack = UndoGroup()
 
 def beginMacro(level,name):

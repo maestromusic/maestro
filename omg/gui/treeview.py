@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # Copyright 2009 Martin Altmayer
 #
@@ -10,8 +9,10 @@
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from .. import models, modify, logging, tags
-from . import mainwindow
+from .. import models, logging
+from ..modify.treeactions import *
+from ..constants import REAL
+from omg.modify.treeactions import ToggleMajorAction
 
 translate = QtGui.QApplication.translate
 logger = logging.getLogger(__name__)
@@ -46,8 +47,6 @@ class NodeSelection:
         self._elements = [ node for node in self._nodes if isinstance(node, models.Element) ]
         self._parents = set(elem.parent for elem in self._elements)
         self._model = model
-        logger.info('created selection properties: {}'.format(indexes))
-        logger.info('single = {}, singleParent = {}'.format(self.singleElement(), self.singleParent()))
     
     def nodes(self,onlyToplevel=False):
         """Return all nodes that are currently selected. If *onlyToplevel* is True, nodes will be excluded
@@ -70,7 +69,7 @@ class NodeSelection:
             # Just remove duplicates and nodes which don't have tags
             return makeUnique(self._elements) if unique else self._elements
         else:
-            selectedNodes = self.selectedNodes(onlyToplevel=True)
+            selectedNodes = self.nodes(onlyToplevel=True)
             elements = []
             ids = set()
             for node in selectedNodes:
@@ -101,102 +100,7 @@ class NodeSelection:
         """True iff at least one file is selected."""
         return any(el.isFile() for el in self._elements)
         
-class TreeAction(QtGui.QAction):
-    
-    text = 'changeme'
-    def __init__(self, text = None):
-        super().__init__(text or self.text, mainwindow.mainWindow)
-        self.triggered.connect(self.doAction)
-        
-    def initialize(self, selectionProperties, treeview):
-        raise NotImplementedError()
-    
-    def doAction(self):
-        raise NotImplementedError()
-    
-class EditTagsAction(TreeAction):
-    
-    def __init__(self, recursive):
-        super().__init__(translate(__name__, 'edit tags (recursively)') if recursive
-                         else translate(__name__, 'edit tags'))
-        self.recursive = recursive
-    
-    def initialize(self, selection, treeview):
-        self.setEnabled(selection.hasElements())
-        self.selection = selection
-        self.treeview = treeview
-    
-    def doAction(self):
-        """Open a dialog to edit the tags of the currently selected elements (and the children, if
-        *recursive* is True). This is called by the edit tags actions in the contextmenu.
-        """
-        from . import tageditor
-        from .. import modify
-        dialog = tageditor.TagEditorDialog(self.treeview.level,
-                                           self.selection.elements(self.recursive),
-                                           self.treeview)
-        dialog.exec_()
 
-class DeleteAction(TreeAction):
-    """Action to remove selected elements."""
-    
-    text = translate(__name__, 'delete')
-    
-    def initialize(self, selection, treeview):
-        self.setEnabled(False)
-        #TODO: implement delete
-        
-class MergeAction(TreeAction):
-    """Action to merge selected elements into a new container."""
-    
-    text = translate(__name__, 'merge...')
-    
-    def initialize(self, selection, treeview):
-        self.setEnabled(selection.singleParent())
-        self.selection = selection
-        self.treeview = treeview
-    
-    @staticmethod    
-    def createMergeHint(elements):
-        from functools import reduce
-        from ..utils import longestSubstring
-        import string
-        
-        hintRemove = reduce(longestSubstring,
-                   ( ", ".join(elem.tags[tags.TITLE]) for elem in elements )
-                 )
-        return hintRemove.strip(string.punctuation + string.whitespace), hintRemove
-    
-    def doAction(self):
-        from .tagwidgets import MergeDialog
-        elements = self.selection.elements()
-        hintTitle, hintRemove = self.createMergeHint(elements)
-        mergeIndices = sorted(elem.parent.index(elem) for elem in elements)
-        numSiblings = len(elements[0].parent.contents)
-        belowRoot = isinstance(elements[0].parent, models.RootNode)
-        dialog = MergeDialog(hintTitle, hintRemove, len(mergeIndices) < numSiblings and not belowRoot, self.treeview)
-        if dialog.exec_() == QtGui.QDialog.Accepted:
-            modify.merge(self.treeview.level,
-                         elements[0].parent,
-                         mergeIndices,
-                         dialog.newTitle(),
-                         dialog.removeString(),
-                         dialog.adjustPositions())
-class MatchTagsFromFilenamesAction(TreeAction):
-    
-    text = translate(__name__, 'match tags from filename')
-    
-    def initialize(self, selection, treeview):
-        self.setEnabled(selection.hasFiles())
-        self.selection = selection
-        self.treeview = treeview
-        
-    def doAction(self):
-        """Open a TagMatchDialog for the selected elements."""
-        from . import tagmatchdialog
-        dialog = tagmatchdialog.TagMatchDialog(self.treeview.level, self.selection.elements(unique = True), self.treeview)
-        dialog.exec_()
-        
 class NamedList(list):
     def __init__(self, name, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -207,7 +111,7 @@ class TreeView(QtGui.QTreeView):
     ContextMenuProvider system, that allows plugins to insert entries into the context menus of playlist and
     browser.
     """
-    level = modify.REAL
+    level = REAL
     @classmethod
     def initContextMenu(cls):
         """Class method to initialize the context menu. This method should be overwritten in subclasses."""
@@ -215,8 +119,11 @@ class TreeView(QtGui.QTreeView):
         tagsMenu = NamedList(translate(__name__, 'tags'), (EditTagsAction(False),
                                                               EditTagsAction(True),
                                                               MatchTagsFromFilenamesAction()) )
-        structureMenu = NamedList(translate(__name__, 'structure'), (DeleteAction(),
-                                                                     MergeAction()))
+        structureMenu = NamedList(translate(__name__, 'structure'), (DeleteAction(CONTENTS),
+                                                                     DeleteAction(DB),
+                                                                     DeleteAction(DISK),
+                                                                     MergeAction(),
+                                                                     ToggleMajorAction()))
         menu.append(tagsMenu)
         menu.append(structureMenu)
         
@@ -237,7 +144,6 @@ class TreeView(QtGui.QTreeView):
     def contextMenus(cls):
         for c in reversed(cls.mro()):
             if issubclass(c, TreeView):
-                print('yielding context menu of {}: {}'.format(c, c.contextMenu()))
                 yield c.contextMenu()
                 
         
