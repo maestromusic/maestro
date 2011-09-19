@@ -4,7 +4,7 @@
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 3 as
-# published by the Free Software Foundation
+# published by the Free Software Foundation.
 #
 
 import functools
@@ -153,11 +153,11 @@ class Browser(QtGui.QWidget):
                 if len(flagList) > 0:
                     self.criterionFilter.append(criteriaModule.FlagsCriterion(flagList))
         
-        # Convert tag names to tags, leaving the nested list structure unchanged
-        self.createViews(utils.mapRecursively(tags.get,viewsToRestore))
-
         modify.dispatcher.changes.connect(self._handleDispatcher)
-        self.load()
+        
+        # Convert tag names to tags, leaving the nested list structure unchanged.
+        # This will in particular call self.load
+        self.createViews(utils.mapRecursively(tags.get,viewsToRestore))
 
     def saveState(self):
         # Get the flags from self.criterionFilter
@@ -175,25 +175,29 @@ class Browser(QtGui.QWidget):
             'flags': [flagType.name for flagType in flags]
         }
     
-    def load(self):
+    def load(self,restoreState=False):
         # search for the current criteria and reset all views
         criteria = self.criterionFilter + self.searchCriteria
+        if self.searchRequest is not None:
+            self.searchRequest.stop()
+
         if len(criteria) > 0:
             self.table = self.bigResult
-            self.searchRequest = browsermodel.searchEngine.search(
-                                                        db.prefix+"elements",self.bigResult,criteria)
-            # view.load will be called when the search is finished
+            self.searchRequest = browsermodel.searchEngine.search(fromTable = db.prefix+"elements",
+                                                                  resultTable = self.bigResult,
+                                                                  criteria = criteria,
+                                                                  data = restoreState
+                                                                );
+            # view.resetToTable will be called when the search is finished
         else:
             self.table = db.prefix + "elements"
             self.searchRequest = None
             for view in self.views:
-                view.model().reset(self.table)
-                view.startAutoExpand()
+                view.resetToTable(self.table,restoreState=restoreState,autoExpand=not restoreState)
 
     def search(self):
         """Search for the value in the search-box. If it is empty, display all values."""
-        if self.searchRequest is not None:
-            self.searchRequest.stop()
+        #TODO: restoreState if new criteria are narrower than the old ones?
         self.searchCriteria = self.searchBox.getCriteria()
         self.load()
     
@@ -211,6 +215,7 @@ class Browser(QtGui.QWidget):
             newView.selectionModel().selectionChanged.connect(
                                     functools.partial(self.selectionChanged.emit,newView.selectionModel()))
             self.splitter.addWidget(newView)
+        self.load()
 
     def getShowHiddenValues(self):
         """Return whether this browser should display ValueNodes where the hidden-flag in values_varchar is
@@ -246,15 +251,16 @@ class Browser(QtGui.QWidget):
     def _handleSearchFinished(self,request):
         """React to searchFinished signals: Set the table to self.bigResult and reset the model."""
         if request is self.searchRequest and not request.isStopped():
+            restoreState = request.data
             for view in self.views:
-                view.model().reset(self.table)
-                view.startAutoExpand()
+                view.resetToTable(self.table,restoreState=restoreState,autoExpand=not restoreState)
                 
     def _handleDispatcher(self,event):
         # Optimize some cases in which we do not have to start a new search and reload everything.
         if isinstance(event,modify.events.ElementChangeEvent) and event.level == modify.EDITOR:
             return # Does not affect us
-        elif isinstance(event,modify.events.SingleTagChangeEvent) \
+        # TODO remove False
+        elif False and isinstance(event,modify.events.SingleTagChangeEvent) \
                         and all(event.tag not in criterion.getTags() for criterion in self.searchCriteria) \
                         and all(event.tag not in criterion.getTags() for criterion in self.criterionFilter):
             for view in self.views:
@@ -263,7 +269,7 @@ class Browser(QtGui.QWidget):
                 if any(event.tag in layer for layer in view.model().getLayers()):
                     view.model().reset()
             return
-        elif isinstance(event,modify.events.SingleFlagChangeEvent) \
+        elif False and isinstance(event,modify.events.SingleFlagChangeEvent) \
                         and all(event.tag not in criterion.getFlags() for criterion in self.searchCriteria) \
                         and all(event.tag not in criterion.getFlags() for criterion in self.criterionFilter):
             for view in self.views:
@@ -271,8 +277,8 @@ class Browser(QtGui.QWidget):
             return
 
         print("Complicated event: reloading browser")
-        self.load()
-        
+        self.load(restoreState=True)
+            
 
 class TagValueAction(QtGui.QAction):
     tagActionTriggered = QtCore.pyqtSignal([object, int])
@@ -307,6 +313,15 @@ class BrowserTreeView(treeview.TreeView):
         self.setItemDelegate(delegates.BrowserDelegate(self,self.model()))
         #self.doubleClicked.connect(self._handleDoubleClicked)
     
+    def resetToTable(self,table,restoreState,autoExpand):
+        if restoreState:
+            self.saveState()
+        self.model().reset(table)
+        if restoreState:
+            self.restoreState()
+        if autoExpand:
+            self.startAutoExpand()
+            
     def contextMenuProvider(self, actions, currentIndex):
         if currentIndex.isValid():
             node = currentIndex.internalPointer()
@@ -320,6 +335,15 @@ class BrowserTreeView(treeview.TreeView):
     def _handleValueEditAction(self):
         tagwidgets.TagValuePropertiesWidget.showDialog()
 
+    def saveState(self):
+        print("saveState")
+        expanded = self._getExpandedNodes(QtCore.QModelIndex()) # invalid index -> root node
+        import pprint
+        pprint.pprint(expanded)
+    
+    def restoreState(self):
+        print("restoreState")
+        
     def startAutoExpand(self):
         """Start AutoExpand: Calculate the height of all nodes with depth 1. If they fit into the view and
         there is still place left, load the contents of those nodes (using the AutoLoad feature of
@@ -336,7 +360,7 @@ class BrowserTreeView(treeview.TreeView):
         # Calculate the height of the first level
         height = self._getHeightOfDepth(self.model().getRoot(),1,maxHeight)
         if height is None or height < maxHeight:
-            self.depthHeights = [height]
+            self._depthHeights = [height]
             self._autoExpanding = True
             self.model().setAutoLoad(True)
             self.autoExpand()
@@ -349,7 +373,7 @@ class BrowserTreeView(treeview.TreeView):
         self._autoExpanding = False
         self.model().setAutoLoad(False)
         if hasattr(self,'depthHeights'):
-            del self.depthHeights
+            del self._depthHeights
             
         # As long as there is only one node on each level, expand them. This is not necessarily done by
         # AutoExpand because afterwards a vertical scrollbar might be necessary.
@@ -363,7 +387,6 @@ class BrowserTreeView(treeview.TreeView):
         # ValueNodes Optimization.
         if self._autoExpandDepth > len(self.model().getLayers()):
             self._mergeValueNodesOptimization(self.model().getRoot())
-        
         
     def autoExpand(self):
         """This is called at the start of AutoExpand and (by the model) whenever the contents of a node has
@@ -382,15 +405,15 @@ class BrowserTreeView(treeview.TreeView):
         while True:
             # this is at least 2, since depthHeights is initialized with the height of depth 1 in
             # startAutoExpand. 
-            depth = len(self.depthHeights)+1
-            height = self._getHeightOfDepth(self.model().getRoot(),depth,maxHeight-sum(self.depthHeights))
+            depth = len(self._depthHeights)+1
+            height = self._getHeightOfDepth(self.model().getRoot(),depth,maxHeight-sum(self._depthHeights))
             if height is None:
                 return # a node is not loaded yet, so wait for the next call
             if height == 0: # We have reached the last level
                 self.stopAutoExpand()
                 return
-            self.depthHeights.append(height)
-            if sum(self.depthHeights) <= maxHeight:
+            self._depthHeights.append(height)
+            if sum(self._depthHeights) <= maxHeight:
                 self._autoExpandDepth = depth
                 #print("Expanding to depth {}".format(depth-2))
                 # If two levels fit in the view, we want to expand up to depth 1. Qt counts from 0, thus -2.
@@ -478,3 +501,16 @@ class BrowserTreeView(treeview.TreeView):
         if loaded:
             return contentIds
         else: return None
+
+    def _getExpandedNodes(self,index):
+        result = {}
+        for i in range(self.model().rowCount(index)):
+            childIndex = self.model().index(i,0,index)
+            if self.isExpanded(childIndex):
+                child = self.model().data(childIndex,Qt.EditRole)
+                if isinstance(child,browsermodel.CriterionNode):
+                    key = child.getKey()
+                else: key = child.id
+                result[key] = self._getExpandedNodes(childIndex)
+                
+        return result

@@ -35,8 +35,8 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
     """ItemModel for the BrowserTreeViews (Thus a browser may have several models)."""
     showHiddenValues = False
     
-    _autoLoadEnabled = False # While enabled AutoLoading loads the contents of all nodes.
-    _autoLoadGen = None # Generator that produces elements that have to be loaded.
+    _autoLoadEnabled = False # While enabled, AutoLoading loads the contents of all nodes.
+    _autoLoadGenerator = None # Generator that produces elements that have to be loaded.
     
     def __init__(self,layers,browser,view):
         """Initialize this model. It will contain only elements from *table* and group them according to
@@ -61,7 +61,7 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
         if self.table is not None:
             if self._autoLoadEnabled:
                 # Start new autoLoading
-                self._autoLoadGen = self.breadthFirstTraversal()
+                self._autoLoadGenerator = self.breadthFirstTraversal()
             self._startLoading(self.root)
             rootedtreemodel.RootedTreeModel.reset(self)
 
@@ -108,39 +108,35 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
     def mimeData(self,indexes):
         return BrowserMimeData.fromIndexes(self,indexes)
 
-    def isAutoLoadEnabled(self):
-        """Return whether AutoLoad is enabled."""
-        return self.autoLoadEnabled
-
     def setAutoLoad(self,autoLoad):
         """Enable or disable AutoLoad. While enabled the BrowserModel will load the contents of all nodes, one
         by one.
         """
         if autoLoad and not self._autoLoadEnabled:
             self._autoLoadEnabled = True
-            self._autoLoadGen = self.breadthFirstTraversal()
+            self._autoLoadGenerator = self.breadthFirstTraversal()
             self._autoLoad()
         elif not autoLoad and self._autoLoadEnabled:
             self._autoLoadEnabled = False
-            self._autoLoadGen = None
+            self._autoLoadGenerator = None
 
     def _autoLoad(self):
         """If AutoLoad is enabled, load the contents of the next node produced by self._autoLoadGen. To be
         precise: Only start loading them and delay the actual loading to the searchFinished-event.
         """
-        if not self._autoLoadEnabled or self._autoLoadGen is None:
+        if not self._autoLoadEnabled or self._autoLoadGenerator is None:
             # The latter means that all nodes have been loaded already.
             return
         try:
             while True:
-                node = next(self._autoLoadGen)
+                node = next(self._autoLoadGenerator)
                 if isinstance(node,CriterionNode) and not node.hasLoaded():
                     #print("AutoLoading node {} {}".format(id(node),node))
                     node.loadContents()
                     # Wait for the contents to be loaded, _autoLoad will be called again in _searchFinished.
                     break 
         except StopIteration:
-            self._autoLoadGen = None
+            self._autoLoadGenerator = None
 
     def _startLoading(self,node,wait=False):
         """Start loading the contents of *node*, which must be either root or a CriterionNode (The contents of
@@ -300,6 +296,7 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
             self.endInsertRows()
 
     def applyEvent(self,event):
+        """Apply an event to all elements."""
         for node in self.getAllNodes():
             if isinstance(node,Element) and node.id in event.ids():
                 event.applyTo(node)
@@ -374,6 +371,8 @@ class CriterionNode(models.Node):
             else:
                 self.model._startLoading(self,wait=True) # block until the contents are loaded
     
+    def getKey(self):
+        return tuple(self.__class__)
 
 
 class ValueNode(CriterionNode):
@@ -429,6 +428,9 @@ class ValueNode(CriterionNode):
             lines.extend(self.getDisplayValues())
         else: lines = self.getDisplayValues()
         return '\n'.join(lines)
+
+    def getKey(self):
+        return (ValueNode,self.values[0])
 
 
 class VariousNode(CriterionNode):
@@ -559,6 +561,5 @@ def _loadData(element):
     else:
         for child in element.getContents():
             _loadData(child)
-        
     
             
