@@ -48,6 +48,9 @@ class NodeSelection:
         self._parents = set(elem.parent for elem in self._elements)
         self._model = model
     
+    def empty(self):
+        return len(self._nodes) == 0
+    
     def nodes(self,onlyToplevel=False):
         """Return all nodes that are currently selected. If *onlyToplevel* is True, nodes will be excluded
         if an ancestor is also selected.
@@ -101,10 +104,6 @@ class NodeSelection:
         return any(el.isFile() for el in self._elements)
         
 
-class NamedList(list):
-    def __init__(self, name, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.name = name
         
 class TreeView(QtGui.QTreeView):
     """Base class for tree views that contain mainly elements. This class handles mainly the
@@ -173,6 +172,12 @@ class TreeView(QtGui.QTreeView):
             if item.visible:
                 menu.addAction(item)
                 return True
+            return False
+        elif isinstance(item, HybridTreeAction):
+            item.initialize(self.nodeSelection, self)
+            if item.visible:
+                if any( [self._addContextMenuItem(subItem, menu) for subItem in item.actions] ):
+                    return True
             return False
         else:
             subMenu = QtGui.QMenu(item.name, menu)

@@ -193,7 +193,7 @@ def changeTagValue(tag,oldValue,newValue,elements):
         successful = [] # list of element IDs where the file was written successfully
         for element in elements:
             isID = isinstance(element, int)
-            if (isID and db.isFile(element)) or element.isFile():
+            if (isID and db.isFile(element)) or (not isID and element.isFile()):
                 try:
                     real = realfiles.get(db.path(element) if isID else element.path)
                     real.read()

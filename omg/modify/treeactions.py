@@ -16,6 +16,12 @@ from ..constants import *
 
 translate = QtGui.QApplication.translate
 
+
+class NamedList(list):
+    def __init__(self, name, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.name = name
+        
 class TreeAction(QtGui.QAction):
     """Super class for TreeActions, i.e. Actions on TreeViews that can be called by a context menu."""
     text = 'changeme'
@@ -29,6 +35,20 @@ class TreeAction(QtGui.QAction):
     
     def doAction(self):
         raise NotImplementedError()
+
+class HybridTreeAction:
+    """A hybrid class that is initialized like a TreeAction, but contains a list of actions (and possibly
+    further NamedLists) that will be added instead. It may be used to realize complex scenarios
+    where the list itself has to be modified during initalize()."""
+    
+    
+    def __init__(self):
+        super().__init__()
+        self.actions = []
+    
+    def initialize(self, selectionProperties, treeview):
+        raise NotImplementedError()
+        
     
 class EditTagsAction(TreeAction):
     """Action to edit tags; exists both in a recursive and non-recursive variant, depending on the argument
@@ -171,22 +191,44 @@ class TagValueAction(TreeAction):
     
     text = translate(__name__, 'edit value')
     
-    def initialize(self, selection, treeview):
-        from ..models.browser import ValueNode
-        if len(selection.nodes()) == 1 and isinstance(selection.nodes()[0], ValueNode):
-            #self.setEnabled(True)
-            self.visible = True
-            node = selection.nodes()[0]
-            print(node.valueIds)
-            tagID = list(node.valueIds.keys())[0] #TODO: handle multiple value IDs
-            self.valueId = node.valueIds[tagID]
-            self.tag = tags.get(tagID)
-            self.setText(self.tr('edit value [as {}]'.format(self.tag))) 
+    def __init__(self, tag, value, valueId, multiple = False):
+        super().__init__()
+        if multiple:
+            self.setText(self.tr('as {}').format(tag))
         else:
-            #self.setEnabled(False)
-            self.visible = False
-            self.setText(self.tr('edit value'))
-        
+            self.setText(self.tr('edit {} value "{}"').format(tag, value))
+        self.valueId = valueId
+        self.tag = tag
+    
+    def initialize(self, *args):
+        pass
+       
     def doAction(self):
         from ..gui.tagwidgets import TagValuePropertiesWidget
         TagValuePropertiesWidget.showDialog(self.tag, self.valueId)
+
+class TagValueHybridAction(HybridTreeAction):
+    
+    def initialize(self, selection, treeview):
+        if selection.empty():
+            self.visible = False
+            return
+        from ..models.browser import ValueNode
+        valueNode = None
+        for node in selection.nodes():
+            while not isinstance(node, ValueNode):
+                node = node.parent
+            if valueNode and node is not valueNode:
+                self.visible = False
+                return
+            else:
+                valueNode = node
+        self.visible = True
+        self.actions = []
+        multiple = len(valueNode.valueIds) > 1
+        
+        for tagId, valueId in valueNode.valueIds.items():
+            self.actions.append(TagValueAction(tags.get(tagId), valueNode.values[0], valueId, multiple))
+        if multiple:
+            subActions = self.actions
+            self.actions = [NamedList(translate(__name__,'edit value "{}"').format(valueNode.values[0]), subActions)]

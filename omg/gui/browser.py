@@ -16,7 +16,7 @@ from .. import database as db, config, search, constants, utils, tags, modify, f
 from ..search import searchbox, criteria as criteriaModule
 from . import mainwindow, treeview, browserdialog, delegates, tageditor, tagwidgets
 from ..models import browser as browsermodel, Element
-from ..modify.treeactions import TagValueAction
+from ..modify.treeactions import TagValueHybridAction
                          
 translate = QtCore.QCoreApplication.translate
 
@@ -250,7 +250,7 @@ class BrowserTreeView(treeview.TreeView):
     @classmethod
     def initContextMenu(cls):
         """Class method to initialize the context menu. This method should be overwritten in subclasses."""
-        return [ TagValueAction() ]
+        return [ TagValueHybridAction() ]
     
     def __init__(self,parent,layers):
         """Initialize this TreeView with the given parent (which must be the browser-widget) and the given
