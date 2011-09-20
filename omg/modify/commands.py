@@ -281,7 +281,10 @@ class RemoveElementsCommand(UndoCommand):
     
     def __init__(self, level, elements, mode = CONTENTS, text=''):
         """Creates the remove command. Elements must be an iterable of Element objects, mode
-        one of DISK, DB, CONTENTS (see the class doc for details)."""
+        one of DISK, DB, CONTENTS (see the class doc for details).
+        
+        NOTE: It is probably a good idea to clear undo stacks after removing files from disk. An undo will
+        restore the database to the state it had before the deletion, but the files are lost forever."""
         QtGui.QUndoCommand.__init__(self, text)
         
         if level == EDITOR and mode != CONTENTS:
@@ -322,6 +325,9 @@ class RemoveElementsCommand(UndoCommand):
                 real.removeContents(self.positionOnlyChanges)
             else:
                 real.deleteElements(list(self.elementPool.keys()))
+            if self.mode == DISK:
+                paths = [f.path for f in self.elementPool.values() if f.isFile() ]
+                real.deleteFilesFromDisk(paths)
         else:
             dispatcher.changes.emit(events.RemoveContentsEvent(self.level, self.positionOnlyChanges))
     

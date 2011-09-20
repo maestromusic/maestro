@@ -171,6 +171,13 @@ editor command history will be lost. Continue?'):
                 raise StackChangeRejectedException()
             self.editorStack.clear()
         self.setActiveStack(self.mainStack if level == REAL else self.editorStack)
+
+    def clearBoth(self):
+        """Clear both stacks and set the level to REAL."""
+        self.editorStack.clear()
+        self.mainStack.clear()
+        self.setActiveStack(self.mainStack)
+
 stack = UndoGroup()
 
 def beginMacro(level,name):

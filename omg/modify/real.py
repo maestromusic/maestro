@@ -12,10 +12,11 @@ This module will really modify database and filesystem (using database.write and
 do any Undo-/Redo-stuff.
 """
  
-from .. import database as db, tags as tagsModule, realfiles, logging
+from .. import database as db, tags as tagsModule, realfiles, logging, utils
 from ..database import write
 from . import dispatcher, events
 from ..constants import REAL
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +67,11 @@ def deleteElements(elids):
     db.write.deleteElements(elids)
     dispatcher.changes.emit(events.ElementsDeletedEvent(elids))
 
+def deleteFilesFromDisk(paths):
+    """Delete the given files from the filesystem. *paths* is a list of paths."""
+    for path in paths:
+        logger.warning('permanently removing file "{}"'.format(path))
+        os.remove(utils.absPath(path))
 def addContents(changes, emitEvent = True):
     """Add the given content relations to the database and emit a corresponding event.
     

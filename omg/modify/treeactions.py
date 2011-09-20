@@ -56,9 +56,9 @@ class EditTagsAction(TreeAction):
 class DeleteAction(TreeAction):
     """Action to remove selected elements."""
     
-    textForMode = {DB:translate(__name__, 'delete from database'),
-                     DISK:translate(__name__, 'delete from disk'),
-                     CONTENTS:translate(__name__, 'delete from parent')}
+    textForMode = {DB:translate(__name__, 'delete (from database)'),
+                     DISK:translate(__name__, 'delete (from disk)'),
+                     CONTENTS:translate(__name__, 'remove from parent')}
     def __init__(self, mode):
         """Initialize action with the given *mode* which must be one of DISK, DB, CONTENTS."""
         super().__init__(self.textForMode[mode])
@@ -77,8 +77,17 @@ class DeleteAction(TreeAction):
     def doAction(self):
         from .. import modify
         from ..modify.commands import RemoveElementsCommand
+        if self.mode == DISK:
+            from ..gui.dialogs import question
+            if not question(self.tr('WARNING'),
+                        self.tr('Removing files from disk cannot be made undone and will clear your undo stack.\n'+
+                        'Are you absolutely sure?')):
+                return False
         command = RemoveElementsCommand(self.level, self.selection.elements(), self.mode, text=self.textForMode[self.mode])
         modify.push(command)
+        if self.mode == DISK:
+            from .. import modify
+            modify.stack.clearBoth()
         
 class MergeAction(TreeAction):
     """Action to merge selected elements into a new container."""
