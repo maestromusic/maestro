@@ -19,6 +19,7 @@ translate = QtGui.QApplication.translate
 class TreeAction(QtGui.QAction):
     """Super class for TreeActions, i.e. Actions on TreeViews that can be called by a context menu."""
     text = 'changeme'
+    visible = True
     def __init__(self, text = None):
         super().__init__(text or self.text, mainwindow.mainWindow)
         self.triggered.connect(self.doAction)
@@ -173,7 +174,8 @@ class TagValueAction(TreeAction):
     def initialize(self, selection, treeview):
         from ..models.browser import ValueNode
         if len(selection.nodes()) == 1 and isinstance(selection.nodes()[0], ValueNode):
-            self.setEnabled(True)
+            #self.setEnabled(True)
+            self.visible = True
             node = selection.nodes()[0]
             print(node.valueIds)
             tagID = list(node.valueIds.keys())[0] #TODO: handle multiple value IDs
@@ -181,7 +183,8 @@ class TagValueAction(TreeAction):
             self.tag = tags.get(tagID)
             self.setText(self.tr('edit value [as {}]'.format(self.tag))) 
         else:
-            self.setEnabled(False)
+            #self.setEnabled(False)
+            self.visible = False
             self.setText(self.tr('edit value'))
         
     def doAction(self):

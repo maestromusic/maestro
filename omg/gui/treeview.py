@@ -170,12 +170,17 @@ class TreeView(QtGui.QTreeView):
         NamedList) containing valid items."""
         if isinstance(item, TreeAction):
             item.initialize(self.nodeSelection, self)
-            menu.addAction(item)
+            if item.visible:
+                menu.addAction(item)
+                return True
+            return False
         else:
             subMenu = QtGui.QMenu(item.name, menu)
-            menu.addMenu(subMenu)
-            for subItem in item:
-                self._addContextMenuItem(subItem, subMenu)
+            
+            if any( [self._addContextMenuItem(subItem, subMenu) for subItem in item] ):
+                menu.addMenu(subMenu)
+                return True
+            return False
 
     def contextMenuEvent(self,event):
         self.nodeSelection = NodeSelection(self.selectionModel())
