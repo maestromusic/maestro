@@ -70,7 +70,7 @@ class CommitCommand(UndoCommand):
     def __init__(self):
         QtGui.QUndoCommand.__init__(self)
         self.setText('commit')
-        # store contents of all open editors in self.editorRoots
+        # store (copies of) contents of all open editors in self.editorRoots
         from ..gui import editor
         editorModels = editor.activeEditorModels()
         self.editorRoots = [model.root.copy() for model in editorModels]
@@ -96,24 +96,31 @@ class CommitCommand(UndoCommand):
         
     def redo(self):
         """Perform the commit. This is done by the following steps:
-          - copy contents of all editors, clear them afterwards
+          - copy roots of all editors, clear them afterwards
           - generate real IDs for new elements
           - call real.commit() for all elements contained in the editors; this will also
             invoke a ElementsChangeEvent for all the changes (new elements will have a negative
             id as key in the dictionary)
           - restore the (committed) content in the editors by an appropriate event"""
         
-        progress = QtGui.QProgressDialog(translate('modify.commands', "Commiting files..."),
+        progress = QtGui.QProgressDialog(translate(__name__, "Commiting files..."),
                                          None, 0, 7)
-        progress.setMinimumDuration(300)
+        progress.setMinimumDuration(0)
         progress.setWindowModality(Qt.WindowModal)
         from .. import models
-        # clear all editors by event
-        emptyRoots = [root.copy(contents = []) for root in self.editorRoots]
-        dispatcher.changes.emit(events.ElementChangeEvent(REAL, {root.id:root for root in emptyRoots}, True))
         progress.setValue(1)
         # assign new IDs to all elements which have editor IDs so far
-        self.idMap = real.createNewElements(self.newElements.values())
+        if hasattr(self, 'idMap'): # this is not the first redo
+            elementsToCreate = []
+            for elem in self.newElements.values():
+                elemCopy = elem.copy()
+                elemCopy.id = self.idMap[elem.id]
+                elementsToCreate.append(elemCopy)
+            real.createNewElements(elementsToCreate)
+        else:
+            self.idMap = real.createNewElements(self.newElements.values())
+            
+        
         progress.setValue(2)
         # store new IDs in the editors (old ones are still available via self.idMap
         for elem in itertools.chain( *(root.getAllNodes(skipSelf = True) for root in self.editorRoots) ):
