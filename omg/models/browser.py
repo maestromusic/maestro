@@ -4,7 +4,7 @@
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 3 as
-# published by the Free Software Foundation
+# published by the Free Software Foundation.
 #
 import itertools
 
@@ -12,19 +12,20 @@ from PyQt4 import QtCore
 from PyQt4.QtCore import Qt
 
 from .. import config, models, search, database as db, tags, logging, utils
-from . import rootedtreemodel, mimedata, Element
+from . import rootedtreemodel, mimedata, Node, Element
 
 logger = logging.getLogger(__name__)
 
 searchEngine = None # The search engine used by all browsers
 
-# This result table is used when a CriterionNode is expanded. It is common to all browsers, in contrast to the
-# bigResult-table of a browser in which it will store the results of user searches.
+# This result table is used when a CriterionNode is expanded. It is common to all browsers, in contrast to
+# the bigResult-table of a browser in which it will store the results of user searches.
 smallResult = None
 
 
 def initSearchEngine():
-    """Initialize the single search engine used by all browsers."""
+    """Initialize the single search engine used by all browsers. This is called automatically, when the first
+    browser is created."""
     global searchEngine, smallResult
     if searchEngine is None:
         searchEngine = search.SearchEngine()
@@ -32,20 +33,17 @@ def initSearchEngine():
 
 
 class BrowserModel(rootedtreemodel.RootedTreeModel):
-    """ItemModel for the BrowserTreeViews (Thus a browser may have several models)."""
+    """ItemModel for the BrowserTreeViews (a browser may have several views and hence several models). The
+    model will group its contents according to the parameter *layers*.
+    """
     showHiddenValues = False
+
+    nodeLoaded = QtCore.pyqtSignal(Node)
     
-    _autoLoadEnabled = False # While enabled, AutoLoading loads the contents of all nodes.
-    _autoLoadGenerator = None # Generator that produces elements that have to be loaded.
-    
-    def __init__(self,layers,browser,view):
-        """Initialize this model. It will contain only elements from *table* and group them according to
-        *layers*. *browser* and *view* must be the browser and its view that uses this model.
-        """
+    def __init__(self,layers,browser):
         rootedtreemodel.RootedTreeModel.__init__(self,RootNode(self))
         self.table = None
         self.browser = browser
-        self.view = view
         self.layers = layers
         
         if searchEngine is None:
@@ -59,31 +57,8 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
         if table is not None:
             self.table = table
         if self.table is not None:
-            if self._autoLoadEnabled:
-                # Start new autoLoading
-                self._autoLoadGenerator = self.breadthFirstTraversal()
             self._startLoading(self.root)
             rootedtreemodel.RootedTreeModel.reset(self)
-
-    def setLayer(self,layers):
-        """Set the layers of the model and reset."""
-        if layers != self.layers:
-            self.layers = layers
-            self.reset()
-    
-    def getLayers(self):
-        """Return the layers of this model."""
-        return self.layers
-            
-    def setTable(self,table):
-        """Set the table of this model. The model will only contain elements from <table>."""
-        if table != self.table:
-            self.table = table
-            self.reset()
-        
-    def getTable(self):
-        """Return the table in which this model's contents are contained."""
-        return self.table
     
     def getShowHiddenValues(self):
         """Return whether the browser-view with this model should display ValueNodes where the hidden-flag in
@@ -108,41 +83,11 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
     def mimeData(self,indexes):
         return BrowserMimeData.fromIndexes(self,indexes)
 
-    def setAutoLoad(self,autoLoad):
-        """Enable or disable AutoLoad. While enabled the BrowserModel will load the contents of all nodes, one
-        by one.
-        """
-        if autoLoad and not self._autoLoadEnabled:
-            self._autoLoadEnabled = True
-            self._autoLoadGenerator = self.breadthFirstTraversal()
-            self._autoLoad()
-        elif not autoLoad and self._autoLoadEnabled:
-            self._autoLoadEnabled = False
-            self._autoLoadGenerator = None
-
-    def _autoLoad(self):
-        """If AutoLoad is enabled, load the contents of the next node produced by self._autoLoadGen. To be
-        precise: Only start loading them and delay the actual loading to the searchFinished-event.
-        """
-        if not self._autoLoadEnabled or self._autoLoadGenerator is None:
-            # The latter means that all nodes have been loaded already.
-            return
-        try:
-            while True:
-                node = next(self._autoLoadGenerator)
-                if isinstance(node,CriterionNode) and not node.hasLoaded():
-                    #print("AutoLoading node {} {}".format(id(node),node))
-                    node.loadContents()
-                    # Wait for the contents to be loaded, _autoLoad will be called again in _searchFinished.
-                    break 
-        except StopIteration:
-            self._autoLoadGenerator = None
-
     def _startLoading(self,node,wait=False):
         """Start loading the contents of *node*, which must be either root or a CriterionNode (The contents of
-        containers are loaded via Container.loadContents). For CriterionNodes start a search for the contents.
-        The actual loading will be done in the searchFinished event. Only the rootnode is loaded directly. If
-        *wait* is True this method will wait until the node is loaded. 
+        containers are loaded via Container.loadContents). If *node* is a CriterionNode, start a search for
+        the contents. The actual loading will be done in the searchFinished event. Only the rootnode is
+        loaded directly. If *wait* is True this method will wait until the node is loaded. 
         """
         assert node == self.root or isinstance(node,CriterionNode)
         
@@ -150,8 +95,6 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
             # No need to search...load directly
             if len(self.layers) > 0:
                 self._loadTagLayer(node,self.table)
-                if self._autoLoadEnabled:
-                    self._autoLoad()
             else: self._loadContainerLayer(node,self.table)
         else:
             method = searchEngine.search if not wait else searchEngine.searchAndWait
@@ -163,14 +106,12 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
                                 lockTable=True)
             if wait:
                 # Search is finished.
-                self._handleSearchFinished(searchRequest,noAutoLoad=True)
+                self._handleSearchFinished(searchRequest)
             # else: Wait for searchFinished...somewhat paradoxical :-)
             
-    def _handleSearchFinished(self,searchRequest,noAutoLoad=False):
+    def _handleSearchFinished(self,searchRequest):
         """Handle the searchFinished-event for *searchRequest*: Load the contents of the node
-        ''searchRequest.data''. If AutoLoading is enabled, call self.view.autoExpand to check whether it 
-        should be disabled. If that is not the case, call self._autoLoad to keep AutoLoad running. If the 
-        parameter *noAutoLoad* is True this behaviour is deactivated. AutoLoad is not disabled, though.
+        ''searchRequest.data'' and emit a nodeLoaded signal.
         """
         if searchRequest.owner is self and not searchRequest.isStopped():
             # Determine whether to load a tag-layer or the container-layer at the bottom of the tree.
@@ -179,11 +120,8 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
                 self._loadTagLayer(node,smallResult)
             else: self._loadContainerLayer(node,smallResult)
             searchRequest.releaseTable()
-            if self._autoLoadEnabled and not noAutoLoad:
-                self.view.autoExpand()
-                # When AutoExpand fails, the view will disable AutoLoad. 
-            if self._autoLoadEnabled and not noAutoLoad:
-                self._autoLoad() # Continue auto loading
+            self.nodeLoaded.emit(node)
+            return
     
     def _loadTagLayer(self,node,table):
         """Load the contents of *node* into a tag-layer, using elements from *table*."""
@@ -562,4 +500,3 @@ def _loadData(element):
         for child in element.getContents():
             _loadData(child)
     
-            

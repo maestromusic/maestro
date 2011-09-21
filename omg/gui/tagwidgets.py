@@ -606,7 +606,7 @@ class TagValuePropertiesWidget(QtGui.QWidget):
         self.changeValueCheckbox.setChecked(False)
         self.valueEdit.setText(self.orig_value)
         
-        self.label.setText(self.tr('editing {0} value: {1}'.format(tag, self.orig_value)))
+        self.label.setText(self.tr('editing {0} value: {1}').format(tag, self.orig_value))
         if self.orig_sortValue is None:
             self.sortEdit.setText("")
             self.sortValueCheckbox.setChecked(False)
