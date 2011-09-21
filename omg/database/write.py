@@ -10,10 +10,16 @@ import itertools
 from omg import database as db, tags
 
 
-def createNewElement(file,major):
+def createNewElement(file,major, id = None):
     """Insert a new element into the database and return its id. Set the file and major flag as given in the
-    parameters and set the toplevel flag and elements counter to 1 and 0, respectively."""
-    return db.query("INSERT INTO {}elements (file,toplevel,elements,major) VALUES (?,1,0,?)"
+    parameters and set the toplevel flag and elements counter to 1 and 0, respectively. If an *id* is given,
+    the new element will have this id, otherwise an id is created automatically."""
+    if id is not None:
+        db.query("INSERT INTO {}elements (id, file, toplevel, elements, major) VALUES (?, ?, 1, 0, ?)"
+                 .format(db.prefix), id, int(file), int(major))
+        return id
+    else:
+        return db.query("INSERT INTO {}elements (file,toplevel,elements,major) VALUES (?,1,0,?)"
                         .format(db.prefix),int(file),int(major)).insertId()
                         
                         
@@ -63,7 +69,23 @@ def setContents(data):
     
     db.commit()
 
+def addContents(data):
+    """Add contents relations to the database without touching existing ones. *data* is a list of
+    (parentID, position, elementID) tuples."""
+    db.multiQuery("INSERT INTO {}contents (container_id, position, element_id) VALUES (?,?,?)"
+                  .format(db.prefix), data)
+    
+def removeContents(data):
+    """Remove contents of one or more elements. *data* is a list of (parentID, position) tuples."""
+    db.multiQuery("DELETE FROM {}contents WHERE container_id = ? AND position = ?"
+                   .format(db.prefix), data)
 
+def changePositions(parentID, changes):
+    """Change the positions of children of *parentID* as given by *changes*, which is a list of (oldPos, newPos)
+    tuples."""
+    db.multiQuery("UPDATE {}contents SET position=? WHERE container_id=? AND position=?"
+                  .format(db.prefix), [(newPos,parentID,oldPos) for (oldPos,newPos) in changes ])
+     
 def updateElementsCounter(elids = None):
     """Update the elements counter. If *elids* is a list of elements-ids, the counters of those elements will
     be updated. If *elids* is None, all counters will be set to their correct value."""

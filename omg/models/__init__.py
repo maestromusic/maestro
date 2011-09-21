@@ -117,7 +117,7 @@ class Node:
          See also find."""
         for i,n in enumerate(self.getContents()):
             if compareByID:
-                if n.id == node.id:
+                if n.id == node.id and n.position == node.position:
                     return i
                 
             else:

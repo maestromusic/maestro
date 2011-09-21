@@ -58,6 +58,8 @@ class Formatter:
         those titles will be used (this is useful, if the element itself does not have a tags-attribute)."""
         if titles is not None:
             result = " - ".join(titles)
+        elif self.element.tags is None:
+            result = 'maddin: warum passiert das?'
         elif tags.TITLE in self.element.tags:
             result = " - ".join(self.element.tags[tags.TITLE])
         elif isinstance(self.element,models.File):

@@ -66,10 +66,11 @@ class SingleElementChangeEvent(ElementChangeEvent):
 
 class MajorFlagChangeEvent(SingleElementChangeEvent):
     """A modify event for toggling the major flag of an element."""
+    
+    tagsChanged = False
+    flagsChanged = False
     def __init__(self, level, element):
         super().__init__(level, element)
-        self.tagsChanged = False
-        self.flagsChanged = False
         
     def applyTo(self, element):
         element.major = self.element.major
@@ -102,57 +103,71 @@ class PositionChangeEvent(ElementChangeEvent):
 
         
     
-class InsertElementsEvent(ElementChangeEvent):
-    """A specialized modify event for the insertion of elements. <insertions> is a dict mapping parentId -> iterable of
-    (index, elementList) tuples."""
+class InsertContentsEvent(ElementChangeEvent):
+    """A specialized modify event for the insertion of elements into a container."""
+    
+    contentsChanged = True
+    tagsChanged = False
+    flagsChanged = False
+    
     def __init__(self, level, insertions):
+        """Create the event. *insertions* is a dict mapping parentId to a list of (position,element)
+        pairs."""
         self.insertions = insertions
         self.level = level
-        self.contentsChanged = True
-        self.tagsChanged = False
-        self.flagsChanged = False
         
     def ids(self):
         return self.insertions.keys()
     
     def getNewContentsCount(self, element):
-        return element.getContentsCount() + sum(map(len, tup[1]) for tup in self.insertions[element.id])
+        return element.getContentsCount() + len(self.insertions[element.id])
     
     def applyTo(self, element):
-        for i, elems in self.insertions[element.id]:
-            element.insertContents(i, [e.copy() for e in elems])
+        for pos, ins in self.insertions[element.id]:
+            insertedElem = ins.copy()
+            insertedElem.parent = element
+            inserted = False
+            for i, elem in enumerate(element.contents):
+                if elem.position > pos:
+                    element.contents[i:i] = [insertedElem]
+                    inserted = True
+                    break
+            if not inserted:
+                elem.contents.append(insertedElem)
             
 
-class RemoveElementsEvent(ElementChangeEvent):
-    """A specialized modify event for the removal of elements. Removals is a dict mapping parent ids to an iterable of
-    (index, number) tuples, meaning that parent.contents[index,index+number] will be removed. The caller must
-    make sure that it is feasable to remove elements in the order they appear in the iterable – i.e. they should be sorted
-    decreasing."""
+class RemoveContentsEvent(ElementChangeEvent):
+    """A specialized modify event for the removal of contents of containers."""
+    
+    contentsChanged = True
+    tagsChanged = False
+    flagsChanged = False
+    
     def __init__(self, level, removals):
+        """Initialize the event. *removals* is a dict mapping parent ids to a list of positions at which
+        elements are removed."""
         self.removals = removals
         self.level = level
-        self.contentsChanged = True
-        self.tagsChanged = False
-        self.flagsChanged = False
         
     def ids(self):
         return self.removals.keys()
     
     def getNewContentsCount(self, element):
-        return element.getContentsCount() - sum(tup[1] for tup in self.removals[element.id])
+        return element.getContentsCount() - len(self.removals[element.id])
     
     def applyTo(self, element):
-        for index, count in self.removals[element.id]:
-            del element.contents[index:index+count]
+        elem.contents = [ child for child in elem.contents if child.position not in self.removals[element.id] ]
             
 
 class TagChangeEvent(ElementChangeEvent):
+    
+    contentsChanged = False
+    tagsChanged = True
+    flagsChanged = False
+    
     def __init__(self,level,newTags):
         self.level = level
         self.newTags = newTags
-        self.contentsChanged = False
-        self.tagsChanged = True
-        self.flagsChanged = False
         
     def ids(self):
         return self.newTags.keys()
@@ -167,22 +182,19 @@ class TagChangeEvent(ElementChangeEvent):
 
             
 class SingleTagChangeEvent(TagChangeEvent):
-    def __init__(self,level,tag,elements):
+    def __init__(self,level,tag,elementIDs):
         assert isinstance(tag,tags.Tag)
         self.level = level
         self.tag = tag
-        self.elements = elements
-        self.contentsChanged = False
-        self.tagsChanged = True
-        self.flagsChanged = False
+        self.elementIDs = elementIDs
         
     def ids(self):
-        return [element.id for element in self.elements]
+        return self.elementIDs
     
     
 class TagValueAddedEvent(SingleTagChangeEvent):
-    def __init__(self,level,tag,value,elements):
-        super().__init__(level,tag,elements)
+    def __init__(self,level,tag,value,elementIDs):
+        super().__init__(level,tag,elementIDs)
         self.value = value
 
     def applyTo(self,element):
@@ -190,12 +202,12 @@ class TagValueAddedEvent(SingleTagChangeEvent):
             element.tags.add(self.tag,self.value)
             
     def __str__(self):
-        return "Add: {} {} {}".format(self.tag,self.value,self.elements)
+        return "Add: {} {} {}".format(self.tag,self.value,self.elementIDs)
     
     
 class TagValueRemovedEvent(SingleTagChangeEvent):
-    def __init__(self,level,tag,value,elements):
-        super().__init__(level,tag,elements)
+    def __init__(self,level,tag,value,elementIDs):
+        super().__init__(level,tag,elementIDs)
         self.value = value
 
     def applyTo(self,element):
@@ -203,12 +215,12 @@ class TagValueRemovedEvent(SingleTagChangeEvent):
             element.tags.remove(self.tag,self.value)
         
     def __str__(self):
-        return "Remove: {} {} {}".format(self.tag,self.value,self.elements)
+        return "Remove: {} {} {}".format(self.tag,self.value,self.elementIDs)
     
 
 class TagValueChangedEvent(SingleTagChangeEvent):
-    def __init__(self,level,tag,oldValue,newValue,elements):
-        super().__init__(level,tag,elements)
+    def __init__(self,level,tag,oldValue,newValue,elementIDs):
+        super().__init__(level,tag,elementIDs)
         self.oldValue = oldValue
         self.newValue = newValue
 
@@ -217,16 +229,18 @@ class TagValueChangedEvent(SingleTagChangeEvent):
             element.tags.replace(self.tag,self.oldValue,self.newValue)
 
     def __str__(self):
-        return "Change: {} {}->{} {}".format(self.tag,self.oldValue,self.newValue,self.elements)
+        return "Change: {} {}->{} {}".format(self.tag,self.oldValue,self.newValue,self.elementIDs)
     
 
 class FlagChangeEvent(ElementChangeEvent):
+    
+    contentsChanged = False
+    tagsChanged = False
+    flagsChanged = True
+    
     def __init__(self,level,newFlags):
         self.level = level
-        self.newFlags = newFlags
-        self.contentsChanged = False
-        self.tagsChanged = False
-        self.flagsChanged = True
+        self.newFlags = newFlags    
         
     def ids(self):
         return self.newFlags.keys()
@@ -246,9 +260,6 @@ class SingleFlagChangeEvent(FlagChangeEvent):
         self.level = level
         self.flag = flag
         self.elements = elements
-        self.contentsChanged = False
-        self.tagsChanged = False
-        self.flagsChanged = True
         
     def ids(self):
         return [element.id for element in self.elements]

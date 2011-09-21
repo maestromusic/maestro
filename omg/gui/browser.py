@@ -16,7 +16,7 @@ from .. import database as db, config, search, constants, utils, tags, modify, f
 from ..search import searchbox, criteria as criteriaModule
 from . import mainwindow, treeview, browserdialog, delegates, tageditor, tagwidgets
 from ..models import browser as browsermodel, Element, Container
-    
+from ..modify.treeactions import TagValueHybridAction
 translate = QtCore.QCoreApplication.translate
 
 
@@ -282,22 +282,6 @@ class Browser(QtGui.QWidget):
                 view.model().applyEvent(event)
             return
 
-        self.load(restoreExpanded=True)
-            
-
-class TagValueAction(QtGui.QAction):
-    tagActionTriggered = QtCore.pyqtSignal([object, int])
-    
-    def __init__(self, tag, valueId, parent):
-        super().__init__("", parent)
-        super().setText(self.tr('edit value [as {0}]'.format(tag)))
-        self.triggered.connect(self._handleAction)
-        self.tag = tag
-        self.valueId = valueId
-    
-    def _handleAction(self):
-        self.tagActionTriggered.emit(self.tag, self.valueId)
-
 
 class BrowserTreeView(treeview.TreeView):
     """TreeView for the Browser. A browser may contain more than one view each using its own model. *parent*
@@ -310,10 +294,14 @@ class BrowserTreeView(treeview.TreeView):
     
     # List of optimizers which will improve the display after reloading.
     _optimizer = None
+
+    @classmethod
+    def initContextMenu(cls):
+        """Class method to initialize the context menu. This method should be overwritten in subclasses."""
+        return [ TagValueHybridAction() ]
     
     def __init__(self,parent,layers):
         treeview.TreeView.__init__(self,parent)
-        self.contextMenuProviderCategory = 'browser'
         self.setModel(browsermodel.BrowserModel(layers,parent))
         self.setItemDelegate(delegates.BrowserDelegate(self,self.model()))
         #self.doubleClicked.connect(self._handleDoubleClicked)

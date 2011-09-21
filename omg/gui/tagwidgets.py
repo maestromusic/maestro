@@ -620,12 +620,14 @@ class TagValuePropertiesWidget(QtGui.QWidget):
     def commit(self):
         from ..modify import commands 
         if self.changeValueCheckbox.isChecked() and self.valueEdit.text() != self.orig_value:
-            raise NotImplementedError('value renaming not yet possible')
+            #TODO: make sure that the new value is not an empty string  
+            command = commands.RenameTagValueCommand(self.tag, self.orig_value, self.valueEdit.text())
+            modify.push(command)
         if self.sortValueCheckbox.isChecked():
             if self.sortEdit.text() != self.orig_sortValue:
                 command = commands.SortValueUndoCommand(self.tag, self.valueId, self.orig_sortValue, self.sortEdit.text())
                 modify.push(command)
-        else:
+        elif self.orig_sortValue is not None:
             command = commands.SortValueUndoCommand(self.tag, self.valueId, self.orig_sortValue, None)
             modify.push(command)
         if self.hiddenCheckbox.isChecked() != self.orig_hidden:
@@ -656,3 +658,45 @@ class TagValuePropertiesWidget(QtGui.QWidget):
         dialog.exec_()
         if dialog.result() == QtGui.QDialog.Accepted:
             tvp.commit()
+            
+class MergeDialog(QtGui.QDialog):
+    """This dialog is shown if the user requests to merge some children into a new intermediate container."""
+    
+    def __init__(self, hintTitle, hintRemove, askForPositionAdjusting, parent = None):
+        super().__init__(parent)
+        layout = QtGui.QGridLayout()
+        label = QtGui.QLabel(self.tr('Title of new container:'))
+        layout.addWidget(label, 0, 0)
+        self.titleEdit = QtGui.QLineEdit(hintTitle)
+        layout.addWidget(self.titleEdit, 0, 1)
+        self.checkBox = QtGui.QCheckBox(self.tr('Remove from titles:'))
+        self.checkBox.setChecked(True)
+        layout.addWidget(self.checkBox, 1, 0)
+        self.removeEdit = QtGui.QLineEdit(hintRemove)
+        layout.addWidget(self.removeEdit, 1, 1)
+        self.checkBox.toggled.connect(self.removeEdit.setEnabled)
+        
+        if askForPositionAdjusting:
+            self.positionCheckBox = QtGui.QCheckBox(self.tr('Auto-adjust positions'))
+            self.positionCheckBox.setChecked(True)
+            layout.addWidget(self.positionCheckBox, 2, 0, 1, 2)
+        hLayout = QtGui.QHBoxLayout()
+        self.cancelButton = QtGui.QPushButton(self.tr('Cancel'))
+        self.okButton = QtGui.QPushButton(self.tr('OK'))
+        self.cancelButton.clicked.connect(self.reject)
+        self.okButton.clicked.connect(self.accept)
+        hLayout.addStretch()
+        hLayout.addWidget(self.cancelButton)
+        hLayout.addWidget(self.okButton)
+        layout.addLayout(hLayout, 3 if askForPositionAdjusting else 2, 0, 1, 2)
+        layout.setColumnStretch(1, 1)
+        self.setLayout(layout)
+    def newTitle(self):
+        return self.titleEdit.text()
+    def removeString(self):
+        return self.removeEdit.text() if self.checkBox.isChecked() else ''
+    def adjustPositions(self):
+        if hasattr(self, 'positionCheckBox'):
+            return self.positionCheckBox.isChecked()
+        else:
+            return False

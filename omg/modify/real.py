@@ -12,31 +12,54 @@ This module will really modify database and filesystem (using database.write and
 do any Undo-/Redo-stuff.
 """
  
-from .. import database as db, tags, realfiles, logging
+from .. import database as db, tags as tagsModule, realfiles, logging, utils
 from ..database import write
-from . import dispatcher, events, REAL
+from . import dispatcher, events
+from ..constants import REAL
+import os
 
 logger = logging.getLogger(__name__)
 
 
-def createNewElements(elements):
-    """Create new elements. *elements* is a list of preliminary elements (i.e. element instances with
-    negative ids). This method will insert new entries in the elements and file table. It won't save
-    any contents, tags or flags though.
+def createNewElements(elements, setData = False):
+    """Create new elements. *elements* is a list of preliminary elements. If they have negative IDs, new IDs for
+    them are created automatically. Otherwise, they are inserted with the IDs as given in the element.
+    This method will insert new entries in the elements and file table. It won't save
+    any contents. Tags and flags are saved only if *setData* is True.
     
     This method will return a dict mapping old to new ids.
     """
     result = {}
+    if setData:
+        tagChanges = {}
+        flagChanges = {}
+        emptyTags = tagsModule.Storage()
+        emptyFlags = [] 
     for element in elements:
-        assert element.id < 0
-        oldId = element.id
-        newId = db.write.createNewElement(element.isFile(),element.major if element.isContainer() else False)
+        newId = db.write.createNewElement(element.isFile(),
+                                          element.major if element.isContainer() else False,
+                                          id = None if element.id < 0 else element.id)
         if element.isFile():
             db.write.addFile(newId,element.path,None,element.length)
+        if setData:
+            tagChanges[newId] = (emptyTags, element.tags)
+            flagChanges[newId] = (emptyFlags, element.flags)
         
         result[element.id] = newId
+    if setData:
+        changeTags(tagChanges, elements, emitEvent = False)
+        changeFlags(flagChanges,  emitEvent = False)
     return result
 
+def newContainer(tags, flags, major, id = None):
+    """Creates a new container in the database with the given attributes. Returns its id.
+    This function does not emit any events."""
+    id = db.write.createNewElement(False, major, id)
+    oldTags = tagsModule.Storage()
+    oldFlags = []
+    changeTags({id:(oldTags,tags)}, emitEvent = False)
+    changeFlags({id:(oldFlags,flags)}, emitEvent = False)
+    return id    
 
 def deleteElements(elids):
     """Delete the elements with the given ids from the database. This will delete from the elements table
@@ -44,8 +67,32 @@ def deleteElements(elids):
     db.write.deleteElements(elids)
     dispatcher.changes.emit(events.ElementsDeletedEvent(elids))
 
+def deleteFilesFromDisk(paths):
+    """Delete the given files from the filesystem. *paths* is a list of paths."""
+    for path in paths:
+        logger.warning('permanently removing file "{}"'.format(path))
+        os.remove(utils.absPath(path))
+def addContents(changes, emitEvent = True):
+    """Add the given content relations to the database and emit a corresponding event.
+    
+    *changes* is a dict mapping parent IDs to a list of (position, element) tuples."""
+    db.write.addContents( [ (parentID,pair[0],pair[1].id) for parentID,pairs in changes.items() for pair in pairs ] )
+    dispatcher.changes.emit(events.InsertContentsEvent(REAL, changes))
+    
+def removeContents(changes):
+    """Remove the given content relations from the database and emit a corresponding event.
+    
+    *changes* should be a dict mapping parent IDs to lists of positions to remove."""
+    db.write.removeContents([ (parentID,p) for parentID,positions in changes.items() for p in positions ])
+    dispatcher.changes.emit(events.RemoveContentsEvent(REAL, changes))
 
-def commit(changes):
+def changePositions(parentID, changes):
+    """Change positions of children of *parentID* according to *changes*, which is a list of tuples
+    (oldPosition, newPosition)."""
+    db.write.changePositions(parentID, changes)
+    dispatcher.changes.emit(events.PositionChangeEvent(REAL, parentID, dict(changes)))
+    
+def commit(changes, emitEvent = True):
     """Commits all elements, given by an id->(oldElement,newElement) dictionary, into the database.
     
     After the commit, the elements in the database will look like those in the argument.
@@ -81,19 +128,22 @@ def commit(changes):
     if len(contents) > 0:
         db.write.setContents(contents)
     
-    dispatcher.changes.emit(events.ElementChangeEvent(REAL,{id: tuple[1] for id,tuple in changes.items()}, True))
+    if emitEvent:
+        dispatcher.changes.emit(events.ElementChangeEvent(REAL,{id: tuple[1] for id,tuple in changes.items()}, True))
 
 
 def addTagValue(tag,value,elements): 
-    """Add a tag of type *tag* and value *value* to each element in *elements*."""
-    assert isinstance(tag,tags.Tag) and len(elements) > 0
+    """Add a tag of type *tag* and value *value* to each element in *elements*, which is a list of either
+    elements or element IDs."""
+    assert isinstance(tag,tagsModule.Tag) and len(elements) > 0
     
     if not tag.private:
-        successful = [] # list of elements where the file was written successfully
+        successful = [] # list of element IDs where the file was written successfully
         for element in elements:
-            if element.isFile():
+            isID = isinstance(element, int)
+            if (isID and db.isFile(element)) or element.isFile():
                 try:
-                    real = realfiles.get(element.path)
+                    real = realfiles.get(db.path(element) if isID else element.path)
                     real.read()
                     real.tags.add(tag,value)
                     real.saveTags()
@@ -101,17 +151,17 @@ def addTagValue(tag,value,elements):
                     logger.error("Could not add tags to '{}'.".format(element.path))
                     logger.error("Error was: {}".format(e))
                     continue
-            successful.append(element)
-    else: successful = elements
+            successful.append(element if isID else element.id)
+    else: successful = [el if isinstance(el, int) else el.id for el in elements]
 
     if len(successful) > 0:
-        db.write.addTagValues((element.id for element in successful),tag,[value])
-        dispatcher.changes.emit(events.TagValueAddedEvent(REAL,tag,value,successful))
+        db.write.addTagValues(successful, tag,[value])
+        dispatcher.changes.emit(events.TagValueAddedEvent(REAL,tag,value, successful))
 
 
 def removeTagValue(tag,value,elements):
     """Remove the given value of tag *tag* from each element in *elements*."""
-    assert isinstance(tag,tags.Tag) and len(elements) > 0
+    assert isinstance(tag,tagsModule.Tag) and len(elements) > 0
     
     if not tag.private:
         successful = [] # list of elements where the file was written successfully
@@ -135,16 +185,17 @@ def removeTagValue(tag,value,elements):
 
 
 def changeTagValue(tag,oldValue,newValue,elements):
-    """For each element in *elements*: If element has a tag of type *tag* and value *oldValue* then remove
-    it. In any case add *newValue*."""
-    assert isinstance(tag,tags.Tag) and len(elements) > 0
-
+    """For each element in *elements*, which is a list of either elements or element IDs:
+    If element has a tag of type *tag* and value *oldValue* then remove it.
+    In any case add *newValue*."""
+    assert isinstance(tag,tagsModule.Tag) and len(elements) > 0
     if not tag.private:
-        successful = [] # list of elements where the file was written successfully
+        successful = [] # list of element IDs where the file was written successfully
         for element in elements:
-            if element.isFile():
+            isID = isinstance(element, int)
+            if (isID and db.isFile(element)) or (not isID and element.isFile()):
                 try:
-                    real = realfiles.get(element.path)
+                    real = realfiles.get(db.path(element) if isID else element.path)
                     real.read()
                     real.tags.replace(tag,oldValue,newValue)
                     real.saveTags()
@@ -152,11 +203,11 @@ def changeTagValue(tag,oldValue,newValue,elements):
                     logger.error("Could not change tag value from '{}'.".format(element.path))
                     logger.error("Error was: {}".format(e))
                     continue
-            successful.append(element)
-    else: successful = elements
+            successful.append(element if isID else element.id)
+    else: successful = [el if isinstance(el, int) else el.id for el in elements]
         
     if len(successful) > 0:
-        db.write.changeTagValue((element.id for element in successful),tag,oldValue,newValue)
+        db.write.changeTagValue(successful,tag,oldValue,newValue)
         dispatcher.changes.emit(events.TagValueChangedEvent(REAL,tag,oldValue,newValue,successful))
 
 
@@ -171,8 +222,8 @@ def _getPathAndFileTags(id,elements):
                 return path,fileTags
             else: return None,None
     # Arriving here means that no element has the given id
-    if db.isFile(element.id):
-        return db.path(element.id),None
+    if db.isFile(id):
+        return db.path(id),None
     else: return None,None
 
 def changeTags(changes,elements=[],emitEvent = True):
