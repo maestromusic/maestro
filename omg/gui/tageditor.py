@@ -12,7 +12,7 @@ from PyQt4.QtCore import Qt
 import itertools, os.path
 
 from .. import constants, tags, strutils, utils, config, logging, modify, constants
-from ..models import tageditormodel, simplelistmodel, File, flageditor as flageditormodel
+from ..models import tageditor as tageditormodel, simplelistmodel, File, flageditor as flageditormodel
 from ..gui import formatter, singletageditor, dialogs, tagwidgets, mainwindow, editor, flageditor
 from ..gui.misc import widgetlist, dynamicgridlayout
 from ..constants import REAL, EDITOR

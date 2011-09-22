@@ -11,7 +11,7 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from omg import models, constants, tags, utils
-from omg.models import simplelistmodel, tageditormodel
+from omg.models import simplelistmodel
 from omg.gui import tagwidgets
 from omg.gui.misc import listview, widgetlist
 
