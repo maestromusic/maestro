@@ -54,10 +54,6 @@ class SearchRequest:
         - ''resultTable'': table name where the results should be stored. This table must be created by the
             SearchEngine's createResultTable method.
         - ''criteria'': The criteria the search results must match. Consider the criteria module.
-        - ''parent'': Another SearchRequest. If that request is stopped, this request will also be stopped.
-        - ''owner'': This is not used by the search engine. It may be used to store the instance that
-            triggered the search. In the searchFinished slot this allows to determine which signals should be
-            processed.
         - ''data'': This is also not used and may contain any other data needed to process the searchFinished
             signal.
         - ''lockTable'': If True the resultTable will be locked after the search and every other search to
@@ -74,15 +70,11 @@ class SearchRequest:
     # True the engine's _finishedEvent is set instead (threading.Event). This is only used by searchAndWait.
     _fireEvent = False
     
-    def __init__(self,engine,fromTable,resultTable,criteria,owner=None,parent=None,data=None,lockTable=False):
+    def __init__(self,engine,fromTable,resultTable,criteria,data=None,lockTable=False):
         self.engine = engine
         self.fromTable = fromTable
         self.resultTable = resultTable
         self.criteria = criteria
-        self.owner = owner
-        if parent is not None and not isinstance(parent,SearchRequest):
-            raise TypeError("Parent must be a SearchRequest.")
-        self.parent = parent
         self.data = data
         self.lockTable = lockTable
         
@@ -90,16 +82,16 @@ class SearchRequest:
         """Return a copy of this request with the same data. The new request won't be stopped even if this
         request is.
         """
-        request = SearchRequest(self.engine,self.fromTable,self.resultTable,self.criteria,self.owner,
-                                self.parent,self.data,self.lockTable)
+        request = SearchRequest(self.engine,self.fromTable,self.resultTable,self.criteria,
+                                self.data,self.lockTable)
         return request
         
     def isStopped(self):
-        """Determines whether this request or its parent has been stopped."""
-        return self._stopped or (self.parent is not None and self.parent._stopped)
+        """Determines whether this request has been stopped."""
+        return self._stopped
     
     def stop(self):
-        """Stop this request and all requests that have this one as parent."""
+        """Stop this request."""
         with self.engine._thread.lock:
             if not self._stopped:
                 #print("Search: Stopping request {}".format(self))
@@ -117,8 +109,7 @@ class SearchRequest:
             
     def __str__(self):
         return "<SearchRequest: {}->{} for [{}] | ({},{},{},{})".format(self.fromTable,
-                 self.resultTable,",".join(str(c) for c in self.criteria),self.owner,
-                 self.parent,self.data,self.lockTable)
+                 self.resultTable,",".join(str(c) for c in self.criteria),self.data,self.lockTable)
         
 
 class SearchEngine(QtCore.QObject):
@@ -199,8 +190,6 @@ class SearchEngine(QtCore.QObject):
         assert request.engine is self
         with self._thread.lock:
             if request in self._thread.requests or request.isStopped():
-                # The latter happens in particular if the parent request was stopped just before this method
-                # was called.
                 return
             #print("Search: Got new request {}".format(request))
             self._thread.requests.append(request)
