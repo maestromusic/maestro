@@ -372,7 +372,6 @@ class TagUndoCommand(UndoCommand):
             self.elements = [el.export(attributes=['path']) for el in elements]
         
     def redo(self):
-        logger.debug('TagUndoCommand -- redo (REAL:{})'.format(self.level == REAL))
         if self.level == REAL:
             real.changeTags(self.changes,self.elements)
         else:
@@ -380,7 +379,6 @@ class TagUndoCommand(UndoCommand):
             dispatcher.changes.emit(events.TagChangeEvent(self.level, changes))
 
     def undo(self):
-        logger.debug('TagUndoCommand -- undo (REAL:{})'.format(self.level == REAL))
         if self.level == REAL:
             real.changeTags({k: (v[1],v[0]) for k,v in self.changes.items()},self.elements)
         else:

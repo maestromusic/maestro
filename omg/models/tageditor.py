@@ -593,7 +593,7 @@ class TagEditorModel(QtCore.QObject):
         changes = {element.id: (element.originalTags,self.getTagsOfElement(element))
                         for element in self.inner.elements}
         
-        self._push(modify.commands.TagUndoCommand(self.level,changes,self.inner.elements,
+        modify.push(modify.commands.TagUndoCommand(self.level,changes,self.inner.elements,
                                                   text=self.tr("Change tags")))
             
     def _addElementsWithValue(self,tag,value,elements):

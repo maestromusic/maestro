@@ -179,7 +179,7 @@ class FlagEditorModel(QtCore.QObject):
         changes = {element.id: (element.flags,self.getFlagsOfElement(element))
                         for element in self.elements}
         
-        self._push(modify.commands.FlagUndoCommand(self.level,changes,text=self.tr("Change flags")))
+        modify.push(modify.commands.FlagUndoCommand(self.level,changes,text=self.tr("Change flags")))
 
     def _handleDispatcher(self,event):
         """React to change events."""
