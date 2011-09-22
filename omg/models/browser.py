@@ -38,6 +38,8 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
     """
     showHiddenValues = False
 
+    _searchRequests = None
+    
     nodeLoaded = QtCore.pyqtSignal(Node)
     
     def __init__(self,layers,browser):
@@ -45,6 +47,7 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
         self.table = None
         self.browser = browser
         self.layers = layers
+        self._searchRequests = []
         
         if searchEngine is None:
             initSearchEngine()
@@ -54,6 +57,10 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
     def reset(self,table=None):
         """Reset the model reloading all data from self.table. If *table* is given, first set self.table to
         *table*."""
+        for request in self._searchRequests:
+            request.stop()
+        self._searchRequests = [] # Avoid handling requests whose finished-signal is already in the queue.
+        
         if table is not None:
             self.table = table
         if self.table is not None:
@@ -99,11 +106,8 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
         else:
             method = searchEngine.search if not wait else searchEngine.searchAndWait
             # Collect the criteria in this node and its parents and put the search results into smallResult
-            searchRequest = method(self.table,smallResult,node._collectCriteria(),
-                                parent=self.browser.searchRequest,
-                                owner=self,
-                                data=node,
-                                lockTable=True)
+            searchRequest = method(self.table,smallResult,node._collectCriteria(),data=node,lockTable=True)
+            self._searchRequests.append(searchRequest)
             if wait:
                 # Search is finished.
                 self._handleSearchFinished(searchRequest)
@@ -113,13 +117,14 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
         """Handle the searchFinished-event for *searchRequest*: Load the contents of the node
         ''searchRequest.data'' and emit a nodeLoaded signal.
         """
-        if searchRequest.owner is self and not searchRequest.isStopped():
+        if searchRequest in self._searchRequests:
             # Determine whether to load a tag-layer or the container-layer at the bottom of the tree.
             node = searchRequest.data
             if node.layerIndex+1 < len(self.layers):
                 self._loadTagLayer(node,smallResult)
             else: self._loadContainerLayer(node,smallResult)
             searchRequest.releaseTable()
+            self._searchRequests.remove(searchRequest)
             self.nodeLoaded.emit(node)
             return
     

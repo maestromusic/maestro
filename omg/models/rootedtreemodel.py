@@ -133,8 +133,8 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
         try:
             parent.getContents().index(node)
         except ValueError:
-            raise RuntimeError("Cannot create an index for node {} because "
-                               + "it is not contained in its alleged parent {}.".format(node,parent))
+            raise RuntimeError("Cannot create an index for node {} because ".format(node)
+                               + "it is not contained in its alleged parent {}.".format(parent))
             
         return self.createIndex(parent.getContents().index(node),0,node)     
 

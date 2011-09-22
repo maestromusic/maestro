@@ -182,8 +182,10 @@ class Browser(QtGui.QWidget):
         to restore them again after reloading.
         """
         criteria = self.criterionFilter + self.searchCriteria
+        # This will effectively stop any request from being processed
         if self.searchRequest is not None:
             self.searchRequest.stop()
+            self.searchRequest = None
 
         if len(criteria) > 0:
             self.table = self.bigResult
@@ -255,7 +257,8 @@ class Browser(QtGui.QWidget):
         
     def _handleSearchFinished(self,request):
         """React to searchFinished signals: Set the table to self.bigResult and reset the model."""
-        if request is self.searchRequest and not request.isStopped():
+        if request is self.searchRequest:
+            self.searchRequest = None
             # Whether the view should restore expanded nodes after the search is stored in request.data.
             restore = request.data
             for view in self.views:
@@ -266,7 +269,8 @@ class Browser(QtGui.QWidget):
         # Optimize some cases in which we do not have to start a new search and reload everything.
         if isinstance(event,modify.events.ElementChangeEvent) and event.level == modify.EDITOR:
             return # Does not affect us
-        elif isinstance(event,modify.events.SingleTagChangeEvent) \
+        #TODO: remove 'false and'
+        elif False and isinstance(event,modify.events.SingleTagChangeEvent) \
                     and all(event.tag not in criterion.getTags() for criterion in self.searchCriteria) \
                     and all(event.tag not in criterion.getTags() for criterion in self.criterionFilter):
             for view in self.views:
@@ -275,13 +279,14 @@ class Browser(QtGui.QWidget):
                 if any(event.tag in layer for layer in view.model().layers):
                     view.model().reset()
             return
-        elif isinstance(event,modify.events.SingleFlagChangeEvent) \
+        elif False and isinstance(event,modify.events.SingleFlagChangeEvent) \
                     and all(event.flag not in criterion.getFlags() for criterion in self.searchCriteria) \
                     and all(event.flag not in criterion.getFlags() for criterion in self.criterionFilter):
             for view in self.views:
                 view.model().applyEvent(event)
             return
 
+        self.load(restoreExpanded = True)
 
 class BrowserTreeView(treeview.TreeView):
     """TreeView for the Browser. A browser may contain more than one view each using its own model. *parent*
@@ -293,7 +298,7 @@ class BrowserTreeView(treeview.TreeView):
     finally displaying the elements itself."""
     
     # List of optimizers which will improve the display after reloading.
-    _optimizer = None
+    _optimizers = None
 
     @classmethod
     def initContextMenu(cls):
@@ -304,6 +309,7 @@ class BrowserTreeView(treeview.TreeView):
         treeview.TreeView.__init__(self,parent)
         self.setModel(browsermodel.BrowserModel(layers,parent))
         self.setItemDelegate(delegates.BrowserDelegate(self,self.model()))
+        self._optimizers = []
         #self.doubleClicked.connect(self._handleDoubleClicked)
     
     def resetToTable(self,table,restoreExpanded,expandVisible):
@@ -311,14 +317,19 @@ class BrowserTreeView(treeview.TreeView):
         True, try to restore expanded nodes after reloading. If *expandVisible* is True, automatically 
         expand as much layers as are possible without vertical scrollbar.
         """
-        # The order of the optimizers is very important!
+        if len(self._optimizers) > 0:
+            # Disconnect or otherwise the next optimizer will be started via the finished signal.
+            self._optimizers[-1].finished.disconnect(self._handleOptimizerFinished)
+            self._optimizers[-1].stop()
         self._optimizers = []
+        
+        # The order of the optimizers is very important!
         if restoreExpanded:
             self._optimizers.append(RestoreExpandedOptimizer(self))
-        if expandVisible:
-            self._optimizers.append(ExpandVisibleOptimizer(self))
-        self._optimizers.append(ExpandSingleOptimizer(self))
-        self._optimizers.append(MergeValueNodesOptimizer(self))
+        #if expandVisible:
+        #    self._optimizers.append(ExpandVisibleOptimizer(self))
+        #self._optimizers.append(ExpandSingleOptimizer(self))
+        #self._optimizers.append(MergeValueNodesOptimizer(self))
         
         self.model().reset(table)
         if len(self._optimizers) > 0:
@@ -383,13 +394,16 @@ class RestoreExpandedOptimizer(Optimizer):
     def __init__(self,view):
         super().__init__(view)
         self._expanded = self._getExpandedNodes(QtCore.QModelIndex())
-        view.model().nodeLoaded.connect(self._handleNodeLoaded)
+        self._stopped = True
     
     def start(self):
+        self.view.model().nodeLoaded.connect(self._handleNodeLoaded)
         self._generator = self._expandedNodesGenerator()
+        self._stopped = False
         self._handleNodeLoaded(None)
         
-    def stop(self):                  
+    def stop(self):
+        self._stopped = True            
         self.view.model().nodeLoaded.disconnect(self._handleNodeLoaded)
         self.finished.emit()
     
@@ -412,13 +426,15 @@ class RestoreExpandedOptimizer(Optimizer):
         return result
     
     def _handleNodeLoaded(self,node=None):
+        if self._stopped:
+            return
         try:
             next(self._generator)
             # Reaching this point means a node was expanded, that had not already loaded its contents.
             # Thus we have to wait until the search finishes and the signal is emitted again.
             return
         except StopIteration:
-            self.stop()
+            self.finished.emit()
     
     def _expandedNodesGenerator(self):
         model = self.view.model()
@@ -445,7 +461,6 @@ class RestoreExpandedOptimizer(Optimizer):
                     if mustSearch:
                         yield child
                     break
-            else: print("Not found: {}".format(key))
             
     
 class ExpandVisibleOptimizer(Optimizer):
