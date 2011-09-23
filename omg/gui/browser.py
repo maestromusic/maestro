@@ -269,8 +269,7 @@ class Browser(QtGui.QWidget):
         # Optimize some cases in which we do not have to start a new search and reload everything.
         if isinstance(event,modify.events.ElementChangeEvent) and event.level == modify.EDITOR:
             return # Does not affect us
-        #TODO: remove 'false and'
-        elif False and isinstance(event,modify.events.SingleTagChangeEvent) \
+        elif sinstance(event,modify.events.SingleTagChangeEvent) \
                     and all(event.tag not in criterion.getTags() for criterion in self.searchCriteria) \
                     and all(event.tag not in criterion.getTags() for criterion in self.criterionFilter):
             for view in self.views:
@@ -279,7 +278,7 @@ class Browser(QtGui.QWidget):
                 if any(event.tag in layer for layer in view.model().layers):
                     view.model().reset()
             return
-        elif False and isinstance(event,modify.events.SingleFlagChangeEvent) \
+        elif isinstance(event,modify.events.SingleFlagChangeEvent) \
                     and all(event.flag not in criterion.getFlags() for criterion in self.searchCriteria) \
                     and all(event.flag not in criterion.getFlags() for criterion in self.criterionFilter):
             for view in self.views:
@@ -326,10 +325,10 @@ class BrowserTreeView(treeview.TreeView):
         # The order of the optimizers is very important!
         if restoreExpanded:
             self._optimizers.append(RestoreExpandedOptimizer(self))
-        #if expandVisible:
-        #    self._optimizers.append(ExpandVisibleOptimizer(self))
-        #self._optimizers.append(ExpandSingleOptimizer(self))
-        #self._optimizers.append(MergeValueNodesOptimizer(self))
+        if expandVisible:
+            self._optimizers.append(ExpandVisibleOptimizer(self))
+        self._optimizers.append(ExpandSingleOptimizer(self))
+        self._optimizers.append(MergeValueNodesOptimizer(self))
         
         self.model().reset(table)
         if len(self._optimizers) > 0:
