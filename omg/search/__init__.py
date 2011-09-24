@@ -4,7 +4,7 @@
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 3 as
-# published by the Free Software Foundation
+# published by the Free Software Foundation.
 #
 import threading
 
@@ -159,6 +159,7 @@ class SearchEngine(QtCore.QObject):
                     toplevel BOOLEAN NOT NULL DEFAULT 0,
                     direct BOOLEAN NOT NULL DEFAULT 1,
                     major BOOLEAN NOT NULL DEFAULT 0,
+                    new BOOLEAN NOT NULL DEFAULT 0,
                     PRIMARY KEY(id))
                     ENGINE MEMORY;
                 """.format(tableName,customColumns))
@@ -458,8 +459,35 @@ class SearchThread(threading.Thread):
                 db.multiQuery(
                     "INSERT IGNORE INTO {} (id,file,major,direct) VALUES (?,?,?,0)"
                     .format(resultTable),args)
-
+        
         setTopLevelFlags(resultTable)
+        # Always include all children of direct results => select from elements
+        addChildren(resultTable,db.prefix+"elements")
+
+
+def addChildren(resultTable,fromTable):
+    """Add to *resultTable* all descendants of direct results. The descendants must be contained in
+    *fromTable*."""
+    # In the first step select direct results which have children, in the other steps select new results.
+    attribute = 'direct'
+    while True:
+        db.query("TRUNCATE TABLE {0}".format(TT_HELP))
+        result = db.query("""
+            INSERT INTO {2} (id)
+                SELECT res.id
+                FROM {1} AS res JOIN {0}elements USING(id)
+                WHERE res.{3} = 1 AND {0}elements.elements > 0
+            """.format(db.prefix,resultTable,TT_HELP,attribute))
+        if result.affectedRows() == 0:
+            return
+        db.query("""
+            INSERT IGNORE INTO {1} (id,file,toplevel,direct,major,new)
+                SELECT c    .element_id,el.file,0,0,el.major,1
+                FROM {2} AS p JOIN {0}contents AS c ON p.id = c.container_id
+                              JOIN {3} AS el ON el.id = c.element_id
+                GROUP BY c.element_id
+                """.format(db.prefix,resultTable,TT_HELP,fromTable))
+        attribute = 'new'
 
 
 def setTopLevelFlags(table):
