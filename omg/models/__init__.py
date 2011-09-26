@@ -8,8 +8,8 @@
 #
 import copy
 
-from omg import tags, logging, config, covers, realfiles, database as db
-from omg.utils import relPath
+from .. import tags, logging, config, covers, realfiles, database as db
+from ..utils import relPath
 
 logger = logging.getLogger(name="models")
 

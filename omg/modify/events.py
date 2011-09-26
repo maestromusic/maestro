@@ -47,12 +47,14 @@ class ElementsDeletedEvent(ChangeEvent):
     
 class SingleElementChangeEvent(ElementChangeEvent):
     """A specialized modify event if only one element (tags, position, ...) is modified."""
+    
+    tagsChanged = True
+    flagsChanged = True
+    contentsChanged = False
+    
     def __init__(self, level, element):
         self.element = element
         self.level = level
-        self.contentsChanged = False
-        self.tagsChanged = True
-        self.flagsChanged = True
         
     def ids(self):
         return [self.element.id]
@@ -69,6 +71,7 @@ class MajorFlagChangeEvent(SingleElementChangeEvent):
     
     tagsChanged = False
     flagsChanged = False
+    
     def __init__(self, level, element):
         super().__init__(level, element)
         
@@ -78,13 +81,14 @@ class MajorFlagChangeEvent(SingleElementChangeEvent):
 
 class PositionChangeEvent(ElementChangeEvent):
     """An event for the case that the position of several elements below the same parent are changed."""
+    
+    contentsChanged = True
+    tagsChanged = False
+    flagsChanged = False
     def __init__(self, level, parentId, positionMap):
         '''Initializes the event. *positionMap* is a dict mapping old to new positions.'''
-        self.contentsChanged = True
         self.parentId = parentId
         self.positionMap = positionMap
-        self.tagsChanged = False
-        self.flagsChanged = False
         self.level = level
         
     def ids(self):
@@ -94,6 +98,7 @@ class PositionChangeEvent(ElementChangeEvent):
         return len(element.contents)
     
     def applyTo(self, element):
+        logger.warning('this function is crappy and should not be used.')
         assert element.id == self.parentId
         for elem in element.contents:
             if elem.position in self.positionMap:
@@ -123,6 +128,7 @@ class InsertContentsEvent(ElementChangeEvent):
         return element.getContentsCount() + len(self.insertions[element.id])
     
     def applyTo(self, element):
+        logger.warning('this function is crappy and should not be used.')
         for pos, ins in self.insertions[element.id]:
             insertedElem = ins.copy()
             insertedElem.parent = element
@@ -182,6 +188,7 @@ class TagChangeEvent(ElementChangeEvent):
 
             
 class SingleTagChangeEvent(TagChangeEvent):
+    
     def __init__(self,level,tag,elementIDs):
         assert isinstance(tag,tags.Tag)
         self.level = level

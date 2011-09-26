@@ -153,10 +153,14 @@ class UndoGroup(QtGui.QUndoGroup):
         self.addStack(self.mainStack)
         
         self.editorStack = QtGui.QUndoStack()
+        self.editorStack.indexChanged.connect(self._handleEditorIndexChanged)
         self.addStack(self.editorStack)
         
         self.setActiveStack(self.mainStack)
        
+    def _handleEditorIndexChanged(self, idx):
+        if idx == 0:
+            self.setActiveStack(self.mainStack)
     def state(self):
         if self.activeStack() is self.editorStack:
             return EDITOR

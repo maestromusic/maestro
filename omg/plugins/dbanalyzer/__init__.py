@@ -265,12 +265,13 @@ class DBAnalyzerDialog(QtGui.QDialog):
         result = db.query("SELECT id,tagname,tagtype,sorttags,private FROM {}tagids ORDER BY id".format(db.prefix))
         for id,name,type,sort,private in result:
             sortTags = []
-            for sortId in sort.split(','):
-                try:
-                    sortTags.append(db.query("SELECT tagname FROM {}tagids WHERE id = {}"
-                                               .format(db.prefix,sortId)).getSingle())
-                except db.sql.EmptyResultException:
-                    sortTags.append('{} (INVALID!)'.format(sortId))
+            if len(sort) > 0:
+                for sortId in sort.split(','):
+                    try:
+                        sortTags.append(db.query("SELECT tagname FROM {}tagids WHERE id = {}"
+                                                   .format(db.prefix,sortId)).getSingle())
+                    except db.sql.EmptyResultException:
+                        sortTags.append('{} (INVALID!)'.format(sortId))
             sortTags = ", ".join(sortTags) 
                         
             tuple = (id,name,type,sortTags,private,

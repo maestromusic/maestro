@@ -269,7 +269,7 @@ class Browser(QtGui.QWidget):
         # Optimize some cases in which we do not have to start a new search and reload everything.
         if isinstance(event,modify.events.ElementChangeEvent) and event.level == modify.EDITOR:
             return # Does not affect us
-        elif sinstance(event,modify.events.SingleTagChangeEvent) \
+        elif isinstance(event,modify.events.SingleTagChangeEvent) \
                     and all(event.tag not in criterion.getTags() for criterion in self.searchCriteria) \
                     and all(event.tag not in criterion.getTags() for criterion in self.criterionFilter):
             for view in self.views:

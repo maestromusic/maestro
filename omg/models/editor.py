@@ -30,7 +30,7 @@ def walk(element):
         for x in walk(child):
             yield x
                     
-class EditorModel(rootedtreemodel.EditableRootedTreeModel):
+class EditorModel(rootedtreemodel.RootedTreeModel):
     """Model class for the editors where users can edit elements before they are commited into
     the database."""
     
@@ -85,6 +85,7 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
         modelIndex = self.getIndex(node)
         if not event.contentsChanged:
             # this handles SingleElementChangeEvent, all TagChangeEvents, FlagChangeEvents, ...
+            print('editor - tag change event!')
             event.applyTo(node)
             ret = True
         elif isinstance(event, events.PositionChangeEvent):
@@ -92,21 +93,7 @@ class EditorModel(rootedtreemodel.EditableRootedTreeModel):
             self.dataChanged.emit(modelIndex.child(0, 0), modelIndex.child(node.getContentsCount()-1, 0))
             ret = True
         elif isinstance(event, events.InsertContentsEvent):
-            for pos, newElement in event.insertions[id]:
-                insertedElem = newElement.copy()
-                insertedElem.parent = node
-                inserted = False
-                for i, elem in enumerate(node.contents):
-                    if (elem.position and elem.position > pos) or i > pos:
-                        self.beginInsertRows(modelIndex, i, i)
-                        node.contents[i:i] = [insertedElem]
-                        self.endInsertRows()
-                        inserted = True
-                        break
-                if not inserted:
-                    self.beginInsertRows(modelIndex, len(node.contents), len(node.contents))
-                    node.contents.append(insertedElem)
-                    self.endInsertRows()
+            self.insert(node, event.insertions[id])
             ret = False   
         elif isinstance(event, events.RemoveContentsEvent):
             for i, elem in reversed(list(enumerate(node.contents))):

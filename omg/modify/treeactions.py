@@ -10,7 +10,7 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from ..gui import mainwindow
-from .. import modify, tags
+from .. import modify, tags, models
 from ..modify import commands
 from ..constants import *
 
@@ -132,7 +132,7 @@ class MergeAction(TreeAction):
         return hintRemove.strip(string.punctuation + string.whitespace), hintRemove
     
     def doAction(self):
-        from .tagwidgets import MergeDialog
+        from ..gui.tagwidgets import MergeDialog
         elements = self.selection.elements()
         hintTitle, hintRemove = self.createMergeHint(elements)
         mergeIndices = sorted(elem.parent.index(elem) for elem in elements)
