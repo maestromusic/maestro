@@ -167,11 +167,11 @@ class UndoGroup(QtGui.QUndoGroup):
         else:
             return REAL
 
-    def setState(self, level):
+    def setState(self, level,skipWarning=False):
         if level == REAL and self.state() == EDITOR:
             from ..gui.dialogs import question
-            if not question('warning', 'you are about to switch from editor to real stack. The \
-editor command history will be lost. Continue?'):
+            if not skipWarning and not question('warning', 'you are about to switch from editor to real \
+                                                stack. The editor command history will be lost. Continue?'):
                 raise StackChangeRejectedException()
             self.editorStack.clear()
         self.setActiveStack(self.mainStack if level == REAL else self.editorStack)
@@ -192,7 +192,7 @@ def endMacro():
     stack.activeStack().endMacro()
 
 def push(command):
-    stack.setState(command.level)
+    stack.setState(command.level,skipWarning=isinstance(command,commands.CommitCommand))
     stack.activeStack().push(command)
 
 def createUndoAction(level,parent,prefix):
