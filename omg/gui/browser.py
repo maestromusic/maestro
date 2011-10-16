@@ -433,7 +433,7 @@ class RestoreExpandedOptimizer(Optimizer):
             # Thus we have to wait until the search finishes and the signal is emitted again.
             return
         except StopIteration:
-            self.finished.emit()
+            self.stop()
     
     def _expandedNodesGenerator(self):
         model = self.view.model()
