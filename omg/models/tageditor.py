@@ -239,31 +239,22 @@ class UndoCommand(QtGui.QUndoCommand):
             self.undoMethod = model.inner.changeTag
             self.undoParams = [newTag,oldTag]
 
-    def _getActions(self,redo):
-        """Return a list of actions that are necessary to perform the change of this UndoCommand outside of
-        the tageditor (i.e. database or editor). Each action is a tuple consisting of a type (one of 'add',
-        'remove' or 'change') and one or more arguments (confer _modify).
-        
-        If *redo* is true the actions will redo this command otherwise they will undo it.
-        """
+    def _modify(self,redo):
+        """Redo this command or undo it, depending on the parameter *redo*."""
         if self.method.__name__ == 'insertRecord':
             pos,record = self.params
-            action = ('add' if redo else 'remove',record.tag,record.value,record.elementsWithValue)
-            return [action]
+            self._execute('add' if redo else 'remove',record.elementsWithValue,record.tag,record.value)
         elif self.method.__name__ == 'removeRecord':
             record = self.params[0] # 'record, = self.params' would work, too.
-            action = ('remove' if redo else 'add',record.tag,record.value,record.elementsWithValue)
-            return [action]
+            self._execute('remove' if redo else 'add',record.elementsWithValue,record.tag,record.value)
         elif self.method.__name__ == 'changeRecord':
             if redo:
                 tag,oldRecord,newRecord = self.params
             else: tag,newRecord,oldRecord = self.params
         
             if oldRecord.tag != newRecord.tag:
-                return [
-                    ('remove',oldRecord.tag,oldRecord.value,oldRecord.elementsWithValue),
-                    ('add',   newRecord.tag,newRecord.value,newRecord.elementsWithValue)
-                  ]
+                self._execute('remove',oldRecord.elementsWithValue,oldRecord.tag,oldRecord.value)
+                self._execute('add',newRecord.elementsWithValue,newRecord.tag,newRecord.value)
             else:
                 oldElements = set(oldRecord.elementsWithValue)
                 newElements = set(newRecord.elementsWithValue)
@@ -271,16 +262,14 @@ class UndoCommand(QtGui.QUndoCommand):
                 addList = list(newElements - oldElements)
                 actions = []
                 if len(removeList):
-                    actions.append(('remove',oldRecord.tag,oldRecord.value,removeList))
+                    self._execute('remove',removeList,oldRecord.tag,oldRecord.value)
                 if len(addList):
-                    actions.append(('add',   newRecord.tag,newRecord.value,addList))
+                    self._execute('add',addList,newRecord.tag,newRecord.value)
                     
                 if oldRecord.value != newRecord.value:
                     changeList = list(newElements.intersection(oldElements))
                     if len(changeList):
-                        actions.append(('change',oldRecord.tag,oldRecord.value,newRecord.value,changeList))
-                return actions
-        else: return [] # The remaining commands affect only the tageditor
+                        self._execute('change',changeList,oldRecord.tag,oldRecord.value,newRecord.value)
         
     def redo(self):
         # First modify the inner model
@@ -296,31 +285,28 @@ class UndoCommand(QtGui.QUndoCommand):
         if self.model.saveDirectly:
             self._modify(False)
 
-    def _modify(self,redo):
-        """This method changes things outside of the tageditor (database or editor). It will fetch a list of
-        actions from _getActions and either call corresponding methods from modify.db (level = REAL) or emit
-        the corresponding events (level=editor).
-        
-        If *redo* is true the method will redo this command otherwise it will undo it.
+    def _execute(self,type,elements,*params):
+        """Depending on the level either emit a SingleTagChangeEvent (EDITOR) or call a function from
+        modify.real (REAL), which will emit an event after really changing things. *type* is one of 'add',
+        'remove' or 'change' and determines which event or function should be used. *elements* are the
+        affected elements (one of the arguments of the event/function) and *params* are the other parameters
+        (corresponding event/function pairs share the same signature).
         """
-        actions = self._getActions(redo)
         if self.model.level == modify.EDITOR:
-            for action in actions:
-                if action[0] == 'add':
-                    event = modify.events.TagValueAddedEvent(modify.EDITOR,*action[1:])
-                elif action[0] == 'remove':
-                    event = modify.events.TagValueRemovedEvent(modify.EDITOR,*action[1:])
-                elif action[0] == 'change':
-                    event = modify.events.TagValueChangedEvent(modify.EDITOR,*action[1:])
-                modify.dispatcher.changes.emit(event)
-        else: # level == REAL
-            for action in actions:
-                if action[0] == 'add':
-                    modify.real.addTagValue(*action[1:])
-                elif action[0] == 'remove':
-                    modify.real.removeTagValue(*action[1:])
-                elif action[0] == 'change':
-                    modify.real.changeTagValue(*action[1:])
+            ids = [element.id for element in elements]
+            theClass = {
+                'add': modify.events.TagValueAddedEvent,
+                'remove': modify.events.TagValueRemovedEvent,
+                'change': modify.events.TagValueChangedEvent
+            }[type]
+            modify.dispatcher.changes.emit(theClass(modify.EDITOR,elementIDs=ids,*params))
+        else:
+            theFunction = {
+                'add': modify.real.addTagValue,
+                'remove': modify.real.removeTagValue,
+                'change': modify.real.changeTagValue
+            }[type]
+            theFunction(elements=elements,*params)
 
 
 class TagEditorModel(QtCore.QObject):

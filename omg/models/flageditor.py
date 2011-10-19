@@ -316,31 +316,22 @@ class FlagEditorUndoCommand(QtGui.QUndoCommand):
         if self.model.saveDirectly:
             self._modify(False)
          
-    def _getActions(self,redo):
-        """Return a list of actions that are necessary to perform the change of this UndoCommand outside of
-        the flageditor (i.e. database or editor). Each action is a tuple consisting of a type ('add' or
-        'remove') and one or more arguments (confer _modify).
-        
-        If *redo* is true the actions will redo this command otherwise they will undo it.
-        """
+    def _modify(self,redo):
+        """Redo this command or undo it, depending on the parameter *redo*."""
         if self.method.__name__ == '_insertRecord':
             pos,record = self.params
-            action = ('add' if redo else 'remove',record.flag,record.elementsWithFlag)
-            return [action]
+            self._execute('add' if redo else 'remove',record.flag,record.elementsWithFlag)
         elif self.method.__name__ == '_removeRecord':
             record = self.params[0] # 'record, = self.params' would work, too.
-            action = ('remove' if redo else 'add',record.flag,record.elementsWithFlag)
-            return [action]
+            self._execute('remove' if redo else 'add',record.flag,record.elementsWithFlag)
         elif self.method.__name__ == '_changeRecord':
             if redo:
                 oldRecord,newRecord = self.params
             else: newRecord,oldRecord = self.params
         
             if oldRecord.flag != newRecord.flag:
-                return [
-                    ('remove',oldRecord.flag,oldRecord.elementsWithFlag),
-                    ('add',   newRecord.flag,newRecord.elementsWithFlag)
-                  ]
+                self._execute('remove',oldRecord.flag,oldRecord.elementsWithFlag)
+                self._execute('add',newRecord.flag,newRecord.elementsWithFlag)
             else:
                 oldElements = set(oldRecord.elementsWithFlag)
                 newElements = set(newRecord.elementsWithFlag)
@@ -348,30 +339,28 @@ class FlagEditorUndoCommand(QtGui.QUndoCommand):
                 addList = list(newElements - oldElements)
                 actions = []
                 if len(removeList):
-                    actions.append(('remove',oldRecord.flag,removeList))
+                    self._execute('remove',oldRecord.flag,removeList)
                 if len(addList):
-                    actions.append(('add',newRecord.flag,addList))
+                    self._execute('add',newRecord.flag,addList)
                 return actions
-           
-    def _modify(self,redo):
-        """This method changes things outside of the flageditor (database or editor). It will fetch a list of
-        actions from _getActions and either call corresponding methods from modify.real (level = REAL) or
-        emit the corresponding events (level=editor).
-        
-        If *redo* is true the method will redo this command otherwise it will undo it.
+    
+    def _execute(self,type,*params):
+        """Depending on the level either emit a SingleFlagChangeEvent (EDITOR) or call a function from
+        modify.real (REAL), which will emit an event after really changing things. *type* is one of 'add' or
+        'remove' and determines which event or function should be used. *params* are the arguments of the
+        event/function (corresponding event/function pairs share the same signature).
         """
-        actions = self._getActions(redo)
         if self.model.level == modify.EDITOR:
-            for action in actions:
-                if action[0] == 'add':
-                    event = modify.events.FlagAddedEvent(modify.EDITOR,*action[1:])
-                elif action[0] == 'remove':
-                    event = modify.events.FlagRemovedEvent(modify.EDITOR,*action[1:])
-            modify.dispatcher.changes.emit(event)
-        else: # level == REAL
-            for action in actions:
-                if action[0] == 'add':
-                    modify.real.addFlag(*action[1:])
-                elif action[0] == 'remove':
-                    modify.real.removeFlag(*action[1:])
+            print([el.id for el in params[1]])
+            theClass = {
+                'add': modify.events.FlagAddedEvent,
+                'remove': modify.events.FlagRemovedEvent
+            }[type]
+            modify.dispatcher.changes.emit(theClass(modify.EDITOR,*params))
+        else:
+            theFunction = {
+                'add': modify.real.addFlag,
+                'remove': modify.real.removeFlag
+            }[type]
+            theFunction(*params)
                     
