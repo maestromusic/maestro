@@ -133,6 +133,7 @@ tables = [SQLTable(createQuery) for createQuery in (
 """CREATE TABLE {}flag_names (
         id      SMALLINT UNSIGNED NOT NULL AUTO_INCREMENT,
         name    VARCHAR({})       NOT NULL,
+        icon    VARCHAR(255)      DEFAULT NULL,
         PRIMARY KEY(id)
 ) ENGINE InnoDB, CHARACTER SET 'utf8';
 """.format(db.prefix,constants.FLAG_VARCHAR_LENGTH),

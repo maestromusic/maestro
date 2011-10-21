@@ -454,7 +454,7 @@ def elementsWithTagValue(tagSpec, valueSpec):
 def flags(elid):
     from .. import flags
     return [flags.Flag(*row) for row in query("""
-                    SELECT n.id,n.name
+                    SELECT n.id,n.name,n.icon
                     FROM {0}flag_names AS n JOIN {0}flags AS f ON f.flag_id = n.id
                     WHERE f.element_id = ?
                     ORDER BY n.name

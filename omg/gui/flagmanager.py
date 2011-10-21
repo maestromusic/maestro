@@ -26,12 +26,13 @@ class FlagManager(QtGui.QDialog):
         self.setLayout(QtGui.QVBoxLayout())
         
         self.tableWidget = QtGui.QTableWidget()
-        self.tableWidget.setColumnCount(3)
+        self.tableWidget.setColumnCount(4)
         self.tableWidget.verticalHeader().hide()
         # TODO: Does not work
         #self.tableWidget.setSortingEnabled(True)
         self.tableWidget.horizontalHeader().setResizeMode(QtGui.QHeaderView.ResizeToContents)
         self.tableWidget.itemChanged.connect(self._handleItemChanged)
+        self.tableWidget.cellDoubleClicked.connect(self._handleCellDoubleClicked)
         self.layout().addWidget(self.tableWidget)
         
         buttonBarLayout = QtGui.QHBoxLayout()
@@ -53,12 +54,13 @@ class FlagManager(QtGui.QDialog):
         
     def _loadFlags(self):
         """Load flags information from flags-module to GUI."""
+        self._flagTypes = []
         self.tableWidget.clear()
         self.tableWidget.setHorizontalHeaderLabels(
-                    [self.tr("Name"),self.tr("# of elements"),self.tr("Actions")])
+                    [self.tr("Icon"),self.tr("Name"),self.tr("# of elements"),self.tr("Actions")])
         
         result = db.query("""
-                SELECT id,name,COUNT(element_id)
+                SELECT id,name,icon,COUNT(element_id)
                 FROM {0}flag_names LEFT JOIN {0}flags ON id = flag_id
                 GROUP BY id
                 """.format(db.prefix))
@@ -66,12 +68,22 @@ class FlagManager(QtGui.QDialog):
         self.tableWidget.setRowCount(result.size())
             
         for i,row in enumerate(result):
-            id,name,count = row
-            flagType = flags.Flag(id,name)
+            id,name,iconPath,count = row
+            if db.isNull(iconPath):
+                iconPath = None
+            flagType = flags.Flag(id,name,iconPath)
+            self._flagTypes.append(flagType)
             
             column = 0
+            label = QtGui.QLabel()
+            label.setPixmap(QtGui.QPixmap(iconPath))
+            label.setAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
+            label.setToolTip(iconPath)
+            index = self.tableWidget.model().index(i,column)                     
+            self.tableWidget.setIndexWidget(index,label)
+            
+            column += 1
             item = QtGui.QTableWidgetItem(name)
-            item.setData(Qt.UserRole,flagType)
             item.setFlags(Qt.ItemIsEditable | Qt.ItemIsEnabled)
             self.tableWidget.setItem(i,column,item)
             
@@ -82,14 +94,14 @@ class FlagManager(QtGui.QDialog):
             self.tableWidget.setItem(i,column,item)
             
             column += 1
-            self.buttons = iconbuttonbar.IconButtonBar()
-            self.buttons.addIcon(utils.getIcon('delete.png'),
+            buttons = iconbuttonbar.IconButtonBar()
+            buttons.addIcon(utils.getIcon('delete.png'),
                                  functools.partial(self._handleRemoveButton,flagType),
                                  self.tr("Delete flag"))
-            self.buttons.addIcon(utils.getIcon('goto.png'),
+            buttons.addIcon(utils.getIcon('goto.png'),
                                  toolTip=self.tr("Show in browser"))
             index = self.tableWidget.model().index(i,column)                     
-            self.tableWidget.setIndexWidget(index,self.buttons)
+            self.tableWidget.setIndexWidget(index,buttons)
             
         self.tableWidget.resizeColumnsToContents()
     
@@ -118,9 +130,9 @@ class FlagManager(QtGui.QDialog):
     def _handleItemChanged(self,item):
         """When an item has been changed, ask the user if he really wants this and if so perform the change
         in the database and reload."""
-        if item.column() != 0:
+        if item.column() != 1: # Only the name column is editable
             return
-        flagType = item.data(Qt.UserRole)
+        flagType = self._flagTypes[item.row()]
         oldName = flagType.name
         newName = item.text()
         if oldName == newName:
@@ -162,18 +174,33 @@ class FlagManager(QtGui.QDialog):
                     db.query("UPDATE {}flags SET flag_id = ? WHERE flag_id = ?".format(db.prefix),
                                newFlagType.id,flagType.id)
                 flags.removeFlagType(flagType)
-            else: newFlagType = flags.changeFlagType(flagType,name=newName)
-            
-            if number > 0:
-                # TODO: Emit a changeevent for elements
-                pass
-            
-            # Finally store the correct flag in the item's userrole
-            item.setData(Qt.UserRole,newFlagType)
+            else: newFlagType = flags.changeFlagType(flagType,newName,flagType.iconPath)
+
+            # Update self._flagTypes
+            self._flagTypes[item.row()] = newFlagType
         else:
             # Otherwise reset the item
             item.setText(oldName)
-        
+    
+    def _handleCellDoubleClicked(self,row,column):
+        """Handle double clicks on the first column containing icons. A click will open a file dialog to
+        change the icon."""
+        if column == 0:
+            flagType = self._flagTypes[row]
+            # Choose a sensible directory as starting point
+            if flagType.iconPath is None:
+                dir = 'images/flags/'
+            else: dir = flagType.iconPath
+            fileName = QtGui.QFileDialog.getOpenFileName(self,self.tr("Open flag icon"),dir,
+                                                         self.tr("Images (*.png *.xpm *.jpg)"))
+            if fileName:
+                newFlagType = flags.changeFlagType(flagType,flagType.name,fileName)
+                self._flagTypes[row] = newFlagType
+                # Update the widget
+                index = self.tableWidget.model().index(row,column)                     
+                label = self.tableWidget.indexWidget(index)
+                label.setPixmap(QtGui.QPixmap(newFlagType.iconPath))
+                
     def _elementNumber(self,flagType):
         """Return the number of elements that contain a flag of the given type."""
         return db.query("SELECT COUNT(element_id) FROM {}flags WHERE flag_id = ?"
@@ -197,5 +224,5 @@ def createNewFlagType(parent = None):
                                   translate("FlagManager","This is no a valid flagname."))
         return None
     else:
-        return flags.addFlagType(name)
+        return flags.addFlagType(name,iconPath=None)
     
