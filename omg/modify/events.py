@@ -17,8 +17,18 @@ class ChangeEvent:
 
 
 class ElementChangeEvent(ChangeEvent):
+    """A generic change event for all sorts of element modifications. To handle events generically you will
+    usually first check whether the event affects your particular component using the type, ''ids'' or the
+    attributes ''contentsChanged'', ''tagsChanged'' and ''flagsChanged'' and then use ''applyTo''.
     
-    """A generic change event for all sorts of element modifications."""
+    Parameters:
+    
+        - level: either ''modify.REAL'' or ''modify.EDITOR''
+        - changes: dict mapping element ids to tuples containing the element before and after the change
+        - contentsChanged,tagsChanged,flagsChanged: If one of these parameters is True the corresponding data
+          may have changed. If it is false, you are save to assume that it did not change.
+          
+    \ """
     def __init__(self, level, changes, contentsChanged=False,tagsChanged=True,flagsChanged=True):
         self.changes = changes
         self.level = level
@@ -27,13 +37,31 @@ class ElementChangeEvent(ChangeEvent):
         self.flagsChanged = flagsChanged
     
     def ids(self):
+        """Return a list of the ids of the elements changed by this event."""
         return self.changes.keys()
     
     def getNewContentsCount(self, element):
         return self.changes[element.id].getContentsCount()
     
     def applyTo(self, element):
+        """Apply the changes stored in this event to *element*."""
         element.copyFrom(self.changes[element.id], copyContents = self.contentsChanged)
+        
+    def getTags(self,id):
+        """Return the new tags of the element with the given id. This may only be called if ''tagsChanged''
+        is True and *id* is in ''ids''."""
+        # Note that many subclasses that do not change tags and have no changes attribute
+        # do not reimplement this method.
+        assert self.tagsChanged
+        return self.changes[id].tags
+    
+    def getFlags(self,id):
+        """Return the new flags of the element with the given id. This may only be called if ''flagsChanged''
+        is True and *id* is in ''ids''."""
+        # Note that many subclasses that do not change flags and have no changes attribute
+        # do not reimplement this method.
+        assert self.flagsChanged
+        return self.changes[id].flags
 
 
 class ElementsDeletedEvent(ChangeEvent):
@@ -64,8 +92,18 @@ class SingleElementChangeEvent(ElementChangeEvent):
     
     def applyTo(self, element):
         element.copyFrom(self.element, copyContents = False)
-
-
+    
+    def getTags(self,id):
+        if id == self.element.id:
+            return self.element.tags
+        else: return None
+        
+    def getFlags(self,id):
+        if id == self.element.id:
+            return self.element.flags
+        else: return None
+        
+        
 class MajorFlagChangeEvent(SingleElementChangeEvent):
     """A modify event for toggling the major flag of an element."""
     
@@ -165,29 +203,43 @@ class RemoveContentsEvent(ElementChangeEvent):
         elem.contents = [ child for child in elem.contents if child.position not in self.removals[element.id] ]
             
 
-class TagChangeEvent(ElementChangeEvent):
+class TagFlagChangeEvent(ElementChangeEvent):
+    """This event is emitted when tags and/or flags of an arbitrary number of elements changes. *newData* is
+    a dict mapping elements ids to tuples containing first the new tags and secondly the new flags. Either
+    part may be None, indicating that tags or flags did not change."""
     
     contentsChanged = False
-    tagsChanged = True
-    flagsChanged = False
     
-    def __init__(self,level,newTags):
+    def __init__(self,level,newData):
         self.level = level
-        self.newTags = newTags
+        self.newData = newData
+        self.tagsChanged = any(new[0] is not None for new in newData.values())
+        self.flagsChanged = any(new[1] is not None for new in newData.values())
         
     def ids(self):
-        return self.newTags.keys()
+        return self.newData.keys()
     
     def applyTo(self,element):
-        assert element.id in self.newTags
-        if element.tags is not None:
-            element.tags = self.newTags[element.id].copy()
-    
+        newTags,newFlags = self.newData[element.id]
+        if element.tags is not None and newTags is not None:
+            element.tags = newTags.copy()
+        if element.flags is not None and newFlags is not None:
+            element.flags = list(newFlags)
+        
     def __str__(self):
-        return "Change tags of {} elements".format(len(self.newTags))
+        return "Modify tags/flags"
+    
+    def getTags(self,id):
+        return self.newData[id][0]
 
+    def getFlags(self,id):
+        return self.newData[id][1]
+    
             
-class SingleTagChangeEvent(TagChangeEvent):
+class SingleTagChangeEvent(TagFlagChangeEvent):
+    """Abstract superclass for events in which one tag changes in several elements."""
+    tagsChanged = True
+    flagsChanged = False
     
     def __init__(self,level,tag,elementIDs):
         assert isinstance(tag,tags.Tag)
@@ -198,6 +250,9 @@ class SingleTagChangeEvent(TagChangeEvent):
     def ids(self):
         return self.elementIDs
     
+    def getTags(self,id):
+        raise NotImplementedError() # This is currently not used
+        
     
 class TagValueAddedEvent(SingleTagChangeEvent):
     def __init__(self,level,tag,value,elementIDs):
@@ -237,32 +292,13 @@ class TagValueChangedEvent(SingleTagChangeEvent):
 
     def __str__(self):
         return "Change: {} {}->{} {}".format(self.tag,self.oldValue,self.newValue,self.elementIDs)
-    
 
-class FlagChangeEvent(ElementChangeEvent):
-    
-    contentsChanged = False
+
+class SingleFlagChangeEvent(TagFlagChangeEvent):
+    """Abstract superclass for events in which one flag changes in several elements."""
     tagsChanged = False
     flagsChanged = True
     
-    def __init__(self,level,newFlags):
-        self.level = level
-        self.newFlags = newFlags    
-        
-    def ids(self):
-        return self.newFlags.keys()
-    
-    def applyTo(self,element):
-        assert element.id in self.newFlags
-        if element.flags is not None:
-            element.flags = list(self.newFlags[element.id])
-            
-    def __str__(self):
-        return "Modify flags"
-    
-    
-class SingleFlagChangeEvent(FlagChangeEvent):
-    """Abstract superclass for events where one flag changes in several elements."""
     def __init__(self,level,flag,elements):
         self.level = level
         self.flag = flag
@@ -270,6 +306,9 @@ class SingleFlagChangeEvent(FlagChangeEvent):
         
     def ids(self):
         return [element.id for element in self.elements]
+
+    def getFlags(self,id):
+        raise NotImplementedError() # This is currently not used        
         
     
 class FlagAddedEvent(SingleFlagChangeEvent):

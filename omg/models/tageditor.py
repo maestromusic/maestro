@@ -570,17 +570,14 @@ class TagEditorModel(QtCore.QObject):
                     result.add(tag,record.value)
         return result
                     
-    def save(self):
-        """Save the tags as stored in the records to the database/filesystem or to the editor. This method
-        may only be used if saveDirectly is False."""
+    def getChanges(self):
+        """Return the changes between the tags as stored in the records and the tags in database/filesystem
+        or in the editor. This method may only be used if saveDirectly is False."""
         if self.saveDirectly:
             raise RuntimeError("You must not call save in a TagEditorModel that saves directly.")
             
-        changes = {element.id: (element.originalTags,self.getTagsOfElement(element))
-                        for element in self.inner.elements}
-        
-        modify.push(modify.commands.TagUndoCommand(self.level,changes,self.inner.elements,
-                                                  text=self.tr("Change tags")))
+        return {element.id: (element.originalTags,self.getTagsOfElement(element))
+                for element in self.inner.elements}
             
     def _addElementsWithValue(self,tag,value,elements):
         """Add *elements* to the record defined by *tag* and *value*. Create the record when necessary."""
@@ -621,7 +618,7 @@ class TagEditorModel(QtCore.QObject):
             - delete elements on ElementsDeletedEvents,
             - change all affected records on TagTypeChangedEvent. Furthermore the tag is used as a key in
               self.inner.tags and must be updated here, too.
-            - React to TagChangeEvents.
+            - React to events that change tags.
              
         \ """
         if isinstance(event,modify.events.ElementsDeletedEvent):
@@ -684,11 +681,7 @@ class TagEditorModel(QtCore.QObject):
                 for element in self.inner.elements:
                     if element.id in event.ids():
                         # No need to copy because the tags will be deleted in createRecords in a moment.
-                        if isinstance(event,modify.events.TagChangeEvent):
-                            element.tags = event.newTags[element.id]
-                        elif isinstance(event,modify.events.SingleElementChangeEvent):
-                            element.tags = event.element.tags
-                        else: element.tags = event.changes[element.id].tags
+                        element.tags = event.getTags(element.id)
                     else: element.tags = self.getTagsOfElement(element)
                 self.createRecords() # This will directly remove the tags-attributes again   
             

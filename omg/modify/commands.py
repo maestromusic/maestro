@@ -361,51 +361,46 @@ class CreateContainerCommand(UndoCommand):
         
     def undo(self):
         real.deleteElements([self.id])
-        
-        
-class TagUndoCommand(UndoCommand):
-    """An UndoCommand that changes only tags. The difference to UndoCommand is that the dict *changes*
-    contains tuples of tags.Storage: the tags before and after the change."""
-    def __init__(self,level,changes,elements=None,text = ''):
-        UndoCommand.__init__(self,level,changes,contentsChanged=False,text=text)
+
+
+class TagFlagUndoCommand(UndoCommand):
+    """An UndoCommand that changes only tags and/or flags. The dicts *tagChanges* and *flagChanges* map
+    ids to tuples: the tags (tags.Storage) or flags (list) before and after the change. On level REAL
+    the parameter *elements* must be a list of affected elements."""
+    def __init__(self,level,tagChanges,flagChanges,elements=None,text = ''):
+        QtGui.QUndoCommand.__init__(self)
+        self.level  = level
+        self.tagChanges = tagChanges
+        self.flagChanges = flagChanges
+        self.contentsChanged = False
+        self.setText("Tags/Flags changed")
         if level == REAL:
             self.elements = [el.export(attributes=['path']) for el in elements]
         
     def redo(self):
         if self.level == REAL:
-            real.changeTags(self.changes,self.elements)
-        else:
-            changes = {k: v[1] for k,v in self.changes.items()}
-            dispatcher.changes.emit(events.TagChangeEvent(self.level, changes))
+            real.changeTags(self.tagChanges,self.elements,emitEvent=False)
+            real.changeFlags(self.flagChanges,emitEvent=False)
+        # Emit an event
+        new = {id: (tags[1],None) for id,tags in self.tagChanges.items()}
+        for id,flags in self.flagChanges.items():
+            if id in new:
+                new[id] = (new[id][0],flags[1]) # Set the None part of the tuple above to the new flags
+            else: new[id] = (None,flags)
+        dispatcher.changes.emit(events.TagFlagChangeEvent(self.level,new))
 
     def undo(self):
         if self.level == REAL:
-            real.changeTags({k: (v[1],v[0]) for k,v in self.changes.items()},self.elements)
-        else:
-            changes = {k: v[0] for k,v in self.changes.items()}
-            dispatcher.changes.emit(events.TagChangeEvent(self.level, changes))
-
-
-class FlagUndoCommand(UndoCommand):
-    """An UndoCommand that changes only tags. The difference to UndoCommand is that the dict *changes*
-    contains tuples of tags.Storage: the tags before and after the change."""
-    def __init__(self,level,changes,text = ''):
-        super().__init__(level,changes,contentsChanged=False,text=text)
-        
-    def redo(self):
-        if self.level == REAL:
-            real.changeFlags(self.changes)
-        else:
-            changes = {k: v[1] for k,v in self.changes.items()}
-            dispatcher.changes.emit(events.FlagChangeEvent(self.level, changes))
-
-    def undo(self):
-        if self.level == REAL:
-            real.changeFlags({k: (v[1],v[0]) for k,v in self.changes.items()})
-        else:
-            changes = {k: v[0] for k,v in self.changes.items()}
-            dispatcher.changes.emit(events.FlagChangeEvent(self.level, changes))
-            
+            real.changeTags({k: (v[1],v[0]) for k,v in self.tagChanges.items()},self.elements,emitEvent=False)
+            real.changeFlags({k: (v[1],v[0]) for k,v in self.flagChanges.items()},emitEvent=False)
+        # Emit an event
+        new = {id: (tags[0],None) for id,tags in self.tagChanges.items()}
+        for id,flags in self.flagChanges.items():
+            if id in new:
+                new[id] = (new[id][0],flags[0]) # Set the None part of the tuple above to the old flags
+            else: new[id] = (None,flags)
+        dispatcher.changes.emit(events.TagFlagChangeEvent(self.level,new))
+         
             
 class SortValueUndoCommand(UndoCommand):
     """An UndoCommand that changes the sort value of a tag value."""
@@ -421,6 +416,7 @@ class SortValueUndoCommand(UndoCommand):
         
     def undo(self):
         real.setSortValue(self.tag,self.valueId,self.oldSort,self.newSort)
+
 
 class ValueHiddenUndoCommand(UndoCommand):
     """An UndoCommand to change the "hidden" attribute of a tag value."""
@@ -439,6 +435,7 @@ class ValueHiddenUndoCommand(UndoCommand):
     
     def undo(self):
         real.setHidden(self.tag, self.valueId, not self.newState)      
+
 
 class RenameTagValueCommand(UndoCommand):
     """A command to rename *all* occurences of a specific tag value, e.g. all "Frederic Chopin" to

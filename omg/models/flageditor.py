@@ -171,15 +171,14 @@ class FlagEditorModel(QtCore.QObject):
         """Return all flags of a specific element."""
         return [record.flag for record in self.records if element in record.elementsWithFlag]
     
-    def save(self):
-        """Save flags as stored in the internal records to the database and emit a change event."""
+    def getChanges(self):
+        """Return the changes between the flags as stored in the records and the flags in the database
+        or in the editor. This method may only be used if saveDirectly is False."""
         if self.saveDirectly:
             raise RuntimeError("You must not call save in a FlagEditorModel that saves directly.")
             
-        changes = {element.id: (element.flags,self.getFlagsOfElement(element))
-                        for element in self.elements}
-        
-        modify.push(modify.commands.FlagUndoCommand(self.level,changes,text=self.tr("Change flags")))
+        return {element.id: (element.flags,self.getFlagsOfElement(element))
+                for element in self.elements}
 
     def _handleDispatcher(self,event):
         """React to change events."""
@@ -248,11 +247,7 @@ class FlagEditorModel(QtCore.QObject):
                 for element in self.elements:
                     if element.id in event.ids():
                         # No need to copy because the flags will be deleted in createRecords in a moment.
-                        if isinstance(event,modify.events.FlagChangeEvent):
-                            element.flags = event.newFlags[element.id]
-                        elif isinstance(event,modify.events.SingleElementChangeEvent):
-                            element.flags = event.element.flags
-                        else: element.flags = event.changes[element.id].flags
+                        element.flags = event.getFlags(element.id)
                     else: element.flags = self.getFlagsOfElement(element)
                 self.createRecords()
 

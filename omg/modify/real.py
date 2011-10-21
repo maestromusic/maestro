@@ -226,6 +226,7 @@ def _getPathAndFileTags(id,elements):
         return db.path(id),None
     else: return None,None
 
+
 def changeTags(changes,elements=[],emitEvent = True):
     """Change tags arbitrarily: *changes* is a dict mapping element ids to tuples consisting
     of two tags.Storages - the tags before and after the change. *elements* is a list of affected elements

@@ -355,25 +355,27 @@ class TagEditorWidget(QtGui.QWidget):
 
         # If changeTag fails, then reset the box
         if not self.model.changeTag(oldTag,newTag):
-            QtGui.QMessageBox.warning(self,self.tr("Invalid value"),self.tr("At least one value is invalid for the new type."))
+            QtGui.QMessageBox.warning(self,self.tr("Invalid value"),
+                                      self.tr("At least one value is invalid for the new type."))
             # reset the editor...unfortunately this emits valueChanged again
             tagBox.tagChanged.disconnect(self._handleTagChangedByUser)
             tagBox.setTag(oldTag)
             tagBox.tagChanged.connect(self._handleTagChangedByUser)
         
     def _handleSave(self):
+        """Handle the save button (only if ''saveDirectly'' is True)."""
         if self.model.saveDirectly:
             raise RuntimeError("You must not call save in a TagEditor that saves directly.") 
         
         if not all(singleTagEditor.isValid() for singleTagEditor in self.singleTagEditors.values()):
             QtGui.QMessageBox.warning(self,self.tr("Invalid value"),self.tr("At least one value is invalid."))
         else:
-            modify.beginMacro(self.level,self.tr("Changs tags/flags"))
-            self.model.save()
-            self.flagModel.save()
-            modify.endMacro()
+            modify.push(modify.commands.TagFlagUndoCommand(self.level,
+                                                           self.model.getChanges(),
+                                                           self.flagModel.getChanges(),
+                                                           elements = self.model.getElements()))
             self.saved.emit()
-        
+                
     def contextMenuEvent(self,contextMenuEvent,record=None):
         menu = QtGui.QMenu(self)
 

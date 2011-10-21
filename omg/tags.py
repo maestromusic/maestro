@@ -409,6 +409,7 @@ def changeTagType(tag,name=None,valueType=None,private=None,sortTags=None):
         from .modify import dispatcher, events, CHANGED
         dispatcher.tagTypeChanged.emit(events.TagTypeChangedEvent(CHANGED,tag))
 
+
 def loadTagTypesFromDB():
     """Initialize _tagsById, _tagsByName and tagList from the database"""
     global _tagsByName, _tagsById, tagList
