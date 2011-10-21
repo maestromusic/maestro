@@ -50,13 +50,14 @@ class TagEditorDock(QtGui.QDockWidget):
         self.editorEditorWidget.setVertical(vertical) 
     
     def _handleSelectionChanged(self,elements,source):
+        """React to changes to the global selection: Load the selected elements in the correct
+        TagEditorWidget."""
         if isinstance(source,editor.EditorTreeView):
             self.editorEditorWidget.setElements(elements)
             self.tabWidget.setCurrentWidget(self.editorEditorWidget)
-        elif self.tabWidget.currentWidget() != self.editorEditorWidget:
+        else:
             self.realEditorWidget.setElements(elements)
-        # else do nothing (if the user works in the editor, it would be annoying if each click e.g. in the 
-        # browser would switch the tageditor to REAL-level.
+            self.tabWidget.setCurrentWidget(self.realEditorWidget)
         
     def dragEnterEvent(self,event):
         if event.mimeData().hasFormat(config.options.gui.mime) or event.mimeData().hasUrls():
