@@ -87,7 +87,7 @@ class EditorModel(rootedtreemodel.RootedTreeModel):
             # this handles SingleElementChangeEvent, all TagChangeEvents, FlagChangeEvents, ...
             print('editor - tag change event!')
             event.applyTo(node)
-            ret = False
+            ret = isinstance(event, events.SingleElementChangeEvent)
         elif isinstance(event, events.PositionChangeEvent):
             event.applyTo(node)
             self.dataChanged.emit(modelIndex.child(0, 0), modelIndex.child(node.getContentsCount()-1, 0))
