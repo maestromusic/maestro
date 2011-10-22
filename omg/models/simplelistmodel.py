@@ -1,18 +1,32 @@
-#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# Copyright 2010 Martin Altmayer
+# OMG Music Manager  -  http://omg.mathematik.uni-kl.de
+# Copyright (C) 2009-2011 Martin Altmayer, Michael Helmling
 #
-# This program is free software; you can redistribute it and/or modify
-# it under the terms of the GNU General Public License version 3 as
-# published by the Free Software Foundation
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
 #
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
 from PyQt4 import QtCore
 from PyQt4.QtCore import Qt
 
 class SimpleListModel(QtCore.QAbstractListModel):
-    """SimpleListModel wraps a list model around a simple Python list. It's data-function will return the elements in the list for the edit-role and a string-representation of them for the DisplayRole. Thus this class provides an easy way to get a list of arbitrary Python-objects into a QListView."""
+    """SimpleListModel wraps a list model around a simple Python list. It's data-function will return the
+    elements in the list for the edit-role and a string-representation of them for the DisplayRole. Thus this
+    class provides an easy way to get a list of arbitrary Python-objects into a QListView.
+    """
     def __init__(self,items=None,strFunction=str):
-        """Initialize the model. You may specify a list of <items> to start and a function <strFunction> to get the string representation from items (by default the built-in function str is used)."""
+        """Initialize the model. You may specify a list of *items* to start and a function *strFunction* to
+        get the string representation from items (by default the built-in function str is used)."""
         QtCore.QAbstractListModel.__init__(self)
         self.items = items if items is not None else []
         self.strFunction = strFunction
@@ -29,7 +43,8 @@ class SimpleListModel(QtCore.QAbstractListModel):
         self.endResetModel()
     
     def isEditable(self):
-        """Return whether the model is editable, that is whether the model's flags-function sets the Qt.ItemIsEditable-flag."""
+        """Return whether the model is editable, that is whether the model's flags-function sets the
+        Qt.ItemIsEditable-flag."""
         return self.editable
     
     def setEditable(self,editable):
@@ -63,3 +78,4 @@ class SimpleListModel(QtCore.QAbstractListModel):
         if self.editable:
             return Qt.ItemIsEnabled | Qt.ItemIsSelectable | Qt.ItemIsEditable
         else: return Qt.ItemIsEnabled | Qt.ItemIsSelectable
+        
