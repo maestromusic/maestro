@@ -109,25 +109,23 @@ class FlagView(QtGui.QTableWidget):
         
     def _loadFlags(self):
         self.clear()
-        result = db.query("SELECT id,name FROM {}flag_names ORDER BY name".format(db.prefix))
+        flagList = sorted(flags.allFlags(),key=lambda f: f.name)
         
-        if result.size() > 5:
+        if len(flagList):
             self.setColumnCount(2)
             import math
-            rowCount = math.ceil(result.size()/2)
+            rowCount = math.ceil(len(flagList)/2)
             self.setRowCount(rowCount)
         else:
             self.setColumnCount(1)
-            rowCount = result.size()
-            self.setRowCount(rowCount)
+            rowCount = len(flagList)
+            self.setRowCount(len(flagList))
     
-        for row,sqlRow in enumerate(result):
-            id,name = sqlRow
-            flagType = flags.Flag(id,name)
+        for row,flagType in enumerate(flagList):
             column = 1 if row >= rowCount else 0
             
             item = QtGui.QTableWidgetItem()
-            item.setText(name)
+            item.setText(flagType.name)
             item.setData(Qt.UserRole,flagType)
             item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsUserCheckable)
             item.setCheckState(Qt.Checked if flagType in self.selectedFlagTypes else Qt.Unchecked)

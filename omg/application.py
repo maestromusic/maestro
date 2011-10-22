@@ -46,7 +46,7 @@ def init(cmdConfig = [],initTags=True,testDB=False):
 
     *cmdOptions* is a list of options given on the command line that will overwrite the corresponding option
     from the file or the default. Each list item has to be a string like ``main.collection=/var/music``.
-    If *initTags* is False, the tag module will not be initialized.
+    If *initTags* is False, the modules ''tags'' and ''flags'' will not be initialized.
     If *testDB* is True, the database connection will be build using :func:`database.testConnect`.
     Warning: In this case you may want to set *initTags* to False because the test database is usually empty.
     """
@@ -88,8 +88,9 @@ def init(cmdConfig = [],initTags=True,testDB=False):
     else: database.testConnect()
 
     if initTags:
-        from omg import tags
+        from omg import tags,flags
         tags.init()
+        flags.init()
 
     return app
 

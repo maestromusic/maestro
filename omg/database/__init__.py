@@ -459,16 +459,15 @@ def elementsWithTagValue(tagSpec, valueSpec):
     return query("SELECT element_id FROM {}tags WHERE tag_id = ? AND value_id = ?".format(prefix),
                  tag.id, valueID).getSingleColumn()
 
+
 # flags table
 #=======================================================================
 def flags(elid):
     from .. import flags
-    return [flags.Flag(*row) for row in query("""
-                    SELECT n.id,n.name,n.icon
-                    FROM {0}flag_names AS n JOIN {0}flags AS f ON f.flag_id = n.id
-                    WHERE f.element_id = ?
-                    ORDER BY n.name
-                """.format(prefix),elid)]
+    return [flags.get(id) for id in query(
+                    "SELECT flag_id FROM {}flags WHERE element_id = ?".format(prefix),elid)
+              .getSingleColumn()]
+
 
 # Help methods
 #=======================================================================
