@@ -1,0 +1,19 @@
+README
+============
+OMG is a sophisticated music manager that helps you to organize, browse and play your digital music collection.
+
+More information can be found on OMG's website http://omg.mathematik.uni-kl.de
+
+OMG is copyright of Martin Altmayer <martin.altmayer@web.de> and Michael Helmling and licensed under the GPL v3 (confer the file COPYING).
+
+
+ATTRIBUTIONS
+==============
+OMG uses an adaption to Python 3 of python-mpd (http://jatreuman.indefero.net/p/python-mpd/) by J. Alexander Treuman licensed under GPL v3.
+OMG uses code from  configobj-py3 (https://bitbucket.org/zubin71/configobj-py3) by Zubin Mithra which is the Python 3 version of ConfigObj (http://www.voidspace.org.uk/python/configobj.html) by Michael Foord and Nicola Larosa, which is licensed under the BSD License.
+
+OMG uses icons from the following software / free icon sets:
+Tango       http://tango.freedesktop.org/            released as public domain.
+Silk        http://www.famfamfam.com/lab/icons/silk/ by Mark James licensed under CC BY 3.0.
+Fugue Icons http://p.yusukekamiyamane.com/           by Yusuke Kamiyamane licensed under CC BY 3.0.
+Amarok      http://amarok.kde.org/                   licensed under GPL v3.
