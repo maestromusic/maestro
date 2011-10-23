@@ -22,18 +22,42 @@ from PyQt4 import QtGui
 
 logger = logging.getLogger(__name__)
 
+_flagsById = None
+_flagsByName = None
+
+
+def init():
+    """Initialize the flag module loading flags from the database. You must call this method before methods
+    like get can be used."""
+    global _flagsById, _flagsByName, flagList
+    _flagsById = {}
+    _flagsByName = {}
+    for row in db.query("SELECT id,name,icon FROM {}flag_names".format(db.prefix)):
+        id,name,iconPath = row
+        if db.isNull(iconPath):
+            iconPath = None
+        flagType = Flag(id,name,iconPath)
+        _flagsById[flagType.id] = flagType
+        _flagsByName[flagType.name] = flagType
+
 
 class Flag:
-    """A flagtype with an id, a name an optionally an icon. At first glance flags are like tags, but in fact
+    """A flagtype with an id, a name and optionally an icon. At first glance flags are like tags, but in fact
     they are much easier, because they have no values, valuetypes, translations and because they are not
     stored in files.
     
-    Note: Contrary to tags you should use the constructor of Flags. So while there will usually be only one
-    instance for each tag, there may be many for each flagtype.
+    Usually you shold get tag instances via the :func:`get-method<omg.tags.get>`. The exception is for
+    tags that are not (yet) in the database (use :func:`exists` to check this). For these tags
+    :func:`get` will fail and you have to create your own instances. If you use the common instance, it
+    will get automatically updated on TagTypeChangeEvents.
     """
     def __init__(self,id,name,iconPath):
         self.id = id
         self.name = name
+        self.setIconPath(iconPath)
+    
+    def setIconPath(self,iconPath):
+        """Set the flag's iconPath and load the icon."""
         self.iconPath = iconPath
         self.icon = QtGui.QIcon(iconPath)
         
@@ -54,13 +78,9 @@ def get(identifier):
     """Return a flagtype. *identifier* may be an int (the flag's id), a string (its name) or a flagtype (in
     this case it is simply returned)."""
     if isinstance(identifier,int):
-        name = db.query("SELECT name FROM {}flag_names WHERE id = ?"
-                        .format(db.prefix),identifier).getSingle()
-        return Flag(identifier,name)
+        return _flagsById[identifier]
     elif isinstance(identifier,str):
-        id = db.query("SELECT id FROM {}flag_names WHERE name = ?"
-                        .format(db.prefix),identifier).getSingle()
-        return Flag(id,identifier)
+        return _flagsByName[identifier]
     elif isinstance(identifier,FlagType):
         return identifier
     else: raise ValueError("identifier must be either int or string or FlagType.")
@@ -68,8 +88,7 @@ def get(identifier):
 
 def exists(name):
     """Return whether a flagtype with the given name exists."""
-    return bool(db.query("SELECT COUNT(*) FROM {}flag_names WHERE name = ?".format(db.prefix),name)
-                    .getSingle())
+    return name in _flagsByName
 
 
 def isValidFlagname(name):
@@ -79,12 +98,12 @@ def isValidFlagname(name):
 
 def allFlags():
     """Return a list containing all flags in the database."""
-    return [Flag(*row) for row in db.query("SELECT id,name FROM {}flag_names ORDER BY name"
-                                                .format(db.prefix))]
+    return _flagsById.values()
 
 
 def addFlagType(name,iconPath):
-    """Add a new flag with the given name to the database and return it."""
+    """Add a new flag with the given name to the database, emit a FlagTypeChangedEvent and return
+    the new flag."""
     if exists(name):
         raise ValueError("There is already a flag named '{}'.".format(name))
     
@@ -92,40 +111,45 @@ def addFlagType(name,iconPath):
     id = db.query("INSERT INTO {}flag_names (name,icon) VALUES (?,?)"
                     .format(db.prefix),name,iconPath).insertId()
     newFlag = Flag(id,name,iconPath)
+    _flagsById[id] = newFlag
+    _flagsByName[name] = newFlag
+    
     modify.dispatcher.changes.emit(modify.events.FlagTypeChangedEvent(modify.ADDED,newFlag))
     return newFlag
 
 
 def removeFlagType(flagType):
-    """Remove the given *flagType* from the database."""
+    """Remove the given *flagType* from the database and emit a FlagTypeChangedEvent."""
     if not exists(flagType.name):
         raise ValueError("Cannot remove flagtype '{}' because it does not exist.".format(flagType))
     
     logger.info("Removing flag '{}'.".format(flagType))
     db.query("DELETE FROM {}flag_names WHERE id = ?".format(db.prefix),flagType.id)
+    del _flagsById[flagType.id]
+    del _flagsByName[flagType.name]
     modify.dispatcher.changes.emit(modify.events.FlagTypeChangedEvent(modify.DELETED,flagType))
 
 
-def changeFlagType(flagType,name,iconPath):
-    """Change the name of *flagType* in the database and return a new FlagType-instance with the new name."""    
+def changeFlagType(flagType,name=None,iconPath=''):
+    """Change the name and/or iconPath of *flagType* in the database and emit an event. If name or iconPath
+    is not given, it will not be changed. Set iconPath to None to remove the icon."""    
     assignments = []
     data = []
     
-    if name != flagType.name:
+    if name is not None and name != flagType.name:
         if exists(name):
             raise ValueError("There is already a flag named '{}'.".format(name))
         logger.info("Changing flag name '{}' to '{}'.".format(flagType.name,name))
         assignments.append('name = ?')
         data.append(name)
+        flagType.name = name
         
-    if iconPath != flagType.iconPath:
+    if iconPath != '' and iconPath != flagType.iconPath:
         assignments.append('icon = ?')
         data.append(iconPath)
+        flagType.setIconPath(iconPath)
     
     if len(assignments) > 0:
         data.append(flagType.id) # for the where clause
         db.query("UPDATE {}flag_names SET {} WHERE id = ?".format(db.prefix,','.join(assignments)),*data)
-        newFlagType = Flag(flagType.id,name,iconPath)
-        modify.dispatcher.changes.emit(modify.events.FlagTypeChangedEvent(modify.CHANGED,newFlagType))
-        return newFlagType
-    else: return flagType
+        modify.dispatcher.changes.emit(modify.events.FlagTypeChangedEvent(modify.CHANGED,flagType))

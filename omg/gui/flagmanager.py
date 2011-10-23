@@ -63,44 +63,32 @@ class FlagManager(QtGui.QDialog):
         
     def _loadFlags(self):
         """Load flags information from flags-module to GUI."""
-        self._flagTypes = []
+        self._flagTypes = sorted(flags.allFlags(),key=lambda f: f.name)
         self.tableWidget.clear()
         self.tableWidget.setHorizontalHeaderLabels(
                     [self.tr("Icon"),self.tr("Name"),self.tr("# of elements"),self.tr("Actions")])
-        
-        result = db.query("""
-                SELECT id,name,icon,COUNT(element_id)
-                FROM {0}flag_names LEFT JOIN {0}flags ON id = flag_id
-                GROUP BY id
-                """.format(db.prefix))
     
-        self.tableWidget.setRowCount(result.size())
+        self.tableWidget.setRowCount(len(self._flagTypes))
             
-        for i,row in enumerate(result):
-            id,name,iconPath,count = row
-            if db.isNull(iconPath):
-                iconPath = None
-            flagType = flags.Flag(id,name,iconPath)
-            self._flagTypes.append(flagType)
-            
+        for row,flagType in enumerate(self._flagTypes):
             column = 0
             label = QtGui.QLabel()
-            label.setPixmap(QtGui.QPixmap(iconPath))
+            label.setPixmap(QtGui.QPixmap(flagType.iconPath))
             label.setAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
-            label.setToolTip(iconPath)
-            index = self.tableWidget.model().index(i,column)                     
+            label.setToolTip(flagType.iconPath)
+            index = self.tableWidget.model().index(row,column)                     
             self.tableWidget.setIndexWidget(index,label)
             
             column += 1
-            item = QtGui.QTableWidgetItem(name)
+            item = QtGui.QTableWidgetItem(flagType.name)
             item.setFlags(Qt.ItemIsEditable | Qt.ItemIsEnabled)
-            self.tableWidget.setItem(i,column,item)
+            self.tableWidget.setItem(row,column,item)
             
             column += 1
-            item = QtGui.QTableWidgetItem('{}    '.format(count))
+            item = QtGui.QTableWidgetItem('{}    '.format(self._getElementCount(flagType)))
             item.setTextAlignment(Qt.AlignVCenter | Qt.AlignRight)
             item.setFlags(Qt.ItemIsEnabled)
-            self.tableWidget.setItem(i,column,item)
+            self.tableWidget.setItem(row,column,item)
             
             column += 1
             buttons = iconbuttonbar.IconButtonBar()
@@ -109,11 +97,15 @@ class FlagManager(QtGui.QDialog):
                                  self.tr("Delete flag"))
             buttons.addIcon(utils.getIcon('goto.png'),
                                  toolTip=self.tr("Show in browser"))
-            index = self.tableWidget.model().index(i,column)                     
+            index = self.tableWidget.model().index(row,column)                     
             self.tableWidget.setIndexWidget(index,buttons)
             
         self.tableWidget.resizeColumnsToContents()
     
+    def _getElementCount(self,flagType):
+        return db.query("SELECT COUNT(*) FROM {}flags WHERE flag_id = ?".format(db.prefix),flagType.id)\
+                        .getSingle()
+                        
     def _handleAddButton(self):
         """Create a new flag (querying the user for the flag's name) and reload the flags."""
         if createNewFlagType(self) is not None:
@@ -183,10 +175,7 @@ class FlagManager(QtGui.QDialog):
                     db.query("UPDATE {}flags SET flag_id = ? WHERE flag_id = ?".format(db.prefix),
                                newFlagType.id,flagType.id)
                 flags.removeFlagType(flagType)
-            else: newFlagType = flags.changeFlagType(flagType,newName,flagType.iconPath)
-
-            # Update self._flagTypes
-            self._flagTypes[item.row()] = newFlagType
+            else: flags.changeFlagType(flagType,newName,flagType.iconPath)
         else:
             # Otherwise reset the item
             item.setText(oldName)
@@ -203,12 +192,12 @@ class FlagManager(QtGui.QDialog):
             fileName = QtGui.QFileDialog.getOpenFileName(self,self.tr("Open flag icon"),dir,
                                                          self.tr("Images (*.png *.xpm *.jpg)"))
             if fileName:
-                newFlagType = flags.changeFlagType(flagType,flagType.name,fileName)
-                self._flagTypes[row] = newFlagType
+                flags.changeFlagType(flagType,flagType.name,fileName)
                 # Update the widget
                 index = self.tableWidget.model().index(row,column)                     
                 label = self.tableWidget.indexWidget(index)
-                label.setPixmap(QtGui.QPixmap(newFlagType.iconPath))
+                label.setPixmap(QtGui.QPixmap(flagType.iconPath))
+                label.setToolTip(flagType.iconPath)
                 
     def _elementNumber(self,flagType):
         """Return the number of elements that contain a flag of the given type."""
