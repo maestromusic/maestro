@@ -64,5 +64,12 @@ class FileSystemCheckThread(threading.Thread):
                         status = 'ok'
                 else:
                     self.queue.put((prio-1, os.path.join(path, file)))
-            logger.debug('now {}: {}'.format(status, relPath(path)))
-            db.query("UPDATE {0}folders SET state = ? WHERE path = ?".format(db.prefix), status, relPath(path))
+            state = list(db.query('''SELECT state FROM {}folders WHERE path = ?'''.format(db.prefix),
+                        relPath(path)).getSingleColumn())
+            if len(state) > 0:
+                if state[0] != status:
+                    logger.debug('now {}: {}'.format(status, relPath(path)))
+                    db.query('''UPDATE {}folders SET state = ? WHERE path = ?'''.format(db.prefix),
+                         status, relPath(path))
+            else:
+                db.query("INSERT INTO {0}folders (state, path) VALUES(?, ?)".format(db.prefix), status, relPath(path))
