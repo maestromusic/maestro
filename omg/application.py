@@ -125,12 +125,11 @@ def run(cmdConfig = []):
     from omg import plugins
     plugins.enablePlugins()
 
+    from . import player
+    player.init()
     # Create GUI
     # First import all modules that want to add WidgetData
-    import omg.gui.filesystembrowser
-    import omg.gui.editor
-    import omg.gui.browser
-    import omg.gui.tageditor
+    from .gui import filesystembrowser, editor, browser, tageditor, playback
     from omg.gui import mainwindow
     global mainWindow
     mainWindow = mainwindow.MainWindow()

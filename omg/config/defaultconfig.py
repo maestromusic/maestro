@@ -149,5 +149,7 @@ storage = OrderedDict((
 ("browser", {
     'views': ([[['composer','artist','performer']],[['genre'],['composer','artist','performer']]],),
 }),
-
+("player", {
+    'configured_players': ([('mpd_local', 'mpd'), ('mpd_remote', 'mpd')],),
+}),
 ))

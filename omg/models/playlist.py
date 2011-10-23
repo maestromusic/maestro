@@ -27,69 +27,6 @@ from . import rootedtreemodel, treebuilder, mimedata
 
 db = database.get()
 logger = logging.getLogger("omg.models.playlist")
-
-class RemoveContentsCommand(QtGui.QUndoCommand):
-    def __init__(self, model, parentIdx, row, num, text="remove element(s)"):
-        QtGui.QUndoCommand.__init__(self, text)
-        self.model = model
-        self.parentIdx = QtCore.QPersistentModelIndex(parentIdx)
-        self.row = row
-        self.num = num
-        self.parentItem = model.data(parentIdx, Qt.EditRole)
-        if self.parentItem is None:
-            self.parentItem = model.root
-        self.elements = self.parentItem.getChildren()[row:row+num]
-    
-    def redo(self):
-        self.model.beginRemoveRows(QtCore.QModelIndex(self.parentIdx), self.row, self.row+self.num-1)
-        del self.parentItem.getChildren()[self.row:self.row+self.num]
-        self.model.endRemoveRows()
-    
-    def undo(self):
-        self.model.beginInsertRows(QtCore.QModelIndex(self.parentIdx), self.row, self.row+self.num-1)
-        self.parentItem.getChildren()[self.row:self.row] = self.elements
-        for el in self.elements:
-            el.parent = self.parentItem
-        self.model.endInsertRows()
-
-class InsertContentsCommand(QtGui.QUndoCommand):
-    def __init__(self, model, parent, row, contents, copy = True, text = "insert element(s)"):
-        QtGui.QUndoCommand.__init__(self, text)
-        self.model = model
-        if parent.isFile():
-            raise ValueError("Cannot insert contents into file {}".format(parent))
-        self.parentIdx = QtCore.QPersistentModelIndex(model.getIndex(parent))
-        self.parentItem = parent
-        self.row = row
-        self.contents = contents
-        if copy:
-            self.contents = [node.copy() for node in self.contents]
-    
-    def redo(self):
-        self.model.beginInsertRows(QtCore.QModelIndex(self.parentIdx), self.row, self.row + len(self.contents) - 1)
-        for node in self.contents:
-            node.setParent(self.parentItem)
-        self.parentItem.getChildren()[self.row:self.row] = self.contents
-        self.model.endInsertRows()
-    
-    def undo(self):
-        self.model.beginRemoveRows(QtCore.QModelIndex(self.parentIdx), self.row, self.row + len(self.contents) - 1)
-        del self.parentItem.getChildren()[self.row:self.row+len(self.contents)]
-        self.model.endRemoveRows()
-        
-
-class ModelResetCommand(QtGui.QUndoCommand):
-    def __init__(self, model):
-        QtGui.QUndoCommand.__init__(self, "reset model")
-        self.model = model
-    
-    def redo(self):
-        self.oldRoot = self.model.root
-        self.model.setRoot(models.RootNode())
-    
-    def undo(self):
-        self.model.setRoot(self.oldRoot)
-        self.model.reset()
         
 class BasicPlaylist(rootedtreemodel.RootedTreeModel):
     """Basic model for playlists. A BasicPlaylists contains a list of nodes and supports insertion and removal of nodes as well as drag and drop of omg's own mimetype (config-variable gui->mime) and "text/uri-list"."""

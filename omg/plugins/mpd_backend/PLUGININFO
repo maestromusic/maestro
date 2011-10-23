@@ -1,0 +1,4 @@
+name=MPD Backend
+author=Michael Helmling
+version=0.1
+description=Provides a playback and playlist management backend to the music player daemon (MPD).
