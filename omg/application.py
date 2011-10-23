@@ -92,6 +92,8 @@ def init(cmdConfig = [],initTags=True,testDB=False):
         tags.init()
         flags.init()
 
+    from . import sync
+    sync.init()
     return app
 
 

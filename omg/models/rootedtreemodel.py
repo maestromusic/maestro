@@ -166,8 +166,10 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
                 yield child
     
     def changePositions(self, parent, changes):
-        
+        #TODO: finish & use in event handling
         elementParent = isinstance(parent, Element)
+        
+        
         for before, after in changes:
             for i, elem in parent.contents:
                 afterIndex = -1
@@ -180,9 +182,6 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
                     afterIndex = i
             if afterIndex == -1:
                 afterIndex = len(parent.contents)
-                     
-                     
-        
           
     def insert(self,parent,insertions):
         """Insert nodes below *parent*. *insertions* is a list of (int, Element) tuples. The integer is

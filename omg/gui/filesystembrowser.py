@@ -17,8 +17,10 @@
 #
 
 from PyQt4 import QtGui, QtCore
-from omg.config import options
-from omg.gui import mainwindow
+import os
+from .. import config, database as db
+from . import mainwindow
+from ..utils import relPath
 
 """This module contains a dock widget that displays the music in directory view, i.e. without
 considering the container structure in the database. It is meant to help building up the database.
@@ -28,26 +30,46 @@ special icon."""
 translate = QtCore.QCoreApplication.translate
 
 class IconProvider(QtGui.QFileIconProvider):
-    pass
+    
+    def __init__(self):
+        super().__init__()
+        self.dirtyFolderIcon = QtGui.QIcon("images/icons/folder_unknown.svg")
+        self.musicFolderIcon = QtGui.QIcon("images/icons/folder_ok.svg")
+        self.defaultFolderIcon = QtGui.QIcon("images/icons/folder.svg")
+    
+    def icon(self, arg):
+        if os.path.isdir(arg.absoluteFilePath()):
+            path = arg.absoluteFilePath()
+            dir = relPath(arg.canonicalFilePath())
+            if dir == '..':
+                return super().icon(arg)
+            stati = set(db.query('''SELECT state FROM {}folders WHERE path = ? OR path LIKE CONCAT(?, "/%")
+            GROUP BY state'''.format(db.prefix),
+                             dir, dir).getSingleColumn())
+            if 'unsynced' in stati:
+                return self.dirtyFolderIcon
+            elif 'ok' in stati:
+                return self.musicFolderIcon
+            else:
+                return self.defaultFolderIcon
+        return super().icon(arg)  
+        
 
 class FileSystemBrowserModel(QtGui.QFileSystemModel):
     
     def __init__(self, parent = None):
         QtGui.QFileSystemModel.__init__(self, parent)
         self.setFilter(QtCore.QDir.AllEntries | QtCore.QDir.NoDotAndDotDot)
-        self.dirtyFolderIcon = QtGui.QIcon("images/icons/folder_unknown.svg")
-        self.musicFolderIcon = QtGui.QIcon("images/icons/folder_ok.svg")
-        self.defaultFolderIcon = QtGui.QIcon("images/icons/folder.svg")
+       
+        self.setIconProvider(IconProvider())
 
     def columnCount(self, index):
         return 1
                 
         
 class FileSystemBrowser(QtGui.QTreeView):
-    currentDirectoriesChanged = QtCore.pyqtSignal(list, bool)
-    searchDirectoryChanged = QtCore.pyqtSignal(str)
     
-    def __init__(self, rootDirectory = options.main.collection, parent = None):
+    def __init__(self, rootDirectory = config.options.main.collection, parent = None):
         QtGui.QTreeView.__init__(self, parent)
         self.setAlternatingRowColors(True)
         self.setModel(FileSystemBrowserModel())
@@ -55,19 +77,6 @@ class FileSystemBrowser(QtGui.QTreeView):
         self.setRootIndex(musikindex)
         self.setSelectionMode(self.ExtendedSelection)
         self.setDragDropMode(QtGui.QAbstractItemView.DragOnly)
-        
-    def selectionChanged(self, current, previous):
-        self.currentDirectoriesChanged.emit([self.model().filePath(item) for item in self.selectedIndexes()], False)
-        QtGui.QTreeView.selectionChanged(self, current, previous)
-        
-    def contextMenuEvent(self, event):
-        if self.selectionModel().hasSelection():
-            menu = QtGui.QMenu(self)
-            menu.addAction(self.findAllAlbumsAction)
-            menu.popup(event.globalPos())
-            event.accept()
-        else:
-            event.ignore()
 
 class FileSystemBrowserDock(QtGui.QDockWidget):
     """A DockWidget wrapper for the FileSystemBrowser."""
