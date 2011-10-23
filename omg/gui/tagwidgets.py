@@ -58,12 +58,12 @@ class TagLabel(QtGui.QLabel):
         if tag is None:
             self.clear()
         else:
-            if tag.iconPath() is not None:
+            if tag.iconPath is not None:
                 if self.iconOnly:
                     super().setText('<img src="{}" widht="{}" height="{}">'
-                                      .format(tag.iconPath(),self.iconSize.width(),self.iconSize.height()))
+                                      .format(tag.iconPath,self.iconSize.width(),self.iconSize.height()))
                 else: super().setText('<img src="{}" widht="{}" height="{}"> {}'
-                                      .format(tag.iconPath(),self.iconSize.width(),
+                                      .format(tag.iconPath,self.iconSize.width(),
                                               self.iconSize.height(),tag.translated()))
             else: super().setText(tag.translated())
         
@@ -170,8 +170,8 @@ class TagTypeBox(QtGui.QStackedWidget):
     
     def _addTagToBox(self,tag):
         """Add a tag to the box. Display icon and translation if available."""
-        if tag.iconPath() is not None:
-            self.box.addItem(QtGui.QIcon(tag.iconPath()),tag.translated(),tag)
+        if tag.icon is not None:
+            self.box.addItem(tag.icon,tag.translated(),tag)
         else: self.box.addItem(tag.translated(),tag)
         
     def showLabel(self):
@@ -282,8 +282,8 @@ class TagTypeBox(QtGui.QStackedWidget):
             for i in range(self.box.count()):
                 if self.box.itemData(i) == event.tagType:
                     self.box.setItemText(i,event.tagType.translated())
-                    if event.tagType.iconPath() is not None:
-                        self.box.setItemIcon(i,QtGui.QIcon(event.tagType.iconPath()))
+                    if event.tagType.icon is not None:
+                        self.box.setItemIcon(i,event.tagType.icon)
                     # Do not change the tag because there is only one instance
                     return
             
@@ -444,6 +444,7 @@ class NewTagTypeDialog(QtGui.QDialog):
                  privateEditable=False,includeDeleteOption = False):
         QtGui.QDialog.__init__(self, parent)
         self.setWindowModality(QtCore.Qt.WindowModal)
+        self.setWindowTitle(self.tr("New tag type"))
         self.setLayout(QtGui.QVBoxLayout(self))
         self.tagname = tagname
         self.tagnameEditable = tagnameEditable
@@ -570,6 +571,7 @@ class EnhancedComboBox(QtGui.QComboBox):
             return True
         return False # don't stop the event
 
+
 class TagValuePropertiesWidget(QtGui.QWidget):
     """A widget that displays properties of tag values (sort tags, hidden status) and allows to change them."""
     def __init__(self, parent = None):
@@ -669,44 +671,3 @@ class TagValuePropertiesWidget(QtGui.QWidget):
         if dialog.result() == QtGui.QDialog.Accepted:
             tvp.commit()
             
-class MergeDialog(QtGui.QDialog):
-    """This dialog is shown if the user requests to merge some children into a new intermediate container."""
-    
-    def __init__(self, hintTitle, hintRemove, askForPositionAdjusting, parent = None):
-        super().__init__(parent)
-        layout = QtGui.QGridLayout()
-        label = QtGui.QLabel(self.tr('Title of new container:'))
-        layout.addWidget(label, 0, 0)
-        self.titleEdit = QtGui.QLineEdit(hintTitle)
-        layout.addWidget(self.titleEdit, 0, 1)
-        self.checkBox = QtGui.QCheckBox(self.tr('Remove from titles:'))
-        self.checkBox.setChecked(True)
-        layout.addWidget(self.checkBox, 1, 0)
-        self.removeEdit = QtGui.QLineEdit(hintRemove)
-        layout.addWidget(self.removeEdit, 1, 1)
-        self.checkBox.toggled.connect(self.removeEdit.setEnabled)
-        
-        if askForPositionAdjusting:
-            self.positionCheckBox = QtGui.QCheckBox(self.tr('Auto-adjust positions'))
-            self.positionCheckBox.setChecked(True)
-            layout.addWidget(self.positionCheckBox, 2, 0, 1, 2)
-        hLayout = QtGui.QHBoxLayout()
-        self.cancelButton = QtGui.QPushButton(self.tr('Cancel'))
-        self.okButton = QtGui.QPushButton(self.tr('OK'))
-        self.cancelButton.clicked.connect(self.reject)
-        self.okButton.clicked.connect(self.accept)
-        hLayout.addStretch()
-        hLayout.addWidget(self.cancelButton)
-        hLayout.addWidget(self.okButton)
-        layout.addLayout(hLayout, 3 if askForPositionAdjusting else 2, 0, 1, 2)
-        layout.setColumnStretch(1, 1)
-        self.setLayout(layout)
-    def newTitle(self):
-        return self.titleEdit.text()
-    def removeString(self):
-        return self.removeEdit.text() if self.checkBox.isChecked() else ''
-    def adjustPositions(self):
-        if hasattr(self, 'positionCheckBox'):
-            return self.positionCheckBox.isChecked()
-        else:
-            return False

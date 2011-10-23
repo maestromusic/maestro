@@ -21,6 +21,23 @@ from PyQt4.QtCore import Qt
 from .. import utils
 
 
+def question(title, text):
+    """Display a modal question dialog with the given *title* and *text*. Return True if the
+    user selected "Yes" and False otherwise."""
+    from . import mainwindow
+    ans = QtGui.QMessageBox.question(mainwindow.mainWindow,
+                                     title,
+                                     text,
+                                     buttons = QtGui.QMessageBox.No | QtGui.QMessageBox.Yes)
+    return ans == QtGui.QMessageBox.Yes
+
+
+def warning(title, text):
+    """Display a modal warning dialog with the given *title* and *text*."""
+    from . import mainwindow
+    QtGui.QMessageBox.warning(mainwindow.mainWindow, title, text)
+    
+    
 class FancyPopup(QtGui.QFrame):
     """Fancy popup that looks like a tooltip. It is shown beneath its parent component (usually the button
     that opens the popup).
@@ -121,18 +138,45 @@ class FancyTabbedPopup(FancyPopup):
         p.setBrush(QtGui.QPalette.WindowText,self.parent().palette().windowText())
         self.tabWidget.setPalette(p)
         
-        
-def question(title, text):
-    """Display a modal question dialog with the given *title* and *text*. Return True if the
-    user selected "Yes" and False otherwise."""
-    from . import mainwindow
-    ans = QtGui.QMessageBox.question(mainwindow.mainWindow,
-                                     title,
-                                     text,
-                                     buttons = QtGui.QMessageBox.No | QtGui.QMessageBox.Yes)
-    return ans == QtGui.QMessageBox.Yes
 
-def warning(title, text):
-    """Display a modal warning dialog with the given *title* and *text*."""
-    from . import mainwindow
-    QtGui.QMessageBox.warning(mainwindow.mainWindow, title, text)
+class MergeDialog(QtGui.QDialog):
+    """This dialog is shown if the user requests to merge some children into a new intermediate container."""
+    
+    def __init__(self, hintTitle, hintRemove, askForPositionAdjusting, parent = None):
+        super().__init__(parent)
+        layout = QtGui.QGridLayout()
+        label = QtGui.QLabel(self.tr('Title of new container:'))
+        layout.addWidget(label, 0, 0)
+        self.titleEdit = QtGui.QLineEdit(hintTitle)
+        layout.addWidget(self.titleEdit, 0, 1)
+        self.checkBox = QtGui.QCheckBox(self.tr('Remove from titles:'))
+        self.checkBox.setChecked(True)
+        layout.addWidget(self.checkBox, 1, 0)
+        self.removeEdit = QtGui.QLineEdit(hintRemove)
+        layout.addWidget(self.removeEdit, 1, 1)
+        self.checkBox.toggled.connect(self.removeEdit.setEnabled)
+        
+        if askForPositionAdjusting:
+            self.positionCheckBox = QtGui.QCheckBox(self.tr('Auto-adjust positions'))
+            self.positionCheckBox.setChecked(True)
+            layout.addWidget(self.positionCheckBox, 2, 0, 1, 2)
+        hLayout = QtGui.QHBoxLayout()
+        self.cancelButton = QtGui.QPushButton(self.tr('Cancel'))
+        self.okButton = QtGui.QPushButton(self.tr('OK'))
+        self.cancelButton.clicked.connect(self.reject)
+        self.okButton.clicked.connect(self.accept)
+        hLayout.addStretch()
+        hLayout.addWidget(self.cancelButton)
+        hLayout.addWidget(self.okButton)
+        layout.addLayout(hLayout, 3 if askForPositionAdjusting else 2, 0, 1, 2)
+        layout.setColumnStretch(1, 1)
+        self.setLayout(layout)
+    def newTitle(self):
+        return self.titleEdit.text()
+    def removeString(self):
+        return self.removeEdit.text() if self.checkBox.isChecked() else ''
+    def adjustPositions(self):
+        if hasattr(self, 'positionCheckBox'):
+            return self.positionCheckBox.isChecked()
+        else:
+            return False

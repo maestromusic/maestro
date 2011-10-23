@@ -59,7 +59,9 @@ class Flag:
     def setIconPath(self,iconPath):
         """Set the flag's iconPath and load the icon."""
         self.iconPath = iconPath
-        self.icon = QtGui.QIcon(iconPath)
+        if iconPath is not None:
+            self.icon = QtGui.QIcon(iconPath)
+        else: self.icon = None
         
     def __str__(self):
         return self.name

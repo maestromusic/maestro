@@ -22,7 +22,7 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from .. import tags, utils, database as db, constants
-from . import tagwidgets
+from . import tagwidgets, dialogs
 from .misc import iconbuttonbar
 
 
@@ -39,12 +39,15 @@ class TagManager(QtGui.QDialog):
                     self.tr("Note that you cannot change or remove tags that already appear in elements.")))
         
         self.tableWidget = QtGui.QTableWidget()
-        self.tableWidget.setColumnCount(6)
+        self.tableWidget.setColumnCount(7)
         self.tableWidget.verticalHeader().hide()
         # TODO: Does not work
         #self.tableWidget.setSortingEnabled(True)
         self.tableWidget.horizontalHeader().setResizeMode(QtGui.QHeaderView.ResizeToContents)
         self.tableWidget.itemChanged.connect(self._handleItemChanged)
+        self.tableWidget.cellDoubleClicked.connect(self._handleCellDoubleClicked)
+        self.tableWidget.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.tableWidget.customContextMenuRequested.connect(self._handleCustomContextMenuRequested)
         self.layout().addWidget(self.tableWidget)
         
         buttonBarLayout = QtGui.QHBoxLayout()
@@ -68,18 +71,24 @@ class TagManager(QtGui.QDialog):
         """Load tag information from tags-module to GUI."""
         self.tableWidget.clear()
         self.tableWidget.setHorizontalHeaderLabels(
-                    [self.tr("Name"),self.tr("Value-Type"),self.tr("Private?"),
+                    [self.tr("Icon"),self.tr("Name"),self.tr("Value-Type"),self.tr("Private?"),
                      self.tr("Sort-Tags"),self.tr("# of elements"),self.tr("Actions")])
         self.tableWidget.setRowCount(len(tags.tagList))
         
         for row,tag in enumerate(tags.tagList):
-            column = 0
             number = self._elementNumber(tag)
             
+            column = 0
+            label = QtGui.QLabel()       
+            label.setAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
+            index = self.tableWidget.model().index(row,column)   
+            self.tableWidget.setIndexWidget(index,label)
+            if tag.iconPath is not None:
+                label.setPixmap(tag.icon.pixmap(32,32))
+                label.setToolTip(tag.iconPath)     
+            
+            column += 1
             item = QtGui.QTableWidgetItem(tag.name)
-            item.setData(Qt.UserRole,tag)
-            if tag.iconPath() is not None:
-                item.setIcon(QtGui.QIcon(tag.iconPath()))
             if number == 0:
                 item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsEditable)
             else: item.setFlags(Qt.ItemIsEnabled)
@@ -99,7 +108,6 @@ class TagManager(QtGui.QDialog):
             
             column += 1
             item = QtGui.QTableWidgetItem()
-            item.setData(Qt.UserRole,tag)
             if number == 0:
                 item.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
             else: item.setFlags(Qt.ItemIsUserCheckable)
@@ -128,6 +136,9 @@ class TagManager(QtGui.QDialog):
                                      toolTip=self.tr("Show in browser"))
                 index = self.tableWidget.model().index(row,column)                     
                 self.tableWidget.setIndexWidget(index,self.buttons)
+                
+        for i in range(len(tags.tagList)):
+            self.tableWidget.setRowHeight(i,36)
     
     def _handleAddButton(self):
         """Open a NewTagTypeDialog and create a new tag."""
@@ -139,21 +150,19 @@ class TagManager(QtGui.QDialog):
     def _handleRemoveButton(self,tag):
         """Ask the user if he really wants this and if so, remove the tag."""
         if self._elementNumber(tag) > 0:
-            QtGui.QMessageBox.warning(self,self.tr("Cannot remove tag"),
-                                      self.tr("Cannot remove a tag that appears in elements."))
+            dialogs.warning(self.tr("Cannot remove tag"),
+                            self.tr("Cannot remove a tag that appears in elements."))
             return
         
-        if QtGui.QMessageBox.question(self,self.tr("Remove tag?"),
-                                      self.tr("Do you really want to remove the tag '{}'?").format(tag.name),
-                                      QtGui.QMessageBox.Yes | QtGui.QMessageBox.No,
-                                      QtGui.QMessageBox.Yes) \
-                == QtGui.QMessageBox.Yes:
+        if dialogs.question(self.tr("Remove tag?"),
+                            self.tr("Do you really want to remove the tag '{}'?").format(tag.name)):
             tags.removeTagType(tag)
             self._loadTags()
 
     def _handleItemChanged(self,item):
-        if item.column() == 0:
-            tag = item.data(Qt.UserRole)
+        """Handle changes to the name or private state of a tag."""
+        if item.column() == 1:
+            tag = tags.tagList[item.row()]
             oldName = tag.name
             newName = item.text()
             if oldName == newName:
@@ -165,32 +174,82 @@ class TagManager(QtGui.QDialog):
                     (not tags.isValidTagname(newName),self.tr("'{}' is not a valid tagname.").format(newName))
                  ):
                  if check:
-                    QtGui.QMessageBox.warning(self,self.tr("Cannot change tag"),message)
+                    dialogs.warning(self.tr("Cannot change tag"),message)
                     item.setText(oldName) # Reset
                     return
             tags.changeTagType(tag,name=newName)
             self._loadTags()
                 
         elif item.column() == 2: 
-            tag = item.data(Qt.UserRole)
+            tag = tags.tagList[item.row()]
             newPrivate = item.checkState() == Qt.Checked
             if newPrivate == tag.private:
                 return
             if self._elementNumber(tag) > 0:
-                QtGui.QMessageBox.warning(self,self.tr("Cannot change tag"),
-                                          self.tr("Cannot change a tag that appears in elements."))
+                dialogs.warning(self.tr("Cannot change tag"),
+                                self.tr("Cannot change a tag that appears in elements."))
                 item.setText(oldName)
                 return
             tags.changeTagType(tag,private=newPrivate)
             self._loadTags()
-    
+                
     def _handleValueTypeChanged(self,tag,type):
+        """Handle changes to the comboboxes containing valuetypes."""
         if self._elementNumber(tag) > 0:
-            QtGui.QMessageBox.warning(self,self.tr("Cannot change tag"),
-                                      self.tr("Cannot change a tag that appears in elements."))
+            dialogs.warning(self.tr("Cannot change tag"),
+                            self.tr("Cannot change a tag that appears in elements."))
             return
         tags.changeTagType(tag,valueType=type)
-        
+    
+    def _handleCellDoubleClicked(self,row,column):
+        """Handle double clicks on the first column containing icons. A click will open a file dialog to
+        change the icon."""
+        if column == 0:
+            tagType = tags.tagList[row]
+            self._openIconDialog(tagType)
+    
+    def _handleCustomContextMenuRequested(self,pos):
+        """React to customContextMenuRequested signals."""
+        row = self.tableWidget.rowAt(pos.y())
+        column = self.tableWidget.columnAt(pos.x())
+        if column == 0 and row != -1:
+            tagType = tags.tagList[row]
+            menu = QtGui.QMenu(self.tableWidget)
+            if tagType.iconPath is None:
+                changeAction = QtGui.QAction(self.tr("Add icon..."),menu)
+            else: changeAction = QtGui.QAction(self.tr("Change icon..."),menu)
+            changeAction.triggered.connect(lambda: self._openIconDialog(tagType))
+            menu.addAction(changeAction)
+            removeAction = QtGui.QAction(self.tr("Remove icon"),menu)
+            removeAction.triggered.connect(lambda: self._setIcon(tagType,None))
+            menu.addAction(removeAction)
+            menu.exec_(self.tableWidget.viewport().mapToGlobal(pos))
+    
+    def _openIconDialog(self,tagType):
+        """Open a file dialog so that the user may choose an icon for the given tag."""
+        # Choose a sensible directory as starting point
+        if tagType.iconPath is None:
+            dir = 'images/tags/'
+        else: dir = tagType.iconPath
+        fileName = QtGui.QFileDialog.getOpenFileName(self,self.tr("Choose tag icon"),dir,
+                                                     self.tr("Images (*.png *.xpm *.jpg)"))
+        if fileName:
+            self._setIcon(tagType,fileName)
+            
+    def _setIcon(self,tagType,iconPath):
+        """Set the icon(-path) of *tagType* to *iconPath* and update the GUI.""" 
+        tags.changeTagType(tagType,iconPath=iconPath)
+        # Update the widget
+        row = tags.tagList.index(tagType)
+        index = self.tableWidget.model().index(row,0)                     
+        label = self.tableWidget.indexWidget(index)
+        if tagType.icon is not None:
+            label.setPixmap(tagType.icon.pixmap(32,32))
+            label.setToolTip(tagType.iconPath)
+        else:
+            label.setPixmap(QtGui.QPixmap())
+            label.setToolTip(None)
+            
     def _elementNumber(self,tag):
         """Return the number of elements that contain a tag of the given type."""
         return db.query("SELECT COUNT(DISTINCT element_id) FROM {}tags WHERE tag_id = ?"

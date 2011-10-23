@@ -142,7 +142,7 @@ class MergeAction(TreeAction):
         return hintRemove.strip(string.punctuation + string.whitespace), hintRemove
     
     def doAction(self):
-        from ..gui.tagwidgets import MergeDialog
+        from ..gui.dialogs import MergeDialog
         elements = self.selection.elements()
         hintTitle, hintRemove = self.createMergeHint(elements)
         mergeIndices = sorted(elem.parent.index(elem) for elem in elements)

@@ -211,6 +211,7 @@ class TagEditorWidget(QtGui.QWidget):
         self.layout().addWidget(self.flagWidget)
         
         self.flagLabel = QtGui.QLabel() # Text will be set in setVertical
+        self.flagLabel.setToolTip(self.tr("Flags"))
         self.flagWidget.layout().addWidget(self.flagLabel)
         
         flagScrollArea = QtGui.QScrollArea()

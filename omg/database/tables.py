@@ -94,6 +94,7 @@ tables = [SQLTable(createQuery) for createQuery in (
         id       SMALLINT UNSIGNED             NOT NULL AUTO_INCREMENT,
         tagname  VARCHAR(63)                   NOT NULL,
         tagtype  ENUM('varchar','date','text') NOT NULL DEFAULT 'varchar',
+        icon     VARCHAR(255)                  DEFAULT NULL,
         sorttags VARCHAR(20)                   NOT NULL,
         private  BOOLEAN                       NOT NULL,
         PRIMARY KEY(id),

@@ -42,6 +42,8 @@ class FlagManager(QtGui.QDialog):
         self.tableWidget.horizontalHeader().setResizeMode(QtGui.QHeaderView.ResizeToContents)
         self.tableWidget.itemChanged.connect(self._handleItemChanged)
         self.tableWidget.cellDoubleClicked.connect(self._handleCellDoubleClicked)
+        self.tableWidget.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.tableWidget.customContextMenuRequested.connect(self._handleCustomContextMenuRequested)
         self.layout().addWidget(self.tableWidget)
         
         buttonBarLayout = QtGui.QHBoxLayout()
@@ -72,12 +74,13 @@ class FlagManager(QtGui.QDialog):
             
         for row,flagType in enumerate(self._flagTypes):
             column = 0
-            label = QtGui.QLabel()
-            label.setPixmap(QtGui.QPixmap(flagType.iconPath))
+            label = QtGui.QLabel()       
             label.setAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
-            label.setToolTip(flagType.iconPath)
-            index = self.tableWidget.model().index(row,column)                     
+            index = self.tableWidget.model().index(row,column)   
             self.tableWidget.setIndexWidget(index,label)
+            if flagType.iconPath is not None:
+                label.setPixmap(QtGui.QPixmap(flagType.iconPath))
+                label.setToolTip(flagType.iconPath)           
             
             column += 1
             item = QtGui.QTableWidgetItem(flagType.name)
@@ -103,6 +106,7 @@ class FlagManager(QtGui.QDialog):
         self.tableWidget.resizeColumnsToContents()
     
     def _getElementCount(self,flagType):
+        """Return the number of elements having the given flag."""
         return db.query("SELECT COUNT(*) FROM {}flags WHERE flag_id = ?".format(db.prefix),flagType.id)\
                         .getSingle()
                         
@@ -129,8 +133,8 @@ class FlagManager(QtGui.QDialog):
             self._loadFlags()
 
     def _handleItemChanged(self,item):
-        """When an item has been changed, ask the user if he really wants this and if so perform the change
-        in the database and reload."""
+        """When the name of a flag has been changed, ask the user if he really wants this and if so perform
+        the change in the database and reload."""
         if item.column() != 1: # Only the name column is editable
             return
         flagType = self._flagTypes[item.row()]
@@ -185,20 +189,47 @@ class FlagManager(QtGui.QDialog):
         change the icon."""
         if column == 0:
             flagType = self._flagTypes[row]
-            # Choose a sensible directory as starting point
+            self._openIconDialog(flagType)
+    
+    def _handleCustomContextMenuRequested(self,pos):
+        """React to customContextMenuRequested signals."""
+        row = self.tableWidget.rowAt(pos.y())
+        column = self.tableWidget.columnAt(pos.x())
+        if column == 0 and row != -1:
+            flagType = self._flagTypes[row]
+            menu = QtGui.QMenu(self.tableWidget)
             if flagType.iconPath is None:
-                dir = 'images/flags/'
-            else: dir = flagType.iconPath
-            fileName = QtGui.QFileDialog.getOpenFileName(self,self.tr("Open flag icon"),dir,
-                                                         self.tr("Images (*.png *.xpm *.jpg)"))
-            if fileName:
-                flags.changeFlagType(flagType,flagType.name,fileName)
-                # Update the widget
-                index = self.tableWidget.model().index(row,column)                     
-                label = self.tableWidget.indexWidget(index)
-                label.setPixmap(QtGui.QPixmap(flagType.iconPath))
-                label.setToolTip(flagType.iconPath)
-                
+                changeAction = QtGui.QAction(self.tr("Add icon..."),menu)
+            else: changeAction = QtGui.QAction(self.tr("Change icon..."),menu)
+            changeAction.triggered.connect(lambda: self._openIconDialog(flagType))
+            menu.addAction(changeAction)
+            removeAction = QtGui.QAction(self.tr("Remove icon"),menu)
+            removeAction.triggered.connect(lambda: self._setIcon(flagType,None))
+            menu.addAction(removeAction)
+            menu.exec_(self.tableWidget.viewport().mapToGlobal(pos))
+    
+    def _openIconDialog(self,flagType):
+        """Open a file dialog so that the user may choose an icon for the given flag."""
+        # Choose a sensible directory as starting point
+        if flagType.iconPath is None:
+            dir = 'images/flags/'
+        else: dir = flagType.iconPath
+        fileName = QtGui.QFileDialog.getOpenFileName(self,self.tr("Choose flag icon"),dir,
+                                                     self.tr("Images (*.png *.xpm *.jpg)"))
+        if fileName:
+            self._setIcon(flagType,fileName)
+            
+    def _setIcon(self,flagType,iconPath):
+        """Set the icon(-path) of *flagType* to *iconPath* and update the GUI.""" 
+        flags.changeFlagType(flagType,iconPath=iconPath)
+        # Update the widget
+        row = self._flagTypes.index(flagType)
+        index = self.tableWidget.model().index(row,0)                     
+        label = self.tableWidget.indexWidget(index)
+        # Both works also if iconPath is None
+        label.setPixmap(QtGui.QPixmap(flagType.iconPath))
+        label.setToolTip(flagType.iconPath)
+            
     def _elementNumber(self,flagType):
         """Return the number of elements that contain a flag of the given type."""
         return db.query("SELECT COUNT(element_id) FROM {}flags WHERE flag_id = ?"

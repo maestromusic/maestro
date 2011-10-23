@@ -41,9 +41,11 @@ from functools import reduce
 
 from omg import config, constants, logging
 from omg.utils import FlexiDate, getIconPath
-import PyQt4
-translate = PyQt4.QtGui.QApplication.translate
+from PyQt4 import QtGui
+
+translate = QtGui.QApplication.translate
 logger = logging.getLogger("omg.tags")
+
 
 # Module variables - Will be initialized with the first call of init.
 #=================================================================================
@@ -154,7 +156,7 @@ class ValueType:
     def __str__(self):
         return self.name
 
-# Modul variables for the existing types
+# Module variables for the existing types
 TYPE_VARCHAR = ValueType('varchar', translate('tags', 'a tag type for normal (not too long) text values'))
 TYPE_TEXT = ValueType('text', translate('tags', 'a tag type for long texts (like e.g. lyrics)'))
 TYPE_DATE = ValueType('date', translate('tags', 'a tag type for dates'))
@@ -163,20 +165,18 @@ TYPES = [TYPE_VARCHAR,TYPE_TEXT,TYPE_DATE]
 
 class Tag:
     """
-        A tag like ``'artist'``. ``'title'``, etc.. Tags have three public attributes:
+        A tagtype like ``'artist'``. ``'title'``, etc.. Tags have three public attributes:
         
             * ``id``: The id of the tag if it is in the database or None otherwise,
             * ``name``: The name of the tag,
-            * ``type``: The type as instance of :class:`omg.tags.ValueType`.
+            * ``type``: The valuetype of this tag (e.g. varchar) as instance of :class:`omg.tags.ValueType`.
 
-        Usually you shold get tag instances via the :func:`get-method<omg.tags.get>`. The exception is for
+        Usually you should get tag instances via the :func:`get-method<omg.tags.get>`. The exception is for
         tags that are not (yet) in the database (use :func:`exists` to check this). For these tags
-        :func:`get` will fail and you have to create your own instances. 
-
-        Tags contain a tagname and compare equal if and only this tagname is equal. Tags may be used as
-        dictionary keys.
+        :func:`get` will fail and you have to create your own instances. If you use the common instance, it
+        will get automatically updated on TagTypeChangeEvents.
     """
-    def __init__(self,id,name,valueType,sortTags,private=False):
+    def __init__(self,id,name,valueType,iconPath,sortTags,private=False):
         if not isinstance(id,int) or not isinstance(name,str) or not isinstance(valueType,ValueType):
             raise TypeError("Invalid type (id,name,valueType): ({},{},{}) of types ({},{},{})"
                                 .format(id,name,valueType,type(id),type(name),type(valueType)))
@@ -184,9 +184,18 @@ class Tag:
         self.id = id
         self.name = name.lower()
         self.type = valueType
+        self.setIconPath(iconPath)
         self.sortTags = sortTags
         self.private = private
 
+    def setIconPath(self,iconPath):
+        """Set the tag's iconPath and load the icon."""
+        assert iconPath is None or isinstance(iconPath,str)
+        self.iconPath = iconPath
+        if iconPath is not None:
+            self.icon = QtGui.QIcon(iconPath)
+        else: self.icon = None
+        
     def isValid(self,value):
         """Return whether the given value is a valid tag-value for this tag (this depends only on the
         tag-type).
@@ -198,20 +207,10 @@ class Tag:
         return self.type.sqlFormat(value)
         
     def __eq__(self,other):
-        if other is None or not isinstance(other,Tag):
-            return False
-        else:
-            if self.id is not None and other.id is not None:
-                return self.id == other.id
-            else: return self.name == other.name
+        return isinstance(other,Tag) and other.id == self.id
     
     def __ne__(self,other):
-        if other is None or not isinstance(other,Tag):
-            return True
-        else:
-            if self.id is not None and other.id is not None:
-                return self.id != other.id
-            else: return self.name != other.name
+        return not isinstance(other,Tag) or other.id != self.id
 
     def __hash__(self):
         return self.id
@@ -226,13 +225,8 @@ class Tag:
         """Return the translation of this tag in the user's language. In most cases you will want to display
         this string rather than ``tag.name``.
         """
-        # if self.name is not contained in the dict return the name itself
+        # if self.name is not contained in the dict, return the name itself
         return _translation.get(self.name,self.name) 
-    
-    def iconPath(self):
-        """Return the path to the icon of this tag or ``None`` if there is no such icon."""
-        path = getIconPath("tag_{}.png".format(self.name))
-        return path if os.path.isfile(path) else None
 
         
 class UnknownTagError(RuntimeError):
@@ -299,7 +293,7 @@ def get(identifier, createDialogIfNew = False):
 
 
 def isTranslation(name):
-    """Return whether *name* is the translation of a known tag."""
+    """Return whether *name* is the translation of a known tag (comparison is case-insensitive!)."""
     return name.lower() in map(str.lower,_translation.values())
 
 
@@ -315,29 +309,26 @@ def fromTranslation(translation):
     else: return get(translation)
 
     
-def addTagType(name, type, sort = None, private = False):
-    """Adds a new tag named *name* of type *type* to the database. The parameter *sort* is a list of tags
-    by which elements should be sorted if displayed below a ValueNode of this new tag; this defaults to the
-    title tag. If *private* is True, a private tag is created.
+def addTagType(name,valueType,iconPath=None,sortTags=None,private=False):
+    """Adds a new tag named *name* of type *valueType* to the database. The parameter *sort* is a list of
+    tags by which elements should be sorted if displayed below a ValueNode of this new tag; this defaults to
+    the title tag. If *private* is True, a private tag is created.
     
     After creation the dispatcher's tagTypeChanged signal is emitted.
     """
-    logger.info("Adding new tag '{}' of type '{}'.".format(name,type.name))
+    logger.info("Adding new tag '{}' of type '{}'.".format(name,valueType.name))
     name = name.lower()
     if name in _tagsByName:
         raise RuntimeError("Requested creation of tag {} which is already there".format(name))
-    if sort is None:
-        if TITLE is not None:
-            sort = [TITLE]
-        else:
-            sort = []
+    if sortTags is None:
+        sortTags = [TITLE] if TITLE is not None else []
     
     from . import database
     id = database.query(
-        "INSERT INTO {}tagids (tagname,tagtype, sorttags, private) VALUES (?, ?, ?, ?)"
+        "INSERT INTO {}tagids (tagname,tagtype,icon,sorttags, private) VALUES (?,?,?,?,?)"
               .format(database.prefix),
-        name,type.name, ','.join(str(tag.id) for tag in sort), private).insertId()
-    newTag = Tag(id,name,type,sort,private)
+        name,valueType.name,iconPath,','.join(str(tag.id) for tag in sortTags), private).insertId()
+    newTag = Tag(id,name,valueType,iconPath,sortTags,private)
     _tagsByName[name] = newTag
     _tagsById[id] = newTag
     tagList.append(newTag)
@@ -369,10 +360,10 @@ def removeTagType(tag):
     dispatcher.changes.emit(events.TagTypeChangedEvent(DELETED,tag))
 
 
-def changeTagType(tag,name=None,valueType=None,private=None,sortTags=None):
+def changeTagType(tag,name=None,valueType=None,iconPath='',private=None,sortTags=None):
     """Change a tagtype. In particular update the instance *tag* (this is usually the only instance of this
-    tag) and the database. The other arguments determine what to change. Set them to None to leave a
-    property unchanged. This will not touch any files though!
+    tag) and the database. The other arguments determine what to change. Omit them to leave a property
+    unchanged. This method will not touch any files though!
     
     After removal the dispatcher's tagTypeChanged signal is emitted.
     """
@@ -394,6 +385,11 @@ def changeTagType(tag,name=None,valueType=None,private=None,sortTags=None):
         assignments.append('tagtype = ?')
         params.append(valueType.name)
         tag.type = valueType
+    
+    if iconPath != '' and iconPath != tag.iconPath:
+        assignments.append('icon = ?')
+        params.append(iconPath)
+        tag.setIconPath(iconPath)
         
     if private is not None and bool(private) != tag.private:
         assignments.append('private = 1' if private else 'private = 0')
@@ -416,7 +412,7 @@ def changeTagType(tag,name=None,valueType=None,private=None,sortTags=None):
                         *params)
         
         from .modify import dispatcher, events, CHANGED
-        dispatcher.tagTypeChanged.emit(events.TagTypeChangedEvent(CHANGED,tag))
+        dispatcher.changes.emit(events.TagTypeChangedEvent(CHANGED,tag))
 
 
 def loadTagTypesFromDB():
@@ -425,9 +421,13 @@ def loadTagTypesFromDB():
     from omg import database
     _tagsById = {}
     _tagsByName = {}
-    for row in database.query("SELECT id,tagname,tagtype,sorttags,private FROM {}tagids"
+    for row in database.query("SELECT id,tagname,tagtype,icon,sorttags,private FROM {}tagids"
                               .format(database.prefix)):
-        newTag = Tag(row[0],row[1],ValueType.byName(row[2]),row[3],row[4])
+        id,tagName,valueType,iconPath,sortTags,private = row
+        if database.isNull(iconPath):
+            iconPath = None
+        valueType = ValueType.byName(valueType)
+        newTag = Tag(id,tagName,valueType,iconPath,sortTags,private)
         _tagsById[newTag.id] = newTag
         _tagsByName[newTag.name] = newTag
         
