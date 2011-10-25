@@ -151,13 +151,14 @@ class EditorWidget(QtGui.QDockWidget):
         changes = OrderedDict()
         c_tags = tags.Storage()
         c_tags[tags.TITLE] = [title]
-        container = Container(id = modify.newEditorId(), tags = c_tags, contents = None, position = None )
+        container = Container(id = modify.newEditorId(),contents = None, tags = c_tags, flags = [],
+                              position = None,major=False )
         oldRoot = self.editor.model().root
         newRoot = oldRoot.copy()
         newRoot.contents.append(container)
         container.setParent(newRoot)
         changes[oldRoot.id] = (oldRoot, newRoot)
-        comm = modify.UndoCommand(modify.EDITOR, changes, contentsChanged = True, text=self.tr('new container'))
+        comm = modify.commands.UndoCommand(modify.EDITOR, changes, contentsChanged = True, text=self.tr('new container'))
         modify.push(comm)
         
     def saveState(self):
