@@ -40,7 +40,7 @@ The following example shows basic usage of the module::
 
     # An easy method to retrieve a single value from the database is getSingle:
     number = db.query("SELECT COUNT(*) FROM persons").getSingle()
-    # Note that this will raise an EmptyResultException if the query does return an empty result.
+    # Note that this will raise an EmptyResultException if the query returned an empty result.
 
 The main class of the module is :class:`AbstractSQL <omg.database.sql.AbstractSQL>` which is subclassed by
 every driver.

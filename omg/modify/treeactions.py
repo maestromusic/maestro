@@ -133,7 +133,7 @@ class MergeAction(TreeAction):
     @staticmethod    
     def createMergeHint(elements):
         from functools import reduce
-        from ..utils import longestSubstring
+        from ..strutils import longestSubstring
         import string
         
         hintRemove = reduce(longestSubstring,

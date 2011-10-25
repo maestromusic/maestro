@@ -286,7 +286,6 @@ class TagTypeBox(QtGui.QStackedWidget):
                         self.box.setItemIcon(i,event.tagType.icon)
                     # Do not change the tag because there is only one instance
                     return
-            
 
 
 class TagValueEditor(QtGui.QWidget):
