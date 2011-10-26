@@ -22,7 +22,7 @@ from PyQt4.QtCore import Qt
 import itertools
 from . import Node, Element, RootNode
 from .. import logging
-logger = logging.getLogger(name="models")
+logger = logging.getLogger('models.rootedtreemodel')
 
 class RootedTreeModel(QtCore.QAbstractItemModel):
     """The RootedTreeModel subclasses QAbstractItemModel to create a simple model for QTreeViews. It takes one
@@ -195,7 +195,6 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
         insertJobs = []
         allSeen = False
         for i, node in itertools.chain(enumerate(parent.contents), [(lastIndex, None)]):
-            print(i, node)
             insertHere = []
             current = node.position if node and isinstance(parent, Element) else i
             try:

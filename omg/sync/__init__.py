@@ -28,13 +28,14 @@ logger = logging.getLogger("omg.sync")
 def init():
     global fsct
     fsct = FileSystemCheckThread()
-    fsct.daemon = True
     fsct.start()
     
 def shutdown():
     """Terminates this module; waits for all threads to complete."""
 #    hashQueue.join() # wait until all tasks in the commit queue are done
     #fsct.join()
+    fsct.shouldStop.set()
+    fsct.join()
 
 
 class FileSystemCheckThread(threading.Thread):
@@ -43,16 +44,23 @@ class FileSystemCheckThread(threading.Thread):
         threading.Thread.__init__(self)
         self.queue = queue.PriorityQueue()
         self.queue.put((1000, config.options.main.collection))
-        
+        self.shouldStop = threading.Event()
+    
     def run(self):
+        self.shallStop = False
         db.connect()
-        while True:
-            prio, path = self.queue.get()
+        while not self.shouldStop.is_set():
+            try:
+                prio, path = self.queue.get(False)
+            except queue.Empty:
+                break
             status = 'nomusic'
             music = False
             dirty = False
             files = os.listdir(path)
             for file in files:
+                if self.shouldStop.is_set():
+                    break
                 file = os.path.join(path, file)
                 if os.path.isfile(file):
                     if hasKnownExtension(file):
@@ -64,6 +72,8 @@ class FileSystemCheckThread(threading.Thread):
                         status = 'ok'
                 else:
                     self.queue.put((prio-1, os.path.join(path, file)))
+            if self.shouldStop.is_set():
+                break
             state = list(db.query('''SELECT state FROM {}folders WHERE path = ?'''.format(db.prefix),
                         relPath(path)).getSingleColumn())
             if len(state) > 0:
@@ -73,3 +83,5 @@ class FileSystemCheckThread(threading.Thread):
                          status, relPath(path))
             else:
                 db.query("INSERT INTO {0}folders (state, path) VALUES(?, ?)".format(db.prefix), status, relPath(path))
+        db.close()
+        logger.debug('sync thread closed')

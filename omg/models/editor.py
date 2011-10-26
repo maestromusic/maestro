@@ -95,7 +95,7 @@ class EditorModel(rootedtreemodel.RootedTreeModel):
         modelIndex = self.getIndex(node)
         if not event.contentsChanged:
             # this handles SingleElementChangeEvent, all TagChangeEvents, FlagChangeEvents, ...
-            print('editor - tag change event!')
+            logger.debug('editor - tag change event!')
             event.applyTo(node)
             ret = isinstance(event, events.SingleElementChangeEvent)
         elif isinstance(event, events.PositionChangeEvent):
@@ -174,15 +174,29 @@ class EditorModel(rootedtreemodel.RootedTreeModel):
             # first case: OMG mime data -> nodes from an editor, browser etc.
             return self._dropOMGMime(mimeData, action, parent, row)
         elif mimeData.hasFormat("text/uri-list"):
-            # easy case: files and/or folders are dropped from outside or from a filesystembrowser.
-            nodes = self._handleUrlDrop(mimeData.urls())
-            if nodes is False:
+            # files and/or folders are dropped from outside or from a filesystembrowser.
+            nodes = self._dropURLMime(mimeData.urls())
+            if not nodes:
                 return False
+            if parent.id == self.root.id:
+                insertPosition = row
+            else:
+                insertPosition = 1 if row == 0 else parent.contents[row-1].position+1
             ins = []
-            for index, node in enumerate(nodes, start = row):
-                ins.append( (index, node) )
-            insertions = {parent.id: ins}
-            command = commands.InsertElementsCommand(modify.EDITOR, insertions, 'dropCopy->insert')
+            for node in nodes:
+                ins.append( (insertPosition, node) )
+                if parent.id != self.root.id:
+                    node.position = insertPosition
+                insertPosition += 1
+            # now check if the positions of the subsequent nodes have to be increased
+            if parent.id != self.root.id and parent.getContentsCount() >= row+1:
+                positionOverflow  = insertPosition - parent.contents[row].position
+                if positionOverflow > 0:
+                    positionChanges = [ (n.position, n.position + positionOverflow) for n in parent.contents[row:] ]
+                    pc = commands.PositionChangeCommand(EDITOR, parent.id, positionChanges, self.tr('adjust positions'))
+                    modify.push(pc)
+                        
+            command = commands.InsertElementsCommand(modify.EDITOR, {parent.id: ins}, 'dropCopy->insert')
             modify.push(command)
             return True
     
@@ -211,6 +225,10 @@ class EditorModel(rootedtreemodel.RootedTreeModel):
         return file
      
     def _dropOMGMime(self, mimeData, action, parent, row):
+        """handles drop of OMG mime data into the editor.
+        
+        Various cases (and combinations thereof)must be handled: Nodes might be copied or moved
+        within the same parent, or moved / copied from the "outside"."""
         orig_nodes = OrderedDict()
         for node in mimeData.getElements():
             orig_nodes[node.id] = self.importNode(node) 
@@ -278,7 +296,7 @@ class EditorModel(rootedtreemodel.RootedTreeModel):
         modify.endMacro()
         return True
         
-    def _handleUrlDrop(self, urls):
+    def _dropURLMime(self, urls):
         '''This method is called if url MIME data is dropped onto this model, from an external file manager
         or a filesystembrowser widget.'''
         files = sorted(set( (f for f in collectFiles((url.path() for url in urls)) if hasKnownExtension(f)) ))
