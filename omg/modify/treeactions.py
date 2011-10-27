@@ -228,9 +228,11 @@ class TagValueHybridAction(HybridTreeAction):
         for node in selection.nodes():
             while not isinstance(node, ValueNode):
                 node = node.parent
-            if valueNode and node is not valueNode:
-                self.visible = False
-                return
+                if valueNode or node.getParent() is None:
+                    # Either there is more than one ValueNode or none
+                    # (the latter happens for elements sorted under a Various/Unknown node
+                    self.visible = False
+                    return
             else:
                 valueNode = node
         self.visible = True

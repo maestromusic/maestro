@@ -121,7 +121,7 @@ def merge(level, parent, indices, newTitle, removeString, adjustPositions):
         newContainer = Container(id = newEditorId(),
                                  contents = newChildren,
                                  tags = t,
-                                 flags = None,
+                                 flags = [],
                                  position = insertPosition,
                                  major = False)
     else:

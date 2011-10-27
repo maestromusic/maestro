@@ -652,18 +652,6 @@ class TagEditorModel(QtCore.QObject):
                         self.inner.removeTag(tag)
             return
         
-        elif isinstance(event,modify.events.TagTypeChangedEvent):
-            if event.action == modify.CHANGED: # ADDED and REMOVED don't affect us
-                # This finds the record using the tagtype's id and thus also works with the changed tag.
-                if event.tagType in self.inner.tags:
-                    # This finds the old tagType by its hash (id), which equals the new id and replaces it.
-                    self.inner.tags.changeKey(event.tagType,event.tagType,sameHash=True)
-                    for record in self.inner.tags[event.tagType]:
-                        newRecord = Record(event.tagType,record.value,self.inner.elements,
-                                           record.elementsWithValue)
-                        self.inner.changeRecord(event.tagType,record,newRecord)
-            return
-        
         elif isinstance(event,modify.events.ElementChangeEvent):
             if event.level != self.level:
                 return
@@ -693,8 +681,11 @@ class TagEditorModel(QtCore.QObject):
                         # No need to copy because the tags will be deleted in createRecords in a moment.
                         element.tags = event.getTags(element.id)
                     else: element.tags = self.getTagsOfElement(element)
-                self.createRecords() # This will directly remove the tags-attributes again   
-            
+                self.createRecords() # This will directly remove the tags-attributes again
+        
+        # else: It is not necessary to process TagTypeChangedEvents because the tag's single instance is
+        # updated automatically and the GUI reacts to the signal itself.
+        
     def getPossibleSeparators(self,records):
         """Return all separators (from constants.SEPARATORS) that are present in every value of the given
         records."""
