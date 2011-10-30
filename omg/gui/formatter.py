@@ -26,6 +26,7 @@ from PyQt4 import QtCore
 translate = QtCore.QCoreApplication.translate
 trEnc = QtCore.QCoreApplication.CodecForTr
  
+ 
 class Formatter:
     """A Formatter takes an element and offers several functions to get formatted output from the tags, length, title etc. of the element."""
     def __init__(self,element):
@@ -69,7 +70,7 @@ class Formatter:
         if titles is not None:
             result = " - ".join(titles)
         elif self.element.tags is None:
-            result = 'maddin: warum passiert das?'
+            result = translate("Formatter","<No title>")
         elif tags.TITLE in self.element.tags:
             result = " - ".join(self.element.tags[tags.TITLE])
         elif isinstance(self.element,models.File):

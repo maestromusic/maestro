@@ -42,7 +42,16 @@ class DelegateContext:
 
 
 class AbstractDelegate(QtGui.QStyledItemDelegate):
-    """This is how AbstractDelegate works: Whenever the view calls paint or sizeHint a DelegateContext is created to store some variables needed for the paint process (e.g. the painter) or the size computation (e.g. the size). In particular the context stores whether we are painting or computing the size. In the case of painting now getBackground is called and the background of the item is drawn. Now layout is invoked in both cases. This method which must be implemented in subclasses should use methods like addLine and drawCover to fill the item with data. The implementations of addLine, drawCover, etc. will paint or compute the size using the information of the stored DelegateContext. The advantage of this method is that you have to write only one method in the subclass that works for both paint and sizeHint...and that you don't have to deal with ugly size computations and drawing code."""
+    """This is how AbstractDelegate works: Whenever the view calls paint or sizeHint a DelegateContext is
+    created to store some variables needed for the paint process (e.g. the painter) or the size computation
+    (e.g. the size). In particular the context stores whether we are painting or computing the size. In the
+    case of painting now getBackground is called and the background of the item is drawn. Now layout is
+    invoked in both cases. This method which must be implemented in subclasses should use methods like
+    addLine and drawCover to fill the item with data. The implementations of addLine, drawCover, etc. will
+    paint or compute the size using the information of the stored DelegateContext. The advantage of this
+    method is that you have to write only one method in the subclass that works for both paint and
+    sizeHint...and that you don't have to deal with ugly size computations and drawing code.
+    """
     context = None
     hSpace = 2
     vSpace = 1
@@ -58,11 +67,14 @@ class AbstractDelegate(QtGui.QStyledItemDelegate):
 
     # Abstract methods which must be implemented in subclasses
     def layout(self,index):
-        """Layout the node with the given index. This method is called by paint and sizeHint. Its implementation should use drawCover and addLine."""
+        """Layout the node with the given index. This method is called by paint and sizeHint. Its
+        implementation should use drawCover and addLine."""
         raise NotImplementedError()
 
     def getBackground(self,index):
-        """Return a QBrush which should be used to fill the background of the node with the given index, or None if the background should not be filled. This method is called by paint. The default implementation returns None."""
+        """Return a QBrush which should be used to fill the background of the node with the given index,
+        or None if the background should not be filled. This method is called by paint. The default
+        implementation returns None."""
         return None
 
     # This is the implementation of QItemDelegate.paint and will be called to draw an item.

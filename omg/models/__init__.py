@@ -21,7 +21,7 @@ import copy
 from .. import tags, logging, config, covers, realfiles, database as db
 from ..utils import relPath
 
-logger = logging.getLogger(name="models")
+logger = logging.getLogger(__name__)
 
 
 class Node:
@@ -293,7 +293,7 @@ class Element(Node):
         else:
             return self.id is not None and (self.isFile() or all(e.isInDB(True) for e in self.contents))
 
-    def export(self,attributes,copyList=[],replace=[]):
+    def export(self,attributes,copyList=[],replace={}):
         if isinstance(self,Container):
             result = Container(self.id,None,None,None,None,None)
         else: result = File(self.id,None,None,None,None,None)
@@ -371,12 +371,27 @@ class Element(Node):
             for element in self.getContents(): 
                 element.loadTags(recursive, fromFS) 
 
+    def loadFlags(self,recursive=False):
+        """Load flags from the database. If the element is not contained in the database, set self.flags to
+        an empty list.
+        If *recursive* is True, all tags from children of this node (recursively) will be loaded, too.
+        """
+        if self.isInDB():
+            self.flags = db.flags(self.id)
+        else: self.flags = []
+        if recursive:
+            for element in self.getContents():
+                element.loadFlags(recursive)
+            
     def hasCover(self):
         """Return whether this element has a cover."""
         return self.isInDB() and covers.hasCover(self.id)
         
     def getCover(self,size=None,fromFS=False):
-        """Get this elements's cover with <size>x<size> pixels or the large version if <size> is None. The cover will be cached and returned from the cache in subsequent calls. Set <fromFS> to True to enforce that the cover is read from the filesystem and not from cache."""
+        """Get this elements's cover with *size*x*size* pixels or the large version if *size* is None.
+        The cover will be cached and returned from the cache in subsequent calls. Set *fromFS* to True to
+        enforce that the cover is read from the filesystem and not from cache.
+        """
         if not fromFS:
             try:
                 return self._covers[size]
@@ -416,16 +431,19 @@ class Element(Node):
     
     def __str__(self):
         if self.tags is not None:
-            ret =  "({}) <{}[{}]> {}".format(self.position if self.position is not None else '', type(self).__name__,self.id, self.getTitle())
+            ret =  "({}) <{}[{}]> {}".format(self.position if self.position is not None else '',
+                                             type(self).__name__,
+                                             self.id, 
+                                             self.getTitle())
         else: ret =  "<{}[{}]>".format(type(self).__name__,self.id)
         return '*' + ret if self.major else ret
     
 
 class Container(Element):
+    """Element-subclass for containers."""
     
     contents = None
     
-    """Element-subclass for containers."""
     def __init__(self, id, contents, tags, flags, position, major):
         """Initialize this container, optionally with a contents list.
         Note that the list won't be copied but the parents will be changed to this container."""
@@ -439,7 +457,8 @@ class Container(Element):
         self.major = major
     
     @staticmethod
-    def fromId(id, *, contents=None, tags=None, flags=None, position=None, parentId=None, major = None, loadData=True):
+    def fromId(id, *, contents=None, tags=None, flags=None, position=None,
+               parentId=None, major = None, loadData=True):
         if loadData:
             if tags is None:
                 tags = db.tags(id)
@@ -510,7 +529,8 @@ class File(Element):
         self.path = path
     
     @staticmethod
-    def fromId(id,*,tags=None,flags=None,path=None,length=None,position=None,parentId=None,major=False,loadData=True):
+    def fromId(id,*,tags=None,flags=None,path=None,length=None,position=None,
+               parentId=None,major=False,loadData=True):
         if loadData and id > 0:
             if tags is None:
                 tags = db.tags(id)

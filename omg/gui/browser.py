@@ -23,7 +23,7 @@ from PyQt4.QtCore import Qt
 
 from .. import database as db, config, search, constants, utils, tags, modify, flags
 from ..search import searchbox, criteria as criteriaModule
-from . import mainwindow, treeview, browserdialog, delegates, tageditor, tagwidgets
+from . import mainwindow, treeview, browserdialog, delegates2, tageditor, tagwidgets
 from ..models import browser as browsermodel, Element, Container
 from ..modify.treeactions import TagValueHybridAction
 translate = QtCore.QCoreApplication.translate
@@ -242,7 +242,7 @@ class Browser(QtGui.QWidget):
         """Show or hide ValueNodes where the hidden-flag in values_varchar is set."""
         self.showHiddenValues = showHiddenValues
         for view in self.views:
-            view.setShowHiddenValues(showHiddenValues)
+            view.model().setShowHiddenValues(showHiddenValues)
     
     def setCriterionFilter(self,criteria):
         """Set the criterion filter. This is a list of criteria that will be prepended to the search criteria
@@ -316,7 +316,8 @@ class BrowserTreeView(treeview.TreeView):
     def __init__(self,parent,layers):
         treeview.TreeView.__init__(self,parent)
         self.setModel(browsermodel.BrowserModel(layers,parent))
-        self.setItemDelegate(delegates.BrowserDelegate(self,self.model()))
+        self.header().sectionResized.connect(self.model().layoutChanged)
+        self.setItemDelegate(delegates2.BrowserDelegate(self))
         self._optimizers = []
         #self.doubleClicked.connect(self._handleDoubleClicked)
     
@@ -340,6 +341,7 @@ class BrowserTreeView(treeview.TreeView):
         self._optimizers.append(MergeValueNodesOptimizer(self))
         
         self.model().reset(table)
+        
         if len(self._optimizers) > 0:
             for optimizer in self._optimizers:
                 optimizer.finished.connect(self._handleOptimizerFinished)
@@ -477,7 +479,7 @@ class ExpandVisibleOptimizer(Optimizer):
         
         Because loading contents involves searches the _autoExpand-method needs to be called repeatedly after
         each search.
-        """ 
+        """
         self._autoExpandDepth = 0
         maxHeight = self.view.maximumViewportSize().height()
         # Calculate the height of the first level

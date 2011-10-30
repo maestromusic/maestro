@@ -94,6 +94,11 @@ defaults = OrderedDict((
     "startTab": (str,"playlist","Either 'playlist' or 'editor' whatever you want to see on startup."),
     "flageditor_animation": (bool,True,"Enable/disable animations in the flageditor."),
     "flageditor_maxtooltiplines": (int,5,"Maximum number of lines that will be shown in a tooltip in the flageditor."),
+    "browser": {
+                "cover_size": (int,40,"Size of covers in the browser."),
+                "left_tags": (list,['composer','artist','performer'],"Tags in the left column."),
+                "right_tags": (list,['date','conductor'],"Tags in the right column."),
+    }
 }),
 
 ("misc", {

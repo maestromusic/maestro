@@ -170,7 +170,12 @@ class TreeView(QtGui.QTreeView):
         palette.setColor(QtGui.QPalette.Base,QtGui.QColor(0xE9,0xE9,0xE9))
         palette.setColor(QtGui.QPalette.AlternateBase,QtGui.QColor(0xD9,0xD9,0xD9))
         self.setPalette(palette)
-
+    
+        # These rows enable a horizontal scrollbar. The length that can be scrolled will be determined by
+        # the column length and _not_ by the delegate's sizehint (though you may use resizeColumnToContents).
+        #self.header().setHorizontalScrollMode(QtGui.QAbstractItemView.ScrollPerPixel)
+        #self.header().setStretchLastSection(False)
+        #self.header().setResizeMode(0,QtGui.QHeaderView.ResizeToContents)
 
     def _addContextMenuItem(self, item, menu):
         """Adds the context menu part defined by *item* to the parent *menu*.
