@@ -17,9 +17,13 @@
 #
 
 """
-This module wraps Python's logging module in a way so that logging works even if that module is not yet
-configured. Simply use ``logging.getLogger(name)`` to get a Logger and use it like the usual loggers.
-Before logging is configured everything will be printed to the console, so call ``init`` as early as
+This module wraps Python's :mod:`logging` module in a way so that logging works even if that module is not
+yet configured. Simply use ``logging.getLogger(name)`` to get a Logger and use it like the usual loggers::
+
+    logger = logging.getLogger(__name__) # __name__ is the name of the current module
+    logger.debug("Test")
+
+Before logging is configured everything will be printed to the console, so call :func:`init` as early as
 possible (but after the config module has been initialized).
 """
 
@@ -29,8 +33,8 @@ configured = False # Whether logging has been configured (i.e. init has been suc
 
 
 class Logger:
-    """A logger prints log messages to stderr until logging is configured. Afterwards it wraps a usual Python
-    Logger with the same name."""
+    """A logger prints log messages to ``stderr`` until logging is configured. Afterwards it wraps a usual
+    Python :class:`Logger <logging.Logger>` with the same name."""
     def __init__(self,name):
         self.name = name
         if configured:
@@ -38,6 +42,8 @@ class Logger:
         else: self._logger = None
 
     def log(self,level,message):
+        """Log a message on the given level. *level* must be a string from
+        ``['DEBUG','INFO',WARNING','ERROR','CRITICAL']``."""
         if not configured:
             print(" - ".join([level,self.name,message]),file=sys.stderr)
         else:
@@ -47,21 +53,28 @@ class Logger:
             self._logger.log(getattr(logging,level),message)
         
     def debug(self,message):
+        """Log a debug message."""
         self.log("DEBUG",message)
 
     def info(self,message):
+        """Log an info message."""
         self.log("INFO",message)
         
     def warning(self,message):
+        """Log a warning message."""
         self.log("WARNING",message)
         
     def error(self,message):
+        """Log an error message."""
         self.log("ERROR",message)
         
     def critical(self,message):
+        """Log a critical error message."""
         self.log("CRITICAL",message)
 
     def exception(self,message):
+        """Log an exception message. Information about the exception will be fetched using :mod:`traceback`.
+        """
         if not configured:
             type, value, tb = sys.exc_info()
             self.error(message + " Exception: {}".format(value))
@@ -83,8 +96,8 @@ def getLogger(name=None):
 
 
 def init():
-    """Initialize logging from the logging configuration file and the config file. You must initialize the
-    config module first.
+    """Initialize logging according to the config variable ``config.storage.main.logging``. Of course, you
+    must initialize the config module first.
     """
     from omg import config
     
@@ -102,7 +115,8 @@ def init():
 
 
 def shutdown():
-    """Shuts down Python's logging system. Further log calls after this method will be printed to stderr."""
+    """Shuts down Python's logging system. This module's logging functions will still work, but all further
+    messages will be printed to ``stderr``."""
     global configured
     logging.shutdown()
     configured = False

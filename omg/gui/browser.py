@@ -414,11 +414,6 @@ class RestoreExpandedOptimizer(Optimizer):
         self._stopped = True            
         self.view.model().nodeLoaded.disconnect(self._handleNodeLoaded)
         self.finished.emit()
-    
-    def _getKey(self,node):
-        if isinstance(node,browsermodel.CriterionNode):
-            key = node.getKey()
-        else: key = node.id
                 
     def _getExpandedNodes(self,index):
         model = self.view.model()

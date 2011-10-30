@@ -20,10 +20,12 @@ import datetime, os, functools
 from omg import config
 from omg import constants
 from PyQt4 import QtGui
-from difflib import SequenceMatcher
+from collections import OrderedDict
+
 
 def mapRecursively(f,aList):
-    """Take *aList* which may contain (recursively) further lists and apply *f* to each element in these lists (except the lists). Return a copy of *aList* with the results::
+    """Take *aList* which may contain (recursively) further lists and apply *f* to each element in these
+    lists (except the lists). Return a copy of *aList* with the results::
 
             >>> mapRecursively(lambda x: 2*x,[1,2,[3,4],[5]])
             [2,4,[6,8],[10]]
@@ -36,16 +38,18 @@ def mapRecursively(f,aList):
         else: result.append(f(item))
     return result
 
-def longestSubstring(a, b):
-    sm = SequenceMatcher(None, a, b)
-    result = sm.find_longest_match(0, len(a), 0, len(b))
-    return a[result[0]:result[0]+result[2]]
-
 
 def createRanges(tuples):
     """Compresses the given list of iterables into ranges according to the first element of each list member.
-    Example: ranges( (1, 10), (2, 11), (3, 12), (5,13), (7,14), (8,15) ) will return
-    ( (1, [[10], [11], [12]]), (5, [[13]]), (7, [ [14], [15] ]) )"""
+    Example::
+
+        ranges( (1, 10), (2, 11), (3, 12), (5,13), (7,14), (8,15) )
+        
+    will return ::
+    
+        ( (1, [[10], [11], [12]]), (5, [[13]]), (7, [ [14], [15] ]) )
+        
+    \ """
     previous = None
     start = None
     ids = []
@@ -60,14 +64,17 @@ def createRanges(tuples):
         previous = i
         ids.append(payload)
     yield start, ids
+
+
 def hasKnownExtension(file):
     """Return True if the given path has a known extension (i.e., appears in options.main.extension).
-    Does _not_ check whether the file actually exists, is readable, etc."""
+    Does **not** check whether the file actually exists, is readable, etc."""
     s = file.rsplit(".", 1)
     if len(s) == 1:
         return False
     else:
         return s[1].lower() in config.options.main.extensions
+
 
 def relPath(file):
     """Returns the relative path of a music file against the collection base path."""
@@ -76,24 +83,39 @@ def relPath(file):
     else:
         return file
 
+
 def absPath(file):
-    """Returns the absolute path of a music file inside the collection directory, if it is not absolute already."""
+    """Returns the absolute path of a music file inside the collection directory, if it is not absolute
+    already."""
     if not os.path.isabs(file):
         return os.path.join(config.options.main.collection, file)
     else:
         return file
 
+
 def collectFiles(paths):
-    """Return a list of absolute paths to all files in the given paths (which must be absolute, too).
-    That is, if a path in <paths> is a file, it will be contained in the resulting list, whereas if it is a
-    directory, all files within (recursively) will be contained in the result."""
-    filePaths = []
+    """Finds all music files below the given *paths*. The output is a dict mapping subdirectory paths to
+    lists of contained music files."""
+    
+    filePaths ={}
+    def add(file, parent = None):
+        
+        if not hasKnownExtension(file):
+            return
+        dir = parent or os.path.dirname(file)
+        if dir not in filePaths:
+            filePaths[dir] = []
+        filePaths[dir].append(file)
     for path in paths:
         if os.path.isfile(path):
-            filePaths.append(path)
-        elif os.path.isdir(path):
-            filePaths.extend(collectFiles(os.path.join(path,p) for p in os.listdir(path)))
+            add(path)
+        else:
+            for parent, dirs, files in os.walk(path):
+                for f in sorted(files):
+                    add(os.path.join(parent, f), parent)
+                dirs.sort()
     return filePaths
+
 
 def getIconPath(name,plugin=None):
     """Return the path of the icon with the given name. If the icon belongs to a plugin, specify the name of
@@ -116,11 +138,12 @@ class FlexiDate(object):
 
     Note that while MySQL's DATE type can store dates where day and month may be unspecified, neither
     datetime.date nor QDate can. Thus binding FlexiDates to SQL-queries does not work. For this reason
-    FlexiDates are stored as integers in the DB (confer :meth:`FlexiDate.toSql` and :meth:`FlexiDate.fromSql`.
+    FlexiDates are stored as integers in the DB (confer :meth:`FlexiDate.toSql` and
+    :meth:`FlexiDate.fromSql`).
 
     The parameters may be anything that can be converted to :func:`int`. *month* and *day* may also be
     ``None``. If *month* or *day* are 0 or ``None`` they are regarded as unspecified. Note that you must not
-    give a nonzero *day* if *month* is zero or ``None``. This method raises a :exc:`ValueException` if 
+    give a nonzero *day* if *month* is zero or ``None``. This method raises a :exc:`ValueError` if 
     conversion to :func:`int` fails or if the date is invalid (confer :class:`datetime.date`).
     """
     def __init__(self, year, month = None, day = None):
@@ -292,28 +315,12 @@ class OrderedDict(dict):
         self.insert(self.index(posKey),key,value)
 
 
-# Stores the assigned unique keys generated by getUniqueKey
-_usedKeys = set()
-
-def getUniqueKey(prefix):
-    """Generate a globally unique key starting with *prefix*."""
-    for i in range(2**64):
-        key = "{}_{}".format(prefix,i)
-        if key not in _usedKeys:
-            _usedKeys.add(key)
-            return key
-    raise RuntimeError("Unique keys for prefix {} exhausted.".format(prefix))
-    
-def freeUniqueKey(key):
-    """Free the given key, so that it may be returned again by getUniqueKey."""
-    _usedKeys.discard(key)
-
-
 @functools.total_ordering
 class PointAtInfinity:
     """Depending on the parameter *plus* this object is either bigger or smaller than any other object
     (except for other instances of PointAtInfinity with the same parameter). This is useful in key-functions
-    for list.sort."""
+    for list.sort. The advantage compared to ``float("inf")`` is that the latter only compares to numbers.
+    """
     def __init__(self,plus=True):
         self.plus = plus
         
@@ -325,4 +332,3 @@ class PointAtInfinity:
 
     def __str__(self):
         return "{}{}".format('+' if self.plus else '-', '∞')
-    

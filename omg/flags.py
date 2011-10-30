@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from . import database as db, modify, logging
+from . import database as db, modify, logging, constants
 from PyQt4 import QtGui
 
 
@@ -95,7 +95,7 @@ def exists(name):
 
 def isValidFlagname(name):
     """Return whether *name* is a valid name for a flagtype."""
-    return len(name) > 0 and not name.isspace()
+    return 0 < len(name.encoded()) <= constants.FLAG_VARCHAR_LENGTH and not name.isspace()
 
 
 def allFlags():

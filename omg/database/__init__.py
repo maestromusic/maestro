@@ -35,8 +35,8 @@ or, if the connection was already established in another module::
     db.query(...)
 
 
-Threading
-========================================================================
+**Threading**
+
 Each thread must have its own connection object. This module stores all connection objects and methods like
 ``query`` automatically choose the correct connection. However you have to initialize the connection for
 each thread and use a ``with`` statement to ensure the connection is finally closed again. Typically the

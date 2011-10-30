@@ -92,8 +92,6 @@ def init(cmdConfig = [],initTags=True,testDB=False):
         tags.init()
         flags.init()
 
-    from . import sync
-    sync.init()
     return app
 
 
@@ -125,13 +123,14 @@ def run(cmdConfig = []):
     from omg import plugins
     plugins.enablePlugins()
 
-    from . import player
-    player.init()
+    from . import sync
+    sync.init()
     # Create GUI
     # First import all modules that want to add WidgetData
-    from .gui import filesystembrowser, editor, browser, tageditor, playback
-    from omg.gui import mainwindow
+    from .gui import filesystembrowser, editor, browser, tageditor, mainwindow, playback
     global mainWindow
+    from . import player
+    player.init()
     mainWindow = mainwindow.MainWindow()
     plugins.mainWindowInit()
 
@@ -146,5 +145,5 @@ def run(cmdConfig = []):
     #sync.shutdown()
     config.shutdown()
     logging.shutdown()
-
+    sync.shutdown()
     sys.exit(returnValue)

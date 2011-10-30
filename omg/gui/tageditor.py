@@ -416,7 +416,7 @@ class TagEditorWidget(QtGui.QWidget):
                 action = fancyMenu.addAction(self.tr("Extend to all elements"))
                 action.triggered.connect(lambda: self.model.extendRecords(selectedRecords))
             
-            if len(selectedRecords) > 1 and all(r.tag().type == tags.TYPE_VARCHAR for r in selectedRecords):
+            if len(selectedRecords) > 1 and all(r.tag.type == tags.TYPE_VARCHAR for r in selectedRecords):
                 commonPrefix = strutils.commonPrefix(str(record.value) for record in selectedRecords)
                 
                 if len(commonPrefix) > 0:

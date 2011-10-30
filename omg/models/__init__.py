@@ -414,6 +414,14 @@ class Element(Node):
             return '\n'.join(parts)
         else: return str(self)
     
+    def iPosition(self):
+        """Return the position of the element, if its parent is itself an element, or the index, if
+        the parent is a root node."""
+        if isinstance(self.parent, RootNode):
+            return self.parent.index(self)
+        else:
+            return self.position
+        
     def __str__(self):
         if self.tags is not None:
             ret =  "({}) <{}[{}]> {}".format(self.position if self.position is not None else '', type(self).__name__,self.id, self.getTitle())

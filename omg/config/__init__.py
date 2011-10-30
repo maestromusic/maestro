@@ -18,37 +18,47 @@
     
 """
 This package handles OMG's configuration. There are five sources where configuration may come from:
-Three files in the configuration directory, the default options which are hard coded into the defaultconfig
-module (and into plugins) and finally the command line where arbitrary config options may be overwritten
-using the -c option.
+Three files in the configuration directory, the default options which are hard coded into the
+:mod:`defaultconfig <omg.config.defaultconfig>` module (and into plugins) and finally the command line where
+arbitrary config options may be overwritten using the -c option.
 The three files are:
-    - config. This is the main configuration file and the one that is mainly edited by the user.
-    But it may be written from the program, too. It contains several sections which may contain options
-    and nested sections. Options must have a type (str,int or list) and a default value stored in
-    defaultconfig. To get the option “size” from the section “gui” simply use “config.options.gui.size”.
-    This will directly return the option's value. In the rare cases you need the option itself as
-    ConfigOption-instance use “config.optionObject.gui.size”. Instead of attribute access you may also use
-    item access: “config.options['gui']['size']”. Both types of access allow to write values via assignment.
-    Note that values will not be written to the file before the application terminates, though.
 
-    - storage. This file holds persistent information and is mainly written by the program. But it is human
-    readable and can thus be edited by the user, too. The most important difference to config is that this
-    file uses ConfigObj's unrepr-mode. Therefore you may store any combination of Python's standard types
-    including lists and dicts. Access works like for config, but with the variables “config.storage” and
-    “config.storageObject”.
+    * ``config``. This is the main configuration file and the one that is mainly edited by the user.
+      But it may be written from the program, too. It contains several sections which may contain options
+      and nested sections. Options must have a type (str,int or list) and a default value stored in
+      defaultconfig. To get the option ``size`` from the section ``gui`` simply use ::
+    
+        config.options.gui.size
+      
+      This will directly return the option's value. In the rare cases you need
+      the option itself as :class:`ConfigOption`-instance use ``config.optionObject.gui.size``.
+      
+      Instead of
+      attribute access you may also use item access::
+      
+          config.options['gui']['size']
+        
+      Both types of access allow to write values via assignment.
+      Note that values will not be written to the file before the application terminates, though.
 
-    - binary. The last file contains simply a pickled dict to store arbitrary binary data. During the
-    application this dict can be accessed via config.binary which really is simply a dict, so there are no
-    sections or attribute access like for config and storage. Take care that your keys don't conflict with
-    other modules!
+    * ``storage``. This file also holds persistent information but is mainly written by the program. It is
+      human readable and can be edited by the user, though. The most important difference to ``config`` is
+      that this file uses ConfigObj's ``unrepr``-mode. Therefore you may store any combination of Python's
+      standard types including lists and dicts. Access works like for config, but with the variables
+      ``config.storage`` and ``config.storageObject``.
 
-    Both config and storage may only contain options which are defined in the defaultconfig module or in the
-    default configuration of a plugin that is returned by its defaultConfig or defaultStorage method (to be
-    precise they may contain sections which are not defined. OMG will assume that they belong to a plugin
-    that is not loaded).
+    * ``binary``. The last file contains simply a pickled dict to store arbitrary binary data. During the
+      application this dict can be accessed via ``config.binary`` which really is simply a dict, so there are
+      no sections or attribute access like for ``config`` and ``storage``. Take care that your keys don't
+      conflict with other modules!
 
-    Call init at application start to read options and call shutdown at the end to write the options. Use
-    loadPlugins and removePlugins to add or remove plugin configuration.
+Both ``config`` and ``storage`` may only contain options which are defined in the
+:mod:`defaultconfig <omg.config.defaultconfig>` module or in the default configuration of a plugin that
+is returned by its ``defaultConfig`` or ``defaultStorage`` method (to be precise they may contain
+sections which are not defined. OMG will assume that they belong to a plugin that is not loaded).
+
+Call :func:`init` at application start to read options and call :func:`shutdown` at the end to write the
+options. Use :func:`loadPlugins` and :func:`removePlugins` to add or remove plugin configuration.
 """
 
 import os, sys, pickle
@@ -58,7 +68,8 @@ from . import configobj
 
 CONFDIR = None
 
-# These are the main access objects. The first two give direct access to the values, while the last two yield ConfigOption instances
+# These are the main access objects. The first two give direct access to the values,
+# while the last two yield ConfigOption instances
 options = None
 storage = None
 optionObject = None

@@ -22,7 +22,7 @@ from PyQt4.QtCore import Qt
 import itertools
 from . import Node, Element, RootNode
 from .. import logging
-logger = logging.getLogger(name="models")
+logger = logging.getLogger('models.rootedtreemodel')
 
 class RootedTreeModel(QtCore.QAbstractItemModel):
     """The RootedTreeModel subclasses QAbstractItemModel to create a simple model for QTreeViews. It takes one
@@ -166,22 +166,58 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
                 yield child
     
     def changePositions(self, parent, changes):
-        #TODO: finish & use in event handling
-        elementParent = isinstance(parent, Element)
-        
-        
-        for before, after in changes:
-            for i, elem in parent.contents:
-                afterIndex = -1
-                current = elem.position if elementParent else i
-                if current == before:
-                    beforeIndex = i
-                    if elementParent:
-                        elem.position = after
-                if afterIndex == -1 and after <= current:
-                    afterIndex = i
-            if afterIndex == -1:
-                afterIndex = len(parent.contents)
+        """Changes positions of elements below *parent*, according to the oldPosition->newPosition dict *changes.*"""
+        logger.debug('position change -- {}'.format(changes))
+        def argsort(seq):
+            # http://stackoverflow.com/questions/3382352/equivalent-of-numpy-argsort-in-basic-python/3383106#3383106
+            #lambda version by Tony Veijalainen
+            return [x for x,y in sorted(enumerate(seq), key = lambda x: x[1])]
+        def newPosition(i):
+            try:
+                return changes[i]
+            except KeyError:
+                return i
+        sortedIndices = argsort( [ newPosition(node.iPosition()) for node in parent.contents ] )
+        # change position attribute of elements
+        if not isinstance(parent, RootNode):
+            for elem in parent.contents:
+                elem.position = newPosition(elem.position)
+        parentIndex = self.getIndex(parent)
+        # I stores the changes done on the current indexes of the elements in parent.contents
+        I = list(range(len(sortedIndices)))
+        # J[k] stores where to find the element that, before any changes, was at index k; i.e.
+        # at any time parent.contents[J[k]] is the element that was parent.contents[k] before
+        # the call to this method 
+        J = list(range(len(sortedIndices)))
+        i = len(I)-1
+        # start from the end
+        while i >= 0:
+            # decrease i until there is a wrong position
+            while sortedIndices[i] == I[i]:
+                i -= 1
+                if i < 0:
+                    return
+            # here: sortedIndices[i] != I[i]
+            end = sortedIndices[i]
+            start = end
+            for j in range(i-1,-1,-1):
+                if sortedIndices[j] == start - 1:
+                    start = sortedIndices[j]
+                else:
+                    break
+            iStart, iEnd = J[start], J[end]
+            self.beginMoveRows(parentIndex, iStart, iEnd, parentIndex, i+1)
+            # move elements
+            for lst in parent.contents, I:
+                lst[i+1:i+1] = lst[iStart:iEnd+1]
+                lst[iStart:iEnd+1] = [] 
+            self.endMoveRows()
+            # update J
+            tmp = J[start:end+1]
+            J[start:end+1] = []
+            J[iStart:iStart] = tmp
+            
+            i -= 1
           
     def insert(self,parent,insertions):
         """Insert nodes below *parent*. *insertions* is a list of (int, Element) tuples. The integer is
@@ -195,7 +231,6 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
         insertJobs = []
         allSeen = False
         for i, node in itertools.chain(enumerate(parent.contents), [(lastIndex, None)]):
-            print(i, node)
             insertHere = []
             current = node.position if node and isinstance(parent, Element) else i
             try:

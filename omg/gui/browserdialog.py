@@ -208,7 +208,7 @@ class ViewConfigurationDialog(QtGui.QDialog):
         
         self._handleValueChanged(len(self.browser.views))
         for i in range(0,len(self.browser.views)):
-            self.viewConfigurations[i].setLayers(self.browser.views[i].model().getLayers())
+            self.viewConfigurations[i].setLayers(self.browser.views[i].model().layers)
         
     def _handleValueChanged(self,value):
         if value < len(self.viewConfigurations):

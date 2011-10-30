@@ -44,7 +44,6 @@ class EditorModel(rootedtreemodel.RootedTreeModel):
     """Model class for the editors where users can edit elements before they are commited into
     the database."""
     
-    guessAlbums = True # whether to guess album structure on file drop
     
     def __init__(self, name = 'default'):
         """Initializes the model with the given name (used for debugging). A new RootNode will
@@ -53,6 +52,8 @@ class EditorModel(rootedtreemodel.RootedTreeModel):
         self.contents = []
         self.name = name
         modify.dispatcher.changes.connect(self.handleChangeEvent)
+        self.albumGroupers = []
+        self.metacontainer_regex=r" ?[([]?(?:cd|disc|part|teil|disk|vol)\.? ?([iI0-9]+)[)\]]?"
 
     
     def handleChangeEvent(self, event):
@@ -95,12 +96,11 @@ class EditorModel(rootedtreemodel.RootedTreeModel):
         modelIndex = self.getIndex(node)
         if not event.contentsChanged:
             # this handles SingleElementChangeEvent, all TagChangeEvents, FlagChangeEvents, ...
-            print('editor - tag change event!')
+            logger.debug('editor - tag change event!')
             event.applyTo(node)
             ret = isinstance(event, events.SingleElementChangeEvent)
         elif isinstance(event, events.PositionChangeEvent):
-            event.applyTo(node)
-            self.dataChanged.emit(modelIndex.child(0, 0), modelIndex.child(node.getContentsCount()-1, 0))
+            self.changePositions(node, event.positionMap)
             ret = False
         elif isinstance(event, events.InsertContentsEvent):
             self.insert(node, event.insertions[id])
@@ -169,20 +169,34 @@ class EditorModel(rootedtreemodel.RootedTreeModel):
         # if something is dropped on no item, append it to the end of the parent
         if row == -1:
             row = parent.getContentsCount()
-        parent = parent.copy()
+        #parent = parent.copy()
         if mimeData.hasFormat(options.gui.mime):
             # first case: OMG mime data -> nodes from an editor, browser etc.
             return self._dropOMGMime(mimeData, action, parent, row)
         elif mimeData.hasFormat("text/uri-list"):
-            # easy case: files and/or folders are dropped from outside or from a filesystembrowser.
-            nodes = self._handleUrlDrop(mimeData.urls())
-            if nodes is False:
+            # files and/or folders are dropped from outside or from a filesystembrowser.
+            nodes = self._dropURLMime(mimeData.urls())
+            if not nodes:
                 return False
+            if parent.id == self.root.id:
+                insertPosition = row
+            else:
+                insertPosition = 1 if row == 0 else parent.contents[row-1].position+1
             ins = []
-            for index, node in enumerate(nodes, start = row):
-                ins.append( (index, node) )
-            insertions = {parent.id: ins}
-            command = commands.InsertElementsCommand(modify.EDITOR, insertions, 'dropCopy->insert')
+            for node in nodes:
+                ins.append( (insertPosition, node) )
+                if parent.id != self.root.id:
+                    node.position = insertPosition
+                insertPosition += 1
+            # now check if the positions of the subsequent nodes have to be increased
+            if parent.id != self.root.id and parent.getContentsCount() >= row+1:
+                positionOverflow  = insertPosition - parent.contents[row].position
+                if positionOverflow > 0:
+                    positionChanges = [ (n.position, n.position + positionOverflow) for n in parent.contents[row:] ]
+                    pc = commands.PositionChangeCommand(EDITOR, parent.id, positionChanges, self.tr('adjust positions'))
+                    modify.push(pc)
+                        
+            command = commands.InsertElementsCommand(modify.EDITOR, {parent.id: ins}, 'dropCopy->insert')
             modify.push(command)
             return True
     
@@ -211,6 +225,10 @@ class EditorModel(rootedtreemodel.RootedTreeModel):
         return file
      
     def _dropOMGMime(self, mimeData, action, parent, row):
+        """handles drop of OMG mime data into the editor.
+        
+        Various cases (and combinations thereof)must be handled: Nodes might be copied or moved
+        within the same parent, or moved / copied from the "outside"."""
         orig_nodes = OrderedDict()
         for node in mimeData.getElements():
             orig_nodes[node.id] = self.importNode(node) 
@@ -239,7 +257,7 @@ class EditorModel(rootedtreemodel.RootedTreeModel):
             if node.id in move: # node moved away
                 movedBefore += 1
             else:
-                position = parent.index(node, True) if isinstance(parent, RootNode) else node.position
+                position = node.iPosition()
                 currentPosition = position - movedBefore + 1
                 if movedBefore > 0:
                     positionChanges.append( (position, position - movedBefore) )
@@ -251,19 +269,21 @@ class EditorModel(rootedtreemodel.RootedTreeModel):
                                                            text = 'drop->remove')
             commandsToPush.append(removeCommand)
         for node in move.values():
-            positionChanges.append( (node.position, currentPosition) )
+            positionChanges.append( (node.iPosition(), currentPosition) )
             currentPosition += 1
         insertions = { parent.id:[] }
         for node in insert_same + insert_other:
             insertions[parent.id].append( (currentPosition, node) )
-            if not isinstance(parent, RootNode):
+            if isinstance(parent, RootNode):
+                node.position = None
+            else:
                 node.position = currentPosition
             currentPosition += 1
         
         # adjust positions behind
         for node in parent.contents[row:]:
-            if node.id not in move and node.position < currentPosition:
-                positionChanges.append( (node.position, currentPosition) )
+            if node.id not in move and node.iPosition() < currentPosition:
+                positionChanges.append( (node.iPosition(), currentPosition) )
                 currentPosition += 1        
             
         command = commands.PositionChangeCommand(EDITOR, parent.id, positionChanges, self.tr('adjust positions'))
@@ -278,157 +298,135 @@ class EditorModel(rootedtreemodel.RootedTreeModel):
         modify.endMacro()
         return True
         
-    def _handleUrlDrop(self, urls):
+    def _dropURLMime(self, urls):
         '''This method is called if url MIME data is dropped onto this model, from an external file manager
         or a filesystembrowser widget.'''
-        files = sorted(set( (f for f in collectFiles((url.path() for url in urls)) if hasKnownExtension(f)) ))
+        files = collectFiles(sorted(url.path() for url in urls))
+        numFiles = sum(len(v) for v in files.values())
         progress = QtGui.QProgressDialog()
-        progress.setLabelText(self.tr("Importing {0} files...").format(len(files)))
-        progress.setRange(0, len(files))
+        progress.setLabelText(self.tr("Importing {0} files...").format(numFiles))
+        progress.setRange(0, numFiles)
         progress.setMinimumDuration(800)
         progress.setWindowModality(Qt.WindowModal)
-        elementList = []
-        for i,f in enumerate(files):
-            progress.setValue(i+1)
-            QtGui.QApplication.processEvents()
-            if progress.wasCanceled():
-                return False
-            readOk = False
-            while not readOk:
-                try:
-                    theFile = self.importFile(f)
-                    elementList.append(theFile)
-                    readOk = True
-                except tags.UnknownTagError as e:
-                    from ..gui.tagwidgets import NewTagTypeDialog
-                    text = self.tr('Unknown tag\n{1}={2}\n found in \n{0}.\n What should its type be?').format(relPath(f), e.tagname, e.values)
-                    dialog = NewTagTypeDialog(e.tagname, text = text,
-                      includeDeleteOption = True)
-                    ret = dialog.exec_()
-                    if ret == dialog.Accepted:
-                        pass
-                    elif ret == dialog.Delete or ret == dialog.DeleteAlways:
-                        
-                        if ret == dialog.DeleteAlways:
-                            options.tags.always_delete = options.tags.always_delete + [e.tagname]
-                        logger.debug('REMOVE TAG {0} from {1}'.format(e.tagname, f))
-                        real = realfiles.get(f)
-                        real.remove(e.tagname)
-                    else:
-                        progress.cancel()
-                        return False
-        if self.guessAlbums:
-            return self.guessTree(elementList)
-        else:
-            return elementList
-        
-    def setGuessAlbums(self, state):
-        self.guessAlbums = state == Qt.Checked
-        
-    def guessTree(self, files):
-        """Tries to guess a container structure from the given File list."""
-        
-        albumsFoundByName = {} # name->container map
-        albumsFoundByID = {} #id->container map
-        
-        for file in files:
-            id = file.id
-            t = file.tags
-            if id > 0:
-                albumIds = db.parents(id)
-                for aid in albumIds:
-                    if not aid in albumsFoundByID:
-                        exAlb = albumsFoundByID[aid] = Container.fromId(aid)
-                    exAlbName = ", ".join(exAlb.tags[tags.TITLE])
-                    if not exAlbName in albumsFoundByName:
-                        albumsFoundByName[exAlbName] = exAlb
-                    
-                    file.parent = exAlb
-                    exAlb.contents.append(file)
-            elif tags.ALBUM in t:
-                album = ", ".join(t[tags.ALBUM])
-                if not album in albumsFoundByName:
-                    albumsFoundByName[album] = Container(id = modify.newEditorId(),
-                                                         contents = None,
-                                                         tags = tags.Storage(),
-                                                         flags = [], position = None, major = True)
-                file.parent = albumsFoundByName[album]
-                albumsFoundByName[album].contents.append(file)
-                if file.position is None:
-                    file.position = 0
-            elif tags.TITLE in t:
-                album = "SingleFile" + ", ".join(t[tags.TITLE])
-                albumsFoundByName[album] = file
+        #elements = OrderedDict(files.keys())
+        for path, pFiles in files.items():
+            elems = []
+            for f in pFiles:
+                progress.setValue(progress.value() + 1)
+                QtGui.QApplication.processEvents()
+                if progress.wasCanceled():
+                    return False
+                readOk = False
+                while not readOk:
+                    try:
+                        theFile = self.importFile(f)
+                        elems.append(theFile)
+                        readOk = True
+                    except tags.UnknownTagError as e:
+                        from ..gui.tagwidgets import NewTagTypeDialog
+                        text = self.tr('Unknown tag\n{1}={2}\n found in \n{0}.\n What should its type be?').format(relPath(f), e.tagname, e.values)
+                        dialog = NewTagTypeDialog(e.tagname, text = text,
+                          includeDeleteOption = True)
+                        ret = dialog.exec_()
+                        if ret == dialog.Accepted:
+                            pass
+                        elif ret == dialog.Delete or ret == dialog.DeleteAlways:
+                            
+                            if ret == dialog.DeleteAlways:
+                                options.tags.always_delete = options.tags.always_delete + [e.tagname]
+                            logger.debug('REMOVE TAG {0} from {1}'.format(e.tagname, f))
+                            real = realfiles.get(f)
+                            real.remove(e.tagname)
+                        else:
+                            progress.cancel()
+                            return False
+            files[path] = elems
+        if len(self.albumGroupers) > 0:            
+            if "DIRECTORY" in self.albumGroupers:
+                albums = []
+                singles = []
+                for k,v in sorted(files.items()):
+                    al, si = self.guessAlbums(v)
+                    albums.extend(al)
+                    singles.extend(si)
             else:
-                album = file.path
-                albumsFoundByName[album] = file
-            
-        
-        for album in albumsFoundByName.values():
-            self.finalize(album)
-        FIND_DISC_RE=r" ?[([]?(?:cd|disc|part|teil|disk|vol)\.? ?([iI0-9]+)[)\]]?"
-        metaContainers = {}
-        finalAlbums = []
-        for name, album in albumsFoundByName.items():
-            discstring = re.findall(FIND_DISC_RE,name,flags=re.IGNORECASE)
+                albums, singles = self.guessAlbums(itertools.chain(*files.values()))
+            return self.guessMetaContainers(albums) + singles
+        else:
+            return list(itertools.chain(*files.values()))
+    
+    def guessAlbums(self, elements):
+        groupTags = self.albumGroupers[:]
+        albumTag = groupTags[0]
+        dirMode = albumTag == "DIRECTORY"
+        if "DIRECTORY" in groupTags:
+            groupTags.remove("DIRECTORY")
+        byKey = {}
+        for element in elements:
+            if dirMode:
+                key = relPath(os.path.dirname(element.path))
+            else:
+                key = tuple( (tuple(element.tags[tag]) if tag in element.tags else None) for tag in groupTags)
+            if key not in byKey:
+                byKey[key] = []
+            byKey[key].append(element)
+            if element.position is None:
+                element.position = 1
+        singles, albums = [], []
+        for key, elements in byKey.items():
+            elem = elements[0]
+            if dirMode or (albumTag in elem.tags):
+                album = Container(modify.newEditorId(), [], tags.Storage(), [], None, True)
+                for elem in sorted(elements, key = lambda e: e.position):
+                    if len(album.contents) > 0 and album.contents[-1].position == elem.position:
+                        raise RuntimeError('multiple positions below same album -- please fix this with TagEditor!!')
+                    album.contents.append(elem)
+                    elem.parent = album
+                album.tags = tags.findCommonTags(album.contents, True)
+                album.tags[tags.TITLE] = [key] if dirMode else elem.tags[albumTag]
+                albums.append(album)
+            else:
+                element.position = None
+                singles.append(element)
+        return albums, singles
+    
+    def guessMetaContainers(self, albums):
+        # search for meta-containers in albums
+        groupTags = self.albumGroupers[:]
+        albumTag = groupTags[0]
+        dirMode = albumTag == "DIRECTORY"
+        if "DIRECTORY" in groupTags:
+            groupTags.remove("DIRECTORY")
+        metaContainers = OrderedDict()
+        result = []
+        for album in albums:
+            name = ", ".join(album.tags[tags.TITLE])
+            discstring = re.findall(self.metacontainer_regex, name,flags=re.IGNORECASE)
             if len(discstring) > 0:
                 discnumber = discstring[0]
                 if discnumber.lower().startswith("i"): #roman number, support I-III :)
                     discnumber = len(discnumber)
                 else:
                     discnumber = int(discnumber)
-                discname_reduced = re.sub(FIND_DISC_RE,"",name,flags=re.IGNORECASE)
-                if discname_reduced in metaContainers:
-                    metaContainer = metaContainers[discname_reduced]
+                discname_reduced = re.sub(self.metacontainer_regex,"",name,flags=re.IGNORECASE)
+                key = tuple( (tuple(album.tags[tag]) if tag in album.tags else None) for tag in groupTags[1:])
+                if (key, discname_reduced) in metaContainers:
+                    metaContainer = metaContainers[(key, discname_reduced)]
                 else:
-                    metaContainer = Container(id = modify.newEditorId(), contents = None,
-                                              tags = tags.Storage(), flags = [], major = True, position = None)
-                    metaContainers[discname_reduced] = metaContainer
+                    metaContainer = Container(modify.newEditorId(), None, tags.Storage(), [], None, True)
+                    metaContainers[(key, discname_reduced)] = metaContainer
                 metaContainer.contents.append(album)
                 album.position = discnumber
                 album.parent = metaContainer
             else:
-                finalAlbums.append(album)
-        for title, album in metaContainers.items():
-            self.finalize(album)
-            album.tags[tags.TITLE] = [title]
-        finalAlbums.extend(metaContainers.values())
-        return finalAlbums
-        
-    def finalize(self, album):
-        """Finalize a heuristically guessed album: Update tags such that the album contains
-        all tags that are equal in all children."""
-        if album.isFile():
-            return
-        album.contents.sort(key=lambda x : x.position or -1)
-        album.tags = tags.findCommonTags(album.contents, True)
-        if tags.ALBUM in album.tags:
-            album.tags[tags.TITLE] = album.tags[tags.ALBUM]
-    
-    def shiftPositions(self, elements, delta):
-        '''Shift the positions of the given elements by *delta* (if valid).'''
-        elementsByParents = itertools.groupby(elements, key = lambda x: x.parent.id)
-        for key, group in elementsByParents:
-            elems = sorted(group, key = lambda x: x.position)
-            parent = elems[0].parent
-            if isinstance(parent, RootNode):
-                continue
-            if delta < 0 and elems[0].position + delta <= parent.contents.index(elems[0]):
-                from ..gui.dialogs import warning
-                warning('position below zero', 'not enough space before to decrease position')
-                continue
-            positionChanges = []
-            unit = (-1)**(delta<0) # -1 if delta < 0 else 1
-            currentPosition = parent.contents[-1+(delta>0)].position
-            for elem in parent.contents[::unit]:
-                if elem in elems:
-                    positionChanges.append( (elem.position, elem.position+delta) )
-                    currentPosition = elem.position + delta + unit
-                else:
-                    if elem.position*unit < currentPosition*unit:
-                        positionChanges.append( (elem.position, currentPosition) )
-                    currentPosition += unit
-                    
-            command = commands.PositionChangeCommand(modify.EDITOR, parent.id, positionChanges, self.tr('position change'))
-            modify.push(command)
-            
+                result.append(album)
+        for key, meta in metaContainers.items():
+            meta.tags = tags.findCommonTags(meta.contents, True)
+            meta.tags[tags.TITLE] = [key[1]]
+            meta.tags[albumTag] = [key[1]]
+            meta.sortContents()
+            for i in range(1, len(meta.contents)):
+                if meta.contents[i].position == meta.contents[i-1].position:
+                    raise RuntimeError('multiple positions below same meta-container -- please fix this with TagEditor!!')
+            result.append(meta)
+        return result

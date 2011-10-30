@@ -20,9 +20,18 @@
 
 import re, itertools
 from omg import config, constants
+from difflib import SequenceMatcher
+
+def longestSubstring(a, b):
+    """Return the longest common substring of *a* and *b*."""
+    sm = SequenceMatcher(None, a, b)
+    result = sm.find_longest_match(0, len(a), 0, len(b))
+    return a[result[0]:result[0]+result[2]]
+
 
 def replace(text,dict):
-    """Replace multiple pairs at a single blow. To be exact: The keys of *dict* are replaced by the corresponding values."""
+    """Replace multiple pairs at a single blow. To be exact: The keys of *dict* are replaced by the
+    corresponding values."""
     regex = re.compile('|'.join(map(re.escape,dict)))
     def translate(match):
         return dict[match.group(0)]
@@ -30,21 +39,25 @@ def replace(text,dict):
 
 
 def nextNonWhiteSpace(string,pos=0):
-    """Return the position of the first non-whitespace character in *string*, beginning at *pos*. If no such character is found, return the length of *string*."""
+    """Return the position of the first non-whitespace character in *string*, beginning at *pos*. If no such
+    character is found, return the length of *string*."""
     while pos < len(string) and string[pos].isspace():
         pos = pos + 1
     return pos
 
 
 def nextWhiteSpace(string,pos=0):
-    """Return the position of the first whitespace character in *string*, beginning at *pos*. If no such character is found, return the length of *string*."""
+    """Return the position of the first whitespace character in *string*, beginning at *pos*. If no such
+    character is found, return the length of *string*."""
     while pos < len(string) and not string[pos].isspace():
         pos = pos + 1
     return pos
 
 
 def formatLength(lengthInSeconds):
-    """Convert a number of seconds into a string like ``01:34``, ``00:05`` or ``1:20:00``. Hours are only displayed when *lengthInSeconds* is at least 3600. Minutes and seconds are displayed with leading zeros."""
+    """Convert a number of seconds into a string like ``01:34``, ``00:05`` or ``1:20:00``. Hours are only
+    displayed when *lengthInSeconds* is at least 3600. Minutes and seconds are displayed with leading zeros.
+    """
     if not isinstance(lengthInSeconds,int):
         lengthInSeconds = int(lengthInSeconds)
         
@@ -55,6 +68,7 @@ def formatLength(lengthInSeconds):
     else:
         hours = int(lengthInSeconds / 3600)
         return "{0:d}:{1:02d}:{2:02d}".format(hours,minutes,seconds)
+
 
 def commonPrefix(strings):
     """Given a list of string or something that can be converted to one, return the longest common prefix."""
@@ -68,17 +82,21 @@ def commonPrefix(strings):
 
         
 def numberFromPrefix(string):
-    """Check whether string starts with something like ``'23'``, ``'1.'``, ``'IV.  '``. To be precise: This method first checks whether *string* starts with an arabic or roman integer number (roman numbers are case-insensitive). If so, the method returns a tuple containing
+    """Check whether string starts with something like ``'23'``, ``'1.'``, ``'IV.  '``. To be precise: This
+    method first checks whether *string* starts with an arabic or roman integer number (roman numbers are
+    case-insensitive). If so, the method returns a tuple containing
 
         * the number (as ``int``) and
-        * the prefix. This is the part at the beginning of *string* containing the number and -- if present -- a period directly following the number and/or subsequent whitespace.
+        * the prefix. This is the part at the beginning of *string* containing the number and -- if present
+          -- a period directly following the number and/or subsequent whitespace.
 
     If no number is found, this method returns ``(None,"")``. For example::
 
         >>> numberFromPrefix("IV. Allegro vivace")
         (4,"IV. ")
 
-    This method is used to find numbers in song titles. To avoid false positives, it currently finds only roman numbers build from I,V and X.
+    This method is used to find numbers in song titles. To avoid false positives, it currently finds only
+    roman numbers build from I,V and X.
     """
     if len(string) == 0:
         return (None,"")
@@ -109,7 +127,9 @@ def numberFromPrefix(string):
 
 
 def rstripSeparator(string):
-    """Return a copy of *string* where whitespace at the end is removed. If after removing whitespace the string contains one of the separators from ``constants.SEPARATORS`` at its end, remove it together with additional whitespace."""
+    """Return a copy of *string* where whitespace at the end is removed. If after removing whitespace the
+    string contains one of the separators from ``constants.SEPARATORS`` at its end, remove it together with
+    additional whitespace."""
     string = string.rstrip()
     for sep in constants.SEPARATORS:
         if string.endswith(sep):
@@ -128,7 +148,8 @@ def isRomanNumber(string):
 
 
 def romanToArabic(roman):
-    """Return the value of the given roman number (which may contain upper and lower case letters) or raise a :exc:`ValueError` if *roman* is not a correct roman number."""
+    """Return the value of the given roman number (which may contain upper and lower case letters) or raise
+    a :exc:`ValueError` if *roman* is not a correct roman number."""
     roman = roman.upper()
     if not all(c in "MDCLXVI" for c in roman):
         raise ValueError("Invalid character in roman number.")
