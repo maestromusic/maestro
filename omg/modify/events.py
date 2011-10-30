@@ -146,13 +146,7 @@ class PositionChangeEvent(ElementChangeEvent):
         return len(element.contents)
     
     def applyTo(self, element):
-        logger.warning('this function is crappy and should not be used.')
-        assert element.id == self.parentId
-        for elem in element.contents:
-            if elem.position in self.positionMap:
-                elem.position = self.positionMap[elem.position]
-        if hasattr(element, 'sortContents'):
-            element.sortContents()
+        raise NotImplementedError("PositionChangeEvent to complicated for applyTo -- use RootedTreeModel.changePositions!")
 
         
     
