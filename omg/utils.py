@@ -20,6 +20,7 @@ import datetime, os, functools
 from omg import config
 from omg import constants
 from PyQt4 import QtGui
+from collections import OrderedDict
 
 
 def mapRecursively(f,aList):
@@ -93,15 +94,26 @@ def absPath(file):
 
 
 def collectFiles(paths):
-    """Return a list of absolute paths to all files in the given paths (which must be absolute, too).
-    That is, if a path in *paths* is a file, it will be contained in the resulting list, whereas if it is a
-    directory, all files within (recursively) will be contained in the result."""
-    filePaths = []
+    """Finds all music files below the given *paths*. The output is a dict mapping subdirectory paths to
+    lists of contained music files."""
+    
+    filePaths ={}
+    def add(file, parent = None):
+        
+        if not hasKnownExtension(file):
+            return
+        dir = parent or os.path.dirname(file)
+        if dir not in filePaths:
+            filePaths[dir] = []
+        filePaths[dir].append(file)
     for path in paths:
         if os.path.isfile(path):
-            filePaths.append(path)
-        elif os.path.isdir(path):
-            filePaths.extend(collectFiles(os.path.join(path,p) for p in os.listdir(path)))
+            add(path)
+        else:
+            for parent, dirs, files in os.walk(path):
+                for f in sorted(files):
+                    add(os.path.join(parent, f), parent)
+                dirs.sort()
     return filePaths
 
 
