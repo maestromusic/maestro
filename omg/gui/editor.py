@@ -59,12 +59,10 @@ def storeProfiles():
     storage_profiles = {}
     for name, lst in profiles().items():
         storage_profiles[name] = []
-        print(lst)
         for item in lst:
             if item == "DIRECTORY":
                 storage_profiles[name].append(item)
             else:
-                print(item)
                 storage_profiles[name].append('t' + item.name)
     config.storage.editor.guess_profiles = storage_profiles
         
@@ -313,7 +311,9 @@ is on, files will only be grouped together if they are in the same directory."""
         descriptionLabel.setWordWrap(True)
         mainLayout.addWidget(descriptionLabel)
         self.profileChooser = QtGui.QComboBox(self)
-        self.profileChooser.addItems(list(profiles().keys()))
+        prfs = list(profiles().keys())
+        self.profileChooser.addItems(prfs)
+        self.profileChooser.setCurrentIndex(prfs.index(profile) if profile != '' else 0)
         self.profileChooser.setSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Preferred)
         self.profileChooser.currentIndexChanged[str].connect(self.setCurrentProfile)
         self.newProfileButton = QtGui.QPushButton(self.tr("new"))
@@ -367,9 +367,6 @@ guessing. This is useful in most cases, unless you have albums that are split ac
         self.setMainGrouperButton.clicked.connect(self.setMain)
         configSideLayout.addWidget(self.setMainGrouperButton)
         configSideLayout.addStretch()
-        self.printConfigButton = QtGui.QPushButton("OMGWTF")
-        self.printConfigButton.clicked.connect(lambda: print(profiles()))
-        configSideLayout.addWidget(self.printConfigButton)
         configLayout.addWidget(self.preview)
         configLayout.addLayout(configSideLayout)
         mainLayout.addLayout(configLayout)
@@ -423,7 +420,6 @@ guessing. This is useful in most cases, unless you have albums that are split ac
                 action.setDisabled(action.data() in profile)
     
     def renameCurrent(self, newName):
-        #newName = self.nameEdit.text()
         profile = profiles()[self.profile]
         profiles()[newName] = profile
         del profiles()[self.profile]
