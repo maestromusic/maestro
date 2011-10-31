@@ -346,14 +346,14 @@ class ValueNode(CriterionNode):
         CriterionNode.__init__(self,parent,model)
         self.valueIds = valueIds
         self.values = [value]
-        if config.options.gui.browser_show_sort_values:
+        if config.options.gui.browser.show_sort_values:
             self.sortValues = [sortValue if sortValue is not None else value]
     
     def getDisplayValues(self):
         """Return the values that should be displayed for this node."""
-        if config.options.gui.browser_show_sort_values:
-            return self.values
-        else: return self.sortValues
+        if config.options.gui.browser.show_sort_values:
+            return self.sortValues
+        else: return self.values
 
     def getCriterion(self):
         return search.criteria.TagIdCriterion(self.valueIds)
@@ -369,7 +369,7 @@ class ValueNode(CriterionNode):
         """
         self.values.extend(other.values)
         self.values.sort()
-        if config.options.gui.browser_show_sort_values:
+        if config.options.gui.browser.show_sort_values:
             self.sortValues.extend(other.sortValues)
             self.sortValues.sort()
         qtIndex = self.model.getIndex(self)

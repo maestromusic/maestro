@@ -293,7 +293,25 @@ class Element(Node):
         else:
             return self.id is not None and (self.isFile() or all(e.isInDB(True) for e in self.contents))
 
-    def export(self,attributes,copyList=[],replace={}):
+    def export(self,attributes,copyList=['contents'],replace={}):
+        """Return a copy of this element with a specified set of attributes. In contrast to copy this method
+        allows to control what attributes the result will have and loads missing attributes from the
+        database. Therefore this method is particularly useful when elements are exported from one component
+        to another (e.g. drops, events).
+        
+            - *attributes* is the list of attributes the result will have. It must not include ''id'',
+              because this attribute is always copied. Attributes that are missing in the original node will
+              be loaded from the database/filesystem.
+            - usually attributes will be copied by reference. *copyList* is a list that may contain
+              ''contents'',''flags'' and/or ''tags''. When contained in *copyList*, these attributes will be
+              really copied. In case of ''contents'' this implies applying this method with the same
+              parameters recursively to the children.
+              Warning: Usually you will want a real copy of the contents. Elements in a shallow copy will
+              have broken parent pointers. Therefore ''['contents']'' is the default value.
+            - finally you may give a dict *replace* mapping attribute names to values. These values will
+              overwrite corresponding values from the original.
+        
+        \ """ 
         if isinstance(self,Container):
             result = Container(self.id,None,None,None,None,None)
         else: result = File(self.id,None,None,None,None,None)
