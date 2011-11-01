@@ -35,7 +35,7 @@ LEFT,RIGHT = 1,2
 
 class DelegateStyle:
     """A DelegateStyle is used to specify the style of texts in a TextItem or MultiTextItem. It stores the
-    three attributes *fontSize*, *bold* and *italic*.
+    three attributes *fontSize*, *bold* and *italic*. Note that *fontSize* stores the pointsize of the font.
     """
     def __init__(self,fontSize,bold,italic):
         self.fontSize = fontSize
@@ -44,9 +44,9 @@ class DelegateStyle:
 
 
 # Some standard styles used in the delegates
-STD_STYLE = DelegateStyle(11,False,False)
-ITALIC_STYLE = DelegateStyle(11,False,True)
-BOLD_STYLE = DelegateStyle(11,True,False)
+STD_STYLE = DelegateStyle(8,False,False)
+ITALIC_STYLE = DelegateStyle(STD_STYLE.fontSize,False,True)
+BOLD_STYLE = DelegateStyle(STD_STYLE.fontSize,True,False)
         
 
 class AbstractDelegate(QtGui.QStyledItemDelegate):
@@ -104,6 +104,8 @@ class AbstractDelegate(QtGui.QStyledItemDelegate):
         
         # Initialize. Subclasses or Delegate items may access painter and option.
         self.painter = painter
+        # Draw the background depending on selection etc.
+        QtGui.QApplication.style().drawControl(QtGui.QStyle.CE_ItemViewItem,option,painter)
         painter.save()
         painter.translate(option.rect.x(),option.rect.y())
         self.option = option
@@ -226,7 +228,7 @@ class AbstractDelegate(QtGui.QStyledItemDelegate):
         """Return a QFontMetrics-object for a font with the given style."""
         if style is None:
             style = STD_STYLE
-        self.font.setPixelSize(style.fontSize)
+        self.font.setPointSize(style.fontSize)
         self.font.setBold(style.bold)
         self.font.setItalic(style.italic)
         return QtGui.QFontMetrics(self.font)
@@ -236,7 +238,7 @@ class AbstractDelegate(QtGui.QStyledItemDelegate):
         methods of DelegateItems."""
         if style is None:
             style = STD_STYLE
-        self.font.setPixelSize(style.fontSize)
+        self.font.setPointSize(style.fontSize)
         self.font.setBold(style.bold)
         self.font.setItalic(style.italic)
         self.painter.setFont(self.font)

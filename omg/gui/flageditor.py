@@ -324,6 +324,8 @@ class AddFlagPopup(dialogs.FancyPopup):
             if self.model.getRecord(flag) is None:
                 item = QtGui.QListWidgetItem(flag.name)
                 item.setData(Qt.UserRole,flag)
+                if flag.icon is not None:
+                    item.setIcon(flag.icon)
                 self.flagList.addItem(item)
                 
         buttonLayout = QtGui.QHBoxLayout()
