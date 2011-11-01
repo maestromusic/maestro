@@ -465,8 +465,8 @@ class BrowserMimeData(mimedata.MimeData):
             return self.elementList
         
         # self.elementList may contain CriterionNodes or (unlikely) LoadingNodes.
-        self.elementList = itertools.chain.from_iterable(self._getElementsInstantly(node)
-                                                            for node in self.nodeList)
+        self.elementList = list(itertools.chain.from_iterable(self._getElementsInstantly(node)
+                                                              for node in self.nodeList))
         self.nodeList = None # Save memory
         return self.elementList
                                           
