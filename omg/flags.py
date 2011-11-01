@@ -95,7 +95,7 @@ def exists(name):
 
 def isValidFlagname(name):
     """Return whether *name* is a valid name for a flagtype."""
-    return 0 < len(name.encoded()) <= constants.FLAG_VARCHAR_LENGTH and not name.isspace()
+    return 0 < len(name.encode()) <= constants.FLAG_VARCHAR_LENGTH and not name.isspace()
 
 
 def allFlags():

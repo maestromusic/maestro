@@ -63,6 +63,17 @@ class Formatter:
             return node.tags[tag]
         else: return []
         
+    def flags(self,removeParentFlags=False):
+        values = self.element.flags[:]
+        parent = self.element.getParent()
+        while parent is not None:
+            if isinstance(parent,models.Element) and parent.flags is not None:
+                for flag in parent.flags:
+                    if flag in values:
+                        values.remove(flag)
+            parent = parent.getParent()
+        return values
+    
     def title(self,titles=None):
         """Return the title or the path or the path if the element contains no title or some dummy-title if
         it even doesn't contain a path. If a list of strings is given for the optional argument *titles*
