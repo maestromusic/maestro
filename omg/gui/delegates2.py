@@ -307,6 +307,27 @@ class CoverItem(DelegateItem):
         return self.size,self.size
 
 
+class ColorBarItem(DelegateItem):
+    def __init__(self,background,width,height=None):
+        self.background = background
+        self.width = width
+        self.height = height
+        
+    def sizeHint(self,delegate,availableWidth=None):
+        return self.width,self.height if self.height is not None else 1
+    
+    def paint(self,delegate,rect,align=LEFT):
+        if align == RIGHT:
+            left = rect.x() + rect.width() - self.width
+        else: left = rect.x()
+        if self.height is None:
+            height = rect.height()
+        else: height = self.height()
+        delegate.painter.fillRect(QtCore.QRect(left,rect.y(),self.width,height),
+                                  self.background)
+        return self.width,height
+
+
 class IconBarItem(DelegateItem):
     """An IconBarItem displays a list of icons in a grid. The size of the grid is specified by the parameters
     *rows* and *columns*, of which at least one must be None: The None-parameter will be set to the minimum
@@ -322,7 +343,7 @@ class IconBarItem(DelegateItem):
     
         - *iconSize*: size of the icon (icons are assumed to be quadratic). Default is 16.
         - *hSpace*: horizontal space between icons
-        - *vSpace*: vertica space between icons
+        - *vSpace*: vertical space between icons
         
     \ """
     iconSize = 16
@@ -521,8 +542,8 @@ class BrowserDelegate(AbstractDelegate):
 
             # Cover
             if node.hasCover():
-                self.addLeft(CoverItem(node.getCover(32),32))
-                availableWidth -= 32 + self.hSpace
+                self.addLeft(CoverItem(node.getCover(self.coverSize),self.coverSize))
+                availableWidth -= self.coverSize + self.hSpace
             
             # Title
             titleItem = TextItem(f.title(),BOLD_STYLE if node.isContainer() else STD_STYLE)
@@ -628,3 +649,80 @@ class BrowserDelegate(AbstractDelegate):
         elif isinstance(node,browser.ValueNode) and tag.id in node.valueIds:
             return node.values
         else: return []
+        
+
+class EditorDelegate(AbstractDelegate):
+    """Delegate for the editor."""
+    showPaths = True
+    
+    def __init__(self,view):
+        super().__init__(view)
+        self.leftTags = [tags.get(name) for name in
+                            config.options.gui.editor.left_tags if tags.exists(name)]
+        self.rightTags = [tags.get(name) for name in
+                            config.options.gui.editor.right_tags if tags.exists(name)]
+        self.coverSize = config.options.gui.editor.cover_size
+        
+    def layout(self,index,availableWidth):
+        element = self.model.data(index)
+        f = formatter.Formatter(element)
+        
+        # Prepare data
+        if element.tags is None:
+            element.loadTags()
+        leftTexts,rightTexts = self._prepareTags(f,element)
+        if element.flags is None:
+            element.loadFlags()
+        flagIcons,flagsWithoutIcon = [],[]
+        for flag in f.flags(True):
+            if flag.icon is not None:
+                flagIcons.append(flag.icon)
+            else: flagsWithoutIcon.append(flag)
+
+        # In DB
+        if not element.isInDB():
+            self.addLeft(ColorBarItem(QtGui.QColor("yellow"),10))
+            
+        # Cover
+        if element.hasCover():
+            self.addLeft(CoverItem(element.getCover(self.coverSize),self.coverSize))
+        
+        # Flag-Icons
+        if len(flagIcons) > 0:
+            self.addRight(IconBarItem(flagIcons,columns=2 if len(flagIcons) > 2 else 1))
+            
+        # Title
+        titleItem = TextItem(f.title(),BOLD_STYLE if element.isContainer() else STD_STYLE)
+        self.addCenter(titleItem)
+        
+        self.newRow()
+        
+        if self.showPaths and element.isFile():
+            self.addCenter(TextItem(element.path,ITALIC_STYLE))
+            self.newRow()
+            
+        # Tags
+        if len(leftTexts) > 0 or len(rightTexts) > 0:
+            self.addCenter(MultiTextItem(leftTexts,rightTexts))
+            self.newRow()
+            
+        # Flags without icon
+        if len(flagsWithoutIcon) > 0:
+            self.addCenter(TextItem(', '.join(flag.name for flag in flagWithoutIcon)))
+            
+    def _prepareTags(self,formatter,element):
+        leftTexts = []
+        for tag in self.leftTags:
+            if tag in element.tags:
+                text = formatter.tag(tag,True)
+                if len(text) > 0:
+                    leftTexts.append(text)
+        rightTexts = []
+        for i,tag in enumerate(self.rightTags):
+            if tag in element.tags:
+                text = formatter.tag(tag,True)
+                if len(text) > 0:
+                    rightTexts.append(text)
+        
+        return leftTexts,rightTexts
+    

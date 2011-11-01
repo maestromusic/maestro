@@ -85,6 +85,11 @@ defaults = OrderedDict((
 ("gui", {
     "mime": (str,"application/x-omgelementlist","Mime-type used to copy and paste data within OMG."),
     "iconsize": (int,16,"Size of various icons."),
+    "editor": {
+                "cover_size": (int,64,"Size of covers in the editor."),
+                "left_tags": (list,['composer','artist','performer'],"Tags in the left column."),
+                "right_tags": (list,['date','conductor'],"Tags in the right column."),
+    },
     "flageditor": {
                 "animation": (bool,True,"Enable/disable animations in the flageditor."),
                 "max_tooltip_lines": (int,5,"Maximum number of lines that will be shown in a tooltip (containing element titles) in the flageditor.")
