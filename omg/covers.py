@@ -18,67 +18,79 @@
 
 import os
 import shutil
+
 from PyQt4 import QtGui,QtCore
 from PyQt4.QtCore import Qt
 
-# Path to cover directory
-COVER_DIR = os.path.expanduser("~/.omg/cover/")
+from omg import config
+
+COVER_DIR = os.path.join(config.CONFDIR,'cover')
 
 
 def hasCover(elementId):
     """Return whether the element with the given id has a cover."""
     assert isinstance(elementId,int)
-    return os.path.exists(COVER_DIR+"large/"+str(elementId))
+    return os.path.exists(os.path.join(COVER_DIR,"large",str(elementId)))
+
 
 def getCoverPath(elementId,size=None):
-    """Return the path to the cover of the element with id <elementId> in size <size>x<size> pixel or in original size, if <size> is None. Return None if the element has no cover."""
+    """Return the path to the cover of the element with id *elementId* in size *size*x*size* pixel or in
+    original size, if *size* is None. Return None if the element has no cover."""
     assert isinstance(elementId,int)
     if size is None:
-        dir = COVER_DIR+"large/"
-    else: dir = COVER_DIR+"cache_{0}/".format(size)
+        dir = os.path.join(COVER_DIR,'large')
+    else: dir = os.path.join(COVER_DIR,'cache_{0}'.format(size))
+    path = os.path.join(dir,str(elementId))
     
-    if not os.path.exists(dir+str(elementId)):
+    if not os.path.exists(path):
         if size is None:
             return None # Element does not have a cover
         else:
             try:
                 cacheCover(elementId,size)
-                return dir+str(elementId)
+                return path
             except IOError:
                 return None
-    else: return dir+str(elementId)
-    
+    else: return path
+
+
 def getCover(elementId,size=None):
-    """Return the cover of the given element as QImage. If no cover is found or Qt was not able to load the image, return None. If <size> is None, the large cover will be returned. Otherwise the cover will be scaled to size x size pixels and cached in the appropriate folder."""
+    """Return the cover of the given element as QPixmap. If no cover is found or Qt was not able to load the
+    image, return None. If *size* is None, the large cover will be returned. Otherwise the cover will be
+    scaled to size x size pixels and cached in the appropriate folder."""
     assert isinstance(elementId,int)
     path = getCoverPath(elementId,size)
     if path is not None:
-        cover = QtGui.QImage(path)
+        cover = QtGui.QPixmap(path)
         if not cover.isNull(): # Loading succeeded
             return cover
     return None
-    
+
+
 def cacheCover(elementId,size):
-    """Create a thumbnail of the cover of the element with the given id with <size>x<size> pixels and cache it in the appropriate cache-folder."""
+    """Create a thumbnail of the cover of the element with the given id with *size*x*size* pixels and cache
+    it in the appropriate cache-folder."""
     assert isinstance(elementId,int)
     assert isinstance(size,int)
-    largeCover = QtGui.QImage(COVER_DIR+"large/"+str(elementId))
+    largeCover = QtGui.QPixmap(os.path.join(COVER_DIR,'large',str(elementId)))
     if largeCover.isNull():
-        raise IOError("Cover of element {0} could not be loaded.".format(elementId))
+        raise IOError("Cover of element {} could not be loaded.".format(elementId))
     smallCover = largeCover.scaled(QtCore.QSize(size,size),Qt.KeepAspectRatio,Qt.SmoothTransformation)
     
-    dir = COVER_DIR+"cache_{0}/".format(size)
+    dir = os.path.join(COVER_DIR,'cache_{}'.format(size))
     if not os.path.isdir(dir):
         os.mkdir(dir)
     
-    if not smallCover.save(dir+str(elementId),"png"):
-        raise IOError("File {0} could not be saved.".format(dir+str(elementId)))
+    path = os.path.join(dir,str(elementId))
+    if not smallCover.save(path,"png"):
+        raise IOError("File {} could not be saved.".format(path))
 
 
 def cacheAll(size):
-    """Create thumbnails with <size>x<size> pixels of all covers and save them in the appropriate cache-folder."""
-    for path in os.listdir(COVER_DIR+"large/"):
-        if path.isdigit() and os.path.isfile(COVER_DIR+"large/"+path):
+    """Create thumbnails with *size*x*size* pixels of all covers and save them in the appropriate
+    cache-folder."""
+    for path in os.listdir(os.path.join(COVER_DIR,'large')):
+        if path.isdigit() and os.path.isfile(os.path.join(COVER_DIR,'large',path)):
             try:
                 cacheCover(path,size)
             except IOError as e:
@@ -89,15 +101,15 @@ def setCover(id,cover):
     assert isinstance(id,int)
     if not os.path.exists(COVER_DIR):
         os.mkdir(COVER_DIR)
-    if not os.path.exists(COVER_DIR+"large/"):
-        os.mkdir(COVER_DIR+"large/")
-    if not cover.save(COVER_DIR+"large/"+str(id),"png"):
+    if not os.path.exists(os.path.join(COVER_DIR,'large')):
+        os.mkdir(os.path.join(COVER_DIR,'large'))
+    if not cover.save(os.path.join(COVER_DIR,'large',str(id)),"png"):
         return False
     else:
         # Remove cached files
         for path in os.listdir(COVER_DIR):
-            if path[0:6] == "cache_" and os.path.isfile(COVER_DIR+path+"/"+str(id)):
-                os.remove(COVER_DIR+path+"/"+str(id))
+            if path[0:6] == "cache_" and os.path.isfile(os.path.join(COVER_DIR,path,str(id))):
+                os.remove(os.path.join(COVER_DIR,path,str(id)))
         # Distribute the change
         distributor.indicesChanged.emit(distributor.DatabaseChangeNotice(id,cover=True))
         return True

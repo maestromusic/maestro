@@ -84,7 +84,7 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
     
     def setShowHiddenValues(self,showHiddenValues):
         """Show or hide ValueNodes where the hidden-flag in values_varchar is set."""
-        if showHiddenValues != showHiddenValues:
+        if showHiddenValues != self.showHiddenValues:
             self.showHiddenValues = showHiddenValues
             self.reset()
             
@@ -177,7 +177,7 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
                     if value in aNode.values:
                         aNode.valueIds[tagId] = valueId
                         break
-
+    
         # Check whether a VariousNode is necessary
         result = db.query("""
             SELECT t.value_id
@@ -203,7 +203,7 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
                 self.endInsertRows()
         elif len(valueNodes) > 0:
             node.setContents(valueNodes)
-        
+    
         # Directload shortcut
         # Tag-layers containing only one CriterionNode are not helpful, so if this happens load the contents
         # of the only CriterionNode. There is no need to search because it would give the same results.
@@ -338,22 +338,22 @@ class ValueNode(CriterionNode):
     display e.g. all artists and all composers in one tag-layer.
     """
     def __init__(self,parent,model,value,valueIds,sortValue):
-        """Initialize this ValueNode with the parent-node <parent> and the given model. <valueIds> is a dict
+        """Initialize this ValueNode with the parent-node *parent* and the given model. *valueIds* is a dict
         mapping tags to value-ids of the tag. This node will contain elements having at least one of the
-        value-ids in the corresponding tag. <value> is the value of the value-ids (which should be the same
+        value-ids in the corresponding tag. *value* is the value of the value-ids (which should be the same
         for all tags) and will be displayed on the node.
         """
         CriterionNode.__init__(self,parent,model)
         self.valueIds = valueIds
         self.values = [value]
-        if config.options.gui.browser_show_sort_values:
+        if config.options.gui.browser.show_sort_values:
             self.sortValues = [sortValue if sortValue is not None else value]
     
     def getDisplayValues(self):
         """Return the values that should be displayed for this node."""
-        if config.options.gui.browser_show_sort_values:
-            return self.values
-        else: return self.sortValues
+        if config.options.gui.browser.show_sort_values:
+            return self.sortValues
+        else: return self.values
 
     def getCriterion(self):
         return search.criteria.TagIdCriterion(self.valueIds)
@@ -369,7 +369,7 @@ class ValueNode(CriterionNode):
         """
         self.values.extend(other.values)
         self.values.sort()
-        if config.options.gui.browser_show_sort_values:
+        if config.options.gui.browser.show_sort_values:
             self.sortValues.extend(other.sortValues)
             self.sortValues.sort()
         qtIndex = self.model.getIndex(self)
@@ -465,8 +465,8 @@ class BrowserMimeData(mimedata.MimeData):
             return self.elementList
         
         # self.elementList may contain CriterionNodes or (unlikely) LoadingNodes.
-        self.elementList = itertools.chain.from_iterable(self._getElementsInstantly(node)
-                                                            for node in self.nodeList)
+        self.elementList = list(itertools.chain.from_iterable(self._getElementsInstantly(node)
+                                                              for node in self.nodeList))
         self.nodeList = None # Save memory
         return self.elementList
                                           

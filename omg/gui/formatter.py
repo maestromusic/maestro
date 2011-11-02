@@ -26,6 +26,7 @@ from PyQt4 import QtCore
 translate = QtCore.QCoreApplication.translate
 trEnc = QtCore.QCoreApplication.CodecForTr
  
+ 
 class Formatter:
     """A Formatter takes an element and offers several functions to get formatted output from the tags, length, title etc. of the element."""
     def __init__(self,element):
@@ -62,6 +63,17 @@ class Formatter:
             return node.tags[tag]
         else: return []
         
+    def flags(self,removeParentFlags=False):
+        values = self.element.flags[:]
+        parent = self.element.getParent()
+        while parent is not None:
+            if isinstance(parent,models.Element) and parent.flags is not None:
+                for flag in parent.flags:
+                    if flag in values:
+                        values.remove(flag)
+            parent = parent.getParent()
+        return values
+    
     def title(self,titles=None):
         """Return the title or the path or the path if the element contains no title or some dummy-title if
         it even doesn't contain a path. If a list of strings is given for the optional argument *titles*
@@ -69,7 +81,7 @@ class Formatter:
         if titles is not None:
             result = " - ".join(titles)
         elif self.element.tags is None:
-            result = 'maddin: warum passiert das?'
+            result = translate("Formatter","<No title>")
         elif tags.TITLE in self.element.tags:
             result = " - ".join(self.element.tags[tags.TITLE])
         elif isinstance(self.element,models.File):

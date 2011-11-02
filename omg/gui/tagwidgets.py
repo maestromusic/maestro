@@ -65,13 +65,28 @@ class TagLabel(QtGui.QLabel):
                 else: super().setText('<img src="{}" widht="{}" height="{}"> {}'
                                       .format(tag.iconPath,self.iconSize.width(),
                                               self.iconSize.height(),tag.translated()))
-            else: super().setText(tag.translated())
+            else:
+                if self.iconOnly:
+                    # Display only the beginning of the tagname, occupying two times the width of an icon
+                    # (in most cases this should suffice to guess the tag).
+                    fm = QtGui.QFontMetrics(self.font())
+                    text = fm.elidedText(tag.translated(),Qt.ElideRight,2*self.iconSize.width())
+                    self.setToolTip(tag.translated())
+                else:
+                    text = tag.translated()
+                    self.setToolTip(None)
+                super().setText(text)
         
     def setIconOnly(self,iconOnly):
         """Set whether the label should use iconOnly-mode: When set it will only display the icon and no text,
         if an icon is available."""
         if iconOnly != self.iconOnly:
             self.iconOnly = iconOnly
+            if iconOnly:
+                font = self.font()
+                font.setPointSize(8)
+                self.setFont(font)
+            else: self.setFont(QtGui.QApplication.font())
             self.setTag(self.tag)
             
 

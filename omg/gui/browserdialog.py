@@ -182,7 +182,7 @@ class ViewConfigurationDialog(QtGui.QDialog):
         topLayout = QtGui.QHBoxLayout()
         topLayout.addWidget(QtGui.QLabel(self.tr("Number of views: ")))
         spinBox = QtGui.QSpinBox()
-        spinBox.setRange(1,5)
+        spinBox.setRange(1,config.options.gui.browser.max_view_count)
         spinBox.setValue(len(self.browser.views))
         spinBox.valueChanged.connect(self._handleValueChanged)
         topLayout.addWidget(spinBox)
@@ -231,7 +231,7 @@ class ViewConfigurationDialog(QtGui.QDialog):
 class ViewConfiguration(QtGui.QWidget):
     """A row in BrowserDialog which allows to configure a single view."""
     def __init__(self,parent,index):
-        """Initialize this ViewConfiguration with the given parent and the label "View <index+1>: "."""
+        """Initialize this ViewConfiguration with the given parent and the label "View *index+1*: "."""
         QtGui.QWidget.__init__(self,parent)
         
         # GUI

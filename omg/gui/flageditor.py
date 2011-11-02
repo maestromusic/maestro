@@ -86,7 +86,7 @@ class FlagEditor(QtGui.QWidget):
                 self._flagWidgets.remove(flagWidget)
                
                 # No need to start animation for the last flag
-                if config.options.gui.flageditor_animation and pos < len(self._flagWidgets):
+                if config.options.gui.flageditor.animation and pos < len(self._flagWidgets):
                     size = flagWidget.sizeHint()
                     empty = QtGui.QWidget()
                     if self.vertical:
@@ -193,7 +193,7 @@ class FlagWidget(QtGui.QWidget):
         # If the record is not common to all elements, display a tooltip containing the titles of those
         # elements that have the flag. But do not use more than flageditor_maxtooltiplines lines.
         if not self.record.isCommon():
-            maxLines = config.options.gui.flageditor_maxtooltiplines
+            maxLines = config.options.gui.flageditor.max_tooltip_lines
             if len(self.record.elementsWithFlag) > maxLines:
                 lines = [element.title for element in self.record.elementsWithFlag[:maxLines-1]]
                 lines.append(self.tr("(And %n other)",'',len(self.record.elementsWithFlag) - (maxLines-1)))
@@ -324,6 +324,8 @@ class AddFlagPopup(dialogs.FancyPopup):
             if self.model.getRecord(flag) is None:
                 item = QtGui.QListWidgetItem(flag.name)
                 item.setData(Qt.UserRole,flag)
+                if flag.icon is not None:
+                    item.setIcon(flag.icon)
                 self.flagList.addItem(item)
                 
         buttonLayout = QtGui.QHBoxLayout()
