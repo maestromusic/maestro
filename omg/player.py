@@ -44,7 +44,7 @@ class PlayerBackend(QtCore.QObject):
     stateChanged = QtCore.pyqtSignal(int)
     volumeChanged = QtCore.pyqtSignal(int)
     currentSongChanged = QtCore.pyqtSignal(int)
-    elapsedChanged = QtCore.pyqtSignal(float)
+    elapsedChanged = QtCore.pyqtSignal(float, float)
     playlistChanged = QtCore.pyqtSignal()
     
     def __init__(self, name):
@@ -54,6 +54,7 @@ class PlayerBackend(QtCore.QObject):
         self.volume = 0
         self.currentSong = 0
         self.elapsed = 0
+        self.currentSongLength = 0
         
     def setState(self, state):
         """Set the state of the player to one of STOP, PLAY, PAUSE."""

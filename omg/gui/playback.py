@@ -55,12 +55,24 @@ class PlaybackWidget(QtGui.QDockWidget):
         
         self.setBackend(self.backendChooser.itemData(0))
     
+    def updateSlider(self, current, total):
+        if self.seekSlider.isSliderDown():
+            return
+        if self.seekSlider.maximum() != total:
+            print('update max')
+            self.seekSlider.setRange(0, int(total))
+        self.seekSlider.setValue(current)
     def setBackend(self, backend):
         if hasattr(self, 'backend'):
             pass #TODO: disconnect signals
         self.backend = backend
-        self.backend.elapsedChanged.connect(self.seekSlider.setValue)
+        
+        self.backend.elapsedChanged.connect(self.updateSlider)
         self.backend.stateChanged.connect(lambda state: self.ppButton.setPlaying(state == player.PLAY))
+        
+        self.ppButton.stateChanged.connect(backend.setState)
+        self.stopButton.clicked.connect(lambda: backend.setState(player.STOP))
+        self.seekSlider.sliderMoved.connect(backend.setElapsed)
         
     def update(self):
         self.ppButton.setPlaying(self.backend.state == player.PLAY)
@@ -85,12 +97,15 @@ class PlayPauseButton(QtGui.QPushButton):
     pause = QtCore.pyqtSignal()
     playIcon = utils.getIcon("play.png")
     pauseIcon = utils.getIcon("pause.png")
+    stateChanged = QtCore.pyqtSignal(int)
     
     def __init__(self,parent):
         """Initialize this button with the given parent. The button will be in pause-state."""
         QtGui.QPushButton.__init__(self,self.playIcon,'',parent)
         self.playing = False
         self.clicked.connect(lambda : self.pause.emit() if self.playing else self.play.emit() )
+        self.pause.connect(lambda : self.stateChanged.emit(player.PAUSE))
+        self.play.connect(lambda : self.stateChanged.emit(player.PLAY))
 
     def setPlaying(self,playing):
         """Set the state of this button to play if <playing> is true or pause otherwise."""
