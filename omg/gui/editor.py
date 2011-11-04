@@ -20,7 +20,7 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from collections import OrderedDict
-from ..gui import mainwindow, delegates2
+from ..gui import mainwindow, delegates
 from ..models import editor, Container, Element, RootNode
 from ..modify import commands
 from ..constants import EDITOR
@@ -84,7 +84,7 @@ class EditorTreeView(treeview.TreeView):
         self.setDefaultDropAction(Qt.MoveAction)
         self.setDropIndicatorShown(True)
         self.setModel(editor.EditorModel())
-        self.setItemDelegate(delegates2.EditorDelegate(self))
+        self.setItemDelegate(delegates.EditorDelegate(self))
         
         self.viewport().setMouseTracking(True)
         self.selectionModel().selectionChanged.connect(self._handleSelectionChanged)

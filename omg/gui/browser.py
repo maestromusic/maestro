@@ -23,7 +23,7 @@ from PyQt4.QtCore import Qt
 
 from .. import database as db, config, search, constants, utils, tags, modify, flags
 from ..search import searchbox, criteria as criteriaModule
-from . import mainwindow, treeview, browserdialog, delegates2, tageditor, tagwidgets
+from . import mainwindow, treeview, browserdialog, delegates, tageditor, tagwidgets
 from ..models import browser as browsermodel, Element, Container
 from ..modify.treeactions import TagValueHybridAction
 translate = QtCore.QCoreApplication.translate
@@ -317,7 +317,7 @@ class BrowserTreeView(treeview.TreeView):
         treeview.TreeView.__init__(self,parent)
         self.setModel(browsermodel.BrowserModel(layers,parent))
         self.header().sectionResized.connect(self.model().layoutChanged)
-        self.setItemDelegate(delegates2.BrowserDelegate(self))
+        self.setItemDelegate(delegates.BrowserDelegate(self))
         self._optimizers = []
         #self.doubleClicked.connect(self._handleDoubleClicked)
     
