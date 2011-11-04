@@ -24,6 +24,11 @@ translate = QtCore.QCoreApplication.translate
 from . import mainwindow
 from .. import player, utils
 
+def formatTime(seconds):
+    seconds = int(seconds)
+    minutes = seconds // 60
+    return "{:0>2d}:{:0>2d}".format(minutes, seconds % 60)
+
 class PlaybackWidget(QtGui.QDockWidget):
     def __init__(self, parent = None, state = None, location = None):
         super().__init__(parent)
@@ -31,50 +36,74 @@ class PlaybackWidget(QtGui.QDockWidget):
         widget = QtGui.QWidget()
         self.setWidget(widget)
         
-        layout = QtGui.QHBoxLayout(widget)
+        topLayout = QtGui.QHBoxLayout()
         
-        self.backendChooser = QtGui.QComboBox()
-        for name, pl in player.players.items():
-            self.backendChooser.addItem(name, pl)
-        layout.addWidget(self.backendChooser)
+        self.backendChooser = player.BackendChooser(self)
+        topLayout.addWidget(self.backendChooser)
         
         self.previousButton = QtGui.QPushButton(utils.getIcon("previous.png"),'',self)
         self.ppButton = PlayPauseButton(self)
         self.stopButton = QtGui.QPushButton(utils.getIcon("stop.png"),'',self)
         self.nextButton = QtGui.QPushButton(utils.getIcon("next.png"),'',self)
         
+        self.titleLabel = QtGui.QLabel(self)
+        topLayout.addStretch()
+        topLayout.addWidget(self.titleLabel)
+        topLayout.addStretch()
         self.seekSlider = QtGui.QSlider(Qt.Horizontal,self)
         self.seekSlider.setRange(0,1000)
         self.seekSlider.setTracking(False)
         
-        layout.addWidget(self.previousButton)
-        layout.addWidget(self.ppButton)
-        layout.addWidget(self.stopButton)
-        layout.addWidget(self.nextButton)
-        layout.addWidget(self.seekSlider)
+        bottomLayout = QtGui.QHBoxLayout()
+        self.seekLabel = QtGui.QLabel("0-0", self)
+        topLayout.addWidget(self.previousButton)
+        topLayout.addWidget(self.ppButton)
+        topLayout.addWidget(self.stopButton)
+        topLayout.addWidget(self.nextButton)
+        bottomLayout.addWidget(self.seekSlider)
+        bottomLayout.addWidget(self.seekLabel)
         
-        self.setBackend(self.backendChooser.itemData(0))
+        mainLayout = QtGui.QVBoxLayout(widget)
+        mainLayout.addLayout(topLayout)
+        mainLayout.addLayout(bottomLayout)
+        self.setBackend(self.backendChooser.itemText(0))
+        
+        
     
     def updateSlider(self, current, total):
         if self.seekSlider.isSliderDown():
             return
         if self.seekSlider.maximum() != total:
-            print('update max')
             self.seekSlider.setRange(0, int(total))
         self.seekSlider.setValue(current)
-    def setBackend(self, backend):
+        self.seekLabel.setText("{}-{}".format(formatTime(current), formatTime(total)))
+    
+    def updatePlaylist(self):
+        self.playlistRoot = self.backend.currentPlaylist()
+        
+    def updateCurrent(self, pos):
+        print('update current -- {}'.format(pos))
+        if hasattr(self, "playlistRoot"):
+            self.titleLabel.setTextFormat(Qt.AutoText)
+            self.titleLabel.setText("Playing: <i>{}</i>".format(self.playlistRoot.fileAtOffset(pos).getTitle()))
+    def setBackend(self, name):
         if hasattr(self, 'backend'):
             pass #TODO: disconnect signals
-        self.backend = backend
+        self.backend = player.instance(name)
         
         self.backend.elapsedChanged.connect(self.updateSlider)
         self.backend.stateChanged.connect(lambda state: self.ppButton.setPlaying(state == player.PLAY))
-        
-        self.ppButton.stateChanged.connect(backend.setState)
-        self.stopButton.clicked.connect(lambda: backend.setState(player.STOP))
-        self.seekSlider.sliderMoved.connect(backend.setElapsed)
+        self.backend.playlistChanged.connect(self.updatePlaylist)
+        self.backend.currentSongChanged.connect(self.updateCurrent)
+        self.ppButton.stateChanged.connect(self.backend.setState)
+        self.stopButton.clicked.connect(lambda: self.backend.setState(player.STOP))
+        self.seekSlider.sliderMoved.connect(self.backend.setElapsed)
+        self.previousButton.clicked.connect(self.backend.previous)
+        self.nextButton.clicked.connect(self.backend.next)
+        self.update()
         
     def update(self):
+        print(self.backend.state == player.PLAY)
         self.ppButton.setPlaying(self.backend.state == player.PLAY)
         self.seekSlider.setValue(int(self.backend.elapsed))
         

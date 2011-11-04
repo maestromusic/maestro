@@ -20,11 +20,10 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from collections import OrderedDict
-from ..gui import mainwindow, delegates2
 from ..models import editor, Container, Element, RootNode
 from ..modify import commands
 from ..constants import EDITOR
-from . import treeview
+from . import treeview, mainwindow, delegates2
 from .. import logging, modify, tags, config, utils
 import itertools
 

@@ -165,35 +165,35 @@ class Node:
                 for file in element.getAllFiles():
                     yield file
                         
-    def getFileCount(self):
+    def fileCount(self):
         """Return the number of files contained in this element or in child-elements of it."""
         if self.isFile():
             return 1
         else: return sum(element.getFileCount() for element in self.getContents())
         
-    def getOffset(self):
+    def offset(self):
         """Get the offset of this element in the current tree structure."""
         if self.getParent() is None:
             return 0
         else:
-            offset = self.getParent().getOffset()
+            offset = self.getParent().offset()
             for child in self.getParent().getContents():
                 if child == self:
                     return offset
-                else: offset = offset + child.getFileCount()
+                else: offset = offset + child.fileCount()
             raise ValueError("Node.getOffset: Node {0} is not contained in its parent {1}."
                                 .format(self,self.getParent()))
     
-    def getChildOffset(self,childIndex):
+    def childOffset(self,childIndex):
         """Return the offset of the child with index <childIndex> in this node."""
         if childIndex < 0 or childIndex >= self.getContentCount():
             raise IndexError("childIndex {} is out of bounds.".format(childIndex))
         offset = 0
         for node in self.getContents()[:childIndex]:
-            offset = offset + node.getFileCount()
+            offset = offset + node.fileCount()
         return offset
         
-    def getFileAtOffset(self,offset):
+    def fileAtOffset(self,offset):
         """Get the file at the given <offset>. Note that <offset> is relative to this element, not to the
         whole playlist (unless the element is the rootnode)."""
         assert self.getContents() is not None
@@ -201,12 +201,12 @@ class Node:
         if offset == 0 and self.isFile():
             return self
         else: 
-            child,innerOffset = self.getChildAtOffset(offset)
+            child,innerOffset = self.childAtOffset(offset)
             if child.isFile():
                 return child
-            else: return child.getFileAtOffset(innerOffset)
+            else: return child.fileAtOffset(innerOffset)
         
-    def getChildIndexAtOffset(self,offset):
+    def childIndexAtOffset(self,offset):
         """Return a tuple: the index of the child C that contains the file F with the given offset (relative
         to this element) and the offset of F relative to C ("inner offset").
         For example: If this element is the rootnode and the playlist contains an album with 13 songs and one
@@ -218,8 +218,8 @@ class Node:
         if offset < 0:
             raise IndexError("Offset {0} is out of bounds".format(offset))
         cOffset = 0
-        for i in range(0,self.getContentCount()):
-            fileCount = self.getContent()[i].getFileCount()
+        for i in range(0,self.getContentsCount()):
+            fileCount = self.contents[i].fileCount()
             if offset < cOffset + fileCount:
                 return i,offset-cOffset
             else: cOffset = cOffset + fileCount
@@ -227,12 +227,12 @@ class Node:
             return None,None
         raise IndexError("Offset {0} is out of bounds".format(offset))
     
-    def getChildAtOffset(self,offset):
+    def childAtOffset(self,offset):
         """Return the child containing the file with the given (relative) offset, and the offset of that file
         relative to the child. This is a convenience-method for
         getChildren()[getChildIndexAtOffset(offset)[0]]. Confer getChildIndexAtOffset.
         """
-        index,innerOffset = self.getChildIndexAtOffset(offset)
+        index,innerOffset = self.childIndexAtOffset(offset)
         if index is None:
             return None,None
         else: return self.getContents()[index],innerOffset

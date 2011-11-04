@@ -19,82 +19,162 @@
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
-from omg import player, config
+from omg import player, config, logging, database as db, models
 import mpd
+
+logger = logging.getLogger("omg.plugins.mpd")
 
 MPD_STATES = { 'play': player.PLAY, 'stop': player.STOP, 'pause': player.PAUSE}
 
+default_data = {'host' : 'localhost', 'port': '6600', 'password': ''}
 class MPDThread(QtCore.QThread):
-    
-    def __init__(self, playerInstance, host, port, password = ''):
-        super().__init__()
-        self.host = host
-        self.port = port
-        self.password = password
-        self.state = player.STOP
-        self.elapsed = 0
-        self.player = playerInstance
+    def __init__(self, parent):
+        super().__init__(parent)
         self.start()
-        
+    
     def run(self):
-        print('run!')
+        self.exec_()
+        
+class MPDPlayerBackend(player.PlayerBackend):
+    
+    def __init__(self, name):
+        super().__init__(name)
+        self.host = "localhost"
+        self.port = 6600
+
         self.client = mpd.MPDClient()
         self.client.connect(self.host, self.port)
+        self.playlistVersion = -1
+        self.mpdthread = MPDThread(self)
+        print('before move - {}'.format(self.thread()))
+        self.moveToThread(self.mpdthread)
+        print('after move - {}'.format(QtCore.QThread.currentThreadId()))
         self.timer = QtCore.QTimer()
         self.timer.timeout.connect(self.poll)
-        self.timer.start(50)
-        self.exec_()
-        print('wtf')
+        self.timer.start(200)
+        self.playlistMutex = QtCore.QMutex()
         
     def poll(self):
-        #print('poll!(threaded)')
-        self.mpdStatus = self.client.status()
-        newState = MPD_STATES[self.mpdStatus['state']]
-        self.currentSongInfo = self.client.currentsong()
-        if self.state != newState:
-            self.state = newState
-            self.player.stateChanged.emit(newState)
+        #print('poll - {}'.format(QtCore.QThread.currentThreadId()))
+        status = self.client.status()
+        state = MPD_STATES[status["state"]]
+        if state != self.state:
+            self.stateChanged.emit(state)
+        self.state = state
+        
+        playlistVersion = int(status["playlist"])
+        if playlistVersion != self.playlistVersion:
+            self.updatePlaylist()
+        self.playlistVersion = playlistVersion
+        
+        try:
+            currentSong = int(status["song"])
+        except KeyError:
+            currentSong = -1
+        if currentSong != self.currentSong:
+            mpd_current = self.client.currentsong()
+            if "time" in mpd_current:
+                self.currentSongLength = int(mpd_current["time"])
+            else:
+                self.currentSongLength = 0
+            self.currentSongChanged.emit(currentSong)
+        self.currentSong = currentSong
+
+        try:
+            elapsed = float(status["elapsed"])
+        except KeyError:
+            elapsed = 0
+        if elapsed != self.elapsed:
+            self.elapsedChanged.emit(elapsed, self.currentSongLength)
+        self.elapsed = elapsed
+                
+        self.mpd_status = status
+        
+    def updatePlaylist(self):
+        self.playlistMutex.lock()
+        self.mpd_playlist = self.client.playlistinfo()
+        self.root = models.RootNode()
+        elements = []
+        with db.connect():
+            for file in self.mpd_playlist:
+                path = file["file"]
+                id = db.idFromPath(path)
+                if id:
+                    elements.append(models.File.fromId(id))
+                else:
+                    elements.append(models.File.fromFilesystem(path))
+        self.root.setContents(elements)
+        self.root.printStructure()
+        self.playlistMutex.unlock()
+        self.playlistChanged.emit()
             
-        newElapsed = 0 if newState == player.STOP else float(self.mpdStatus['elapsed'])
-        if newElapsed != self.elapsed:
-            self.elapsed = newElapsed
-            self.player.elapsedChanged.emit(newElapsed, int(self.currentSongInfo['time']))
-            
+
+    @QtCore.pyqtSlot(float)            
     def setElapsed(self, time):
-        self.client.seek(self.mpdStatus['song'], time)
+        logger.debug("mpd -- set Elapsed called")
+        self.client.seek(self.currentSong, time)
  
+    @QtCore.pyqtSlot(int)
     def setState(self, state):
+        logger.debug("mpd -- set State {} called".format(state))
         if state == player.PLAY:
             self.client.play()
         elif state == player.PAUSE:
             self.client.pause()
         elif state == player.STOP:
             self.client.stop()       
-class MPDPlayerBackend(player.PlayerBackend):
     
-    def __init__(self, name):
-        super().__init__(name)
+    def currentPlaylist(self):
+        self.playlistMutex.lock()
+        return self.root
+        self.playlistMutex.unlock()
+    
+    def next(self):
+        self.client.next()
         
-        self.host = "unspecified"
-        self.port = 6600
-        if name in config.storage.mpd.profiles:
-            self.connect(**config.storage.mpd.profiles[name])
-        self.thread = MPDThread(self, self.host, self.port)
-        self.setElapsed = self.thread.setElapsed
-        self.setState = self.thread.setState
-            
-    def connect(self, host = 'localhost', port = 6600, password = ''):
-        print('connect!')
-        self.host = host
-        self.port = port
-        
-
+    def previous(self):
+        self.client.previous()
+    
+    @staticmethod
+    def configWidget(profile = None):
+        """Return a config widget, initialized with the data of the given *profile*."""
+        return MPDConfigWidget(None, profile)
         
     def __str__(self):
         return "MPDPlayerBackend(host={},port={})".format(self.host, self.port)
+
+class MPDConfigWidget(QtGui.QWidget):
+    def __init__(self, parent = None, profile = None):
+        super().__init__(parent)
+        layout = QtGui.QGridLayout(self)
+        layout.addWidget(QtGui.QLabel(self.tr("Host:")), 0, 0, Qt.AlignRight)
+        self.hostEdit = QtGui.QLineEdit()
+        layout.addWidget(self.hostEdit, 0, 1)
+        
+        layout.addWidget(QtGui.QLabel(self.tr("Port:")), 1, 0, Qt.AlignRight)
+        self.portEdit = QtGui.QLineEdit()
+        self.portEdit.setValidator(QtGui.QIntValidator(0, 65535, self))
+        layout.addWidget(self.portEdit, 1, 1)
+        
+        layout.addWidget(QtGui.QLabel(self.tr("Password:")), 2, 0, Qt.AlignRight)
+        self.passwordEdit = QtGui.QLineEdit()
+        layout.addWidget(self.passwordEdit, 2, 1)
+        
+        self.setProfile(profile)
+    
+    def setProfile(self, profile):
+        if profile is not None and profile in config.storage.mpd.profiles:
+            data = config.storage.mpd.profiles[profile]
+        else:
+            data = default_data
+        self.hostEdit.setText(data['host'])
+        self.portEdit.setText(str(data['port']))
+        self.passwordEdit.setText(data['password'])
+        
 def defaultStorage():
     return {"mpd":
             {'profiles': ({'mpd_local': {'host':'localhost', 'port': 6600, 'password': ''}},) } }
 
 def enable():
-    player.playerClasses['mpd'] = MPDPlayerBackend 
+    player.backendClasses['mpd'] = MPDPlayerBackend
+    logger.debug("mpd plugin enabled -- added 'mpd' playerClass") 
