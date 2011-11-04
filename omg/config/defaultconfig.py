@@ -42,7 +42,7 @@ defaults = OrderedDict((
 ("main", {
     "collection": (str,".","Music collection base directory"),
     "plugins": (list,["dbanalyzer","logodock"],"List of plugin names (i.e. the name of the corresponding directory in /omg/plugins/."),
-    "extensions": (list, ["flac", "m4a", "mp3", "mp4", "mp4", "oga", "ogg", "spx"], "file extensions")
+    "extensions": (list, ["flac", "m4a", "mp3", "mp4", "mpc", "oga", "ogg", "spx"], "file extensions")
 }),
     
 ("i18n", {
