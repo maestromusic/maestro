@@ -137,7 +137,7 @@ class FlagEditorModel(QtCore.QObject):
     def changeRecord(self,oldRecord,newRecord):
         """Change *oldRecord* into *newRecord*. Make sure, that both records have self.elements as list of
         elements and a nonempty sublist thereof as list of elements with flag."""
-        if len(newRecord.elementsWithFlag) > 0:
+        if len(newRecord.elementsWithFlag) == 0:
             raise ValueError("newRecord must contain at least one element; otherwise use removeFlag.")
         command = FlagEditorUndoCommand(self,self._changeRecord,oldRecord,newRecord,
                                         text=self.tr("Change flag record"))

@@ -21,9 +21,8 @@ import math,itertools
 from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
-from omg import models, tags, config
-from omg.models import browser
-from omg.gui import formatter
+from omg import models, tags, config, strutils
+from omg.models import browser as browsermodel
 
 
 # Constants for delegate.state
@@ -35,7 +34,7 @@ LEFT,RIGHT = 1,2
 
 class DelegateStyle:
     """A DelegateStyle is used to specify the style of texts in a TextItem or MultiTextItem. It stores the
-    three attributes *fontSize*, *bold* and *italic*.
+    three attributes *fontSize*, *bold* and *italic*. Note that *fontSize* stores the pointsize of the font.
     """
     def __init__(self,fontSize,bold,italic):
         self.fontSize = fontSize
@@ -44,9 +43,9 @@ class DelegateStyle:
 
 
 # Some standard styles used in the delegates
-STD_STYLE = DelegateStyle(11,False,False)
-ITALIC_STYLE = DelegateStyle(11,False,True)
-BOLD_STYLE = DelegateStyle(11,True,False)
+STD_STYLE = DelegateStyle(8,False,False)
+ITALIC_STYLE = DelegateStyle(STD_STYLE.fontSize,False,True)
+BOLD_STYLE = DelegateStyle(STD_STYLE.fontSize,True,False)
         
 
 class AbstractDelegate(QtGui.QStyledItemDelegate):
@@ -91,7 +90,55 @@ class AbstractDelegate(QtGui.QStyledItemDelegate):
         """Layout the node with the given index. This method is called by paint and sizeHint and must be
         implemented in subclasses."""
         raise NotImplementedError()
-    
+
+    def sizeHint(self,option,index):
+        """Implementation of QtGui.QStyleItemDelegate.sizHint. This method is called by Qt. It will call
+        self.layout (implemented in subclasses) to fill the lists ''left'', ''center'' and ''right'' and
+        then compute the sizeHint based on the DelegateItems in those lists.
+        """
+        if self.state is not None:
+            import sys
+            sys.exit("Fatal error: AbstractDelegate.sizeHint was called during painting/sizehinting.")
+        self.state = SIZE_HINT
+
+        # Total width available. Note that option.rect is useless due to a performance hack in Qt.
+        # (Confer QTreeView::indexRowSizeHint in Qt's sources) 
+        totalWidth = self.parent().viewport().width() - 2*self.hMargin
+        totalWidth -= self.parent().indentation() * self.model.data(index).getDepth()
+        
+        # Collect items
+        self.left,self.right,self.center = [],[],[]
+        self.layout(index,totalWidth)
+                       
+        leftWidth,leftMaxHeight = self._rowDimensions(self.left)
+        rightWidth,rightMaxHeight = self._rowDimensions(self.right)
+        
+        # Add the space separating the parts
+        if leftWidth > 0:
+            leftWidth += self.hSpace
+        if rightWidth > 0:
+            rightWidth += self.hSpace
+        
+        # Calculate the center's size
+        remainingWidth = totalWidth - leftWidth - rightWidth;
+
+        centerHeight = 0
+        centerMaxWidth = 0
+        for row in self.center:
+            if len(row) == 0:
+                continue
+            rowWidth,rowMaxHeight = self._rowDimensions((item for item,align in row),remainingWidth)
+            centerHeight += rowMaxHeight + self.vSpace
+            if rowWidth > centerMaxWidth: 
+                centerMaxWidth = rowWidth
+        if centerHeight > 0:
+            centerHeight -= self.vSpace # above loop adds one space too much
+        
+        self.state = None
+        
+        return QtCore.QSize(leftWidth + centerMaxWidth + rightWidth + 2*self.hMargin,
+                            max(leftMaxHeight,centerHeight,rightMaxHeight) + 2* self.vMargin)
+        
     def paint(self,painter,option,index):
         """Implementation of QtGui.QStyleItemDelegate.paint. This method is called by Qt. It will call
         self.layout (implemented in subclasses) to fill the lists ''left'', ''center'' and ''right'' and
@@ -104,6 +151,8 @@ class AbstractDelegate(QtGui.QStyledItemDelegate):
         
         # Initialize. Subclasses or Delegate items may access painter and option.
         self.painter = painter
+        # Draw the background depending on selection etc.
+        QtGui.QApplication.style().drawControl(QtGui.QStyle.CE_ItemViewItem,option,painter)
         painter.save()
         painter.translate(option.rect.x(),option.rect.y())
         self.option = option
@@ -154,54 +203,6 @@ class AbstractDelegate(QtGui.QStyledItemDelegate):
         self.painter = None
         self.option = None
         self.state = None
-
-    def sizeHint(self,option,index):
-        """Implementation of QtGui.QStyleItemDelegate.sizHint. This method is called by Qt. It will call
-        self.layout (implemented in subclasses) to fill the lists ''left'', ''center'' and ''right'' and
-        then compute the sizeHint based on the DelegateItems in those lists.
-        """
-        if self.state is not None:
-            import sys
-            sys.exit("Fatal error: AbstractDelegate.sizeHint was called during painting/sizehinting.")
-        self.state = SIZE_HINT
-
-        # Total width available. Note that option.rect is useless due to a performance hack in Qt.
-        # (Confer QTreeView::indexRowSizeHint in Qt's sources) 
-        totalWidth = self.parent().viewport().width() - 2*self.hMargin
-        totalWidth -= self.parent().indentation() * self.model.data(index).getDepth()
-        
-        # Collect items
-        self.left,self.right,self.center = [],[],[]
-        self.layout(index,totalWidth)
-                       
-        leftWidth,leftMaxHeight = self._rowDimensions(self.left)
-        rightWidth,rightMaxHeight = self._rowDimensions(self.right)
-        
-        # Add the space separating the parts
-        if leftWidth > 0:
-            leftWidth += self.hSpace
-        if rightWidth > 0:
-            rightWidth += self.hSpace
-        
-        # Calculate the center's size
-        remainingWidth = totalWidth - leftWidth - rightWidth;
-
-        centerHeight = 0
-        centerMaxWidth = 0
-        for row in self.center:
-            if len(row) == 0:
-                continue
-            rowWidth,rowMaxHeight = self._rowDimensions((item for item,align in row),remainingWidth)
-            centerHeight += rowMaxHeight + self.vSpace
-            if rowWidth > centerMaxWidth: 
-                centerMaxWidth = rowWidth
-        if centerHeight > 0:
-            centerHeight -= self.vSpace # above loop adds one space too much
-        
-        self.state = None
-        
-        return QtCore.QSize(leftWidth + centerMaxWidth + rightWidth + 2*self.hMargin,
-                            max(leftMaxHeight,centerHeight,rightMaxHeight) + 2* self.vMargin)
                     
     def _rowDimensions(self,items,availableWidth = None):
         """Helper function for sizeHint: Compute the size of *items* when they are laid out in a row and get
@@ -226,7 +227,7 @@ class AbstractDelegate(QtGui.QStyledItemDelegate):
         """Return a QFontMetrics-object for a font with the given style."""
         if style is None:
             style = STD_STYLE
-        self.font.setPixelSize(style.fontSize)
+        self.font.setPointSize(style.fontSize)
         self.font.setBold(style.bold)
         self.font.setItalic(style.italic)
         return QtGui.QFontMetrics(self.font)
@@ -236,11 +237,22 @@ class AbstractDelegate(QtGui.QStyledItemDelegate):
         methods of DelegateItems."""
         if style is None:
             style = STD_STYLE
-        self.font.setPixelSize(style.fontSize)
+        self.font.setPointSize(style.fontSize)
         self.font.setBold(style.bold)
         self.font.setItalic(style.italic)
         self.painter.setFont(self.font)
         return QtGui.QFontMetrics(self.font)
+    
+    def length(self,element):
+        """Return the formatted length of the element."""
+        length = element.getLength()
+        if length is not None:
+            return strutils.formatLength(self.element.getLength())
+        else: return ""
+
+    def files(self):
+        """Return the formatted number of files in the element."""
+        return self.tr("%n piece(s)","",self.element.getFileCount())
 
 
 class DelegateItem:
@@ -308,6 +320,10 @@ class CoverItem(DelegateItem):
 
 
 class ColorBarItem(DelegateItem):
+    """A ColorBarItem is simply a filled area. You must specify the *width* of the area, whereas the *height*
+    may be None (the item will stretch over the available height). *background* may be everything that can
+    be submitted to QPainter.fillRect, e.g. QColor, QBrush.
+    """
     def __init__(self,background,width,height=None):
         self.background = background
         self.width = width
@@ -515,38 +531,39 @@ class BrowserDelegate(AbstractDelegate):
         self.rightTags = [tags.get(name) for name in
                             config.options.gui.browser.right_tags if tags.exists(name)]
         self.coverSize = config.options.gui.browser.cover_size
+        self.showPositions = config.options.gui.browser.show_positions
+        self.optimizeDate = True
         
     def layout(self,index,availableWidth):
         node = self.model.data(index)
         
-        if isinstance(node,browser.ValueNode):
+        if isinstance(node,browsermodel.ValueNode):
             for value in node.getDisplayValues():
                 self.addCenter(TextItem(value))
                 self.newRow()
-        elif isinstance(node,browser.VariousNode):
+        elif isinstance(node,browsermodel.VariousNode):
             self.addCenter(TextItem(self.tr("Unknown/Various"),ITALIC_STYLE))
-        elif isinstance(node,browser.HiddenValuesNode):
+        elif isinstance(node,browsermodel.HiddenValuesNode):
             self.addCenter(TextItem(self.tr("Hidden"),ITALIC_STYLE))
-        elif isinstance(node,browser.LoadingNode):
+        elif isinstance(node,browsermodel.LoadingNode):
             self.addCenter(TextItem(self.tr("Loading..."),ITALIC_STYLE))
         elif isinstance(node,models.Element):
-            f = formatter.Formatter(node)
-            
             # Prepare data
             if node.tags is None:
                 node.loadTags()
-            leftTexts,rightTexts,dateValues = self._prepareTags(f,node)
+            leftTexts,rightTexts,dateValues = self.prepareTags(node)
             if node.flags is None:
                 node.loadFlags()
-            flagIcons = [flag.icon for flag in f.flags(True) if flag.icon is not None]
-
+            flagIcons = self.getFlagIcons(node)
+            
             # Cover
             if node.hasCover():
                 self.addLeft(CoverItem(node.getCover(self.coverSize),self.coverSize))
                 availableWidth -= self.coverSize + self.hSpace
             
             # Title
-            titleItem = TextItem(f.title(),BOLD_STYLE if node.isContainer() else STD_STYLE)
+            titleItem = TextItem(node.getTitle(prependPosition=self.showPositions),
+                                 BOLD_STYLE if node.isContainer() else STD_STYLE)
             self.addCenter(titleItem)
             
             # Flags
@@ -565,7 +582,7 @@ class BrowserDelegate(AbstractDelegate):
                                          - flagIconsItem.sizeHint(self)[0] - 2* self.hSpace
                         if self.getFontMetrics().width(dateValues) <= remainingWidth:
                             self.addCenter(TextItem(dateValues),align=RIGHT)
-                            rightTexts.pop(0) # Remove date from the tags we'll display
+                        else: rightTexts.insert(0,dateValues) # display the date together with the rightTags
                     self.newRow()
                 else:
                     self.newRow() # We'll put the flags either into right region or into a new row
@@ -612,43 +629,82 @@ class BrowserDelegate(AbstractDelegate):
                     titleLength = titleItem.sizeHint(self)[0]
                     if self.getFontMetrics().width(dateValues) <= availableWidth - titleLength - self.hSpace:
                         self.addCenter(TextItem(dateValues),align=RIGHT)
-                        rightTexts.pop(0) # Remove date from the tags we'll display
+                    else: rightTexts.insert(0,dateValues) # display the date together with the rightTags
                 self.newRow()
             
             # Tags
             if len(leftTexts) > 0 or len(rightTexts) > 0:
                 self.addCenter(MultiTextItem(leftTexts,rightTexts))
             
-    def _prepareTags(self,formatter,element):
+    def prepareTags(self,element):
+        """Return two lists and a third value containing information about the tags of *element*:
+        
+            - the first list contains the concatenated tag values for each tag in ''self.leftTags''
+            - the second list contains the same for ''self.rightTags''
+            - if self.optimizeDate is True and *element* has a "date"-tag, the last value contains the
+              concatenated date values (else None)
+              
+        \ """
         leftTexts = []
-        dateValues = None
         for tag in self.leftTags:
             if tag in element.tags:
-                text = formatter.tag(tag,True,self._getTags)
-                if len(text) > 0:
-                    leftTexts.append(text)
+                values = self.getTagValues(tag,element)
+                if len(values) > 0:
+                    separator = ' - ' if tag == tags.TITLE or tag == tags.ALBUM else ', '
+                    leftTexts.append(separator.join(str(v) for v in values))
         rightTexts = []
-        for i,tag in enumerate(self.rightTags):
+        for tag in self.rightTags:
             if tag in element.tags:
-                text = formatter.tag(tag,True,self._getTags)
-                if len(text) > 0:
-                    rightTexts.append(text)
-                    if i == 0 and tag.name == "date":
-                        dateValues = text
+                values = self.getTagValues(tag,element)
+                if len(values) > 0:
+                    separator = ' - ' if tag == tags.TITLE or tag == tags.ALBUM else ', '
+                    rightTexts.append(separator.join(str(v) for v in values))
+        
+        dateValues = None
+        if self.optimizeDate and tags.exists("date"):
+            dateTag = tags.get("date")
+            if dateTag in element.tags:
+                dateValues = ', '.join(str(v) for v in self.getTagValues(dateTag,element))
         
         return leftTexts,rightTexts,dateValues
-                
-    def _getTags(self,node,tag):
-        """Return a list with the tag-values of the given tag of *node* which may be an element but also
-        any other node appearing in the browser. This function is a callback function for Formatter.tag.
-        """
-        if isinstance(node,models.Element):
-            if node.tags is None:
-                node.loadTags()
-            return node.tags[tag] if tag in node.tags else []
-        elif isinstance(node,browser.ValueNode) and tag.id in node.valueIds:
-            return node.values
-        else: return []
+    
+    def getTagValues(self,tagType,element):
+        """Return all values of the tag *tagType* in *element* excluding values that appear in parent nodes.
+        Values from ValueNode-ancestors will also be removed."""
+        if tagType not in element.tags:
+            return []
+        values = list(element.tags[tagType]) # copy!
+        
+        parent = element
+        while len(values) > 0:
+            parent = parent.getParent()
+            if parent is None or isinstance(parent,models.RootNode):
+                break
+        
+            if isinstance(parent,models.Element) and tagType in parent.tags:
+                parentValues = parent.tags[tagType]
+            elif isinstance(parent,browsermodel.ValueNode):
+                parentValues = parent.values
+            else: parentValues = []
+            
+            for value in parentValues:
+                if value in values:
+                    values.remove(value)
+        
+        return values
+    
+    def getFlagIcons(self,element):
+        """Return flag icons that should be displayed for *element*. All flags contained in at least one
+        parent node will be removed from the result."""
+        flags = [flag for flag in element.flags if flag.icon is not None]
+        parent = element.getParent()
+        while parent is not None:
+            if isinstance(parent,models.Element):
+                for flag in parent.flags:
+                    if flag.icon is not None and flag in flags:
+                        flags.remove(flag)
+            parent = parent.getParent()
+        return [flag.icon for flag in flags]
         
 
 class EditorDelegate(AbstractDelegate):
@@ -665,19 +721,14 @@ class EditorDelegate(AbstractDelegate):
         
     def layout(self,index,availableWidth):
         element = self.model.data(index)
-        f = formatter.Formatter(element)
         
         # Prepare data
         if element.tags is None:
             element.loadTags()
-        leftTexts,rightTexts = self._prepareTags(f,element)
+        leftTexts,rightTexts = self.prepareTags(element)
         if element.flags is None:
             element.loadFlags()
-        flagIcons,flagsWithoutIcon = [],[]
-        for flag in f.flags(True):
-            if flag.icon is not None:
-                flagIcons.append(flag.icon)
-            else: flagsWithoutIcon.append(flag)
+        flagIcons,flagsWithoutIcon = self.getFlags(element)
 
         # In DB
         if not element.isInDB():
@@ -692,11 +743,13 @@ class EditorDelegate(AbstractDelegate):
             self.addRight(IconBarItem(flagIcons,columns=2 if len(flagIcons) > 2 else 1))
             
         # Title
-        titleItem = TextItem(f.title(),BOLD_STYLE if element.isContainer() else STD_STYLE)
+        titleItem = TextItem(element.getTitle(prependPosition=True,usePath=not self.showPaths),
+                                              BOLD_STYLE if element.isContainer() else STD_STYLE)
         self.addCenter(titleItem)
         
         self.newRow()
         
+        # Path
         if self.showPaths and element.isFile():
             self.addCenter(TextItem(element.path,ITALIC_STYLE))
             self.newRow()
@@ -710,19 +763,50 @@ class EditorDelegate(AbstractDelegate):
         if len(flagsWithoutIcon) > 0:
             self.addCenter(TextItem(', '.join(flag.name for flag in flagWithoutIcon)))
             
-    def _prepareTags(self,formatter,element):
+    def prepareTags(self,element):
         leftTexts = []
         for tag in self.leftTags:
             if tag in element.tags:
-                text = formatter.tag(tag,True)
-                if len(text) > 0:
-                    leftTexts.append(text)
+                values = self.getTagValues(tag,element)
+                if len(values) > 0:
+                    separator = ' - ' if tag == tags.TITLE or tag == tags.ALBUM else ', '
+                    leftTexts.append(separator.join(str(v) for v in values))
         rightTexts = []
-        for i,tag in enumerate(self.rightTags):
+        for tag in self.rightTags:
             if tag in element.tags:
-                text = formatter.tag(tag,True)
-                if len(text) > 0:
-                    rightTexts.append(text)
-        
+                values = self.getTagValues(tag,element)
+                if len(values) > 0:
+                    separator = ' - ' if tag == tags.TITLE or tag == tags.ALBUM else ', '
+                    rightTexts.append(separator.join(str(v) for v in values))
         return leftTexts,rightTexts
+    
+    def getTagValues(self,tagType,element):
+        if tagType not in element.tags:
+            return []
+        values = list(element.tags[tagType]) # copy!
+        
+        parent = element
+        while len(values) > 0:
+            parent = parent.getParent()
+            if parent is None or isinstance(parent,models.RootNode):
+                break
+            parentValues = parent.tags[tagType]
+            
+            for value in parentValues:
+                if value in values:
+                    values.remove(value)
+        
+        return values
+    
+    def getFlags(self,element):
+        flags = list(element.flags) # copy!
+        parent = element.getParent()
+        while parent is not None:
+            if isinstance(parent,models.Element):
+                for flag in parent.flags:
+                    if flag in flags:
+                        flags.remove(flag)
+            parent = parent.getParent()
+        return [flag.icon for flag in flags if flag.icon is not None],\
+               [flag.name for flag in flags if flag.icon is None]
     
