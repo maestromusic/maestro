@@ -16,12 +16,16 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+from PyQt4 import QtCore
+
 import copy
 
 from .. import tags, logging, config, covers, realfiles, database as db
 from ..utils import relPath
 
 logger = logging.getLogger(__name__)
+
+translate = QtCore.QCoreApplication.translate
 
 
 class Node:
@@ -400,7 +404,7 @@ class Element(Node):
         if recursive:
             for element in self.getContents():
                 element.loadFlags(recursive)
-            
+        
     def hasCover(self):
         """Return whether this element has a cover."""
         return self.isInDB() and covers.hasCover(self.id)
@@ -429,12 +433,32 @@ class Element(Node):
 
     # Misc
     #====================================================
-    def getTitle(self,titles=None):
-        """Convenience method to get the formatted title of this element. If a list of strings is given for
-        the optional argument *titles* those titles will be used (this is useful, if the element itself does
-        not have a tags-attribute)"""
-        from omg.gui import formatter
-        return formatter.Formatter(self).title(titles)
+    def getTitle(self,prependPosition=False,usePath=True,titles=None):
+        """Return the title of this element or some dummy title, if the element does not have a title tag.
+        Additionally the result may contain a position (if *prependPosition* is True) and/or the element's
+        id (if ''config.options.misc.show_ids'' is True). If *usePath* is True, the path will be used as
+        title for files without title tag. Finally, the optional argument *titles* may be used to overwrite
+        the titles stored in ''self.tags'' (this is in particular useful if the element does not store tags).
+        """
+        result = ''
+        
+        if prependPosition and self.position is not None:
+            result += "{} - ".format(self.position)
+        
+        if self.isInDB() and config.options.misc.show_ids:
+            result += "[{0}] ".format(self.id)
+            
+        if titles is not None:
+            result += " - ".join(titles)
+        elif self.tags is None:
+            result += translate("Element","<No title>")
+        elif tags.TITLE in self.tags:
+            result += " - ".join(self.tags[tags.TITLE])
+        elif usePath and self.isFile() and self.path is not None:
+            result += self.path
+        else: result += translate("Element","<No title>")
+
+        return result
     
     def toolTipText(self):
         parts = []

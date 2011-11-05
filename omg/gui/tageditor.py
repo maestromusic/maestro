@@ -23,7 +23,7 @@ import itertools, os.path
 
 from .. import constants, tags, strutils, utils, config, logging, modify, constants
 from ..models import tageditor as tageditormodel, simplelistmodel, File, flageditor as flageditormodel
-from ..gui import formatter, singletageditor, dialogs, tagwidgets, mainwindow, editor, flageditor
+from ..gui import singletageditor, dialogs, tagwidgets, mainwindow, editor, flageditor
 from ..gui.misc import widgetlist, dynamicgridlayout
 from ..constants import REAL, EDITOR
 
@@ -494,7 +494,6 @@ class RecordDialog(QtGui.QDialog):
             self.valueEditor.setValue(record.value)
             
         self.elementsBox = QtGui.QListView(self)
-        # Use a formatter to print the title of the elements
         self.elementsBox.setModel(simplelistmodel.SimpleListModel(elements,lambda el: el.title))
         self.elementsBox.setSelectionMode(QtGui.QAbstractItemView.MultiSelection)
         for i,element in enumerate(elements):

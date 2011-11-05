@@ -83,7 +83,7 @@ class EditorTreeView(treeview.TreeView):
         self.setDefaultDropAction(Qt.MoveAction)
         self.setDropIndicatorShown(True)
         self.setModel(editor.EditorModel())
-        self.setItemDelegate(delegates2.EditorDelegate(self))
+        self.setItemDelegate(delegates.EditorDelegate(self))
         
         self.viewport().setMouseTracking(True)
         self.selectionModel().selectionChanged.connect(self._handleSelectionChanged)
