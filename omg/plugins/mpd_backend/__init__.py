@@ -46,9 +46,7 @@ class MPDPlayerBackend(player.PlayerBackend):
         self.client.connect(self.host, self.port)
         self.playlistVersion = -1
         self.mpdthread = MPDThread(self)
-        print('before move - {}'.format(self.thread()))
         self.moveToThread(self.mpdthread)
-        print('after move - {}'.format(QtCore.QThread.currentThreadId()))
         self.timer = QtCore.QTimer()
         self.timer.timeout.connect(self.poll)
         self.timer.start(200)
@@ -104,7 +102,6 @@ class MPDPlayerBackend(player.PlayerBackend):
                 else:
                     elements.append(models.File.fromFilesystem(path))
         self.root.setContents(elements)
-        self.root.printStructure()
         self.playlistMutex.unlock()
         self.playlistChanged.emit()
             
@@ -147,17 +144,17 @@ class MPDConfigWidget(QtGui.QWidget):
     def __init__(self, parent = None, profile = None):
         super().__init__(parent)
         layout = QtGui.QGridLayout(self)
-        layout.addWidget(QtGui.QLabel(self.tr("Host:")), 0, 0, Qt.AlignRight)
-        self.hostEdit = QtGui.QLineEdit()
+        layout.addWidget(QtGui.QLabel(self.tr("Host:"), self), 0, 0, Qt.AlignRight)
+        self.hostEdit = QtGui.QLineEdit(self)
         layout.addWidget(self.hostEdit, 0, 1)
         
-        layout.addWidget(QtGui.QLabel(self.tr("Port:")), 1, 0, Qt.AlignRight)
-        self.portEdit = QtGui.QLineEdit()
+        layout.addWidget(QtGui.QLabel(self.tr("Port:"), self), 1, 0, Qt.AlignRight)
+        self.portEdit = QtGui.QLineEdit(self)
         self.portEdit.setValidator(QtGui.QIntValidator(0, 65535, self))
         layout.addWidget(self.portEdit, 1, 1)
         
-        layout.addWidget(QtGui.QLabel(self.tr("Password:")), 2, 0, Qt.AlignRight)
-        self.passwordEdit = QtGui.QLineEdit()
+        layout.addWidget(QtGui.QLabel(self.tr("Password:"), self), 2, 0, Qt.AlignRight)
+        self.passwordEdit = QtGui.QLineEdit(self)
         layout.addWidget(self.passwordEdit, 2, 1)
         
         self.setProfile(profile)
@@ -170,11 +167,42 @@ class MPDConfigWidget(QtGui.QWidget):
         self.hostEdit.setText(data['host'])
         self.portEdit.setText(str(data['port']))
         self.passwordEdit.setText(data['password'])
+    
+    def storeProfile(self, profile):
+        host = self.hostEdit.text()
+        port = self.portEdit.text()
+        password = self.passwordEdit.text()
+        profiles = config.storage.mpd.profiles
+        profiles[profile] = {'host': host, 'port': port, 'password': password}
+        config.storage.mpd.profiles = profiles
+        
         
 def defaultStorage():
     return {"mpd":
-            {'profiles': ({'mpd_local': {'host':'localhost', 'port': 6600, 'password': ''}},) } }
+            {'profiles': ({},) } }
 
+def _handleNewProfile(name):
+    if player.configuredBackends[name] == 'mpd':
+        logger.debug("adding MPD backend {}".format(name))
+        profiles = config.storage.mpd.profiles.copy()
+        profiles[name] = default_data.copy()
+        config.storage.mpd.profiles = profiles
+    else:
+        logger.debug("MPD backend ignoring profile add: {}, backend {}".format(name, player.configuredBackends[name]))
+def _handleRenameProfile(old, new):
+    logger.debug("rename profile request {} {}".format(old, new))
+    if player.configuredBackends[new] == 'mpd':
+        assert old in config.storage.mpd.profiles
+        config.storage.mpd.profiles = {
+            (new if name==old else name): conf for name,conf in config.storage.mpd.profiles.items()}
+def _handleRemoveProfile(name):
+    if name in config.storage.mpd.profiles:
+        profiles = config.storage.mpd.profiles 
+        del profiles[name]
+        config.storage.mpd.profiles = profiles
 def enable():
     player.backendClasses['mpd'] = MPDPlayerBackend
-    logger.debug("mpd plugin enabled -- added 'mpd' playerClass") 
+    player.notifier.profileAdded.connect(_handleNewProfile)
+    player.notifier.profileRenamed.connect(_handleRenameProfile)
+    player.notifier.profileRemoved.connect(_handleRemoveProfile)
+    logger.debug("mpd plugin enabled -- added 'mpd' playerClass")

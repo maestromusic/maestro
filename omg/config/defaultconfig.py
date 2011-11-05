@@ -164,6 +164,6 @@ storage = OrderedDict((
     'views': ([[['composer','artist','performer']],[['genre'],['composer','artist','performer']]],),
 }),
 ("player", {
-    'configured_players': ([('mpd_local', 'mpd')],),
+    'configured_players': ([],),
 }),
 ))

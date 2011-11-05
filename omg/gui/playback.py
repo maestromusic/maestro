@@ -66,7 +66,7 @@ class PlaybackWidget(QtGui.QDockWidget):
         mainLayout = QtGui.QVBoxLayout(widget)
         mainLayout.addLayout(topLayout)
         mainLayout.addLayout(bottomLayout)
-        self.setBackend(self.backendChooser.itemText(0))
+        self.setBackend(self.backendChooser.currentProfile())
         
         
     
@@ -88,7 +88,12 @@ class PlaybackWidget(QtGui.QDockWidget):
             self.titleLabel.setText("Playing: <i>{}</i>".format(self.playlistRoot.fileAtOffset(pos).getTitle()))
     def setBackend(self, name):
         if hasattr(self, 'backend'):
-            pass #TODO: disconnect signals
+            self.disconnect(self.backend) #TODO: disconnect signals
+            self.backend.disconnect(self)
+        
+        if name is None:
+            self.titleLabel.setText('no backend connected')
+            return
         self.backend = player.instance(name)
         
         self.backend.elapsedChanged.connect(self.updateSlider)

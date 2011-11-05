@@ -18,19 +18,22 @@
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
-import itertools
+import itertools, collections
 from . import config, logging
 logger = logging.getLogger("omg.player")
 STOP, PLAY, PAUSE = range(3)
 
 
-configuredBackends = {} # map profile name -> backend name
-backendClasses = {} # map mackend name -> backend class (subclass of PlayerBackend)
+configuredBackends = collections.OrderedDict() # map profile name -> backend name
+backendClasses = collections.OrderedDict() # map mackend name -> backend class (subclass of PlayerBackend)
+
 def init():
     global configuredBackends
     for name, backend in config.storage.player.configured_players:
         configuredBackends[name] = backend
-
+    updateConfig()
+def updateConfig():
+    config.storage.player.configured_players = list(configuredBackends.items()) #hack: trick config.storage!
 _runningBackends = {}
 def instance(name):
     """Returns the instance of the player backend according to the given profile name.
@@ -38,35 +41,99 @@ def instance(name):
     if name not in _runningBackends:
         _runningBackends[name] = backendClasses[configuredBackends[name]](name)
     return _runningBackends[name]
-        
+
+class ProfileNotifier(QtCore.QObject):
+    profileRenamed = QtCore.pyqtSignal(str, str) # old name, new name
+    profileAdded = QtCore.pyqtSignal(str, str) # profile name, backend name
+    profileRemoved = QtCore.pyqtSignal(str)
+    def __init__(self):
+        super().__init__()
+notifier = ProfileNotifier()
+
+# debug output
+notifier.profileRenamed.connect(lambda a, b: logger.debug("renamed profile {} to {}".format(a,b)))
+notifier.profileAdded.connect(lambda a, b: logger.debug("added profile {} class {}".format(a,b)))
+notifier.profileRemoved.connect(lambda a: logger.debug("removed profiel {}".format(a)))
+
+def addProfile(name, backend):
+    configuredBackends[name] = backend
+    updateConfig()
+    notifier.profileAdded.emit(name, backend)
+
+def renameProfile(old, new):
+    global configuredBackends
+    configuredBackends = collections.OrderedDict(
+        ((new if name==old else name), backend) for name,backend in configuredBackends.items())
+    updateConfig()
+    notifier.profileRenamed.emit(old, new)
+
+def removeProfile(name):
+    del configuredBackends[name]
+    updateConfig()
+    notifier.profileRemoved.emit(name)
 
 class BackendChooser(QtGui.QComboBox):
     """This class provides a combo box that lets the user choose the a player backend from
     the list of existing backends. In such a case, the signal *backendChanged* is emitted."""
     
+    ignoreSignal = False
+    
     backendChanged = QtCore.pyqtSignal(object)
     def __init__(self, parent = None):
         super().__init__(parent)
-        for name, backend in configuredBackends.items():
+        for name in configuredBackends:
             self.addItem(name)
-        self.currentIndexChanged[int].connect(self.handleIndexChange)
+        
         self.storedIndex = 0
         self.addItem(self.tr("configure..."))
-        self.ignoreSignal = False
-                             
+        self.currentIndexChanged[int].connect(self.handleIndexChange)
+        notifier.profileRenamed.connect(self.handleProfileRenamed)
+        notifier.profileAdded.connect(lambda name: self.insertItem(self.count()-1, name))
+        notifier.profileRemoved.connect(self.handleProfileRemoved)
+    
+    def currentProfile(self):
+        """Returns the name of the currently selected profile, or *None* if none is selected.
+        
+        The latter happens especially in the case that no profile is configured."""
+        if self.currentIndex() == self.count()-1:
+            return None
+        return self.currentText()                         
     def handleIndexChange(self, i):
-        if self.ignoreSignal:
+        if BackendChooser.ignoreSignal:
             return
         if i != self.count() - 1:
             self.backendChanged.emit(self.itemText(i))
             self.storedIndex = i
         else:
+            BackendChooser.ignoreSignal = True            
             BackendConfigDialog(self, self.itemText(self.storedIndex)).exec_()
-            self.ignoreSignal = True
             self.setCurrentIndex(self.storedIndex)
-            self.ignoreSignal = False
-        
+            BackendChooser.ignoreSignal = False
             
+    def mousePressEvent(self, event):
+        if self.count() == 1 and event.button() == Qt.LeftButton:
+            BackendChooser.ignoreSignal = True
+            BackendConfigDialog(self, None).exec_()
+            BackendChooser.ignoreSignal = False
+            event.accept()
+        else:
+            return super().mousePressEvent(event)
+     
+    def handleProfileRenamed(self, old, new):
+        for i in range(self.count()-1):
+            if self.itemText(i) == old:                
+                self.setItemText(i, new)
+                break
+    
+    def handleProfileRemoved(self, name):
+        for i in range(self.count()-1):
+            if self.itemText(i) == name:
+                wasIgnore = BackendChooser.ignoreSignal
+                BackendChooser.ignoreSignal = True
+                self.removeItem(i)
+                BackendChooser.ignoreSignal = wasIgnore
+                #TODO: handle removal of current profile!
+                break
     
 class PlayerBackend(QtCore.QObject):
     """This is an abstract class for modules that implement connection to a backend
@@ -147,6 +214,7 @@ class BackendConfigDialog(QtGui.QDialog):
         self.newButton = QtGui.QPushButton(self.tr("new"))
         self.newButton.clicked.connect(self.newProfile)
         self.deleteButton = QtGui.QPushButton(self.tr("remove"))
+        self.deleteButton.clicked.connect(self.removeCurrentProfile)
         topLayout = QtGui.QHBoxLayout()
         topLayout.addWidget(self.profileChooser, stretch = 1)
         topLayout.addWidget(self.newButton)
@@ -157,7 +225,7 @@ class BackendConfigDialog(QtGui.QDialog):
         for i, name in enumerate(backendClasses):
             self.classChooser.addItem(name)
             self.classes[name] = i
-        self.classChooser.currentIndexChanged[str].connect(self.backendClassChanged)
+        self.classChooser.currentIndexChanged[str].connect(self.changeConfigureWidget)
         self.nameEdit = QtGui.QLineEdit(self)
         self.nameEdit.editingFinished.connect(self.renameCurrentLayout)
         self.nameEdit.setFocus()
@@ -170,12 +238,13 @@ class BackendConfigDialog(QtGui.QDialog):
         
         controlBox = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Close)
 
-        controlBox.rejected.connect(self.accept)
         
+        controlBox.rejected.connect(self.ensureConfigIsStored)
+        controlBox.rejected.connect(self.accept)
         mainLayout = QtGui.QVBoxLayout(self)
-        mainLayout.addLayout(topLayout)
-        mainLayout.addLayout(secondLayout)
-        mainLayout.addWidget(controlBox)
+        mainLayout.addLayout(topLayout, stretch = 0)
+        mainLayout.addLayout(secondLayout, stretch = 0)
+        mainLayout.addWidget(controlBox, stretch = 1)
         self.mainLayout = mainLayout
         self.classConfigWidget = None
         self.setCurrentProfile(currentProfile)
@@ -184,20 +253,39 @@ class BackendConfigDialog(QtGui.QDialog):
         text = self.nameEdit.text()
         if text == '':
             return
+        if self.profileChooser.currentText() == text:
+            return
+        renameProfile(self.profileChooser.currentText(), text)
         self.profileChooser.setItemText(self.profileChooser.currentIndex(), text)
+        self.storedProfile = text
+    
+    def removeCurrentProfile(self):
+        name = self.profileChooser.currentText()
+        self.profileChooser.removeItem(self.profileChooser.currentIndex())
+        removeProfile(name)
+        self.profiles = {}
+        for i, name in enumerate(configuredBackends):
+            self.profiles[name] = i
           
     def setCurrentProfile(self, name):
-        self.nameEdit.setEnabled(name is not None)
-        self.classChooser.setEnabled(name is not None)
-        self.deleteButton.setEnabled(name is not None)
-        if name is not None:
-            self.classChooser.setCurrentIndex(self.classes[configuredBackends[name]])
-            self.backendClassChanged(configuredBackends[name])
-            self.nameEdit.setText(name)
-    
-    def backendClassChanged(self, backend):
+        self.nameEdit.setEnabled(bool(name))
+        self.classChooser.setEnabled(bool(name))
+        self.deleteButton.setEnabled(bool(name))
         if self.classConfigWidget is not None:
+            self.ensureConfigIsStored()
             self.mainLayout.removeWidget(self.classConfigWidget)
+            self.classConfigWidget.setVisible(False)
+        if name:
+            backend = configuredBackends[name]
+            self.classChooser.setCurrentIndex(self.classes[backend])
+            self.changeConfigureWidget(backend)            
+            self.nameEdit.setText(name)
+        self.storedProfile = name
+    
+    def ensureConfigIsStored(self):
+        if self.classConfigWidget is not None:
+            self.classConfigWidget.storeProfile(self.storedProfile)
+    def changeConfigureWidget(self, backend):
         self.classConfigWidget = backendClasses[backend].configWidget(self.profileChooser.currentText())
         self.mainLayout.insertWidget(2, self.classConfigWidget)
         
@@ -208,8 +296,9 @@ class BackendConfigDialog(QtGui.QDialog):
                 if name + str(i) not in self.profiles:
                     name = name + str(i)
                     break
-        cls = next(iter(backendClasses))
-        configuredBackends[name] = cls
+        backend = next(iter(backendClasses))
+        addProfile(name, backend)
         self.profiles[name] = len(self.profiles)
         self.profileChooser.addItem(name)
         self.profileChooser.setCurrentIndex(self.profileChooser.count()-1)
+        
