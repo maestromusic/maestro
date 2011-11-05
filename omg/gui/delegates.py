@@ -484,6 +484,9 @@ class MultiTextItem(DelegateItem):
             #print("Length: {} {}".format(leftLength,rightLength))
             #print("Max: {} {}".format(leftMax,rightMax))
             
+            if leftLength == 0 and rightLength == 0: # Avoid division by zero
+                continue # Nothing to display
+            
             leftColumnLength = math.ceil(leftLength/(leftLength+rightLength) * (availableWidth - SEP_1))
                 
             if leftMax + rightMax > availableWidth - SEP_1:
@@ -569,6 +572,7 @@ class BrowserDelegate(AbstractDelegate):
             # Flags
             # Here starts the mess...depending on the available space we want to put flags and if possible
             # even the date into the title row.
+            addedDateToFirstRow = False
             if len(flagIcons) > 0:
                 flagIconsItem = IconBarItem(flagIcons)
                 titleLength = titleItem.sizeHint(self)[0]
@@ -582,7 +586,7 @@ class BrowserDelegate(AbstractDelegate):
                                          - flagIconsItem.sizeHint(self)[0] - 2* self.hSpace
                         if self.getFontMetrics().width(dateValues) <= remainingWidth:
                             self.addCenter(TextItem(dateValues),align=RIGHT)
-                        else: rightTexts.insert(0,dateValues) # display the date together with the rightTags
+                            addedDateToFirstRow = True
                     self.newRow()
                 else:
                     self.newRow() # We'll put the flags either into right region or into a new row
@@ -598,7 +602,7 @@ class BrowserDelegate(AbstractDelegate):
                         # No tags
                         if 2*maxFlagsInTitleRow >= len(flagIcons):
                             flagIconsItem.rows = 2
-                            self.addRight(flagIconsItem,align=RIGHT)
+                            self.addRight(flagIconsItem)
                         else: self.addCenter(flagIconsItem,align=RIGHT)
                     else:
                         # Do not use too many columns
@@ -629,10 +633,13 @@ class BrowserDelegate(AbstractDelegate):
                     titleLength = titleItem.sizeHint(self)[0]
                     if self.getFontMetrics().width(dateValues) <= availableWidth - titleLength - self.hSpace:
                         self.addCenter(TextItem(dateValues),align=RIGHT)
-                    else: rightTexts.insert(0,dateValues) # display the date together with the rightTags
+                        addedDateToFirstRow = True
                 self.newRow()
             
             # Tags
+            if not addedDateToFirstRow and dateValues is not None:
+                rightTexts.insert(0,dateValues) # display the date together with the rightTags
+                
             if len(leftTexts) > 0 or len(rightTexts) > 0:
                 self.addCenter(MultiTextItem(leftTexts,rightTexts))
             
