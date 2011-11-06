@@ -22,7 +22,8 @@ from PyQt4.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
 from . import mainwindow
-from .. import player, utils
+from .. import player, utils, logging
+logger = logging.getLogger("omg.player")
 
 def formatTime(seconds):
     seconds = int(seconds)
@@ -67,6 +68,7 @@ class PlaybackWidget(QtGui.QDockWidget):
         mainLayout.addLayout(topLayout)
         mainLayout.addLayout(bottomLayout)
         self.setBackend(self.backendChooser.currentProfile())
+        self.backendChooser.backendChanged.connect(self.setBackend)
         
         
     
@@ -80,35 +82,64 @@ class PlaybackWidget(QtGui.QDockWidget):
     
     def updatePlaylist(self):
         self.playlistRoot = self.backend.currentPlaylist()
+        self.updateCurrent(self.backend.currentSong)
         
     def updateCurrent(self, pos):
-        print('update current -- {}'.format(pos))
         if hasattr(self, "playlistRoot"):
             self.titleLabel.setTextFormat(Qt.AutoText)
             self.titleLabel.setText("Playing: <i>{}</i>".format(self.playlistRoot.fileAtOffset(pos).getTitle()))
+    
+    def updateState(self, state):
+        self.ppButton.setPlaying(state == player.PLAY)
+    
+    def handleStop(self):
+        QtCore.QMetaObject.invokeMethod(self.backend, "setState", Qt.QueuedConnection, QtCore.Q_ARG(int, player.STOP))
+        #self.backend.setState(player.STOP)
+    
+    def handleConnectionChange(self, state):
+        for item in self.previousButton, self.ppButton, self.stopButton, self.nextButton, self.seekSlider, self.seekLabel:
+            item.setEnabled(state == player.CONNECTED)
+        if state == player.CONNECTING:
+            self.titleLabel.setText(self.tr("connecting..."))
+        elif state == player.DISCONNECTED:
+            self.titleLabel.setText(self.tr("unable to connect"))
     def setBackend(self, name):
         if hasattr(self, 'backend'):
-            self.disconnect(self.backend) #TODO: disconnect signals
-            self.backend.disconnect(self)
-        
+            self.backend.elapsedChanged.disconnect(self.updateSlider)
+            self.backend.stateChanged.disconnect(self.updateState)
+            self.backend.playlistChanged.disconnect(self.updatePlaylist)
+            self.backend.currentSongChanged.disconnect(self.updateCurrent)
+            self.ppButton.stateChanged.disconnect(self.backend.setState)
+            self.seekSlider.sliderMoved.disconnect(self.backend.setElapsed)
+            self.previousButton.clicked.disconnect(self.backend.previous)
+            self.nextButton.clicked.disconnect(self.backend.next)
+            self.backend.connectionStateChanged.disconnect(self.handleConnectionChange)
         if name is None:
             self.titleLabel.setText('no backend connected')
             return
         self.backend = player.instance(name)
-        
-        self.backend.elapsedChanged.connect(self.updateSlider)
-        self.backend.stateChanged.connect(lambda state: self.ppButton.setPlaying(state == player.PLAY))
-        self.backend.playlistChanged.connect(self.updatePlaylist)
-        self.backend.currentSongChanged.connect(self.updateCurrent)
+        self.backend.elapsedChanged.connect(self.updateSlider, Qt.QueuedConnection)
+        self.backend.stateChanged.connect(self.updateState, Qt.QueuedConnection)
+        self.backend.playlistChanged.connect(self.updatePlaylist, Qt.QueuedConnection)
+        self.backend.currentSongChanged.connect(self.updateCurrent, Qt.QueuedConnection)
         self.ppButton.stateChanged.connect(self.backend.setState)
-        self.stopButton.clicked.connect(lambda: self.backend.setState(player.STOP))
-        self.seekSlider.sliderMoved.connect(self.backend.setElapsed)
-        self.previousButton.clicked.connect(self.backend.previous)
-        self.nextButton.clicked.connect(self.backend.next)
-        self.update()
+        self.stopButton.clicked.connect(self.handleStop)
+        self.seekSlider.sliderMoved.connect(self.backend.setElapsed,Qt.QueuedConnection)
+        self.previousButton.clicked.connect(self.backend.previous,Qt.QueuedConnection)
+        self.nextButton.clicked.connect(self.backend.next,Qt.QueuedConnection)
+        if self.backend.connected:
+            self.handleConnectionChange(player.CONNECTED)
+            logger.debug('1')
+            self.updatePlaylist()
+            logger.debug('2')
+            self.update()
+            logger.debug('3')
+        else:
+            self.handleConnectionChange(player.DISCONNECTED)
+        self.backend.connectionStateChanged.connect(self.handleConnectionChange)
+        
         
     def update(self):
-        print(self.backend.state == player.PLAY)
         self.ppButton.setPlaying(self.backend.state == player.PLAY)
         self.seekSlider.setValue(int(self.backend.elapsed))
         

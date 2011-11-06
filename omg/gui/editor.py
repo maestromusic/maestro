@@ -23,7 +23,7 @@ from collections import OrderedDict
 from ..models import editor, Container, Element, RootNode
 from ..modify import commands
 from ..constants import EDITOR
-from . import treeview, mainwindow, delegates2
+from . import treeview, mainwindow, delegates
 from .. import logging, modify, tags, config, utils
 import itertools
 

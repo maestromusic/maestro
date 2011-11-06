@@ -39,21 +39,40 @@ class MPDPlayerBackend(player.PlayerBackend):
     
     def __init__(self, name):
         super().__init__(name)
-        self.host = "localhost"
-        self.port = 6600
 
-        self.client = mpd.MPDClient()
-        self.client.connect(self.host, self.port)
         self.playlistVersion = -1
         self.mpdthread = MPDThread(self)
         self.moveToThread(self.mpdthread)
         self.timer = QtCore.QTimer()
         self.timer.timeout.connect(self.poll)
-        self.timer.start(200)
+        self.timer.start(500)
         self.playlistMutex = QtCore.QMutex()
-        
+        #QtCore.QMetaObject.invokeMethod(self, "ensureConnection", Qt.QueuedConnection)
+    
+    def ensureConnection(self):
+        if self.connected:
+            return True
+        try:
+            data = config.storage.mpd.profiles[self.name]
+        except KeyError:
+            logger.warning("no MPD config found for profile {} - using default".format(self.name))
+            data = default_data
+        self.client = mpd.MPDClient()
+        try:
+            self.connectionStateChanged.emit(player.CONNECTING)
+            self.client.connect(data["host"], data["port"], timeout = 3)
+            self.connected = True
+            self.connectionStateChanged.emit(player.CONNECTED)
+            return True
+        except Exception as e:
+            logger.warning('could not connect profile {}: {}'.format(self.name, e))
+            self.connectionStateChanged.emit(player.DISCONNECTED)
+            return False
+         
     def poll(self):
         #print('poll - {}'.format(QtCore.QThread.currentThreadId()))
+        if not self.ensureConnection():
+            return
         status = self.client.status()
         state = MPD_STATES[status["state"]]
         if state != self.state:
@@ -87,9 +106,10 @@ class MPDPlayerBackend(player.PlayerBackend):
         self.elapsed = elapsed
                 
         self.mpd_status = status
-        
+    
     def updatePlaylist(self):
-        self.playlistMutex.lock()
+        if not self.ensureConnection():
+            return
         self.mpd_playlist = self.client.playlistinfo()
         self.root = models.RootNode()
         elements = []
@@ -102,17 +122,20 @@ class MPDPlayerBackend(player.PlayerBackend):
                 else:
                     elements.append(models.File.fromFilesystem(path))
         self.root.setContents(elements)
-        self.playlistMutex.unlock()
         self.playlistChanged.emit()
             
-
-    @QtCore.pyqtSlot(float)            
+    @QtCore.pyqtSlot(float)
     def setElapsed(self, time):
+        if not self.ensureConnection():
+            return
         logger.debug("mpd -- set Elapsed called")
         self.client.seek(self.currentSong, time)
  
     @QtCore.pyqtSlot(int)
     def setState(self, state):
+        print('STAT BLA')
+        if not self.ensureConnection():
+            return
         logger.debug("mpd -- set State {} called".format(state))
         if state == player.PLAY:
             self.client.play()
@@ -122,14 +145,18 @@ class MPDPlayerBackend(player.PlayerBackend):
             self.client.stop()       
     
     def currentPlaylist(self):
-        self.playlistMutex.lock()
         return self.root
-        self.playlistMutex.unlock()
     
+    @QtCore.pyqtSlot()
     def next(self):
+        if not self.ensureConnection():
+            return
         self.client.next()
         
+    @QtCore.pyqtSlot()
     def previous(self):
+        if not self.ensureConnection():
+            return
         self.client.previous()
     
     @staticmethod

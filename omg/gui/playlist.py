@@ -21,6 +21,7 @@ from PyQt4.QtCore import Qt
 
 from . import treeview, mainwindow
 from .. import logging, player
+from ..models import playlist
 from ..constants import PLAYLIST
 
 translate = QtCore.QCoreApplication.translate
@@ -38,8 +39,26 @@ class PlaylistWidget(QtGui.QDockWidget):
     def __init__(self, parent = None, state = None, location = None):
         super().__init__(parent)
         self.setWindowTitle(self.tr('playlist'))
+        self.treeview = PlaylistTreeView()
+        self.treeview.setModel(playlist.BasicPlaylist())
+        widget = QtGui.QWidget()
+        layout = QtGui.QVBoxLayout(widget)
+        layout.addWidget(self.treeview)
+        
+        bottomLayout = QtGui.QHBoxLayout()
+        
         self.backendChooser = player.BackendChooser(self)
-        self.backendChooser.backendChanged.connect(lambda b: print('backend changed: {}'.format(b)))
+        self.backendChooser.backendChanged.connect(self.handleBackendChanged)
+        bottomLayout.addWidget(self.backendChooser)
+        bottomLayout.addStretch()
+        layout.addLayout(bottomLayout)
+        self.setWidget(widget)
+    
+    def handleBackendChanged(self, name):
+        backend = player.instance(name)
+        if backend.connected:
+            self.treeview.model().setRoot(backend.currentPlaylist())
+        
 data = mainwindow.WidgetData(id = "playlist",
                              name = translate("Playlist","playlist"),
                              theClass = PlaylistWidget,

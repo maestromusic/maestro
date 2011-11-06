@@ -22,6 +22,7 @@ import itertools, collections
 from . import config, logging
 logger = logging.getLogger("omg.player")
 STOP, PLAY, PAUSE = range(3)
+DISCONNECTED, CONNECTING, CONNECTED = range(3)
 
 
 configuredBackends = collections.OrderedDict() # map profile name -> backend name
@@ -78,7 +79,7 @@ class BackendChooser(QtGui.QComboBox):
     
     ignoreSignal = False
     
-    backendChanged = QtCore.pyqtSignal(object)
+    backendChanged = QtCore.pyqtSignal(str)
     def __init__(self, parent = None):
         super().__init__(parent)
         for name in configuredBackends:
@@ -147,52 +148,66 @@ class PlayerBackend(QtCore.QObject):
     currentSongChanged = QtCore.pyqtSignal(int)
     elapsedChanged = QtCore.pyqtSignal(float, float)
     playlistChanged = QtCore.pyqtSignal()
+    connectionStateChanged = QtCore.pyqtSignal(int)
     
     def __init__(self, name):
         super().__init__()
+        notifier.profileRenamed.connect(self._handleProfileRename)
         self.name = name
         self.state = STOP
         self.volume = 0
         self.currentSong = -1
         self.elapsed = 0
         self.currentSongLength = 0
+        self.connected = False
     
+    def _handleProfileRename(self, old, new):
+        if self.name == old:
+            self.name = new
+            
     @staticmethod
     def configWidget(profile = None):
         """Return a config widget, initialized with the data of the given *profile*."""
         raise NotImplementedError()
-         
+    
+    @QtCore.pyqtSlot(int)
     def setState(self, state):
         """Set the state of the player to one of STOP, PLAY, PAUSE."""
         raise NotImplementedError()
      
+    @QtCore.pyqtSlot(int)
     def setVolume(self, volume):
         """Set the volume of the player. *volume* must be an integer between 0 and 100."""
         raise NotImplementedError()
     
+    @QtCore.pyqtSlot(int)
     def setCurrentSong(self, index):
         """Set the song at offset *index* as active."""
         raise NotImplementedError()
     
+    @QtCore.pyqtSlot(float)
     def setElapsed(self, seconds):
         """Jump within the currently playing song to the position at time *seconds*, which
         is a float."""
         raise NotImplementedError()
-        
+    
     def currentPlaylist(self):
         """Returns the current playlist in form of a root node."""
         raise NotImplementedError()
     
+    @QtCore.pyqtSlot(object)
     def setPlaylist(self, root):
         """Change the playlist; *root* is an instance of models.RootNode containing the playlist
         elements as children."""
         raise NotImplementedError()
     
+    @QtCore.pyqtSlot()
     def next(self):
         """Jump to the next song in the playlist. If the playlist is stopped or at the last 
         song, this is ignored."""
         raise NotImplementedError()
     
+    @QtCore.pyqtSlot()
     def previous(self):
         """Jump to the previous song in the playlist. If the playlist is stopped or at the
         first song, this is ignored."""

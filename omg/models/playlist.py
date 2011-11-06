@@ -21,11 +21,9 @@ import difflib, logging, os, itertools
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from omg import database, models, mpclient, tags, absPath, relPath, distributor
-from omg.config import options
+from omg import database as db, models, config
 from . import rootedtreemodel, treebuilder, mimedata
 
-db = database.get()
 logger = logging.getLogger("omg.models.playlist")
         
 class BasicPlaylist(rootedtreemodel.RootedTreeModel):
@@ -36,161 +34,8 @@ class BasicPlaylist(rootedtreemodel.RootedTreeModel):
     def __init__(self):
         """Initialize with an empty playlist."""
         rootedtreemodel.RootedTreeModel.__init__(self,models.RootNode())
-        self.setContents([])
-        distributor.indicesChanged.connect(self._handleIndicesChanged)
-        self.undoStack = QtGui.QUndoStack(self)
-    
-    def setRoot(self,root):
-        """Set the root-node of this playlist which must be of type models.RootNode. All views using this model will be reset."""
-        assert isinstance(root,models.RootNode)
-        self.contents = root.contents
-        rootedtreemodel.RootedTreeModel.setRoot(self,root)
-        self.undoStack.clear()
-        
-    def setContents(self,contents):
-        """Set the contents of this playlist and set their parent to self.root. The contents are only the toplevel-elements in the playlist, not all files. All views using this model will be reset."""
-        self.contents = contents
-        self.root.contents = contents
-        for node in contents:
-            node.setParent(self.root)
-        self.reset()
-        
-    def flags(self,index):
-        defaultFlags = rootedtreemodel.RootedTreeModel.flags(self,index)
-        if index.isValid():
-            return defaultFlags | Qt.ItemIsDropEnabled | Qt.ItemIsDragEnabled
-        else: return defaultFlags | Qt.ItemIsDropEnabled
-    
-    def supportedDropActions(self):
-        return Qt.CopyAction | Qt.MoveAction
-         
-    def mimeTypes(self):
-        return [options.gui.mime,"text/uri-list"]
-    
-    def mimeData(self,indexes):
-        return mimedata.createFromIndexes(self,indexes)
 
-    # A note on removing and inserting rows via DND: We cannot implement insertRows because we have no way to insert empty rows without elements. Instead we overwrite dropMimeData and use self.insertElements. On the other hand we implement removeRows to remove rows at the end of internal move operations and let Qt call this method.
-    def dropMimeData(self,mimeData,action,row,column,parentIndex):
-        if action == Qt.IgnoreAction:
-            return True
 
-        if column > 0:
-            return False
-        
-        contents = self._prepareMimeData(mimeData)
-        if contents is None:
-            return False
-        self.undoStack.beginMacro("Drop item(s)")
-        if parentIndex.isValid():
-            parent = self.data(parentIndex)
-        else: parent = self.root
-        
-        if 0 <= row < parent.getChildrenCount():
-            self.insertContents(parent,row,contents,copy=False)
-        else: # Probably the element was dropped onto parent and not between any rows
-            if parent.isFile():
-                # Insert as sibling next to parent
-                self.insertContents(parent.getParent(),parent.getParent().index(parent)+1,contents,copy=False)
-            else: self.insertContents(parent,parent.getChildrenCount(),contents,copy=False)
-        self.undoStack.endMacro()
-        return True
-
-    def _prepareMimeData(self, mimeData):
-        """Create an Element structure from the MIME data that can be inserted into the model."""
-        if mimeData.hasFormat(options.gui.mime):
-            return [node.copy() for node in mimeData.retrieveData(options.gui.mime)]
-        elif mimeData.hasFormat("text/uri-list"):
-            return self.importPaths(relPath(url.path()) for url in mimeData.urls())
-        else:
-            return None
-        
-    def removeRows(self,row,count,parentIndex):
-        # Reimplementation of QAbstractItemModel.removeRows
-        if parentIndex.isValid():
-            parent = self.data(parentIndex)
-        else: parent = self.root
-        self.removeContents(parent,row,row+count)
-        return True
-        
-    def removeContents(self,parent,start,end):
-        """Remove the nodes with indices <start>-<end> (without <end>!) from <parent>'s children."""
-        command = RemoveContentsCommand(self, self.getIndex(parent), start, end-start, "remove Item")
-        self.undoStack.push(command)
-        #self.beginRemoveRows(self.getIndex(parent),start,end-1)
-        #del parent.getChildren()[start:end]
-        #self.endRemoveRows()
-    
-    def removeByQtIndex(self,index):
-        """Remove the element with the given Qt-index from the model and remove all files within it from the MPD-playlist. The index may point to a file or a container, but must be valid."""
-        if not index.isValid():
-            raise ValueError("BaiscPlaylist.removeByQtIndex: Index is not valid.")
-        element = self.data(index)
-        start =  element.getParent().index(element)
-        self.removeContents(element.getParent(),start,start+1)
-        
-    def insertContents(self,parent,row,contents,copy=True):
-        """Insert <contents> as children at the given row into the node <parent>. If <copy> is True, <contents> will be copied deeply which is usually the right thing to do, as the parents of the nodes in <contents> must be adjusted."""
-        
-        command = InsertContentsCommand(self, parent, row, contents, copy, text="insert Item(s)")
-        self.undoStack.push(command)
-        #=======================================================================
-        # if parent.isFile():
-        #    raise ValueError("Cannot insert contents into file {}".format(parent))
-        # self.beginInsertRows(self.getIndex(parent),row,row+len(contents)-1)
-        # if copy:
-        #    contents = [node.copy() for node in contents]
-        # for node in contents:
-        #    node.setParent(parent)
-        # parent.getChildren()[row:row] = contents
-        # self.endInsertRows()
-        #=======================================================================
-    
-    def importPaths(self,paths):
-        """Return a list of elements from the given (relative) paths which may be inserted into the playlist."""
-        # _collectFiles works with absolute paths, so we need to convert paths before and after _collectFiles
-        filePaths = [relPath(path) for path in self._collectFiles(absPath(p) for p in paths)]
-        return [self._createItem(path) for path in filePaths]
-        
-    def _collectFiles(self,paths): # TODO: Sort?
-        """Return a list of absolute paths to all files in the given paths (which must be absolute, too). That is, if a path in <paths> is a file, it will be contained in the resulting list, whereas if it is a directory, all files within (recursively) will be contained in the result."""
-        filePaths = []
-        for path in paths:
-            if os.path.isfile(path):
-                filePaths.append(path)
-            elif os.path.isdir(path):
-                filePaths.extend(self._collectFiles(os.path.join(path,p) for p in os.listdir(path)))
-        return filePaths
-   
-    def _createItem(self,path,parent=None):
-        """Create a playlist-item for the given path. The parent of the new element is set to <parent> (even when this is None)."""
-        id = db.query("SELECT element_id FROM files WHERE path = ?",path).getSingle() # may be None
-        result = models.File(id,path=path)
-        result.loadTags()
-        result.parent = parent
-        return result
-
-    def _handleIndicesChanged(self,event):
-        allIds = event.getAllIds()
-
-        if (event.deleted or event.created)\
-                  and not set(allIds).isdisjoint(set(node.id for node in self.getAllNodes())):
-            self.restructure()
-            return
-
-        for element in self.getAllNodes():
-            if element.id in allIds:
-                index = self.getIndex(element)
-                dataChanged = False
-                if event.cover:
-                    element.deleteCoverCache()
-                    dataChanged = True
-                if event.tags:
-                    element.loadTags()
-                    dataChanged = True
-                if dataChanged:
-                    self.dataChanged.emit(index,index)
-                
 
 class ManagedPlaylist(BasicPlaylist):
     """A ManagedPlaylist organizes the tree-structure over the "flat playlist" (just the files) in a nice way. In contrast to BasicPlaylist, ManagedPlaylist uses mainly offsets to address files, as the tree-structure may change during most operations. Additionally offset-based insert- and remove-functions are needed for synchronization with MPD (confer SynchronizablePlaylist). Of course, there are also functions to insert and remove using a reference to the parent-container, but they internally just call the offset-based functions."""
