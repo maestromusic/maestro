@@ -279,15 +279,17 @@ class DelegateItem:
     
 
 class TextItem(DelegateItem):
-    """A TextItem displays a single text. Optionally you can set the DelegateStyle of the text."""
-    def __init__(self,text,style=None):
+    """A TextItem displays a single text. Optionally you can set the DelegateStyle of the text and a
+    minimum height of the text line."""
+    def __init__(self,text,style=None,minHeight=0):
         self.text = text
         self.style = style
+        self.minHeight = minHeight
         
     def sizeHint(self,delegate,availableWidth=-1):
         rect = QtCore.QRect(0,0,availableWidth,14)
         bRect = delegate.getFontMetrics(self.style).boundingRect(rect,Qt.TextSingleLine,self.text)
-        return bRect.width(),bRect.height()
+        return bRect.width(),max(bRect.height(),self.minHeight)
 
     def paint(self,delegate,rect,align=LEFT):
         delegate._configurePainter(self.style)
@@ -298,7 +300,7 @@ class TextItem(DelegateItem):
         # Enable elided text
         #text = delegate.painter.fontMetrics().elidedText(self.text,Qt.ElideRight,rect.width())
         bRect = delegate.painter.drawText(rect,flags,self.text)
-        return bRect.width(),bRect.height()
+        return bRect.width(),max(bRect.height(),self.minHeight)
     
     
 class CoverItem(DelegateItem):
@@ -628,7 +630,8 @@ class BrowserDelegate(AbstractDelegate):
             
             # Title
             titleItem = TextItem(node.getTitle(prependPosition=self.showPositions),
-                                 BOLD_STYLE if node.isContainer() else STD_STYLE)
+                                 BOLD_STYLE if node.isContainer() else STD_STYLE,
+                                 minHeight=IconBarItem.iconSize if len(flagIcons) > 0 else 0)
             self.addCenter(titleItem)
             
             # Flags
