@@ -87,8 +87,8 @@ defaults = OrderedDict((
     "iconsize": (int,16,"Size of various icons."),
     "editor": {
                 "cover_size": (int,64,"Size of covers in the editor."),
-                "left_tags": (list,['composer','artist','performer'],"Tags in the left column."),
-                "right_tags": (list,['date','conductor'],"Tags in the right column."),
+                "left_tags": (list,['album','composer','artist','performer'],"Tags in the left column."),
+                "right_tags": (list,['date','genre','conductor'],"Tags in the right column."),
     },
     "flageditor": {
                 "animation": (bool,True,"Enable/disable animations in the flageditor."),

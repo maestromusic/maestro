@@ -424,7 +424,7 @@ class RestoreExpandedOptimizer(Optimizer):
             childIndex = model.index(i,0,index)
             if self.view.isExpanded(childIndex):
                 child = model.data(childIndex,Qt.EditRole)
-                if isinstance(child,browsermodel.CriterionNode):
+                if isinstance(child,[browsermodel.CriterionNode,child,browsermodel.HiddenValuesNode]):
                     key = child.getKey()
                 else: key = child.id
                 result[key] = self._getExpandedNodes(childIndex)

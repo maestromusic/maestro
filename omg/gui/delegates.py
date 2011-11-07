@@ -279,15 +279,17 @@ class DelegateItem:
     
 
 class TextItem(DelegateItem):
-    """A TextItem displays a single text. Optionally you can set the DelegateStyle of the text."""
-    def __init__(self,text,style=None):
+    """A TextItem displays a single text. Optionally you can set the DelegateStyle of the text and a
+    minimum height of the text line."""
+    def __init__(self,text,style=None,minHeight=0):
         self.text = text
         self.style = style
+        self.minHeight = minHeight
         
     def sizeHint(self,delegate,availableWidth=-1):
         rect = QtCore.QRect(0,0,availableWidth,14)
         bRect = delegate.getFontMetrics(self.style).boundingRect(rect,Qt.TextSingleLine,self.text)
-        return bRect.width(),bRect.height()
+        return bRect.width(),max(bRect.height(),self.minHeight)
 
     def paint(self,delegate,rect,align=LEFT):
         delegate._configurePainter(self.style)
@@ -298,7 +300,7 @@ class TextItem(DelegateItem):
         # Enable elided text
         #text = delegate.painter.fontMetrics().elidedText(self.text,Qt.ElideRight,rect.width())
         bRect = delegate.painter.drawText(rect,flags,self.text)
-        return bRect.width(),bRect.height()
+        return bRect.width(),max(bRect.height(),self.minHeight)
     
     
 class CoverItem(DelegateItem):
@@ -455,6 +457,19 @@ def getTextInfo(fm,text):
 
 
 class MultiTextItem(DelegateItem):
+    """A MultiTextItem stores two columns, each containing several rows of text. In contrast to a usual
+    two-column layout, the width of the columns may differ in different rows. MultiTextItem will try to 
+    compute the width cleverly, so that a minimal number of rows is needed in total.
+    
+    *leftTexts* and *rightTexts* are lists of the columns' texts. These lists may contain strings or
+    QTextDocuments, allowing for e.g. multi-colored text. If you use QTextDocuments in *rightTexts* you
+    should set the document's alignment to right.
+    
+    *style* is the DelegateStyle applied to all strings (not the QTextDocuments) in the list.
+    
+    Warning: MultiTextItems will take all available horizontal space. Thus you can usually use it only in
+    the center region of an AbstractDelegate and must add it last to its row.
+    """
     def __init__(self,leftTexts,rightTexts,style=STD_STYLE):
         self.leftTexts = leftTexts
         self.rightTexts = rightTexts
@@ -473,12 +488,25 @@ class MultiTextItem(DelegateItem):
         return result
 
     def _layout(self,delegate,fm,availableWidth,availableHeight,paint):
+        """Paint (if *paint* is True) or compute sizeHint given the *delegate*, fontMetrics *fm* and
+        available space. The main task is to compute the distribution of space in each row based on the
+        length of the texts in both columns.
+        """
         #print("availableWidth{}: {}".format(" (paint)" if paint else '',availableWidth))
         leftFlags = Qt.AlignLeft | Qt.AlignTop | Qt.TextWordWrap
         rightFlags = Qt.AlignRight | Qt.AlignTop | Qt.TextWordWrap
         
         baseHeight = 0
-        for leftText,rightText in itertools.zip_longest(self.leftTexts,self.rightTexts,fillvalue=''):
+        for leftThing,rightThing in itertools.zip_longest(self.leftTexts,self.rightTexts,fillvalue=''):
+            # Check for QTextDocuments
+            if isinstance(leftThing,QtGui.QTextDocument):
+                leftText = leftThing.toPlainText()
+            else: leftText = leftThing
+            if isinstance(rightThing,QtGui.QTextDocument):
+                rightText = rightThing.toPlainText()
+            else: rightText = rightThing
+            
+            # Compute length of the columns
             leftLength,leftMax = getTextInfo(fm,leftText)
             rightLength,rightMax = getTextInfo(fm,rightText)
             #print("Length: {} {}".format(leftLength,rightLength))
@@ -501,18 +529,24 @@ class MultiTextItem(DelegateItem):
                          
             rect = QtCore.QRect(0,baseHeight,leftColumnLength,availableHeight-baseHeight)
             #print("Paint in left rect{}: {}".format(" (paint)" if paint else '',rect))
-            if paint:
-                leftBRect = delegate.painter.drawText(rect,leftFlags,leftText)
-            else: leftBRect = fm.boundingRect(rect,leftFlags,leftText)
+            if isinstance(leftThing,QtGui.QTextDocument):
+                self.processTextDocument(leftThing,rect,delegate.painter if paint else None)
+            else:
+                if paint:
+                    leftBRect = delegate.painter.drawText(rect,leftFlags,leftText)
+                else: leftBRect = fm.boundingRect(rect,leftFlags,leftText)
             #print("LeftBRect{}: {}".format(" (paint)" if paint else '',leftBRect))
             
             rightColumnStart = leftBRect.width() + SEP_1
             #print("leftColumnLength: {}  | rightColumnStart: {}".format(leftColumnLength,rightColumnStart))
             rect = QtCore.QRect(rightColumnStart,baseHeight,
                                 availableWidth-rightColumnStart,availableHeight-baseHeight)
-            if paint:
-                rightBRect = delegate.painter.drawText(rect,rightFlags,rightText)
-            else: rightBRect = fm.boundingRect(rect,rightFlags,rightText)
+            if isinstance(rightThing,QtGui.QTextDocument):
+                self.processTextDocument(rightThing,rect,delegate.painter if paint else None)
+            else:
+                if paint:
+                    rightBRect = delegate.painter.drawText(rect,rightFlags,rightText)
+                else: rightBRect = fm.boundingRect(rect,rightFlags,rightText)
             #print("RightBRect{}: {}".format(" (paint)" if paint else '',rightBRect))
             
             baseHeight += max(leftBRect.height(),rightBRect.height()) + LINESEP
@@ -521,8 +555,38 @@ class MultiTextItem(DelegateItem):
             baseHeight -= LINESEP # above loop adds one space too much
         return availableWidth,baseHeight
     
+    def processTextDocument(self,document,rect,painter):
+        """Compute the size of the given QTextDocument when rendered in *rect* and paint it if *painter* is
+        not None.
+        """
+        document.setTextWidth(rect.width())
+        if painter is not None:
+            painter.save()
+            painter.translate(rect.topLeft())
+            document.drawContents(painter,QtCore.QRectF(rect.translated(-rect.x(),-rect.y())))
+            #painter.drawRect(rect.translated(-rect.x(),-rect.y()))
+            painter.restore()
+        size = document.size().toSize()
+        return QtCore.QRect(rect.x(),rect.top(),size.width(),size.height())
         
-
+        
+#class RichTextItem(DelegateItem):
+#    def __init__(self,document):
+#        self.document = document
+#        
+#    def sizeHint(self,delegate,availableWidth=None):
+#        assert availableWidth is not None
+#        self.document.setTextWidth(availableWidth)
+#        size = self.document.size().toSize()
+#        return size.width(),size.height()
+#    
+#    def paint(self,delegate,rect,align=LEFT):
+#        self.document.setTextWidth(rect.width())
+#        self.document.drawContents(delegate.painter,QtCore.QRectF(rect))
+#        size = self.document.size().toSize()
+#        return size.width(),size.height()
+    
+    
 class BrowserDelegate(AbstractDelegate):
     """Delegate used in the Browser. Does some effort to put flag icons at the optimal place using free space
     in the title row and trying not to increase the overall number of rows.
@@ -566,7 +630,8 @@ class BrowserDelegate(AbstractDelegate):
             
             # Title
             titleItem = TextItem(node.getTitle(prependPosition=self.showPositions),
-                                 BOLD_STYLE if node.isContainer() else STD_STYLE)
+                                 BOLD_STYLE if node.isContainer() else STD_STYLE,
+                                 minHeight=IconBarItem.iconSize if len(flagIcons) > 0 else 0)
             self.addCenter(titleItem)
             
             # Flags
@@ -718,6 +783,14 @@ class EditorDelegate(AbstractDelegate):
     """Delegate for the editor."""
     showPaths = True
     
+    blackFormat = QtGui.QTextCharFormat()
+    blackFormat.setFontPointSize(STD_STYLE.fontSize)
+    redFormat = QtGui.QTextCharFormat()
+    redFormat.setFontPointSize(STD_STYLE.fontSize)
+    redFormat.setForeground(QtGui.QBrush(QtGui.QColor(255,0,0)))
+    
+    removeParentFlags = True
+    
     def __init__(self,view):
         super().__init__(view)
         self.leftTags = [tags.get(name) for name in
@@ -764,6 +837,15 @@ class EditorDelegate(AbstractDelegate):
         # Tags
         if len(leftTexts) > 0 or len(rightTexts) > 0:
             self.addCenter(MultiTextItem(leftTexts,rightTexts))
+#            doc = QtGui.QTextDocument()
+#            cursor = QtGui.QTextCursor(doc)
+#            cursor.insertTable(max(len(leftTexts),len(rightTexts)),2)
+#            for leftText,rightText in itertools.zip_longest(leftTexts,rightTexts,fillvalue=''):
+#                cursor.insertText(leftText)
+#                cursor.movePosition(QtGui.QTextCursor.NextCell)
+#                cursor.insertText(rightText)
+#                cursor.movePosition(QtGui.QTextCursor.NextCell)
+#            self.addCenter(RichTextItem(doc))
             self.newRow()
             
         # Flags without icon
@@ -771,49 +853,94 @@ class EditorDelegate(AbstractDelegate):
             self.addCenter(TextItem(', '.join(flag.name for flag in flagWithoutIcon)))
             
     def prepareTags(self,element):
+        theTags = self.getTags(element)
         leftTexts = []
-        for tag in self.leftTags:
-            if tag in element.tags:
-                values = self.getTagValues(tag,element)
-                if len(values) > 0:
-                    separator = ' - ' if tag == tags.TITLE or tag == tags.ALBUM else ', '
-                    leftTexts.append(separator.join(str(v) for v in values))
         rightTexts = []
+        for tag in self.leftTags:
+            if tag in theTags:
+                leftTexts.append(self.prepareTagValues(element,theTags,tag))
+                del theTags[tag]
         for tag in self.rightTags:
-            if tag in element.tags:
-                values = self.getTagValues(tag,element)
-                if len(values) > 0:
-                    separator = ' - ' if tag == tags.TITLE or tag == tags.ALBUM else ', '
-                    rightTexts.append(separator.join(str(v) for v in values))
+            if tag in theTags:
+                rightTexts.append(self.prepareTagValues(element,theTags,tag,alignRight=True))
+                del theTags[tag]
+        for tag in theTags:
+            if tag != tags.TITLE:
+                leftTexts.append(tag.translated()+': '+self.prepareTagValues(element,theTags,tag))
+            
         return leftTexts,rightTexts
     
-    def getTagValues(self,tagType,element):
-        if tagType not in element.tags:
-            return []
-        values = list(element.tags[tagType]) # copy!
-        
-        parent = element
-        while len(values) > 0:
-            parent = parent.getParent()
-            if parent is None or isinstance(parent,models.RootNode):
-                break
-            parentValues = parent.tags[tagType]
-            
-            for value in parentValues:
-                if value in values:
-                    values.remove(value)
-        
-        return values
+    def prepareTagValues(self,element,theTags,tag,alignRight=False):
+        separator = ' - ' if tag == tags.TITLE or tag == tags.ALBUM else ', '
+        if hasattr(element,'missingTags') and tag in element.missingTags \
+                and any(v in element.missingTags[tag] for v in theTags[tag]):
+            doc = QtGui.QTextDocument()
+            doc.setDocumentMargin(0)
+            cursor = QtGui.QTextCursor(doc)
+            if alignRight:
+                format = QtGui.QTextBlockFormat()
+                format.setAlignment(Qt.AlignRight)
+                cursor.setBlockFormat(format)
+            for i,value in enumerate(theTags[tag]):
+                if value in element.missingTags[tag]:
+                    cursor.insertText(str(value),self.redFormat)
+                else: cursor.insertText(str(value),self.blackFormat)
+                if i != len(theTags[tag]) - 1:
+                    cursor.insertText(separator)
+            return doc
+        else: 
+            strings = [str(v) for v in theTags[tag]]
+        return separator.join(strings)
     
-    def getFlags(self,element):
-        flags = list(element.flags) # copy!
+    def getTags(self,element):
+        theTags = element.tags.copy()
         parent = element.getParent()
-        while parent is not None:
-            if isinstance(parent,models.Element):
-                for flag in parent.flags:
-                    if flag in flags:
-                        flags.remove(flag)
+
+        while not isinstance(parent,models.RootNode):
+            # Be careful to iterate over the parent's tags because theTags might change
+            for tag in parent.tags:
+                if tag not in theTags:
+                    for value in parent.tags[tag]:
+                        self.addMissing(parent,tag,value)
+                    continue
+                if hasattr(parent,'missingTags') and tag in parent.missingTags:
+                    missing = parent.missingTags[tag]
+                else: missing = []
+                for value in parent.tags[tag]:
+                    if tag in theTags and value in theTags[tag]: # tag may be removed from theTags
+                        if value not in missing:
+                            theTags[tag].remove(value)
+                    else:
+                        self.addMissing(parent,tag,value)            
             parent = parent.getParent()
+            
+        return theTags
+    
+    def addMissing(self,element,tag,value):
+        if not hasattr(element,'missingTags'):
+            element.missingTags = tags.Storage()
+        if tag not in element.missingTags:
+            element.missingTags[tag] = [value]
+        elif value not in element.missingTags[tag]:
+            element.missingTags[tag].append(value)
+            
+    def getFlags(self,element):
+        """Return two lists containing the flags of *element*: The first list contains the icons of the flags
+        that have one, the second list contains the names of those flags that do not have an icon.
+        
+        If the ''removeParentFlags'' option is True, flags that are set in an ancestor are removed.
+        """
+        if self.removeParentFlags:
+            flags = list(element.flags) # copy!
+            parent = element.getParent()
+            while parent is not None:
+                if isinstance(parent,models.Element):
+                    for flag in parent.flags:
+                        if flag in flags:
+                            flags.remove(flag)
+                parent = parent.getParent()
+        else:
+            flags = element.flags
         return [flag.icon for flag in flags if flag.icon is not None],\
                [flag.name for flag in flags if flag.icon is None]
     

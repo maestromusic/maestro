@@ -30,34 +30,27 @@ import os
 logger = logging.getLogger(__name__)
 
 
-def createNewElements(elements, setData = False):
+def createNewElements(elements):
     """Create new elements. *elements* is a list of preliminary elements. If they have negative IDs, new IDs for
     them are created automatically. Otherwise, they are inserted with the IDs as given in the element.
     This method will insert new entries in the elements and file table. It won't save
-    any contents. Tags and flags are saved only if *setData* is True.
+    any contents.
     
     This method will return a dict mapping old to new ids.
     """
     result = {}
-    if setData:
-        tagChanges = {}
-        flagChanges = {}
-        emptyTags = tagsModule.Storage()
-        emptyFlags = [] 
+    newFileParams = []
     for element in elements:
         newId = db.write.createNewElement(element.isFile(),
                                           element.major if element.isContainer() else False,
                                           id = None if element.id < 0 else element.id)
         if element.isFile():
-            db.write.addFile(newId,element.path,None,element.length)
-        if setData:
-            tagChanges[newId] = (emptyTags, element.tags)
-            flagChanges[newId] = (emptyFlags, element.flags)
-        
+            newFileParams.append((newId,element.path,element.length))
         result[element.id] = newId
-    if setData:
-        changeTags(tagChanges, elements, emitEvent = False)
-        changeFlags(flagChanges,  emitEvent = False)
+        
+    if len(newFileParams) > 0:
+        db.multiQuery("INSERT INTO {}files SET element_id = ?, path = ?, length = ?"
+                      .format(db.prefix),newFileParams)
     return result
 
 def newContainer(tags, flags, major, id = None):
@@ -244,6 +237,8 @@ def changeTags(changes,elements=[],emitEvent = True):
     """
     abort = False
         
+    removeParams = []
+    addParams = []
     successful = [] # list of element ids whose file was written successfully
     for id,changeTuple in changes.items():
         oldTags,newTags = changeTuple
@@ -265,13 +260,26 @@ def changeTags(changes,elements=[],emitEvent = True):
                 continue
         successful.append(id)
         
-        unchangedTags = [tag for tag in oldTags if tag in newTags and oldTags[tag] == newTags[tag]]
-        if len(unchangedTags) < len(oldTags):
-            db.write.removeAllTagValues(id,(tag for tag in oldTags if not tag in unchangedTags))
-        if len(unchangedTags) < len(newTags):
-            for tag in newTags:
-                if tag not in unchangedTags:
-                    db.write.addTagValues(id,tag,newTags[tag])
+        for tag in oldTags:
+            if tag not in newTags:
+                removeParams.extend((id,tag.id,db.idFromValue(tag,value)) for value in oldTags[tag])
+            else:
+                removeParams.extend((id,tag.id,db.idFromValue(tag,value))
+                                        for value in oldTags[tag] if value not in newTags[tag])
+        for tag in newTags:
+            if tag not in oldTags:
+                addParams.extend((id,tag.id,db.idFromValue(tag,value,insert=True)) for value in newTags[tag])
+            else:
+                addParams.extend((id,tag.id,db.idFromValue(tag,value,insert=True))
+                                    for value in newTags[tag] if value not in oldTags[tag])
+    
+    if len(removeParams) > 0:
+        db.multiQuery("DELETE FROM {}tags WHERE element_id = ? AND tag_id = ? AND value_id = ?"
+                      .format(db.prefix),removeParams)
+  
+    if len(addParams) > 0:
+        db.multiQuery("INSERT INTO {}tags SET element_id = ?,tag_id = ?,value_id = ?"
+                      .format(db.prefix),addParams) 
   
     if len(successful) > 0 and emitEvent:
         changes = {k: v[1] for k,v in changes.items() if k in successful}
@@ -293,11 +301,25 @@ def removeFlag(flag,elements):
 def changeFlags(changes,emitEvent = True):
     """Change flags arbitrarily: *changes* is a dict mapping element ids to tuples consisting
     of two lists of flags - the flags before and after the change."""
+    removeParams, addParams = [],[]
+    
     for id,changeTuple in changes.items():
         oldFlags,newFlags = changeTuple
-        # Compare the lists forgetting the order
-        if any(f not in oldFlags for f in newFlags) or any(f not in newFlags for f in oldFlags):
-            db.write.setFlags(id,newFlags)
+        for f in oldFlags:
+            if f not in newFlags:
+                removeParams.append((id,f.id))
+        for f in newFlags:
+            if f not in oldFlags:
+                addParams.append((id,f.id))
+    
+    if len(removeParams) > 0:
+        db.multiQuery("DELETE FROM {}flags WHERE element_id = ? AND flag_id = ?"
+                      .format(db.prefix),removeParams)
+        
+    if len(addParams) > 0:
+        db.multiQuery("INSERT INTO {}flags SET element_id = ?, flag_id = ?"
+                      .format(db.prefix),addParams)
+        
     if emitEvent:
         changes = {k: v[1] for k,v in changes.items()}
         dispatcher.changes.emit(events.FlagChangeEvent(REAL,changes))

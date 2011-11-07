@@ -501,6 +501,17 @@ class TagValueList(list):
         list.__delitem__(self,key)
         if len(self) == 0:
             self.storage._removeList(self)
+            
+    def remove(self,value):
+        list.remove(self,value)
+        if len(self) == 0:
+            self.storage._removeList(self)
+            
+    def pop(self):
+        value = list.pop(self)
+        if len(self) == 0:
+            self.storage._removeList(self)
+        return value
 
 
 class Storage(dict):
@@ -509,11 +520,16 @@ class Storage(dict):
     list and adds a few useful functions to deal with such datastructures.
     """
     def __init__(self,*args):
+        if len(args) == 1 and isinstance(args[0],dict):
+            assert all(isinstance(v,TagValueList) for v in args[0].values())
         dict.__init__(self,*args)
     
     def copy(self):
         """Return a copy of this storage-object containing copies of the original tag-value-lists."""
-        return Storage({tag: list(l) for tag,l in self.items()})
+        result = Storage({tag: TagValueList(self,l) for tag,l in self.items()})
+        for tagValueList in result.values():
+            tagValueList.storage = result
+        return result
         
     def __setitem__(self,key,value):
         assert isinstance(key,Tag)
@@ -566,9 +582,7 @@ class Storage(dict):
         for value in values:
             try:
                 self[tag].remove(value)
-            except ValueError: pass 
-        if not self[tag]:
-            del self[tag]
+            except ValueError: pass
             
     def replace(self,tag,oldValue,newValue):
         """Replace a value of *tag*. Because *newValue* will be at the same position where *oldValue* was,
