@@ -44,6 +44,11 @@ def instance(name):
     """Returns the instance of the player backend according to the given profile name.
     If the instance does not yet exist, it is created."""
     if name not in _runningBackends:
+        if configuredBackends[name] not in backendClasses:
+            logger.warning('Could not load playback profile {} because backend {} is not available. '
+                           'Did you forget to load the plugin?'.format(
+                  name, configuredBackends[name]))
+            return None
         _runningBackends[name] = backendClasses[configuredBackends[name]](name)
     return _runningBackends[name]
 

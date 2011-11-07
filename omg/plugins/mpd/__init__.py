@@ -220,9 +220,13 @@ def _handleRemoveProfile(name):
         profiles = config.storage.mpd.profiles 
         del profiles[name]
         config.storage.mpd.profiles = profiles
+
 def enable():
     player.backendClasses['mpd'] = MPDPlayerBackend
     player.notifier.profileAdded.connect(_handleNewProfile)
     player.notifier.profileRenamed.connect(_handleRenameProfile)
     player.notifier.profileRemoved.connect(_handleRemoveProfile)
     logger.debug("mpd plugin enabled -- added 'mpd' playerClass")
+
+def disable():
+    del player.backendClasses['mpd']

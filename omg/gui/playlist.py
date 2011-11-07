@@ -86,8 +86,12 @@ class PlaylistWidget(QtGui.QDockWidget):
         if name is None:
             self.treeview.setDisabled(True)
             return
+        backend = player.instance(name)
+        if backend is None:
+            self.treeview.setDisabled(True)
+            return
         self.treeview.setEnabled(True)
-        self.backend = player.instance(name)
+        self.backend = backend
         self.treeview.setModel(self.backend.playlist)
         
 data = mainwindow.WidgetData(id = "playlist",

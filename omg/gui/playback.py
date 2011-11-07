@@ -51,6 +51,7 @@ class PlaybackWidget(QtGui.QDockWidget):
         
         self.titleLabel = QtGui.QLabel(self)
         self.titleLabel.setTextFormat(Qt.AutoText)
+        self.titleLabel.setWordWrap(True)
         topLayout.addStretch()
         topLayout.addWidget(self.titleLabel)
         topLayout.addStretch()
@@ -117,8 +118,13 @@ class PlaybackWidget(QtGui.QDockWidget):
         if name is None:
             self.titleLabel.setText(self.tr('no backend selected'))
             return
-        self.backend = player.instance(name)
-        print(self.backend)
+        backend = player.instance(name)
+        if backend is None:
+            self.titleLabel.setText(self.tr('could not set playback profile {} because its '
+                                            'backend class is not available. Did you forget ' 
+                                            'to enable a plugin?').format(name))
+            return
+        self.backend = backend 
         self.backend.elapsedChanged.connect(self.updateSlider)
         self.backend.stateChanged.connect(self.updateState)
         self.backend.currentSongChanged.connect(self.updateCurrent)
