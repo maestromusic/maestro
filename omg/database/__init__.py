@@ -355,7 +355,7 @@ def idFromHash(hash):
 
 # values_* tables
 #=======================================================================         
-@functools.lru_cache(10000)
+@functools.lru_cache(1000)
 def valueFromId(tagSpec,valueId):
     """Return the value from the tag *tagSpec* with id *valueId* or raise an sql.EmptyResultException if
     that id does not exist. Date tags will be returned as FlexiDate.
@@ -368,6 +368,7 @@ def valueFromId(tagSpec,valueId):
     return value
 
 
+@functools.lru_cache(1000)
 def idFromValue(tagSpec,value,insert=False):
     """Return the id of the given value in the tag-table of tag *tagSpec*. If the value does not exist,
     raise an sql.EmptyResultException, unless the optional parameter *insert* is set to True. In that case
@@ -385,11 +386,13 @@ def idFromValue(tagSpec,value,insert=False):
             return result.insertId()
         else: raise e
 
+
 def hidden(tagSpec, valueId):
     """Returns True iff the given tag value is set hidden."""
     tag = tagsModule.get(tagSpec)
     return query("SELECT hide FROM {}values_{} WHERE tag_id = ? AND id = ?".format(prefix, tag.type),
                  tag.id, valueId).getSingle() 
+
 
 def sortValue(tagSpec, valueId, valueIfNone = False):
     """Returns the sort value for the given tag value, or None if it is not set.
