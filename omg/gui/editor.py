@@ -76,7 +76,7 @@ class EditorTreeView(treeview.TreeView):
     level = EDITOR
     
     def __init__(self, parent = None):
-        treeview.TreeView.__init__(self, parent)
+        super().__init__(parent)
         self.setSelectionMode(self.ExtendedSelection)
         self.setDragEnabled(True)
         self.setAcceptDrops(True)
@@ -86,18 +86,7 @@ class EditorTreeView(treeview.TreeView):
         self.setItemDelegate(delegates.EditorDelegate(self))
         
         self.viewport().setMouseTracking(True)
-        self.selectionModel().selectionChanged.connect(self._handleSelectionChanged)
-    
-    def _handleSelectionChanged(self, selected, deselected):
-        """Change the global selection if some any elements are selected in any views."""
-        globalSelection = []
-        for index in self.selectionModel().selectedIndexes():
-            node = self.model().data(index)
-            # The browser does not load tags automatically
-            if isinstance(node,Element):
-                globalSelection.append(node)
-        if len(globalSelection):
-            mainwindow.setGlobalSelection(globalSelection,self)
+        self.selectionModel().selectionChanged.connect(self.updateGlobalSelection)
 
     def dragEnterEvent(self, event):
         if event.source() is self:

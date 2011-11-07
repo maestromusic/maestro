@@ -20,7 +20,10 @@ from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
 from omg import player, config, logging, database as db, models
-import mpd
+from omg.utils import relPath, absPath
+from omg.models import playlist
+
+import mpd, threading, itertools
 
 logger = logging.getLogger("omg.plugins.mpd")
 
@@ -34,20 +37,22 @@ class MPDThread(QtCore.QThread):
     
     def run(self):
         self.exec_()
-        
+
 class MPDPlayerBackend(player.PlayerBackend):
     
+    pathlistChanged = QtCore.pyqtSignal(list)
     def __init__(self, name):
         super().__init__(name)
 
         self.playlistVersion = -1
+        self.playlist = playlist.BasicPlaylist()
         self.mpdthread = MPDThread(self)
-        self.moveToThread(self.mpdthread)
         self.timer = QtCore.QTimer()
+        self.pathlistChanged.connect(self.playlist.updateFromPathList, Qt.QueuedConnection)
+        self.currentSongChanged.connect(self.playlist.setCurrent)
+        self.moveToThread(self.mpdthread)
         self.timer.timeout.connect(self.poll)
         self.timer.start(500)
-        self.playlistMutex = QtCore.QMutex()
-        #QtCore.QMetaObject.invokeMethod(self, "ensureConnection", Qt.QueuedConnection)
     
     def ensureConnection(self):
         if self.connected:
@@ -111,18 +116,10 @@ class MPDPlayerBackend(player.PlayerBackend):
         if not self.ensureConnection():
             return
         self.mpd_playlist = self.client.playlistinfo()
-        self.root = models.RootNode()
-        elements = []
-        with db.connect():
-            for file in self.mpd_playlist:
-                path = file["file"]
-                id = db.idFromPath(path)
-                if id:
-                    elements.append(models.File.fromId(id))
-                else:
-                    elements.append(models.File.fromFilesystem(path))
-        self.root.setContents(elements)
-        self.playlistChanged.emit()
+        paths = []
+        for file in self.mpd_playlist:
+            paths.append(file["file"])
+        self.pathlistChanged.emit(paths)
             
     @QtCore.pyqtSlot(float)
     def setElapsed(self, time):
@@ -133,7 +130,6 @@ class MPDPlayerBackend(player.PlayerBackend):
  
     @QtCore.pyqtSlot(int)
     def setState(self, state):
-        print('STAT BLA')
         if not self.ensureConnection():
             return
         logger.debug("mpd -- set State {} called".format(state))
@@ -143,9 +139,6 @@ class MPDPlayerBackend(player.PlayerBackend):
             self.client.pause()
         elif state == player.STOP:
             self.client.stop()       
-    
-    def currentPlaylist(self):
-        return self.root
     
     @QtCore.pyqtSlot()
     def next(self):
@@ -165,7 +158,7 @@ class MPDPlayerBackend(player.PlayerBackend):
         return MPDConfigWidget(None, profile)
         
     def __str__(self):
-        return "MPDPlayerBackend(host={},port={})".format(self.host, self.port)
+        return "MPDPlayerBackend({})".format(self.name)
 
 class MPDConfigWidget(QtGui.QWidget):
     def __init__(self, parent = None, profile = None):

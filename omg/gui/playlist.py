@@ -19,8 +19,8 @@
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from . import treeview, mainwindow
-from .. import logging, player
+from . import treeview, mainwindow, delegates, playerwidgets
+from .. import logging, player, tags, config
 from ..models import playlist
 from ..constants import PLAYLIST
 
@@ -32,7 +32,27 @@ class PlaylistTreeView(treeview.TreeView):
     level = PLAYLIST
     
     def __init__(self, parent = None):
-        treeview.TreeView.__init__(self, parent)
+        super().__init__(parent)
+        self.setSelectionMode(self.ExtendedSelection)
+        self.setDragEnabled(True)
+        self.setAcceptDrops(True)
+        self.setDefaultDropAction(Qt.MoveAction)
+        self.setDropIndicatorShown(True)
+        self.setItemDelegate(PlaylistDelegate(self))
+        self.viewport().setMouseTracking(True)
+    
+    def setModel(self, model):
+        print('set')
+        if self.selectionModel():
+            self.selectionModel().selectionChanged.disconnect(self.updateGlobalSelection)
+        super().setModel(model)
+        self.selectionModel().selectionChanged.connect(self.updateGlobalSelection)
+
+class PlaylistDelegate(delegates.BrowserDelegate):
+    """Delegate for the playlist."""
+    
+    def __init__(self,view):
+        super().__init__(view)
         
 class PlaylistWidget(QtGui.QDockWidget):
     
@@ -40,24 +60,31 @@ class PlaylistWidget(QtGui.QDockWidget):
         super().__init__(parent)
         self.setWindowTitle(self.tr('playlist'))
         self.treeview = PlaylistTreeView()
-        self.treeview.setModel(playlist.BasicPlaylist())
+ 
         widget = QtGui.QWidget()
         layout = QtGui.QVBoxLayout(widget)
-        layout.addWidget(self.treeview)
-        
+        layout.addWidget(self.treeview)       
         bottomLayout = QtGui.QHBoxLayout()
-        
-        self.backendChooser = player.BackendChooser(self)
-        self.backendChooser.backendChanged.connect(self.handleBackendChanged)
+        self.backendChooser = playerwidgets.BackendChooser(self)
+        self.backendChooser.backendChanged.connect(self.setBackend)
         bottomLayout.addWidget(self.backendChooser)
         bottomLayout.addStretch()
         layout.addLayout(bottomLayout)
         self.setWidget(widget)
+        print(state)
+        if not self.backendChooser.setCurrentProfile(state):
+            self.setBackend(self.backendChooser.currentProfile())
     
-    def handleBackendChanged(self, name):
-        backend = player.instance(name)
-        if backend.connected:
-            self.treeview.model().setRoot(backend.currentPlaylist())
+    def saveState(self):
+        return self.backendChooser.currentProfile()
+    def setBackend(self, name):
+        logger.debug("set backend: {}".format(name))
+        if name is None:
+            self.treeview.setDisabled(True)
+            return
+        self.treeview.setEnabled(True)
+        self.backend = player.instance(name)
+        self.treeview.setModel(self.backend.playlist)
         
 data = mainwindow.WidgetData(id = "playlist",
                              name = translate("Playlist","playlist"),

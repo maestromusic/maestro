@@ -21,7 +21,7 @@ from PyQt4.QtCore import Qt
 
 translate = QtCore.QCoreApplication.translate
 
-from . import mainwindow
+from . import mainwindow, playerwidgets
 from .. import player, utils, logging
 logger = logging.getLogger("omg.player")
 
@@ -31,15 +31,17 @@ def formatTime(seconds):
     return "{:0>2d}:{:0>2d}".format(minutes, seconds % 60)
 
 class PlaybackWidget(QtGui.QDockWidget):
+    """The PlaybackWidgets provides playback controls -- play/pause, stop, nex/previous song,
+    seek inside the song, set volume, display title."""
     def __init__(self, parent = None, state = None, location = None):
         super().__init__(parent)
-        self.setWindowTitle(self.tr('player controls'))
+        self.setWindowTitle(self.tr('playback controls'))
         widget = QtGui.QWidget()
         self.setWidget(widget)
         
         topLayout = QtGui.QHBoxLayout()
-        
-        self.backendChooser = player.BackendChooser(self)
+            
+        self.backendChooser = playerwidgets.BackendChooser(self)
         topLayout.addWidget(self.backendChooser)
         
         self.previousButton = QtGui.QPushButton(utils.getIcon("previous.png"),'',self)
@@ -48,6 +50,7 @@ class PlaybackWidget(QtGui.QDockWidget):
         self.nextButton = QtGui.QPushButton(utils.getIcon("next.png"),'',self)
         
         self.titleLabel = QtGui.QLabel(self)
+        self.titleLabel.setTextFormat(Qt.AutoText)
         topLayout.addStretch()
         topLayout.addWidget(self.titleLabel)
         topLayout.addStretch()
@@ -67,10 +70,11 @@ class PlaybackWidget(QtGui.QDockWidget):
         mainLayout = QtGui.QVBoxLayout(widget)
         mainLayout.addLayout(topLayout)
         mainLayout.addLayout(bottomLayout)
-        self.setBackend(self.backendChooser.currentProfile())
+        print(state)
         self.backendChooser.backendChanged.connect(self.setBackend)
-        
-        
+        if not self.backendChooser.setCurrentProfile(state):
+            print('not??')
+            self.setBackend(self.backendChooser.currentProfile())
     
     def updateSlider(self, current, total):
         if self.seekSlider.isSliderDown():
@@ -80,14 +84,9 @@ class PlaybackWidget(QtGui.QDockWidget):
         self.seekSlider.setValue(current)
         self.seekLabel.setText("{}-{}".format(formatTime(current), formatTime(total)))
     
-    def updatePlaylist(self):
-        self.playlistRoot = self.backend.currentPlaylist()
-        self.updateCurrent(self.backend.currentSong)
-        
     def updateCurrent(self, pos):
-        if hasattr(self, "playlistRoot"):
-            self.titleLabel.setTextFormat(Qt.AutoText)
-            self.titleLabel.setText("Playing: <i>{}</i>".format(self.playlistRoot.fileAtOffset(pos).getTitle()))
+        current = self.backend.playlist.current
+        self.titleLabel.setText("Playing: <i>{}</i>".format(current.getTitle()))
     
     def updateState(self, state):
         self.ppButton.setPlaying(state == player.PLAY)
@@ -103,11 +102,11 @@ class PlaybackWidget(QtGui.QDockWidget):
             self.titleLabel.setText(self.tr("connecting..."))
         elif state == player.DISCONNECTED:
             self.titleLabel.setText(self.tr("unable to connect"))
+            
     def setBackend(self, name):
         if hasattr(self, 'backend'):
             self.backend.elapsedChanged.disconnect(self.updateSlider)
             self.backend.stateChanged.disconnect(self.updateState)
-            self.backend.playlistChanged.disconnect(self.updatePlaylist)
             self.backend.currentSongChanged.disconnect(self.updateCurrent)
             self.ppButton.stateChanged.disconnect(self.backend.setState)
             self.seekSlider.sliderMoved.disconnect(self.backend.setElapsed)
@@ -115,34 +114,34 @@ class PlaybackWidget(QtGui.QDockWidget):
             self.nextButton.clicked.disconnect(self.backend.next)
             self.backend.connectionStateChanged.disconnect(self.handleConnectionChange)
         if name is None:
-            self.titleLabel.setText('no backend connected')
+            self.titleLabel.setText(self.tr('no backend selected'))
             return
         self.backend = player.instance(name)
-        self.backend.elapsedChanged.connect(self.updateSlider, Qt.QueuedConnection)
-        self.backend.stateChanged.connect(self.updateState, Qt.QueuedConnection)
-        self.backend.playlistChanged.connect(self.updatePlaylist, Qt.QueuedConnection)
-        self.backend.currentSongChanged.connect(self.updateCurrent, Qt.QueuedConnection)
+        print(self.backend)
+        self.backend.elapsedChanged.connect(self.updateSlider)
+        self.backend.stateChanged.connect(self.updateState)
+        self.backend.currentSongChanged.connect(self.updateCurrent)
         self.ppButton.stateChanged.connect(self.backend.setState)
         self.stopButton.clicked.connect(self.handleStop)
-        self.seekSlider.sliderMoved.connect(self.backend.setElapsed,Qt.QueuedConnection)
-        self.previousButton.clicked.connect(self.backend.previous,Qt.QueuedConnection)
-        self.nextButton.clicked.connect(self.backend.next,Qt.QueuedConnection)
+        self.seekSlider.sliderMoved.connect(self.backend.setElapsed)
+        self.previousButton.clicked.connect(self.backend.previous)
+        self.nextButton.clicked.connect(self.backend.next)
         if self.backend.connected:
             self.handleConnectionChange(player.CONNECTED)
-            logger.debug('1')
             self.updatePlaylist()
-            logger.debug('2')
-            self.update()
-            logger.debug('3')
         else:
             self.handleConnectionChange(player.DISCONNECTED)
+        self.update()
         self.backend.connectionStateChanged.connect(self.handleConnectionChange)
         
         
     def update(self):
         self.ppButton.setPlaying(self.backend.state == player.PLAY)
         self.seekSlider.setValue(int(self.backend.elapsed))
-        
+    
+    def saveState(self):
+        return self.backendChooser.currentProfile()
+    
 data = mainwindow.WidgetData(id = "playback",
                              name = translate("Playback","playback"),
                              theClass = PlaybackWidget,

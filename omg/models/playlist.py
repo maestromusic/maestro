@@ -34,6 +34,35 @@ class BasicPlaylist(rootedtreemodel.RootedTreeModel):
     def __init__(self):
         """Initialize with an empty playlist."""
         rootedtreemodel.RootedTreeModel.__init__(self,models.RootNode())
+    
+    @QtCore.pyqtSlot(int)
+    def setCurrent(self, index):
+        elem = self.root.fileAtOffset(index)
+        assert(elem.isFile())
+        self.current = elem
+        print('new current: {}'.format(self.current))
+
+    def _rebuild(self, paths):
+        self.beginResetModel()
+        elements = []
+        for path in paths:
+            id = db.idFromPath(path)
+            if id is not None:
+                elements.append(models.File.fromId(id))
+            else:
+                elements.append(models.File.fromFilesystem(path))
+        self.root.setContents(elements)
+        self.endResetModel()
+    
+    @QtCore.pyqtSlot(list)
+    def updateFromPathList(self, paths):
+        for path,file in itertools.zip_longest(paths, self.root.getAllFiles()):
+            if path is None or file is None:
+                self._rebuild(paths)
+                return
+            if path != file.path:
+                self._rebuild(paths)
+                return 
 
 
 
