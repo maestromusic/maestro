@@ -38,7 +38,6 @@ class PlaylistTreeView(treeview.TreeView):
         self.setAcceptDrops(True)
         self.setDefaultDropAction(Qt.MoveAction)
         self.setDropIndicatorShown(True)
-        self.setItemDelegate(PlaylistDelegate(self))
         self.viewport().setMouseTracking(True)
     
     def setModel(self, model):
@@ -46,6 +45,7 @@ class PlaylistTreeView(treeview.TreeView):
         if self.selectionModel():
             self.selectionModel().selectionChanged.disconnect(self.updateGlobalSelection)
         super().setModel(model)
+        self.setItemDelegate(PlaylistDelegate(self))
         self.selectionModel().selectionChanged.connect(self.updateGlobalSelection)
 
 class PlaylistDelegate(delegates.BrowserDelegate):
@@ -53,6 +53,10 @@ class PlaylistDelegate(delegates.BrowserDelegate):
     
     def __init__(self,view):
         super().__init__(view)
+        
+    def background(self, index):
+        if index == self.model.getIndex(self.model.current):
+            return QtGui.QBrush(QtGui.QColor(110,149,229))
         
 class PlaylistWidget(QtGui.QDockWidget):
     

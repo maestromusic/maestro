@@ -173,7 +173,7 @@ class Node:
         """Return the number of files contained in this element or in child-elements of it."""
         if self.isFile():
             return 1
-        else: return sum(element.getFileCount() for element in self.getContents())
+        else: return sum(element.fileCount() for element in self.getContents())
         
     def offset(self):
         """Get the offset of this element in the current tree structure."""
@@ -592,14 +592,25 @@ class File(Element):
                 length = db.length(id)
             if position is None and parentId is not None:
                 position = db.position(parentId,id)
+                #TODO: db.position now is db.positions() ... what to do if the 
+                #element appears more than once below the same parent? (e.g. in a playlist)
             if major is None:
                 major = db.isMajor(id)
         return File(id,tags,flags,path,length,position)
         
     @staticmethod
     def fromFilesystem(path):
-        real = realfiles.get(path)
-        real.read()
+        try:
+            real = realfiles.get(path)
+            real.read()
+            fileTags = real.tags
+            length = real.length
+            position = real.position
+        except OSError:
+            fileTags = tags.Storage()
+            fileTags[tags.TITLE] = ['<could not open file>']
+            length = 0
+            position = 0
         rpath = relPath(path)
         id = db.idFromPath(rpath)
         if id is None:
@@ -609,7 +620,7 @@ class File(Element):
         else:
             flags = db.flags(id)
             # TODO: Load private tags!
-        return File(tags=real.tags,flags=flags,path=rpath,length=real.length,position=real.position,id = id)
+        return File(tags=fileTags,flags=flags,path=rpath,length=length,position=position,id = id)
 
     def hasContents(self):
         return False

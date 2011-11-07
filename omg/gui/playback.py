@@ -86,7 +86,8 @@ class PlaybackWidget(QtGui.QDockWidget):
     
     def updateCurrent(self, pos):
         current = self.backend.playlist.current
-        self.titleLabel.setText("Playing: <i>{}</i>".format(current.getTitle()))
+        if current is not None:
+            self.titleLabel.setText("Playing: <i>{}</i>".format(current.getTitle()))
     
     def updateState(self, state):
         self.ppButton.setPlaying(state == player.PLAY)
