@@ -349,6 +349,10 @@ class BrowserTreeView(treeview.TreeView):
         
     def _handleOptimizerFinished(self):
         """Handle the finished-signal from the current optimizer."""
+        if len(self._optimizers) == 0:
+            # This happens when resetToTable is called and the optimizers are cleared
+            # before the already emitted signal is processed.
+            return
         optimizer = self._optimizers.pop(0)
         optimizer.finished.disconnect(self._handleOptimizerFinished)
         if len(self._optimizers) > 0:

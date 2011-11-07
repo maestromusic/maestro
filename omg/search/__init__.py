@@ -490,6 +490,7 @@ def addChildren(resultTable,fromTable):
             """.format(db.prefix,resultTable,TT_HELP,attribute))
         if result.affectedRows() == 0:
             return
+        db.query("UPDATE {} SET new = 0".format(resultTable))
         db.query("""
             INSERT IGNORE INTO {1} (id,file,toplevel,direct,major,new)
                 SELECT c    .element_id,el.file,0,0,el.major,1
