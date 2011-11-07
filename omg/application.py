@@ -127,8 +127,10 @@ def run(cmdConfig = []):
     sync.init()
     # Create GUI
     # First import all modules that want to add WidgetData
-    from .gui import filesystembrowser, editor, browser, tageditor, mainwindow
+    from .gui import filesystembrowser, editor, browser, tageditor, mainwindow, playback, playlist
     global mainWindow
+    from . import player
+    player.init()
     mainWindow = mainwindow.MainWindow()
     plugins.mainWindowInit()
 
