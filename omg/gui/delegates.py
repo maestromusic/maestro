@@ -530,7 +530,7 @@ class MultiTextItem(DelegateItem):
             rect = QtCore.QRect(0,baseHeight,leftColumnLength,availableHeight-baseHeight)
             #print("Paint in left rect{}: {}".format(" (paint)" if paint else '',rect))
             if isinstance(leftThing,QtGui.QTextDocument):
-                self.processTextDocument(leftThing,rect,delegate.painter if paint else None)
+                leftBRect = self.processTextDocument(leftThing,rect,delegate.painter if paint else None)
             else:
                 if paint:
                     leftBRect = delegate.painter.drawText(rect,leftFlags,leftText)
@@ -542,7 +542,7 @@ class MultiTextItem(DelegateItem):
             rect = QtCore.QRect(rightColumnStart,baseHeight,
                                 availableWidth-rightColumnStart,availableHeight-baseHeight)
             if isinstance(rightThing,QtGui.QTextDocument):
-                self.processTextDocument(rightThing,rect,delegate.painter if paint else None)
+                rightBRect = self.processTextDocument(rightThing,rect,delegate.painter if paint else None)
             else:
                 if paint:
                     rightBRect = delegate.painter.drawText(rect,rightFlags,rightText)
