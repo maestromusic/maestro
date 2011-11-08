@@ -20,11 +20,10 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from collections import OrderedDict
-from ..gui import mainwindow, delegates
 from ..models import editor, Container, Element, RootNode
 from ..modify import commands
 from ..constants import EDITOR
-from . import treeview
+from . import treeview, mainwindow, delegates
 from .. import logging, modify, tags, config, utils
 import itertools
 
@@ -77,7 +76,7 @@ class EditorTreeView(treeview.TreeView):
     level = EDITOR
     
     def __init__(self, parent = None):
-        treeview.TreeView.__init__(self, parent)
+        super().__init__(parent)
         self.setSelectionMode(self.ExtendedSelection)
         self.setDragEnabled(True)
         self.setAcceptDrops(True)
@@ -87,18 +86,7 @@ class EditorTreeView(treeview.TreeView):
         self.setItemDelegate(delegates.EditorDelegate(self))
         
         self.viewport().setMouseTracking(True)
-        self.selectionModel().selectionChanged.connect(self._handleSelectionChanged)
-    
-    def _handleSelectionChanged(self, selected, deselected):
-        """Change the global selection if some any elements are selected in any views."""
-        globalSelection = []
-        for index in self.selectionModel().selectedIndexes():
-            node = self.model().data(index)
-            # The browser does not load tags automatically
-            if isinstance(node,Element):
-                globalSelection.append(node)
-        if len(globalSelection):
-            mainwindow.setGlobalSelection(globalSelection,self)
+        self.selectionModel().selectionChanged.connect(self.updateGlobalSelection)
 
     def dragEnterEvent(self, event):
         if event.source() is self:

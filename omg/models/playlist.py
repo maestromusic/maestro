@@ -21,75 +21,10 @@ import difflib, logging, os, itertools
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from omg import database, models, mpclient, tags, absPath, relPath, distributor
-from omg.config import options
+from omg import database as db, models, config
 from . import rootedtreemodel, treebuilder, mimedata
 
-db = database.get()
 logger = logging.getLogger("omg.models.playlist")
-
-class RemoveContentsCommand(QtGui.QUndoCommand):
-    def __init__(self, model, parentIdx, row, num, text="remove element(s)"):
-        QtGui.QUndoCommand.__init__(self, text)
-        self.model = model
-        self.parentIdx = QtCore.QPersistentModelIndex(parentIdx)
-        self.row = row
-        self.num = num
-        self.parentItem = model.data(parentIdx, Qt.EditRole)
-        if self.parentItem is None:
-            self.parentItem = model.root
-        self.elements = self.parentItem.getChildren()[row:row+num]
-    
-    def redo(self):
-        self.model.beginRemoveRows(QtCore.QModelIndex(self.parentIdx), self.row, self.row+self.num-1)
-        del self.parentItem.getChildren()[self.row:self.row+self.num]
-        self.model.endRemoveRows()
-    
-    def undo(self):
-        self.model.beginInsertRows(QtCore.QModelIndex(self.parentIdx), self.row, self.row+self.num-1)
-        self.parentItem.getChildren()[self.row:self.row] = self.elements
-        for el in self.elements:
-            el.parent = self.parentItem
-        self.model.endInsertRows()
-
-class InsertContentsCommand(QtGui.QUndoCommand):
-    def __init__(self, model, parent, row, contents, copy = True, text = "insert element(s)"):
-        QtGui.QUndoCommand.__init__(self, text)
-        self.model = model
-        if parent.isFile():
-            raise ValueError("Cannot insert contents into file {}".format(parent))
-        self.parentIdx = QtCore.QPersistentModelIndex(model.getIndex(parent))
-        self.parentItem = parent
-        self.row = row
-        self.contents = contents
-        if copy:
-            self.contents = [node.copy() for node in self.contents]
-    
-    def redo(self):
-        self.model.beginInsertRows(QtCore.QModelIndex(self.parentIdx), self.row, self.row + len(self.contents) - 1)
-        for node in self.contents:
-            node.setParent(self.parentItem)
-        self.parentItem.getChildren()[self.row:self.row] = self.contents
-        self.model.endInsertRows()
-    
-    def undo(self):
-        self.model.beginRemoveRows(QtCore.QModelIndex(self.parentIdx), self.row, self.row + len(self.contents) - 1)
-        del self.parentItem.getChildren()[self.row:self.row+len(self.contents)]
-        self.model.endRemoveRows()
-        
-
-class ModelResetCommand(QtGui.QUndoCommand):
-    def __init__(self, model):
-        QtGui.QUndoCommand.__init__(self, "reset model")
-        self.model = model
-    
-    def redo(self):
-        self.oldRoot = self.model.root
-        self.model.setRoot(models.RootNode())
-    
-    def undo(self):
-        self.model.setRoot(self.oldRoot)
-        self.model.reset()
         
 class BasicPlaylist(rootedtreemodel.RootedTreeModel):
     """Basic model for playlists. A BasicPlaylists contains a list of nodes and supports insertion and removal of nodes as well as drag and drop of omg's own mimetype (config-variable gui->mime) and "text/uri-list"."""
@@ -99,173 +34,54 @@ class BasicPlaylist(rootedtreemodel.RootedTreeModel):
     def __init__(self):
         """Initialize with an empty playlist."""
         rootedtreemodel.RootedTreeModel.__init__(self,models.RootNode())
-        self.setContents([])
-        distributor.indicesChanged.connect(self._handleIndicesChanged)
-        self.undoStack = QtGui.QUndoStack(self)
+        self.current = None
     
-    def setRoot(self,root):
-        """Set the root-node of this playlist which must be of type models.RootNode. All views using this model will be reset."""
-        assert isinstance(root,models.RootNode)
-        self.contents = root.contents
-        rootedtreemodel.RootedTreeModel.setRoot(self,root)
-        self.undoStack.clear()
-        
-    def setContents(self,contents):
-        """Set the contents of this playlist and set their parent to self.root. The contents are only the toplevel-elements in the playlist, not all files. All views using this model will be reset."""
-        self.contents = contents
-        self.root.contents = contents
-        for node in contents:
-            node.setParent(self.root)
-        self.reset()
-        
-    def flags(self,index):
-        defaultFlags = rootedtreemodel.RootedTreeModel.flags(self,index)
-        if index.isValid():
-            return defaultFlags | Qt.ItemIsDropEnabled | Qt.ItemIsDragEnabled
-        else: return defaultFlags | Qt.ItemIsDropEnabled
-    
-    def supportedDropActions(self):
-        return Qt.CopyAction | Qt.MoveAction
-         
-    def mimeTypes(self):
-        return [options.gui.mime,"text/uri-list"]
-    
-    def mimeData(self,indexes):
-        return mimedata.createFromIndexes(self,indexes)
-
-    # A note on removing and inserting rows via DND: We cannot implement insertRows because we have no way to insert empty rows without elements. Instead we overwrite dropMimeData and use self.insertElements. On the other hand we implement removeRows to remove rows at the end of internal move operations and let Qt call this method.
-    def dropMimeData(self,mimeData,action,row,column,parentIndex):
-        if action == Qt.IgnoreAction:
-            return True
-
-        if column > 0:
-            return False
-        
-        contents = self._prepareMimeData(mimeData)
-        if contents is None:
-            return False
-        self.undoStack.beginMacro("Drop item(s)")
-        if parentIndex.isValid():
-            parent = self.data(parentIndex)
-        else: parent = self.root
-        
-        if 0 <= row < parent.getChildrenCount():
-            self.insertContents(parent,row,contents,copy=False)
-        else: # Probably the element was dropped onto parent and not between any rows
-            if parent.isFile():
-                # Insert as sibling next to parent
-                self.insertContents(parent.getParent(),parent.getParent().index(parent)+1,contents,copy=False)
-            else: self.insertContents(parent,parent.getChildrenCount(),contents,copy=False)
-        self.undoStack.endMacro()
-        return True
-
-    def _prepareMimeData(self, mimeData):
-        """Create an Element structure from the MIME data that can be inserted into the model."""
-        if mimeData.hasFormat(options.gui.mime):
-            return [node.copy() for node in mimeData.retrieveData(options.gui.mime)]
-        elif mimeData.hasFormat("text/uri-list"):
-            return self.importPaths(relPath(url.path()) for url in mimeData.urls())
-        else:
-            return None
-        
-    def removeRows(self,row,count,parentIndex):
-        # Reimplementation of QAbstractItemModel.removeRows
-        if parentIndex.isValid():
-            parent = self.data(parentIndex)
-        else: parent = self.root
-        self.removeContents(parent,row,row+count)
-        return True
-        
-    def removeContents(self,parent,start,end):
-        """Remove the nodes with indices <start>-<end> (without <end>!) from <parent>'s children."""
-        command = RemoveContentsCommand(self, self.getIndex(parent), start, end-start, "remove Item")
-        self.undoStack.push(command)
-        #self.beginRemoveRows(self.getIndex(parent),start,end-1)
-        #del parent.getChildren()[start:end]
-        #self.endRemoveRows()
-    
-    def removeByQtIndex(self,index):
-        """Remove the element with the given Qt-index from the model and remove all files within it from the MPD-playlist. The index may point to a file or a container, but must be valid."""
-        if not index.isValid():
-            raise ValueError("BaiscPlaylist.removeByQtIndex: Index is not valid.")
-        element = self.data(index)
-        start =  element.getParent().index(element)
-        self.removeContents(element.getParent(),start,start+1)
-        
-    def insertContents(self,parent,row,contents,copy=True):
-        """Insert <contents> as children at the given row into the node <parent>. If <copy> is True, <contents> will be copied deeply which is usually the right thing to do, as the parents of the nodes in <contents> must be adjusted."""
-        
-        command = InsertContentsCommand(self, parent, row, contents, copy, text="insert Item(s)")
-        self.undoStack.push(command)
-        #=======================================================================
-        # if parent.isFile():
-        #    raise ValueError("Cannot insert contents into file {}".format(parent))
-        # self.beginInsertRows(self.getIndex(parent),row,row+len(contents)-1)
-        # if copy:
-        #    contents = [node.copy() for node in contents]
-        # for node in contents:
-        #    node.setParent(parent)
-        # parent.getChildren()[row:row] = contents
-        # self.endInsertRows()
-        #=======================================================================
-    
-    def importPaths(self,paths):
-        """Return a list of elements from the given (relative) paths which may be inserted into the playlist."""
-        # _collectFiles works with absolute paths, so we need to convert paths before and after _collectFiles
-        filePaths = [relPath(path) for path in self._collectFiles(absPath(p) for p in paths)]
-        return [self._createItem(path) for path in filePaths]
-        
-    def _collectFiles(self,paths): # TODO: Sort?
-        """Return a list of absolute paths to all files in the given paths (which must be absolute, too). That is, if a path in <paths> is a file, it will be contained in the resulting list, whereas if it is a directory, all files within (recursively) will be contained in the result."""
-        filePaths = []
-        for path in paths:
-            if os.path.isfile(path):
-                filePaths.append(path)
-            elif os.path.isdir(path):
-                filePaths.extend(self._collectFiles(os.path.join(path,p) for p in os.listdir(path)))
-        return filePaths
-   
-    def _createItem(self,path,parent=None):
-        """Create a playlist-item for the given path. The parent of the new element is set to <parent> (even when this is None)."""
-        id = db.query("SELECT element_id FROM files WHERE path = ?",path).getSingle() # may be None
-        result = models.File(id,path=path)
-        result.loadTags()
-        result.parent = parent
-        return result
-
-    def _handleIndicesChanged(self,event):
-        allIds = event.getAllIds()
-
-        if (event.deleted or event.created)\
-                  and not set(allIds).isdisjoint(set(node.id for node in self.getAllNodes())):
-            self.restructure()
+    @QtCore.pyqtSlot(int)
+    def setCurrent(self, index):
+        if index == -1:
             return
+        elem = self.root.fileAtOffset(index)
+        assert(elem.isFile())
+        newCurrent = elem
+        if newCurrent != self.current:
+            newIndex = self.getIndex(newCurrent)
+            self.dataChanged.emit(newIndex, newIndex)
+            if self.current is not None:
+                oldIndex = self.getIndex(self.current)
+                self.current = newCurrent
+                self.dataChanged.emit(oldIndex, oldIndex)
+            else:
+                self.current = newCurrent
 
-        for element in self.getAllNodes():
-            if element.id in allIds:
-                index = self.getIndex(element)
-                dataChanged = False
-                if event.cover:
-                    element.deleteCoverCache()
-                    dataChanged = True
-                if event.tags:
-                    element.loadTags()
-                    dataChanged = True
-                if dataChanged:
-                    self.dataChanged.emit(index,index)
-                
-
-class ManagedPlaylist(BasicPlaylist):
-    """A ManagedPlaylist organizes the tree-structure over the "flat playlist" (just the files) in a nice way. In contrast to BasicPlaylist, ManagedPlaylist uses mainly offsets to address files, as the tree-structure may change during most operations. Additionally offset-based insert- and remove-functions are needed for synchronization with MPD (confer SynchronizablePlaylist). Of course, there are also functions to insert and remove using a reference to the parent-container, but they internally just call the offset-based functions."""
+    def _rebuild(self, paths):
+        self.beginResetModel()
+        elements = []
+        for path in paths:
+            id = db.idFromPath(path)
+            if id is not None:
+                elements.append(models.File.fromId(id))
+            else:
+                elements.append(models.File.fromFilesystem(path))
+        elements = self.restructure(elements)
+        self.root.setContents(elements)
+        
+        self.endResetModel()
     
-    def restructure(self):
+    @QtCore.pyqtSlot(list)
+    def updateFromPathList(self, paths):
+        for path,file in itertools.zip_longest(paths, self.root.getAllFiles()):
+            if path is None or file is None:
+                self._rebuild(paths)
+                return
+            if path != file.path:
+                self._rebuild(paths)
+                return 
+            
+    def restructure(self, paths):
         """Restructure the whole container tree in this model. This method does not change the flat playlist, but it uses treebuilder to create an optimal container structure over the MPD playlist."""
-        treeBuilder = self._createTreeBuilder([self._createItem(path) for path in self.pathList])
+        treeBuilder = self._createTreeBuilder(paths)
         treeBuilder.buildParentGraph()
-        self.setContents(treeBuilder.buildTree(createOnlyChildren=False))
-        for element in self.contents:
-            element.parent = self.root
-        self.reset()
+        return treeBuilder.buildTree(createOnlyChildren=False)
         
     def removeContents(self,parent,start,end):
         # Reimplemented from BasicPlaylist
@@ -520,12 +336,13 @@ class ManagedPlaylist(BasicPlaylist):
         
     def _getParentIds(self,id):
         """Return a list containing the ids of all parents of the given id. This is a helper method for the TreeBuilder-algorithm."""
-        return [id for id in db.query("SELECT container_id FROM contents WHERE element_id = ?",id).getSingleColumn()]
+        return db.parents(id)
                
     def _createNode(self,id,contents):
         """If contents is not empty, create an Container-instance for the given id containing <contents>. Otherwise create an instance of File with the given id. This is a helper method for the TreeBuilder-algorithm."""
         if len(contents) > 0:
-            newNode = models.Container(id,contents=contents)
+            newNode = models.Container.fromId(id)
+            newNode.setContents(contents)
         else: newNode = models.File(id)
         newNode.loadTags()
         return newNode
@@ -533,170 +350,3 @@ class ManagedPlaylist(BasicPlaylist):
     def _seqLen(self,sequence):
         """Return the length of an item-sequence."""
         return sequence[1] - sequence[0] + 1
-
-
-class SynchronizablePlaylist(ManagedPlaylist):
-    """SynchronizablePlaylist adds the capability to synchronize the playlist with MPD to ManagedPlaylist."""
-    # List of all paths of songs in the playlist. Used for fast synchronization with MPD.
-    pathList = None
-    
-    # Currently playing offset and a persistent index to the element
-    currentlyPlayingOffset = None
-    
-    # While _syncLock is True, synchronization with MPD pauses. This is used during complex changes of the model.
-    _syncLock = False
-    
-    def _refreshPathList(self):
-        """Recompute the internal pathlist used to synchronize with MPD."""
-        self.pathList = [file.getPath() for file in self.root.getAllFiles()]
-        
-    def startSynchronization(self):
-        """Start to synchronize this playlist with MPD."""
-        self._refreshPathList()
-    
-    def stopSynchronization(self):
-        """Stop synchronizing this playlist with MPD."""
-        self.pathList = None
-        self.currentlyPlayingOffset = None
-        
-    def setRoot(self,root):
-        self._syncLock = True
-        ManagedPlaylist.setRoot(self,root)
-        self._refreshPathList()
-        self._syncLock = False
-        
-    def setContents(self,contents):
-        self._syncLock = True
-        ManagedPlaylist.setContents(self,contents)
-        self._refreshPathList()
-        self._syncLock = False
-    
-    def removeFiles(self,start,end):
-        if self._syncLock:
-            logger.warning("removeFiles was called while syncLock was True.")
-            return
-        self._syncLock = True
-        if self.pathList is not None:
-            del self.pathList[start:end]
-            try:
-                mpclient.delete(start,end)
-            except mpclient.CommandError as e:
-                logger.error("Deleting files from MPD's playlist failed: "+e.message)
-        ManagedPlaylist.removeFiles(self,start,end)
-        self._syncLock = False
-        
-    def insertElements(self,elements,offset,copy=True):
-        if self._syncLock:
-            logger.warning("insertElements was called while syncLock was True.")
-            return
-        self._syncLock = True
-        if offset == -1:
-            offset = len(self.pathList)
-            
-        if copy:
-            elements = [node.copy() for node in elements]
-        
-        # Warning: This may change elements by throwing away songs that didn't fit into MPD.
-        self._insertFilesToMPD(offset,elements)
-        if len(elements) > 0:
-            files = (element.getAllFiles() for element in elements)
-            self.pathList[offset:offset] = [file.getPath() for file in itertools.chain.from_iterable(files)]
-            ManagedPlaylist.insertElements(self,elements,offset,copy=False) # no need to copy again
-        self._syncLock = False
-    
-    def _insertFilesToMPD(self,offset,elements):
-        """Insert the files contained in the tree <elements> into MPD at the given offset. If insertion of a certain file fails, the file is removed from <elements> (so this parameter is changed by the method!)"""
-        assert offset >= 0
-        startOffset = offset
-        i = 0
-        while i < len(elements):
-            element = elements[i]
-            if element.isFile():
-                if mpclient.insert(offset,element):
-                    offset = offset + 1
-                    i = i + 1
-                else:
-                    logger.warning("File '{}' could not be added to MPD. Maybe it is not in MPD's database?"
-                                        .format(element.getPath()))
-                    del elements[i]
-            else:
-                offset = offset + self._insertFilesToMPD(offset,element.getChildren())
-                i = i + 1
-        return offset-startOffset
-        
-    def _getFilteredOpcodes(self,a,b):
-        """Helper method for synchronize: Use difflib.SequenceMatcher to retrieve a list of opCodes describing how to turn <a> into <b> and filter and improve it:
-        - opCodes with 'equal'-tag are removed
-        - opCodes with 'replace'-tag are replaced by a 'delete'-tag and an 'insert'-tag
-        - After performing the action of an opCode (e.g. deleting some files) the indices of subsequent files change and performing the action of the next opCode would lead to errors. So this method also corrects the indices (e.g. decreases all subsequent indices by the number of deleted files."""
-        opCodes = difflib.SequenceMatcher(None,a,b).get_opcodes()
-        offset = 0
-        for tag,i1,i2,j1,j2 in opCodes:
-            if tag == 'equal':
-                continue
-            elif tag == 'delete':
-                yield (tag,i1+offset,i2+offset,-1,-1)
-                offset = offset - i2 + i1
-            elif tag == 'insert':
-                yield (tag,i1+offset,i2+offset,j1,j2)
-                offset == offset + j2 - j1
-            elif tag == 'replace':
-                yield ('delete',i1+offset,i2+offset,-1,-1)
-                offset = offset - i2 + i1
-                yield ('insert',i1+offset,i2+offset,j1,j2)
-                offset == offset + j2 - j1
-            else: raise ValueError("Opcode tag {0} is not supported.".format(tag))
-            
-    def synchronize(self,pathList,status):
-        """Synchronize with MPD: Change the playlist to match the given list of paths. <status> is the MPD-status and is used to synchronize the currently played song."""
-        if self._syncLock:
-            return
-        
-        if len(pathList) == 0 and len(self.contents) > 0:
-            BasicPlaylist.setContents(self,[]) # this will reset the model
-        else:
-            for tag,i1,i2,j1,j2 in self._getFilteredOpcodes(self.pathList,pathList):
-                if tag == 'delete':
-                    del self.pathList[i1:i2]
-                    ManagedPlaylist.removeFiles(self,i1,i2) # call the super-class implementation since otherwise elements would be removed from the pathlist again.
-                    self.glue(self.root,i1)
-                elif tag == 'insert':
-                    self.pathList[i1:i1] = pathList[j1:j2]
-                    ManagedPlaylist.insertElements(self,self.importPaths(pathList[j1:j2]),i1)
-                else:
-                    # Opcodes are filtered to contain only 'delete' and 'insert'
-                    logger.warning("Got an unknown opcode: '{}',{},{},{},{}".format(tag,i1,i2,j1,j2))
-            
-            # Synchronize currently playing song
-            if 'song' not in status:
-                if self.currentlyPlayingOffset is not None:
-                    self.currentlyPlayingOffset = None
-                    try:
-                        currentlyPlaying = self.currentlyPlaying()
-                        if currentlyPlaying is not None:
-                            index = self.getIndex(currentlyPlaying)
-                            self.dataChanged.emit(index,index)
-                    except ValueError: pass # Probably the element was removed from the playlist
-            elif int(status['song']) != self.currentlyPlayingOffset:
-                if self.currentlyPlayingOffset is not None:
-                    oldElement = self.root.getFileAtOffset(self.currentlyPlayingOffset)
-                else: oldElement = None
-                self.currentlyPlayingOffset = int(status['song'])
-                # Update the new and the old song
-                if oldElement is not None:
-                    try:
-                        index = self.getIndex(oldElement)
-                        self.dataChanged.emit(index,index)
-                    except ValueError: pass # Probably the element was removed from the playlist
-                index = self.getIndex(self.currentlyPlaying())
-                self.dataChanged.emit(index,index)
-    
-    def currentlyPlaying(self):
-        """Return the element, which is currently playing."""
-        if self.currentlyPlayingOffset is None:
-            return None
-        else: return self.root.getFileAtOffset(self.currentlyPlayingOffset)
-        
-    def isPlaying(self,element):
-        """Return whether the song <element> is the one which is currently played by MPD."""
-        return element.getOffset() == self.currentlyPlayingOffset

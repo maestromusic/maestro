@@ -202,6 +202,19 @@ class TreeView(QtGui.QTreeView):
                 return True
             return False
 
+    def updateGlobalSelection(self, selected, deselected):
+        """Change the global selection if some any elements are selected in any views. Connect the
+        selectionChanged() signal of the selection model to this slot to obtain the desired effect."""
+        globalSelection = []
+        for index in self.selectionModel().selectedIndexes():
+            node = self.model().data(index)
+            # The browser does not load tags automatically
+            if isinstance(node, models.Element):
+                globalSelection.append(node)
+        if len(globalSelection):
+            from . import mainwindow
+            mainwindow.setGlobalSelection(globalSelection,self)
+            
     def contextMenuEvent(self,event):
         self.nodeSelection = NodeSelection(self.selectionModel())
         

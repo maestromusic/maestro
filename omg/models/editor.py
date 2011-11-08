@@ -374,8 +374,7 @@ class EditorModel(rootedtreemodel.RootedTreeModel):
                 element.position = 1
         singles, albums = [], []
         for key, elements in byKey.items():
-            elem = elements[0]
-            if dirMode or (albumTag in elem.tags):
+            if dirMode or (albumTag in elements[0].tags):
                 album = Container(modify.newEditorId(), [], tags.Storage(), [], None, True)
                 for elem in sorted(elements, key = lambda e: e.position):
                     if len(album.contents) > 0 and album.contents[-1].position == elem.position:
@@ -386,8 +385,9 @@ class EditorModel(rootedtreemodel.RootedTreeModel):
                 album.tags[tags.TITLE] = [key] if dirMode else elem.tags[albumTag]
                 albums.append(album)
             else:
-                element.position = None
-                singles.append(element)
+                for element in elements:
+                    element.position = None
+                singles.extend(elements)
         return albums, singles
     
     def guessMetaContainers(self, albums):

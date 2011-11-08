@@ -138,6 +138,11 @@ class AbstractDelegate(QtGui.QStyledItemDelegate):
         
         return QtCore.QSize(leftWidth + centerMaxWidth + rightWidth + 2*self.hMargin,
                             max(leftMaxHeight,centerHeight,rightMaxHeight) + 2* self.vMargin)
+    
+    def background(self, index):
+        """Defines the background brush for the given ModelIndex. If None is returned, the default
+        background is used. Reimplement this in subclasses to use custom background colors."""
+        return None
         
     def paint(self,painter,option,index):
         """Implementation of QtGui.QStyleItemDelegate.paint. This method is called by Qt. It will call
@@ -152,6 +157,9 @@ class AbstractDelegate(QtGui.QStyledItemDelegate):
         # Initialize. Subclasses or Delegate items may access painter and option.
         self.painter = painter
         # Draw the background depending on selection etc.
+        background = self.background(index)
+        if background is not None:
+            option.backgroundBrush = background
         QtGui.QApplication.style().drawControl(QtGui.QStyle.CE_ItemViewItem,option,painter)
         painter.save()
         painter.translate(option.rect.x(),option.rect.y())
