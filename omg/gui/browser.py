@@ -428,9 +428,16 @@ class RestoreExpandedOptimizer(Optimizer):
             childIndex = model.index(i,0,index)
             if self.view.isExpanded(childIndex):
                 child = model.data(childIndex,Qt.EditRole)
-                if isinstance(child,[browsermodel.CriterionNode,child,browsermodel.HiddenValuesNode]):
+                # Get an identifier for this node, which is unique among all siblings and will be the same
+                # for an equivalent node after reloading the model.
+                if isinstance(child,browsermodel.ValueNode):
                     key = child.getKey()
-                else: key = child.id
+                elif isinstance(child,models.Element):
+                    key = child.id    
+                else: 
+                    # This works for nodeclasses of which not more than one instance has the same parent.
+                    # (e.g. HiddenValuesNode).
+                    key = (child.__class__,)
                 result[key] = self._getExpandedNodes(childIndex)
         return result
     
@@ -458,8 +465,9 @@ class RestoreExpandedOptimizer(Optimizer):
                 continue
             key,expanded = currentDict.popitem()
             for child in currentNode.getContents():
-                if (isinstance(child,browsermodel.CriterionNode) and child.getKey() == key) \
-                            or (isinstance(child,Container) and child.id == key):
+                if (isinstance(child,browsermodel.ValueNode) and child.getKey() == key) \
+                            or (isinstance(child,Container) and child.id == key) \
+                            or (key == (child.__class__,)):
                     if len(expanded) > 0:
                         # After expanding this node, process expanded nodes below this one
                         listOfDicts.append(expanded)

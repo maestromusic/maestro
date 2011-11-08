@@ -874,11 +874,11 @@ class EditorDelegate(AbstractDelegate):
                 del theTags[tag]
         for tag in theTags:
             if tag != tags.TITLE:
-                leftTexts.append(tag.translated()+': '+self.prepareTagValues(element,theTags,tag))
+                leftTexts.append(self.prepareTagValues(element,theTags,tag,addTagName=True))
             
         return leftTexts,rightTexts
     
-    def prepareTagValues(self,element,theTags,tag,alignRight=False):
+    def prepareTagValues(self,element,theTags,tag,addTagName=False,alignRight=False):
         separator = ' - ' if tag == tags.TITLE or tag == tags.ALBUM else ', '
         if hasattr(element,'missingTags') and tag in element.missingTags \
                 and any(v in element.missingTags[tag] for v in theTags[tag]):
@@ -889,6 +889,8 @@ class EditorDelegate(AbstractDelegate):
                 format = QtGui.QTextBlockFormat()
                 format.setAlignment(Qt.AlignRight)
                 cursor.setBlockFormat(format)
+            if addTagName:
+                cursor.insertText('{}: '.format(tag.translated()),self.blackFormat)
             for i,value in enumerate(theTags[tag]):
                 if value in element.missingTags[tag]:
                     cursor.insertText(str(value),self.redFormat)
@@ -898,7 +900,9 @@ class EditorDelegate(AbstractDelegate):
             return doc
         else: 
             strings = [str(v) for v in theTags[tag]]
-        return separator.join(strings)
+            if addTagName:
+                return '{}: {}'.format(tag.translated(),separator.join(strings))
+            else: return separator.join(strings)
     
     def getTags(self,element):
         theTags = element.tags.copy()

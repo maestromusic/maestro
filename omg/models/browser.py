@@ -323,13 +323,6 @@ class CriterionNode(models.Node):
                 # The contents will be added in BrowserModel.searchFinished
             else:
                 self.model._startLoading(self,wait=True) # block until the contents are loaded
-    
-    def getKey(self):
-        """Return an identifier for this node, which is unique among all siblings and will be the same for
-        an equivalent node after reloading the model."""
-        # This implementation works for subclasses of which not more than one instance has the same parent.
-        # (e.g. HiddenValuesNode). The class ValueNode will reimplement this method.
-        return (self.__class__,)
 
 
 class ValueNode(CriterionNode):
