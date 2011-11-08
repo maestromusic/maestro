@@ -38,33 +38,16 @@ def mapRecursively(f,aList):
         else: result.append(f(item))
     return result
 
-
-def createRanges(tuples):
-    """Compresses the given list of iterables into ranges according to the first element of each list member.
-    Example::
-
-        ranges( (1, 10), (2, 11), (3, 12), (5,13), (7,14), (8,15) )
-        
-    will return ::
-    
-        ( (1, [[10], [11], [12]]), (5, [[13]]), (7, [ [14], [15] ]) )
-        
-    \ """
-    previous = None
-    start = None
-    ids = []
-    for i, *payload in sorted(tuples):
-        if previous is None:
-            previous = start = i
-        if i > previous + 1:
-            # emit previous range
-            yield start, ids
-            start = i
-            ids = []
-        previous = i
-        ids.append(payload)
-    yield start, ids
-
+def ranges(lst):
+    def helper(lst, first, cur, result):
+        if len(lst) == 0:
+            return result + [(first,cur)]
+        if lst[0][1] == cur + 1:
+            return helper(lst[1:], first, cur+1, result)
+        return helper(lst[1:], lst[0][1], lst[0][1], result + [(first,cur)])
+    if len(lst) <= 1:
+        return list(map(lambda x: (x,x), lst))
+    return helper(list(enumerate(lst[1:])), lst[0], lst[0], list())
 
 def hasKnownExtension(file):
     """Return True if the given path has a known extension (i.e., appears in options.main.extension).

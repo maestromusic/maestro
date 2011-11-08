@@ -22,6 +22,7 @@ from PyQt4.QtCore import Qt
 import itertools
 from . import Node, Element, RootNode
 from .. import logging
+from ..utils import ranges
 logger = logging.getLogger('models.rootedtreemodel')
 
 class RootedTreeModel(QtCore.QAbstractItemModel):
@@ -167,7 +168,7 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
     
     def changePositions(self, parent, changes):
         """Changes positions of elements below *parent*, according to the oldPosition->newPosition dict *changes.*"""
-        logger.debug('position change -- {}'.format(changes))
+        #TODO: rewrite with difflib / opcodes??
         def argsort(seq):
             # http://stackoverflow.com/questions/3382352/equivalent-of-numpy-argsort-in-basic-python/3383106#3383106
             #lambda version by Tony Veijalainen
@@ -216,7 +217,6 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
             tmp = J[start:end+1]
             J[start:end+1] = []
             J[iStart:iStart] = tmp
-            
             i -= 1
           
     def insert(self,parent,insertions):
@@ -248,3 +248,12 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
             self.beginInsertRows(self.getIndex(parent), i, i+len(nodes)-1)
             parent.insertContents(i, nodes)
             self.endInsertRows()
+    
+    def remove(self, parent, removals):
+        """Remove nodes below *parent*. The elements to remove are defined by *removals*, a list of IDs."""
+        modelIndex = self.getIndex(parent)
+        i = [ i for i,elem in enumerate(parent.contents) if elem.iPosition() in removals ]
+        for start, end in reversed(ranges(i)):
+            self.beginRemoveRows(modelIndex, start, end)
+            del parent.contents[start:end+1]
+            self.endRemoveRows()

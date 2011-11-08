@@ -19,12 +19,11 @@
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
-from .. import logging, modify, database as db, tags, realfiles
+from .. import logging, modify, tags, realfiles, config
 from . import mimedata
-from ..models import rootedtreemodel, RootNode, File, Container, Element
-from ..config import options
+from ..models import rootedtreemodel, RootNode, File, Container
 from ..modify import events, commands
-from ..utils import hasKnownExtension, collectFiles, relPath
+from ..utils import collectFiles, relPath
 from ..constants import EDITOR, CONTENTS
 from collections import OrderedDict
 import re, itertools, os
@@ -44,13 +43,10 @@ class EditorModel(rootedtreemodel.RootedTreeModel):
     """Model class for the editors where users can edit elements before they are commited into
     the database."""
     
-    
-    def __init__(self, name = 'default'):
-        """Initializes the model with the given name (used for debugging). A new RootNode will
-        be created and set as root."""
+    def __init__(self):
+        """Initializes the model. A new RootNode will be set as root."""
         super().__init__(RootNode())
         self.contents = []
-        self.name = name
         modify.dispatcher.changes.connect(self.handleChangeEvent)
         self.albumGroupers = []
         self.metacontainer_regex=r" ?[([]?(?:cd|disc|part|teil|disk|vol)\.? ?([iI0-9]+)[)\]]?"
@@ -77,6 +73,9 @@ class EditorModel(rootedtreemodel.RootedTreeModel):
             self.clear()
             
     def handleElementChangeEvent(self, event):
+        """Traverse this editor's tree in top-down manner. If a subtree is replaced by the
+        event applying function (indicated by skip = True), that subtree is not traversed
+        anymore."""
         if self.root.id in event.ids():
             if self.applyChangesToNode(self.root, event):
                 return
@@ -91,27 +90,21 @@ class EditorModel(rootedtreemodel.RootedTreeModel):
                 del children[i]
     
     def applyChangesToNode(self, node, event):
-        id = node.id
-        logger.debug('event match ID={0} at {1}'.format(id, self.name))
+        """Helper function for the handling of ElementChangeEvents. Ensures proper application
+        to a single node."""
         modelIndex = self.getIndex(node)
         if not event.contentsChanged:
             # this handles SingleElementChangeEvent, all TagChangeEvents, FlagChangeEvents, ...
-            logger.debug('editor - tag change event!')
             event.applyTo(node)
             ret = isinstance(event, events.SingleElementChangeEvent)
         elif isinstance(event, events.PositionChangeEvent):
             self.changePositions(node, event.positionMap)
-            ret = False
+            ret = True #PositionChangeEvent handles only _one_ parent -> no children can be affected
         elif isinstance(event, events.InsertContentsEvent):
-            self.insert(node, event.insertions[id])
+            self.insert(node, event.insertions[node.id])
             ret = False   
         elif isinstance(event, events.RemoveContentsEvent):
-            for i, elem in reversed(list(enumerate(node.contents))):
-                position = elem.position if not isinstance(node, RootNode) else node.index(elem)
-                if position in event.removals[id]:
-                    self.beginRemoveRows(modelIndex, i, i)
-                    del node.contents[i]
-                    self.endRemoveRows()
+            self.remove(node, event.removals[node.id])
             ret = False
         elif event.__class__ == events.ElementChangeEvent:
             if node.isFile():
@@ -130,15 +123,6 @@ class EditorModel(rootedtreemodel.RootedTreeModel):
             logger.warning('unknown element change event: {}'.format(event))
         self.dataChanged.emit(modelIndex, modelIndex)
         return ret
-           
-    def setContents(self,contents):
-        """Set the contents of this editor and set their parent to self.root.
-        All views using this model will be reset."""
-        self.contents = contents
-        self.root.contents = contents
-        for node in contents:
-            node.setParent(self.root)
-        self.reset()
         
     def flags(self,index):
         defaultFlags = super().flags(index)
@@ -150,7 +134,7 @@ class EditorModel(rootedtreemodel.RootedTreeModel):
         return Qt.CopyAction | Qt.MoveAction
     
     def mimeTypes(self):
-        return (options.gui.mime,"text/uri-list")
+        return (config.options.gui.mime,"text/uri-list")
     
     def mimeData(self,indexes):
         return mimedata.MimeData.fromIndexes(self,indexes)
@@ -170,7 +154,7 @@ class EditorModel(rootedtreemodel.RootedTreeModel):
         if row == -1:
             row = parent.getContentsCount()
         #parent = parent.copy()
-        if mimeData.hasFormat(options.gui.mime):
+        if mimeData.hasFormat(config.options.gui.mime):
             # first case: OMG mime data -> nodes from an editor, browser etc.
             return self._dropOMGMime(mimeData, action, parent, row)
         elif mimeData.hasFormat("text/uri-list"):
@@ -333,7 +317,7 @@ class EditorModel(rootedtreemodel.RootedTreeModel):
                         elif ret == dialog.Delete or ret == dialog.DeleteAlways:
                             
                             if ret == dialog.DeleteAlways:
-                                options.tags.always_delete = options.tags.always_delete + [e.tagname]
+                                config.options.tags.always_delete = config.options.tags.always_delete + [e.tagname]
                             logger.debug('REMOVE TAG {0} from {1}'.format(e.tagname, f))
                             real = realfiles.get(f)
                             real.remove(e.tagname)
@@ -394,7 +378,6 @@ class EditorModel(rootedtreemodel.RootedTreeModel):
         # search for meta-containers in albums
         groupTags = self.albumGroupers[:]
         albumTag = groupTags[0]
-        dirMode = albumTag == "DIRECTORY"
         if "DIRECTORY" in groupTags:
             groupTags.remove("DIRECTORY")
         metaContainers = OrderedDict()

@@ -16,20 +16,22 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+# --------- Qt imports -----------------------
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
+translate = QtCore.QCoreApplication.translate
 
-from collections import OrderedDict
-from ..models import editor, Container, Element, RootNode
-from ..modify import commands
+# --------- OMG imports ----------------------
+from ..models import editor, Container
 from ..constants import EDITOR
 from . import treeview, mainwindow, delegates
-from .. import logging, modify, tags, config, utils
+from .. import logging, modify, tags, config
+logger = logging.getLogger(__name__)
+
+# --------- Python standard lib imports ------
 import itertools
+from collections import OrderedDict
 
-
-translate = QtCore.QCoreApplication.translate
-logger = logging.getLogger("gui.editor")
 
 _profiles = None
 

@@ -474,7 +474,7 @@ class MainWindow(QtGui.QMainWindow):
         the focus will run through all browsers).
         """ 
         browserDocks = self.getWidgets('browser')
-        for browserDock in browserDocks:
+        for i, browserDock in enumerate(browserDocks):
             if browserDock.widget().searchBox.hasFocus():
                 nextIndex = (i+1) % len(browserDocks)
                 browserDocks[nextIndex].widget().searchBox.setFocus(Qt.OtherFocusReason)
