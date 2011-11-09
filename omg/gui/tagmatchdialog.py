@@ -93,7 +93,6 @@ class TagMatchDialog(QtGui.QDialog):
         for row in range(self.table.rowCount()):
             element = self.table.item(row, 0).internalPointer
             tagDict = self.table.item(row, 1).internalPointer
-            print('new tags for {0}: {1}'.format(element, tagDict))
             elementAfter = element.copy()
             if not self.keepOtherTagsCheckbox.isChecked():
                 elementAfter.tags = tags.Storage()

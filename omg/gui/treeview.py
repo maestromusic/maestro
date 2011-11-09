@@ -27,19 +27,6 @@ from omg.modify.treeactions import ToggleMajorAction
 translate = QtGui.QApplication.translate
 logger = logging.getLogger(__name__)
 
-def makeUnique(iterable):
-    """Return a list that is a copy of *iterable* where all elements with the same ID appear only once."""
-    ret = []
-    ids = set()
-    for elem in iterable:
-        if hasattr(elem, 'id'):
-            if not elem.id in ids:
-                ids.add(elem.id)
-                ret.append(elem)
-        else:
-            ret.append(elem)
-    return ret
-
 class NodeSelection:
     """Objects of this class store a selection of nodes a TreeView. Different than a QItemSelectionModel,
     a NodeSelection knows about Nodes, Elements etc and provides special methods to determine properties
@@ -75,12 +62,12 @@ class NodeSelection:
                     result.append(node)
             return result
         
-    def elements(self, recursive = False, unique = True):
+    def elements(self, recursive = False):
         """Returns a list of all selected elements. If *recursive* is True, all children of selected elements
         are also returned. If *unique* is True, the list does not contain more than one element with the same ID."""
         if not recursive:
             # Just remove duplicates and nodes which don't have tags
-            return makeUnique(self._elements) if unique else self._elements
+            return self._elements
         else:
             selectedNodes = self.nodes(onlyToplevel=True)
             elements = []

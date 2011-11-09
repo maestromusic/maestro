@@ -168,6 +168,7 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
     
     def changePositions(self, parent, changes):
         """Changes positions of elements below *parent*, according to the oldPosition->newPosition dict *changes.*"""
+        logger.debug('POSITION CHANGE: {}'.format(changes))
         #TODO: rewrite with difflib / opcodes??
         def argsort(seq):
             # http://stackoverflow.com/questions/3382352/equivalent-of-numpy-argsort-in-basic-python/3383106#3383106
@@ -218,6 +219,7 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
             J[start:end+1] = []
             J[iStart:iStart] = tmp
             i -= 1
+        self.dataChanged.emit(parentIndex.child(0, 0), parentIndex.child(0, len(I)))
           
     def insert(self,parent,insertions):
         """Insert nodes below *parent*. *insertions* is a list of (int, Element) tuples. The integer is
@@ -225,7 +227,6 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
         This method always copies elements before insertion."""
         insertionIter = iter(sorted(insertions))
         insertPos, insertElem = next(insertionIter)
-        logger.debug(insertions)
         lastIndex = len(parent.contents)
         offset = 0
         insertJobs = []

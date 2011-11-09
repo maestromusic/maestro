@@ -141,7 +141,6 @@ class EditorModel(rootedtreemodel.RootedTreeModel):
     
     def dropMimeData(self,mimeData,action,row,column,parentIndex):
         """This function does all the magic that happens if elements are dropped onto this editor."""
-        logger.debug("dropMimeData on {} row {}".format(self.data(parentIndex, Qt.EditRole), row))
         QtGui.QApplication.changeOverrideCursor(Qt.ArrowCursor) # dont display the DnD cursor during the warning
         if action == Qt.IgnoreAction:
             return True
@@ -171,7 +170,10 @@ class EditorModel(rootedtreemodel.RootedTreeModel):
                 ins.append( (insertPosition, node) )
                 if parent.id != self.root.id:
                     node.position = insertPosition
+                else:
+                    node.position = None
                 insertPosition += 1
+            modify.beginMacro(EDITOR, self.tr("drop URIs"))
             # now check if the positions of the subsequent nodes have to be increased
             if parent.id != self.root.id and parent.getContentsCount() >= row+1:
                 positionOverflow  = insertPosition - parent.contents[row].position
@@ -180,8 +182,9 @@ class EditorModel(rootedtreemodel.RootedTreeModel):
                     pc = commands.PositionChangeCommand(EDITOR, parent.id, positionChanges, self.tr('adjust positions'))
                     modify.push(pc)
                         
-            command = commands.InsertElementsCommand(modify.EDITOR, {parent.id: ins}, 'dropCopy->insert')
+            command = commands.InsertElementsCommand(EDITOR, {parent.id: ins}, 'dropCopy->insert')
             modify.push(command)
+            modify.endMacro()
             return True
     
     def importNode(self, node):
@@ -274,9 +277,9 @@ class EditorModel(rootedtreemodel.RootedTreeModel):
         commandsToPush.append(command)
         
         if len(insertions[parent.id]) > 0:
-            insertCommand = commands.InsertElementsCommand(modify.EDITOR, insertions, 'drop->insert')
+            insertCommand = commands.InsertElementsCommand(EDITOR, insertions, 'drop->insert')
             commandsToPush.append(insertCommand)
-        modify.beginMacro(modify.EDITOR, self.tr('drop elements'))
+        modify.beginMacro(EDITOR, self.tr('drop elements'))
         for command in commandsToPush:
             modify.push(command)
         modify.endMacro()

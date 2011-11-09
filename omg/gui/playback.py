@@ -71,10 +71,8 @@ class PlaybackWidget(QtGui.QDockWidget):
         mainLayout = QtGui.QVBoxLayout(widget)
         mainLayout.addLayout(topLayout)
         mainLayout.addLayout(bottomLayout)
-        print(state)
         self.backendChooser.backendChanged.connect(self.setBackend)
         if not self.backendChooser.setCurrentProfile(state):
-            print('not??')
             self.setBackend(self.backendChooser.currentProfile())
     
     def updateSlider(self, current, total):

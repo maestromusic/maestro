@@ -41,7 +41,6 @@ class PlaylistTreeView(treeview.TreeView):
         self.viewport().setMouseTracking(True)
     
     def setModel(self, model):
-        print('set')
         if self.selectionModel():
             self.selectionModel().selectionChanged.disconnect(self.updateGlobalSelection)
         super().setModel(model)
@@ -75,7 +74,6 @@ class PlaylistWidget(QtGui.QDockWidget):
         bottomLayout.addStretch()
         layout.addLayout(bottomLayout)
         self.setWidget(widget)
-        print(state)
         if not self.backendChooser.setCurrentProfile(state):
             self.setBackend(self.backendChooser.currentProfile())
     

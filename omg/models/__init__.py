@@ -475,7 +475,7 @@ class Element(Node):
         """Return the position of the element, if its parent is itself an element, or the index, if
         the parent is a root node."""
         if isinstance(self.parent, RootNode):
-            return self.parent.index(self)
+            return self.parent.index(self, False)
         else:
             return self.position
         

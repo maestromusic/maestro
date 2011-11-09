@@ -20,6 +20,7 @@ from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
 from .. import modify, tags
+from ..constants import EDITOR 
 
 
 class Record:
@@ -355,13 +356,13 @@ class FlagEditorUndoCommand(QtGui.QUndoCommand):
         'remove' and determines which event or function should be used. *params* are the arguments of the
         event/function (corresponding event/function pairs share the same signature).
         """
-        if self.model.level == modify.EDITOR:
+        if self.model.level == EDITOR:
             print([el.id for el in params[1]])
             theClass = {
                 'add': modify.events.FlagAddedEvent,
                 'remove': modify.events.FlagRemovedEvent
             }[type]
-            modify.dispatcher.changes.emit(theClass(modify.EDITOR,*params))
+            modify.dispatcher.changes.emit(theClass(EDITOR,*params))
         else:
             theFunction = {
                 'add': modify.real.addFlag,

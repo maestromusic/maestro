@@ -29,8 +29,6 @@ def enable():
     _action.setText(translate("Preferences"))
     _action.triggered.connect(showDialog)
     options = config.optionObject
-    #print(len(options))
-    #print(list(options))
 
 def mainWindowInit():
     application.mainWindow.menus['edit'].addAction(_action)

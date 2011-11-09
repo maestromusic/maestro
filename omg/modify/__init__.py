@@ -91,19 +91,20 @@ def merge(level, parent, indices, newTitle, removeString, adjustPositions):
     |- pos2: child3 (title = Nocturne Op. 13/37)
     |- pos3: child4 (title = Prelude BWV 42)
     """ 
-    from ..models import Container
+    from ..models import Container, Element
 
+    logger.debug("starting merge\n  on parent {}\n  indices {}".format(parent, indices))
     beginMacro(level, translate('modify', 'merge elements'))
     
     insertIndex = indices[0]
-    insertPosition = parent.contents[insertIndex].position
+    insertPosition = parent.contents[insertIndex].iPosition()
+    newContainerPosition = insertPosition if isinstance(parent, Element) else None
     newChildren = []
     toRemove = []    
     positionChanges = []
     
     for i, element in enumerate(parent.contents[insertIndex:], start = insertIndex):
         if i in indices:
-            currentPosition = element.position
             copy = parent.contents[i].copy()
             if tags.TITLE in copy.tags:
                 copy.tags[tags.TITLE] = [ t.replace(removeString, '') for t in copy.tags[tags.TITLE] ]
@@ -122,12 +123,12 @@ def merge(level, parent, indices, newTitle, removeString, adjustPositions):
                                  contents = newChildren,
                                  tags = t,
                                  flags = [],
-                                 position = insertPosition,
+                                 position = newContainerPosition,
                                  major = False)
     else:
         createCommand = commands.CreateContainerCommand(t, None, False)
         push(createCommand)
-        newContainer = Container.fromId(createCommand.id, loadData = True, position = insertPosition)
+        newContainer = Container.fromId(createCommand.id, loadData = True, position = newContainerPosition)
 
     insertions = { parent.id : [(insertPosition, newContainer)] }
     if level == REAL:

@@ -75,7 +75,6 @@ class MPDPlayerBackend(player.PlayerBackend):
             return False
          
     def poll(self):
-        #print('poll - {}'.format(QtCore.QThread.currentThreadId()))
         if not self.ensureConnection():
             return
         status = self.client.status()

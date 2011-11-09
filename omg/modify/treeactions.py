@@ -22,7 +22,7 @@ from PyQt4.QtCore import Qt
 from ..gui import mainwindow
 from .. import modify, tags, models
 from ..modify import commands
-from ..constants import *
+from ..constants import DB, DISK, CONTENTS, REAL
 
 translate = QtGui.QApplication.translate
 
@@ -106,7 +106,6 @@ class DeleteAction(TreeAction):
         self.level = treeview.level
         
     def doAction(self):
-        from .. import modify
         from ..modify.commands import RemoveElementsCommand
         if self.mode == DISK:
             from ..gui.dialogs import question
@@ -171,7 +170,7 @@ class MatchTagsFromFilenamesAction(TreeAction):
     def doAction(self):
         """Open a TagMatchDialog for the selected elements."""
         from . import tagmatchdialog
-        dialog = tagmatchdialog.TagMatchDialog(self.treeview.level, self.selection.elements(unique = True), self.treeview)
+        dialog = tagmatchdialog.TagMatchDialog(self.treeview.level, self.selection.elements(), self.treeview)
         dialog.exec_()
 
 class ToggleMajorAction(TreeAction):

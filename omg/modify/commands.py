@@ -24,7 +24,7 @@ from PyQt4.QtCore import Qt
 
 from .. import tags as tagsModule, logging, database as db, models
 from . import events, real, dispatcher
-from ..constants import *
+from ..constants import REAL, EDITOR, CONTENTS, DISK
 
 translate = QtCore.QCoreApplication.translate
 logger = logging.getLogger(__name__)
@@ -116,7 +116,6 @@ class CommitCommand(UndoCommand):
                                          None, 0, 7)
         progress.setMinimumDuration(0)
         progress.setWindowModality(Qt.WindowModal)
-        from .. import models
         progress.setValue(1)
         # assign new IDs to all elements which have editor IDs so far
         if hasattr(self, 'idMap'): # this is not the first redo
@@ -312,16 +311,14 @@ class RemoveElementsCommand(UndoCommand):
                 self.elementPool[element.id] = element.copy()
             if mode == CONTENTS:
                 parentIDs = (element.parent.id,)
-                parentIsRoot = isinstance(element.parent, models.RootNode)
             else:
                 parentIDs = db.parents(element.id)
-                parentIsRoot = False
             
             for parentID in parentIDs:
                 if parentID not in self.changes:
                     self.changes[parentID] = set()
                 if mode == CONTENTS:
-                    positions = (element.parent.index(element, True) if parentIsRoot else element.position,)
+                    positions = (element.iPosition(),)
                 else:
                     positions = db.positions(parentID, element.id)
                 for position in positions:
@@ -347,7 +344,7 @@ class RemoveElementsCommand(UndoCommand):
             for position, elementID in values:
                 changeList.append((position, self.elementPool[elementID]))
         if self.level == REAL:
-            """Reinsert the elements. First we create them, then handle content relations."""
+            #Reinsert the elements. First we create them, then handle content relations.
             real.createNewElements(list(self.elementPool.values()))
             real.addContents(elementChanges)
         else:

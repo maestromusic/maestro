@@ -16,14 +16,11 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import itertools
-
 from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
-from .. import constants, models, tags, utils, strutils, modify
-from ..constants import REAL
-from . import simplelistmodel
+from .. import constants, tags, utils, modify
+from ..constants import REAL, EDITOR
 
 translate = QtCore.QCoreApplication.translate
 
@@ -302,14 +299,14 @@ class UndoCommand(QtGui.QUndoCommand):
         affected elements (one of the arguments of the event/function) and *params* are the other parameters
         (corresponding event/function pairs share the same signature).
         """
-        if self.model.level == modify.EDITOR:
+        if self.model.level == EDITOR:
             ids = [element.id for element in elements]
             theClass = {
                 'add': modify.events.TagValueAddedEvent,
                 'remove': modify.events.TagValueRemovedEvent,
                 'change': modify.events.TagValueChangedEvent
             }[type]
-            modify.dispatcher.changes.emit(theClass(modify.EDITOR,elementIDs=ids,*params))
+            modify.dispatcher.changes.emit(theClass(EDITOR,elementIDs=ids,*params))
         else:
             theFunction = {
                 'add': modify.real.addTagValue,

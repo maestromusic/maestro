@@ -21,11 +21,12 @@ import functools
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
-from .. import database as db, config, search, constants, utils, tags, modify, flags
+from .. import database as db, config,utils, tags, modify, flags
 from ..search import searchbox, criteria as criteriaModule
-from . import mainwindow, treeview, browserdialog, delegates, tageditor, tagwidgets
+from . import mainwindow, treeview, browserdialog, delegates, tagwidgets
 from ..models import browser as browsermodel, Element, Container
 from ..modify.treeactions import TagValueHybridAction
+from ..constants import EDITOR, REAL
 translate = QtCore.QCoreApplication.translate
 
 
@@ -276,7 +277,7 @@ class Browser(QtGui.QWidget):
     def _handleDispatcher(self,event):
         """Handle a change event."""
         # Optimize some cases in which we do not have to start a new search and reload everything.
-        if isinstance(event,modify.events.ElementChangeEvent) and event.level == modify.EDITOR:
+        if isinstance(event,modify.events.ElementChangeEvent) and event.level == EDITOR:
             return # Does not affect us
         elif isinstance(event,modify.events.SingleTagChangeEvent) \
                     and all(event.tag not in criterion.getTags() for criterion in self.searchCriteria) \

@@ -33,7 +33,7 @@ class ElementChangeEvent(ChangeEvent):
     
     Parameters:
     
-        - level: either ''modify.REAL'' or ''modify.EDITOR''
+        - level: either ''REAL'' or ''EDITOR''
         - changes: dict mapping element ids to tuples containing the element before and after the change
         - contentsChanged,tagsChanged,flagsChanged: If one of these parameters is True the corresponding data
           may have changed. If it is false, you are save to assume that it did not change.
@@ -72,6 +72,10 @@ class ElementChangeEvent(ChangeEvent):
         # do not reimplement this method.
         assert self.flagsChanged
         return self.changes[id].flags
+    
+    def __str__(self):
+        return type(self).__name__ + '(level={}, contentsChanged={}, tagsChanged = {}, flagsChanged = {})'.format(
+                self.level, self.contentsChanged, self.tagsChanged, self.flagsChanged)
 
 
 class ElementsDeletedEvent(ChangeEvent):
@@ -133,6 +137,7 @@ class PositionChangeEvent(ElementChangeEvent):
     contentsChanged = True
     tagsChanged = False
     flagsChanged = False
+    
     def __init__(self, level, parentId, positionMap):
         '''Initializes the event. *positionMap* is a dict mapping old to new positions.'''
         self.parentId = parentId
@@ -182,7 +187,8 @@ class InsertContentsEvent(ElementChangeEvent):
                     break
             if not inserted:
                 elem.contents.append(insertedElem)
-            
+    def __str__(self):
+        return 'InsertContentsEvent({}, insertions={})'.format(self.level, self.insertions)
 
 class RemoveContentsEvent(ElementChangeEvent):
     """A specialized modify event for the removal of contents of containers."""
@@ -204,7 +210,10 @@ class RemoveContentsEvent(ElementChangeEvent):
         return element.getContentsCount() - len(self.removals[element.id])
     
     def applyTo(self, element):
-        elem.contents = [ child for child in elem.contents if child.position not in self.removals[element.id] ]
+        element.contents = [ child for child in elem.contents if child.position not in self.removals[element.id] ]
+        
+    def __str__(self):
+        return 'RemoveContentsEvent({}, removals={})'.format(self.level, self.removals)
             
 
 class TagFlagChangeEvent(ElementChangeEvent):
