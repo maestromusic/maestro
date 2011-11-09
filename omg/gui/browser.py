@@ -433,7 +433,7 @@ class RestoreExpandedOptimizer(Optimizer):
                 # for an equivalent node after reloading the model.
                 if isinstance(child,browsermodel.ValueNode):
                     key = child.getKey()
-                elif isinstance(child,models.Element):
+                elif isinstance(child, Element):
                     key = child.id    
                 else: 
                     # This works for nodeclasses of which not more than one instance has the same parent.

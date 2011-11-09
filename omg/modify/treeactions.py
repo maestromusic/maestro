@@ -116,7 +116,6 @@ class DeleteAction(TreeAction):
         command = RemoveElementsCommand(self.level, self.selection.elements(), self.mode, text=self.textForMode[self.mode])
         modify.push(command)
         if self.mode == DISK:
-            from .. import modify
             modify.stack.clearBoth()
         
 class MergeAction(TreeAction):

@@ -24,7 +24,7 @@ from PyQt4.QtCore import Qt
 
 from .. import tags as tagsModule, logging, database as db, models
 from . import events, real, dispatcher
-from ..constants import REAL, EDITOR, CONTENTS, DISK
+from ..constants import REAL, EDITOR, CONTENTS, DB, DISK
 
 translate = QtCore.QCoreApplication.translate
 logger = logging.getLogger(__name__)
@@ -345,7 +345,8 @@ class RemoveElementsCommand(UndoCommand):
                 changeList.append((position, self.elementPool[elementID]))
         if self.level == REAL:
             #Reinsert the elements. First we create them, then handle content relations.
-            real.createNewElements(list(self.elementPool.values()))
+            if self.mode == DB:
+                real.createNewElements(list(self.elementPool.values()))
             real.addContents(elementChanges)
         else:
             dispatcher.changes.emit(events.InsertContentsEvent(EDITOR, elementChanges))
