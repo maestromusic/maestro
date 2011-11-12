@@ -348,7 +348,7 @@ class ColorBarItem(DelegateItem):
         else: left = rect.x()
         if self.height is None:
             height = rect.height()
-        else: height = self.height()
+        else: height = self.height
         delegate.painter.fillRect(QtCore.QRect(left,rect.y(),self.width,height),
                                   self.background)
         return self.width,height
@@ -636,10 +636,15 @@ class BrowserDelegate(AbstractDelegate):
                 self.addLeft(CoverItem(node.getCover(self.coverSize),self.coverSize))
                 availableWidth -= self.coverSize + self.hSpace
             
-            # Title
+            # Major ?
+            
+            # Title and Major
             titleItem = TextItem(node.getTitle(prependPosition=self.showPositions),
                                  BOLD_STYLE if node.isContainer() else STD_STYLE,
                                  minHeight=IconBarItem.iconSize if len(flagIcons) > 0 else 0)
+            
+            if isinstance(node,models.Container) and node.major:
+                self.addCenter(ColorBarItem(QtGui.QColor(255,0,0),5,titleItem.sizeHint(self)[1]))
             self.addCenter(titleItem)
             
             # Flags
@@ -648,7 +653,7 @@ class BrowserDelegate(AbstractDelegate):
             addedDateToFirstRow = False
             if len(flagIcons) > 0:
                 flagIconsItem = IconBarItem(flagIcons)
-                titleLength = titleItem.sizeHint(self)[0]
+                titleLength = sum(item.sizeHint(self)[0] for item,align in self.center[0])
                 maxFlagsInTitleRow = flagIconsItem.maxColumnsIn(availableWidth - titleLength - self.hSpace)
                 if maxFlagsInTitleRow >= len(flagIcons):
                     # Yeah, all flags fit into the title row
@@ -762,6 +767,8 @@ class BrowserDelegate(AbstractDelegate):
                 break
         
             if isinstance(parent,models.Element) and tagType in parent.tags:
+                if parent.tags is None:
+                    parent.loadTags()
                 parentValues = parent.tags[tagType]
             elif isinstance(parent,browsermodel.ValueNode):
                 parentValues = parent.values
@@ -880,29 +887,29 @@ class EditorDelegate(AbstractDelegate):
     
     def prepareTagValues(self,element,theTags,tag,addTagName=False,alignRight=False):
         separator = ' - ' if tag == tags.TITLE or tag == tags.ALBUM else ', '
-        if hasattr(element,'missingTags') and tag in element.missingTags \
-                and any(v in element.missingTags[tag] for v in theTags[tag]):
-            doc = QtGui.QTextDocument()
-            doc.setDocumentMargin(0)
-            cursor = QtGui.QTextCursor(doc)
-            if alignRight:
-                format = QtGui.QTextBlockFormat()
-                format.setAlignment(Qt.AlignRight)
-                cursor.setBlockFormat(format)
-            if addTagName:
-                cursor.insertText('{}: '.format(tag.translated()),self.blackFormat)
-            for i,value in enumerate(theTags[tag]):
-                if value in element.missingTags[tag]:
-                    cursor.insertText(str(value),self.redFormat)
-                else: cursor.insertText(str(value),self.blackFormat)
-                if i != len(theTags[tag]) - 1:
-                    cursor.insertText(separator)
-            return doc
-        else: 
-            strings = [str(v) for v in theTags[tag]]
-            if addTagName:
-                return '{}: {}'.format(tag.translated(),separator.join(strings))
-            else: return separator.join(strings)
+#        if hasattr(element,'missingTags') and tag in element.missingTags \
+#                and any(v in element.missingTags[tag] for v in theTags[tag]):
+#            doc = QtGui.QTextDocument()
+#            doc.setDocumentMargin(0)
+#            cursor = QtGui.QTextCursor(doc)
+#            if alignRight:
+#                format = QtGui.QTextBlockFormat()
+#                format.setAlignment(Qt.AlignRight)
+#                cursor.setBlockFormat(format)
+#            if addTagName:
+#                cursor.insertText('{}: '.format(tag.translated()),self.blackFormat)
+#            for i,value in enumerate(theTags[tag]):
+#                if value in element.missingTags[tag]:
+#                    cursor.insertText(str(value),self.redFormat)
+#                else: cursor.insertText(str(value),self.blackFormat)
+#                if i != len(theTags[tag]) - 1:
+#                    cursor.insertText(separator)
+#            return doc
+#        else: 
+        strings = [str(v) for v in theTags[tag]]
+        if addTagName:
+            return '{}: {}'.format(tag.translated(),separator.join(strings))
+        else: return separator.join(strings)
     
     def getTags(self,element):
         theTags = element.tags.copy()
@@ -912,8 +919,8 @@ class EditorDelegate(AbstractDelegate):
             # Be careful to iterate over the parent's tags because theTags might change
             for tag in parent.tags:
                 if tag not in theTags:
-                    for value in parent.tags[tag]:
-                        self.addMissing(parent,tag,value)
+#                    for value in parent.tags[tag]:
+#                        self.addMissing(parent,tag,value)
                     continue
                 if hasattr(parent,'missingTags') and tag in parent.missingTags:
                     missing = parent.missingTags[tag]
@@ -922,19 +929,19 @@ class EditorDelegate(AbstractDelegate):
                     if tag in theTags and value in theTags[tag]: # tag may be removed from theTags
                         if value not in missing:
                             theTags[tag].remove(value)
-                    else:
-                        self.addMissing(parent,tag,value)            
+#                    else:
+#                        self.addMissing(parent,tag,value)            
             parent = parent.getParent()
             
         return theTags
     
-    def addMissing(self,element,tag,value):
-        if not hasattr(element,'missingTags'):
-            element.missingTags = tags.Storage()
-        if tag not in element.missingTags:
-            element.missingTags[tag] = [value]
-        elif value not in element.missingTags[tag]:
-            element.missingTags[tag].append(value)
+#    def addMissing(self,element,tag,value):
+#        if not hasattr(element,'missingTags'):
+#            element.missingTags = tags.Storage()
+#        if tag not in element.missingTags:
+#            element.missingTags[tag] = [value]
+#        elif value not in element.missingTags[tag]:
+#            element.missingTags[tag].append(value)
             
     def getFlags(self,element):
         """Return two lists containing the flags of *element*: The first list contains the icons of the flags
