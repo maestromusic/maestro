@@ -437,7 +437,7 @@ class TagEditorWidget(QtGui.QWidget):
                             number,prefix = strutils.numberFromPrefix(rest)
                             if number is not None:
                                 newValues.append(record.value[prefixLength+len(prefix):])
-                            else: newValues.append(record.value[prefixLength])
+                            else: newValues.append(record.value[prefixLength:])
                         action.triggered.connect(lambda: self.model.editMany(selectedRecords,newValues))
                     else:
                         action = fancyMenu.addAction(self.tr("Remove common start"))

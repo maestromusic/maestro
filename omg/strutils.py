@@ -95,8 +95,8 @@ def numberFromPrefix(string):
         >>> numberFromPrefix("IV. Allegro vivace")
         (4,"IV. ")
 
-    This method is used to find numbers in song titles. To avoid false positives, it currently finds only
-    roman numbers build from I,V and X.
+    This method is used to find numbers in song titles. To avoid false positives, it only detects numbers if
+    they are followed by whitespace or a period and finds only roman numbers build from I,V and X.
     """
     if len(string) == 0:
         return (None,"")
@@ -119,12 +119,15 @@ def numberFromPrefix(string):
         else: return (None,"") # no number found...give up
         
     # Ok I found a prefix
+    indexWhereNumberEnds = i
     if string[i] == '.':
         i += 1
-        while (string[i].isspace()):
-            i += 1
-    return (number,string[:i])
-
+    while (string[i].isspace()):
+        i += 1
+    if indexWhereNumberEnds > i:
+        return (number,string[:i])
+    else: return (None,'')
+    
 
 def rstripSeparator(string):
     """Return a copy of *string* where whitespace at the end is removed. If after removing whitespace the
