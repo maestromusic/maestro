@@ -166,10 +166,8 @@ class TagManager(QtGui.QDialog):
                             self.tr("Cannot remove a tag that appears in elements."))
             return
         
-        if dialogs.question(self.tr("Remove tag?"),
-                            self.tr("Do you really want to remove the tag '{}'?").format(tag.name)):
-            tags.removeTagType(tag)
-            self._loadTags()
+        modify.push(modify.commands.TagTypeUndoCommand(modify.DELETED,tag))
+        self._loadTags()
 
     def _handleItemChanged(self,item):
         """Handle changes to the name or private state of a tag."""
@@ -190,7 +188,7 @@ class TagManager(QtGui.QDialog):
                     dialogs.warning(self.tr("Cannot change tag"),message)
                     item.setText(oldName) # Reset
                     return
-            modify.push(modify.commands.TagTypeUndoCommand(tag,name=newName))
+            modify.push(modify.commands.TagTypeUndoCommand(modify.CHANGED,tag,name=newName))
             self._loadTags()
                 
         elif item.column() == self._getColumnIndex("private"): 
@@ -204,7 +202,7 @@ class TagManager(QtGui.QDialog):
                                 self.tr("Cannot change a tag that appears in elements."))
                 item.setText(oldName)
                 return
-            modify.push(modify.commands.TagTypeUndoCommand(tag,private=newPrivate))
+            modify.push(modify.commands.TagTypeUndoCommand(modify.CHANGED,tag,private=newPrivate))
             self._loadTags()
                 
     def _handleValueTypeChanged(self,tag,type):
@@ -214,7 +212,7 @@ class TagManager(QtGui.QDialog):
             dialogs.warning(self.tr("Cannot change tag"),
                             self.tr("Cannot change a tag that appears in elements."))
             return
-        modify.push(modify.commands.TagTypeUndoCommand(tag,valueType=type))
+        modify.push(modify.commands.TagTypeUndoCommand(modify.CHANGED,tag,valueType=type))
     
     def _handleCellDoubleClicked(self,row,column):
         """Handle double clicks on the first column containing icons. A click will open a file dialog to
@@ -236,6 +234,7 @@ class TagManager(QtGui.QDialog):
             changeAction.triggered.connect(lambda: self._openIconDialog(tagType))
             menu.addAction(changeAction)
             removeAction = QtGui.QAction(self.tr("Remove icon"),menu)
+            removeAction.setEnabled(tagType.iconPath is not None)
             removeAction.triggered.connect(lambda: self._setIcon(tagType,None))
             menu.addAction(removeAction)
             menu.exec_(self.tableWidget.viewport().mapToGlobal(pos))
@@ -253,7 +252,7 @@ class TagManager(QtGui.QDialog):
             
     def _setIcon(self,tagType,iconPath):
         """Set the icon(-path) of *tagType* to *iconPath* and update the GUI."""
-        modify.push(modify.commands.TagTypeUndoCommand(tagType,iconPath=iconPath))
+        modify.push(modify.commands.TagTypeUndoCommand(modify.CHANGED,tagType,iconPath=iconPath))
         # Update the widget
         row = tags.tagList.index(tagType)
         index = self.tableWidget.model().index(row,0)                     

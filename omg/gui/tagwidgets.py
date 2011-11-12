@@ -528,8 +528,10 @@ class NewTagTypeDialog(QtGui.QDialog):
                 return
             self.tagname = tagname
         if self._newTag is None:
-            self._newTag = tags.addTagType(self.tagname,self.combo.getType(),
-                                           private=self.privateBox.isChecked())
+            modify.push(modify.commands.TagTypeUndoCommand(modify.ADDED,None,name=self.tagname,
+                                                           valueType=self.combo.getType(),
+                                                           private=self.privateBox.isChecked()))
+            self._newTag = tags.get(self.tagname)
         self.accept()
         
     @staticmethod

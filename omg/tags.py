@@ -309,13 +309,30 @@ def fromTranslation(translation):
     else: return get(translation)
 
     
-def addTagType(name,valueType,iconPath=None,sortTags=None,private=False):
+def addTagType(name,valueType,iconPath=None,private=False,sortTags=None,tagType=None):
     """Adds a new tag named *name* of type *valueType* to the database. The parameter *sort* is a list of
     tags by which elements should be sorted if displayed below a ValueNode of this new tag; this defaults to
     the title tag. If *private* is True, a private tag is created.
     
-    After creation the dispatcher's tagTypeChanged signal is emitted.
+    Alternatively, if *tagType* is given, this tagtype with its id and data will be added to
+    the database ignoring all other arguments. This is only used to undo a tagtype's deletion.
+    
+    After creation the dispatcher's TagTypeChanged signal is emitted.
     """
+    from . import database as db
+    from .modify import dispatcher, events, ADDED
+    if tagType is not None:
+        data = (tagType.id,tagType.name,tagType.type,tagType.iconPath,
+                ','.join(str(tag.id) for tag in tagType.sortTags), tagType. private)
+        db.query(
+            "INSERT INTO {}tagids (id,tagname,tagtype,icon,sorttags,private) VALUES (?,?,?,?,?,?)"
+              .format(db.prefix),*data)
+        _tagsByName[tagType.name] = tagType
+        _tagsById[tagType.id] = tagType
+        tagList.append(tagType)
+        dispatcher.changes.emit(events.TagTypeChangedEvent(ADDED,tagType))
+        return tagType
+        
     logger.info("Adding new tag '{}' of type '{}'.".format(name,valueType.name))
     name = name.lower()
     if name in _tagsByName:
@@ -323,16 +340,14 @@ def addTagType(name,valueType,iconPath=None,sortTags=None,private=False):
     if sortTags is None:
         sortTags = [TITLE] if TITLE is not None else []
     
-    from . import database
-    id = database.query(
+    id = db.query(
         "INSERT INTO {}tagids (tagname,tagtype,icon,sorttags, private) VALUES (?,?,?,?,?)"
-              .format(database.prefix),
+              .format(db.prefix),
         name,valueType.name,iconPath,','.join(str(tag.id) for tag in sortTags), private).insertId()
     newTag = Tag(id,name,valueType,iconPath,sortTags,private)
     _tagsByName[name] = newTag
     _tagsById[id] = newTag
     tagList.append(newTag)
-    from .modify import dispatcher, events, ADDED
     dispatcher.changes.emit(events.TagTypeChangedEvent(ADDED,newTag))
     return newTag
 
@@ -377,6 +392,8 @@ def changeTagType(tag,name=None,valueType=None,iconPath='',private=None,sortTags
             raise ValueError("'{}' is not a valid tagname.".format(name))
         assignments.append('tagname = ?')
         params.append(name)
+        del _tagsByName[tag.name]
+        _tagsByName[name] = tag
         tag.name = name
     
     if valueType is not None and name != tag.type:
