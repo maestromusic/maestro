@@ -417,7 +417,7 @@ class TagEditorWidget(QtGui.QWidget):
                 action.triggered.connect(lambda: self.model.extendRecords(selectedRecords))
             
             if len(selectedRecords) > 1 and all(r.tag.type == tags.TYPE_VARCHAR for r in selectedRecords):
-                commonPrefix = strutils.commonPrefix(str(record.value) for record in selectedRecords)
+                commonPrefix = strutils.commonPrefix(record.value for record in selectedRecords)
                 
                 if len(commonPrefix) > 0:
                     action = fancyMenu.addAction(self.tr("Edit common start..."))
@@ -443,7 +443,13 @@ class TagEditorWidget(QtGui.QWidget):
                         action = fancyMenu.addAction(self.tr("Remove common start"))
                         newValues = [record.value[len(commonPrefix):] for record in selectedRecords]
                         action.triggered.connect(lambda: self.model.editMany(selectedRecords,newValues))
-                
+                else:
+                    if any(strutils.numberFromPrefix(r.value)[0] is not None for r in selectedRecords):
+                        action = fancyMenu.addAction(self.tr("Remove numbers from beginning"))
+                        # Remove the prefix returned in the second tuple part
+                        newValues = [r.value[len(strutils.numberFromPrefix(r.value)[1]):]
+                                        for r in selectedRecords]
+                        action.triggered.connect(lambda: self.model.editMany(selectedRecords,newValues))
             for separator in self.model.getPossibleSeparators(selectedRecords):
                 action = fancyMenu.addAction(self.tr("Separate at '{}'").format(separator))
                 action.triggered.connect(lambda: self.model.splitMany(selectedRecords,separator))
