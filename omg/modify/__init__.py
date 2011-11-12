@@ -50,6 +50,8 @@ class ChangeEventDispatcher(QtCore.QObject):
 dispatcher = ChangeEventDispatcher()
 dispatcher.changes.connect(_debugAll)
 
+stack = QtGui.QUndoStack()
+
 
 def commitEditors():
     logger.debug('creating commit command')
@@ -152,68 +154,21 @@ def newEditorId():
     _currentEditorId -= 1
     return _currentEditorId
 
-class StackChangeRejectedException(Exception):
-    pass
-
-class UndoGroup(QtGui.QUndoGroup):
-    def __init__(self, parent = None):
-        QtGui.QUndoGroup.__init__(self, parent)
-        
-        self.mainStack = QtGui.QUndoStack()
-        self.addStack(self.mainStack)
-        
-        self.editorStack = QtGui.QUndoStack()
-        self.editorStack.indexChanged.connect(self._handleEditorIndexChanged)
-        self.addStack(self.editorStack)
-        
-        self.setActiveStack(self.mainStack)
-       
-    def _handleEditorIndexChanged(self, idx):
-        if idx == 0:
-            self.setActiveStack(self.mainStack)
-    def state(self):
-        if self.activeStack() is self.editorStack:
-            return EDITOR
-        else:
-            return REAL
-
-    def setState(self, level,skipWarning=False):
-        if level == REAL and self.state() == EDITOR:
-            from ..gui.dialogs import question
-            if not skipWarning and not question('warning', 'you are about to switch from editor to real \
-                                                stack. The editor command history will be lost. Continue?'):
-                raise StackChangeRejectedException()
-            self.editorStack.clear()
-        self.setActiveStack(self.mainStack if level == REAL else self.editorStack)
-
-    def clearBoth(self):
-        """Clear both stacks and set the level to REAL."""
-        self.editorStack.clear()
-        self.mainStack.clear()
-        self.setActiveStack(self.mainStack)
-
-stack = UndoGroup()
 
 def beginMacro(level,name):
-    stack.setState(level)
-    stack.activeStack().beginMacro(name)
+    stack.beginMacro(name)
 
 def endMacro():
-    stack.activeStack().endMacro()
+    stack.endMacro()
 
 def push(command):
-    stack.setState(command.level,skipWarning=isinstance(command,commands.CommitCommand))
-    stack.activeStack().push(command)
+    stack.push(command)
 
 def createUndoAction(level,parent,prefix):
-    if level == REAL:
-        return stack.mainStack.createUndoAction(parent,prefix)
-    else: return stack.editorStack.createUndoAction(parent,prefix)
+    return stack.createUndoAction(parent,prefix)
 
 def createRedoAction(level,parent,prefix):
-    if level == REAL:
-        return stack.mainStack.createRedoAction(parent,prefix)
-    else: return stack.editorStack.createRedoAction(parent,prefix)
+    return stack.createRedoAction(parent,prefix)
 
 
 # This is simply so that other modules can use modify.real.<stuff>
