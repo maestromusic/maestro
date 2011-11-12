@@ -39,8 +39,7 @@ class IconProvider(QtGui.QFileIconProvider):
     
     def icon(self, arg):
         if os.path.isdir(arg.absoluteFilePath()):
-            path = arg.absoluteFilePath()
-            dir = relPath(arg.canonicalFilePath())
+            dir = relPath(arg.absoluteFilePath())
             if dir == '..':
                 return super().icon(arg)
             stati = set(db.query('''SELECT state FROM {}folders WHERE path = ? OR path LIKE CONCAT(?, "/%")
