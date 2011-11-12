@@ -44,19 +44,5 @@ class UndoViewDock(QtGui.QDockWidget):
         QtGui.QDockWidget.__init__(self,parent)
         self.setWindowTitle(self.tr("UndoView"))
         
-        self.tabWidget = QtGui.QTabWidget(self)
-        self.setWidget(self.tabWidget)
-        
-        activeView = QtGui.QUndoView(modify.stack)
-        realView = QtGui.QUndoView(modify.stack.mainStack)
-        editorView = QtGui.QUndoView(modify.stack.editorStack)
-        
-        self.tabWidget.addTab(activeView,self.tr("Active"))
-        self.tabWidget.addTab(realView,self.tr("Real"))
-        self.tabWidget.addTab(editorView,self.tr("Editor"))
-        
-        if state is not None and isinstance(state,int) and 0 <= state < self.tabWidget.count():
-            self.tabWidget.setCurrentIndex(state)
-        
-    def saveState(self):
-        return self.tabWidget.currentIndex()
+        undoView = QtGui.QUndoView(modify.stack)
+        self.setWidget(undoView)
