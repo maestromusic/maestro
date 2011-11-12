@@ -103,9 +103,19 @@ def allFlags():
     return _flagsById.values()
 
 
-def addFlagType(name,iconPath):
-    """Add a new flag with the given name to the database, emit a FlagTypeChangedEvent and return
-    the new flag."""
+def addFlagType(name,iconPath,flagType=None):
+    """Add a new flag with the given name and iconPath to the database, emit a FlagTypeChangedEvent and
+    return the new flag. If *flagType* is given, this flagType with its id, name and icon will be added to
+    the database ignoring the other arguments. This is only used to undo a flagtype's deletion.
+    """
+    if flagType is not None:
+        db.query("INSERT INTO {}flag_names (id,name,icon) VALUES (?,?,?)"
+                 .format(db.prefix),flagType.id,flagType.name,flagType.iconPath)
+        _flagsById[flagType.id] = flagType
+        _flagsByName[flagType.name] = flagType
+        modify.dispatcher.changes.emit(modify.events.FlagTypeChangedEvent(modify.ADDED,flagType))
+        return flagType
+        
     if exists(name):
         raise ValueError("There is already a flag named '{}'.".format(name))
     
@@ -144,6 +154,8 @@ def changeFlagType(flagType,name=None,iconPath=''):
         logger.info("Changing flag name '{}' to '{}'.".format(flagType.name,name))
         assignments.append('name = ?')
         data.append(name)
+        del _flagsByName[flagType.name]
+        _flagsByName[name] = flagType
         flagType.name = name
         
     if iconPath != '' and iconPath != flagType.iconPath:

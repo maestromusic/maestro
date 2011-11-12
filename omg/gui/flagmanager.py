@@ -16,15 +16,16 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import functools
+import functools, os
 
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from .. import database as db, constants, utils, flags
+from .. import database as db, constants, utils, flags, modify
 from .misc import iconbuttonbar
 
 translate = QtCore.QCoreApplication.translate
+
 
 class FlagManager(QtGui.QDialog):
     """The FlagManager allows to add, edit and remove flagtypes."""
@@ -34,8 +35,15 @@ class FlagManager(QtGui.QDialog):
         self.resize(500,400)
         self.setLayout(QtGui.QVBoxLayout())
         
+        self.columns = [
+                ("icon",   self.tr("Icon")),
+                ("name",   self.tr("Name")),
+                ("number", self.tr("# of elements")),
+                ("actions",self.tr("Actions"))
+                ]
+        
         self.tableWidget = QtGui.QTableWidget()
-        self.tableWidget.setColumnCount(4)
+        self.tableWidget.setColumnCount(len(self.columns))
         self.tableWidget.verticalHeader().hide()
         # TODO: Does not work
         #self.tableWidget.setSortingEnabled(True)
@@ -73,7 +81,7 @@ class FlagManager(QtGui.QDialog):
         self.tableWidget.setRowCount(len(self._flagTypes))
             
         for row,flagType in enumerate(self._flagTypes):
-            column = 0
+            column = self._getColumnIndex("icon")
             label = QtGui.QLabel()       
             label.setAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
             index = self.tableWidget.model().index(row,column)   
@@ -82,18 +90,18 @@ class FlagManager(QtGui.QDialog):
                 label.setPixmap(QtGui.QPixmap(flagType.iconPath))
                 label.setToolTip(flagType.iconPath)           
             
-            column += 1
+            column = self._getColumnIndex("name")
             item = QtGui.QTableWidgetItem(flagType.name)
             item.setFlags(Qt.ItemIsEditable | Qt.ItemIsEnabled)
             self.tableWidget.setItem(row,column,item)
             
-            column += 1
+            column = self._getColumnIndex("number")
             item = QtGui.QTableWidgetItem('{}    '.format(self._getElementCount(flagType)))
             item.setTextAlignment(Qt.AlignVCenter | Qt.AlignRight)
             item.setFlags(Qt.ItemIsEnabled)
             self.tableWidget.setItem(row,column,item)
             
-            column += 1
+            column = self._getColumnIndex("actions")
             buttons = iconbuttonbar.IconButtonBar()
             buttons.addIcon(utils.getIcon('delete.png'),
                                  functools.partial(self._handleRemoveButton,flagType),
@@ -117,8 +125,8 @@ class FlagManager(QtGui.QDialog):
     
     def _handleRemoveButton(self,flagType):
         """Ask the user if he really wants this and if so, remove the flag."""
-        number = self._elementNumber(flagType)
-        if number > 0:
+        number,allowChanges = self._appearsInElements(flagType)
+        if not allowChanges:
             question = self.tr("Do you really want to remove the flag '{}'? It will be removed from %n element(s).",None,number)
         else: question = self.tr("Do you really want to remove the flag '{}'?")
         if (QtGui.QMessageBox.question(self,self.tr("Remove flag?"),
@@ -129,13 +137,13 @@ class FlagManager(QtGui.QDialog):
             if number > 0:
                 # TODO
                 raise NotImplementedError()
-            flags.removeFlagType(flagType)
+            modify.push(modify.commands.FlagTypeUndoCommand(modify.DELETED,flagType))
             self._loadFlags()
 
     def _handleItemChanged(self,item):
         """When the name of a flag has been changed, ask the user if he really wants this and if so perform
         the change in the database and reload."""
-        if item.column() != 1: # Only the name column is editable
+        if item.column() != self._getColumnIndex("name"): # Only the name column is editable
             return
         flagType = self._flagTypes[item.row()]
         oldName = flagType.name
@@ -149,40 +157,22 @@ class FlagManager(QtGui.QDialog):
             item.setText(oldName)
             return
         
-        # First find the correct question to pose to the user
-        number = self._elementNumber(flagType)
+        number,allowChanges = self._appearsInElements(flagType)
         if flags.exists(newName):
-            if number == 0:
-                QtGui.QMessageBox.warning(self,self.tr("Cannot change flag"),
-                                          self.tr("A flag name '{}' does already exist.").format(newName))
+            QtGui.QMessageBox.warning(self,self.tr("Cannot change flag"),
+                                      self.tr("A flag name '{}' does already exist.").format(newName))
+            item.setText(oldName)
+            return
+                                
+        if number > 0:
+            question = self.tr("Do you really want to change the flag '{}'? It will be changed in %n element(s).",None,number).format(oldName)
+            if (QtGui.QMessageBox.question(self,self.tr("Change flag?"),question,
+                                   QtGui.QMessageBox.Yes | QtGui.QMessageBox.No,
+                                   QtGui.QMessageBox.Yes)
+                        != QtGui.QMessageBox.Yes):
                 item.setText(oldName)
                 return
-            else:
-                question = self.tr("A flag named '{}' does already exist. Shall I merge both flags? Remember that '{}' is used in %n elements.",None,number).format(newName,oldName)
-        else:                               
-            if number > 0:
-                question = self.tr("Do you really want to change the flag '{}'? It will be changed in %n element(s).",None,number).format(oldName)
-            else: question = self.tr("Do you really want to change the flag '{}'?").format(oldName)
-        
-        # Then pose the question
-        if (QtGui.QMessageBox.question(self,self.tr("Change flag?"),question,
-                                       QtGui.QMessageBox.Yes | QtGui.QMessageBox.No,
-                                       QtGui.QMessageBox.Yes)
-                == QtGui.QMessageBox.Yes):
-            if number > 0:
-                elements = list(db.query("SELECT element_id FROM {}flags WHERE flag_id = ?"
-                                            .format(db.prefix),flagType.id).getSingleColumn())
-            if flags.exists(newName):
-                # Merge the flags: Give all elements the existing flag and delete flagType
-                if number > 0:
-                    newFlagType = flags.get(newName)
-                    db.query("UPDATE {}flags SET flag_id = ? WHERE flag_id = ?".format(db.prefix),
-                               newFlagType.id,flagType.id)
-                flags.removeFlagType(flagType)
-            else: flags.changeFlagType(flagType,newName,flagType.iconPath)
-        else:
-            # Otherwise reset the item
-            item.setText(oldName)
+        modify.push(modify.commands.FlagTypeUndoCommand(modify.CHANGED,flagType,name=newName))
     
     def _handleCellDoubleClicked(self,row,column):
         """Handle double clicks on the first column containing icons. A click will open a file dialog to
@@ -204,6 +194,7 @@ class FlagManager(QtGui.QDialog):
             changeAction.triggered.connect(lambda: self._openIconDialog(flagType))
             menu.addAction(changeAction)
             removeAction = QtGui.QAction(self.tr("Remove icon"),menu)
+            removeAction.setEnabled(flagType.iconPath is not None)
             removeAction.triggered.connect(lambda: self._setIcon(flagType,None))
             menu.addAction(removeAction)
             menu.exec_(self.tableWidget.viewport().mapToGlobal(pos))
@@ -212,7 +203,8 @@ class FlagManager(QtGui.QDialog):
         """Open a file dialog so that the user may choose an icon for the given flag."""
         # Choose a sensible directory as starting point
         if flagType.iconPath is None:
-            dir = 'images/flags/'
+            dir = os.path.join('images','flags')
+            print(dir)
         else: dir = flagType.iconPath
         fileName = QtGui.QFileDialog.getOpenFileName(self,self.tr("Choose flag icon"),dir,
                                                      self.tr("Images (*.png *.xpm *.jpg)"))
@@ -221,7 +213,7 @@ class FlagManager(QtGui.QDialog):
             
     def _setIcon(self,flagType,iconPath):
         """Set the icon(-path) of *flagType* to *iconPath* and update the GUI.""" 
-        flags.changeFlagType(flagType,iconPath=iconPath)
+        modify.push(modify.commands.FlagTypeUndoCommand(modify.CHANGED,flagType,iconPath=iconPath))
         # Update the widget
         row = self._flagTypes.index(flagType)
         index = self.tableWidget.model().index(row,0)                     
@@ -229,11 +221,30 @@ class FlagManager(QtGui.QDialog):
         # Both works also if iconPath is None
         label.setPixmap(QtGui.QPixmap(flagType.iconPath))
         label.setToolTip(flagType.iconPath)
-            
-    def _elementNumber(self,flagType):
-        """Return the number of elements that contain a flag of the given type."""
-        return db.query("SELECT COUNT(element_id) FROM {}flags WHERE flag_id = ?"
-                            .format(db.prefix),flagType.id).getSingle()        
+                   
+    def _appearsInElements(self,flagType):
+        """Return the number of db-elements that contain a flag of the given type in the database. As second 
+        result return whether the user should be allowed to change the flag, i.e. whether the flag does not
+        appear in any element in the database nor in the editor.
+        """
+        number = db.query("SELECT COUNT(element_id) FROM {}flags WHERE flag_id = ?"
+                            .format(db.prefix),flagType.id).getSingle()  
+        if number > 0:
+            return number,False
+        else:
+            from omg.gui import editor
+            for model in editor.activeEditorModels():
+                if any(flagType in node.flags for node in model.getRoot().getAllNodes(skipSelf=True)):
+                    return 0,False
+            return 0,True
+        
+    def _getColumnIndex(self,columnKey):
+        """Return the index of the column with the given key (i.e. the first part of the corresponding tuple
+        in self.columns."""
+        for i in range(len(self.columns)):
+            if self.columns[i][0] == columnKey:
+                return i
+        raise ValueError("Invalid key {}".format(columnKey))
     
 
 def createNewFlagType(parent = None):
@@ -253,5 +264,6 @@ def createNewFlagType(parent = None):
                                   translate("FlagManager","This is no a valid flagname."))
         return None
     else:
-        return flags.addFlagType(name,iconPath=None)
+        modify.push(modify.commands.FlagTypeUndoCommand(modify.ADDED,name=name,iconPath=None))
+        return True
     

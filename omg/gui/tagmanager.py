@@ -267,8 +267,8 @@ class TagManager(QtGui.QDialog):
             
     def _appearsInElements(self,tag):
         """Return the number of db-elements that contain a tag of the given type in the database. As second 
-        result return whether the user should be allowed to change the tag, i.e. whether the number of
-        elements in which the tag appears is 0 both in the db and in the editor.
+        result return whether the user should be allowed to change the tag, i.e. whether the tag does not
+        appear in any element in the database nor in the editor.
         """
         number = db.query("SELECT COUNT(DISTINCT element_id) FROM {}tags WHERE tag_id = ?"
                                .format(db.prefix),tag.id).getSingle()
