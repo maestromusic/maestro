@@ -75,10 +75,7 @@ class NodeSelection:
             for node in selectedNodes:
                 for child in node.getAllNodes():
                     if isinstance(child,models.Element):
-                        # if the element is inside the database, load it from there, because
-                        # browser stores incomplete elements
-                        # TODO: bääh
-                        elements.append(models.Element.fromId(child.id) if child.isInDB() else child)
+                        elements.append(child)
             return elements
         
     def singleElement(self):
