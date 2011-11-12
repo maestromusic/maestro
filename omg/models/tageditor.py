@@ -666,7 +666,7 @@ class TagEditorModel(QtCore.QObject):
                     for element in affected:
                         elementTags = self.getTagsOfElement(element)
                         if tags.TITLE in elementTags:
-                            element.title = element.getTitle(elementTags[tags.TITLE])
+                            element.title = element.getTitle(titles=elementTags[tags.TITLE])
                         else: element.title = element.getTitle() # Will produce something like 'No title'
                     self.titlesChanged.emit(affected)
                     
