@@ -21,7 +21,7 @@ import math,itertools
 from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
-from omg import models, tags, config, strutils
+from omg import models, tags, config, strutils, database as db
 from omg.models import browser as browsermodel
 
 
@@ -626,6 +626,8 @@ class BrowserDelegate(AbstractDelegate):
             # Prepare data
             if node.tags is None:
                 node.loadTags()
+            if node.isContainer() and node.major is None:
+                node.major = db.isMajor(node.id)
             leftTexts,rightTexts,dateValues = self.prepareTags(node)
             if node.flags is None:
                 node.loadFlags()

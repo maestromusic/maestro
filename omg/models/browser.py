@@ -217,7 +217,7 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
         this creates all children of *node* and not only the next level of the tree-structure as _loadTagLayer
         does. For performance reasons this method does not load the data (''Element.fromId(loadData=False)'').
         """
-        result = db.query("SELECT id,file FROM {0} WHERE toplevel = 1".format(table))
+        result = db.query("SELECT id,file,major FROM {0} WHERE toplevel = 1".format(table))
         if node.contents is not None:
             # Only use beginRemoveRows and friends if there are already contents. If we are going to add the
             # first contents to node (this happens thanks to the directload shortcut), we must not call
@@ -230,7 +230,8 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
         
         if contentsNone:
             self.beginInsertRows(self.getIndex(node),0,len(result)-1)
-        node.setContents([(models.File if file else models.Container).fromId(id) for id,file in result])
+        node.setContents([models.File.fromId(id) if file else models.Container.fromId(id,major=major)
+                                                        for id,file,major in result])
         for element in node.contents:
             element.parent = node
             if element.isContainer():
