@@ -530,6 +530,7 @@ class NewTagTypeDialog(QtGui.QDialog):
         if self._newTag is None:
             modify.push(modify.commands.TagTypeUndoCommand(modify.ADDED,None,name=self.tagname,
                                                            valueType=self.combo.getType(),
+                                                           iconPath=None,
                                                            private=self.privateBox.isChecked()))
             self._newTag = tags.get(self.tagname)
         self.accept()

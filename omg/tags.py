@@ -322,7 +322,7 @@ def addTagType(name,valueType,iconPath=None,private=False,sortTags=None,tagType=
     from . import database as db
     from .modify import dispatcher, events, ADDED
     if tagType is not None:
-        data = (tagType.id,tagType.name,tagType.type,tagType.iconPath,
+        data = (tagType.id,tagType.name,tagType.type.name,tagType.iconPath,
                 ','.join(str(tag.id) for tag in tagType.sortTags), tagType. private)
         db.query(
             "INSERT INTO {}tagids (id,tagname,tagtype,icon,sorttags,private) VALUES (?,?,?,?,?,?)"
