@@ -37,6 +37,7 @@ class TagLabel(QtGui.QLabel):
         QtGui.QLabel.__init__(self,parent)
         self.iconOnly = iconOnly
         self.setTag(tag)
+        modify.dispatcher.changes.connect(self._handleDispatcher)
 
     def text(self):
         if self.tag is not None:
@@ -89,6 +90,11 @@ class TagLabel(QtGui.QLabel):
             else: self.setFont(QtGui.QApplication.font())
             self.setTag(self.tag)
             
+    def _handleDispatcher(self,event):
+        """Reload the widget on TagTypeChangedEvents applying to our tag."""
+        if isinstance(event,modify.events.TagTypeChangedEvent) and event.tagType == self.tag:
+            self.setTag(self.tag)
+
 
 class ValueTypeBox(QtGui.QComboBox):
     """Combobox to choose a ValueType for tags. Additionally it has a property 'disableMouseWheel'. If this
