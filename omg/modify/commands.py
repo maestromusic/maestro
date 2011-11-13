@@ -152,7 +152,7 @@ class CommitCommand(UndoCommand):
         progress.setValue(5)
         # notify the editors to display the new commited content
         dispatcher.changes.emit(events.ElementChangeEvent(
-                            REAL, {root.id:root for root in self.editorRoots}, True))
+                            EDITOR, {root.id:root for root in self.editorRoots}, True))
         progress.setValue(6)
         
         
@@ -189,7 +189,7 @@ class CommitCommand(UndoCommand):
             if elem.id in revIdMap:
                 elem.id = revIdMap[elem.id]
         dispatcher.changes.emit(events.ElementChangeEvent(
-                            REAL, {root.id:root for root in self.editorRoots}, True))
+                            EDITOR, {root.id:root for root in self.editorRoots}, True))
                 
 
 class ChangeSingleElementCommand(UndoCommand):
