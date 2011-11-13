@@ -38,7 +38,7 @@ def leadingInt(item):
     Otherwise return -1.""" 
     text = item.text()
     i = 0
-    while i < len(text) and text[i].isnumeric:
+    while i < len(text) and text[i].isnumeric():
         i += 1
     if i == 0:
         return -1
