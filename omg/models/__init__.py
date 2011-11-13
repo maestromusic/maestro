@@ -580,7 +580,7 @@ class File(Element):
     
     @staticmethod
     def fromId(id,*,tags=None,flags=None,path=None,length=None,position=None,
-               parentId=None,major=False,loadData=True):
+               parentId=None,loadData=True):
         if loadData and id > 0:
             if tags is None:
                 tags = db.tags(id)
@@ -594,8 +594,6 @@ class File(Element):
                 position = db.position(parentId,id)
                 #TODO: db.position now is db.positions() ... what to do if the 
                 #element appears more than once below the same parent? (e.g. in a playlist)
-            if major is None:
-                major = db.isMajor(id)
         return File(id,tags,flags,path,length,position)
         
     @staticmethod

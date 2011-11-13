@@ -22,8 +22,8 @@ from collections import OrderedDict
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from .. import tags as tagsModule, logging, database as db, models
-from . import events, real, dispatcher
+from .. import tags as tagsModule, logging, database as db, models, flags as flagsModule
+from . import events, real, dispatcher, ADDED, DELETED, CHANGED
 from ..constants import REAL, EDITOR, CONTENTS, DB, DISK
 
 translate = QtCore.QCoreApplication.translate
@@ -480,3 +480,106 @@ class RenameTagValueCommand(UndoCommand):
         real.changeTagValue(self.tag, self.newValue, self.oldValue, self.changeSimple)
         if len(self.both) > 0:
             real.addTagValue(self.tag, self.oldValue, self.both)
+            
+
+class TagTypeUndoCommand(UndoCommand):
+    """This command changes *tagType* according to the other parameters and vice versa (default values won't
+    change the corresponding attribute). For the attributes see ``tags.changeTagType``."""
+    def __init__(self,tagType,name=None,valueType=None,iconPath='',private=None,sortTags=None):
+        super().__init__(level=None,changes=None)
+        self.tagType = tagType
+        self.oldData = (tagType.name,tagType.type,tagType.iconPath,tagType.private,tagType.sortTags)
+        self.newData = (name,valueType,iconPath,private,sortTags)
+        
+    def redo(self):
+        tagsModule.changeTagType(self.tagType,*self.newData)
+
+    def undo(self):
+        tagsModule.changeTagType(self.tagType,*self.oldData)
+        
+
+class TagTypeUndoCommand(UndoCommand):
+    """This command adds, changes or deletes a tagtype. What parameters are necessary depends on the
+    first parameter *action* which may be one of
+    
+        - ``modify.ADDED``: In this case all parameters except *tagType* must be given
+          as data for the new type.
+        - ``modify.CHANGED``: The command will change *tagType* according to the parameters (default values
+          won't change the corresponding attribute).
+        - ``modify.DELETED``: *tagType* will be removed. All other parameters are useless.
+    
+    \ """
+    def __init__(self,action,tagType=None,name=None,valueType=None,iconPath='',private=None,sortTags=None):
+        texts = {ADDED:   translate("TagTypeUndoCommand","Add tagtype"),
+                 DELETED: translate("TagTypeUndoCommand","Delete tagtype"),
+                 CHANGED: translate("TagTypeUndoCommand","Change tagtype")
+                }
+        super().__init__(level=None,changes=None,text=texts[action])
+        self.action = action
+        self.tagType = tagType
+        if action != ADDED:
+            self.oldData = (tagType.name,tagType.type,tagType.iconPath,tagType.private,tagType.sortTags)
+        self.newData = (name,valueType,iconPath,private,sortTags)
+        
+    def redo(self):
+        if self.action == ADDED:
+            self.tagType = tagsModule.addTagType(*self.newData)
+        elif self.action == DELETED:
+            tagsModule.removeTagType(self.tagType)
+        elif self.action == CHANGED:
+            tagsModule.changeTagType(self.tagType,*self.newData)
+        else: raise ValueError("Invalid action {}".format(self.action))
+
+    def undo(self):
+        if self.action == ADDED:
+            tagsModule.removeTagType(self.tagType)
+        elif self.action == DELETED:
+            # It is important to restore exactly the same instance,
+            # because it might be used in many elements within the undohistory.
+            tagsModule.addTagType(None,None,tagType=self.tagType)
+        elif self.action == CHANGED:
+            tagsModule.changeTagType(self.tagType,*self.oldData)
+        else: raise ValueError("Invalid action {}".format(self.action))
+
+
+class FlagTypeUndoCommand(UndoCommand):
+    """This command adds, changes or deletes a flagtype. What parameters are necessary depends on the
+    first parameter *action* which may be one of
+    
+        - ``modify.ADDED``: In this case *name* and *iconPath* must be given as data for the new type.
+        - ``modify.CHANGED``: The command will change *flagType* according to the parameters *name*
+          and *iconPath* (default values won't change the corresponding attribute).
+        - ``modify.DELETED``: *flagType* will be removed.
+    
+    \ """
+    def __init__(self,action,flagType=None,name=None,iconPath=''):
+        texts = {ADDED:   translate("FlagTypeUndoCommand","Add flagtype"),
+                 DELETED: translate("FlagTypeUndoCommand","Delete flagtype"),
+                 CHANGED: translate("FlagTypeUndoCommand","Change flagtype")
+                }
+        super().__init__(level=None,changes=None,text=texts[action])
+        self.action = action
+        self.flagType = flagType
+        if action != ADDED:
+            self.oldData = (flagType.name,flagType.iconPath)
+        self.newData = (name,iconPath)
+        
+    def redo(self):
+        if self.action == ADDED:
+            self.flagType = flagsModule.addFlagType(*self.newData)
+        elif self.action == DELETED:
+            flagsModule.removeFlagType(self.flagType)
+        elif self.action == CHANGED:
+            flagsModule.changeFlagType(self.flagType,*self.newData)
+        else: raise ValueError("Invalid action {}".format(self.action))
+
+    def undo(self):
+        if self.action == ADDED:
+            flagsModule.removeFlagType(self.flagType)
+        elif self.action == DELETED:
+            # It is important to restore exactly the same instance,
+            # because it might be used in many elements within the undohistory.
+            flagsModule.addFlagType(None,None,flagType=self.flagType)
+        elif self.action == CHANGED:
+            flagsModule.changeFlagType(self.flagType,*self.oldData)
+        else: raise ValueError("Invalid action {}".format(self.action))
