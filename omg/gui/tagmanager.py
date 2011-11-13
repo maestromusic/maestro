@@ -16,16 +16,16 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import functools
+import functools, os
 
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from .. import tags, utils, database as db, constants, modify
-from . import tagwidgets, dialogs
+from . import tagwidgets, dialogs, misc
 from .misc import iconbuttonbar
 
-
+    
 class TagManager(QtGui.QDialog):
     """The TagManager allows to add, edit and remove tagtypes (like artist, composer,...). To make things
     easy it only allows changing tagtypes which do not appear in any element."""
@@ -51,8 +51,7 @@ class TagManager(QtGui.QDialog):
         self.tableWidget = QtGui.QTableWidget()
         self.tableWidget.setColumnCount(len(self.columns))
         self.tableWidget.verticalHeader().hide()
-        # TODO: Does not work
-        #self.tableWidget.setSortingEnabled(True)
+        self.tableWidget.setSortingEnabled(True)
         self.tableWidget.horizontalHeader().setResizeMode(QtGui.QHeaderView.ResizeToContents)
         self.tableWidget.cellDoubleClicked.connect(self._handleCellDoubleClicked)
         self.tableWidget.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -82,6 +81,9 @@ class TagManager(QtGui.QDialog):
         self.tableWidget.clear()
         self.tableWidget.setHorizontalHeaderLabels([column[1] for column in self.columns])
         self.tableWidget.setRowCount(len(tags.tagList))
+        
+        CheckedSortItem = misc.createSortingTableWidgetClass('PrivateItemClass','checked')
+        NumericSortItem = misc.createSortingTableWidgetClass('NumericalSortClass','leadingInt')
         
         for row,tag in enumerate(tags.tagList):
             number,allowChanges = self._appearsInElements(tag)
@@ -115,7 +117,7 @@ class TagManager(QtGui.QDialog):
                 self.tableWidget.setItem(row,column,item)
             
             column = self._getColumnIndex("private")
-            item = QtGui.QTableWidgetItem()
+            item = CheckedSortItem()
             if allowChanges:
                 item.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
             else: item.setFlags(Qt.ItemIsUserCheckable)
@@ -132,7 +134,7 @@ class TagManager(QtGui.QDialog):
             if not allowChanges and number == 0:
                 text = self.tr("0, appears in editor")
             else: text = number
-            item = QtGui.QTableWidgetItem("{}    ".format(text))
+            item = NumericSortItem("{}    ".format(text))
             item.setTextAlignment(Qt.AlignVCenter | Qt.AlignRight)
             item.setFlags(Qt.ItemIsEnabled)
             self.tableWidget.setItem(row,column,item)
@@ -243,7 +245,7 @@ class TagManager(QtGui.QDialog):
         """Open a file dialog so that the user may choose an icon for the given tag."""
         # Choose a sensible directory as starting point
         if tagType.iconPath is None:
-            dir = 'images/tags/'
+            dir = os.path.join('images','tags')
         else: dir = tagType.iconPath
         fileName = QtGui.QFileDialog.getOpenFileName(self,self.tr("Choose tag icon"),dir,
                                                      self.tr("Images (*.png *.xpm *.jpg)"))
@@ -287,4 +289,4 @@ class TagManager(QtGui.QDialog):
             if self.columns[i][0] == columnKey:
                 return i
         raise ValueError("Invalid key {}".format(columnKey))
-    
+

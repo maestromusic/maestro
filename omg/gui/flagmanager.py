@@ -22,6 +22,7 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from .. import database as db, constants, utils, flags, modify
+from . import misc
 from .misc import iconbuttonbar
 
 translate = QtCore.QCoreApplication.translate
@@ -45,8 +46,7 @@ class FlagManager(QtGui.QDialog):
         self.tableWidget = QtGui.QTableWidget()
         self.tableWidget.setColumnCount(len(self.columns))
         self.tableWidget.verticalHeader().hide()
-        # TODO: Does not work
-        #self.tableWidget.setSortingEnabled(True)
+        self.tableWidget.setSortingEnabled(True)
         self.tableWidget.horizontalHeader().setResizeMode(QtGui.QHeaderView.ResizeToContents)
         self.tableWidget.itemChanged.connect(self._handleItemChanged)
         self.tableWidget.cellDoubleClicked.connect(self._handleCellDoubleClicked)
@@ -79,7 +79,9 @@ class FlagManager(QtGui.QDialog):
                     [self.tr("Icon"),self.tr("Name"),self.tr("# of elements"),self.tr("Actions")])
     
         self.tableWidget.setRowCount(len(self._flagTypes))
-            
+        
+        NumericSortItem = misc.createSortingTableWidgetClass('NumericSortItem',misc.leadingInt)
+        
         for row,flagType in enumerate(self._flagTypes):
             column = self._getColumnIndex("icon")
             label = QtGui.QLabel()       
@@ -96,7 +98,7 @@ class FlagManager(QtGui.QDialog):
             self.tableWidget.setItem(row,column,item)
             
             column = self._getColumnIndex("number")
-            item = QtGui.QTableWidgetItem('{}    '.format(self._getElementCount(flagType)))
+            item = NumericSortItem('{}    '.format(self._getElementCount(flagType)))
             item.setTextAlignment(Qt.AlignVCenter | Qt.AlignRight)
             item.setFlags(Qt.ItemIsEnabled)
             self.tableWidget.setItem(row,column,item)
