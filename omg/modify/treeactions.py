@@ -20,10 +20,11 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from ..gui import mainwindow
-from .. import modify, tags, models
+from .. import modify, tags, models, logging
 from ..modify import commands
 from ..constants import DB, DISK, CONTENTS, REAL
 
+logger = logging.getLogger(__name__)
 translate = QtGui.QApplication.translate
 
 
@@ -168,7 +169,7 @@ class MatchTagsFromFilenamesAction(TreeAction):
         
     def doAction(self):
         """Open a TagMatchDialog for the selected elements."""
-        from . import tagmatchdialog
+        from ..gui import tagmatchdialog
         dialog = tagmatchdialog.TagMatchDialog(self.treeview.level, self.selection.elements(), self.treeview)
         dialog.exec_()
 

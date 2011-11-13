@@ -87,6 +87,7 @@ class RealFile:
             logger.warning("Found invalid tag-value '{}' for tag {} in file {}".format(value,tag,self.path))
             return None 
 
+rfClass = None
 try:
     import cutags    
     class UFile(RealFile):

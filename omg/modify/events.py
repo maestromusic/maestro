@@ -124,11 +124,19 @@ class MajorFlagChangeEvent(SingleElementChangeEvent):
     tagsChanged = False
     flagsChanged = False
     
-    def __init__(self, level, element):
-        super().__init__(level, element)
+    def __init__(self, level, id, flag):
+        self.level = level
+        self.id = id
+        self.flag = flag
         
+    def ids(self):
+        return [self.id]
+    
     def applyTo(self, element):
-        element.major = self.element.major
+        element.major = self.flag
+    
+    def __str__(self):
+        return "MajorFlagChangeEvent({}, id={}, flag={})".format(self.level, self.id, self.flag)
 
 
 class PositionChangeEvent(ElementChangeEvent):

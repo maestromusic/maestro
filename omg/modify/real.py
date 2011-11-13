@@ -66,6 +66,8 @@ def newContainer(tags, flags, major, id = None):
 def deleteElements(elids):
     """Delete the elements with the given ids from the database. This will delete from the elements table
     and due to foreign keys also from files, tags, flags and contents and emit an ElementsDeletedEvent."""
+    if len(elids) == 0:
+        return
     db.write.deleteElements(elids)
     dispatcher.changes.emit(events.ElementsDeletedEvent(elids))
 
@@ -115,7 +117,7 @@ def commit(changes, emitEvent = True):
     
     # Major
     for tup in changes.values():
-        setMajor(tup[1], emitEvent = False)
+        setMajor(tup[1].id, tup[1].major, emitEvent = False)
     
     # Contents (including position)
     contents = {}
@@ -325,11 +327,11 @@ def changeFlags(changes,emitEvent = True):
         dispatcher.changes.emit(events.FlagChangeEvent(REAL,changes))
 
 
-def setMajor(element, emitEvent = True):
-    """Set the 'major' flag of the element according to the element's attribute."""
-    db.write.setMajor(element.id, element.major)
+def setMajor(id, flag, emitEvent = True):
+    """Set the major attribute of the element given by *id* to *flag* (True or False)."""
+    db.write.setMajor(id, flag)
     if emitEvent:
-        dispatcher.changes.emit(events.MajorFlagChangeEvent(REAL, element))
+        dispatcher.changes.emit(events.MajorFlagChangeEvent(REAL, id, flag))
     
 def setSortValue(tag,valueId,newValue,oldValue=-1):
     """Change a sortvalue and emit a SortValueChangedEvent. *tag* and *valueId* specify the affected value,

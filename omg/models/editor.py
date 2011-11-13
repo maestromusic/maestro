@@ -56,10 +56,10 @@ class EditorModel(rootedtreemodel.RootedTreeModel):
         """React on an incoming ChangeEvent by applying all changes that affect the
         current model."""
         if isinstance(event, events.ElementChangeEvent):
-            self.handleElementChangeEvent(event)
+            if event.level == EDITOR:
+                self.handleElementChangeEvent(event)
         elif isinstance(event, events.ElementsDeletedEvent):
-            # real event incoming -- resetting editor ...
-            self.clear()
+            pass
         elif isinstance(event, events.TagTypeChangedEvent):
             pass #TODO: was macht man da??
         elif isinstance(event, events.FlagTypeChangedEvent):

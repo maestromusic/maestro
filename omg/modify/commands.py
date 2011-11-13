@@ -151,7 +151,8 @@ class CommitCommand(UndoCommand):
         real.commit(changes)
         progress.setValue(5)
         # notify the editors to display the new commited content
-        dispatcher.changes.emit(events.ElementChangeEvent(REAL, {root.id:root for root in self.editorRoots}, True))
+        dispatcher.changes.emit(events.ElementChangeEvent(
+                            REAL, {root.id:root for root in self.editorRoots}, True))
         progress.setValue(6)
         
         
@@ -163,7 +164,8 @@ class CommitCommand(UndoCommand):
         """
         # clear the editors
         emptyRoots = [root.copy(contents = []) for root in self.editorRoots]
-        dispatcher.changes.emit(events.ElementChangeEvent(REAL, {root.id:root for root in emptyRoots}, True))
+        dispatcher.changes.emit(events.ElementChangeEvent(
+                            REAL, {root.id:root for root in emptyRoots}, True))
         
         # undo changes to elements that were in the db before
         changes = {}
@@ -186,6 +188,8 @@ class CommitCommand(UndoCommand):
                                             root.getAllNodes(skipSelf = True) for root in self.editorRoots):
             if elem.id in revIdMap:
                 elem.id = revIdMap[elem.id]
+        dispatcher.changes.emit(events.ElementChangeEvent(
+                            REAL, {root.id:root for root in self.editorRoots}, True))
                 
 
 class ChangeSingleElementCommand(UndoCommand):
@@ -212,13 +216,14 @@ class ChangeMajorFlagCommand(ChangeSingleElementCommand):
     def __init__(self, level, element, text = ''):
         QtGui.QUndoCommand.__init__(self, text)
         self.level = level
-        self.element = element.copy()
+        self.newMajor = not element.major
+        self.id = element.id
         
     def redo(self):
-        self.element.major = not self.element.major
         if self.level == REAL:
-            real.setMajor(self.element, emitEvent = False)
-        dispatcher.changes.emit(events.MajorFlagChangeEvent(self.level, self.element))
+            real.setMajor(self.id, self.newMajor, emitEvent = False)
+        dispatcher.changes.emit(events.MajorFlagChangeEvent(self.level, self.id, self.newMajor))
+        self.newMajor = not self.newMajor
     
     undo = redo
     

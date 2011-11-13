@@ -57,10 +57,7 @@ def commitEditors():
     logger.debug('creating commit command')
     command = commands.CommitCommand()
     logger.debug('created commit command. Pushing...')
-    try:
-        push(command)
-    except StackChangeRejectedException:
-        pass
+    push(command)
              
     
 def merge(level, parent, indices, newTitle, removeString, adjustPositions):
