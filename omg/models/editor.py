@@ -403,6 +403,7 @@ class EditorModel(rootedtreemodel.RootedTreeModel):
                 metaContainer.contents.append(album)
                 album.position = discnumber
                 album.parent = metaContainer
+                album.major = False
             else:
                 result.append(album)
         for key, meta in metaContainers.items():
