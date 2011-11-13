@@ -96,30 +96,38 @@ def changePositions(parentID, changes):
     db.write.changePositions(parentID, changes)
     dispatcher.changes.emit(events.PositionChangeEvent(REAL, parentID, dict(changes)))
     
-def commit(changes, emitEvent = True):
+def commit(changes, emitEvent = True, newIds = tuple()):
     """Commits all elements, given by an id->(oldElement,newElement) dictionary, into the database.
     
     After the commit, the elements in the database will look like those in the argument.
     If an element in changes.values() is a container, the contents must be loaded, but
-    do not need to have any loaded data besides position and id."""
+    do not need to have any loaded data besides position and id.
+    
+    You can optionally specify a list of *newIds*; these are the IDs of elements that have
+    been created just for the current commit. It will be used for optimization."""
     logger.debug("Committing {} elements".format(len(changes)))
     
     # Tags
+    logger.debug("Committing tags")
     changeTags({oldElement.id: (oldElement.tags,newElement.tags)
                     for oldElement,newElement in changes.values()},
                [oldElement for oldElement,newElement in changes.values()],
                emitEvent = False)
     
     # Flags
+    logger.debug("Committing flags")
     changeFlags({oldElement.id: (oldElement.flags, newElement.flags)
                  for oldElement, newElement in changes.values()},
                 emitEvent = False)
     
     # Major
+    logger.debug("Committing major")
     for tup in changes.values():
-        setMajor(tup[1].id, tup[1].major, emitEvent = False)
+        if tup[1].id not in newIds:
+            setMajor(tup[1].id, tup[1].major, emitEvent = False)
     
     # Contents (including position)
+    logger.debug("Committing contents")
     contents = {}
     for id,changesTuple in changes.items():
         oldElement,newElement = changesTuple
@@ -274,7 +282,7 @@ def changeTags(changes,elements=[],emitEvent = True):
             else:
                 addParams.extend((id,tag.id,db.idFromValue(tag,value,insert=True))
                                     for value in newTags[tag] if value not in oldTags[tag])
-    
+    logger.debug("query...")
     if len(removeParams) > 0:
         db.multiQuery("DELETE FROM {}tags WHERE element_id = ? AND tag_id = ? AND value_id = ?"
                       .format(db.prefix),removeParams)
@@ -282,7 +290,7 @@ def changeTags(changes,elements=[],emitEvent = True):
     if len(addParams) > 0:
         db.multiQuery("INSERT INTO {}tags SET element_id = ?,tag_id = ?,value_id = ?"
                       .format(db.prefix),addParams) 
-  
+    logger.debug("query done.")
     if len(successful) > 0 and emitEvent:
         changes = {k: v[1] for k,v in changes.items() if k in successful}
         dispatcher.changes.emit(events.TagChangeEvent(REAL,changes))

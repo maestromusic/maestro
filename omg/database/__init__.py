@@ -193,6 +193,7 @@ def listTables():
 #=========================================================================
 def query(*params):
     try:
+        print(params)
         return connections[threading.current_thread().ident].query(*params)
     except KeyError:
         raise RuntimeError("Cannot access database before a connection for this thread has been opened.")

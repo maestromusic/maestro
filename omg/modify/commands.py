@@ -138,17 +138,22 @@ class CommitCommand(UndoCommand):
         # commit all the changes
         changes = {}
         for id, elem in self.newElements.items():
-            oldElem = models.Element.fromId(self.idMap[id], loadData = False)
-            if hasattr(elem, 'fileTags'):
-                oldElem.fileTags = elem.fileTags
-            oldElem.tags = tagsModule.Storage()
-            oldElem.flags = list()
+            if elem.isFile():
+                oldElem = models.File(id = self.idMap[id], tags = tagsModule.Storage(),
+                                      flags = list(), path = elem.path, length = None,
+                                      position = None)
+                if hasattr(elem, 'fileTags'):
+                    oldElem.fileTags = elem.fileTags
+            else:
+                oldElem = models.Container(id = self.idMap[id], contents = list(),
+                                           tags = tagsModule.Storage(),
+                                         flags = list(), position = None, major = elem.major)
             changes[self.idMap[id]] = ( oldElem, elem )
         progress.setValue(3)
         for id, elem in self.dbElements.items():
             changes[id] = ( self.originalElements[id], self.dbElements[id] )
         progress.setValue(4)
-        real.commit(changes)
+        real.commit(changes, newIds = tuple(self.idMap.values()))
         progress.setValue(5)
         # notify the editors to display the new commited content
         dispatcher.changes.emit(events.ElementChangeEvent(

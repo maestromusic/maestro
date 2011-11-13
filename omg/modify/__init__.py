@@ -54,9 +54,7 @@ stack = QtGui.QUndoStack()
 
 
 def commitEditors():
-    logger.debug('creating commit command')
     command = commands.CommitCommand()
-    logger.debug('created commit command. Pushing...')
     push(command)
              
     
