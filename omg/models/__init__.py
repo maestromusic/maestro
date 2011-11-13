@@ -445,7 +445,7 @@ class Element(Node):
         if prependPosition and self.position is not None:
             result += "{} - ".format(self.position)
         
-        if self.isInDB() and config.options.misc.show_ids:
+        if hasattr(self,'id') and config.options.misc.show_ids:
             result += "[{0}] ".format(self.id)
             
         if titles is not None:

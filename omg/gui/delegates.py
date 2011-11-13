@@ -638,8 +638,6 @@ class BrowserDelegate(AbstractDelegate):
                 self.addLeft(CoverItem(node.getCover(self.coverSize),self.coverSize))
                 availableWidth -= self.coverSize + self.hSpace
             
-            # Major ?
-            
             # Title and Major
             titleItem = TextItem(node.getTitle(prependPosition=self.showPositions),
                                  BOLD_STYLE if node.isContainer() else STD_STYLE,
@@ -838,10 +836,13 @@ class EditorDelegate(AbstractDelegate):
         # Flag-Icons
         if len(flagIcons) > 0:
             self.addRight(IconBarItem(flagIcons,columns=2 if len(flagIcons) > 2 else 1))
-            
-        # Title
+
+        # Title and Major
         titleItem = TextItem(element.getTitle(prependPosition=True,usePath=not self.showPaths),
-                                              BOLD_STYLE if element.isContainer() else STD_STYLE)
+                             BOLD_STYLE if element.isContainer() else STD_STYLE)
+        
+        if element.isContainer() and element.major:
+            self.addCenter(ColorBarItem(QtGui.QColor(255,0,0),5,titleItem.sizeHint(self)[1]))
         self.addCenter(titleItem)
         
         self.newRow()
