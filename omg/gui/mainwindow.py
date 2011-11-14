@@ -198,6 +198,11 @@ class MainWindow(QtGui.QMainWindow):
         self.menus['extras'] = self.menuBar().addMenu(self.tr("&Extras"))
         self.menus['help'] = self.menuBar().addMenu(self.tr("&Help"))
         
+        preferencesAction = QtGui.QAction(self)
+        preferencesAction.setText(self.tr("Preferences..."))
+        preferencesAction.triggered.connect(self.showPreferences)
+        self.menus['edit'].addAction(preferencesAction)
+
         tagManagerAction = QtGui.QAction(self)
         tagManagerAction.setText(self.tr("Tagmanager..."))
         tagManagerAction.triggered.connect(self.showTagManager)
@@ -419,6 +424,11 @@ class MainWindow(QtGui.QMainWindow):
         config.binary["mainwindow_geometry"] = bytearray(self.saveGeometry())
         config.binary["mainwindow_state"] = bytearray(self.saveState())
 
+    def showPreferences(self):
+        from . import preferences
+        preferences = preferences.PreferencesDialog(self)
+        preferences.exec_()
+        
     def showTagManager(self):
         from . import tagmanager
         tagManager = tagmanager.TagManager(self)

@@ -297,7 +297,36 @@ class OrderedDict(dict):
         """Insert the mapping ``key: value`` before the key *posKey*."""
         self.insert(self.index(posKey),key,value)
 
+    def items(self):
+        return OrderedDictItems(self)
 
+    @staticmethod
+    def fromItems(items):
+        """Create an OrderedDict from a list of key->value pairs."""
+        result = OrderedDict()
+        for key,value in items:
+            result[key] = value
+        return result
+    
+
+class OrderedDictItems:
+    """OrderedDict.items returns an instance of this class to ensure that the items are returned in the
+    correct order."""
+    def __init__(self,oDict):
+        self.oDict = oDict
+    
+    def __len__(self):
+        return len(self.oDict)
+    
+    def __contains__(self,item):
+        return item in self.oDict
+    
+    def __iter__(self):
+        """Return an iterator which will iterate over the keys in the correct order."""
+        for key in self.oDict._keyList:
+            yield key,self.oDict[key]
+
+    
 @functools.total_ordering
 class PointAtInfinity:
     """Depending on the parameter *plus* this object is either bigger or smaller than any other object

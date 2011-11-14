@@ -19,26 +19,18 @@
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 from omg import application, config
+from omg.gui import preferences
 import functools
 translate = functools.partial(QtGui.QApplication.translate, 'ConfigEditor')
 
-_action = None
-def enable():
-    global _action
-    _action = QtGui.QAction(application.mainWindow)
-    _action.setText(translate("Preferences"))
-    _action.triggered.connect(showDialog)
-    options = config.optionObject
 
-def mainWindowInit():
-    application.mainWindow.menus['edit'].addAction(_action)
+def enable():
+    preferences.addPanel('plugins/configeditor',translate('ConfigEditor'),PreferencesDialog)
+
 
 def disable():
-    application.mainWindow.menus['edit'].removeAction(_action)
-def showDialog():
-    pd = PreferencesDialog(application.mainWindow)
-    pd.show()
-
+    preferences.removePanel('plugins/configeditor')
+    
 
 def populateSections(section, parent):
     item = QtGui.QTreeWidgetItem(parent)
@@ -55,6 +47,7 @@ def populateSections(section, parent):
         if isinstance(subsect, config.ConfigSection):
             populateSections(subsect, item)
     item.setExpanded(True)
+
 
 class ConfigItem(QtGui.QTableWidgetItem):
     def __init__(self, widget, option):
@@ -106,6 +99,7 @@ class ConfigItem(QtGui.QTableWidgetItem):
         self.option.updateFileValue(self.text())
         self.dirty = False
         
+        
 class ConfigSectionWidget(QtGui.QTableWidget):
     def __init__(self, section, parent = None):
         super().__init__(parent)
@@ -156,6 +150,8 @@ class ConfigSectionWidget(QtGui.QTableWidget):
         if item is not None:
             self.contextMenu.popup(event.globalPos() + QtCore.QPoint(2,2))
         event.accept()
+        
+        
 class PreferencesDialog(QtGui.QDialog):
     def __init__(self, parent = None):
         super().__init__(parent)
@@ -187,6 +183,7 @@ class PreferencesDialog(QtGui.QDialog):
         self.setLayout(mainLayout)
         self.resize(QtCore.QSize(600,400))
         self._ignoreDirty = False
+        
     def _handleCurrentItemChanged(self, current, previous):
         if self._ignoreDirty:
             return
@@ -206,3 +203,4 @@ class PreferencesDialog(QtGui.QDialog):
                 return
             
         self.sectionWidget.setSection(current.data(0, Qt.UserRole))
+        
