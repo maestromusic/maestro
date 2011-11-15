@@ -116,11 +116,11 @@ class PlayerBackend(QtCore.QObject):
         notifier.profileRenamed.connect(self._handleProfileRename)
         self.name = name
         self.state = STOP
+        self.connectionState = DISCONNECTED
         self.volume = 0
         self.currentSong = -1
         self.elapsed = 0
         self.currentSongLength = 0
-        self.connected = False
         self.playlist = None
     
     def _handleProfileRename(self, old, new):
@@ -154,9 +154,8 @@ class PlayerBackend(QtCore.QObject):
         raise NotImplementedError()
 
     @QtCore.pyqtSlot(object)
-    def setPlaylist(self, root):
-        """Change the playlist; *root* is an instance of models.RootNode containing the playlist
-        elements as children."""
+    def setPlaylist(self, paths):
+        """Change the playlist; paths is a list of music file paths."""
         raise NotImplementedError()
     
     @QtCore.pyqtSlot()
@@ -170,7 +169,17 @@ class PlayerBackend(QtCore.QObject):
         """Jump to the previous song in the playlist. If the playlist is stopped or at the
         first song, this is ignored."""
         raise NotImplementedError()
-        raise NotImplementedError
+    
+    def registerFrontend(self, obj):
+        """Tell this player class that a frontend object *obj* started to use it. The backend
+        can use this information e.g. to make a connection retry or to start polling."""
+        pass
+    
+    def unregisterFrontend(self, obj):
+        """Tell this player class that a frontend object *obj* thas stopped using the backend.
+        This may be used to stop time-consuming backend operations as soon as nobody is using
+        it anymore."""
+        pass
     
 
         

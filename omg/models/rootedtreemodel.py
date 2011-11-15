@@ -21,9 +21,9 @@ from PyQt4.QtCore import Qt
 
 import itertools
 from . import Node, Element, RootNode
-from .. import logging
+from .. import logging, config
 from ..utils import ranges
-logger = logging.getLogger('models.rootedtreemodel')
+logger = logging.getLogger(__name__)
 
 class RootedTreeModel(QtCore.QAbstractItemModel):
     """The RootedTreeModel subclasses QAbstractItemModel to create a simple model for QTreeViews. It takes one
@@ -74,6 +74,9 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
         if role == Qt.ToolTipRole:
             return self.toolTipText(index)
         return None
+    
+    def mimeTypes(self):
+        return (config.options.gui.mime,"text/uri-list")
     
     def toolTipText(self, index):
         if index:

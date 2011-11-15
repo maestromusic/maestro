@@ -31,6 +31,8 @@ class PlaylistTreeView(treeview.TreeView):
     """This is the main widget of a playlist: The tree view showing the current element tree."""
     level = PLAYLIST
     
+    songSelected = QtCore.pyqtSignal(int)
+    
     def __init__(self, parent = None):
         super().__init__(parent)
         self.setSelectionMode(self.ExtendedSelection)
@@ -46,6 +48,14 @@ class PlaylistTreeView(treeview.TreeView):
         super().setModel(model)
         self.setItemDelegate(PlaylistDelegate(self))
         self.selectionModel().selectionChanged.connect(self.updateGlobalSelection)
+        self.doubleClicked.connect(self._handleDoubleClick)
+        
+    def _handleDoubleClick(self, idx):
+        if idx.isValid():
+            offset = idx.internalPointer().offset()
+            if self.model().currentIndex is None or offset != self.model().currentIndex:
+                self.songSelected.emit(offset)
+        
 
 class PlaylistDelegate(delegates.BrowserDelegate):
     """Delegate for the playlist."""
@@ -80,7 +90,9 @@ class PlaylistWidget(QtGui.QDockWidget):
     def saveState(self):
         return self.backendChooser.currentProfile()
     def setBackend(self, name):
-        logger.debug("set backend: {}".format(name))
+        if hasattr(self, 'backend'):
+            self.backend.unregisterFrontend(self)
+            self.treeview.songSelected.disconnect(self.backend.setCurrentSong)
         if name is None:
             self.treeview.setDisabled(True)
             return
@@ -88,9 +100,12 @@ class PlaylistWidget(QtGui.QDockWidget):
         if backend is None:
             self.treeview.setDisabled(True)
             return
+        backend.registerFrontend(self)
+        
         self.treeview.setEnabled(True)
         self.backend = backend
         self.treeview.setModel(self.backend.playlist)
+        self.treeview.songSelected.connect(self.backend.setCurrentSong)
         
 data = mainwindow.WidgetData(id = "playlist",
                              name = translate("Playlist","playlist"),

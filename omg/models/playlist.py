@@ -30,18 +30,19 @@ class BasicPlaylist(rootedtreemodel.RootedTreeModel):
     """Basic model for playlists. A BasicPlaylists contains a list of nodes and supports insertion and removal of nodes as well as drag and drop of omg's own mimetype (config-variable gui->mime) and "text/uri-list"."""
     # Toplevel elements in the playlist
     contents = None
+    filesDropped = QtCore.pyqtSignal(int, list)
     
     def __init__(self):
         """Initialize with an empty playlist."""
         rootedtreemodel.RootedTreeModel.__init__(self,models.RootNode())
-        self.current = None
+        self.current = self.currentIndex = None
     
     @QtCore.pyqtSlot(int)
     def setCurrent(self, index):
         if index == -1:
             return
         elem = self.root.fileAtOffset(index)
-        assert(elem.isFile())
+        assert elem.isFile()
         newCurrent = elem
         if newCurrent != self.current:
             newIndex = self.getIndex(newCurrent)
@@ -52,6 +53,8 @@ class BasicPlaylist(rootedtreemodel.RootedTreeModel):
                 self.dataChanged.emit(oldIndex, oldIndex)
             else:
                 self.current = newCurrent
+        self.currentIndex = index
+        
 
     def _rebuild(self, paths):
         self.beginResetModel()
@@ -62,7 +65,7 @@ class BasicPlaylist(rootedtreemodel.RootedTreeModel):
                 elements.append(models.File.fromId(id))
             else:
                 elements.append(models.File.fromFilesystem(path))
-        elements = self.restructure(elements)
+        #elements = self.restructure(elements)
         self.root.setContents(elements)
         
         self.endResetModel()
@@ -76,7 +79,25 @@ class BasicPlaylist(rootedtreemodel.RootedTreeModel):
             if path != file.path:
                 self._rebuild(paths)
                 return 
-            
+
+
+    def flags(self,index):
+        defaultFlags = super().flags(index)
+        if index.isValid():
+            return defaultFlags | Qt.ItemIsDropEnabled | Qt.ItemIsDragEnabled
+        else: return defaultFlags | Qt.ItemIsDropEnabled
+    
+    def supportedDropActions(self):
+        return Qt.CopyAction | Qt.MoveAction
+
+    def dropMimeData(self,mimeData,action,row,column,parentIndex):
+        if mimeData.hasFormat(config.options.gui.mime):
+            files = [f.copy() for f in itertools.chain.from_iterable(e.getAllFiles() for e in mimeData.getElements())]
+            self.filesDropped.emit(row, files)
+            return True
+        return False
+    
+    # OLD STUFF -- NOT USED YET ------        
     def restructure(self, paths):
         """Restructure the whole container tree in this model. This method does not change the flat playlist, but it uses treebuilder to create an optimal container structure over the MPD playlist."""
         treeBuilder = self._createTreeBuilder(paths)

@@ -113,6 +113,7 @@ class PlaybackWidget(QtGui.QDockWidget):
             self.previousButton.clicked.disconnect(self.backend.previous)
             self.nextButton.clicked.disconnect(self.backend.next)
             self.backend.connectionStateChanged.disconnect(self.handleConnectionChange)
+            self.backend.unregisterFrontend(self)
         if name is None:
             self.titleLabel.setText(self.tr('no backend selected'))
             return
@@ -131,9 +132,10 @@ class PlaybackWidget(QtGui.QDockWidget):
         self.seekSlider.sliderMoved.connect(self.backend.setElapsed)
         self.previousButton.clicked.connect(self.backend.previous)
         self.nextButton.clicked.connect(self.backend.next)
-        if self.backend.connected:
+        self.backend.registerFrontend(self)
+        if self.backend.connectionState == player.CONNECTED:
             self.handleConnectionChange(player.CONNECTED)
-            self.updatePlaylist()
+
         else:
             self.handleConnectionChange(player.DISCONNECTED)
         self.update()

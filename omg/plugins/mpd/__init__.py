@@ -52,11 +52,21 @@ class MPDPlayerBackend(player.PlayerBackend):
         self.currentSongChanged.connect(self.playlist.setCurrent)
         self.moveToThread(self.mpdthread)
         self.timer.timeout.connect(self.poll)
-        self.timer.start(500)
+        
+        self.consecutiveConnectionFailures = 0
+        self._frontendLock = threading.Lock()
+        self._numFrontends = 0
     
+    def _setConnectionState(self, state):
+        if self.connectionState != state:
+            self.connectionStateChanged.emit(state)
+        self.connectionState = state
+        
     def ensureConnection(self):
-        if self.connected:
+        if self.connectionState == player.CONNECTED:
             return True
+        if self.connectionState == player.DISCONNECTED and self.consecutiveConnectionFailures > 4:
+            return False
         try:
             data = config.storage.mpd.profiles[self.name]
         except KeyError:
@@ -64,16 +74,25 @@ class MPDPlayerBackend(player.PlayerBackend):
             data = default_data
         self.client = mpd.MPDClient()
         try:
-            self.connectionStateChanged.emit(player.CONNECTING)
+            self._setConnectionState(player.CONNECTING)
             self.client.connect(data["host"], data["port"], timeout = 3)
-            self.connected = True
-            self.connectionStateChanged.emit(player.CONNECTED)
+            self.consecutiveConnectionFailures = 0
+            self._setConnectionState(player.CONNECTED)
             return True
         except Exception as e:
             logger.warning('could not connect profile {}: {}'.format(self.name, e))
-            self.connectionStateChanged.emit(player.DISCONNECTED)
+            if self.connectionState == player.CONNECTED:
+                self._setConnectionState(player.DISCONNECTED)
+            self.consecutiveConnectionFailures += 1
+            self.delayConnectionAttempt()
             return False
-         
+    
+    def delayConnectionAttempt(self):
+        if self.consecutiveConnectionFailures <= 4:
+            self.thread().sleep(2**self.consecutiveConnectionFailures)
+        else:
+            self._setConnectionState(player.DISCONNECTED)
+            
     def poll(self):
         if not self.ensureConnection():
             return
@@ -120,14 +139,12 @@ class MPDPlayerBackend(player.PlayerBackend):
             paths.append(file["file"])
         self.pathlistChanged.emit(paths)
             
-    @QtCore.pyqtSlot(float)
     def setElapsed(self, time):
         if not self.ensureConnection():
             return
         logger.debug("mpd -- set Elapsed called")
         self.client.seek(self.currentSong, time)
  
-    @QtCore.pyqtSlot(int)
     def setState(self, state):
         if not self.ensureConnection():
             return
@@ -139,17 +156,39 @@ class MPDPlayerBackend(player.PlayerBackend):
         elif state == player.STOP:
             self.client.stop()       
     
-    @QtCore.pyqtSlot()
+    def setCurrentSong(self, index):
+        if not self.ensureConnection():
+            return
+        self.client.play(index)
+    
+    def setPlaylist(self, paths):
+        if not self.ensureConnection():
+            return
     def next(self):
         if not self.ensureConnection():
             return
         self.client.next()
         
-    @QtCore.pyqtSlot()
     def previous(self):
         if not self.ensureConnection():
             return
         self.client.previous()
+    
+    def registerFrontend(self, obj):
+        with self._frontendLock:
+            self._numFrontends += 1
+            if self._numFrontends == 1:
+                logger.debug('frontend {} registered at {} -- starting poll'.format(obj, self))
+                self.timer.start(500)
+            if self.consecutiveConnectionFailures >= 5:
+                self.consecutiveConnectionFailures = 0
+    
+    def unregisterFrontend(self, obj):
+        with self._frontendLock:
+            self._numFrontends -= 1
+            if self._numFrontends == 0:
+                logger.debug('frontend {} deregistered at {} -- stopping poll'.format(obj, self))
+                self.timer.stop()
     
     @staticmethod
     def configWidget(profile = None):
