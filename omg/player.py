@@ -122,6 +122,8 @@ class PlayerBackend(QtCore.QObject):
         self.elapsed = 0
         self.currentSongLength = 0
         self.playlist = None
+        
+        self.stack = QtGui.QUndoStack()
     
     def _handleProfileRename(self, old, new):
         if self.name == old:
@@ -153,9 +155,17 @@ class PlayerBackend(QtCore.QObject):
         is a float."""
         raise NotImplementedError()
 
-    @QtCore.pyqtSlot(object)
+    @QtCore.pyqtSlot(list)
     def setPlaylist(self, paths):
         """Change the playlist; paths is a list of music file paths."""
+        raise NotImplementedError()
+
+    @QtCore.pyqtSlot(int, list)
+    def insertIntoPlaylist(self, position, paths):
+        raise NotImplementedError()
+    
+    @QtCore.pyqtSignal(list)
+    def removeFromPlaylist(self, positions):
         raise NotImplementedError()
     
     @QtCore.pyqtSlot()
@@ -182,4 +192,35 @@ class PlayerBackend(QtCore.QObject):
         pass
     
 
+class PlayerUndoCommand(QtGui.QUndoCommand):
+    
+    def __init__(self, backend, text = ''):
+        super().__init__()
+        self.backend = backend
+        self.setText(text)
+
+class InsertIntoPlaylistCommand(QtGui.QUndoCommand):
+    
+    def __init__(self, backend, position, paths, text = 'insert files into playlist'):
+        super().__init__(backend, text)
+        self.position = position
+        self.paths = paths
+        
+    def redo(self):
+        self.backend.insertIntoPlaylist(self.position, self.paths)
+    
+    def undo(self):
+        self.backend.removeFromPlaylist(list(range(self.position, self.position+len(self.paths)+1)))
+    
+class ClearPlaylistCommand(PlayerUndoCommand):
+    
+    def __init__(self, backend, currentPlaylist, text = 'clear playlist'):
+        super().__init__(backend, text)
+        self.beforeList = currentPlaylist
+    
+    def redo(self):
+        self.backend.setPlaylist([])
+    
+    def undo(self):
+        self.backend.setPlaylist(self.beforeList)
         

@@ -46,11 +46,14 @@ class MPDPlayerBackend(player.PlayerBackend):
 
         self.playlistVersion = -1
         self.playlist = playlist.BasicPlaylist()
+        
         self.mpdthread = MPDThread(self)
         self.timer = QtCore.QTimer()
-        self.pathlistChanged.connect(self.playlist.updateFromPathList, Qt.QueuedConnection)
+        
         self.currentSongChanged.connect(self.playlist.setCurrent)
         self.moveToThread(self.mpdthread)
+        self.playlist.filesDropped.connect(self.insertIntoPlaylist, Qt.QueuedConnection)
+        self.pathlistChanged.connect(self.playlist.updateFromPathList, Qt.QueuedConnection)
         self.timer.timeout.connect(self.poll)
         
         self.consecutiveConnectionFailures = 0
@@ -129,7 +132,7 @@ class MPDPlayerBackend(player.PlayerBackend):
         self.elapsed = elapsed
                 
         self.mpd_status = status
-    
+
     def updatePlaylist(self):
         if not self.ensureConnection():
             return
@@ -138,13 +141,15 @@ class MPDPlayerBackend(player.PlayerBackend):
         for file in self.mpd_playlist:
             paths.append(file["file"])
         self.pathlistChanged.emit(paths)
-            
+    
+    @QtCore.pyqtSlot(float)        
     def setElapsed(self, time):
         if not self.ensureConnection():
             return
         logger.debug("mpd -- set Elapsed called")
         self.client.seek(self.currentSong, time)
  
+    @QtCore.pyqtSlot(int)
     def setState(self, state):
         if not self.ensureConnection():
             return
@@ -156,19 +161,33 @@ class MPDPlayerBackend(player.PlayerBackend):
         elif state == player.STOP:
             self.client.stop()       
     
+    @QtCore.pyqtSlot(int)
     def setCurrentSong(self, index):
         if not self.ensureConnection():
             return
         self.client.play(index)
     
+    @QtCore.pyqtSlot(list)
     def setPlaylist(self, paths):
         if not self.ensureConnection():
             return
+    
+    @QtCore.pyqtSlot(int, list)
+    def insertIntoPlaylist(self, position, paths):
+        if not self.ensureConnection():
+            return
+        firstIndex = len(self.mpd_playlist)
+        for path in paths:
+            self.client.add(path)
+        self.client.move("{}:{}".format(firstIndex, firstIndex + len(paths)), str(position))
+    
+    @QtCore.pyqtSlot()
     def next(self):
         if not self.ensureConnection():
             return
         self.client.next()
-        
+    
+    @QtCore.pyqtSlot()
     def previous(self):
         if not self.ensureConnection():
             return

@@ -41,19 +41,22 @@ class PlaylistTreeView(treeview.TreeView):
         self.setDefaultDropAction(Qt.MoveAction)
         self.setDropIndicatorShown(True)
         self.viewport().setMouseTracking(True)
+        self.doubleClicked.connect(self._handleDoubleClick)
     
-    def setModel(self, model):
+    def setBackend(self, backend):
+        self.backend = backend
+        model = backend.playlist
         if self.selectionModel():
             self.selectionModel().selectionChanged.disconnect(self.updateGlobalSelection)
-        super().setModel(model)
+        self.setModel(model)
         self.setItemDelegate(PlaylistDelegate(self))
         self.selectionModel().selectionChanged.connect(self.updateGlobalSelection)
-        self.doubleClicked.connect(self._handleDoubleClick)
+        self.songSelected.connect(backend.setCurrentSong)
         
     def _handleDoubleClick(self, idx):
         if idx.isValid():
             offset = idx.internalPointer().offset()
-            if self.model().currentIndex is None or offset != self.model().currentIndex:
+            if offset != self.backend.currentSong:
                 self.songSelected.emit(offset)
         
 
@@ -64,7 +67,7 @@ class PlaylistDelegate(delegates.BrowserDelegate):
         super().__init__(view)
         
     def background(self, index):
-        if index == self.model.getIndex(self.model.current):
+        if index == self.model.currentModelIndex:
             return QtGui.QBrush(QtGui.QColor(110,149,229))
         
 class PlaylistWidget(QtGui.QDockWidget):
@@ -104,8 +107,8 @@ class PlaylistWidget(QtGui.QDockWidget):
         
         self.treeview.setEnabled(True)
         self.backend = backend
-        self.treeview.setModel(self.backend.playlist)
-        self.treeview.songSelected.connect(self.backend.setCurrentSong)
+        self.treeview.setBackend(self.backend)
+        
         
 data = mainwindow.WidgetData(id = "playlist",
                              name = translate("Playlist","playlist"),

@@ -16,13 +16,13 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import difflib, logging, os, itertools
+import itertools
 
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from omg import database as db, models, config
-from . import rootedtreemodel, treebuilder, mimedata
+from .. import database as db, models, config, utils, logging
+from . import rootedtreemodel, treebuilder
 
 logger = logging.getLogger("omg.models.playlist")
         
@@ -35,7 +35,7 @@ class BasicPlaylist(rootedtreemodel.RootedTreeModel):
     def __init__(self):
         """Initialize with an empty playlist."""
         rootedtreemodel.RootedTreeModel.__init__(self,models.RootNode())
-        self.current = self.currentIndex = None
+        self.current = self.currentModelIndex = None
     
     @QtCore.pyqtSlot(int)
     def setCurrent(self, index):
@@ -46,17 +46,16 @@ class BasicPlaylist(rootedtreemodel.RootedTreeModel):
         newCurrent = elem
         if newCurrent != self.current:
             newIndex = self.getIndex(newCurrent)
+            if self.currentModelIndex is not None and self.currentModelIndex.isValid():
+                self.dataChanged.emit(self.currentModelIndex, self.currentModelIndex)
+            self.current = newCurrent
+            self.currentModelIndex = newIndex
             self.dataChanged.emit(newIndex, newIndex)
-            if self.current is not None:
-                oldIndex = self.getIndex(self.current)
-                self.current = newCurrent
-                self.dataChanged.emit(oldIndex, oldIndex)
-            else:
-                self.current = newCurrent
-        self.currentIndex = index
+        
         
 
     def _rebuild(self, paths):
+        logger.debug('begin reset')
         self.beginResetModel()
         elements = []
         for path in paths:
@@ -67,7 +66,7 @@ class BasicPlaylist(rootedtreemodel.RootedTreeModel):
                 elements.append(models.File.fromFilesystem(path))
         #elements = self.restructure(elements)
         self.root.setContents(elements)
-        
+        logger.debug('end reset')
         self.endResetModel()
     
     @QtCore.pyqtSlot(list)
@@ -92,10 +91,14 @@ class BasicPlaylist(rootedtreemodel.RootedTreeModel):
 
     def dropMimeData(self,mimeData,action,row,column,parentIndex):
         if mimeData.hasFormat(config.options.gui.mime):
-            files = [f.copy() for f in itertools.chain.from_iterable(e.getAllFiles() for e in mimeData.getElements())]
-            self.filesDropped.emit(row, files)
-            return True
-        return False
+            paths = [f.path for f in itertools.chain.from_iterable(e.getAllFiles() for e in mimeData.getElements())]            
+        else:
+            paths = list(map(utils.relPath, itertools.chain.from_iterable(
+                utils.collectFiles(u.path() for u in mimeData.urls()).values())))
+        if row == -1:
+            row = self.root.fileCount()
+        self.filesDropped.emit(row, paths)
+        return True
     
     # OLD STUFF -- NOT USED YET ------        
     def restructure(self, paths):
