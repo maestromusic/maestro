@@ -36,6 +36,8 @@ class MPDThread(QtCore.QThread):
         self.start()
     
     def run(self):
+        self.timer = QtCore.QTimer(self)
+        self.timer.start(500)
         self.exec_()
 
 class MPDPlayerBackend(player.PlayerBackend):
