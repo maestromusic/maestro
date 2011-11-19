@@ -23,7 +23,7 @@ translate = QtCore.QCoreApplication.translate
 
 from . import mainwindow, playerwidgets
 from .. import player, utils, logging
-logger = logging.getLogger("omg.player")
+logger = logging.getLogger("omg.playback")
 
 def formatTime(seconds):
     seconds = int(seconds)
@@ -92,8 +92,7 @@ class PlaybackWidget(QtGui.QDockWidget):
         self.ppButton.setPlaying(state == player.PLAY)
     
     def handleStop(self):
-        QtCore.QMetaObject.invokeMethod(self.backend, "setState", Qt.QueuedConnection, QtCore.Q_ARG(int, player.STOP))
-        #self.backend.setState(player.STOP)
+        self.backend.setState(player.STOP)
     
     def handleConnectionChange(self, state):
         for item in self.previousButton, self.ppButton, self.stopButton, self.nextButton, self.seekSlider, self.seekLabel:
@@ -102,16 +101,20 @@ class PlaybackWidget(QtGui.QDockWidget):
             self.titleLabel.setText(self.tr("connecting..."))
         elif state == player.DISCONNECTED:
             self.titleLabel.setText(self.tr("unable to connect"))
+        else:
+            self.updateCurrent(self.backend.currentSong)
+            self.updateState(self.backend.state)
             
     def setBackend(self, name):
+        logger.debug("setBackend {}".format(name))
         if hasattr(self, 'backend'):
             self.backend.elapsedChanged.disconnect(self.updateSlider)
             self.backend.stateChanged.disconnect(self.updateState)
             self.backend.currentSongChanged.disconnect(self.updateCurrent)
             self.ppButton.stateChanged.disconnect(self.backend.setState)
             self.seekSlider.sliderMoved.disconnect(self.backend.setElapsed)
-            self.previousButton.clicked.disconnect(self.backend.previous)
-            self.nextButton.clicked.disconnect(self.backend.next)
+            self.previousButton.clicked.disconnect(self.backend.previousSong)
+            self.nextButton.clicked.disconnect(self.backend.nextSong)
             self.backend.connectionStateChanged.disconnect(self.handleConnectionChange)
             self.backend.unregisterFrontend(self)
         if name is None:
@@ -130,21 +133,15 @@ class PlaybackWidget(QtGui.QDockWidget):
         self.ppButton.stateChanged.connect(self.backend.setState)
         self.stopButton.clicked.connect(self.handleStop)
         self.seekSlider.sliderMoved.connect(self.backend.setElapsed)
-        self.previousButton.clicked.connect(self.backend.previous)
-        self.nextButton.clicked.connect(self.backend.next)
+        self.previousButton.clicked.connect(self.backend.previousSong)
+        self.nextButton.clicked.connect(self.backend.nextSong)
         self.backend.registerFrontend(self)
         if self.backend.connectionState == player.CONNECTED:
             self.handleConnectionChange(player.CONNECTED)
-
         else:
             self.handleConnectionChange(player.DISCONNECTED)
-        self.update()
         self.backend.connectionStateChanged.connect(self.handleConnectionChange)
         
-        
-    def update(self):
-        self.ppButton.setPlaying(self.backend.state == player.PLAY)
-        self.seekSlider.setValue(int(self.backend.elapsed))
     
     def saveState(self):
         return self.backendChooser.currentProfile()

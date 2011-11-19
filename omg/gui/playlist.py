@@ -56,8 +56,7 @@ class PlaylistTreeView(treeview.TreeView):
     def _handleDoubleClick(self, idx):
         if idx.isValid():
             offset = idx.internalPointer().offset()
-            if offset != self.backend.currentSong:
-                self.songSelected.emit(offset)
+            self.songSelected.emit(offset)
         
 
 class PlaylistDelegate(delegates.BrowserDelegate):
@@ -84,7 +83,16 @@ class PlaylistWidget(QtGui.QDockWidget):
         self.backendChooser = playerwidgets.BackendChooser(self)
         self.backendChooser.backendChanged.connect(self.setBackend)
         bottomLayout.addWidget(self.backendChooser)
+        self.clearButton = QtGui.QPushButton(self.tr('clear'), self)
+        self.shuffleButton = QtGui.QPushButton(self.tr('shuffle'), self)
+        bottomLayout.addWidget(self.clearButton)
+        bottomLayout.addWidget(self.shuffleButton)
         bottomLayout.addStretch()
+        self.undoButton = QtGui.QToolButton(self)
+        self.redoButton = QtGui.QToolButton(self)
+        bottomLayout.addWidget(self.undoButton)
+        bottomLayout.addWidget(self.redoButton) 
+        
         layout.addLayout(bottomLayout)
         self.setWidget(widget)
         if not self.backendChooser.setCurrentProfile(state):
@@ -93,9 +101,11 @@ class PlaylistWidget(QtGui.QDockWidget):
     def saveState(self):
         return self.backendChooser.currentProfile()
     def setBackend(self, name):
+        logger.debug("playlist gui sets backend: {}".format(name))
         if hasattr(self, 'backend'):
             self.backend.unregisterFrontend(self)
             self.treeview.songSelected.disconnect(self.backend.setCurrentSong)
+            self.clearButton.clicked.disconnect(self.backend.clearPlaylist)
         if name is None:
             self.treeview.setDisabled(True)
             return
@@ -107,6 +117,9 @@ class PlaylistWidget(QtGui.QDockWidget):
         
         self.treeview.setEnabled(True)
         self.backend = backend
+        self.undoButton.setDefaultAction(self.backend.stack.createUndoAction(self))
+        self.redoButton.setDefaultAction(self.backend.stack.createRedoAction(self))
+        self.clearButton.clicked.connect(self.backend.clearPlaylist)
         self.treeview.setBackend(self.backend)
         
         
