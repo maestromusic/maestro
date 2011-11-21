@@ -21,19 +21,17 @@ import functools, os
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from .. import database as db, constants, utils, flags, modify
-from . import misc
-from .misc import iconbuttonbar
+from ... import database as db, constants, utils, flags, modify
+from .. import misc
+from ..misc import iconbuttonbar
 
 translate = QtCore.QCoreApplication.translate
 
 
-class FlagManager(QtGui.QDialog):
+class FlagManager(QtGui.QWidget):
     """The FlagManager allows to add, edit and remove flagtypes."""
-    def __init__(self,parent=None):
-        QtGui.QDialog.__init__(self,parent)
-        self.setWindowTitle(self.tr("FlagManager - OMG {}").format(constants.VERSION))
-        self.resize(500,400)
+    def __init__(self,dialog,parent=None):
+        super().__init__(parent)
         self.setLayout(QtGui.QVBoxLayout())
         
         self.columns = [
@@ -66,7 +64,7 @@ class FlagManager(QtGui.QDialog):
         style = QtGui.QApplication.style()
         closeButton = QtGui.QPushButton(style.standardIcon(QtGui.QStyle.SP_DialogCloseButton),
                                         self.tr("Close"))
-        closeButton.clicked.connect(self.accept)
+        closeButton.clicked.connect(dialog.accept)
         buttonBarLayout.addWidget(closeButton)
         
         self._loadFlags()
@@ -234,7 +232,7 @@ class FlagManager(QtGui.QDialog):
         if number > 0:
             return number,False
         else:
-            from omg.gui import editor
+            from .. import editor
             for model in editor.activeEditorModels():
                 if any(flagType in node.flags for node in model.getRoot().getAllNodes(skipSelf=True)):
                     return 0,False

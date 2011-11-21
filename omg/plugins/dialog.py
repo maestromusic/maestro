@@ -37,22 +37,12 @@ COLUMN_HEADERS = [translate("PluginDialog","Enabled"),
                   ]
 
 
-class PluginDialog(QtGui.QDialog):
+class PluginDialog(QtGui.QWidget):
     """Dialog to display all plugins with the info from the PLUGININFO file and allow the user to enable or disable them."""
-    def __init__(self,parent=None):
-        QtGui.QDialog.__init__(self,parent)
+    def __init__(self,dialog,parent=None):
+        super().__init__(parent)
         self.setLayout(QtGui.QVBoxLayout())
-        self.setWindowTitle("OMG version {} – Plugins".format(constants.VERSION))
-        if "pluginwindow_geometry" in config.binary and isinstance(config.binary["mainwindow_geometry"],bytearray):
-            success = self.restoreGeometry(config.binary["pluginwindow_geometry"])
-        else: success = False
-        if not success: # Default geometry
-            self.resize(900,500)
-            # Center the window
-            screen = QtGui.QDesktopWidget().screenGeometry()
-            size = self.geometry()
-            self.move((screen.width()-size.width())/2, (screen.height()-size.height())/2)
-
+        
         self.layout().addWidget(QtGui.QLabel(self.tr("Warning: Changes will be performed immediately!")))
         self.table = QtGui.QTableWidget()
         self.layout().addWidget(self.table,1)
@@ -61,7 +51,7 @@ class PluginDialog(QtGui.QDialog):
         self.layout().addLayout(buttonLayout)
         buttonLayout.addStretch(1)
         closeButton = QtGui.QPushButton(QtGui.QIcon.fromTheme('window-close'),self.tr("Close"))
-        closeButton.clicked.connect(self.close)
+        closeButton.clicked.connect(dialog.close)
         buttonLayout.addWidget(closeButton,0)
         
         self.table.setRowCount(len(plugins))
@@ -82,11 +72,6 @@ class PluginDialog(QtGui.QDialog):
 
         # Connect at the end so _handleCellChanged is not called when the cells are initialized
         self.table.cellChanged.connect(self._handleCellChanged)
-
-    def close(self):
-        # Copy the bytearray to avoid memory access errors
-        config.binary["pluginwindow_geometry"] = bytearray(self.saveGeometry())
-        QtGui.QDialog.close(self)
 
     def _handleCellChanged(self,row,column):
         """Enable or disable plugins when the check state of a plugin has been changed."""

@@ -17,14 +17,14 @@
 #
 
 """
-This module implements OMG's flexible widget system. It consists of mainwindow.MainWindow which the toplevel
-window of OMG and a flexible amount of central widgets (which are displayed as tabs in the center) and dock
-widgets. This module manages a list of all available widget types (confer WidgetData). Plugins may add their
-own widgets using addWidgetData. From this list a View menu is created that allows the user to show/hide
-central widgets and add new dock widgets. While there can be only at most one instance of each central widget,
-dock widgets can have many instances (unless the unique-flag in the corresponding WidgetData is set to True).
-At the end of the application the state and position of each widget is saved and at application start it will
-be restored again.
+This module implements OMG's flexible widget system. It consists of mainwindow.MainWindow which is the
+toplevel window of OMG and a flexible amount of central widgets (which are displayed as tabs in the center)
+and dock widgets. This module manages a list of all available widget types (confer WidgetData). Plugins may
+add their own widgets using addWidgetData. From this list a View menu is created that allows the user to
+show/hide central widgets and add new dock widgets. While there can be only at most one instance of each
+central widget, dock widgets can have many instances (unless the unique-flag in the corresponding WidgetData
+is set to True). At the end of the application the state and position of each widget is saved and at
+application start it will be restored again.
 
 To work with this system central widgets or dock widget must follow some rules:
 
@@ -224,6 +224,18 @@ class MainWindow(QtGui.QMainWindow):
     def getDockWidgets(self):
         return self._dockWidgets
     
+    def getWidgets(self,id,central=True,docks=True):
+        """Return the list of widgets corresponding to the WidgetData-instance determined by *id*. If you
+        set *central* or *docks* to False, central or dockwidgets, respectively, won't be considered.
+        """
+        data = WidgetData.fromId(id)
+        result = []
+        if central and data in self._centralWidgets:
+            result.append(self._centralWidgets[data])
+        if docks and data in self._dockWidgets:
+            result.extend(self._dockWidgets[data])
+        return result
+        
     def updateViewMenu(self):
         """Update the view menu whenever the list of registered widgets has changed."""
         self.menus['view'].clear()
@@ -426,18 +438,15 @@ class MainWindow(QtGui.QMainWindow):
 
     def showPreferences(self):
         from . import preferences
-        preferences = preferences.PreferencesDialog(self)
-        preferences.exec_()
+        preferences.show(self)
         
     def showTagManager(self):
-        from . import tagmanager
-        tagManager = tagmanager.TagManager(self)
-        tagManager.exec_()
+        from . import preferences
+        preferences.show(self,"main/tagmanager")
         
     def showFlagManager(self):
-        from . import flagmanager
-        flagManager = flagmanager.FlagManager(self)
-        flagManager.exec_()
+        from . import preferences
+        preferences.show(self,"main/flagmanager")
 
     def showAboutDialog(self):
         """Display the About dialog."""

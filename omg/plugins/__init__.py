@@ -150,20 +150,9 @@ def enablePlugins():
 
 def mainWindowInit():
     """Call plugin.mainWindowInit for all enabled plugins."""
-    pluginAction = QtGui.QAction(mainwindow.mainWindow)
-    pluginAction.setText(translate("PluginDialog","&Plugins..."))
-    pluginAction.triggered.connect(_showPluginDialog)
-    mainwindow.mainWindow.menus['extras'].addAction(pluginAction)
-    
     for plugin in plugins.values():
         if plugin.enabled:
             plugin.mainWindowInit()
-
-
-def _showPluginDialog():
-    from omg.plugins import dialog
-    dialog.PluginDialog(mainwindow.mainWindow).exec_()
-
 
 
 def shutdown():

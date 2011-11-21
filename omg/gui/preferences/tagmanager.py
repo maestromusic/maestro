@@ -21,18 +21,16 @@ import functools, os
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from .. import tags, utils, database as db, constants, modify
-from . import tagwidgets, dialogs, misc
-from .misc import iconbuttonbar
+from ... import tags, utils, database as db, constants, modify
+from .. import tagwidgets, dialogs, misc
+from ..misc import iconbuttonbar
 
     
-class TagManager(QtGui.QDialog):
+class TagManager(QtGui.QWidget):
     """The TagManager allows to add, edit and remove tagtypes (like artist, composer,...). To make things
     easy it only allows changing tagtypes which do not appear in any element."""
-    def __init__(self,parent=None):
-        QtGui.QDialog.__init__(self,parent)
-        self.setWindowTitle(self.tr("TagManager - OMG {}").format(constants.VERSION))
-        self.resize(650,600)
+    def __init__(self,dialog,parent=None):
+        super().__init__(parent)
         self.setLayout(QtGui.QVBoxLayout())
         
         self.layout().addWidget(QtGui.QLabel(
@@ -70,7 +68,7 @@ class TagManager(QtGui.QDialog):
         style = QtGui.QApplication.style()
         closeButton = QtGui.QPushButton(style.standardIcon(QtGui.QStyle.SP_DialogCloseButton),
                                         self.tr("Close"))
-        closeButton.clicked.connect(self.accept)
+        closeButton.clicked.connect(dialog.accept)
         buttonBarLayout.addWidget(closeButton)
         
         self._loadTags()
@@ -155,7 +153,7 @@ class TagManager(QtGui.QDialog):
     
     def _handleAddButton(self):
         """Open a NewTagTypeDialog and create a new tag."""
-        from . import dialogs
+        from .. import dialogs
         tag = tagwidgets.NewTagTypeDialog.createTagType(tagname='',tagnameEditable=True,privateEditable=True)
         if tag is not None:
             self._loadTags()
@@ -276,7 +274,7 @@ class TagManager(QtGui.QDialog):
         if number > 0:
             return number,False
         else:
-            from omg.gui import editor
+            from .. import editor
             for model in editor.activeEditorModels():
                 if any(tag in node.tags for node in model.getRoot().getAllNodes(skipSelf=True)):
                     return 0,False
