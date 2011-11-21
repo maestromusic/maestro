@@ -23,133 +23,234 @@ from omg import player, config, logging, database as db, models
 from omg.utils import relPath, absPath
 from omg.models import playlist
 
-import mpd, threading, itertools
+import mpd, queue, itertools
 
 logger = logging.getLogger("omg.plugins.mpd")
 
+CONNECTION_TIMEOUT = 5 # time in seconds before an initial connection to MPD is given up
+POLLING_INTERVAL = 600 # milliseconds between two MPD polls
 MPD_STATES = { 'play': player.PLAY, 'stop': player.STOP, 'pause': player.PAUSE}
+
 
 default_data = {'host' : 'localhost', 'port': '6600', 'password': ''}
 class MPDThread(QtCore.QThread):
-    def __init__(self, parent):
-        super().__init__(parent)
-        self.start()
     
+    changeFromMPD = QtCore.pyqtSignal(str, object)
+    
+    def __init__(self, backend, connectionData):
+        super().__init__(None)
+        self.timer = QtCore.QTimer(self)
+        self.moveToThread(self)
+        self.timer.moveToThread(self)
+        self.timer.timeout.connect(self.poll)
+        self.backend = backend
+        self.connectionData = connectionData
+        self.playlistVersion = self.state   = \
+            self.currentSong = self.elapsed = \
+            self.currentSongLength = None
+        self.doPolling = False
+        self.seekRequest = None
+    
+    def _seek(self):
+        if self.seekRequest is not None:
+            self.client.seek(self.currentSong, self.seekRequest)
+            self.seekRequest = None
+        
+    def _handleMainChange(self, what, how):
+        logger.debug("received command {} with args {}".format(what, how))
+        if what == "set_playlist":
+            self.client.clear()
+            for path in how:
+                self.client.add(path)
+            self.mpd_playlist = how
+            self.playlistVersion += len(how) + 1
+            
+        elif what == "elapsed":
+            self.seekRequest = how
+            self.seekTimer.start(20)
+        
+        elif what == "state":
+            if how == player.PLAY:
+                self.client.play()
+            elif how == player.PAUSE:
+                self.client.pause(1)
+            elif how == player.STOP:
+                self.client.stop()
+        
+        elif what == "currentSong":
+            self.client.play(how)
+        
+        elif what == "nextSong":
+            self.client.next()
+        elif what == "previousSong":
+            self.client.previous()
+            
+        elif what == "insert":
+            for position,path in how:
+                self.client.addid(path, position)
+                # mpd's playlist counter increases by two if addid is called somewhere else
+                # than at the end
+                self.playlistVersion += 1 if position == len(self.mpd_playlist) else 2
+                self.mpd_playlist[position:position] = [path]
+                
+        elif what == "remove":
+            for position, path in reversed(how):
+                self.client.delete(position)
+                del self.mpd_playlist[position]
+            self.playlistVersion += len(how) 
+    
+    def _updateAttributes(self, emit = True):
+        
+        # fetch information from MPD
+        self.mpd_status = self.client.status()
+        
+        # check for a playlist change
+        playlistVersion = int(self.mpd_status["playlist"])
+        if playlistVersion != self.playlistVersion:
+            logger.debug("detected new plVersion: {}-->{}".format(self.playlistVersion, playlistVersion))
+            self.playlistVersion = playlistVersion
+            self.mpd_playlist = [x["file"] for x in self.client.playlistinfo()]
+            if emit:
+                self.changeFromMPD.emit('playlist', self.mpd_playlist)
+
+        # check if current song has changed. If so, also update length of current
+        # song
+        try:
+            currentSong = int(self.mpd_status["song"])
+        except KeyError:
+            currentSong = -1
+        if currentSong != self.currentSong:
+            self.currentSong = currentSong
+            if currentSong != -1:
+                self.mpd_current = self.client.currentsong()
+                self.currentSongLength = int(self.mpd_current["time"])
+            else:
+                self.currentSongLength = 0 # no current song
+            if emit:
+                self.changeFromMPD.emit('currentSong', self.currentSong)
+             
+        # check for a change of playing state
+        state = MPD_STATES[self.mpd_status["state"]]
+        if emit and state != self.state:
+            self.changeFromMPD.emit('state', state)
+        self.state = state
+        
+        # check if elapsed time has changed
+        if state != player.STOP:
+            elapsed = float(self.mpd_status['elapsed'])
+            if emit and elapsed != self.elapsed:
+                self.changeFromMPD.emit('elapsed', elapsed)
+            self.elapsed = elapsed
+            
+        
     def run(self):
+        # connect to MPD
+        self.client = mpd.MPDClient()
+        self.client.connect(host = self.connectionData['host'],
+                            port = self.connectionData['port'],
+                            timeout = CONNECTION_TIMEOUT)
+        # obtain initial playlist / current song status
+        
+        self._updateAttributes(emit = False)
+        self.changeFromMPD.emit('init_done',
+            (self.mpd_playlist, self.currentSong, self.currentSongLength, self.elapsed, self.state))
+
+        # start event loop for polling
+        self.timer.start(POLLING_INTERVAL)
+        self.doPolling = True
+        
+        self.seekTimer = QtCore.QTimer(self)
+        self.seekTimer.setSingleShot(True)
+        self.seekTimer.timeout.connect(self._seek)
         self.exec_()
+        
+    def poll(self):
+        if self.doPolling:
+            logger.debug("MPD thread is polling")
+            self._updateAttributes()
 
 class MPDPlayerBackend(player.PlayerBackend):
     
-    pathlistChanged = QtCore.pyqtSignal(list)
+    changeFromMain = QtCore.pyqtSignal(str, object)
+    
     def __init__(self, name):
         super().__init__(name)
-
-        self.playlistVersion = -1
-        self.playlist = playlist.BasicPlaylist()
-        self.mpdthread = MPDThread(self)
-        self.timer = QtCore.QTimer()
-        self.pathlistChanged.connect(self.playlist.updateFromPathList, Qt.QueuedConnection)
-        self.currentSongChanged.connect(self.playlist.setCurrent)
-        self.moveToThread(self.mpdthread)
-        self.timer.timeout.connect(self.poll)
-        self.timer.start(500)
-    
-    def ensureConnection(self):
-        if self.connected:
-            return True
+        self.playlist = playlist.Playlist(self)
         try:
             data = config.storage.mpd.profiles[self.name]
         except KeyError:
             logger.warning("no MPD config found for profile {} - using default".format(self.name))
             data = default_data
-        self.client = mpd.MPDClient()
-        try:
-            self.connectionStateChanged.emit(player.CONNECTING)
-            self.client.connect(data["host"], data["port"], timeout = 3)
-            self.connected = True
+        self.mpdthread = MPDThread(self, data)
+        self.mpdthread.changeFromMPD.connect(self._handleMPDChange, Qt.QueuedConnection)
+        self.changeFromMain.connect(self.mpdthread._handleMainChange)
+        self.currentSongChanged.connect(self.playlist.setCurrent)
+        self.mpdthread.start()
+        self._numFrontends = 0
+        
+    @QtCore.pyqtSlot(str, object)
+    def _handleMPDChange(self, what, how):
+        if what == 'init_done':
+            self.paths, self.currentSong, self.currentSongLength, self.elapsed, self.state = how
+            self.playlist.updateFromPathList(self.paths)
+            if self.currentSong != -1:
+                self.playlist.setCurrent(self.currentSong)
+            self.connectionState = player.CONNECTED
             self.connectionStateChanged.emit(player.CONNECTED)
-            return True
-        except Exception as e:
-            logger.warning('could not connect profile {}: {}'.format(self.name, e))
-            self.connectionStateChanged.emit(player.DISCONNECTED)
-            return False
-         
-    def poll(self):
-        if not self.ensureConnection():
-            return
-        status = self.client.status()
-        state = MPD_STATES[status["state"]]
-        if state != self.state:
-            self.stateChanged.emit(state)
-        self.state = state
+            self.stack.clear()
         
-        playlistVersion = int(status["playlist"])
-        if playlistVersion != self.playlistVersion:
-            self.updatePlaylist()
-        self.playlistVersion = playlistVersion
-        
-        try:
-            currentSong = int(status["song"])
-        except KeyError:
-            currentSong = -1
-        if currentSong != self.currentSong:
-            mpd_current = self.client.currentsong()
-            if "time" in mpd_current:
-                self.currentSongLength = int(mpd_current["time"])
-            else:
-                self.currentSongLength = 0
-            self.currentSongChanged.emit(currentSong)
-        self.currentSong = currentSong
-
-        try:
-            elapsed = float(status["elapsed"])
-        except KeyError:
-            elapsed = 0
-        if elapsed != self.elapsed:
-            self.elapsedChanged.emit(elapsed, self.currentSongLength)
-        self.elapsed = elapsed
-                
-        self.mpd_status = status
-    
-    def updatePlaylist(self):
-        if not self.ensureConnection():
-            return
-        self.mpd_playlist = self.client.playlistinfo()
-        paths = []
-        for file in self.mpd_playlist:
-            paths.append(file["file"])
-        self.pathlistChanged.emit(paths)
+        elif what == 'elapsed':
+            self.elapsed = how
+            self.elapsedChanged.emit(how, self.currentSongLength)
             
-    @QtCore.pyqtSlot(float)
+        elif what == 'state':
+            self.state = how
+            self.stateChanged.emit(how)
+            
+        elif what == 'currentSong':
+            self.currentSong = how
+            self.currentSongChanged.emit(how)
+        else:
+            print('WHAT? {}'.format(what))
+                    
     def setElapsed(self, time):
-        if not self.ensureConnection():
-            return
-        logger.debug("mpd -- set Elapsed called")
-        self.client.seek(self.currentSong, time)
+        self.changeFromMain.emit('elapsed', time)
  
-    @QtCore.pyqtSlot(int)
     def setState(self, state):
-        if not self.ensureConnection():
-            return
-        logger.debug("mpd -- set State {} called".format(state))
-        if state == player.PLAY:
-            self.client.play()
-        elif state == player.PAUSE:
-            self.client.pause()
-        elif state == player.STOP:
-            self.client.stop()       
+        self.changeFromMain.emit("state", state)
     
-    @QtCore.pyqtSlot()
-    def next(self):
-        if not self.ensureConnection():
-            return
-        self.client.next()
+    def setCurrentSong(self, index):
+        self.changeFromMain.emit("currentSong", index)
+    
+    def _setPlaylist(self, paths):
+        super()._setPlaylist(paths)
+        self.changeFromMain.emit('set_playlist', paths)
+    
+    def _insertIntoPlaylist(self, insertions):
+        super()._insertIntoPlaylist(insertions)
+        self.changeFromMain.emit('insert', insertions)
+    
+    def _removeFromPlaylist(self, removals):
+        super()._removeFromPlaylist(removals)
+        self.changeFromMain.emit('remove', removals)
         
-    @QtCore.pyqtSlot()
-    def previous(self):
-        if not self.ensureConnection():
-            return
-        self.client.previous()
+    def nextSong(self):
+        self.changeFromMain.emit('nextSong', None)
+    
+    def previousSong(self):
+        self.changeFromMain.emit('previousSong', None)
+    
+    def registerFrontend(self, obj):
+        self._numFrontends += 1
+        if self._numFrontends == 1:
+            logger.debug('frontend {} registered at {} -- starting poll'.format(obj, self))
+            self.mpdthread.doPolling = True
+    
+    def unregisterFrontend(self, obj):
+        self._numFrontends -= 1
+        if self._numFrontends == 0:
+            logger.debug('frontend {} deregistered at {} -- stopping poll'.format(obj, self))
+            self.mpdthread.doPolling = False
     
     @staticmethod
     def configWidget(profile = None):

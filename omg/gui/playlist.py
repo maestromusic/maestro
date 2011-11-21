@@ -31,6 +31,8 @@ class PlaylistTreeView(treeview.TreeView):
     """This is the main widget of a playlist: The tree view showing the current element tree."""
     level = PLAYLIST
     
+    songSelected = QtCore.pyqtSignal(int)
+    
     def __init__(self, parent = None):
         super().__init__(parent)
         self.setSelectionMode(self.ExtendedSelection)
@@ -39,13 +41,23 @@ class PlaylistTreeView(treeview.TreeView):
         self.setDefaultDropAction(Qt.MoveAction)
         self.setDropIndicatorShown(True)
         self.viewport().setMouseTracking(True)
+        self.doubleClicked.connect(self._handleDoubleClick)
     
-    def setModel(self, model):
+    def setBackend(self, backend):
+        self.backend = backend
+        model = backend.playlist
         if self.selectionModel():
             self.selectionModel().selectionChanged.disconnect(self.updateGlobalSelection)
-        super().setModel(model)
+        self.setModel(model)
         self.setItemDelegate(PlaylistDelegate(self))
         self.selectionModel().selectionChanged.connect(self.updateGlobalSelection)
+        self.songSelected.connect(backend.setCurrentSong)
+        
+    def _handleDoubleClick(self, idx):
+        if idx.isValid():
+            offset = idx.internalPointer().offset()
+            self.songSelected.emit(offset)
+        
 
 class PlaylistDelegate(delegates.BrowserDelegate):
     """Delegate for the playlist."""
@@ -54,7 +66,7 @@ class PlaylistDelegate(delegates.BrowserDelegate):
         super().__init__(view)
         
     def background(self, index):
-        if index == self.model.getIndex(self.model.current):
+        if index == self.model.currentModelIndex:
             return QtGui.QBrush(QtGui.QColor(110,149,229))
         
 class PlaylistWidget(QtGui.QDockWidget):
@@ -71,7 +83,16 @@ class PlaylistWidget(QtGui.QDockWidget):
         self.backendChooser = playerwidgets.BackendChooser(self)
         self.backendChooser.backendChanged.connect(self.setBackend)
         bottomLayout.addWidget(self.backendChooser)
+        self.clearButton = QtGui.QPushButton(self.tr('clear'), self)
+        self.shuffleButton = QtGui.QPushButton(self.tr('shuffle'), self)
+        bottomLayout.addWidget(self.clearButton)
+        bottomLayout.addWidget(self.shuffleButton)
         bottomLayout.addStretch()
+        self.undoButton = QtGui.QToolButton(self)
+        self.redoButton = QtGui.QToolButton(self)
+        bottomLayout.addWidget(self.undoButton)
+        bottomLayout.addWidget(self.redoButton) 
+        
         layout.addLayout(bottomLayout)
         self.setWidget(widget)
         if not self.backendChooser.setCurrentProfile(state):
@@ -80,7 +101,11 @@ class PlaylistWidget(QtGui.QDockWidget):
     def saveState(self):
         return self.backendChooser.currentProfile()
     def setBackend(self, name):
-        logger.debug("set backend: {}".format(name))
+        logger.debug("playlist gui sets backend: {}".format(name))
+        if hasattr(self, 'backend'):
+            self.backend.unregisterFrontend(self)
+            self.treeview.songSelected.disconnect(self.backend.setCurrentSong)
+            self.clearButton.clicked.disconnect(self.backend.clearPlaylist)
         if name is None:
             self.treeview.setDisabled(True)
             return
@@ -88,9 +113,15 @@ class PlaylistWidget(QtGui.QDockWidget):
         if backend is None:
             self.treeview.setDisabled(True)
             return
+        backend.registerFrontend(self)
+        
         self.treeview.setEnabled(True)
         self.backend = backend
-        self.treeview.setModel(self.backend.playlist)
+        self.undoButton.setDefaultAction(self.backend.stack.createUndoAction(self))
+        self.redoButton.setDefaultAction(self.backend.stack.createRedoAction(self))
+        self.clearButton.clicked.connect(self.backend.clearPlaylist)
+        self.treeview.setBackend(self.backend)
+        
         
 data = mainwindow.WidgetData(id = "playlist",
                              name = translate("Playlist","playlist"),

@@ -116,12 +116,15 @@ class PlayerBackend(QtCore.QObject):
         notifier.profileRenamed.connect(self._handleProfileRename)
         self.name = name
         self.state = STOP
+        self.connectionState = DISCONNECTED
         self.volume = 0
         self.currentSong = -1
         self.elapsed = 0
         self.currentSongLength = 0
-        self.connected = False
         self.playlist = None
+        self.paths = []
+        
+        self.stack = QtGui.QUndoStack()
     
     def _handleProfileRename(self, old, new):
         if self.name == old:
@@ -132,45 +135,127 @@ class PlayerBackend(QtCore.QObject):
         """Return a config widget, initialized with the data of the given *profile*."""
         raise NotImplementedError()
     
-    @QtCore.pyqtSlot(int)
     def setState(self, state):
         """Set the state of the player to one of STOP, PLAY, PAUSE."""
         raise NotImplementedError()
      
-    @QtCore.pyqtSlot(int)
     def setVolume(self, volume):
         """Set the volume of the player. *volume* must be an integer between 0 and 100."""
         raise NotImplementedError()
     
-    @QtCore.pyqtSlot(int)
     def setCurrentSong(self, index):
         """Set the song at offset *index* as active."""
         raise NotImplementedError()
     
-    @QtCore.pyqtSlot(float)
     def setElapsed(self, seconds):
         """Jump within the currently playing song to the position at time *seconds*, which
         is a float."""
         raise NotImplementedError()
 
-    @QtCore.pyqtSlot(object)
-    def setPlaylist(self, root):
-        """Change the playlist; *root* is an instance of models.RootNode containing the playlist
-        elements as children."""
-        raise NotImplementedError()
     
-    @QtCore.pyqtSlot()
-    def next(self):
+    def _setPlaylist(self, paths):
+        """Set the current playlist given by *paths*. This method will clear the current
+        playlist and then set the new one from scratch; therefore, the more intelligent 
+        alternatives insertIntoPlaylist and removeFromPlaylist are preferrable."""
+        self.playlist.updateFromPathList(paths)
+        
+    def setPlaylist(self, paths):
+        """Creates an UndoCommand to change the playlist according to *paths* and
+        pushes that command onto the undo stack."""
+        self.stack.push(ChangePlaylistCommand(self, self.paths, paths))
+
+    def _insertIntoPlaylist(self, insertions):
+        self.playlist.insertSongs(insertions)
+        
+    def insertIntoPlaylist(self, insertions):
+        self.stack.push(InsertIntoPlaylistCommand(self, insertions))
+    
+    def _removeFromPlaylist(self, removals):
+        self.playlist.removeSongs(removals)
+        
+    def removeFromPlaylist(self, removals):
+        self.stack.push(RemoveFromPlaylistCommand(self, removals))
+    
+    def clearPlaylist(self):
+        """Creates an UndoCommand to clear the playlist and pushes it onto the undo stack."""
+        command = ClearPlaylistCommand(self, self.paths)
+        self.stack.push(command)
+    
+    def nextSong(self):
         """Jump to the next song in the playlist. If the playlist is stopped or at the last 
         song, this is ignored."""
         raise NotImplementedError()
     
-    @QtCore.pyqtSlot()
-    def previous(self):
+    def previousSong(self):
         """Jump to the previous song in the playlist. If the playlist is stopped or at the
         first song, this is ignored."""
         raise NotImplementedError()
-        raise NotImplementedError
+    
+    def registerFrontend(self, obj):
+        """Tell this player class that a frontend object *obj* started to use it. The backend
+        can use this information e.g. to make a connection retry or to start polling."""
+        pass
+    
+    def unregisterFrontend(self, obj):
+        """Tell this player class that a frontend object *obj* thas stopped using the backend.
+        This may be used to stop time-consuming backend operations as soon as nobody is using
+        it anymore."""
+        pass
     
 
+class PlayerUndoCommand(QtGui.QUndoCommand):
+    
+    def __init__(self, backend, text = '', fromOutside = False):
+        super().__init__()
+        self.backend = backend
+        self.fromOutside = fromOutside
+        self.setText(text)
+        
+    def redo(self):
+        if not self.fromOutside:
+            self._redo()
+    
+    def _redo(self):
+        raise NotImplementedError()
+
+class InsertIntoPlaylistCommand(PlayerUndoCommand):
+    
+    def __init__(self, backend, insertions, text = 'insert files', fromOutside = False):
+        super().__init__(backend, text, fromOutside)
+        self.insertions = insertions
+        
+    def _redo(self):
+        self.backend._insertIntoPlaylist(self.insertions)
+    
+    def undo(self):
+        self.backend._removeFromPlaylist(self.insertions)
+
+class RemoveFromPlaylistCommand(PlayerUndoCommand):
+    
+    def __init__(self, backend, removals,
+                 text = 'remove files from playlist', fromOutside = False):
+        super().__init__(backend, text, fromOutside)
+        self.removals = removals
+    
+    def _redo(self):
+        self.backend._removeFromPlaylist(self.removals)
+        
+    def undo(self):
+        self.backend._insertIntoPlaylist(self.removals)
+        
+class ChangePlaylistCommand(PlayerUndoCommand):
+    
+    def __init__(self, backend, currentPlaylist, newPlaylist, text = 'change playlist', fromOutside = False):
+        super().__init__(backend, text, fromOutside)
+        self.beforeList = currentPlaylist
+        self.afterList = newPlaylist
+    
+    def _redo(self):
+        self.backend._setPlaylist(self.afterList)
+    
+    def undo(self):
+        self.backend._setPlaylist(self.beforeList)
+        
+def ClearPlaylistCommand(backend, currentPlaylist, text = 'clear playlist', fromOutside = False):
+    return ChangePlaylistCommand(backend, currentPlaylist, [], text, fromOutside)
         

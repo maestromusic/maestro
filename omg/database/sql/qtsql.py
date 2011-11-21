@@ -19,11 +19,12 @@
 """Database driver using QtSql. Have a look at database.sql.AbstractSQL for docstrings."""
 
 from PyQt4 import QtSql, QtCore
-import datetime, threading
+import threading
 
 from . import DBException, EmptyResultException, AbstractSql, AbstractSqlResult
-from omg import utils,strutils
+from ... import utils, logging
 
+logger = logging.getLogger(__name__)
 
 class Sql(AbstractSql):
     def __init__(self):

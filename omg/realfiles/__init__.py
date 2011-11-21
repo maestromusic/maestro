@@ -25,7 +25,6 @@ logger = logging.getLogger(__name__)
 
 def get(path):
     """Create a RealFile-instance for the given path, which may be a relative or absolute path."""
-    print('real requested {} '.format(path))
     if not os.path.isabs(path):
         path = absPath(path)
     return rfClass(path)

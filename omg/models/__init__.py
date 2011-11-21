@@ -598,6 +598,7 @@ class File(Element):
         
     @staticmethod
     def fromFilesystem(path):
+        rpath = relPath(path)
         try:
             real = realfiles.get(path)
             real.read()
@@ -606,10 +607,10 @@ class File(Element):
             position = real.position
         except OSError:
             fileTags = tags.Storage()
-            fileTags[tags.TITLE] = ['<could not open file>']
+            fileTags[tags.TITLE] = ['<could not open:> {}'.format(rpath)]
             length = 0
             position = 0
-        rpath = relPath(path)
+        
         id = db.idFromPath(rpath)
         if id is None:
             from .. import modify

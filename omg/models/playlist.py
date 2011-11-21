@@ -16,42 +16,43 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import difflib, logging, os, itertools
+import itertools
 
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from omg import database as db, models, config
-from . import rootedtreemodel, treebuilder, mimedata
+from .. import database as db, models, config, utils, logging, player
+from . import rootedtreemodel, treebuilder
 
 logger = logging.getLogger("omg.models.playlist")
         
-class BasicPlaylist(rootedtreemodel.RootedTreeModel):
+class Playlist(rootedtreemodel.RootedTreeModel):
     """Basic model for playlists. A BasicPlaylists contains a list of nodes and supports insertion and removal of nodes as well as drag and drop of omg's own mimetype (config-variable gui->mime) and "text/uri-list"."""
     # Toplevel elements in the playlist
     contents = None
     
-    def __init__(self):
+    def __init__(self, backend):
         """Initialize with an empty playlist."""
         rootedtreemodel.RootedTreeModel.__init__(self,models.RootNode())
-        self.current = None
+        self.backend = backend
+        self.current = self.currentModelIndex = None
+        logger.debug("playlist model created")
     
-    @QtCore.pyqtSlot(int)
     def setCurrent(self, index):
         if index == -1:
             return
         elem = self.root.fileAtOffset(index)
-        assert(elem.isFile())
+        assert elem.isFile()
         newCurrent = elem
-        if newCurrent != self.current:
-            newIndex = self.getIndex(newCurrent)
-            self.dataChanged.emit(newIndex, newIndex)
-            if self.current is not None:
-                oldIndex = self.getIndex(self.current)
-                self.current = newCurrent
-                self.dataChanged.emit(oldIndex, oldIndex)
-            else:
-                self.current = newCurrent
+        #if newCurrent != self.current:
+        newIndex = self.getIndex(newCurrent)
+        if self.currentModelIndex is not None and self.currentModelIndex.isValid():
+            self.dataChanged.emit(self.currentModelIndex, self.currentModelIndex)
+        self.current = newCurrent
+        self.currentModelIndex = newIndex
+        self.dataChanged.emit(newIndex, newIndex)
+        
+        
 
     def _rebuild(self, paths):
         self.beginResetModel()
@@ -62,12 +63,10 @@ class BasicPlaylist(rootedtreemodel.RootedTreeModel):
                 elements.append(models.File.fromId(id))
             else:
                 elements.append(models.File.fromFilesystem(path))
-        elements = self.restructure(elements)
+        #elements = self.restructure(elements)
         self.root.setContents(elements)
-        
         self.endResetModel()
     
-    @QtCore.pyqtSlot(list)
     def updateFromPathList(self, paths):
         for path,file in itertools.zip_longest(paths, self.root.getAllFiles()):
             if path is None or file is None:
@@ -76,7 +75,75 @@ class BasicPlaylist(rootedtreemodel.RootedTreeModel):
             if path != file.path:
                 self._rebuild(paths)
                 return 
+
+
+    def flags(self,index):
+        defaultFlags = super().flags(index)
+        if index.isValid():
+            return defaultFlags | Qt.ItemIsDropEnabled | Qt.ItemIsDragEnabled
+        else: return defaultFlags | Qt.ItemIsDropEnabled
+    
+    def supportedDropActions(self):
+        return Qt.CopyAction | Qt.MoveAction
+
+    def dropMimeData(self,mimeData,action,row,column,parentIndex):
+        if mimeData.hasFormat(config.options.gui.mime):
+            paths = [f.path for f in itertools.chain.from_iterable(e.getAllFiles() for e in mimeData.getElements())]            
+        else:
+            paths = list(map(utils.relPath, itertools.chain.from_iterable(
+                utils.collectFiles(u.path() for u in mimeData.urls()).values())))
+        if row == -1:
+            row = self.root.fileCount()
+        self.backend.insertIntoPlaylist(list(enumerate(paths, start = row)))
+        return True
+    
+    def insertSongs(self,insertions):
+        insertions = {i:p for i,p in insertions}
+        rngs = utils.ranges(sorted(insertions.keys()))
+        for start,end in rngs:
+            if start < self.root.fileCount():
+                elemAtOffset = self.root.fileAtOffset(start)
+                parent = elemAtOffset.parent
+                index = parent.index(elemAtOffset)
+            else:
+                parent = self.root
+                index = len(self.root.contents)
             
+            paths = [insertions[i] for i in range(start, end+1)]
+            elements = []
+            for path in paths:
+                id = db.idFromPath(path)
+                if id is not None:
+                    elements.append(models.File.fromId(id))
+                else:
+                    elements.append(models.File.fromFilesystem(path))
+                
+            self.beginInsertRows(self.getIndex(parent), index, index + len(elements) - 1)
+            parent.insertContents(index, elements)
+            self.endInsertRows()
+        
+            if start <= self.backend.currentSong:
+                self.setCurrent(self.backend.currentSong + len(paths))
+            else:
+                self.setCurrent(self.backend.currentSong)
+    
+    def removeSongs(self, removals):
+        removals = {i:p for i,p in removals}
+        rngs = utils.ranges(sorted(removals.keys()))
+        for start, end in reversed(rngs):
+            elemAtOffset = self.root.fileAtOffset(start)
+            parent = elemAtOffset.parent
+            index = parent.index(elemAtOffset)
+            
+            self.beginRemoveRows(self.getIndex(parent), index, index + end - start)
+            del parent.contents[index:(index+end-start+1)]
+            self.endRemoveRows()
+            
+            if start <= self.backend.currentSong:
+                self.setCurrent(self.backend.currentSong + end - start + 1)
+            else:
+                self.setCurrent(self.backend.currentSong) 
+    # OLD STUFF -- NOT USED YET ------        
     def restructure(self, paths):
         """Restructure the whole container tree in this model. This method does not change the flat playlist, but it uses treebuilder to create an optimal container structure over the MPD playlist."""
         treeBuilder = self._createTreeBuilder(paths)
