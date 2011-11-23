@@ -63,6 +63,8 @@ class Playlist(rootedtreemodel.RootedTreeModel):
                 elements.append(models.File.fromId(id))
             else:
                 elements.append(models.File.fromFilesystem(path))
+        for i, element in enumerate(elements, start = 1):
+            element.position = i
         #elements = self.restructure(elements)
         self.root.setContents(elements)
         self.endResetModel()
@@ -111,21 +113,17 @@ class Playlist(rootedtreemodel.RootedTreeModel):
             
             paths = [insertions[i] for i in range(start, end+1)]
             elements = []
-            for path in paths:
+            for i, path in enumerate(paths, start=start):
                 id = db.idFromPath(path)
                 if id is not None:
                     elements.append(models.File.fromId(id))
                 else:
                     elements.append(models.File.fromFilesystem(path))
-                
+                elements[-1].position = i
+            
             self.beginInsertRows(self.getIndex(parent), index, index + len(elements) - 1)
             parent.insertContents(index, elements)
             self.endInsertRows()
-        
-            if start <= self.backend.currentSong:
-                self.setCurrent(self.backend.currentSong + len(paths))
-            else:
-                self.setCurrent(self.backend.currentSong)
     
     def removeSongs(self, removals):
         removals = {i:p for i,p in removals}
@@ -138,11 +136,7 @@ class Playlist(rootedtreemodel.RootedTreeModel):
             self.beginRemoveRows(self.getIndex(parent), index, index + end - start)
             del parent.contents[index:(index+end-start+1)]
             self.endRemoveRows()
-            
-            if start <= self.backend.currentSong:
-                self.setCurrent(self.backend.currentSong + end - start + 1)
-            else:
-                self.setCurrent(self.backend.currentSong) 
+
     # OLD STUFF -- NOT USED YET ------        
     def restructure(self, paths):
         """Restructure the whole container tree in this model. This method does not change the flat playlist, but it uses treebuilder to create an optimal container structure over the MPD playlist."""

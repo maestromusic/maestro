@@ -118,22 +118,23 @@ def run(cmdConfig = []):
     # Load remaining modules
     from omg import tags, search
     search.init()
-
     # Load Plugins
     from omg import plugins
     plugins.enablePlugins()
-
+    
     from . import sync
     sync.init()
     # Create GUI
     # First import all modules that want to add WidgetData
+    
     from .gui import filesystembrowser, editor, browser, tageditor, mainwindow, playback, playlist
     global mainWindow
+    
     from . import player
     player.init()
     mainWindow = mainwindow.MainWindow()
     plugins.mainWindowInit()
-
+    
     # Launch application
     mainWindow.show()
     returnValue = app.exec_()

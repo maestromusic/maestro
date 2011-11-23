@@ -40,25 +40,29 @@ class PlaybackWidget(QtGui.QDockWidget):
         self.setWidget(widget)
         
         topLayout = QtGui.QHBoxLayout()
-            
         self.backendChooser = playerwidgets.BackendChooser(self)
         topLayout.addWidget(self.backendChooser)
         
+        policy = QtGui.QSizePolicy()
+        policy.setHorizontalPolicy(QtGui.QSizePolicy.Fixed)
         self.previousButton = QtGui.QPushButton(utils.getIcon("previous.png"),'',self)
         self.ppButton = PlayPauseButton(self)
         self.stopButton = QtGui.QPushButton(utils.getIcon("stop.png"),'',self)
         self.nextButton = QtGui.QPushButton(utils.getIcon("next.png"),'',self)
         
+        for w in (self.backendChooser, self.previousButton, self.ppButton,
+                       self.stopButton, self.nextButton):
+            w.setSizePolicy(policy)
+        #    widget.setSizePolicy(policy)
         self.titleLabel = QtGui.QLabel(self)
         self.titleLabel.setTextFormat(Qt.AutoText)
         self.titleLabel.setWordWrap(True)
-        topLayout.addStretch()
+        #topLayout.addStretch()
         topLayout.addWidget(self.titleLabel)
-        topLayout.addStretch()
+        #topLayout.addStretch()
         self.seekSlider = QtGui.QSlider(Qt.Horizontal,self)
         self.seekSlider.setRange(0,1000)
         self.seekSlider.setTracking(False)
-        
         bottomLayout = QtGui.QHBoxLayout()
         self.seekLabel = QtGui.QLabel("0-0", self)
         topLayout.addWidget(self.previousButton)
@@ -67,7 +71,6 @@ class PlaybackWidget(QtGui.QDockWidget):
         topLayout.addWidget(self.nextButton)
         bottomLayout.addWidget(self.seekSlider)
         bottomLayout.addWidget(self.seekLabel)
-        
         mainLayout = QtGui.QVBoxLayout(widget)
         mainLayout.addLayout(topLayout)
         mainLayout.addLayout(bottomLayout)
@@ -86,7 +89,9 @@ class PlaybackWidget(QtGui.QDockWidget):
     def updateCurrent(self, pos):
         current = self.backend.playlist.current
         if current is not None:
-            self.titleLabel.setText("Playing: <i>{}</i>".format(current.getTitle()))
+            self.titleLabel.setText("<i>{}</i>".format(current.getTitle()))
+        else:
+            self.titleLabel.setText(self.tr('no song selected'))
     
     def updateState(self, state):
         self.ppButton.setPlaying(state == player.PLAY)
