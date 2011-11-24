@@ -160,6 +160,11 @@ storage = OrderedDict((
     'central_widgets': ([],),
     'dock_widgets': ([],),
     'central_tab_index': (-1,),
+    'delegates': ({
+            'Browser': ("browser",{}),
+            'Editor': ("editor",{}),
+            'Playlist': ("playlist",{})
+            },)
 }),
 ("browser", {
     'views': ([[['composer','artist','performer']],[['genre'],['composer','artist','performer']]],),

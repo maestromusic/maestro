@@ -300,6 +300,12 @@ class OrderedDict(dict):
     def items(self):
         return OrderedDictItems(self)
 
+    def copy(self):
+        result = OrderedDict()
+        result.update(self)
+        result._keyList = self._keyList[:]
+        return result
+        
     @staticmethod
     def fromItems(items):
         """Create an OrderedDict from a list of key->value pairs."""

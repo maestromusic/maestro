@@ -61,14 +61,16 @@ class PlaylistTreeView(treeview.TreeView):
 
 class PlaylistDelegate(delegates.BrowserDelegate):
     """Delegate for the playlist."""
+    options = delegates.BrowserDelegate.options
     
     def __init__(self,view):
-        super().__init__(view)
+        super().__init__(view,delegates.defaultBrowserDelegateConfig)
         
     def background(self, index):
         if index == self.model.currentModelIndex:
             return QtGui.QBrush(QtGui.QColor(110,149,229))
-        
+
+
 class PlaylistWidget(QtGui.QDockWidget):
     
     def __init__(self, parent = None, state = None, location = None):

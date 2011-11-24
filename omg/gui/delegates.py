@@ -16,14 +16,16 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import math,itertools
+import math,itertools,weakref,copy
 
 from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
-from omg import models, tags, config, strutils, database as db
-from omg.models import browser as browsermodel
+from .. import models, tags, config, strutils, database as db, utils
+from ..models import browser as browsermodel
+from .preferences.delegates import DelegateOption, DelegateConfig, addDelegateConfig, getConfig
 
+translate = QtCore.QCoreApplication.translate
 
 # Constants for delegate.state
 SIZE_HINT, PAINT = 1,2
@@ -36,29 +38,55 @@ class DelegateStyle:
     """A DelegateStyle is used to specify the style of texts in a TextItem or MultiTextItem. It stores the
     three attributes *fontSize*, *bold* and *italic*. Note that *fontSize* stores the pointsize of the font.
     """
-    def __init__(self,fontSize,bold,italic):
-        self.fontSize = fontSize
+    def __init__(self,relFontSize,bold,italic):
         self.bold = bold
         self.italic = italic
+        self.relFontSize = relFontSize
 
 
 # Some standard styles used in the delegates
-STD_STYLE = DelegateStyle(8,False,False)
-ITALIC_STYLE = DelegateStyle(STD_STYLE.fontSize,False,True)
-BOLD_STYLE = DelegateStyle(STD_STYLE.fontSize,True,False)
+STD_STYLE = DelegateStyle(1,False,False)
+ITALIC_STYLE = DelegateStyle(1,False,True)
+BOLD_STYLE = DelegateStyle(1,True,False)
         
 
+
+def _copyOptions(options):
+    """Take an instance of utils.OrderedDict containing DelegateOptions and return a copy of the dict
+    containing copies of the options."""
+    return utils.OrderedDict.fromItems([(k,copy.copy(option)) for k,option in options.items()])
+            
+            
 class AbstractDelegate(QtGui.QStyledItemDelegate):
+    _instances = {}
+    
     hSpace = 3
     vSpace = 3
     hMargin = 1
     vMargin = 2
     state = None
     
-    def __init__(self,view):
+    options = utils.OrderedDict.fromItems([(data[0],DelegateOption(*data)) for data in [
+        ("fontSize",translate("Delegates","Fontsize"),"int",8),
+        ("showMajor",translate("Delegates","Display major flag"),"bool",False),
+        ("showPositions",translate("Delegates","Display position numbers"),"bool",True),
+        ("showPaths",translate("Delegates","Display paths"),"bool",False),
+        ("showFlagIcons",translate("Delegates","Display flag icons"),"bool",True),
+        ("hideParentFlags",translate("Delegates","Hide flags that appear in parent elements"),"bool",True),
+        ("maxRowsTag",translate("Delegates","Maximal number of rows per tag"),"int",4),
+        ("maxRowsElement",translate("Delegates","Maximal number of rows per element"),"int",50),
+        ("coverSize",translate("Delegates","Size of covers"),"int",40)
+    ]])
+            
+    def __init__(self,view,config):
         super().__init__(view)
+        if self.__class__ not in AbstractDelegate._instances:
+            AbstractDelegate._instances[self.__class__] = weakref.WeakSet()
+        AbstractDelegate._instances[self.__class__].add(self)
+        self.view = view
         self.model = view.model()
         self.font = QtGui.QFont()
+        self.config = config
     
     def addLeft(self,item):
         """Add an item to the left region. It will be drawn on the right of all previous items
@@ -154,12 +182,12 @@ class AbstractDelegate(QtGui.QStyledItemDelegate):
             sys.exit("Fatal error: AbstractDelegate.paint was called during painting/sizehinting.")
         self.state = PAINT
         
-        # Initialize. Subclasses or Delegate items may access painter and option.
+        # Initialize. Subclasses or delegate items may access painter and option.
         self.painter = painter
-        # Draw the background depending on selection etc.
         background = self.background(index)
         if background is not None:
             option.backgroundBrush = background
+        # Draw the background depending on selection etc.
         QtGui.QApplication.style().drawControl(QtGui.QStyle.CE_ItemViewItem,option,painter)
         painter.save()
         painter.translate(option.rect.x(),option.rect.y())
@@ -235,7 +263,7 @@ class AbstractDelegate(QtGui.QStyledItemDelegate):
         """Return a QFontMetrics-object for a font with the given style."""
         if style is None:
             style = STD_STYLE
-        self.font.setPointSize(style.fontSize)
+        self.font.setPointSize(style.relFontSize * self.config.options["fontSize"].value)
         self.font.setBold(style.bold)
         self.font.setItalic(style.italic)
         return QtGui.QFontMetrics(self.font)
@@ -245,7 +273,7 @@ class AbstractDelegate(QtGui.QStyledItemDelegate):
         methods of DelegateItems."""
         if style is None:
             style = STD_STYLE
-        self.font.setPointSize(style.fontSize)
+        self.font.setPointSize(style.relFontSize * self.config.options["fontSize"].value)
         self.font.setBold(style.bold)
         self.font.setItalic(style.italic)
         self.painter.setFont(self.font)
@@ -295,7 +323,7 @@ class TextItem(DelegateItem):
         self.minHeight = minHeight
         
     def sizeHint(self,delegate,availableWidth=-1):
-        rect = QtCore.QRect(0,0,availableWidth,14)
+        rect = QtCore.QRect(0,0,availableWidth,1)
         bRect = delegate.getFontMetrics(self.style).boundingRect(rect,Qt.TextSingleLine,self.text)
         return bRect.width(),max(bRect.height(),self.minHeight)
 
@@ -599,13 +627,16 @@ class BrowserDelegate(AbstractDelegate):
     """Delegate used in the Browser. Does some effort to put flag icons at the optimal place using free space
     in the title row and trying not to increase the overall number of rows.
     """
-    def __init__(self,view):
-        super().__init__(view)
+    options = _copyOptions(AbstractDelegate.options)
+    options["optimizeDate"] = DelegateOption(
+                            "optimizeDate",translate("Delegates","Optimize display of date tag"),"bool",True)
+
+    def __init__(self,view,delegateConfig):
+        super().__init__(view,delegateConfig)
         self.leftTags = [tags.get(name) for name in
                             config.options.gui.browser.left_tags if tags.exists(name)]
         self.rightTags = [tags.get(name) for name in
                             config.options.gui.browser.right_tags if tags.exists(name)]
-        self.coverSize = config.options.gui.browser.cover_size
         self.showPositions = config.options.gui.browser.show_positions
         self.optimizeDate = True
         
@@ -635,18 +666,20 @@ class BrowserDelegate(AbstractDelegate):
             
             # Cover
             if node.hasCover():
-                self.addLeft(CoverItem(node.getCover(self.coverSize),self.coverSize))
-                availableWidth -= self.coverSize + self.hSpace
+                coverSize = self.config.options['coverSize'].value
+                self.addLeft(CoverItem(node.getCover(coverSize),coverSize))
+                availableWidth -= coverSize + self.hSpace
             
             # Title and Major
-            titleItem = TextItem(node.getTitle(prependPosition=self.showPositions),
+            titleItem = TextItem(node.getTitle(prependPosition=self.config.options['showPositions'].value,
+                                               usePath=False),
                                  BOLD_STYLE if node.isContainer() else STD_STYLE,
                                  minHeight=IconBarItem.iconSize if len(flagIcons) > 0 else 0)
             
-            if isinstance(node,models.Container) and node.major:
+            if self.config.options['showMajor'].value and isinstance(node,models.Container) and node.major:
                 self.addCenter(ColorBarItem(QtGui.QColor(255,0,0),5,titleItem.sizeHint(self)[1]))
             self.addCenter(titleItem)
-            
+                
             # Flags
             # Here starts the mess...depending on the available space we want to put flags and if possible
             # even the date into the title row.
@@ -721,6 +754,13 @@ class BrowserDelegate(AbstractDelegate):
             if len(leftTexts) > 0 or len(rightTexts) > 0:
                 self.addCenter(MultiTextItem(leftTexts,rightTexts))
             
+            # Path
+            if self.config.options['showPaths'].value and node.isFile():
+                if node.path is None:
+                    node.path = db.path(node.id)
+                self.addCenter(TextItem(node.path,ITALIC_STYLE))
+                self.newRow()
+            
     def prepareTags(self,element):
         """Return two lists and a third value containing information about the tags of *element*:
         
@@ -794,25 +834,30 @@ class BrowserDelegate(AbstractDelegate):
         return [flag.icon for flag in flags]
         
 
+defaultBrowserDelegateConfig = DelegateConfig(translate("Delegates","Browser"),BrowserDelegate,builtin=True)
+addDelegateConfig(defaultBrowserDelegateConfig)
+
+
 class EditorDelegate(AbstractDelegate):
     """Delegate for the editor."""
-    showPaths = True
-    
+    options = _copyOptions(AbstractDelegate.options)
+    options['showPaths'].value = True
+    options['showMajor'].value = True
+        
     blackFormat = QtGui.QTextCharFormat()
-    blackFormat.setFontPointSize(STD_STYLE.fontSize)
+    blackFormat.setFontPointSize(8)
     redFormat = QtGui.QTextCharFormat()
-    redFormat.setFontPointSize(STD_STYLE.fontSize)
+    redFormat.setFontPointSize(8)
     redFormat.setForeground(QtGui.QBrush(QtGui.QColor(255,0,0)))
     
     removeParentFlags = True
     
-    def __init__(self,view):
-        super().__init__(view)
+    def __init__(self,view,delegateConfig):
+        super().__init__(view,delegateConfig)
         self.leftTags = [tags.get(name) for name in
                             config.options.gui.editor.left_tags if tags.exists(name)]
         self.rightTags = [tags.get(name) for name in
                             config.options.gui.editor.right_tags if tags.exists(name)]
-        self.coverSize = config.options.gui.editor.cover_size
         
     def layout(self,index,availableWidth):
         element = self.model.data(index)
@@ -831,24 +876,26 @@ class EditorDelegate(AbstractDelegate):
             
         # Cover
         if element.hasCover():
-            self.addLeft(CoverItem(element.getCover(self.coverSize),self.coverSize))
+            coverSize = self.config.options['coverSize'].value
+            self.addLeft(CoverItem(element.getCover(coverSize),coverSize))
         
         # Flag-Icons
         if len(flagIcons) > 0:
             self.addRight(IconBarItem(flagIcons,columns=2 if len(flagIcons) > 2 else 1))
 
         # Title and Major
-        titleItem = TextItem(element.getTitle(prependPosition=True,usePath=not self.showPaths),
+        titleItem = TextItem(element.getTitle(prependPosition=self.config.options['showPositions'].value,
+                                                usePath=not self.config.options['showPaths'].value),
                              BOLD_STYLE if element.isContainer() else STD_STYLE)
         
-        if element.isContainer() and element.major:
+        if self.config.options['showMajor'].value and element.isContainer() and element.major:
             self.addCenter(ColorBarItem(QtGui.QColor(255,0,0),5,titleItem.sizeHint(self)[1]))
         self.addCenter(titleItem)
         
         self.newRow()
         
         # Path
-        if self.showPaths and element.isFile():
+        if self.config.options['showPaths'].value and element.isFile():
             self.addCenter(TextItem(element.path,ITALIC_STYLE))
             self.newRow()
             
@@ -966,3 +1013,6 @@ class EditorDelegate(AbstractDelegate):
         return [flag.icon for flag in flags if flag.icon is not None],\
                [flag.name for flag in flags if flag.icon is None]
     
+    
+defaultEditorDelegateConfig = DelegateConfig(translate("Delegates","Editor"),EditorDelegate,builtin=True)
+addDelegateConfig(defaultEditorDelegateConfig)

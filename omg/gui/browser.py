@@ -152,6 +152,7 @@ class Browser(QtGui.QWidget):
         
         # Restore state
         viewsToRestore = config.storage.browser.views
+        self.delegateConfig = delegates.defaultBrowserDelegateConfig
         if state is not None and isinstance(state,dict):
             if 'instant' in state:
                 self.searchBox.setInstantSearch(state['instant'])
@@ -163,6 +164,11 @@ class Browser(QtGui.QWidget):
                 flagList = [flags.get(name) for name in state['flags'] if flags.exists(name)]
                 if len(flagList) > 0:
                     self.criterionFilter.append(criteriaModule.FlagsCriterion(flagList))
+            if 'delegate' in state:
+                try:
+                    self.delegateConfig = delegates.getConfig(state['delegate'],delegates.BrowserDelegate)
+                except ValueError:
+                    pass # Use default delegate (see above)
         
         modify.dispatcher.changes.connect(self._handleDispatcher)
         
@@ -182,7 +188,8 @@ class Browser(QtGui.QWidget):
             'instant': self.searchBox.getInstantSearch(),
             'showHiddenValues': self.showHiddenValues,
             'views': utils.mapRecursively(lambda tag: tag.name,[view.model().layers for view in self.views]),
-            'flags': [flagType.name for flagType in flags]
+            'flags': [flagType.name for flagType in flags],
+            'delegate': self.delegateConfig.title
         }
     
     def load(self,restoreExpanded=False):
@@ -227,7 +234,7 @@ class Browser(QtGui.QWidget):
             view.setParent(None)
         self.views = []
         for layers in layersList:
-            newView = BrowserTreeView(self,layers)
+            newView = BrowserTreeView(self,layers,self.delegateConfig)
             self.views.append(newView)
             newView.selectionModel().selectionChanged.connect(
                                     functools.partial(self.selectionChanged.emit,newView.selectionModel()))
@@ -314,11 +321,11 @@ class BrowserTreeView(treeview.TreeView):
         """Class method to initialize the context menu. This method should be overwritten in subclasses."""
         return [ TagValueHybridAction() ]
     
-    def __init__(self,parent,layers):
+    def __init__(self,parent,layers,delegateConfig):
         treeview.TreeView.__init__(self,parent)
         self.setModel(browsermodel.BrowserModel(layers,parent))
         self.header().sectionResized.connect(self.model().layoutChanged)
-        self.setItemDelegate(delegates.BrowserDelegate(self))
+        self.setItemDelegate(delegates.BrowserDelegate(self,delegateConfig))
         self._optimizers = []
         #self.doubleClicked.connect(self._handleDoubleClicked)
     

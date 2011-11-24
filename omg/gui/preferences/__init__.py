@@ -77,8 +77,6 @@ class PreferencesDialog(QtGui.QDialog):
             success = self.restoreGeometry(config.binary["preferences_geometry"])
         else:
             success = False
-            if "preferences_geometry" in config.binary:
-                print(config.binary["preferences_geometry"])
         if not success: # Default geometry
             self.resize(800,600)
         
@@ -215,5 +213,7 @@ addPanel("main/tagmanager",translate("PreferencesPanel","Tag Manager"),
             ('gui.preferences.tagmanager','TagManager'))
 addPanel("main/flagmanager",translate("PreferencesPanel","Flag Manager"),
             ('gui.preferences.flagmanager','FlagManager'))
+addPanel("main/delegates",translate("PreferencesPanel","Element display"),
+            ('gui.preferences.delegates','DelegatesPanel'))
                    
 addPanel("plugins",translate("PreferencesPanel","Plugins"),plugindialog.PluginDialog)
