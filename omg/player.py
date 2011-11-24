@@ -209,11 +209,13 @@ class PlayerUndoCommand(QtGui.QUndoCommand):
         super().__init__()
         self.backend = backend
         self.fromOutside = fromOutside
+        self.redoOK = False
         self.setText(text)
         
     def redo(self):
-        if not self.fromOutside:
+        if not self.fromOutside or self.redoOK:
             self._redo()
+        self.redoOK = True
     
     def _redo(self):
         raise NotImplementedError()

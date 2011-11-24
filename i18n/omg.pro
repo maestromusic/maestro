@@ -4,8 +4,9 @@ SOURCES = ../omg/application.py\
 	  ../omg/gui/browser.py\
 	  ../omg/gui/dialogs.py\
 	  ../omg/gui/editor.py\
-	  ../omg/gui/formatter.py\
 	  ../omg/gui/playlist.py\
+      ../omg/gui/playback.py\
+      ../omg/gui/playerwidgets.py\
 	  ../omg/gui/singletageditor.py\
 	  ../omg/gui/tageditor.py\
 	  ../omg/gui/tagwidgets.py\
@@ -15,7 +16,8 @@ SOURCES = ../omg/application.py\
 	  ../omg/modify/__init__.py\
       ../omg/plugins/dbanalyzer/__init__.py\
       ../omg/plugins/searchanalyzer/__init__.py\
-      ../omg/plugins/configeditor/__init__.py
+      ../omg/plugins/configeditor/__init__.py\
+      ../omg/plugins/mpd/__init__.py
          
 
 

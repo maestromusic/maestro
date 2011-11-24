@@ -20,21 +20,26 @@ from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
 from omg import player, config, logging, database as db, models
-from omg.utils import relPath, absPath
+from omg.utils import relPath, absPath, ranges
 from omg.models import playlist
+from omg.player import STOP, PLAY, PAUSE
 
-import mpd, queue, itertools
+import mpd, queue, itertools, functools
 
 logger = logging.getLogger("omg.plugins.mpd")
 
-CONNECTION_TIMEOUT = 5 # time in seconds before an initial connection to MPD is given up
-POLLING_INTERVAL = 600 # milliseconds between two MPD polls
-MPD_STATES = { 'play': player.PLAY, 'stop': player.STOP, 'pause': player.PAUSE}
-
-
+CONNECTION_TIMEOUT = 10 # time in seconds before an initial connection to MPD is given up
+POLLING_INTERVAL = 200 # milliseconds between two MPD polls
+MPD_STATES = { 'play': PLAY, 'stop': STOP, 'pause': PAUSE}
 default_data = {'host' : 'localhost', 'port': '6600', 'password': ''}
+
 class MPDThread(QtCore.QThread):
-    
+    """Helper class for the MPD player backend. An MPDThread communicates with
+    the mpd server via the network. This is done in a distinguished thread in order
+    to avoid lags in the GUI. Whenever the state of mpd changes in a way that is
+    not triggered by OMG, the MPDThread will emit the *changeFromMPD* signal.
+    To detect such changes, the server is polled regularly. Changes from OMG
+    are handled by the *_handleMainChange* slot."""
     changeFromMPD = QtCore.pyqtSignal(str, object)
     
     def __init__(self, backend, connectionData):
@@ -52,24 +57,31 @@ class MPDThread(QtCore.QThread):
         self.seekRequest = None
     
     def _seek(self):
+        """Helper function to seek to a specific point of a song. We use a timer,
+        self.seekTimer, to limit the number of _seek requests sent in short time
+        periods, as it happens if the user pushes the seek slider. By storing the
+        last seek command in self.seekRequest we ensure that the last seek is
+        performed in any case."""
         if self.seekRequest is not None:
             self.client.seek(self.currentSong, self.seekRequest)
             self.seekRequest = None
         
     def _handleMainChange(self, what, how):
-        logger.debug("received command {} with args {}".format(what, how))
-        if what == "set_playlist":
+        """This slot is called by the main OMG program when the user requires a change.
+        *what* is the name of one of the command methods of PlayerBackend, *how*
+        are the corresponding arguments."""
+        if what == "_setPlaylist":
             self.client.clear()
             for path in how:
                 self.client.add(path)
             self.mpd_playlist = how
             self.playlistVersion += len(how) + 1
             
-        elif what == "elapsed":
+        elif what == "setElapsed":
             self.seekRequest = how
             self.seekTimer.start(20)
         
-        elif what == "state":
+        elif what == "setState":
             if how == player.PLAY:
                 self.client.play()
             elif how == player.PAUSE:
@@ -77,15 +89,16 @@ class MPDThread(QtCore.QThread):
             elif how == player.STOP:
                 self.client.stop()
         
-        elif what == "currentSong":
+        elif what == "setCurrentSong":
             self.client.play(how)
         
         elif what == "nextSong":
             self.client.next()
+            
         elif what == "previousSong":
             self.client.previous()
             
-        elif what == "insert":
+        elif what == "_insertIntoPlaylist":
             for position,path in how:
                 self.client.addid(path, position)
                 # mpd's playlist counter increases by two if addid is called somewhere else
@@ -93,31 +106,89 @@ class MPDThread(QtCore.QThread):
                 self.playlistVersion += 1 if position == len(self.mpd_playlist) else 2
                 self.mpd_playlist[position:position] = [path]
                 
-        elif what == "remove":
+        elif what == "_removeFromPlaylist":
             for position, path in reversed(how):
                 self.client.delete(position)
                 del self.mpd_playlist[position]
             self.playlistVersion += len(how) 
-    
-    def _updateAttributes(self, emit = True):
         
+        else:
+            logger.error('Unknown command: {}'.format(what, how))
+    
+    
+    def _handleExternalPlaylistChange(self, newVersion):
+        """Helper function to handle changes in MPD's playlist from outside OMG.
+        Currently, two special cases are detected: Insertion of consecutive songs,
+        and removal of consecutive songs. For those cases, the messages "insert" and
+        "remove", respectively, are emitted.
+        In any other case, a complete playlist change message is emitted."""
+        
+        oldVersion = self.playlistVersion
+        logger.debug("detected new plVersion: {}-->{}".format(oldVersion, newVersion))
+        
+        if oldVersion is None:
+            # this happens only on initialization. Here we don't create an UndoCommand
+            self.mpd_playlist = [x["file"] for x in self.client.playlistinfo()]
+            self.playlistVersion = newVersion
+            return
+        
+        changes = [(int(a["pos"]),a["file"]) for a in self.client.plchanges(oldVersion)]
+        self.playlistVersion = newVersion
+        newLength = int(self.mpd_status["playlistlength"])
+        # first special case: find out if only consecutive songs were removed 
+        if newLength < len(self.mpd_playlist):
+            numRemoved = len(self.mpd_playlist) - newLength
+            newSongsThere = list(zip(*changes))[1] if len(changes) > 0 else []
+            oldSongsThere = self.mpd_playlist[-len(changes):] if len(changes) > 0 else []
+            if all( a == b for a,b in zip(newSongsThere, oldSongsThere)):
+                firstRemoved = newLength - len(changes)
+                removed = list(enumerate(self.mpd_playlist[firstRemoved:firstRemoved+numRemoved],
+                                             start = firstRemoved))
+                del self.mpd_playlist[firstRemoved:firstRemoved+numRemoved]
+                self.changeFromMPD.emit('remove', removed)
+                return
+        
+        # second special case: find out if a number of consecutive songs were inserted
+        if newLength > len(self.mpd_playlist):
+            numInserted = newLength - len(self.mpd_playlist)
+            numShifted = len(changes) - numInserted
+            if numShifted == 0:
+                newSongsThere = []
+                oldSongsThere = []
+            else:
+                newSongsThere = list(zip(*changes[-numShifted:]))[1]
+                oldSongsThere = self.mpd_playlist[-numShifted:]
+            if all (a == b for a,b in zip(newSongsThere, oldSongsThere)):
+                firstInserted = len(self.mpd_playlist) - numShifted
+                insertions = changes[:numInserted]
+                self.mpd_playlist[firstInserted:firstInserted] = insertions
+                self.changeFromMPD.emit('insert', insertions)
+                return
+        
+        # other cases: update self.mpd_playlist and emit a generic "playlist" change message.
+        for pos, file in sorted(changes):
+            if pos < len(self.mpd_playlist):
+                self.mpd_playlist[pos] = file
+            else:
+                self.mpd_playlist.append(file)
+        self.changeFromMPD.emit('playlist', self.mpd_playlist[:])
+        
+    def _updateAttributes(self, emit = True):
+        """Get current status from MPD, update attributes of this object and emit
+        messages if something has changed."""
+         
         # fetch information from MPD
         self.mpd_status = self.client.status()
         
         # check for a playlist change
         playlistVersion = int(self.mpd_status["playlist"])
         if playlistVersion != self.playlistVersion:
-            logger.debug("detected new plVersion: {}-->{}".format(self.playlistVersion, playlistVersion))
-            self.playlistVersion = playlistVersion
-            self.mpd_playlist = [x["file"] for x in self.client.playlistinfo()]
-            if emit:
-                self.changeFromMPD.emit('playlist', self.mpd_playlist)
-
-        # check if current song has changed. If so, also update length of current
-        # song
-        try:
+            self._handleExternalPlaylistChange(playlistVersion)
+            
+        # check if current song has changed. If so, update length of current song
+        if "song" in self.mpd_status:
             currentSong = int(self.mpd_status["song"])
-        except KeyError:
+        else:
             currentSong = -1
         if currentSong != self.currentSong:
             self.currentSong = currentSong
@@ -127,33 +198,50 @@ class MPDThread(QtCore.QThread):
             else:
                 self.currentSongLength = 0 # no current song
             if emit:
-                self.changeFromMPD.emit('currentSong', self.currentSong)
+                self.changeFromMPD.emit('currentSong', (self.currentSong, self.currentSongLength))
              
         # check for a change of playing state
         state = MPD_STATES[self.mpd_status["state"]]
-        if emit and state != self.state:
-            self.changeFromMPD.emit('state', state)
+        if state != self.state:
+            if emit:
+                self.changeFromMPD.emit('state', state)
+            if state == STOP:
+                self.currentSongLength = 0
+                self.currentSong = -1
+                if emit:
+                    self.changeFromMPD.emit('currentSong', (-1, 0))
         self.state = state
         
         # check if elapsed time has changed
-        if state != player.STOP:
+        if state != STOP:
             elapsed = float(self.mpd_status['elapsed'])
             if emit and elapsed != self.elapsed:
                 self.changeFromMPD.emit('elapsed', elapsed)
             self.elapsed = elapsed
-            
+    
+    def connect(self):
+        connected = False
+        
+        while not connected:
+            import socket
+            try:
+                self.client.connect(host = self.connectionData['host'],
+                            port = self.connectionData['port'],
+                            timeout = CONNECTION_TIMEOUT)
+                connected = True
+            except socket.error as e:
+                logger.debug("could not connect to MPD: {}".format(e))
+                self.sleep(2)       
         
     def run(self):
         # connect to MPD
         self.client = mpd.MPDClient()
-        self.client.connect(host = self.connectionData['host'],
-                            port = self.connectionData['port'],
-                            timeout = CONNECTION_TIMEOUT)
+        self.connect()
         # obtain initial playlist / current song status
         
         self._updateAttributes(emit = False)
         self.changeFromMPD.emit('init_done',
-            (self.mpd_playlist, self.currentSong, self.currentSongLength, self.elapsed, self.state))
+            (self.mpd_playlist[:], self.currentSong, self.currentSongLength, self.elapsed, self.state))
 
         # start event loop for polling
         self.timer.start(POLLING_INTERVAL)
@@ -166,8 +254,14 @@ class MPDThread(QtCore.QThread):
         
     def poll(self):
         if self.doPolling:
-            logger.debug("MPD thread is polling")
-            self._updateAttributes()
+            try:
+                self._updateAttributes()
+            except mpd.ConnectionError as e:
+                logger.warning(e)
+                self.client.disconnect()
+                self.changeFromMPD.emit('disconnect', None)
+                self.connect()
+                self.changeFromMPD.emit('connect', None)
 
 class MPDPlayerBackend(player.PlayerBackend):
     
@@ -188,6 +282,16 @@ class MPDPlayerBackend(player.PlayerBackend):
         self.mpdthread.start()
         self._numFrontends = 0
         
+        # initialize functions that emit signals to the MPD thread on being called
+        def _emitChange(what, *args):
+            if what[0]== '_': # those methods call superclass implementation first
+                getattr(player.PlayerBackend, what)(self, *args)
+            self.changeFromMain.emit(what, *args)
+        for what in ("setElapsed", "setState", "setCurrentSong", "_setPlaylist",
+                "_insertIntoPlaylist", "_removeFromPlaylist", "nextSong",
+                "previousSong"):
+            setattr(self, what, functools.partial(_emitChange, what))
+    
     @QtCore.pyqtSlot(str, object)
     def _handleMPDChange(self, what, how):
         if what == 'init_done':
@@ -208,38 +312,37 @@ class MPDPlayerBackend(player.PlayerBackend):
             self.stateChanged.emit(how)
             
         elif what == 'currentSong':
-            self.currentSong = how
-            self.currentSongChanged.emit(how)
+            self.currentSong, self.currentSongLength = how
+            self.currentSongChanged.emit(self.currentSong)
+        
+        elif what == 'remove':
+            self.playlist.removeSongs(how)
+            self.stack.push(player.RemoveFromPlaylistCommand(self, how, '[ext] remove', True))
+            print(self.paths)
+            print(how)
+            for pos,path in reversed(how):
+                del self.paths[pos]
+            print(self.paths)
+        
+        elif what == 'insert':
+            self.playlist.insertSongs(how)
+            self.stack.push(player.InsertIntoPlaylistCommand(self, how, '[ext] insert', True))
+            for pos, path in how:
+                self.paths[pos:pos] = how
+            
+        elif what == 'playlist':
+            print(how)
+            self.playlist.updateFromPathList(how)
+            self.stack.push(player.ChangePlaylistCommand(self, self.paths, how, '[ext] modify', True))
+            self.paths = how
+            
+        elif what == 'disconnect':
+            self.connectionStateChanged.emit(player.DISCONNECTED)
+        elif what == 'connect':
+            self.connectionStateChanged.emit(player.CONNECTED)
         else:
             print('WHAT? {}'.format(what))
                     
-    def setElapsed(self, time):
-        self.changeFromMain.emit('elapsed', time)
- 
-    def setState(self, state):
-        self.changeFromMain.emit("state", state)
-    
-    def setCurrentSong(self, index):
-        self.changeFromMain.emit("currentSong", index)
-    
-    def _setPlaylist(self, paths):
-        super()._setPlaylist(paths)
-        self.changeFromMain.emit('set_playlist', paths)
-    
-    def _insertIntoPlaylist(self, insertions):
-        super()._insertIntoPlaylist(insertions)
-        self.changeFromMain.emit('insert', insertions)
-    
-    def _removeFromPlaylist(self, removals):
-        super()._removeFromPlaylist(removals)
-        self.changeFromMain.emit('remove', removals)
-        
-    def nextSong(self):
-        self.changeFromMain.emit('nextSong', None)
-    
-    def previousSong(self):
-        self.changeFromMain.emit('previousSong', None)
-    
     def registerFrontend(self, obj):
         self._numFrontends += 1
         if self._numFrontends == 1:

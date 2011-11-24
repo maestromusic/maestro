@@ -915,7 +915,7 @@ class EditorDelegate(AbstractDelegate):
             
         # Flags without icon
         if len(flagsWithoutIcon) > 0:
-            self.addCenter(TextItem(', '.join(flag.name for flag in flagWithoutIcon)))
+            self.addCenter(TextItem(', '.join(flag.name for flag in flagsWithoutIcon)))
             
     def prepareTags(self,element):
         theTags = self.getTags(element)

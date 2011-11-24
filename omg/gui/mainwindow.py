@@ -164,21 +164,18 @@ class MainWindow(QtGui.QMainWindow):
     globalSelectionChanged = QtCore.pyqtSignal(list,QtCore.QObject)
     
     def __init__(self,parent=None):
-        QtGui.QMainWindow.__init__(self, parent)
+        super().__init__(parent)
         self.setDockNestingEnabled(True)
         self.setWindowTitle(self.tr('OMG version {}').format(constants.VERSION))
         self.setWindowIcon(QtGui.QIcon("images/omg.png"))
         self.setCentralWidget(QtGui.QTabWidget())
-        
         self.initMenus()
         self.statusBar()
-        
         global mainWindow
         mainWindow = self
-        
         self.restoreLayout()
         self.updateViewMenu()
-                
+
         #TODO: Replace this hack by something clever.
         browserShortcut = QtGui.QShortcut(QtGui.QKeySequence(self.tr("Ctrl+F")),self,
                                           self._handleBrowserShortcut)
@@ -342,7 +339,7 @@ class MainWindow(QtGui.QMainWindow):
         
         widget.setObjectName(objectName)
         self._dockWidgets[data].append(widget)
-        QtGui.QMainWindow.addDockWidget(self,location.area,widget)
+        super().addDockWidget(location.area,widget)
 
         if data.unique:
             self._setUniqueDockActionEnabled(data.id,False)
@@ -365,7 +362,6 @@ class MainWindow(QtGui.QMainWindow):
             screen = QtGui.QDesktopWidget().screenGeometry()
             size = self.geometry()
             self.move((screen.width()-size.width())/2, (screen.height()-size.height())/2)
-        
         # Restore central widgets
         self._centralWidgets = {}
         for id,options in config.storage.gui.central_widgets:
@@ -377,7 +373,6 @@ class MainWindow(QtGui.QMainWindow):
             else: logger.info("Could not load central widget '{}'".format(data))
         if config.storage.gui.central_tab_index < self.centralWidget().count():
             self.centralWidget().setCurrentIndex(config.storage.gui.central_tab_index)
-        
         # Restore dock widgets (create them with correct object names and use QMainWindow.restoreState)
         self._dockWidgets = {}
         for id,objectName,location,options in config.storage.gui.dock_widgets:
@@ -385,7 +380,6 @@ class MainWindow(QtGui.QMainWindow):
             if data is not None: # As above it may happen that data is None.
                 widget = self._createDockWidget(data,Location(*location),objectName,options)
             else: logger.info("Could not load dock widget '{}' with object name '{}'".format(data,objectName))
-
         # Restore state
         if "mainwindow_state" in config.binary and isinstance(config.binary["mainwindow_state"],bytearray):
             success = self.restoreState(config.binary["mainwindow_state"])
@@ -393,7 +387,7 @@ class MainWindow(QtGui.QMainWindow):
         if not success:
             for data,widgets in self._dockWidgets.items():
                 for widget in widgets:
-                    QtGui.QMainWindow.addDockWidget(self,data.preferredDockArea,widget)
+                    super().addDockWidget(data.preferredDockArea,widget)
             
     def saveLayout(self):
         """Save the geometry and state of the main window and the central widgets and dock widgets which are
