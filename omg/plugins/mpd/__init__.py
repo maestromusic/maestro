@@ -29,7 +29,7 @@ import mpd, queue, itertools, functools
 logger = logging.getLogger("omg.plugins.mpd")
 
 CONNECTION_TIMEOUT = 10 # time in seconds before an initial connection to MPD is given up
-POLLING_INTERVAL = 600 # milliseconds between two MPD polls
+POLLING_INTERVAL = 200 # milliseconds between two MPD polls
 MPD_STATES = { 'play': PLAY, 'stop': STOP, 'pause': PAUSE}
 default_data = {'host' : 'localhost', 'port': '6600', 'password': ''}
 

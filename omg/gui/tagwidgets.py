@@ -477,6 +477,7 @@ class NewTagTypeDialog(QtGui.QDialog):
                 text = self.tr("The tag '{}' occurred for the first time. Please enter its type:") \
                                     .format(tagname)
         label = QtGui.QLabel(text)
+        label.setWordWrap(True)
         self.layout().addWidget(label)
             
         if tagnameEditable:

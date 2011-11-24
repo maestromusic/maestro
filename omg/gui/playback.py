@@ -46,13 +46,18 @@ class PlaybackWidget(QtGui.QDockWidget):
         policy = QtGui.QSizePolicy()
         policy.setHorizontalPolicy(QtGui.QSizePolicy.Fixed)
         self.previousButton = QtGui.QPushButton(utils.getIcon("previous.png"),'',self)
-        self.ppButton = PlayPauseButton(self)
-        self.stopButton = QtGui.QPushButton(utils.getIcon("stop.png"),'',self)
-        self.nextButton = QtGui.QPushButton(utils.getIcon("next.png"),'',self)
         
+        self.ppButton = PlayPauseButton(self)
+        self.stopButton = QtGui.QPushButton(utils.getIcon("stop_small.png"),'',self)
+        self.nextButton = QtGui.QPushButton(utils.getIcon("next.png"),'',self)
+        self.ppButton.setIconSize(QtCore.QSize(10,16))
+        self.stopButton.setIconSize(QtCore.QSize(10,16))
+        self.previousButton.setIconSize(QtCore.QSize(16,16))
+        self.nextButton.setIconSize(QtCore.QSize(16,16))
         for w in (self.backendChooser, self.previousButton, self.ppButton,
                        self.stopButton, self.nextButton):
             w.setSizePolicy(policy)
+            
         #    widget.setSizePolicy(policy)
         self.titleLabel = QtGui.QLabel(self)
         self.titleLabel.setTextFormat(Qt.AutoText)
@@ -89,7 +94,7 @@ class PlaybackWidget(QtGui.QDockWidget):
     def updateCurrent(self, pos):
         current = self.backend.playlist.current
         if current is not None:
-            self.titleLabel.setText("<i>{}</i>".format(current.getTitle()))
+            self.titleLabel.setText("{}: <i>{}</i>".format(self.tr("Current song"), current.getTitle()))
         else:
             self.titleLabel.setText(self.tr('no song selected'))
     
@@ -168,8 +173,8 @@ class PlayPauseButton(QtGui.QPushButton):
     # Signals and icons used for the two states
     play = QtCore.pyqtSignal()
     pause = QtCore.pyqtSignal()
-    playIcon = utils.getIcon("play.png")
-    pauseIcon = utils.getIcon("pause.png")
+    playIcon = utils.getIcon("play_small.png")
+    pauseIcon = utils.getIcon("pause_small.png")
     stateChanged = QtCore.pyqtSignal(int)
     
     def __init__(self,parent):
