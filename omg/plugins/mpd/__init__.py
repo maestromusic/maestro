@@ -318,11 +318,8 @@ class MPDPlayerBackend(player.PlayerBackend):
         elif what == 'remove':
             self.playlist.removeSongs(how)
             self.stack.push(player.RemoveFromPlaylistCommand(self, how, '[ext] remove', True))
-            print(self.paths)
-            print(how)
             for pos,path in reversed(how):
                 del self.paths[pos]
-            print(self.paths)
         
         elif what == 'insert':
             self.playlist.insertSongs(how)
@@ -331,7 +328,6 @@ class MPDPlayerBackend(player.PlayerBackend):
                 self.paths[pos:pos] = how
             
         elif what == 'playlist':
-            print(how)
             self.playlist.updateFromPathList(how)
             self.stack.push(player.ChangePlaylistCommand(self, self.paths, how, '[ext] modify', True))
             self.paths = how

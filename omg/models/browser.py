@@ -273,11 +273,11 @@ class CriterionNode(models.Node):
         """Return a list containing the criteria of this node and of all of its parent nodes (as long as they
         are of type CriterionNode)."""
         result = [self.getCriterion()]
-        parent = self.getParent()
+        parent = self.parent
         while parent is not None:
             if isinstance(parent,CriterionNode): # Skip HiddenValuesNodes
                 result.append(parent.getCriterion())
-            parent = parent.getParent()
+            parent = parent.parent
         return result
     
     def getCriterion(self):
@@ -501,8 +501,8 @@ def _loadData(element):
     if element.flags is None:
         element.flags = db.flags(element.id)
         
-    if element.position is None and isinstance(element.getParent(),Element):
-        position = db.position(element.getParent().id,element.id)
+    if element.position is None and isinstance(element.parent,Element):
+        position = db.position(element.parent.id,element.id)
         
     if element.isFile():
         if element.path is None:
@@ -510,6 +510,6 @@ def _loadData(element):
         if element.length is None:
             element.length = db.length(element.id)
     else:
-        for child in element.getContents():
+        for child in element.contents:
             _loadData(child)
     

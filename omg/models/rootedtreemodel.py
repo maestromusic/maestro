@@ -109,7 +109,7 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
         if not index.isValid():
             return QtCore.QModelIndex()
         child = index.internalPointer()
-        parent = child.getParent()
+        parent = child.parent
         # This method should never be called on the root-node because it is not displayed in the treeview.
         assert parent is not None
         if parent == self.root:
@@ -144,7 +144,7 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
         QModelIndex."""
         if node == self.root:
             return QtCore.QModelIndex()
-        parent = node.getParent()
+        parent = node.parent
         try:
             parent.getContents().index(node)
         except ValueError:

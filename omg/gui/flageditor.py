@@ -340,14 +340,14 @@ class AddFlagPopup(dialogs.FancyPopup):
     def _handleAddButton(self):
         """Create a new flagtype (querying the user for the flagtype's name) and directly add it to all
         elements that are currently edited."""
-        from . import flagmanager
+        from .preferences import flagmanager
         flag = flagmanager.createNewFlagType(self.parent())
         self.model.addFlag(flag)
         self.close()
         
     def _handleManagerButton(self):
         """Open the flagmanager."""
-        from . import flagmanager
+        from .preferences import flagmanager
         flagManager = flagmanager.FlagManager(self.parent())
         flagManager.exec_()
         self.close()

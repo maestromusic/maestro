@@ -802,8 +802,8 @@ class BrowserDelegate(AbstractDelegate):
         
         parent = element
         while len(values) > 0:
-            parent = parent.getParent()
-            if parent is None or isinstance(parent,models.RootNode):
+            parent = parent.parent
+            if isinstance(parent,models.RootNode):
                 break
         
             if isinstance(parent,models.Element) and tagType in parent.tags:
@@ -824,13 +824,13 @@ class BrowserDelegate(AbstractDelegate):
         """Return flag icons that should be displayed for *element*. All flags contained in at least one
         parent node will be removed from the result."""
         flags = [flag for flag in element.flags if flag.icon is not None]
-        parent = element.getParent()
+        parent = element.parent
         while parent is not None:
             if isinstance(parent,models.Element):
                 for flag in parent.flags:
                     if flag.icon is not None and flag in flags:
                         flags.remove(flag)
-            parent = parent.getParent()
+            parent = parent.parent
         return [flag.icon for flag in flags]
         
 
@@ -963,9 +963,9 @@ class EditorDelegate(AbstractDelegate):
     
     def getTags(self,element):
         theTags = element.tags.copy()
-        parent = element.getParent()
+        parent = element.parent
 
-        while not isinstance(parent,models.RootNode):
+        while parent is not None and not isinstance(parent,models.RootNode):
             # Be careful to iterate over the parent's tags because theTags might change
             for tag in parent.tags:
                 if tag not in theTags:
@@ -981,7 +981,7 @@ class EditorDelegate(AbstractDelegate):
                             theTags[tag].remove(value)
 #                    else:
 #                        self.addMissing(parent,tag,value)            
-            parent = parent.getParent()
+            parent = parent.parent
             
         return theTags
     
@@ -1001,13 +1001,13 @@ class EditorDelegate(AbstractDelegate):
         """
         if self.removeParentFlags:
             flags = list(element.flags) # copy!
-            parent = element.getParent()
+            parent = element.parent
             while parent is not None:
                 if isinstance(parent,models.Element):
                     for flag in parent.flags:
                         if flag in flags:
                             flags.remove(flag)
-                parent = parent.getParent()
+                parent = parent.parent
         else:
             flags = element.flags
         return [flag.icon for flag in flags if flag.icon is not None],\

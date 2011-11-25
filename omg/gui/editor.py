@@ -254,7 +254,7 @@ class EditorWidget(QtGui.QDockWidget):
         oldRoot = self.editor.model().root
         newRoot = oldRoot.copy()
         newRoot.contents.append(container)
-        container.setParent(newRoot)
+        container.parent = newRoot
         changes[oldRoot.id] = (oldRoot, newRoot)
         comm = modify.commands.UndoCommand(EDITOR, changes, contentsChanged = True, text=self.tr('new container'))
         modify.push(comm)
