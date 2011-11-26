@@ -24,7 +24,7 @@ from omg.utils import relPath, absPath, ranges
 from omg.models import playlist
 from omg.player import STOP, PLAY, PAUSE
 
-import mpd, queue, itertools, functools
+import mpd, queue, itertools, functools, threading
 
 logger = logging.getLogger("omg.plugins.mpd")
 
@@ -53,8 +53,9 @@ class MPDThread(QtCore.QThread):
         self.playlistVersion = self.state   = \
             self.currentSong = self.elapsed = \
             self.currentSongLength = None
-        self.doPolling = False
+        self.doPolling = threading.Event()
         self.seekRequest = None
+        self.connected = False
     
     def _seek(self):
         """Helper function to seek to a specific point of a song. We use a timer,
@@ -220,32 +221,29 @@ class MPDThread(QtCore.QThread):
             self.elapsed = elapsed
     
     def connect(self):
-        connected = False
-        
-        while not connected:
-            import socket
-            try:
-                self.client.connect(host = self.connectionData['host'],
-                            port = self.connectionData['port'],
-                            timeout = CONNECTION_TIMEOUT)
-                connected = True
-            except socket.error as e:
-                logger.debug("could not connect to MPD: {}".format(e))
-                self.sleep(2)       
+        import socket
+        try:
+            self.client.connect(host = self.connectionData['host'],
+                        port = self.connectionData['port'],
+                        timeout = CONNECTION_TIMEOUT)
+            self._updateAttributes(emit = False)
+            self.changeFromMPD.emit('init_done',
+                                    (self.mpd_playlist[:],
+                                     self.currentSong,
+                                     self.currentSongLength,
+                                     self.elapsed,
+                                     self.state))
+            self.connected = True
+            self.changeFromMPD.emit('connect', None)
+            return True
+        except socket.error:
+            self.connected = False
+            return False       
         
     def run(self):
         # connect to MPD
         self.client = mpd.MPDClient()
-        self.connect()
-        # obtain initial playlist / current song status
-        
-        self._updateAttributes(emit = False)
-        self.changeFromMPD.emit('init_done',
-            (self.mpd_playlist[:], self.currentSong, self.currentSongLength, self.elapsed, self.state))
-
-        # start event loop for polling
         self.timer.start(POLLING_INTERVAL)
-        self.doPolling = True
         
         self.seekTimer = QtCore.QTimer(self)
         self.seekTimer.setSingleShot(True)
@@ -253,15 +251,16 @@ class MPDThread(QtCore.QThread):
         self.exec_()
         
     def poll(self):
-        if self.doPolling:
-            try:
-                self._updateAttributes()
-            except mpd.ConnectionError as e:
-                logger.warning(e)
-                self.client.disconnect()
-                self.changeFromMPD.emit('disconnect', None)
-                self.connect()
-                self.changeFromMPD.emit('connect', None)
+        self.doPolling.wait() # do nothing as long as no frontends are registered
+        while not (self.connected or self.connect()):
+            self.sleep(2)
+        try:
+            self._updateAttributes()
+        except mpd.ConnectionError as e:
+            logger.warning(e)
+            self.client.disconnect()
+            self.changeFromMPD.emit('disconnect', None)
+            
 
 class MPDPlayerBackend(player.PlayerBackend):
     
@@ -343,13 +342,13 @@ class MPDPlayerBackend(player.PlayerBackend):
         self._numFrontends += 1
         if self._numFrontends == 1:
             logger.debug('frontend {} registered at {} -- starting poll'.format(obj, self))
-            self.mpdthread.doPolling = True
+            self.mpdthread.doPolling.set()
     
     def unregisterFrontend(self, obj):
         self._numFrontends -= 1
         if self._numFrontends == 0:
             logger.debug('frontend {} deregistered at {} -- stopping poll'.format(obj, self))
-            self.mpdthread.doPolling = False
+            self.mpdthread.doPolling.clear()
     
     @staticmethod
     def configWidget(profile = None):

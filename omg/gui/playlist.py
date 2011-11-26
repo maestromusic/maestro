@@ -55,7 +55,34 @@ class PlaylistTreeView(treeview.TreeView):
         if idx.isValid():
             offset = idx.internalPointer().offset()
             self.songSelected.emit(offset)
+
+    def dragEnterEvent(self, event):
+        if event.source() is self:
+            event.setDropAction(Qt.MoveAction)
+        else:
+            event.setDropAction(Qt.CopyAction)
+        treeview.TreeView.dragEnterEvent(self, event)
         
+    def dragMoveEvent(self, event):
+        if event.source() is self:
+            if event.keyboardModifiers() & Qt.ShiftModifier:
+                event.setDropAction(Qt.MoveAction)
+            elif event.keyboardModifiers() & Qt.ControlModifier:
+                event.setDropAction(Qt.CopyAction)
+        treeview.TreeView.dragMoveEvent(self, event)
+        
+    def dropEvent(self, event):
+        if event.source() is self:
+            if event.keyboardModifiers() & Qt.ShiftModifier:
+                event.setDropAction(Qt.MoveAction)
+            elif event.keyboardModifiers() & Qt.ControlModifier:
+                event.setDropAction(Qt.CopyAction)
+            elif event.source() is self:
+                event.setDropAction(Qt.MoveAction)
+            else:
+                event.setDropAction(Qt.CopyAction)
+        treeview.TreeView.dropEvent(self, event)
+    
 
 class PlaylistDelegate(delegates.BrowserDelegate):
     """Delegate for the playlist."""

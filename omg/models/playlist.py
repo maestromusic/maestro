@@ -29,7 +29,7 @@ from . import rootedtreemodel, treebuilder
 logger = logging.getLogger(__name__)
         
 class Playlist(rootedtreemodel.RootedTreeModel):
-    """Basic model for playlists. A BasicPlaylists contains a list of nodes and supports insertion and removal of nodes as well as drag and drop of omg's own mimetype (config-variable gui->mime) and "text/uri-list"."""
+    """Model for Playlists of a player backend."""
     
     def __init__(self, backend):
         """Initialize with an empty playlist."""
@@ -101,7 +101,9 @@ class Playlist(rootedtreemodel.RootedTreeModel):
 
     def dropMimeData(self,mimeData,action,row,column,parentIndex):
         if mimeData.hasFormat(config.options.gui.mime):
-            paths = [f.path for f in itertools.chain.from_iterable(e.getAllFiles() for e in mimeData.getElements())]            
+            fileElems = list(itertools.chain.from_iterable(e.getAllFiles()
+                             for e in mimeData.getElements()))
+            paths = [f.path for f in fileElems]   
         else:
             paths = list(map(utils.relPath, itertools.chain.from_iterable(
                 utils.collectFiles(u.path() for u in mimeData.urls()).values())))
@@ -114,7 +116,21 @@ class Playlist(rootedtreemodel.RootedTreeModel):
             offset = parent.offset() + parent.fileCount()
         else:
             offset = parent.contents[row].offset()
+        
+        if action == Qt.MoveAction:
+            offsetShift = 0
+            removePairs = []
+            for file in fileElems:
+                fileOffset = file.offset()
+                removePairs.append((fileOffset, file.path))
+                if fileOffset < offset:
+                    offsetShift += 1
+            offset -= offsetShift
+            self.backend.stack.beginMacro(self.tr("move songs"))
+            self.backend.removeFromPlaylist(removePairs)
         self.backend.insertIntoPlaylist(list(enumerate(paths, start = offset)))
+        if action == Qt.MoveAction:
+            self.backend.stack.endMacro()
         return True
     
     def insertSongs(self,insertions):
@@ -368,7 +384,7 @@ class Playlist(rootedtreemodel.RootedTreeModel):
             #we should group them into this parent
 
     def handleElementChangeEvent(self, event):
-        print(event)
+        pass
     def handleChangeEvent(self, event):
         if isinstance(event, events.ElementChangeEvent):
             if event.level == REAL:

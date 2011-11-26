@@ -20,7 +20,7 @@ from PyQt4 import QtCore
 from PyQt4.QtCore import Qt
 
 import itertools
-from . import Node, Element, RootNode
+from . import Node, Element, RootNode, mimedata
 from .. import logging, config
 from ..utils import ranges
 logger = logging.getLogger(__name__)
@@ -77,6 +77,9 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
     
     def mimeTypes(self):
         return (config.options.gui.mime,"text/uri-list")
+    
+    def mimeData(self,indexes):
+        return mimedata.MimeData.fromIndexes(self,indexes)
     
     def toolTipText(self, index):
         if index:
