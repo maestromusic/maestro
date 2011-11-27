@@ -188,11 +188,7 @@ try:
                 if key in ["tracknumber", "discnumber"]:
                     self.ignoredTags[key] = values
                 elif key in options.tags.always_delete:
-                    # remove question after some testing
-                    from ..gui.dialogs import question
-                    if question('really delete tag?',
-                                '"always_delete" tag *{0}* found in {1}. Really delete?'.format(key, self.path)):
-                        toDelete.append(key)
+                    toDelete.append(key)
                 else:
                     try:
                         self._parseAndAdd(key, values)

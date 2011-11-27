@@ -143,7 +143,6 @@ def run(cmdConfig = []):
     search.shutdown()
     mainWindow.saveLayout()
     plugins.shutdown()
-    #sync.shutdown()
     config.shutdown()
     logging.shutdown()
     sync.shutdown()

@@ -46,7 +46,7 @@ def profiles():
         elif name == "DIRECTORY":
             return name
         else:
-            raise ValueError("Coud not parse album grouper element: {}".format(name))
+            raise ValueError("Could not parse album grouper element: {}".format(name))
     global _profiles
     if _profiles is None:
         pr = config.storage.editor.guess_profiles

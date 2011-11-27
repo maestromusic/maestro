@@ -175,7 +175,7 @@ class MainWindow(QtGui.QMainWindow):
         mainWindow = self
         self.restoreLayout()
         self.updateViewMenu()
-
+        
         #TODO: Replace this hack by something clever.
         browserShortcut = QtGui.QShortcut(QtGui.QKeySequence(self.tr("Ctrl+F")),self,
                                           self._handleBrowserShortcut)
