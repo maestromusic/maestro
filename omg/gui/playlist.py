@@ -20,16 +20,14 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from . import treeview, mainwindow, delegates, playerwidgets
-from .. import logging, player, tags, config
-from ..models import playlist
-from ..constants import PLAYLIST
+from .. import logging, player, utils
 
 translate = QtCore.QCoreApplication.translate
 logger = logging.getLogger("gui.playlist")
 
 class PlaylistTreeView(treeview.TreeView):
     """This is the main widget of a playlist: The tree view showing the current element tree."""
-    level = PLAYLIST
+    level = None
     
     songSelected = QtCore.pyqtSignal(int)
     
@@ -42,7 +40,7 @@ class PlaylistTreeView(treeview.TreeView):
         self.setDropIndicatorShown(True)
         self.viewport().setMouseTracking(True)
         self.doubleClicked.connect(self._handleDoubleClick)
-    
+
     def setBackend(self, backend):
         self.backend = backend
         model = backend.playlist
@@ -57,7 +55,34 @@ class PlaylistTreeView(treeview.TreeView):
         if idx.isValid():
             offset = idx.internalPointer().offset()
             self.songSelected.emit(offset)
+
+    def dragEnterEvent(self, event):
+        if event.source() is self:
+            event.setDropAction(Qt.MoveAction)
+        else:
+            event.setDropAction(Qt.CopyAction)
+        treeview.TreeView.dragEnterEvent(self, event)
         
+    def dragMoveEvent(self, event):
+        if event.source() is self:
+            if event.keyboardModifiers() & Qt.ShiftModifier:
+                event.setDropAction(Qt.MoveAction)
+            elif event.keyboardModifiers() & Qt.ControlModifier:
+                event.setDropAction(Qt.CopyAction)
+        treeview.TreeView.dragMoveEvent(self, event)
+        
+    def dropEvent(self, event):
+        if event.source() is self:
+            if event.keyboardModifiers() & Qt.ShiftModifier:
+                event.setDropAction(Qt.MoveAction)
+            elif event.keyboardModifiers() & Qt.ControlModifier:
+                event.setDropAction(Qt.CopyAction)
+            elif event.source() is self:
+                event.setDropAction(Qt.MoveAction)
+            else:
+                event.setDropAction(Qt.CopyAction)
+        treeview.TreeView.dropEvent(self, event)
+    
 
 class PlaylistDelegate(delegates.BrowserDelegate):
     """Delegate for the playlist."""
@@ -69,6 +94,8 @@ class PlaylistDelegate(delegates.BrowserDelegate):
     def background(self, index):
         if index == self.model.currentModelIndex:
             return QtGui.QBrush(QtGui.QColor(110,149,229))
+        elif index in self.model.currentParentsModelIndices:
+            return QtGui.QBrush(QtGui.QColor(140,179,255))
 
 
 class PlaylistWidget(QtGui.QDockWidget):
@@ -87,8 +114,11 @@ class PlaylistWidget(QtGui.QDockWidget):
         bottomLayout.addWidget(self.backendChooser)
         self.clearButton = QtGui.QPushButton(self.tr('clear'), self)
         self.shuffleButton = QtGui.QPushButton(self.tr('shuffle'), self)
+        self.removeButton = QtGui.QPushButton(self.tr('remove'), self)
+        self.removeButton.clicked.connect(self.removeSelected)
         bottomLayout.addWidget(self.clearButton)
         bottomLayout.addWidget(self.shuffleButton)
+        bottomLayout.addWidget(self.removeButton)
         bottomLayout.addStretch()
         self.undoButton = QtGui.QToolButton(self)
         self.redoButton = QtGui.QToolButton(self)
@@ -100,8 +130,26 @@ class PlaylistWidget(QtGui.QDockWidget):
         if not self.backendChooser.setCurrentProfile(state):
             self.setBackend(self.backendChooser.currentProfile())
     
+    def removeSelected(self):
+        elements = set(ix.internalPointer() for ix in self.treeview.selectedIndexes())
+        redundant = set()
+        for element in elements:
+            for parent in element.getParents():
+                if parent in elements:
+                    redundant.add(element)
+        elements -= redundant
+        removals = []
+        for element in elements:
+            for file in element.getAllFiles():
+                #TODO: super inefficient to calculate all the offsets...we need a better way
+                # to do this anyway!
+                removals.append((file.offset(), file.path))
+        removals.sort()
+        self.backend.removeFromPlaylist(removals)
+                
     def saveState(self):
         return self.backendChooser.currentProfile()
+    
     def setBackend(self, name):
         logger.debug("playlist gui sets backend: {}".format(name))
         if hasattr(self, 'backend'):

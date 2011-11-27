@@ -31,9 +31,7 @@ translate = QtCore.QCoreApplication.translate
 class Node:
     """(Abstract) base class for elements in a RootedTreeModel...that is almost everything in playlists,
     browser etc.. Node implements the methods required by RootedTreeModel as well as many tree-structure 
-    methods. To implement getParent, setParent and getContents, it uses self.parent as parent and
-    self.contents as the list of contents, but does not create these variables. Subclasses must either create
-    self.contents and self.parent or overwrite the methods."""
+    methods."""
     
     def hasContents(self):
         """Return whether this node has at least one child node."""
@@ -51,30 +49,20 @@ class Node:
         else:
             # Add the child itself
             return sum(child.getContentsCount(True)+1 for child in self.getContents())   
-    
-    def getParent(self):
-        """Return the parent of this element."""
-        # This is a default implementation and does not mean that every node has a parent-attribute
-        return self.parent
-    
-    def setParent(self,parent):
-        """Set the parent of this node."""
-        # This is a default implementation and does not mean that every node has a parent-attribute
-        self.parent = parent
-    
+
     def setContents(self,contents):
         """Set the list of contents of this container to *contents*. Note that the list won't be copied and in
         fact altered: the parents will be set to this node."""
         assert isinstance(contents,list)
         self.contents = contents
         for element in self.contents:
-            element.setParent(self)
+            element.parent = self
     
     def insertContents(self, index, nodes):
         """Insert *nodes* at position *index* into this node's contents. As with setContents the list won't
         be copied and the parents will be set to this node."""
         for n in nodes:
-            n.setParent(self)
+            n.parent = self
         self.contents[index:index] = nodes
         
     def isFile(self):
@@ -98,27 +86,27 @@ class Node:
             if hasattr(self,'contents'):
                 newNode.contents = [node.copy() for node in self.contents]
                 for node in newNode.contents:
-                    node.setParent(newNode)
+                    node.parent = newNode
         else:
             assert isinstance(contents,list)
             newNode.contents = contents
             for node in newNode.contents:
-                node.setParent(newNode)
+                node.parent = newNode
         return newNode
     
     def getParents(self):
         """Returns a generator yielding all parents of this node in the current tree structure, from the
         direct parent to the root-node."""
-        parent = self.getParent()
+        parent = self.parent
         while parent is not None:
             yield parent
-            parent = parent.getParent()
+            parent = parent.parent
     
     def getDepth(self):
         """Return the depth of this node in the current tree structure. The root node will have level 0."""
-        if self.getParent() is None:
+        if self.parent is None:
             return 0
-        else: return 1 + self.getParent().getDepth()
+        else: return 1 + self.parent.getDepth()
 
     def maxDepth(self):
         """Return the maximum depth of nodes below this node."""
@@ -168,7 +156,7 @@ class Node:
             for element in self.getContents():
                 for file in element.getAllFiles():
                     yield file
-                        
+
     def fileCount(self):
         """Return the number of files contained in this element or in child-elements of it."""
         if self.isFile():
@@ -177,16 +165,16 @@ class Node:
         
     def offset(self):
         """Get the offset of this element in the current tree structure."""
-        if self.getParent() is None:
+        if self.parent is None:
             return 0
         else:
-            offset = self.getParent().offset()
-            for child in self.getParent().getContents():
+            offset = self.parent.offset()
+            for child in self.parent.getContents():
                 if child == self:
                     return offset
                 else: offset = offset + child.fileCount()
             raise ValueError("Node.getOffset: Node {0} is not contained in its parent {1}."
-                                .format(self,self.getParent()))
+                                .format(self,self.parent))
     
     def childOffset(self,childIndex):
         """Return the offset of the child with index <childIndex> in this node."""
@@ -249,16 +237,12 @@ class Node:
 
 class RootNode(Node):
     """Rootnode at the top of a RootedTreeModel."""
+    
+    parent = None
     def __init__(self):
         from .. import modify
         self.contents = []
         self.id = modify.newEditorId()
-    
-    def getParent(self):
-        return None
-    
-    def setParent(self):
-        raise RuntimeError("Cannot set the parent of a RootNode.")
     
     def __repr__(self):
         return 'RootNode[{}] with {} children'.format(self.id, len(self.contents))

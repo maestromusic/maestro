@@ -20,7 +20,6 @@ from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
 from .. import logging, modify, tags, realfiles, config
-from . import mimedata
 from ..models import rootedtreemodel, RootNode, File, Container
 from ..modify import events, commands
 from ..utils import collectFiles, relPath
@@ -131,13 +130,7 @@ class EditorModel(rootedtreemodel.RootedTreeModel):
 
     def supportedDropActions(self):
         return Qt.CopyAction | Qt.MoveAction
-    
-    def mimeTypes(self):
-        return (config.options.gui.mime,"text/uri-list")
-    
-    def mimeData(self,indexes):
-        return mimedata.MimeData.fromIndexes(self,indexes)
-    
+
     def dropMimeData(self,mimeData,action,row,column,parentIndex):
         """This function does all the magic that happens if elements are dropped onto this editor."""
         QtGui.QApplication.changeOverrideCursor(Qt.ArrowCursor) # dont display the DnD cursor during the warning
