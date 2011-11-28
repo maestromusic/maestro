@@ -86,10 +86,18 @@ class DBAnalyzerDialog(QtGui.QDialog):
     def __init__(self,parent=None,dialog=False):
         QtGui.QDialog.__init__(self,parent)
         self.setLayout(QtGui.QHBoxLayout())
+        splitter = QtGui.QSplitter()
+        self.layout().addWidget(splitter)
+        leftWidget = QtGui.QWidget()
         leftLayout = QtGui.QVBoxLayout()
+        leftLayout.setContentsMargins(0,0,0,0)
+        leftWidget.setLayout(leftLayout)
+        splitter.addWidget(leftWidget)
+        rightWidget = QtGui.QWidget()
         rightLayout = QtGui.QVBoxLayout()
-        self.layout().addLayout(leftLayout,0)
-        self.layout().addLayout(rightLayout,1)
+        rightLayout.setContentsMargins(0,0,0,0)
+        rightWidget.setLayout(rightLayout)
+        splitter.addWidget(rightWidget)
 
         # Statistics
         statisticsBox = QtGui.QGroupBox(self.tr("Statistics"))

@@ -243,6 +243,54 @@ class ValueIdsCheck(Check):
             db.query(self._query(type.name,False,True))
 
 
+class WithoutTagsCheck(Check):
+    """Check for elements without tags. Fixing this means removing those elements from the database!"""
+    _columnHeaders = (translate("DBAnalyzerChecks","ID"),translate("DBAnalyzerChecks","Path"),
+                      translate("DBAnalyzerChecks","Elements"))
+                      
+    _name = translate("DBAnalyzerChecks","Without Tags")
+    
+    def check(self,data):
+        select = 'el.id,f.path,el.elements' if data else "COUNT(*)"
+        query = """
+            SELECT {0}
+            FROM {1}elements AS el LEFT JOIN {1}tags AS t ON el.id = t.element_id
+                                   LEFT JOIN {1}files AS f ON el.id = f.element_id
+            WHERE t.tag_id IS NULL
+            """.format(select,db.prefix)
+        if not data:
+            return db.query(query).getSingle()
+        else: return [row for row in db.query(query)]
+        
+    def fix(self): pass
+
+
+class DoubledFilesCheck(Check):
+    """Check for files that appear twice in the database. This check currently cannot be fixed automatically.
+    """
+    _columnHeaders = (translate("DBAnalyzerChecks","ID 1"),translate("DBAnalyzerChecks","ID 2"),
+                      translate("DBAnalyzerChecks","Title"),
+                      translate("DBAnalyzerChecks","Path"))
+    
+    _name = translate("DBAnalyzerChecks","Doubled files")
+    
+    def check(self,data):
+        if not data:
+            return db.query("""
+                    SELECT COUNT(DISTINCT f1.element_id)
+                    FROM {0}files AS f1 JOIN {0}files AS f2
+                                            ON f1.path = f2.path AND f1.element_id != f2.element_id
+                """.format(db.prefix)).getSingle()
+        else:
+            return [(row[0],row[1],getTitle(row[1]),row[2]) for row in db.query("""
+                    SELECT f1.element_id,f2.element_id,f1.path
+                    FROM {0}files AS f1 JOIN {0}files AS f2
+                                            ON f1.path = f2.path AND f1.element_id != f2.element_id
+                """.format(db.prefix))]
+        
+    def fix(self): pass
+    
+    
 def getTitle(id):
     """Return a displayable title for the element with the given id."""
     titles = list(db.query("""
