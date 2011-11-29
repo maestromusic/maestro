@@ -23,7 +23,7 @@ from PyQt4.QtCore import Qt
 
 from .. import models, tags, config, strutils, database as db, utils
 from ..models import browser as browsermodel
-from .preferences.delegates import DelegateOption, DelegateConfig, addDelegateConfig, getConfig
+from .preferences.delegates import DelegateOption, DelegateConfig, addDelegateConfig, getConfig, DataPiece
 
 translate = QtCore.QCoreApplication.translate
 
@@ -806,10 +806,12 @@ class BrowserDelegate(AbstractDelegate):
             if isinstance(parent,models.RootNode):
                 break
         
-            if isinstance(parent,models.Element) and tagType in parent.tags:
+            if isinstance(parent,models.Element):
                 if parent.tags is None:
                     parent.loadTags()
-                parentValues = parent.tags[tagType]
+                if tagType in parent.tags:
+                    parentValues = parent.tags[tagType]
+                else: parentValues = []
             elif isinstance(parent,browsermodel.ValueNode):
                 parentValues = parent.values
             else: parentValues = []
@@ -832,7 +834,13 @@ class BrowserDelegate(AbstractDelegate):
                         flags.remove(flag)
             parent = parent.parent
         return [flag.icon for flag in flags]
-        
+    
+    @staticmethod
+    def getDefaultDataPieces():
+        left = [DataPiece(tags.get(name)) for name in ['composer','artist','performer']]
+        right = [DataPiece(tags.get(name)) for name in ['date','conductor']]
+        return left,right
+
 
 defaultBrowserDelegateConfig = DelegateConfig(translate("Delegates","Browser"),BrowserDelegate,builtin=True)
 addDelegateConfig(defaultBrowserDelegateConfig)
@@ -1013,6 +1021,12 @@ class EditorDelegate(AbstractDelegate):
         return [flag.icon for flag in flags if flag.icon is not None],\
                [flag.name for flag in flags if flag.icon is None]
     
-    
+    @staticmethod
+    def getDefaultDataPieces():
+        left = [DataPiece(tags.get(name)) for name in ['album','composer','artist','performer']]
+        right = [DataPiece(tags.get(name)) for name in ['date','genre','conductor']]
+        return left,right
+
+
 defaultEditorDelegateConfig = DelegateConfig(translate("Delegates","Editor"),EditorDelegate,builtin=True)
 addDelegateConfig(defaultEditorDelegateConfig)

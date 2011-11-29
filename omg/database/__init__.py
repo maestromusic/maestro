@@ -377,8 +377,13 @@ def idFromValue(tagSpec,value,insert=False):
     tag = tagsModule.get(tagSpec)
     value = _encodeValue(tag.type,value)
     try:
-        return query("SELECT id FROM {}values_{} WHERE tag_id = ? AND value = ?"
-                        .format(prefix,tag.type),tag.id,value).getSingle()
+        if tag.type == tagsModule.TYPE_DATE:
+            return query("SELECT id FROM {}values_date WHERE tag_id = ? AND value = ?"
+                            .format(prefix),tag.id,value).getSingle()
+        else:
+            # Compare exactly (using binary collation
+            return query("SELECT id FROM {}values_{} WHERE tag_id = ? AND value COLLATE utf8_bin = ?"
+                            .format(prefix,tag.type),tag.id,value).getSingle()
     except sql.EmptyResultException as e:
         if insert:
             result = query("INSERT INTO {}values_{} SET tag_id = ?,value = ?"

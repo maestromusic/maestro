@@ -549,8 +549,11 @@ class Storage(dict):
         return result
         
     def __setitem__(self,key,value):
-        assert isinstance(key,Tag)
-        assert isinstance(value,Sequence) and not isinstance(value,str)
+        if not isinstance(key,Tag):
+            raise ValueError("key argument must be a tag instance. I got {}".format(key))
+        if not isinstance(value,Sequence) or isinstance(value,str):
+            raise ValueError("value must be a Sequence (but no string. I got {}".format(key))
+            
         if len(value) == 0:
             if key in self:
                 del self[key]

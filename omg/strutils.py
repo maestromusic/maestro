@@ -124,7 +124,8 @@ def numberFromPrefix(string):
         i += 1
     while (string[i].isspace()):
         i += 1
-    if indexWhereNumberEnds > i:
+    # Only detect a number if at least one whitespace or a period was found
+    if indexWhereNumberEnds < i:
         return (number,string[:i])
     else: return (None,'')
     

@@ -21,10 +21,50 @@ import weakref, functools
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-delegateClasses = []
+from ... import utils, tags
+
+translate = QtCore.QCoreApplication.translate
+
+delegateClasses = [] #TODO: not needed
 delegateConfigs = []
 
+
+class DataPiece:
+    def __init__(self,data,title=None):
+        if isinstance(data,tags.Tag):
+            self.tag = data
+            self.data = None
+        else:
+            self.tag = None
+            self.data = data
+            self._title = title
+        self.data = data
         
+    def getTitle(self):
+        if self.tag is not None:
+            return self.tag.translated()
+        else: return self._title
+        
+    title = property(getTitle)
+    
+    def __eq__(self,other):
+        return self.data == other.data
+    
+    def __ne__(self,other):
+        return self.data != other.data
+        
+
+def availableDataPieces():
+    result = [DataPiece(tag) for tag in tags.tagList if tag != tags.TITLE]
+    result.extend([
+            DataPiece("length",translate("Delegates","Length")),
+            DataPiece("filecount",translate("Delegates","Number of files")),
+            #DataPiece("bpm",translate("Delegates","BPM")),
+            DataPiece("filetype",translate("Delegates","Filetype"))
+        ])
+    return result
+
+
 class DelegateOption:
     def __init__(self,id,title,type,default):
         self.id = id
@@ -43,11 +83,18 @@ class DelegateConfig:
         if values is not None:
             for option in self.options:
                 option.value = values[option.id]
+        self.leftData,self.rightData = theClass.getDefaultDataPieces()
         self.builtin = builtin
         
     def copy(self):
         #TODO
         pass
+    
+    def hasDataPiece(self,piece):
+        return piece in self.leftColumn or piece in self.rightColumn
+    
+    def getData(self,left):
+        return self.leftData if left else self.rightData
     
     def resetToDefaults(self):
         self.options = theClass.options.copy()
@@ -140,28 +187,143 @@ class DelegateOptionsPanel(QtGui.QScrollArea):
         self.config = config
         
         innerWidget = QtGui.QWidget()
-        self.setViewport(innerWidget)
+        innerWidget.setLayout(QtGui.QVBoxLayout())
+        innerWidget.layout().setSizeConstraint(QtGui.QLayout.SetFixedSize)
+        self.setWidget(innerWidget)
+        
+        self.datapieceEditor = DataPieceEditor(self)
+        innerWidget.layout().addWidget(self.datapieceEditor)
+        
+        frame = QtGui.QFrame()
+        frame.setFrameStyle(QtGui.QFrame.Sunken | QtGui.QFrame.HLine)
+        innerWidget.layout().addWidget(frame)
+        
         grid = QtGui.QGridLayout()
-        innerWidget.setLayout(grid)
+        grid.setContentsMargins(0,0,0,0)
+        innerWidget.layout().addLayout(grid)
         
         row = 0
         for id,option in config.theClass.options.items():
-            grid.addWidget(QtGui.QLabel(option.title),row,0)
+            grid.addWidget(QtGui.QLabel(option.title),row,1)
             editor = createEditor(option.type,option.value,option.typeOptions)
             editor.valueChanged.connect(functools.partial(self._handleValueChanged,config,option,editor))
-            grid.addWidget(editor,row,1,Qt.AlignRight)
+            grid.addWidget(editor,row,0,Qt.AlignRight)
             row += 1
         grid.setRowStretch(row,1)
+        grid.setColumnStretch(1,1)
+        
         
     def _handleValueChanged(self,config,option,editor):
         if editor.value != option.value:
             option.value = editor.value
-            from .. import delegates
-            if config.theClass in delegates.AbstractDelegate._instances:
-                for instance in delegates.AbstractDelegate._instances[config.theClass]:
-                    instance.view.scheduleDelayedItemsLayout()
+            self._updateDelegates(config)
+    
+    def addDataPiece(self,dataPiece,left):
+        pass
+    
+    def setDataPieces(self,left,right):
+        pass
+    
+    def _updateDelegates(self,config):
+        from .. import delegates
+        if config.theClass in delegates.AbstractDelegate._instances:
+            for instance in delegates.AbstractDelegate._instances[config.theClass]:
+                instance.view.scheduleDelayedItemsLayout()
     
     
+class DataPieceEditor(QtGui.QWidget):
+    def __init__(self,panel):
+        super().__init__()
+        self.setLayout(QtGui.QHBoxLayout())
+        
+        self.leftEditor = DataColumnEditor(panel,True,)
+        self.rightEditor = DataColumnEditor(panel,False)
+        
+        self.layout().addWidget(self.leftEditor)
+        self.layout().addWidget(self.rightEditor)
+            
+    
+class DataColumnEditor(QtGui.QWidget):
+    def __init__(self,panel,left):
+        super().__init__()
+        self.panel = panel
+        self.left = left
+        grid = QtGui.QGridLayout()
+        grid.setContentsMargins(0,0,0,0)
+        self.setLayout(grid)
+        
+        mainColumn = 0 if left else 1
+        
+        self.addDataBox = QtGui.QComboBox()
+        self._fillAddDataBox()
+        self.addDataBox.currentIndexChanged.connect(self._handleAddData)
+        grid.addWidget(self.addDataBox,0,mainColumn)
+        
+        removeDataButton = QtGui.QPushButton()
+        removeDataButton.setIcon(utils.getIcon('delete.png'))
+        grid.addWidget(removeDataButton,0,mainColumn+1)
+        
+        self.listWidget = QtGui.QListWidget()
+        # Effectively this sets the minimum size of listWidget. Note that QListWidgets have a fixed sizeHint
+        # by default, but the default is too large for our purposes here. So we decrease it.
+        self.listWidget.sizeHint = lambda: QtCore.QSize(150,140)
+        self._updateList()
+        grid.addWidget(self.listWidget,1,mainColumn,2,2)
+        
+        upButton = QtGui.QPushButton()
+        upButton.setIcon(utils.getIcon('go-up.png'))
+        downButton = QtGui.QPushButton()
+        downButton.setIcon(utils.getIcon('go-down.png'))
+        
+        if left:
+            grid.addWidget(upButton,1,2)
+            grid.addWidget(downButton,2,2)
+        else:
+            grid.addWidget(upButton,1,0)
+            grid.addWidget(downButton,2,0)
+            
+    def _fillAddDataBox(self):
+        self.addDataBox.clear()
+        self.addDataBox.addItem(
+                        self.tr("Add to left column...") if self.left else self.tr("Add to right column..."))
+        separatorInserted = False
+        for data in availableDataPieces():
+            if data.tag is not None:
+                if data.tag.icon is not None:
+                    self.addDataBox.addItem(data.tag.icon,data.title,data)
+                else: self.addDataBox.addItem(data.title,data)
+            else:
+                if not separatorInserted:
+                    self.addDataBox.insertSeparator(self.addDataBox.count())
+                    separatorInserted = True
+                self.addDataBox.addItem(data.title,data)
+    
+    def _updateList(self):
+        self.listWidget.clear()
+        for dataPiece in self.panel.config.getData(self.left):
+            item = QtGui.QListWidgetItem(dataPiece.title)
+            if dataPiece.tag is not None and dataPiece.tag.icon is not None:
+                item.setIcon(dataPiece.tag.icon)
+            item.setData(Qt.UserRole,dataPiece)
+            self.listWidget.addItem(item)
+            
+    def _handleAddData(self,index):
+        if index == 0:
+            return # 'Add to left column...' was selected
+        dataPiece = self.addDataBox.itemData(index)
+        if not self.panel.config.hasDataPiece(dataPiece):
+            item = QtGui.QListWidgetItem(dataPiece.title)
+            if dataPiece.tag is not None and dataPiece.tag.icon is not None:
+                item.setIcon(dataPiece.tag.icon)
+            item.setData(Qt.UserRole,dataPiece)
+            self.listWidget.addItem(item)
+        self.addDataBox.setCurrentIndex(0)
+        
+    def _handleDispatcher(self,event):
+        # TODO : call _fillAddDataBox on TagTypeChangeEvents
+        pass
+
+
 def createEditor(type,value,options=None):
     return {
         "string": StringEditor,
@@ -207,4 +369,4 @@ class IntEditor(QtGui.QSpinBox):
                 
     value = property(QtGui.QSpinBox.value,QtGui.QSpinBox.setValue)
     # valueChanged is already contained in QSpinBox
-        
+    

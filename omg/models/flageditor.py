@@ -225,12 +225,12 @@ class FlagEditorModel(QtCore.QObject):
                 record = self.getRecord(event.flag)
                 if record is None:
                     # Traverse self.elements so that we don't have to copy
-                    affected = [element for element in self.elements if element in event.getElements()]
+                    affected = [element for element in self.elements if element in event.elements]
                     if len(affected) > 0:
                         self._insertRecord(len(self.records),Record(event.flag,self.elements,affected))
                 elif not record.isCommon(): # Nothing to do otherwise
                      newElementsWithFlag = [element for element in self.elements
-                                    if element in event.getElements() or element in record.elementsWithFlag]
+                                    if element in event.elements or element in record.elementsWithFlag]
                      if len(newElementsWithFlag) > len(record.elementsWithFlag):
                          self._changeRecord(record,Record(record.flag,self.elements,newElementsWithFlag))
                 return

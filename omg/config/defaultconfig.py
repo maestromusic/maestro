@@ -79,7 +79,7 @@ defaults = OrderedDict((
     "album_tag": (str,"album","Key of the album-tag."),
     "search_tags":(list,["album","performer","conductor","title","lyricist","composer","date","artist"],
                     "Tags that will be searched, if you type a text without prefix in a searchbox. Use prefixes to search for other tags."),
-    "always_delete": (list, ["a_tag_nobody_would_want_in_his_files"], "Tags which will be deleted from all files in which they occur.")
+    "always_delete": (list, [], "Tags which will be deleted from all files in which they occur.")
 }),
 
 ("gui", {
