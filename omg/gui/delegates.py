@@ -829,6 +829,8 @@ class BrowserDelegate(AbstractDelegate):
         parent = element.parent
         while parent is not None:
             if isinstance(parent,models.Element):
+                if parent.flags is None:
+                    parent.loadFlags()
                 for flag in parent.flags:
                     if flag.icon is not None and flag in flags:
                         flags.remove(flag)
