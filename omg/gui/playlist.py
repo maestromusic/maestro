@@ -65,10 +65,10 @@ class PlaylistTreeView(treeview.TreeView):
         
     def dragMoveEvent(self, event):
         if event.source() is self:
-            if event.keyboardModifiers() & Qt.ShiftModifier:
-                event.setDropAction(Qt.MoveAction)
-            elif event.keyboardModifiers() & Qt.ControlModifier:
+            if event.keyboardModifiers() & Qt.ControlModifier:
                 event.setDropAction(Qt.CopyAction)
+            else:
+                event.setDropAction(Qt.MoveAction)
         treeview.TreeView.dragMoveEvent(self, event)
         
     def dropEvent(self, event):

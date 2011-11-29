@@ -20,14 +20,14 @@ from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
 from .. import logging, modify, tags, realfiles, config
-from ..models import rootedtreemodel, RootNode, File, Container
+from ..models import rootedtreemodel, RootNode, File, albumguesser
 from ..modify import events, commands
 from ..utils import collectFiles, relPath
 from ..constants import EDITOR, CONTENTS
 from collections import OrderedDict
-import re, itertools, os
+import itertools
 
-logger = logging.getLogger("models.editor")
+logger = logging.getLogger(__name__)
 
 def walk(element):
     """A tree iterator for elements, inspired by os.walk: Returns a tuple (element, contents)
@@ -325,87 +325,26 @@ class EditorModel(rootedtreemodel.RootedTreeModel):
                 albums = []
                 singles = []
                 for k,v in sorted(files.items()):
-                    al, si = self.guessAlbums(v)
-                    albums.extend(al)
-                    singles.extend(si)
+                    try:
+                        al, si = albumguesser.guessAlbums(v, self.albumGroupers)
+                        albums.extend(al)
+                        singles.extend(si)
+                    except albumguesser.GuessError as e:
+                        from ..gui.dialogs import warning
+                        warning(self.tr("Error guessing albums"), str(e))
+                        singles.extend(v)
             else:
-                albums, singles = self.guessAlbums(itertools.chain(*files.values()))
-            return self.guessMetaContainers(albums) + singles
+                try:
+                    albums, singles = self.guessAlbums(itertools.chain(*files.values()), self.albumGroupers)
+                except albumguesser.GuessError as e:
+                    from ..gui.dialogs import warning
+                    warning(self.tr("Error guessing albums"), str(e))
+                    singles.extend(itertools.chain(*files.values()))
+            if self.albumGroupers == ["DIRECTORY"]:
+                return albums + singles
+            else:
+                return albumguesser.guessMetaContainers(albums,
+                                                    self.albumGroupers,
+                                                    self.metacontainer_regex) + singles
         else:
             return list(itertools.chain(*files.values()))
-    
-    def guessAlbums(self, elements):
-        groupTags = self.albumGroupers[:]
-        albumTag = groupTags[0]
-        dirMode = albumTag == "DIRECTORY"
-        if "DIRECTORY" in groupTags:
-            groupTags.remove("DIRECTORY")
-        byKey = {}
-        for element in elements:
-            if dirMode:
-                key = relPath(os.path.dirname(element.path))
-            else:
-                key = tuple( (tuple(element.tags[tag]) if tag in element.tags else None) for tag in groupTags)
-            if key not in byKey:
-                byKey[key] = []
-            byKey[key].append(element)
-            if element.position is None:
-                element.position = 1
-        singles, albums = [], []
-        for key, elements in byKey.items():
-            if dirMode or (albumTag in elements[0].tags):
-                album = Container(modify.newEditorId(), [], tags.Storage(), [], None, True)
-                for elem in sorted(elements, key = lambda e: e.position):
-                    if len(album.contents) > 0 and album.contents[-1].position == elem.position:
-                        raise RuntimeError('multiple positions below same album -- please fix this with TagEditor!!')
-                    album.contents.append(elem)
-                    elem.parent = album
-                album.tags = tags.findCommonTags(album.contents, True)
-                album.tags[tags.TITLE] = [key] if dirMode else elem.tags[albumTag]
-                albums.append(album)
-            else:
-                for element in elements:
-                    element.position = None
-                singles.extend(elements)
-        return albums, singles
-    
-    def guessMetaContainers(self, albums):
-        # search for meta-containers in albums
-        groupTags = self.albumGroupers[:]
-        albumTag = groupTags[0]
-        if "DIRECTORY" in groupTags:
-            groupTags.remove("DIRECTORY")
-        metaContainers = OrderedDict()
-        result = []
-        for album in albums:
-            name = ", ".join(album.tags[tags.TITLE])
-            discstring = re.findall(self.metacontainer_regex, name,flags=re.IGNORECASE)
-            if len(discstring) > 0:
-                discnumber = discstring[0]
-                if discnumber.lower().startswith("i"): #roman number, support I-III :)
-                    discnumber = len(discnumber)
-                else:
-                    discnumber = int(discnumber)
-                discname_reduced = re.sub(self.metacontainer_regex,"",name,flags=re.IGNORECASE)
-                key = tuple( (tuple(album.tags[tag]) if tag in album.tags else None) for tag in groupTags[1:])
-                if (key, discname_reduced) in metaContainers:
-                    metaContainer = metaContainers[(key, discname_reduced)]
-                else:
-                    metaContainer = Container(modify.newEditorId(), None, tags.Storage(), [], None, True)
-                    metaContainers[(key, discname_reduced)] = metaContainer
-                metaContainer.contents.append(album)
-                album.position = discnumber
-                album.parent = metaContainer
-                album.major = False
-            else:
-                result.append(album)
-        for key, meta in metaContainers.items():
-            meta.tags = tags.findCommonTags(meta.contents, True)
-            meta.tags[tags.TITLE] = [key[1]]
-            meta.tags[albumTag] = [key[1]]
-            meta.sortContents()
-            for i in range(1, len(meta.contents)):
-                if meta.contents[i].position == meta.contents[i-1].position:
-                    raise RuntimeError('multiple positions below same meta-container -- please fix this with TagEditor!!')
-            result.append(meta)
-        return result

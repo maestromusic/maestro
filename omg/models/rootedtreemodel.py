@@ -126,7 +126,7 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
             parent = self.root
         else:
             parent = parent.internalPointer()
-        child = parent.getContents()[row]
+        child = parent.contents[row]
         return self.createIndex(row,column,child)
         
     def flags(self,index):
@@ -149,12 +149,12 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
             return QtCore.QModelIndex()
         parent = node.parent
         try:
-            parent.getContents().index(node)
+            parent.index(node)
         except ValueError:
             raise RuntimeError("Cannot create an index for node {} because ".format(node)
                                + "it is not contained in its alleged parent {}.".format(parent))
             
-        return self.createIndex(parent.getContents().index(node),0,node)     
+        return self.createIndex(parent.index(node),0,node)     
 
     def getAllNodes(self):
         """Generator which will return all nodes contained in the tree in depth-first-manner."""
