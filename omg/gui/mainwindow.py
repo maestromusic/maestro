@@ -362,6 +362,11 @@ class MainWindow(QtGui.QMainWindow):
             screen = QtGui.QDesktopWidget().screenGeometry()
             size = self.geometry()
             self.move((screen.width()-size.width())/2, (screen.height()-size.height())/2)
+        
+        # Restore maximized state
+        if "mainwindow_maximized" in config.binary and config.binary["mainwindow_maximized"]:
+            self.showMaximized()
+            
         # Restore central widgets
         self._centralWidgets = {}
         for id,options in config.storage.gui.central_widgets:
@@ -427,6 +432,7 @@ class MainWindow(QtGui.QMainWindow):
         config.storage.gui.dock_widgets = dockWidgetList
         
         # Copy the bytearrays to avoid memory access errors
+        config.binary["mainwindow_maximized"] = self.isMaximized()
         config.binary["mainwindow_geometry"] = bytearray(self.saveGeometry())
         config.binary["mainwindow_state"] = bytearray(self.saveState())
 
