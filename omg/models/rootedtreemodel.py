@@ -261,6 +261,8 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
                 while node is None or insertPos <= current:
                     insertHere.append( insertElem.copy() )
                     insertPos, insertElem = next(insertionIter)
+                    if isinstance(parent, RootNode):
+                        current += 1
             except StopIteration:
                 allSeen = True
             if len(insertHere) > 0:
