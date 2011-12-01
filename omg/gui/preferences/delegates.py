@@ -54,11 +54,10 @@ class DelegatesPanel(QtGui.QWidget):
         
         self._populateDelegateBox()
         self.showPanel(configuration.getConfiguration(self.delegateBox.itemText(0)))
-        
-        modify.dispatcher.changes.connect(self._handleDispatcher)
+        configuration.dispatcher.changes.connect(self._handleDispatcher)
         
     def _handleDispatcher(self,event):
-        if isinstance(event,configuration.DelegateConfigurationEvent) and not event.type == modify.CHANGED:
+        if event.type != modify.CHANGED:
             # Only events of type ADDED or REMOVED change the DelegateBox
             self._populateDelegateBox()
         

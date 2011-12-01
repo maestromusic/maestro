@@ -74,7 +74,7 @@ class AbstractDelegate(QtGui.QStyledItemDelegate):
         self.model = view.model()
         self.font = QtGui.QFont()
         self.config = config
-        modify.dispatcher.changes.connect(self._handleDispatcher)
+        configuration.dispatcher.changes.connect(self._handleDispatcher)
     
     def addLeft(self,item):
         """Add an item to the left region. It will be drawn on the right of all previous items
@@ -103,8 +103,7 @@ class AbstractDelegate(QtGui.QStyledItemDelegate):
         self.center[-1].append((item,align))
 
     def _handleDispatcher(self,event):
-        if isinstance(event,configuration.DelegateConfigurationEvent) and event.config == self.config:
-            print("This is a {} handling an event for {}".format(self.__class__.__name__,event.config.theClass.__name__))
+        if event.config == self.config:
             if event.type == modify.DELETED:
                 self.config = self.config.theClass.defaultConfig # default configs are never removed
             self.view.scheduleDelayedItemsLayout()

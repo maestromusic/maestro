@@ -20,19 +20,27 @@ import copy
 
 from PyQt4 import QtCore
 
-from ... import modify, utils, tags
+from ... import utils, tags
 
 translate = QtCore.QCoreApplication.translate
 
 _configs = []
 
- 
-class DelegateConfigurationEvent(modify.events.ChangeEvent):
-    def __init__(self,config,type=modify.CHANGED):
+# Type of a change
+ADDED,CHANGED,DELETED = 1,2,3
+
+
+class DelegateConfigurationEvent:
+    def __init__(self,config,type=CHANGED):
         self.config = config
         self.type = type
         
 
+class Dispatcher(QtCore.QObject):
+    changes = QtCore.pyqtSignal(DelegateConfigurationEvent)
+ 
+dispatcher = Dispatcher()
+ 
 class DataPiece:
     def __init__(self,data,title=None):
         if isinstance(data,tags.Tag):
@@ -104,24 +112,24 @@ class DelegateConfiguration:
         if dataPiece not in self.leftData and dataPiece not in self.rightData:
             theList = self.leftData if left else self.rightData
             theList.append(dataPiece)
-            modify.dispatcher.changes.emit(DelegateConfigurationEvent(self,modify.CHANGED))
+            dispatcher.changes.emit(DelegateConfigurationEvent(self,CHANGED))
             
     def setDataPieces(self,left,dataPieces):
         if left:
             if self.leftData != dataPieces:
                 self.leftData = dataPieces
-                modify.dispatcher.changes.emit(DelegateConfigurationEvent(self,modify.CHANGED))
+                dispatcher.changes.emit(DelegateConfigurationEvent(self,CHANGED))
         else:
             if self.rightData != dataPieces:
                 self.rightData = dataPieces
-                modify.dispatcher.changes.emit(DelegateConfigurationEvent(self,modify.CHANGED))
+                dispatcher.changes.emit(DelegateConfigurationEvent(self,CHANGED))
     
     def setOption(self,option,value):
         print("This is setOption for option {} with value {}".format(option.title,value))
         assert option in self.options.values()
         if value != option.value:
             option.value = value
-            modify.dispatcher.changes.emit(DelegateConfigurationEvent(self,modify.CHANGED))
+            dispatcher.changes.emit(DelegateConfigurationEvent(self,CHANGED))
         
     def resetToDefaults(self):
         self.options = theClass.options.copy()
@@ -152,14 +160,14 @@ def addDelegateConfiguration(config):
     
 def insertDelegateConfiguration(pos,config):
     _configs.insert(pos,config)
-    modify.dispatcher.changes.emit(DelegateConfigurationEvent(config,modify.ADDED))
+    dispatcher.changes.emit(DelegateConfigurationEvent(config,ADDED))
 
 
 def removeDelegateConfiguration(title):
     for i,config in enumerate(_configs):
         if config.title == title:
             del _configs[i]
-            modify.dispatcher.changes.emit(DelegateConfigurationEvent(config,modify.DELETED))
+            dispatcher.changes.emit(DelegateConfigurationEvent(config,DELETED))
             return
 
 

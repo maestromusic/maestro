@@ -304,8 +304,6 @@ class Browser(QtGui.QWidget):
             for view in self.views:
                 view.model().applyEvent(event)
             return
-        elif isinstance(event,delegateconfiguration.DelegateConfigurationEvent):
-            return # delegate handles this
 
         self.load(restoreExpanded = True)
 

@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 
 # Type of a change
-ADDED,CHANGED,DELETED = range(1,4)
+ADDED,CHANGED,DELETED = 1,2,3
     
             
          
