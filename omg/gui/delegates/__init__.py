@@ -16,14 +16,13 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import math,itertools,weakref,copy
+import math,itertools
 
 from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
-from .. import models, tags, config, strutils, database as db, utils
-from ..models import browser as browsermodel
-from .preferences.delegates import DelegateOption, DelegateConfig, addDelegateConfig, getConfig, DataPiece
+from ... import models, tags, config, strutils, database as db, utils, modify
+from . import configuration
 
 translate = QtCore.QCoreApplication.translate
 
@@ -48,45 +47,34 @@ class DelegateStyle:
 STD_STYLE = DelegateStyle(1,False,False)
 ITALIC_STYLE = DelegateStyle(1,False,True)
 BOLD_STYLE = DelegateStyle(1,True,False)
-        
-
-
-def _copyOptions(options):
-    """Take an instance of utils.OrderedDict containing DelegateOptions and return a copy of the dict
-    containing copies of the options."""
-    return utils.OrderedDict.fromItems([(k,copy.copy(option)) for k,option in options.items()])
             
             
 class AbstractDelegate(QtGui.QStyledItemDelegate):
-    _instances = {}
-    
     hSpace = 3
     vSpace = 3
     hMargin = 1
     vMargin = 2
     state = None
     
-    options = utils.OrderedDict.fromItems([(data[0],DelegateOption(*data)) for data in [
+    options = utils.OrderedDict.fromItems([(data[0],configuration.DelegateOption(*data)) for data in [
         ("fontSize",translate("Delegates","Fontsize"),"int",8),
         ("showMajor",translate("Delegates","Display major flag"),"bool",False),
         ("showPositions",translate("Delegates","Display position numbers"),"bool",True),
         ("showPaths",translate("Delegates","Display paths"),"bool",False),
         ("showFlagIcons",translate("Delegates","Display flag icons"),"bool",True),
-        ("hideParentFlags",translate("Delegates","Hide flags that appear in parent elements"),"bool",True),
-        ("maxRowsTag",translate("Delegates","Maximal number of rows per tag"),"int",4),
-        ("maxRowsElement",translate("Delegates","Maximal number of rows per element"),"int",50),
+        #("hideParentFlags",translate("Delegates","Hide flags that appear in parent elements"),"bool",True),
+        #("maxRowsTag",translate("Delegates","Maximal number of rows per tag"),"int",4),
+        #("maxRowsElement",translate("Delegates","Maximal number of rows per element"),"int",50),
         ("coverSize",translate("Delegates","Size of covers"),"int",40)
     ]])
             
     def __init__(self,view,config):
         super().__init__(view)
-        if self.__class__ not in AbstractDelegate._instances:
-            AbstractDelegate._instances[self.__class__] = weakref.WeakSet()
-        AbstractDelegate._instances[self.__class__].add(self)
         self.view = view
         self.model = view.model()
         self.font = QtGui.QFont()
         self.config = config
+        modify.dispatcher.changes.connect(self._handleDispatcher)
     
     def addLeft(self,item):
         """Add an item to the left region. It will be drawn on the right of all previous items
@@ -113,7 +101,14 @@ class AbstractDelegate(QtGui.QStyledItemDelegate):
         if len(self.center) == 0:
             self.newRow()
         self.center[-1].append((item,align))
-    
+
+    def _handleDispatcher(self,event):
+        if isinstance(event,configuration.DelegateConfigurationEvent) and event.config == self.config:
+            print("This is a {} handling an event for {}".format(self.__class__.__name__,event.config.theClass.__name__))
+            if event.type == modify.DELETED:
+                self.config = self.config.theClass.defaultConfig # default configs are never removed
+            self.view.scheduleDelayedItemsLayout()
+                    
     def layout(self,index):
         """Layout the node with the given index. This method is called by paint and sizeHint and must be
         implemented in subclasses."""
@@ -622,413 +617,3 @@ class MultiTextItem(DelegateItem):
 #        size = self.document.size().toSize()
 #        return size.width(),size.height()
     
-    
-class BrowserDelegate(AbstractDelegate):
-    """Delegate used in the Browser. Does some effort to put flag icons at the optimal place using free space
-    in the title row and trying not to increase the overall number of rows.
-    """
-    options = _copyOptions(AbstractDelegate.options)
-    options["optimizeDate"] = DelegateOption(
-                            "optimizeDate",translate("Delegates","Optimize display of date tag"),"bool",True)
-
-    def __init__(self,view,delegateConfig):
-        super().__init__(view,delegateConfig)
-        self.leftTags = [tags.get(name) for name in
-                            config.options.gui.browser.left_tags if tags.exists(name)]
-        self.rightTags = [tags.get(name) for name in
-                            config.options.gui.browser.right_tags if tags.exists(name)]
-        self.showPositions = config.options.gui.browser.show_positions
-        self.optimizeDate = True
-        
-    def layout(self,index,availableWidth):
-        node = self.model.data(index)
-        
-        if isinstance(node,browsermodel.ValueNode):
-            for value in node.getDisplayValues():
-                self.addCenter(TextItem(value))
-                self.newRow()
-        elif isinstance(node,browsermodel.VariousNode):
-            self.addCenter(TextItem(self.tr("Unknown/Various"),ITALIC_STYLE))
-        elif isinstance(node,browsermodel.HiddenValuesNode):
-            self.addCenter(TextItem(self.tr("Hidden"),ITALIC_STYLE))
-        elif isinstance(node,browsermodel.LoadingNode):
-            self.addCenter(TextItem(self.tr("Loading..."),ITALIC_STYLE))
-        elif isinstance(node,models.Element):
-            # Prepare data
-            if node.tags is None:
-                node.loadTags()
-            if node.isContainer() and node.major is None:
-                node.major = db.isMajor(node.id)
-            leftTexts,rightTexts,dateValues = self.prepareTags(node)
-            if node.flags is None:
-                node.loadFlags()
-            flagIcons = self.getFlagIcons(node)
-            
-            # Cover
-            if node.hasCover():
-                coverSize = self.config.options['coverSize'].value
-                self.addLeft(CoverItem(node.getCover(coverSize),coverSize))
-                availableWidth -= coverSize + self.hSpace
-            
-            # Title and Major
-            titleItem = TextItem(node.getTitle(prependPosition=self.config.options['showPositions'].value,
-                                               usePath=False),
-                                 BOLD_STYLE if node.isContainer() else STD_STYLE,
-                                 minHeight=IconBarItem.iconSize if len(flagIcons) > 0 else 0)
-            
-            if self.config.options['showMajor'].value and isinstance(node,models.Container) and node.major:
-                self.addCenter(ColorBarItem(QtGui.QColor(255,0,0),5,titleItem.sizeHint(self)[1]))
-            self.addCenter(titleItem)
-                
-            # Flags
-            # Here starts the mess...depending on the available space we want to put flags and if possible
-            # even the date into the title row.
-            addedDateToFirstRow = False
-            if len(flagIcons) > 0:
-                flagIconsItem = IconBarItem(flagIcons)
-                titleLength = sum(item.sizeHint(self)[0] for item,align in self.center[0])
-                maxFlagsInTitleRow = flagIconsItem.maxColumnsIn(availableWidth - titleLength - self.hSpace)
-                if maxFlagsInTitleRow >= len(flagIcons):
-                    # Yeah, all flags fit into the title row
-                    self.addCenter(flagIconsItem,align=RIGHT)
-                    # Now we even try to fit the date into the first row
-                    if dateValues is not None:
-                        remainingWidth = availableWidth - titleLength \
-                                         - flagIconsItem.sizeHint(self)[0] - 2* self.hSpace
-                        if self.getFontMetrics().width(dateValues) <= remainingWidth:
-                            self.addCenter(TextItem(dateValues),align=RIGHT)
-                            addedDateToFirstRow = True
-                    self.newRow()
-                else:
-                    self.newRow() # We'll put the flags either into right region or into a new row
-                    
-                    # Now we have an optimization problem: We want to minimize the rows, but the less rows
-                    # we allow, the more columns we need. More columns means less space for tags in the
-                    # center region and thus potentially a lot rows.
-
-                    # First we compute a lower bound of the rows used by the tags
-                    rowsForSure = max(len(leftTexts),len(rightTexts))
-                    
-                    if rowsForSure == 0:
-                        # No tags
-                        if 2*maxFlagsInTitleRow >= len(flagIcons):
-                            flagIconsItem.rows = 2
-                            self.addRight(flagIconsItem)
-                        else: self.addCenter(flagIconsItem,align=RIGHT)
-                    else:
-                        # Do not use too many columns
-                        maxFlagsInTitleRow = min(2,maxFlagsInTitleRow)
-                        if maxFlagsInTitleRow == 0:
-                            # Put all flags on the right side of the tags
-                            flagIconsItem.columns = 1 if len(flagIcons) <= rowsForSure else 2
-                            self.addCenter(flagIconsItem,align=RIGHT)
-                        elif maxFlagsInTitleRow == 2:
-                            # Also use the title row
-                            flagIconsItem.columns = 1 if len(flagIcons) <= rowsForSure+1 else 2
-                            self.addRight(flagIconsItem)
-                        else:
-                            # What's better? To use the title row (1 column) or not (2 columns)?
-                            # Compare the number of additional rows we would need.
-                            # Actually >= holds always, but in case of equality the first option is better
-                            # (less columns).
-                            if len(flagIcons)-1 <= math.ceil(len(flagIcons) / 2):
-                                flagIconsItem.columns = 1
-                                self.addRight(flagIconsItem)
-                            else:
-                                flagIconsItem.columns = 2
-                                self.addCenter(flagIconsItem,align=RIGHT)
-            else: 
-                # This means len(flagIcons) == 0
-                # Try to fit date tag into the first line
-                if dateValues is not None:
-                    titleLength = titleItem.sizeHint(self)[0]
-                    if self.getFontMetrics().width(dateValues) <= availableWidth - titleLength - self.hSpace:
-                        self.addCenter(TextItem(dateValues),align=RIGHT)
-                        addedDateToFirstRow = True
-                self.newRow()
-            
-            # Tags
-            if not addedDateToFirstRow and dateValues is not None:
-                rightTexts.insert(0,dateValues) # display the date together with the rightTags
-                
-            if len(leftTexts) > 0 or len(rightTexts) > 0:
-                self.addCenter(MultiTextItem(leftTexts,rightTexts))
-            
-            # Path
-            if self.config.options['showPaths'].value and node.isFile():
-                if node.path is None:
-                    node.path = db.path(node.id)
-                self.addCenter(TextItem(node.path,ITALIC_STYLE))
-                self.newRow()
-            
-    def prepareTags(self,element):
-        """Return two lists and a third value containing information about the tags of *element*:
-        
-            - the first list contains the concatenated tag values for each tag in ''self.leftTags''
-            - the second list contains the same for ''self.rightTags''
-            - if self.optimizeDate is True and *element* has a "date"-tag, the last value contains the
-              concatenated date values (else None)
-              
-        \ """
-        leftTexts = []
-        for tag in self.leftTags:
-            if tag in element.tags:
-                values = self.getTagValues(tag,element)
-                if len(values) > 0:
-                    separator = ' - ' if tag == tags.TITLE or tag == tags.ALBUM else ', '
-                    leftTexts.append(separator.join(str(v) for v in values))
-        rightTexts = []
-        for tag in self.rightTags:
-            if tag in element.tags:
-                values = self.getTagValues(tag,element)
-                if len(values) > 0:
-                    separator = ' - ' if tag == tags.TITLE or tag == tags.ALBUM else ', '
-                    rightTexts.append(separator.join(str(v) for v in values))
-        
-        dateValues = None
-        if self.optimizeDate and tags.exists("date"):
-            dateTag = tags.get("date")
-            if dateTag in element.tags:
-                dateValues = ', '.join(str(v) for v in self.getTagValues(dateTag,element))
-        
-        return leftTexts,rightTexts,dateValues
-    
-    def getTagValues(self,tagType,element):
-        """Return all values of the tag *tagType* in *element* excluding values that appear in parent nodes.
-        Values from ValueNode-ancestors will also be removed."""
-        if tagType not in element.tags:
-            return []
-        values = list(element.tags[tagType]) # copy!
-        
-        parent = element
-        while len(values) > 0:
-            parent = parent.parent
-            if isinstance(parent,models.RootNode):
-                break
-        
-            if isinstance(parent,models.Element):
-                if parent.tags is None:
-                    parent.loadTags()
-                if tagType in parent.tags:
-                    parentValues = parent.tags[tagType]
-                else: parentValues = []
-            elif isinstance(parent,browsermodel.ValueNode):
-                parentValues = parent.values
-            else: parentValues = []
-            
-            for value in parentValues:
-                if value in values:
-                    values.remove(value)
-        
-        return values
-    
-    def getFlagIcons(self,element):
-        """Return flag icons that should be displayed for *element*. All flags contained in at least one
-        parent node will be removed from the result."""
-        flags = [flag for flag in element.flags if flag.icon is not None]
-        parent = element.parent
-        while parent is not None:
-            if isinstance(parent,models.Element):
-                if parent.flags is None:
-                    parent.loadFlags()
-                for flag in parent.flags:
-                    if flag.icon is not None and flag in flags:
-                        flags.remove(flag)
-            parent = parent.parent
-        return [flag.icon for flag in flags]
-    
-    @staticmethod
-    def getDefaultDataPieces():
-        left = [DataPiece(tags.get(name)) for name in ['composer','artist','performer']]
-        right = [DataPiece(tags.get(name)) for name in ['date','conductor']]
-        return left,right
-
-
-defaultBrowserDelegateConfig = DelegateConfig(translate("Delegates","Browser"),BrowserDelegate,builtin=True)
-addDelegateConfig(defaultBrowserDelegateConfig)
-
-
-class EditorDelegate(AbstractDelegate):
-    """Delegate for the editor."""
-    options = _copyOptions(AbstractDelegate.options)
-    options['showPaths'].value = True
-    options['showMajor'].value = True
-        
-    blackFormat = QtGui.QTextCharFormat()
-    blackFormat.setFontPointSize(8)
-    redFormat = QtGui.QTextCharFormat()
-    redFormat.setFontPointSize(8)
-    redFormat.setForeground(QtGui.QBrush(QtGui.QColor(255,0,0)))
-    
-    removeParentFlags = True
-    
-    def __init__(self,view,delegateConfig):
-        super().__init__(view,delegateConfig)
-        self.leftTags = [tags.get(name) for name in
-                            config.options.gui.editor.left_tags if tags.exists(name)]
-        self.rightTags = [tags.get(name) for name in
-                            config.options.gui.editor.right_tags if tags.exists(name)]
-        
-    def layout(self,index,availableWidth):
-        element = self.model.data(index)
-        
-        # Prepare data
-        if element.tags is None:
-            element.loadTags()
-        leftTexts,rightTexts = self.prepareTags(element)
-        if element.flags is None:
-            element.loadFlags()
-        flagIcons,flagsWithoutIcon = self.getFlags(element)
-
-        # In DB
-        if not element.isInDB():
-            self.addLeft(ColorBarItem(QtGui.QColor("yellow"),10))
-            
-        # Cover
-        if element.hasCover():
-            coverSize = self.config.options['coverSize'].value
-            self.addLeft(CoverItem(element.getCover(coverSize),coverSize))
-        
-        # Flag-Icons
-        if len(flagIcons) > 0:
-            self.addRight(IconBarItem(flagIcons,columns=2 if len(flagIcons) > 2 else 1))
-
-        # Title and Major
-        titleItem = TextItem(element.getTitle(prependPosition=self.config.options['showPositions'].value,
-                                                usePath=not self.config.options['showPaths'].value),
-                             BOLD_STYLE if element.isContainer() else STD_STYLE)
-        
-        if self.config.options['showMajor'].value and element.isContainer() and element.major:
-            self.addCenter(ColorBarItem(QtGui.QColor(255,0,0),5,titleItem.sizeHint(self)[1]))
-        self.addCenter(titleItem)
-        
-        self.newRow()
-        
-        # Path
-        if self.config.options['showPaths'].value and element.isFile():
-            self.addCenter(TextItem(element.path,ITALIC_STYLE))
-            self.newRow()
-            
-        # Tags
-        if len(leftTexts) > 0 or len(rightTexts) > 0:
-            self.addCenter(MultiTextItem(leftTexts,rightTexts))
-#            doc = QtGui.QTextDocument()
-#            cursor = QtGui.QTextCursor(doc)
-#            cursor.insertTable(max(len(leftTexts),len(rightTexts)),2)
-#            for leftText,rightText in itertools.zip_longest(leftTexts,rightTexts,fillvalue=''):
-#                cursor.insertText(leftText)
-#                cursor.movePosition(QtGui.QTextCursor.NextCell)
-#                cursor.insertText(rightText)
-#                cursor.movePosition(QtGui.QTextCursor.NextCell)
-#            self.addCenter(RichTextItem(doc))
-            self.newRow()
-            
-        # Flags without icon
-        if len(flagsWithoutIcon) > 0:
-            self.addCenter(TextItem(', '.join(flag.name for flag in flagsWithoutIcon)))
-            
-    def prepareTags(self,element):
-        theTags = self.getTags(element)
-        leftTexts = []
-        rightTexts = []
-        for tag in self.leftTags:
-            if tag in theTags:
-                leftTexts.append(self.prepareTagValues(element,theTags,tag))
-                del theTags[tag]
-        for tag in self.rightTags:
-            if tag in theTags:
-                rightTexts.append(self.prepareTagValues(element,theTags,tag,alignRight=True))
-                del theTags[tag]
-        for tag in theTags:
-            if tag != tags.TITLE:
-                leftTexts.append(self.prepareTagValues(element,theTags,tag,addTagName=True))
-            
-        return leftTexts,rightTexts
-    
-    def prepareTagValues(self,element,theTags,tag,addTagName=False,alignRight=False):
-        separator = ' - ' if tag == tags.TITLE or tag == tags.ALBUM else ', '
-#        if hasattr(element,'missingTags') and tag in element.missingTags \
-#                and any(v in element.missingTags[tag] for v in theTags[tag]):
-#            doc = QtGui.QTextDocument()
-#            doc.setDocumentMargin(0)
-#            cursor = QtGui.QTextCursor(doc)
-#            if alignRight:
-#                format = QtGui.QTextBlockFormat()
-#                format.setAlignment(Qt.AlignRight)
-#                cursor.setBlockFormat(format)
-#            if addTagName:
-#                cursor.insertText('{}: '.format(tag.translated()),self.blackFormat)
-#            for i,value in enumerate(theTags[tag]):
-#                if value in element.missingTags[tag]:
-#                    cursor.insertText(str(value),self.redFormat)
-#                else: cursor.insertText(str(value),self.blackFormat)
-#                if i != len(theTags[tag]) - 1:
-#                    cursor.insertText(separator)
-#            return doc
-#        else: 
-        strings = [str(v) for v in theTags[tag]]
-        if addTagName:
-            return '{}: {}'.format(tag.translated(),separator.join(strings))
-        else: return separator.join(strings)
-    
-    def getTags(self,element):
-        theTags = element.tags.copy()
-        parent = element.parent
-
-        while parent is not None and not isinstance(parent,models.RootNode):
-            # Be careful to iterate over the parent's tags because theTags might change
-            for tag in parent.tags:
-                if tag not in theTags:
-#                    for value in parent.tags[tag]:
-#                        self.addMissing(parent,tag,value)
-                    continue
-                if hasattr(parent,'missingTags') and tag in parent.missingTags:
-                    missing = parent.missingTags[tag]
-                else: missing = []
-                for value in parent.tags[tag]:
-                    if tag in theTags and value in theTags[tag]: # tag may be removed from theTags
-                        if value not in missing:
-                            theTags[tag].remove(value)
-#                    else:
-#                        self.addMissing(parent,tag,value)            
-            parent = parent.parent
-            
-        return theTags
-    
-#    def addMissing(self,element,tag,value):
-#        if not hasattr(element,'missingTags'):
-#            element.missingTags = tags.Storage()
-#        if tag not in element.missingTags:
-#            element.missingTags[tag] = [value]
-#        elif value not in element.missingTags[tag]:
-#            element.missingTags[tag].append(value)
-            
-    def getFlags(self,element):
-        """Return two lists containing the flags of *element*: The first list contains the icons of the flags
-        that have one, the second list contains the names of those flags that do not have an icon.
-        
-        If the ''removeParentFlags'' option is True, flags that are set in an ancestor are removed.
-        """
-        if self.removeParentFlags:
-            flags = list(element.flags) # copy!
-            parent = element.parent
-            while parent is not None:
-                if isinstance(parent,models.Element):
-                    for flag in parent.flags:
-                        if flag in flags:
-                            flags.remove(flag)
-                parent = parent.parent
-        else:
-            flags = element.flags
-        return [flag.icon for flag in flags if flag.icon is not None],\
-               [flag.name for flag in flags if flag.icon is None]
-    
-    @staticmethod
-    def getDefaultDataPieces():
-        left = [DataPiece(tags.get(name)) for name in ['album','composer','artist','performer']]
-        right = [DataPiece(tags.get(name)) for name in ['date','genre','conductor']]
-        return left,right
-
-
-defaultEditorDelegateConfig = DelegateConfig(translate("Delegates","Editor"),EditorDelegate,builtin=True)
-addDelegateConfig(defaultEditorDelegateConfig)

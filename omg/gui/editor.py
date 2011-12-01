@@ -24,7 +24,8 @@ translate = QtCore.QCoreApplication.translate
 # --------- OMG imports ----------------------
 from ..models import editor, Container
 from ..constants import EDITOR
-from . import treeview, mainwindow, delegates
+from . import treeview, mainwindow
+from .delegates import editor as editordelegate
 from .. import logging, modify, tags, config
 logger = logging.getLogger(__name__)
 
@@ -85,7 +86,7 @@ class EditorTreeView(treeview.TreeView):
         self.setDefaultDropAction(Qt.MoveAction)
         self.setDropIndicatorShown(True)
         self.setModel(editor.EditorModel())
-        self.setItemDelegate(delegates.EditorDelegate(self,delegates.defaultEditorDelegateConfig))
+        self.setItemDelegate(editordelegate.EditorDelegate(self,editordelegate.EditorDelegate.defaultConfig))
         
         self.viewport().setMouseTracking(True)
         self.selectionModel().selectionChanged.connect(self.updateGlobalSelection)

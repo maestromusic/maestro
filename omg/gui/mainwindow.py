@@ -438,7 +438,7 @@ class MainWindow(QtGui.QMainWindow):
 
     def showPreferences(self):
         from . import preferences
-        preferences.show(self)
+        preferences.show(self,"main/delegates")
         
     def showTagManager(self):
         from . import preferences

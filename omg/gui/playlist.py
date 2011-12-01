@@ -19,7 +19,8 @@
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from . import treeview, mainwindow, delegates, playerwidgets
+from . import treeview, mainwindow, playerwidgets
+from .delegates import browser as browserdelegate
 from .. import logging, player, utils
 
 translate = QtCore.QCoreApplication.translate
@@ -84,12 +85,12 @@ class PlaylistTreeView(treeview.TreeView):
         treeview.TreeView.dropEvent(self, event)
     
 
-class PlaylistDelegate(delegates.BrowserDelegate):
+class PlaylistDelegate(browserdelegate.BrowserDelegate):
     """Delegate for the playlist."""
-    options = delegates.BrowserDelegate.options
+    options = browserdelegate.BrowserDelegate.options
     
     def __init__(self,view):
-        super().__init__(view,delegates.defaultBrowserDelegateConfig)
+        super().__init__(view,browserdelegate.BrowserDelegate.defaultConfig)
         
     def background(self, index):
         if index == self.model.currentModelIndex:

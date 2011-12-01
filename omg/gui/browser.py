@@ -23,7 +23,8 @@ from PyQt4.QtCore import Qt
 
 from .. import database as db, config,utils, tags, modify, flags
 from ..search import searchbox, criteria as criteriaModule
-from . import mainwindow, treeview, browserdialog, delegates, tagwidgets
+from . import mainwindow, treeview, browserdialog, tagwidgets
+from .delegates import browser as browserdelegate, configuration as delegateconfiguration
 from ..models import browser as browsermodel, Element, Container
 from ..modify.treeactions import TagValueHybridAction
 from ..constants import EDITOR, REAL
@@ -152,7 +153,7 @@ class Browser(QtGui.QWidget):
         
         # Restore state
         viewsToRestore = config.storage.browser.views
-        self.delegateConfig = delegates.defaultBrowserDelegateConfig
+        self.delegateConfig = browserdelegate.BrowserDelegate.defaultConfig
         if state is not None and isinstance(state,dict):
             if 'instant' in state:
                 self.searchBox.setInstantSearch(state['instant'])
@@ -166,7 +167,9 @@ class Browser(QtGui.QWidget):
                     self.criterionFilter.append(criteriaModule.FlagsCriterion(flagList))
             if 'delegate' in state:
                 try:
-                    self.delegateConfig = delegates.getConfig(state['delegate'],delegates.BrowserDelegate)
+                    from .preferences import delegates as delegatePreferences
+                    self.delegateConfig = delegateconfiguration.getConfiguration(
+                                                            state['delegate'],browserdelegate.BrowserDelegate)
                 except ValueError:
                     pass # Use default delegate (see above)
         
@@ -210,7 +213,7 @@ class Browser(QtGui.QWidget):
                                                                   resultTable = self.bigResult,
                                                                   criteria = criteria,
                                                                   data = restoreExpanded
-                                                                );
+                                                                )
             # view.resetToTable will be called when the search is finished
         else:
             self.table = db.prefix + "elements"
@@ -301,6 +304,8 @@ class Browser(QtGui.QWidget):
             for view in self.views:
                 view.model().applyEvent(event)
             return
+        elif isinstance(event,delegateconfiguration.DelegateConfigurationEvent):
+            return # delegate handles this
 
         self.load(restoreExpanded = True)
 
@@ -325,7 +330,7 @@ class BrowserTreeView(treeview.TreeView):
         treeview.TreeView.__init__(self,parent)
         self.setModel(browsermodel.BrowserModel(layers,parent))
         self.header().sectionResized.connect(self.model().layoutChanged)
-        self.setItemDelegate(delegates.BrowserDelegate(self,delegateConfig))
+        self.setItemDelegate(browserdelegate.BrowserDelegate(self,delegateConfig))
         self._optimizers = []
         #self.doubleClicked.connect(self._handleDoubleClicked)
     

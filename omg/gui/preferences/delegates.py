@@ -21,126 +21,13 @@ import weakref, functools
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from ... import utils, tags
-
-translate = QtCore.QCoreApplication.translate
-
-delegateClasses = [] #TODO: not needed
-delegateConfigs = []
-
-
-class DataPiece:
-    def __init__(self,data,title=None):
-        if isinstance(data,tags.Tag):
-            self.tag = data
-            self.data = None
-        else:
-            self.tag = None
-            self.data = data
-            self._title = title
-        self.data = data
-        
-    def getTitle(self):
-        if self.tag is not None:
-            return self.tag.translated()
-        else: return self._title
-        
-    title = property(getTitle)
-    
-    def __eq__(self,other):
-        return self.data == other.data
-    
-    def __ne__(self,other):
-        return self.data != other.data
-        
-
-def availableDataPieces():
-    result = [DataPiece(tag) for tag in tags.tagList if tag != tags.TITLE]
-    result.extend([
-            DataPiece("length",translate("Delegates","Length")),
-            DataPiece("filecount",translate("Delegates","Number of files")),
-            #DataPiece("bpm",translate("Delegates","BPM")),
-            DataPiece("filetype",translate("Delegates","Filetype"))
-        ])
-    return result
-
-
-class DelegateOption:
-    def __init__(self,id,title,type,default):
-        self.id = id
-        self.title = title
-        self.type = type
-        self.value = default # load from storage
-        self.active = True # load from storage
-        self.typeOptions = None #TODO support max/mins for integer values etc
-        
-        
-class DelegateConfig:
-    def __init__(self,title,theClass,values=None,builtin=False):
-        self.title = title
-        self.theClass = theClass
-        self.options = theClass.options.copy()
-        if values is not None:
-            for option in self.options:
-                option.value = values[option.id]
-        self.leftData,self.rightData = theClass.getDefaultDataPieces()
-        self.builtin = builtin
-        
-    def copy(self):
-        #TODO
-        pass
-    
-    def hasDataPiece(self,piece):
-        return piece in self.leftColumn or piece in self.rightColumn
-    
-    def getData(self,left):
-        return self.leftData if left else self.rightData
-    
-    def resetToDefaults(self):
-        self.options = theClass.options.copy()
-        
-    def __hash__(self):
-        return hash(self.title)
-        
-        
-def getConfig(title,theClass=None):
-    for config in delegateConfigs:
-        if config.title == title:
-            if theClass is not None and config.theClass != theClass:
-                raise ValueError("Delegate configuration with title '{}' cannot be used for {}"
-                                 .format(config.title,theClass.__name__))
-            return config
-    raise ValueError("There is no delegate configuration with title '{}'".format(title))
-        
-        
-def addDelegateConfig(config):
-    insertDelegateConfig(len(delegateConfigs),config)
-    
-    
-def insertDelegateConfig(pos,config):
-    delegateConfigs.insert(pos,config)
-    # Update the dialog if it is visible
-    if DelegatesPanel._instance() is not None:
-        DelegatesPanel._instance()._populateDelegateBox
-
-
-def removeDelegateConfig(title):
-    for i,config in enumerate(delegateConfigs):
-        if config.title == title:
-            del delegateConfigs[i]
-            # Update the dialog if it is visible
-            if DelegatesPanel._instance() is not None:
-                DelegatesPanel._instance()._populateDelegateBox
-            return
+from ... import utils, tags, modify
+from ..delegates import configuration
 
 
 class DelegatesPanel(QtGui.QWidget):
-    # weakref to the only existing instance. Initialize with a weakref pointing to nothing
-    _instance = weakref.ref(set())
-    
     def __init__(self,dialog,parent = None):
         super().__init__(parent)
-        DelegatesPanel._instance = weakref.ref(self)
         self.setLayout(QtGui.QVBoxLayout())
         self.panels = {}
         
@@ -150,8 +37,8 @@ class DelegatesPanel(QtGui.QWidget):
         
         self.delegateBox = QtGui.QComboBox()
         self.delegateBox.currentIndexChanged.connect(
-                                        # get the config using the current item's text
-                                        lambda i: self.showPanel(getConfig(self.delegateBox.itemText(i))))
+                    # get the config havinf the current item's text as title
+                    lambda i: self.showPanel(configuration.getConfiguration(self.delegateBox.itemText(i))))
         self.topLayout.addWidget(self.delegateBox)
         self.topLayout.addStretch(1)
         
@@ -166,12 +53,19 @@ class DelegatesPanel(QtGui.QWidget):
         self.layout().addLayout(bottomLayout)
         
         self._populateDelegateBox()
-        self.showPanel(delegateConfigs[0])
+        self.showPanel(configuration.getConfiguration(self.delegateBox.itemText(0)))
+        
+        modify.dispatcher.changes.connect(self._handleDispatcher)
+        
+    def _handleDispatcher(self,event):
+        if isinstance(event,configuration.DelegateConfigurationEvent) and not event.type == modify.CHANGED:
+            # Only events of type ADDED or REMOVED change the DelegateBox
+            self._populateDelegateBox()
         
     def _populateDelegateBox(self):
         self.delegateBox.clear()
-        for delegateConfig in delegateConfigs:
-            self.delegateBox.addItem(delegateConfig.title)
+        for config in configuration.getConfigurations():
+            self.delegateBox.addItem(config.title)
     
     def showPanel(self,config):
         if config not in self.panels:
@@ -191,7 +85,7 @@ class DelegateOptionsPanel(QtGui.QScrollArea):
         innerWidget.layout().setSizeConstraint(QtGui.QLayout.SetFixedSize)
         self.setWidget(innerWidget)
         
-        self.datapieceEditor = DataPieceEditor(self)
+        self.datapieceEditor = DataPiecesEditor(self)
         innerWidget.layout().addWidget(self.datapieceEditor)
         
         frame = QtGui.QFrame()
@@ -206,32 +100,17 @@ class DelegateOptionsPanel(QtGui.QScrollArea):
         for id,option in config.theClass.options.items():
             grid.addWidget(QtGui.QLabel(option.title),row,1)
             editor = createEditor(option.type,option.value,option.typeOptions)
-            editor.valueChanged.connect(functools.partial(self._handleValueChanged,config,option,editor))
+            editor.valueChanged.connect(functools.partial(self._handleValueChanged,option,editor))
             grid.addWidget(editor,row,0,Qt.AlignRight)
             row += 1
         grid.setRowStretch(row,1)
         grid.setColumnStretch(1,1)
         
-        
-    def _handleValueChanged(self,config,option,editor):
-        if editor.value != option.value:
-            option.value = editor.value
-            self._updateDelegates(config)
-    
-    def addDataPiece(self,dataPiece,left):
-        pass
-    
-    def setDataPieces(self,left,right):
-        pass
-    
-    def _updateDelegates(self,config):
-        from .. import delegates
-        if config.theClass in delegates.AbstractDelegate._instances:
-            for instance in delegates.AbstractDelegate._instances[config.theClass]:
-                instance.view.scheduleDelayedItemsLayout()
+    def _handleValueChanged(self,option,editor):
+        self.config.setOption(option,editor.value)
     
     
-class DataPieceEditor(QtGui.QWidget):
+class DataPiecesEditor(QtGui.QWidget):
     def __init__(self,panel):
         super().__init__()
         self.setLayout(QtGui.QHBoxLayout())
@@ -261,6 +140,7 @@ class DataColumnEditor(QtGui.QWidget):
         
         removeDataButton = QtGui.QPushButton()
         removeDataButton.setIcon(utils.getIcon('delete.png'))
+        removeDataButton.clicked.connect(self._handleRemoveData)
         grid.addWidget(removeDataButton,0,mainColumn+1)
         
         self.listWidget = QtGui.QListWidget()
@@ -287,7 +167,7 @@ class DataColumnEditor(QtGui.QWidget):
         self.addDataBox.addItem(
                         self.tr("Add to left column...") if self.left else self.tr("Add to right column..."))
         separatorInserted = False
-        for data in availableDataPieces():
+        for data in configuration.availableDataPieces():
             if data.tag is not None:
                 if data.tag.icon is not None:
                     self.addDataBox.addItem(data.tag.icon,data.title,data)
@@ -298,37 +178,46 @@ class DataColumnEditor(QtGui.QWidget):
                     separatorInserted = True
                 self.addDataBox.addItem(data.title,data)
     
+    def getDataPieces(self):
+        return [self.listWidget.item(row).data(Qt.UserRole) for row in range(self.listWidget.count())]
+    
     def _updateList(self):
         self.listWidget.clear()
-        for dataPiece in self.panel.config.getData(self.left):
+        for dataPiece in self.panel.config.getDataPieces(self.left):
             item = QtGui.QListWidgetItem(dataPiece.title)
             if dataPiece.tag is not None and dataPiece.tag.icon is not None:
                 item.setIcon(dataPiece.tag.icon)
             item.setData(Qt.UserRole,dataPiece)
             self.listWidget.addItem(item)
-            
+    
     def _handleAddData(self,index):
         if index == 0:
             return # 'Add to left column...' was selected
         dataPiece = self.addDataBox.itemData(index)
         if not self.panel.config.hasDataPiece(dataPiece):
-            item = QtGui.QListWidgetItem(dataPiece.title)
-            if dataPiece.tag is not None and dataPiece.tag.icon is not None:
-                item.setIcon(dataPiece.tag.icon)
-            item.setData(Qt.UserRole,dataPiece)
-            self.listWidget.addItem(item)
+            self.panel.config.addDataPiece(self.left,dataPiece)
+#            item = QtGui.QListWidgetItem(dataPiece.title)
+#            if dataPiece.tag is not None and dataPiece.tag.icon is not None:
+#                item.setIcon(dataPiece.tag.icon)
+#            item.setData(Qt.UserRole,dataPiece)
+#            self.listWidget.addItem(item)
+#            self.panel.config.setDataPieces(self.left,self.getDataPieces())
         self.addDataBox.setCurrentIndex(0)
+    
+    def _handleRemoveData(self):
+        allItems = [self.listWidget.item(row) for row in range(self.listWidget.count())]
+        remainingData = [item.data(Qt.UserRole) for item in allItems if not item.isSelected()]
+        self.panel.config.setDataPieces(self.left,remainingData)
         
-    def _handleDispatcher(self,event):
-        # TODO : call _fillAddDataBox on TagTypeChangeEvents
-        pass
-
+    
+    
 
 def createEditor(type,value,options=None):
     return {
         "string": StringEditor,
         "bool": BoolEditor,
-        "int": IntEditor
+        "int": IntEditor,
+        "tag": TagEditor,
         #TODO: color, combobox
     }[type](value,options)
     
@@ -369,4 +258,42 @@ class IntEditor(QtGui.QSpinBox):
                 
     value = property(QtGui.QSpinBox.value,QtGui.QSpinBox.setValue)
     # valueChanged is already contained in QSpinBox
+
+
+class TagEditor(QtGui.QComboBox):
+    valueChanged = QtCore.pyqtSignal()
     
+    def __init__(self,value,options):
+        super().__init__()
+        self._fillBox(value)
+        self.currentIndexChanged.connect(self.valueChanged)
+            
+    def _fillBox(self,defaultTag):
+        self.clear()
+        self.addItem(self.tr("None"),None)
+        self.insertSeparator(1)
+        for tag in tags.tagList:
+            if tag.icon is not None:
+                self.addItem(tag.icon,tag.translated(),tag)
+            else: self.addItem(tag.translated(),tag)
+            if tag == defaultTag:
+                self.setCurrentIndex(self.count()-1)
+                
+    def getValue(self):
+        return self.itemData(self.currentIndex(),Qt.UserRole)
+    
+    def setValue(self,value):
+        for i in range(self.count()):
+            if self.itemData(i,Qt.UserRole) == value:
+                if i != self.getCurrentIndex():
+                    self.setCurrentIndex(i)
+                    self.valueChanged.emit()
+                return
+            
+    value = property(getValue,setValue)
+    
+    def _handleTagTypeChanged(self,event):
+        """React upon tagTypeChanged-signals from the dispatcher."""
+        if isinstance(event, modify.events.TagTypeChangedEvent):
+            self._fillBox(self.getValue())
+            
