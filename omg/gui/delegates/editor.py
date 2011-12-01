@@ -39,20 +39,15 @@ class EditorDelegate(AbstractDelegate):
     redFormat.setForeground(QtGui.QBrush(QtGui.QColor(255,0,0)))
     
     removeParentFlags = True
-    
-    def __init__(self,view,delegateConfig):
-        super().__init__(view,delegateConfig)
-        
+            
     def layout(self,index,availableWidth):
         element = self.model.data(index)
         
         # Prepare data
         if element.tags is None:
             element.loadTags()
-        leftTexts,rightTexts = self.prepareTags(element)
         if element.flags is None:
             element.loadFlags()
-        flagIcons,flagsWithoutIcon = self.getFlags(element)
 
         # In DB
         if not element.isInDB():
@@ -64,7 +59,8 @@ class EditorDelegate(AbstractDelegate):
             self.addLeft(CoverItem(element.getCover(coverSize),coverSize))
         
         # Flag-Icons
-        if len(flagIcons) > 0:
+        flagIcons,flagsWithoutIcon = self.getFlags(element)
+        if self.config.options['showFlagIcons'].value and len(flagIcons) > 0:
             self.addRight(IconBarItem(flagIcons,columns=2 if len(flagIcons) > 2 else 1))
 
         # Title and Major
@@ -84,6 +80,7 @@ class EditorDelegate(AbstractDelegate):
             self.newRow()
             
         # Tags
+        leftTexts,rightTexts = self.prepareTags(element)
         if len(leftTexts) > 0 or len(rightTexts) > 0:
             self.addCenter(MultiTextItem(leftTexts,rightTexts))
 #            doc = QtGui.QTextDocument()
@@ -111,7 +108,7 @@ class EditorDelegate(AbstractDelegate):
                 if tag in theTags:
                     leftTexts.append(self.prepareTagValues(element,theTags,tag))
                     del theTags[tag]
-        for tag in self.config.rightData:
+        for dataPiece in self.config.rightData:
             if dataPiece.tag is not None:
                 tag = dataPiece.tag
                 if tag in theTags:

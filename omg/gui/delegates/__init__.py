@@ -104,7 +104,7 @@ class AbstractDelegate(QtGui.QStyledItemDelegate):
 
     def _handleDispatcher(self,event):
         if event.config == self.config:
-            if event.type == modify.DELETED:
+            if event.type == configuration.DELETED:
                 self.config = self.config.theClass.defaultConfig # default configs are never removed
             self.view.scheduleDelayedItemsLayout()
                     

@@ -64,6 +64,9 @@ class DataPiece:
     
     def __ne__(self,other):
         return self.data != other.data
+    
+    def __str__(self):
+        return "<DataPiece {}>".format(self.getTitle())
         
 
 def availableDataPieces():
@@ -125,7 +128,6 @@ class DelegateConfiguration:
                 dispatcher.changes.emit(DelegateConfigurationEvent(self,CHANGED))
     
     def setOption(self,option,value):
-        print("This is setOption for option {} with value {}".format(option.title,value))
         assert option in self.options.values()
         if value != option.value:
             option.value = value
