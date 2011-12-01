@@ -22,7 +22,7 @@ from PyQt4.QtCore import Qt
 import itertools
 from . import Node, Element, RootNode, mimedata
 from .. import logging, config
-from ..utils import ranges
+from ..utils import ranges, walk
 logger = logging.getLogger(__name__)
 
 class RootedTreeModel(QtCore.QAbstractItemModel):
@@ -172,10 +172,27 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
                     queue.append(child)
                 yield child
     
+                
+    def handleElementChangeEvent(self, event):
+        """Traverse this model's tree in top-down manner, calling applyChangesToNode for
+        each node. If that function returns True for an element, the subtree of that
+        element is not traversed anymore."""
+        if self.root.id in event.ids():
+            if self.applyChangesToNode(self.root, event):
+                return
+        for parent, children in walk(self.root):
+            toRemove = []
+            for i, node in enumerate(children): 
+                if node.id in event.ids():
+                    skip = self.applyChangesToNode(node, event)
+                    if skip:
+                        toRemove.append(i)
+            for i in reversed(toRemove):
+                del children[i]
+                
     def changePositions(self, parent, changes):
-        """Changes positions of elements below *parent*, according to the oldPosition->newPosition dict *changes.*"""
-        logger.debug('POSITION CHANGE: {}'.format(changes))
-        #TODO: rewrite with difflib / opcodes??
+        """Changes positions of elements below *parent*, according to the
+        oldPosition->newPosition dict *changes.*"""
         def argsort(seq):
             # http://stackoverflow.com/questions/3382352/equivalent-of-numpy-argsort-in-basic-python/3383106#3383106
             #lambda version by Tony Veijalainen
@@ -239,9 +256,9 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
         allSeen = False
         for i, node in itertools.chain(enumerate(parent.contents), [(lastIndex, None)]):
             insertHere = []
-            current = node.position if node and isinstance(parent, Element) else i
+            current = node.iPosition() if node else i
             try:
-                while node is None or insertPos < current:
+                while node is None or insertPos <= current:
                     insertHere.append( insertElem.copy() )
                     insertPos, insertElem = next(insertionIter)
             except StopIteration:

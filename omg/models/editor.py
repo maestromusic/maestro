@@ -28,15 +28,6 @@ from collections import OrderedDict
 import itertools
 
 logger = logging.getLogger(__name__)
-
-def walk(element):
-    """A tree iterator for elements, inspired by os.walk: Returns a tuple (element, contents)
-    where contents may be modified in-place to influence further processing."""
-    contents = element.getContents()[:]
-    yield element, contents
-    for child in contents:
-        for x in walk(child):
-            yield x
                     
 class EditorModel(rootedtreemodel.RootedTreeModel):
     """Model class for the editors where users can edit elements before they are commited into
@@ -69,23 +60,7 @@ class EditorModel(rootedtreemodel.RootedTreeModel):
         else:
             logger.warning('WARNING UNKNOWN EVENT {}, RESETTING EDITOR'.format(event))
             self.clear()
-            
-    def handleElementChangeEvent(self, event):
-        """Traverse this editor's tree in top-down manner. If a subtree is replaced by the
-        event applying function (indicated by skip = True), that subtree is not traversed
-        anymore."""
-        if self.root.id in event.ids():
-            if self.applyChangesToNode(self.root, event):
-                return
-        for parent, children in walk(self.root):
-            toRemove = []
-            for i, node in enumerate(children): 
-                if node.id in event.ids():
-                    skip = self.applyChangesToNode(node, event)
-                    if skip:
-                        toRemove.append(i)
-            for i in reversed(toRemove):
-                del children[i]
+
     
     def applyChangesToNode(self, node, event):
         """Helper function for the handling of ElementChangeEvents. Ensures proper application

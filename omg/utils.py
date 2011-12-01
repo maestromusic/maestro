@@ -49,6 +49,16 @@ def ranges(lst):
         return list(map(lambda x: (x,x), lst))
     return helper(list(enumerate(lst[1:])), lst[0], lst[0], list())
 
+
+def walk(element):
+    """A tree iterator for elements, inspired by os.walk: Returns a tuple (element, contents)
+    where contents may be modified in-place to influence further processing."""
+    contents = element.getContents()[:]
+    yield element, contents
+    for child in contents:
+        for x in walk(child):
+            yield x
+            
 def hasKnownExtension(file):
     """Return True if the given path has a known extension (i.e., appears in options.main.extension).
     Does **not** check whether the file actually exists, is readable, etc."""
