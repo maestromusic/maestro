@@ -60,42 +60,6 @@ class EditorModel(rootedtreemodel.RootedTreeModel):
         else:
             logger.warning('WARNING UNKNOWN EVENT {}, RESETTING EDITOR'.format(event))
             self.clear()
-
-    
-    def applyChangesToNode(self, node, event):
-        """Helper function for the handling of ElementChangeEvents. Ensures proper application
-        to a single node."""
-        modelIndex = self.getIndex(node)
-        if not event.contentsChanged:
-            # this handles SingleElementChangeEvent, all TagChangeEvents, FlagChangeEvents, ...
-            event.applyTo(node)
-            ret = isinstance(event, events.SingleElementChangeEvent)
-        elif isinstance(event, events.PositionChangeEvent):
-            self.changePositions(node, event.positionMap)
-            ret = True #PositionChangeEvent handles only _one_ parent -> no children can be affected
-        elif isinstance(event, events.InsertContentsEvent):
-            self.insert(node, event.insertions[node.id])
-            ret = False   
-        elif isinstance(event, events.RemoveContentsEvent):
-            self.remove(node, event.removals[node.id])
-            ret = False
-        elif event.__class__ == events.ElementChangeEvent:
-            if node.isFile():
-                event.applyTo(node)
-            else:
-                self.beginRemoveRows(modelIndex, 0, node.getContentsCount())
-                temp = node.contents
-                node.contents = []
-                self.endRemoveRows()
-                node.contents = temp
-                self.beginInsertRows(modelIndex, 0, event.getNewContentsCount(node))
-                event.applyTo(node)
-                self.endInsertRows()
-            ret = True
-        else:
-            logger.warning('unknown element change event: {}'.format(event))
-        self.dataChanged.emit(modelIndex, modelIndex)
-        return ret
         
     def flags(self,index):
         defaultFlags = super().flags(index)

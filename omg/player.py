@@ -166,12 +166,17 @@ class PlayerBackend(QtCore.QObject):
 
     def _insertIntoPlaylist(self, insertions):
         self.playlist.insertSongs(insertions)
-        
+        for pos, song in sorted(insertions):
+            self.paths.insert(pos, song)
+            
     def insertIntoPlaylist(self, insertions):
         self.stack.push(InsertIntoPlaylistCommand(self, insertions))
+        
     
     def _removeFromPlaylist(self, removals):
         self.playlist.removeSongs(removals)
+        for pos, song in sorted(removals, reverse = True):
+            del self.paths[pos]
         
     def removeFromPlaylist(self, removals):
         self.stack.push(RemoveFromPlaylistCommand(self, removals))
