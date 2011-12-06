@@ -91,12 +91,7 @@ defaults = OrderedDict((
     },
     "browser": {
                 "max_view_count": (int,5,"The maximal number of views the browser will allow."),
-    },
-    # TODO: Remove these options when the new delegates are used everywhere 
-    "browser_cover_size": (int,40,"Size of covers in the browser."),
-    "small_cover_size": (int,40,"Small cover size used in various places."),
-    "large_cover_size": (int,60,"Not so small cover size used in various places."),
-    "detail_cover_size": (int,160,"Cover size in details view."),
+    }
 }),
 
 ("misc", {
@@ -150,11 +145,8 @@ storage = OrderedDict((
     'central_widgets': ([],),
     'dock_widgets': ([],),
     'central_tab_index': (-1,),
-    'delegates': ({
-            'Browser': ("browser",{}),
-            'Editor': ("editor",{}),
-            'Playlist': ("playlist",{})
-            },)
+    # List of all delegate configurations. Built-in configurations will be added regardless of this list.
+    'delegate_configurations': ([],),
 }),
 ("browser", {
     'views': ([[['composer','artist','performer']],[['genre'],['composer','artist','performer']]],),

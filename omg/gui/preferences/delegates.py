@@ -37,7 +37,7 @@ class DelegatesPanel(QtGui.QWidget):
         
         self.delegateBox = QtGui.QComboBox()
         self.delegateBox.currentIndexChanged.connect(
-                    # get the config havinf the current item's text as title
+                    # get the config having the current item's text as title
                     lambda i: self.showPanel(configuration.getConfiguration(self.delegateBox.itemText(i))))
         self.topLayout.addWidget(self.delegateBox)
         self.topLayout.addStretch(1)
@@ -46,6 +46,9 @@ class DelegatesPanel(QtGui.QWidget):
         self.layout().addWidget(self.stackedWidget)
         
         bottomLayout = QtGui.QHBoxLayout()
+        resetButton = QtGui.QPushButton(self.tr("Reset this configuration"))
+        resetButton.clicked.connect(self._handleResetButton)
+        bottomLayout.addWidget(resetButton)
         bottomLayout.addStretch(1)
         closeButton = QtGui.QPushButton(self.tr("Close"))
         closeButton.clicked.connect(dialog.close)
@@ -72,8 +75,12 @@ class DelegatesPanel(QtGui.QWidget):
             self.stackedWidget.addWidget(panel)
             self.panels[config] = panel
         self.stackedWidget.setCurrentWidget(self.panels[config])
+        self._currentConfig = config
             
-
+    def _handleResetButton(self):
+        self._currentConfig.resetToDefaults()
+        
+        
 class DelegateOptionsPanel(QtGui.QScrollArea):
     def __init__(self,parent,config):
         super().__init__(parent)
@@ -96,18 +103,29 @@ class DelegateOptionsPanel(QtGui.QScrollArea):
         innerWidget.layout().addLayout(grid)
         
         row = 0
-        for id,option in config.theClass.options.items():
+        self._editors = {}
+        for id,option in config.options.items():
             grid.addWidget(QtGui.QLabel(option.title),row,1)
             editor = createEditor(option.type,option.value,option.typeOptions)
             editor.valueChanged.connect(functools.partial(self._handleValueChanged,option,editor))
+            self._editors[id] = editor
             grid.addWidget(editor,row,0,Qt.AlignRight)
             row += 1
         grid.setRowStretch(row,1)
         grid.setColumnStretch(1,1)
         
+        configuration.dispatcher.changes.connect(self._handleConfigurationDispatcher)
+        
     def _handleValueChanged(self,option,editor):
         self.config.setOption(option,editor.value)
     
+    def _handleConfigurationDispatcher(self,event):
+        if event.type == configuration.CHANGED and event.config == self.config:
+            for id,option in self.config.options.items():
+                if option.value != self._editors[id].value:
+                    print("{} {}".format(option.value,self._editors[id].value))
+                    self._editors[id].value = option.value
+        
     
 class DataPiecesEditor(QtGui.QWidget):
     def __init__(self,panel):
@@ -161,6 +179,8 @@ class DataColumnEditor(QtGui.QWidget):
             grid.addWidget(upButton,1,0)
             grid.addWidget(downButton,2,0)
             
+        configuration.dispatcher.changes.connect(self._handleConfigurationDispatcher)
+            
     def _fillAddDataBox(self):
         self.addDataBox.clear()
         self.addDataBox.addItem(
@@ -207,6 +227,10 @@ class DataColumnEditor(QtGui.QWidget):
         allItems = [self.listWidget.item(row) for row in range(self.listWidget.count())]
         remainingData = [item.data(Qt.UserRole) for item in allItems if not item.isSelected()]
         self.panel.config.setDataPieces(self.left,remainingData)
+        
+    def _handleConfigurationDispatcher(self,event):
+        if event.type == configuration.CHANGED and event.config == self.panel.config:
+            self._updateList()
         
     
     
@@ -266,6 +290,7 @@ class TagEditor(QtGui.QComboBox):
         super().__init__()
         self._fillBox(value)
         self.currentIndexChanged.connect(self.valueChanged)
+        modify.dispatcher.changes.connect(self._handleTagTypeChanged)
             
     def _fillBox(self,defaultTag):
         self.clear()
@@ -284,7 +309,7 @@ class TagEditor(QtGui.QComboBox):
     def setValue(self,value):
         for i in range(self.count()):
             if self.itemData(i,Qt.UserRole) == value:
-                if i != self.getCurrentIndex():
+                if i != self.currentIndex():
                     self.setCurrentIndex(i)
                     self.valueChanged.emit()
                 return

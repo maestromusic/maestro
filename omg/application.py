@@ -124,11 +124,14 @@ def run(cmdConfig = []):
     
     from . import sync
     sync.init()
+    
     # Create GUI
     # First import all modules that want to add WidgetData
-    
     from .gui import filesystembrowser, editor, browser, tageditor, mainwindow, playback, playlist
+    from .gui.delegates import configuration as delegateconfiguration
     global mainWindow
+    
+    delegateconfiguration.load()
     
     from . import player
     player.init()
@@ -142,6 +145,7 @@ def run(cmdConfig = []):
     # Close operations
     search.shutdown()
     mainWindow.saveLayout()
+    delegateconfiguration.save()
     plugins.shutdown()
     config.shutdown()
     logging.shutdown()
