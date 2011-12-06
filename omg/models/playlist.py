@@ -154,9 +154,11 @@ class Playlist(rootedtreemodel.RootedTreeModel):
             self._removeFiles(self.root, start, end+1)
             self.glue(self.root, start)
             
-    def restructure(self, elements):
+    def restructure(self, elements = None):
         """Restructure the whole container tree in this model. This method does not change the flat
         playlist, but it uses treebuilder to create an optimal container structure over the MPD playlist."""
+        if elements is None:
+            elements = list(self.root.getAllFiles())
         treeBuilder = treebuilder.TreeBuilder(elements)
         treeBuilder.buildParentGraph()
         return treeBuilder.buildTree(createOnlyChildren=False)
@@ -383,9 +385,19 @@ class Playlist(rootedtreemodel.RootedTreeModel):
             # TODO: If prev and next are files with a common parent
             #we should group them into this parent
 
-    def handleElementChangeEvent(self, event):
-        pass
+    def positionChangeEvent(self, node, event):
+        """Ignore PositionChangeEvents, as the playlist allows custom positions
+        anyway."""
+        return True
+    
+    def removeContentsEvent(self, node, event):
+        """If elements are removed below a container, the whole structure could change."""
+        self._rebuild(self.backend.paths)
+      
+        
     def handleChangeEvent(self, event):
-        if isinstance(event, events.ElementChangeEvent):
+        if type(event) == events.ElementChangeEvent:
+            self._rebuild(self.backend.paths)
+        elif isinstance(event, events.ElementChangeEvent):
             if event.level == REAL:
                 self.handleElementChangeEvent(event)

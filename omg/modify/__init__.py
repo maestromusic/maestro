@@ -88,7 +88,7 @@ def merge(level, parent, indices, newTitle, removeString, adjustPositions):
     |- pos2: child3 (title = Nocturne Op. 13/37)
     |- pos3: child4 (title = Prelude BWV 42)
     """ 
-    from ..models import Container, Element
+    from ..models import Container, Element, RootNode
 
     logger.debug("starting merge\n  on parent {}\n  indices {}".format(parent, indices))
     beginMacro(level, translate('modify', 'merge elements'))
@@ -108,8 +108,8 @@ def merge(level, parent, indices, newTitle, removeString, adjustPositions):
             copy.position = len(newChildren) + 1
             newChildren.append(copy)
             toRemove.append(parent.contents[i])
-        elif adjustPositions:
-            positionChanges.append( (element.position, element.position - len(newChildren) + 1) )
+        elif adjustPositions:# or isinstance(parent, RootNode):
+            positionChanges.append( (element.iPosition(), element.iPosition() - len(newChildren) + 1) )
     push(commands.RemoveElementsCommand(level, toRemove, mode = CONTENTS))
     if len(positionChanges) > 0:
         push(commands.PositionChangeCommand(level, parent.id, positionChanges))

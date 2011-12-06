@@ -20,9 +20,10 @@ from PyQt4 import QtCore
 from PyQt4.QtCore import Qt
 
 import itertools
-from . import Node, Element, RootNode, mimedata
+from . import Node, RootNode, mimedata
 from .. import logging, config
-from ..utils import ranges
+from ..utils import ranges, walk
+from ..modify import events
 logger = logging.getLogger(__name__)
 
 class RootedTreeModel(QtCore.QAbstractItemModel):
@@ -172,10 +173,90 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
                     queue.append(child)
                 yield child
     
+                
+    def handleElementChangeEvent(self, event):
+        """Traverse this model's tree in top-down manner, calling applyChangesToNode for
+        each node. If that function returns True for an element, the subtree of that
+        element is not traversed anymore."""
+        if self.root.id in event.ids():
+            if self.applyChangesToNode(self.root, event):
+                return
+        for parent, children in walk(self.root):
+            toRemove = []
+            for i, node in enumerate(children): 
+                if node.id in event.ids():
+                    skip = self.applyChangesToNode(node, event)
+                    if skip:
+                        toRemove.append(i)
+            for i in reversed(toRemove):
+                del children[i]
+    
+    def noContentsChangedEvent(self, node, event):
+        """Handles events which don't modify the contents of an element, e.g.
+        TagChangeEvent or MajorFlagChangeEvent. The default behavior is to call
+        the event's applyTo method. Override this function in subclasses to change
+        the default behavior."""
+        modelIndex = self.getIndex(node)
+        event.applyTo(node)
+        self.dataChanged.emit(modelIndex, modelIndex)
+        return isinstance(event, events.SingleElementChangeEvent)
+
+    def positionChangeEvent(self, node, event):
+        """Handles incoming position change events. The default is to change positions
+        below the given node if it occurs in the event's position change map."""
+        self.changePositions(node, event.positionMap)
+        return True
+        # PositionChangeEvent handles only _one_ parent -> no children can be affected by the
+        # same event.
+    
+    def insertContentsEvent(self, node, event):
+        self.insert(node, event.insertions[node.id])
+        return False
+    
+    def removeContentsEvent(self, node, event):
+        self.remove(node, event.removals[node.id])
+        return False
+    
+    def elementChangeEvent(self, node, event):
+        """Handle a generic element change event. The default is to call applyTo
+        and reload the contents of the node."""
+        modelIndex = self.getIndex(node)
+        if node.isFile():
+            event.applyTo(node)
+        else:
+            self.beginRemoveRows(modelIndex, 0, node.getContentsCount())
+            temp = node.contents
+            node.contents = []
+            self.endRemoveRows()
+            node.contents = temp
+            self.beginInsertRows(modelIndex, 0, event.getNewContentsCount(node))
+            event.applyTo(node)
+            self.endInsertRows()
+        return True
+    
+    def applyChangesToNode(self, node, event):
+        """Helper function for the handling of ElementChangeEvents. Ensures proper application
+        to a single node."""
+        
+        if not event.contentsChanged:
+            # this handles SingleElementChangeEvent, all TagChangeEvents, FlagChangeEvents, ...
+            ret = self.noContentsChangedEvent(node, event)
+        elif isinstance(event, events.PositionChangeEvent):
+            ret = self.positionChangeEvent(node, event)
+        elif isinstance(event, events.InsertContentsEvent):
+            ret = self.insertContentsEvent(node, event)   
+        elif isinstance(event, events.RemoveContentsEvent):
+            ret = self.removeContentsEvent(node, event)
+        elif event.__class__ == events.ElementChangeEvent:
+            ret = self.elementChangeEvent(node, event)
+        else:
+            logger.warning('unknown element change event: {}'.format(event))
+        
+        return ret
+                
     def changePositions(self, parent, changes):
-        """Changes positions of elements below *parent*, according to the oldPosition->newPosition dict *changes.*"""
-        logger.debug('POSITION CHANGE: {}'.format(changes))
-        #TODO: rewrite with difflib / opcodes??
+        """Changes positions of elements below *parent*, according to the
+        oldPosition->newPosition dict *changes.*"""
         def argsort(seq):
             # http://stackoverflow.com/questions/3382352/equivalent-of-numpy-argsort-in-basic-python/3383106#3383106
             #lambda version by Tony Veijalainen
@@ -239,11 +320,13 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
         allSeen = False
         for i, node in itertools.chain(enumerate(parent.contents), [(lastIndex, None)]):
             insertHere = []
-            current = node.position if node and isinstance(parent, Element) else i
+            current = node.iPosition() if node else i
             try:
-                while node is None or insertPos < current:
+                while node is None or insertPos <= current:
                     insertHere.append( insertElem.copy() )
                     insertPos, insertElem = next(insertionIter)
+                    if isinstance(parent, RootNode):
+                        current += 1
             except StopIteration:
                 allSeen = True
             if len(insertHere) > 0:

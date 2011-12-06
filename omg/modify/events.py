@@ -218,7 +218,7 @@ class RemoveContentsEvent(ElementChangeEvent):
         return element.getContentsCount() - len(self.removals[element.id])
     
     def applyTo(self, element):
-        element.contents = [ child for child in elem.contents if child.position not in self.removals[element.id] ]
+        element.contents = [ child for child in element.contents if child.position not in self.removals[element.id] ]
         
     def __str__(self):
         return 'RemoveContentsEvent({}, removals={})'.format(self.level, self.removals)
