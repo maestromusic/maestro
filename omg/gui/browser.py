@@ -26,7 +26,6 @@ from ..search import searchbox, criteria as criteriaModule
 from . import mainwindow, treeview, browserdialog, tagwidgets
 from .delegates import browser as browserdelegate, configuration as delegateconfiguration
 from ..models import browser as browsermodel, Element, Container
-from ..modify.treeactions import TagValueHybridAction
 from ..constants import EDITOR, REAL
 translate = QtCore.QCoreApplication.translate
 
@@ -318,11 +317,6 @@ class BrowserTreeView(treeview.TreeView):
     
     # List of optimizers which will improve the display after reloading.
     _optimizers = None
-
-    @classmethod
-    def initContextMenu(cls):
-        """Class method to initialize the context menu. This method should be overwritten in subclasses."""
-        return [ TagValueHybridAction() ]
     
     def __init__(self,parent,layers,delegateConfig):
         treeview.TreeView.__init__(self,parent)

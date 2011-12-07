@@ -25,6 +25,7 @@ translate = QtCore.QCoreApplication.translate
 from ..models import editor, Container
 from ..constants import EDITOR
 from . import treeview, mainwindow
+from ..modify.treeactions import *
 from .delegates import editor as editordelegate
 from .. import logging, modify, tags, config
 logger = logging.getLogger(__name__)
@@ -73,11 +74,30 @@ class ProfileChangeNotifier(QtCore.QObject):
     profilesChanged = QtCore.pyqtSignal()     
 profileNotifier = ProfileChangeNotifier()
 profileNotifier.profilesChanged.connect(storeProfiles)
- 
+
+class TestAction(QtGui.QAction):
+    def __init__(self, parent):
+        super().__init__("&Test", parent)
+        self.setToolTip('print info about selected nodes')
+        self.setShortcut(QtGui.QKeySequence(self.tr("Ctrl+T")))
+        #self.setShortcutContext(Qt.WindowShortcut)
+        self.triggered.connect(self.do)
+        print('wf')
+
+    def do(self):
+        idxs = self.parent().selectedIndexes()
+        elems = [ idx.internalPointer() for idx in idxs ]
+        print(elems)
+    
 class EditorTreeView(treeview.TreeView):
     """This is the main widget of an editor: The tree view showing the current element tree."""
     level = EDITOR
-    
+    treeActions = [ NamedList('tags', [EditTagsSingleAction,
+                                       EditTagsRecursiveAction,
+                                       MatchTagsFromFilenamesAction]),
+                    NamedList('structure', [DeleteFromParentAction,
+                                            MergeAction,
+                                            ToggleMajorAction]) ]
     def __init__(self, parent = None):
         super().__init__(parent)
         self.setSelectionMode(self.ExtendedSelection)
@@ -89,7 +109,7 @@ class EditorTreeView(treeview.TreeView):
         self.setItemDelegate(editordelegate.EditorDelegate(self,editordelegate.EditorDelegate.defaultConfig))
         
         self.viewport().setMouseTracking(True)
-        self.selectionModel().selectionChanged.connect(self.updateGlobalSelection)
+        
 
     def dragEnterEvent(self, event):
         if event.source() is self:
@@ -132,7 +152,7 @@ class EditorTreeView(treeview.TreeView):
                 self.model().rowsInserted.disconnect(self._expandInsertedRows)
             except TypeError:
                 pass # was not connected
-               
+        
 class EditorWidget(QtGui.QDockWidget):
     """The editor is a dock widget for editing elements and their structure. It provides methods to "guess"
     the album structure of new files that are dropped from the filesystem."""
