@@ -22,7 +22,6 @@ from PyQt4.QtCore import Qt
 from ... import tags, config, models
 from . import *
 
-
 translate = QtCore.QCoreApplication.translate
 
 

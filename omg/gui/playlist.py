@@ -20,7 +20,7 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from . import treeview, mainwindow, playerwidgets
-from .delegates import browser as browserdelegate
+from .delegates import playlist as playlistdelegate
 from .. import logging, player, utils
 
 translate = QtCore.QCoreApplication.translate
@@ -48,7 +48,7 @@ class PlaylistTreeView(treeview.TreeView):
         if self.selectionModel():
             self.selectionModel().selectionChanged.disconnect(self.updateGlobalSelection)
         self.setModel(model)
-        self.setItemDelegate(PlaylistDelegate(self))
+        self.setItemDelegate(playlistdelegate.PlaylistDelegate(self,playlistdelegate.PlaylistDelegate.defaultConfig))
         self.selectionModel().selectionChanged.connect(self.updateGlobalSelection)
         self.songSelected.connect(backend.setCurrentSong)
         
@@ -83,20 +83,6 @@ class PlaylistTreeView(treeview.TreeView):
             else:
                 event.setDropAction(Qt.CopyAction)
         treeview.TreeView.dropEvent(self, event)
-    
-
-class PlaylistDelegate(browserdelegate.BrowserDelegate):
-    """Delegate for the playlist."""
-    options = browserdelegate.BrowserDelegate.options
-    
-    def __init__(self,view):
-        super().__init__(view,browserdelegate.BrowserDelegate.defaultConfig)
-        
-    def background(self, index):
-        if index == self.model.currentModelIndex:
-            return QtGui.QBrush(QtGui.QColor(110,149,229))
-        elif index in self.model.currentParentsModelIndices:
-            return QtGui.QBrush(QtGui.QColor(140,179,255))
 
 
 class PlaylistWidget(QtGui.QDockWidget):
