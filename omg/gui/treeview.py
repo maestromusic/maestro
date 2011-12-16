@@ -20,6 +20,7 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from .. import models, logging
+from .. import modify
 from ..modify.treeactions import *
 from ..constants import REAL
 
@@ -120,7 +121,7 @@ class TreeView(QtGui.QTreeView):
         palette.setColor(QtGui.QPalette.Base,QtGui.QColor(0xE9,0xE9,0xE9))
         palette.setColor(QtGui.QPalette.AlternateBase,QtGui.QColor(0xD9,0xD9,0xD9))
         self.setPalette(palette)
-        self.setContextMenuPolicy(Qt.ActionsContextMenu)
+        #self.setContextMenuPolicy(Qt.ActionsContextMenu)
     
         # These rows enable a horizontal scrollbar. The length that can be scrolled will be determined by
         # the column length and _not_ by the delegate's sizehint (though you may use resizeColumnToContents).
@@ -135,23 +136,26 @@ class TreeView(QtGui.QTreeView):
     
     def checkTreeActions(self):
         if self._treeActionsVersion != TreeView.treeActionsVersion:
-            for action in self.actions():
-                if isinstance(action, TreeAction):
-                    self.removeAction(action)
-            for thing in self.treeActions:
-                if isinstance(thing, NamedList):
-                    sep = QtGui.QAction(thing.name, self)
-                    sep.setSeparator(True)
-                    self.addAction(sep)
-                    grp = QtGui.QActionGroup(self)
-                    for cls in thing:
-                        act = cls(self)
-                        grp.addAction(act)
-                        self.addAction(act)
-                else:
-                    act = thing(self)
+            self.rebuildTreeActions()
+    
+    def rebuildTreeActions(self):
+        for action in self.actions():
+            if isinstance(action, TreeAction):
+                self.removeAction(action)
+        for thing in self.treeActions:
+            if isinstance(thing, NamedList):
+                sep = QtGui.QAction(thing.name, self)
+                sep.setSeparator(True)
+                self.addAction(sep)
+                grp = QtGui.QActionGroup(self)
+                for cls in thing:
+                    act = cls(self)
+                    grp.addAction(act)
                     self.addAction(act)
-            self._treeActionsVersion = TreeView.treeActionsVersion
+            else:
+                act = thing(self)
+                self.addAction(act)
+        self._treeActionsVersion = TreeView.treeActionsVersion
                 
     def updateNodeSelection(self):
         self.nodeSelection = NodeSelection(self.selectionModel())
@@ -159,7 +163,28 @@ class TreeView(QtGui.QTreeView):
         for action in self.actions():
             if isinstance(action, TreeAction):
                 action.initialize()
+        
+    def contextMenuEvent(self, event):
+        menu = QtGui.QMenu(self)
+        menu.addAction(modify.createUndoAction(self))
+        menu.addAction(modify.createRedoAction(self))
+        for action in self.actions():
+            menu.addAction(action)
+        menu.popup(event.globalPos())
+        event.accept()
+        
+    def keyPressEvent(self, event):
+        self.updateNodeSelection()
+        super().keyPressEvent(event)
+        
+    def mousePressEvent(self, event):
+        self.updateNodeSelection()
+        super().mousePressEvent(event)
     
+    def keyReleaseEvent(self, event):
+        self.updateNodeSelection()
+        super().keyReleaseEvent(event)
+        
     def selectionChanged(self, selected, deselected):
         super().selectionChanged(selected, deselected)
         self.updateGlobalSelection(selected, deselected)

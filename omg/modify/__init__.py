@@ -159,11 +159,11 @@ def endMacro():
 def push(command):
     stack.push(command)
 
-def createUndoAction(level,parent,prefix):
-    return stack.createUndoAction(parent,prefix)
+def createUndoAction(parent, prefix = ""):
+    return stack.createUndoAction(parent, prefix)
 
-def createRedoAction(level,parent,prefix):
-    return stack.createRedoAction(parent,prefix)
+def createRedoAction(parent,prefix = ""):
+    return stack.createRedoAction(parent, prefix)
 
 
 # This is simply so that other modules can use modify.real.<stuff>

@@ -43,6 +43,7 @@ class TreeAction(QtGui.QAction):
         if tooltip:
             self.setToolTip((tooltip))
         self.triggered.connect(self.doAction)
+        self.setShortcutContext(Qt.WidgetShortcut)
     
     def initialize(self):
         pass
@@ -201,7 +202,6 @@ class ToggleMajorAction(TreeAction):
     def initialize(self):
         selection = self.parent().nodeSelection
         self.setEnabled(selection.hasElements())
-        print(selection.elements())
         self.setChecked(all(element.major for element in selection.elements()))
         self.state = self.isChecked()
         self.selection = selection
@@ -213,6 +213,33 @@ class ToggleMajorAction(TreeAction):
         self.toggle()
                 
 
+class RemoveFromPlaylistAction(TreeAction):
+    """This action removes selected elements from a playlist."""
+    
+    def __init__(self, parent):
+        super().__init__(parent, shortcut = "Del")
+        self.setText(self.tr('Remove from playlist'))
+    
+    def initialize(self):
+        self.setDisabled(self.parent().nodeSelection.empty())
+    
+    def doAction(self):
+        self.parent().removeSelected()
+        
+class ClearPlaylistAction(TreeAction):
+    """This action clears a playlist."""
+    
+    def __init__(self, parent):
+        super().__init__(parent, shortcut = "Shift+Del")
+        self.setText(self.tr('Clear playlist'))
+        
+    def initialize(self):
+        self.setEnabled(len(self.parent().backend.paths) > 0)
+        
+    def doAction(self):
+        self.parent().backend.clearPlaylist()
+    
+            
 #class TagValueAction(TreeAction):
 #    """This action triggers a dialog to edit the tag value (set sort value, hidden flag, and rename
 #    the value in all occurences)."""
