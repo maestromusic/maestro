@@ -20,64 +20,22 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from ... import tags, config, models
-from . import *
+from . import StandardDelegate,configuration
 
 translate = QtCore.QCoreApplication.translate
 
 
-class PlaylistDelegate(AbstractDelegate):
+class PlaylistDelegate(StandardDelegate):
     """Delegate for the playlist."""
     
-    options = configuration.copyOptions(AbstractDelegate.options)
+    options = configuration.copyOptions(StandardDelegate.options)
+    options["fitInTitleRowData"].value = configuration.DataPiece("filecount+length")
     
     def background(self, index):
         if index == self.model.currentModelIndex:
             return QtGui.QBrush(QtGui.QColor(110,149,229))
         elif index in self.model.currentParentsModelIndices:
             return QtGui.QBrush(QtGui.QColor(140,179,255))    
-        
-    def layout(self,index,availableWidth):
-        element = self.model.data(index)
-        
-        # Prepare data
-        if element.tags is None:
-            element.loadTags()
-        if element.flags is None:
-            element.loadFlags()
-            
-        # Cover
-        if element.hasCover():
-            coverSize = self.config.options['coverSize'].value
-            self.addLeft(CoverItem(element.getCover(coverSize),coverSize))
-        
-        # Flag-Icons
-        if self.config.options['showFlagIcons'].value:
-            flagIcons = self.prepareFlags(element)[0]
-            if len(flagIcons) > 0:
-                self.addRight(IconBarItem(flagIcons,columns=2 if len(flagIcons) > 2 else 1))
-
-        # Title and Major
-        titleItem = TextItem(element.getTitle(prependPosition=self.config.options['showPositions'].value,
-                                                usePath=not self.config.options['showPaths'].value),
-                             BOLD_STYLE if element.isContainer() else STD_STYLE)
-        
-        if self.config.options['showMajor'].value and element.isContainer() and element.major:
-            self.addCenter(ColorBarItem(QtGui.QColor(255,0,0),5,titleItem.sizeHint(self)[1]))
-        self.addCenter(titleItem)
-        
-        self.newRow()
-        
-        # Path
-        if self.config.options['showPaths'].value and element.isFile():
-            self.addCenter(TextItem(element.path,ITALIC_STYLE))
-            self.newRow()
-            
-        # Columns
-        leftTexts,rightTexts = self.prepareColumns(element)
-        if len(leftTexts) > 0 or len(rightTexts) > 0:
-            self.addCenter(MultiTextItem(leftTexts,rightTexts))
-            self.newRow()
-            
     
     @staticmethod
     def getDefaultDataPieces():
