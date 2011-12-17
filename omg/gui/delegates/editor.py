@@ -96,8 +96,8 @@ class EditorDelegate(AbstractDelegate):
         # Flags without icon
         if len(flagsWithoutIcon) > 0:
             self.addCenter(TextItem(', '.join(flagsWithoutIcon)))
-            
-    def prepareTags(self,element):
+        
+    def prepareColumns(self,element):
         theTags = self.getTags(element)
         leftTexts = []
         rightTexts = []
@@ -107,6 +107,9 @@ class EditorDelegate(AbstractDelegate):
                 if tag in theTags:
                     leftTexts.append(self.prepareTagValues(element,theTags,tag))
                     del theTags[tag]
+            else:
+                text = self.getNonTagData(element,dataPiece)
+                
         for dataPiece in self.config.rightData:
             if dataPiece.tag is not None:
                 tag = dataPiece.tag
@@ -118,33 +121,14 @@ class EditorDelegate(AbstractDelegate):
                 leftTexts.append(self.prepareTagValues(element,theTags,tag,addTagName=True))
             
         return leftTexts,rightTexts
-    
+
     def prepareTagValues(self,element,theTags,tag,addTagName=False,alignRight=False):
         separator = ' - ' if tag == tags.TITLE or tag == tags.ALBUM else ', '
-#        if hasattr(element,'missingTags') and tag in element.missingTags \
-#                and any(v in element.missingTags[tag] for v in theTags[tag]):
-#            doc = QtGui.QTextDocument()
-#            doc.setDocumentMargin(0)
-#            cursor = QtGui.QTextCursor(doc)
-#            if alignRight:
-#                format = QtGui.QTextBlockFormat()
-#                format.setAlignment(Qt.AlignRight)
-#                cursor.setBlockFormat(format)
-#            if addTagName:
-#                cursor.insertText('{}: '.format(tag.translated()),self.blackFormat)
-#            for i,value in enumerate(theTags[tag]):
-#                if value in element.missingTags[tag]:
-#                    cursor.insertText(str(value),self.redFormat)
-#                else: cursor.insertText(str(value),self.blackFormat)
-#                if i != len(theTags[tag]) - 1:
-#                    cursor.insertText(separator)
-#            return doc
-#        else: 
         strings = [str(v) for v in theTags[tag]]
         if addTagName:
             return '{}: {}'.format(tag.translated(),separator.join(strings))
         else: return separator.join(strings)
-    
+        
     def getTags(self,element):
         theTags = element.tags.copy()
         parent = element.parent
@@ -177,25 +161,6 @@ class EditorDelegate(AbstractDelegate):
 #        elif value not in element.missingTags[tag]:
 #            element.missingTags[tag].append(value)
             
-    def getFlags(self,element):
-        """Return two lists containing the flags of *element*: The first list contains the icons of the flags
-        that have one, the second list contains the names of those flags that do not have an icon.
-        
-        If the ''removeParentFlags'' option is True, flags that are set in an ancestor are removed.
-        """
-        if self.removeParentFlags:
-            flags = list(element.flags) # copy!
-            parent = element.parent
-            while parent is not None:
-                if isinstance(parent,models.Element):
-                    for flag in parent.flags:
-                        if flag in flags:
-                            flags.remove(flag)
-                parent = parent.parent
-        else:
-            flags = element.flags
-        return [flag.icon for flag in flags if flag.icon is not None],\
-               [flag.name for flag in flags if flag.icon is None]
     
     @staticmethod
     def getDefaultDataPieces():

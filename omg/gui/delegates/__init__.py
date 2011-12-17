@@ -21,8 +21,9 @@ import math,itertools
 from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
-from ... import models, tags, config, strutils, database as db, utils, modify
+from ... import models, tags, config, strutils, database as db, utils, modify, strutils
 from . import configuration
+from ...models import browser as browsermodel
 
 translate = QtCore.QCoreApplication.translate
 
@@ -62,6 +63,7 @@ class AbstractDelegate(QtGui.QStyledItemDelegate):
         ("showPositions",translate("Delegates","Display position numbers"),"bool",True),
         ("showPaths",translate("Delegates","Display paths"),"bool",False),
         ("showFlagIcons",translate("Delegates","Display flag icons"),"bool",True),
+        ("removeParentFlags",translate("Delegates","Remove flags which appear in ancestor elements"),"bool",True),
         #("hideParentFlags",translate("Delegates","Hide flags that appear in parent elements"),"bool",True),
         #("maxRowsTag",translate("Delegates","Maximal number of rows per tag"),"int",4),
         #("maxRowsElement",translate("Delegates","Maximal number of rows per element"),"int",50),
@@ -282,9 +284,94 @@ class AbstractDelegate(QtGui.QStyledItemDelegate):
 
     def files(self):
         """Return the formatted number of files in the element."""
-        return self.tr("%n piece(s)","",self.element.getFileCount())
+        return translate("AbstractDelegate","%n piece(s)","",QtCore.QCoreApplication.CodecForTr,
+                         self.element.getFileCount())
+    
+    def prepareColumns(self,element,excludeTags=[]):
+        leftTexts = []
+        rightTexts = []
+        for texts,dataPieces in ((leftTexts,self.config.leftData),(rightTexts,self.config.rightData)):
+            for dataPiece in dataPieces:
+                if dataPiece.tag is not None:
+                    tag = dataPiece.tag
+                    if tag in excludeTags:
+                        continue
+                    values = self.getTagValues(tag,element)
+                    if len(values) > 0:
+                        separator = ' - ' if tag == tags.TITLE or tag == tags.ALBUM else ', '
+                        texts.append(separator.join(str(v) for v in values))
+                else:
+                    data = self.getNonTagData(element,dataPiece.data)
+                    if data is not None and len(data) > 0:
+                        texts.append(data)
+                
+        return leftTexts,rightTexts
 
+    def getTagValues(self,tagType,element):
+        """Return all values of the tag *tagType* in *element* excluding values that appear in parent nodes.
+        Values from ValueNode-ancestors will also be removed."""
+        if tagType not in element.tags:
+            return []
+        values = list(element.tags[tagType]) # copy!
+        
+        parent = element
+        while len(values) > 0:
+            parent = parent.parent
+            if isinstance(parent,models.Element):
+                if parent.tags is None:
+                    parent.loadTags()
+                if tagType in parent.tags:
+                    parentValues = parent.tags[tagType]
+                else: parentValues = []
+            elif isinstance(parent,models.RootNode):
+                break
+            elif isinstance(parent,browsermodel.ValueNode):
+                parentValues = parent.values
+            
+            for value in parentValues:
+                if value in values:
+                    values.remove(value)
+        
+        return values
+        
+    def prepareFlags(self,element):
+        """Return two lists containing the flags of *element*: The first list contains the icons of the flags
+        that have one, the second list contains the names of those flags that do not have an icon.
+        
+        If the ''removeParentFlags'' option is True, flags that are set in an ancestor are removed.
+        """
+        if self.config.options['removeParentFlags'].value:
+            flags = list(element.flags) # copy!
+            parent = element.parent
+            while parent is not None:
+                if isinstance(parent,models.Element):
+                    for flag in parent.flags:
+                        if flag in flags:
+                            flags.remove(flag)
+                parent = parent.parent
+        else:
+            flags = element.flags
+        return [flag.icon for flag in flags if flag.icon is not None],\
+               [flag.name for flag in flags if flag.icon is None]
 
+    def getNonTagData(self,element,data):
+        """Return data for non-tag datapieces as string."""
+        if isinstance(element,models.Element):
+            if data == "filetype":
+                ext = element.getExtension()
+                # Do not display extensions in each file if they are the same for the whole container
+                if isinstance(element.parent,models.Element) and element.parent.getExtension() == ext:
+                    return None
+                else: return ext
+            elif data == "length":
+                return strutils.formatLength(element.getLength())
+            elif data == "filecount":
+                if element.isFile():
+                    return None # Do not display a '1' at every file
+                else: return self.tr("%n piece(s)","",element.fileCount())
+        else: return None
+        
+        
 class DelegateItem:
     """A DelegateItem encapsulates one ore more pieces of information (e.g. a text, a cover, a list of
     icons) that can be drawn by a delegate. Given a node in a itemview, subclasses of AbstractDelegate

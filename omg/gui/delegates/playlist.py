@@ -52,7 +52,7 @@ class PlaylistDelegate(AbstractDelegate):
         
         # Flag-Icons
         if self.config.options['showFlagIcons'].value:
-            flagIcons = self.getFlagIcons(element)
+            flagIcons = self.prepareFlags(element)[0]
             if len(flagIcons) > 0:
                 self.addRight(IconBarItem(flagIcons,columns=2 if len(flagIcons) > 2 else 1))
 
@@ -72,79 +72,12 @@ class PlaylistDelegate(AbstractDelegate):
             self.addCenter(TextItem(element.path,ITALIC_STYLE))
             self.newRow()
             
-        # Tags
-        leftTexts,rightTexts = self.prepareTags(element)
+        # Columns
+        leftTexts,rightTexts = self.prepareColumns(element)
         if len(leftTexts) > 0 or len(rightTexts) > 0:
             self.addCenter(MultiTextItem(leftTexts,rightTexts))
             self.newRow()
             
-    def prepareTags(self,element):
-        leftTexts = []
-        rightTexts = []
-        for dataPiece in self.config.leftData:
-            if dataPiece.tag is not None:
-                tag = dataPiece.tag
-                values = self.getTagValues(tag,element)
-                if len(values) > 0:
-                    separator = ' - ' if tag == tags.TITLE or tag == tags.ALBUM else ', '
-                    leftTexts.append(separator.join(str(v) for v in values))
-        for dataPiece in self.config.rightData:
-            if dataPiece.tag is not None:
-                tag = dataPiece.tag
-                values = self.getTagValues(tag,element)
-                if len(values) > 0:
-                    separator = ' - ' if tag == tags.TITLE or tag == tags.ALBUM else ', '
-                    rightTexts.append(separator.join(str(v) for v in values))
-            
-        return leftTexts,rightTexts
-    
-    def prepareTagValues(self,element,theTags,tag,addTagName=False,alignRight=False):
-        separator = ' - ' if tag == tags.TITLE or tag == tags.ALBUM else ', '
-        strings = [str(v) for v in theTags[tag]]
-        if addTagName:
-            return '{}: {}'.format(tag.translated(),separator.join(strings))
-        else: return separator.join(strings)
-
-    def getTagValues(self,tagType,element):
-        """Return all values of the tag *tagType* in *element* excluding values that appear in parent nodes.
-        Values from ValueNode-ancestors will also be removed."""
-        if tagType not in element.tags:
-            return []
-        values = list(element.tags[tagType]) # copy!
-        
-        parent = element
-        while len(values) > 0:
-            parent = parent.parent
-            if isinstance(parent,models.RootNode):
-                break
-        
-            if parent.tags is None:
-                parent.loadTags()
-            if tagType in parent.tags:
-                parentValues = parent.tags[tagType]
-            else: parentValues = []
-            
-            for value in parentValues:
-                if value in values:
-                    values.remove(value)
-        
-        return values
-    
-    def getFlagIcons(self,element):
-        """Return flag icons that should be displayed for *element*. All flags contained in at least one
-        parent node will be removed from the result."""
-        flags = [flag for flag in element.flags if flag.icon is not None]
-        parent = element.parent
-        while parent is not None:
-            if isinstance(parent,models.RootNode):
-                break
-            if parent.flags is None:
-                parent.loadFlags()
-            for flag in parent.flags:
-                if flag.icon is not None and flag in flags:
-                    flags.remove(flag)
-            parent = parent.parent
-        return [flag.icon for flag in flags]
     
     @staticmethod
     def getDefaultDataPieces():

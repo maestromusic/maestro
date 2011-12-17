@@ -66,7 +66,7 @@ class BrowserDelegate(AbstractDelegate):
             
             if node.flags is None:
                 node.loadFlags()
-            flagIcons = self.getFlagIcons(node)
+            flagIcons = self.prepareFlags(node)[0]
             
             if node.isContainer() and node.major is None:
                 node.major = db.isMajor(node.id)
@@ -120,7 +120,7 @@ class BrowserDelegate(AbstractDelegate):
                     # center region and thus potentially a lot rows.
                     
                     # In any case we are not going to fit the fitInTitleRowTag, so we can compute the texts:
-                    leftTexts,rightTexts = self.prepareTags(node,None,False)
+                    leftTexts,rightTexts = self.prepareColumns(node)
 
                     # First we compute a lower bound of the rows used by the tags
                     rowsForSure = max(len(leftTexts),len(rightTexts))
@@ -166,7 +166,8 @@ class BrowserDelegate(AbstractDelegate):
             
             # Tags
             if leftTexts is None: # Tags may have been computed already above 
-                leftTexts,rightTexts = self.prepareTags(node,fitInTitleRowTag,fittedTextInTitleRow)
+                leftTexts,rightTexts = self.prepareColumns(
+                                        node,excludeTags=[fitInTitleRowTag] if fittedTextInTitleRow else [])
 
             if len(leftTexts) > 0 or len(rightTexts) > 0:
                 self.addCenter(MultiTextItem(leftTexts,rightTexts))
@@ -178,83 +179,7 @@ class BrowserDelegate(AbstractDelegate):
                 self.addCenter(TextItem(node.path,ITALIC_STYLE))
                 self.newRow()
 
-    def prepareTags(self,element,fitInTitleRowTag,fittedTextInTitleRow):
-        """Return two lists and a third value containing information about the tags of *element*:
-        
-            - the first list contains the concatenated tag values for each tag in ''self.leftTags''
-            - the second list contains the same for ''self.rightTags''
-            - if the option optimizeDate is True and *element* has a "date"-tag, the last value contains the
-              concatenated date values (else None)
-              
-        \ """
-        if not fittedTextInTitleRow:
-            fitInTitleRowTag = None # Treat this case as if there was no fitInTitleRowTag
-            
-        leftTexts = []
-        for dataPiece in self.config.leftData:
-            if dataPiece.tag is not None:
-                tag = dataPiece.tag
-                if tag in element.tags and tag != fitInTitleRowTag:
-                    values = self.getTagValues(tag,element)
-                    if len(values) > 0:
-                        separator = ' - ' if tag == tags.TITLE or tag == tags.ALBUM else ', '
-                        leftTexts.append(separator.join(str(v) for v in values))
-        rightTexts = []
-        for dataPiece in self.config.rightData:
-            if dataPiece.tag is not None:
-                tag = dataPiece.tag
-                if tag in element.tags and tag != fitInTitleRowTag:
-                    values = self.getTagValues(tag,element)
-                    if len(values) > 0:
-                        separator = ' - ' if tag == tags.TITLE or tag == tags.ALBUM else ', '
-                        rightTexts.append(separator.join(str(v) for v in values))
 
-        return leftTexts,rightTexts
-    
-    def getTagValues(self,tagType,element):
-        """Return all values of the tag *tagType* in *element* excluding values that appear in parent nodes.
-        Values from ValueNode-ancestors will also be removed."""
-        if tagType not in element.tags:
-            return []
-        values = list(element.tags[tagType]) # copy!
-        
-        parent = element
-        while len(values) > 0:
-            parent = parent.parent
-            if isinstance(parent,models.RootNode):
-                break
-        
-            if isinstance(parent,models.Element):
-                if parent.tags is None:
-                    parent.loadTags()
-                if tagType in parent.tags:
-                    parentValues = parent.tags[tagType]
-                else: parentValues = []
-            elif isinstance(parent,browsermodel.ValueNode):
-                parentValues = parent.values
-            else: parentValues = []
-            
-            for value in parentValues:
-                if value in values:
-                    values.remove(value)
-        
-        return values
-    
-    def getFlagIcons(self,element):
-        """Return flag icons that should be displayed for *element*. All flags contained in at least one
-        parent node will be removed from the result."""
-        flags = [flag for flag in element.flags if flag.icon is not None]
-        parent = element.parent
-        while parent is not None:
-            if isinstance(parent,models.Element):
-                if parent.flags is None:
-                    parent.loadFlags()
-                for flag in parent.flags:
-                    if flag.icon is not None and flag in flags:
-                        flags.remove(flag)
-            parent = parent.parent
-        return [flag.icon for flag in flags]
-    
     @staticmethod
     def getDefaultDataPieces():
         left = [configuration.DataPiece(tags.get(name)) for name in ['composer','artist','performer']]

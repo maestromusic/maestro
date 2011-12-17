@@ -5,6 +5,7 @@ SOURCES = ../omg/application.py\
 	  ../omg/gui/dialogs.py\
 	  ../omg/gui/editor.py\
 	  ../omg/gui/playlist.py\
+	  ../omg/gui/delegates/__init__.py\
       ../omg/gui/playback.py\
       ../omg/gui/playerwidgets.py\
 	  ../omg/gui/singletageditor.py\
