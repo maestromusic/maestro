@@ -22,7 +22,7 @@ from PyQt4.QtCore import Qt
 from . import treeview, mainwindow, playerwidgets
 from .delegates import playlist as playlistdelegate
 from .. import logging, player, utils
-
+from ..modify.treeactions import *
 translate = QtCore.QCoreApplication.translate
 logger = logging.getLogger("gui.playlist")
 
@@ -30,6 +30,11 @@ class PlaylistTreeView(treeview.TreeView):
     """This is the main widget of a playlist: The tree view showing the current element tree."""
     level = None
     
+    treeActions = [ NamedList('tags', [EditTagsSingleAction,
+                                       EditTagsRecursiveAction])
+                  , NamedList('playlist', [ RemoveFromPlaylistAction
+                                          , ClearPlaylistAction
+                                          , ]) ]
     songSelected = QtCore.pyqtSignal(int)
     
     def __init__(self, parent = None):
@@ -51,6 +56,16 @@ class PlaylistTreeView(treeview.TreeView):
         self.setItemDelegate(playlistdelegate.PlaylistDelegate(self,playlistdelegate.PlaylistDelegate.defaultConfig))
         self.selectionModel().selectionChanged.connect(self.updateGlobalSelection)
         self.songSelected.connect(backend.setCurrentSong)
+        self.treeActionsVersion += 1
+        self.updateNodeSelection()
+    
+    def rebuildTreeActions(self):
+        """Overridden method. Adds playlist-scope undo/redo methods and calls the backend
+        for backend-specific actions.""" 
+        super().rebuildTreeActions()
+        self.addAction(self.backend.stack.createUndoAction(self, self.tr('Playlist-Undo')))
+        self.addAction(self.backend.stack.createRedoAction(self, self.tr('Playlist-Redo')))
+        self.backend.addTreeActions(self)
         
     def _handleDoubleClick(self, idx):
         if idx.isValid():
@@ -83,42 +98,9 @@ class PlaylistTreeView(treeview.TreeView):
             else:
                 event.setDropAction(Qt.CopyAction)
         treeview.TreeView.dropEvent(self, event)
-
-
-class PlaylistWidget(QtGui.QDockWidget):
-    
-    def __init__(self, parent = None, state = None, location = None):
-        super().__init__(parent)
-        self.setWindowTitle(self.tr('playlist'))
-        self.treeview = PlaylistTreeView()
- 
-        widget = QtGui.QWidget()
-        layout = QtGui.QVBoxLayout(widget)
-        layout.addWidget(self.treeview)       
-        bottomLayout = QtGui.QHBoxLayout()
-        self.backendChooser = playerwidgets.BackendChooser(self)
-        self.backendChooser.backendChanged.connect(self.setBackend)
-        bottomLayout.addWidget(self.backendChooser)
-        self.clearButton = QtGui.QPushButton(self.tr('clear'), self)
-        self.shuffleButton = QtGui.QPushButton(self.tr('shuffle'), self)
-        self.removeButton = QtGui.QPushButton(self.tr('remove'), self)
-        self.removeButton.clicked.connect(self.removeSelected)
-        bottomLayout.addWidget(self.clearButton)
-        bottomLayout.addWidget(self.shuffleButton)
-        bottomLayout.addWidget(self.removeButton)
-        bottomLayout.addStretch()
-        self.undoButton = QtGui.QToolButton(self)
-        self.redoButton = QtGui.QToolButton(self)
-        bottomLayout.addWidget(self.undoButton)
-        bottomLayout.addWidget(self.redoButton) 
         
-        layout.addLayout(bottomLayout)
-        self.setWidget(widget)
-        if not self.backendChooser.setCurrentProfile(state):
-            self.setBackend(self.backendChooser.currentProfile())
-    
     def removeSelected(self):
-        elements = set(ix.internalPointer() for ix in self.treeview.selectedIndexes())
+        elements = set(ix.internalPointer() for ix in self.selectedIndexes())
         redundant = set()
         for element in elements:
             for parent in element.getParents():
@@ -133,7 +115,31 @@ class PlaylistWidget(QtGui.QDockWidget):
                 removals.append((file.offset(), file.path))
         removals.sort()
         self.backend.removeFromPlaylist(removals)
-                
+
+
+class PlaylistWidget(QtGui.QDockWidget):
+    
+    def __init__(self, parent = None, state = None, location = None):
+        super().__init__(parent)
+        self.setWindowTitle(self.tr('playlist'))
+        
+        self.treeview = PlaylistTreeView()
+ 
+        widget = QtGui.QWidget()
+        layout = QtGui.QVBoxLayout(widget)
+        layout.addWidget(self.treeview)       
+        bottomLayout = QtGui.QHBoxLayout()
+        self.backendChooser = playerwidgets.BackendChooser(self)
+        self.backendChooser.backendChanged.connect(self.setBackend)
+        
+        bottomLayout.addWidget(self.backendChooser)
+        bottomLayout.addStretch()
+        
+        layout.addLayout(bottomLayout)
+        self.setWidget(widget)
+        if not self.backendChooser.setCurrentProfile(state):
+            self.setBackend(self.backendChooser.currentProfile())
+    
     def saveState(self):
         return self.backendChooser.currentProfile()
     
@@ -142,7 +148,6 @@ class PlaylistWidget(QtGui.QDockWidget):
         if hasattr(self, 'backend'):
             self.backend.unregisterFrontend(self)
             self.treeview.songSelected.disconnect(self.backend.setCurrentSong)
-            self.clearButton.clicked.disconnect(self.backend.clearPlaylist)
         if name is None:
             self.treeview.setDisabled(True)
             return
@@ -154,9 +159,7 @@ class PlaylistWidget(QtGui.QDockWidget):
         
         self.treeview.setEnabled(True)
         self.backend = backend
-        self.undoButton.setDefaultAction(self.backend.stack.createUndoAction(self))
-        self.redoButton.setDefaultAction(self.backend.stack.createRedoAction(self))
-        self.clearButton.clicked.connect(self.backend.clearPlaylist)
+        
         self.treeview.setBackend(self.backend)
         
         

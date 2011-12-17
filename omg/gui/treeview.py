@@ -20,9 +20,9 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from .. import models, logging
+from .. import modify
 from ..modify.treeactions import *
 from ..constants import REAL
-from omg.modify.treeactions import ToggleMajorAction
 
 translate = QtGui.QApplication.translate
 logger = logging.getLogger(__name__)
@@ -105,44 +105,11 @@ class TreeView(QtGui.QTreeView):
     browser.
     """
     level = REAL
-    @classmethod
-    def initContextMenu(cls):
-        """Class method to initialize the context menu. This method should be overwritten in subclasses."""
-        menu = [ ]
-        tagsMenu = NamedList(translate(__name__, 'tags'), (EditTagsAction(False),
-                                                              EditTagsAction(True),
-                                                              MatchTagsFromFilenamesAction()) )
-        structureMenu = NamedList(translate(__name__, 'structure'), (DeleteAction(CONTENTS),
-                                                                     DeleteAction(DB),
-                                                                     DeleteAction(DISK),
-                                                                     MergeAction(),
-                                                                     ToggleMajorAction()))
-        menu.append(tagsMenu)
-        menu.append(structureMenu)
-        
-        return menu
-        
-        
-    @classmethod
-    def contextMenu(cls):
-        if not '_contextMenu' in cls.__dict__:
-            if 'initContextMenu' in cls.__dict__:
-                # ensure that init is called only for subclasses defining their own init function
-                cls._contextMenu = cls.initContextMenu()
-            else:
-                cls._contextMenu = []
-        return cls._contextMenu
     
-    @classmethod
-    def contextMenus(cls):
-        for c in reversed(cls.mro()):
-            if issubclass(c, TreeView):
-                yield c.contextMenu()
-                
-        
+    treeActions = [ NamedList('tags', [EditTagsSingleAction, EditTagsRecursiveAction]) ]
+    treeActionsVersion = 0
     def __init__(self,parent):
         QtGui.QTreeView.__init__(self,parent)
-        self.contextMenuProviderCategory = None
         
         self.setHeaderHidden(True)
         self.setExpandsOnDoubleClick(False)
@@ -154,38 +121,75 @@ class TreeView(QtGui.QTreeView):
         palette.setColor(QtGui.QPalette.Base,QtGui.QColor(0xE9,0xE9,0xE9))
         palette.setColor(QtGui.QPalette.AlternateBase,QtGui.QColor(0xD9,0xD9,0xD9))
         self.setPalette(palette)
+        #self.setContextMenuPolicy(Qt.ActionsContextMenu)
     
         # These rows enable a horizontal scrollbar. The length that can be scrolled will be determined by
         # the column length and _not_ by the delegate's sizehint (though you may use resizeColumnToContents).
         #self.header().setHorizontalScrollMode(QtGui.QAbstractItemView.ScrollPerPixel)
         #self.header().setStretchLastSection(False)
         #self.header().setResizeMode(0,QtGui.QHeaderView.ResizeToContents)
-
-    def _addContextMenuItem(self, item, menu):
-        """Adds the context menu part defined by *item* to the parent *menu*.
+        self._treeActionsVersion = -1
+    
+    def focusInEvent(self, event):
+        self.updateNodeSelection()
+        super().focusInEvent(event)
+    
+    def checkTreeActions(self):
+        if self._treeActionsVersion != TreeView.treeActionsVersion:
+            self.rebuildTreeActions()
+    
+    def rebuildTreeActions(self):
+        for action in self.actions():
+            if isinstance(action, TreeAction):
+                self.removeAction(action)
+        for thing in self.treeActions:
+            if isinstance(thing, NamedList):
+                sep = QtGui.QAction(thing.name, self)
+                sep.setSeparator(True)
+                self.addAction(sep)
+                grp = QtGui.QActionGroup(self)
+                for cls in thing:
+                    act = cls(self)
+                    grp.addAction(act)
+                    self.addAction(act)
+            else:
+                act = thing(self)
+                self.addAction(act)
+        self._treeActionsVersion = TreeView.treeActionsVersion
+                
+    def updateNodeSelection(self):
+        self.nodeSelection = NodeSelection(self.selectionModel())
+        self.checkTreeActions()
+        for action in self.actions():
+            if isinstance(action, TreeAction):
+                action.initialize()
         
-        *item* must be either a TreeAction object or an iterable with a *name* attribute (e.g. a
-        NamedList) containing valid items."""
-        if isinstance(item, TreeAction):
-            item.initialize(self.nodeSelection, self)
-            if item.visible:
-                menu.addAction(item)
-                return True
-            return False
-        elif isinstance(item, HybridTreeAction):
-            item.initialize(self.nodeSelection, self)
-            if item.visible:
-                if any( [self._addContextMenuItem(subItem, menu) for subItem in item.actions] ):
-                    return True
-            return False
-        else:
-            subMenu = QtGui.QMenu(item.name, menu)
-            
-            if any( [self._addContextMenuItem(subItem, subMenu) for subItem in item] ):
-                menu.addMenu(subMenu)
-                return True
-            return False
-
+    def contextMenuEvent(self, event):
+        menu = QtGui.QMenu(self)
+        menu.addAction(modify.createUndoAction(self))
+        menu.addAction(modify.createRedoAction(self))
+        for action in self.actions():
+            menu.addAction(action)
+        menu.popup(event.globalPos())
+        event.accept()
+        
+    def keyPressEvent(self, event):
+        self.updateNodeSelection()
+        super().keyPressEvent(event)
+        
+    def mousePressEvent(self, event):
+        self.updateNodeSelection()
+        super().mousePressEvent(event)
+    
+    def keyReleaseEvent(self, event):
+        self.updateNodeSelection()
+        super().keyReleaseEvent(event)
+        
+    def selectionChanged(self, selected, deselected):
+        super().selectionChanged(selected, deselected)
+        self.updateGlobalSelection(selected, deselected)
+        self.updateNodeSelection()
+        
     def updateGlobalSelection(self, selected, deselected):
         """Change the global selection if some any elements are selected in any views. Connect the
         selectionChanged() signal of the selection model to this slot to obtain the desired effect."""
@@ -198,18 +202,4 @@ class TreeView(QtGui.QTreeView):
         if len(globalSelection):
             from . import mainwindow
             mainwindow.setGlobalSelection(globalSelection,self)
-            
-    def contextMenuEvent(self,event):
-        self.nodeSelection = NodeSelection(self.selectionModel())
-        
-        contextMenus = list(self.contextMenus())
-        menu = QtGui.QMenu(self)
-        for i, cm in enumerate(contextMenus):
-            for item in cm:
-                self._addContextMenuItem(item, menu)
-            if i < len(contextMenus) -1:
-                menu.addSeparator()
-
-        menu.popup(event.globalPos() + QtCore.QPoint(2,2))
-        event.accept()
         

@@ -23,6 +23,7 @@ from omg import player, config, logging, database as db, models
 from omg.utils import relPath, absPath, ranges
 from omg.models import playlist
 from omg.player import STOP, PLAY, PAUSE
+from omg.modify.treeactions import TreeAction
 
 import mpd, queue, itertools, functools, threading
 
@@ -261,7 +262,10 @@ class MPDThread(QtCore.QThread):
             self.client.disconnect()
             self.changeFromMPD.emit('disconnect', None)
             
-
+    def updateDB(self):
+        if self.connected:
+            self.client.update()
+            
 class MPDPlayerBackend(player.PlayerBackend):
     
     changeFromMain = QtCore.pyqtSignal(str, object)
@@ -280,6 +284,13 @@ class MPDPlayerBackend(player.PlayerBackend):
         self.currentSongChanged.connect(self.playlist.setCurrent)
         self.mpdthread.start()
         self._numFrontends = 0
+        
+        # create actions
+        self.separator = QtGui.QAction("MPD", self)
+        self.separator.setSeparator(True)
+        
+        self.updateDBAction = QtGui.QAction("Update Database", self)
+        self.updateDBAction.triggered.connect(self.mpdthread.updateDB)
         
         # initialize functions that emit signals to the MPD thread on being called
         def _emitChange(what, *args):
@@ -338,6 +349,11 @@ class MPDPlayerBackend(player.PlayerBackend):
         else:
             print('WHAT? {}'.format(what))
                     
+    def addTreeActions(self, view):
+        view.addAction(self.separator)
+        view.addAction(self.updateDBAction)
+        
+    
     def registerFrontend(self, obj):
         self._numFrontends += 1
         if self._numFrontends == 1:

@@ -218,7 +218,7 @@ class ChangeSingleElementCommand(UndoCommand):
 
 class ChangeMajorFlagCommand(ChangeSingleElementCommand):
     """A command to toggle the 'major' flag of a single element."""
-    def __init__(self, level, element, text = ''):
+    def __init__(self, level, element, text = translate(__name__, 'toggle major flag')):
         QtGui.QUndoCommand.__init__(self, text)
         self.level = level
         self.newMajor = not element.major

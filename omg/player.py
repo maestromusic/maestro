@@ -175,7 +175,7 @@ class PlayerBackend(QtCore.QObject):
     
     def _removeFromPlaylist(self, removals):
         self.playlist.removeSongs(removals)
-        for pos, song in sorted(removals, reverse = True):
+        for pos,_ in sorted(removals, reverse = True):
             del self.paths[pos]
         
     def removeFromPlaylist(self, removals):
@@ -196,6 +196,12 @@ class PlayerBackend(QtCore.QObject):
         first song, this is ignored."""
         raise NotImplementedError()
     
+    def addTreeActions(self, playlist):
+        """This method can be used to add custom actions to a treeview which are specific
+        to this backend. The actions should be added to *playlist* by calling its
+        *addAction* method."""
+        pass
+     
     def registerFrontend(self, obj):
         """Tell this player class that a frontend object *obj* started to use it. The backend
         can use this information e.g. to make a connection retry or to start polling."""
