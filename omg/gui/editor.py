@@ -98,7 +98,8 @@ class EditorTreeView(treeview.TreeView):
                   , NamedList('structure', [DeleteFromParentAction,
                                             MergeAction,
                                             FlattenAction,
-                                            ToggleMajorAction])
+                                            ToggleMajorAction,
+                                            NewContainerAction])
                   , NamedList('editor', [ClearEditorAction,
                                          CommitAction]) ]
     def __init__(self, parent = None):
@@ -176,10 +177,6 @@ class EditorWidget(QtGui.QDockWidget):
         vb.addWidget(self.editor)
         hb = QtGui.QHBoxLayout()
         vb.addLayout(hb)
-        
-        self.newContainerButton = QtGui.QPushButton(self.tr("new container"))
-        self.newContainerButton.clicked.connect(self.newContainerDialog)
-        hb.addWidget(self.newContainerButton)
         
         self.autoExpandCheckbox = QtGui.QCheckBox(self.tr('auto expand'))
         self.autoExpandCheckbox.setChecked(expand)
