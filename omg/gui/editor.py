@@ -253,25 +253,6 @@ class EditorWidget(QtGui.QDockWidget):
             self.editor.model().albumGroupers = profiles()[self.guessProfileCombo.itemText(index)]
             self.guessIndex = index
     
-    def newContainerDialog(self):
-        """Display a dialog for creating a new container. This is a very simple dialog that does not
-        query for anything but the title tag."""
-        title, ok = QtGui.QInputDialog.getText(self, "Title", "Title of the container:")
-        if not ok:
-            return
-        changes = OrderedDict()
-        c_tags = tags.Storage()
-        c_tags[tags.TITLE] = [title]
-        container = Container(id = modify.newEditorId(),contents = None, tags = c_tags, flags = [],
-                              position = None,major=False )
-        oldRoot = self.editor.model().root
-        newRoot = oldRoot.copy()
-        newRoot.contents.append(container)
-        container.parent = newRoot
-        changes[oldRoot.id] = (oldRoot, newRoot)
-        comm = modify.commands.UndoCommand(EDITOR, changes, contentsChanged = True, text=self.tr('new container'))
-        modify.push(comm)
-        
     def saveState(self):
         if self.guessProfileCombo.currentIndex() == 0:
             profile = "dontguess"
