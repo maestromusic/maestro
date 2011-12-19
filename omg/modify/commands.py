@@ -23,7 +23,9 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from .. import tags as tagsModule, logging, database as db, models, flags as flagsModule
+from ..models import algorithms
 from . import events, real, dispatcher, ADDED, DELETED, CHANGED
+from .. import modify
 from ..constants import REAL, EDITOR, CONTENTS, DB, DISK
 
 translate = QtCore.QCoreApplication.translate
@@ -588,3 +590,125 @@ class FlagTypeUndoCommand(UndoCommand):
         elif self.action == CHANGED:
             flagsModule.changeFlagType(self.flagType,*self.oldData)
         else: raise ValueError("Invalid action {}".format(self.action))
+
+def merge(level, parent, indices, newTitle, removeString, adjustPositions):
+    """Merge creates a new container between *parent* and the children at the given *indices*.
+    Those child elements will be removed from *parent* and instead inserted as children of
+    the new container at indices[0]. The new container will contain all tags that are equal in
+    all of its new children; its TITLE tag will be set to *newTitle*.
+    
+    removeString defines what to remove from the titles of the elements that are moved below the
+    new container; this will usually be similar to *newTitle* plus possibly some punctutaion.
+    If *adjustPositions* is True, the positions of items that are *not* removed are decreased
+    to fill the gaps arising from moved elements.
+    Example: Consider the following setting of an album containing a Sonata: 
+    
+    * parent
+    |- pos1: child0 (title = Sonata Nr. 5: Allegro)
+    |- pos2: child1 (tilte = Sonata Nr. 5: Adagio)
+    |- pos3: child2 (title = Sonata Nr. 5: Finale. Presto)
+    |- pos4: child3 (title = Nocturne Op. 13/37)
+    |- pos5: child4 (title = Prelude BWV 42)
+    
+    After a call to merge with *indices=(0,1,2)*, *newTitle='Sonata Nr. 5'*, *removeString='Sonata Nr. 5: '*,
+    *adjustPositions = True* the layout would be:
+    
+    * parent
+    |- * pos1: new container (title = Sonata Nr. 5)
+       |- pos1: child0 (title = Allegro)
+       |- pos2: child1 (title = Adagio)
+       |- pos3: child2 (title = Finale. Presto)
+    |- pos2: child3 (title = Nocturne Op. 13/37)
+    |- pos3: child4 (title = Prelude BWV 42)
+    """ 
+    from ..models import Container, Element, RootNode
+
+    logger.debug("starting merge\n  on parent {}\n  indices {}".format(parent, indices))
+    modify.beginMacro(level, translate(__name__, 'merge elements'))
+    
+    insertIndex = indices[0]
+    insertPosition = parent.contents[insertIndex].iPosition()
+    newContainerPosition = insertPosition if isinstance(parent, Element) else None
+    newChildren = []
+    toRemove = []    
+    positionChanges = []
+    
+    for i, element in enumerate(parent.contents[insertIndex:], start = insertIndex):
+        if i in indices:
+            copy = parent.contents[i].copy()
+            if tagsModule.TITLE in copy.tags:
+                copy.tags[tagsModule.TITLE] = [ t.replace(removeString, '') for t in copy.tags[tagsModule.TITLE] ]
+            copy.position = len(newChildren) + 1
+            newChildren.append(copy)
+            toRemove.append(parent.contents[i])
+        elif adjustPositions:# or isinstance(parent, RootNode):
+            positionChanges.append( (element.iPosition(), element.iPosition() - len(newChildren) + 1) )
+    modify.push(RemoveElementsCommand(level, toRemove, mode = CONTENTS))
+    if len(positionChanges) > 0:
+        modify.push(PositionChangeCommand(level, parent.id, positionChanges))
+    t = tagsModule.findCommonTags(newChildren, True)
+    t[tagsModule.TITLE] = [newTitle]
+    if level == EDITOR:
+        newContainer = Container(id = modify.newEditorId(),
+                                 contents = newChildren,
+                                 tags = t,
+                                 flags = [],
+                                 position = newContainerPosition,
+                                 major = False)
+    else:
+        createCommand = CreateContainerCommand(t, None, False)
+        modify.push(createCommand)
+        newContainer = Container.fromId(createCommand.id, loadData = True, position = newContainerPosition)
+
+    insertions = { parent.id : [(insertPosition, newContainer)] }
+    if level == REAL:
+        insertions[newContainer.id] = [ (elem.position, elem) for elem in newChildren ]
+    modify.push(InsertElementsCommand(level, insertions))
+    modify.endMacro()
+
+def flatten(level, elements, recursive):
+    """Flatten out the given elements, i.e. remove them and put their children at their previous
+    place. If *recursive* is *True*, the same will be done for all children, so that we end
+    up with a flat list of files."""
+    if len(elements) > 1:
+        modify.beginMacro(level, translate(__name__, 'Flatten several containers'))
+    for element in elements:
+        if element.isContainer():
+            flattenSingle(level, element, recursive)
+    if len(elements) > 1:
+        modify.endMacro()
+        
+def flattenSingle(level, element, recursive):
+    """helper function to flatten a single container."""
+    parent = element.parent
+    position = element.iPosition()
+    index = parent.index(element)
+
+    if recursive:
+        children = element.getAllFiles()
+    else:
+        children = element.contents
+    modify.beginMacro(level, 'flatten container')
+    if index < len(parent.contents) - 1:
+        # need to ajust positions of elements behind
+        nextPosition = parent.contents[index+1].iPosition()
+        if nextPosition < position + len(children):
+            shift = position + len(children) - nextPosition
+            changes = []
+            for elem in parent.contents[index+1:]:
+                changes.append( (elem.iPosition(), elem.iPosition()+shift))
+            modify.push(PositionChangeCommand(level, parent.id, changes))
+    insertions = []
+    for child in children:
+        childCopy = child.copy()
+        if isinstance(parent, models.Element): 
+            childCopy.position = position
+        insertions.append( (position, childCopy))
+        position += 1
+        
+    modify.push(RemoveElementsCommand(level, [element], DB if level == REAL else CONTENTS))
+    modify.push(InsertElementsCommand(level, {parent.id: insertions}))
+    modify.endMacro()
+    
+        
+    

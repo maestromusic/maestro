@@ -94,10 +94,13 @@ class EditorTreeView(treeview.TreeView):
     level = EDITOR
     treeActions = [ NamedList('tags', [EditTagsSingleAction,
                                        EditTagsRecursiveAction,
-                                       MatchTagsFromFilenamesAction]),
-                    NamedList('structure', [DeleteFromParentAction,
+                                       MatchTagsFromFilenamesAction])
+                  , NamedList('structure', [DeleteFromParentAction,
                                             MergeAction,
-                                            ToggleMajorAction]) ]
+                                            FlattenAction,
+                                            ToggleMajorAction])
+                  , NamedList('editor', [ClearEditorAction,
+                                         CommitAction]) ]
     def __init__(self, parent = None):
         super().__init__(parent)
         self.setSelectionMode(self.ExtendedSelection)
@@ -174,10 +177,6 @@ class EditorWidget(QtGui.QDockWidget):
         hb = QtGui.QHBoxLayout()
         vb.addLayout(hb)
         
-        self.clearButton = QtGui.QPushButton(self.tr("clear"))
-        self.clearButton.clicked.connect(self.editor.model().clear)
-        hb.addWidget(self.clearButton)
-        
         self.newContainerButton = QtGui.QPushButton(self.tr("new container"))
         self.newContainerButton.clicked.connect(self.newContainerDialog)
         hb.addWidget(self.newContainerButton)
@@ -205,11 +204,7 @@ class EditorWidget(QtGui.QDockWidget):
                     break
         hb.addWidget(self.guessProfileCombo)
         
-        hb.addStretch()
-        self.commitButton = QtGui.QPushButton(self.tr('commit'))
-        hb.addWidget(self.commitButton)
-        self.commitButton.clicked.connect(modify.commitEditors)
-        
+        hb.addStretch()        
         profileNotifier.profilesChanged.connect(self._handleProfilesChanged)
 
     def _handleProfilesChanged(self):

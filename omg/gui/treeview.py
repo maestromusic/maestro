@@ -93,6 +93,13 @@ class NodeSelection:
         """True iff at least one element is selected."""
         return len(self._elements) > 0
     
+    def hasContainers(self):
+        """True iff at least one container is selected."""
+        for element in self._elements:
+            if isinstance(element, models.Container):
+                return True
+        return False
+
     def hasFiles(self):
         """True iff at least one file is selected."""
         return any(el.isFile() for el in self._elements)
