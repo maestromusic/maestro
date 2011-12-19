@@ -61,10 +61,10 @@ class DataPiece:
     title = property(getTitle)
     
     def __eq__(self,other):
-        return self.data == other.data and self.tag == other.tag
+        return isinstance(other,DataPiece) and self.data == other.data and self.tag == other.tag
     
     def __ne__(self,other):
-        return self.data != other.data or self.tag != other.tag
+        return not isinstance(other,DataPiece) or self.data != other.data or self.tag != other.tag
     
     def __str__(self):
         return "<DataPiece {}>".format(self.getTitle())
@@ -91,7 +91,8 @@ def availableDataPieces():
             DataPiece("length",translate("Delegates","Length")),
             DataPiece("filecount",translate("Delegates","Number of files")),
             #DataPiece("bpm",translate("Delegates","BPM")),
-            DataPiece("filetype",translate("Delegates","Filetype"))
+            DataPiece("filetype",translate("Delegates","Filetype")),
+            DataPiece("filecount+length",translate("Delegates","Filenumber and length"))
         ])
     return result
 

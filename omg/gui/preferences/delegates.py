@@ -241,6 +241,7 @@ def createEditor(type,value,options=None):
         "bool": BoolEditor,
         "int": IntEditor,
         "tag": TagEditor,
+        "datapiece": DataPieceEditor
         #TODO: color, combobox
     }[type](value,options)
     
@@ -302,6 +303,48 @@ class TagEditor(QtGui.QComboBox):
             else: self.addItem(tag.translated(),tag)
             if tag == defaultTag:
                 self.setCurrentIndex(self.count()-1)
+                
+    def getValue(self):
+        return self.itemData(self.currentIndex(),Qt.UserRole)
+    
+    def setValue(self,value):
+        for i in range(self.count()):
+            if self.itemData(i,Qt.UserRole) == value:
+                if i != self.currentIndex():
+                    self.setCurrentIndex(i)
+                    self.valueChanged.emit()
+                return
+            
+    value = property(getValue,setValue)
+    
+    def _handleTagTypeChanged(self,event):
+        """React upon tagTypeChanged-signals from the dispatcher."""
+        if isinstance(event, modify.events.TagTypeChangedEvent):
+            self._fillBox(self.getValue())
+            
+
+class DataPieceEditor(QtGui.QComboBox):
+    valueChanged = QtCore.pyqtSignal()
+    
+    def __init__(self,value,options):
+        super().__init__()
+        self._fillBox(value)
+        self.currentIndexChanged.connect(self.valueChanged)
+        modify.dispatcher.changes.connect(self._handleTagTypeChanged)
+            
+    def _fillBox(self,default):
+        self.clear()
+        self.addItem(self.tr("None"),None)
+        self.insertSeparator(1)
+        for dataPiece in configuration.availableDataPieces():
+            if dataPiece.tag is not None and dataPiece.tag.icon is not None:
+                self.addItem(dataPiece.tag.icon,dataPiece.title,dataPiece)
+            else: self.addItem(dataPiece.title,dataPiece)
+            if dataPiece == default:
+                self.setCurrentIndex(self.count()-1)
+        # Insert a separator after all tags, before stuff like length
+        self.insertSeparator(
+                    len([data for data in configuration.availableDataPieces() if data.tag is not None])+2)
                 
     def getValue(self):
         return self.itemData(self.currentIndex(),Qt.UserRole)

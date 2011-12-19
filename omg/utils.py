@@ -281,6 +281,13 @@ class OrderedDict(dict):
         self._keyList.insert(pos,key)
         self.__setitem__(key,value)
 
+    def extend(self,items):
+        """Extend this dict by *items* which may be either a dict or a list of key-value pairs."""
+        if isinstance(items,dict):
+            items = items.items()
+        for key,value in items:
+            self.__setitem__(key,value)
+            
     def changeKey(self,oldKey,newKey,sameHash=False):
         """Change the key *oldKey* into *newKey*. Usually this works only if *newKey* is not contained in
         this dict yet. In particular this methods fails, if *oldKey* and *newKey* have the same hash as

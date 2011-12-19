@@ -18,7 +18,7 @@
 
 from PyQt4 import QtCore
 
-import copy
+import copy, os.path
 
 from .. import tags, logging, config, covers, realfiles, database as db
 from ..utils import relPath
@@ -258,7 +258,6 @@ class Element(Node):
     to load tags and contents from the database or from files."""
     tags = None # tags.Storage to store the tags. None until they are loaded
     position = None
-    length = None
     id = None
     
     def __init__(self):
@@ -537,8 +536,22 @@ class Container(Element):
     def getLength(self):
         """Return the length of this element, i.e. the sum of the lengths of all contents."""
         # Skip elements of length None
-        return sum(element.getLength(False) for element in self.contents if element.getLength() is not None)
+        return sum(element.getLength() for element in self.contents if element.getLength() is not None)
     
+    def getExtension(self):
+        """Return the extension of all files in this container. Return None if they have different extension
+        or at least one of them does not have an extension."""
+        extension = None
+        for element in self.contents:
+            ext = element.getExtension()
+            if ext is None:
+                return None
+            if extension is None:
+                extension = ext
+            elif extension != ext:
+                return None
+        return extension
+            
     def sortContents(self):
         """Sorts the contents according to their positions."""
         self.contents.sort(key = lambda el: el.position)
@@ -623,6 +636,13 @@ class File(Element):
     def getLength(self):
         """Return the length of this file."""
         return self.length
-     
+    
+    def getExtension(self):
+        """Return the filename extension of this file."""
+        ext = os.path.splitext(self.path)[1]
+        if len(ext) > 0:
+            return ext[1:].lower() # remove the dot
+        else: return None
+        
     def __repr__(self):
         return "File[{}] {}".format(self.id, self.path)
