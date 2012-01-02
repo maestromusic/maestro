@@ -23,6 +23,7 @@ do any Undo-/Redo-stuff.
  
 from .. import database as db, tags as tagsModule, realfiles, logging, utils
 from ..database import write
+from ..database.sql import EmptyResultException
 from . import dispatcher, events
 from ..constants import REAL
 import os
@@ -45,11 +46,16 @@ def createNewElements(elements):
                                           element.major if element.isContainer() else False,
                                           id = None if element.id < 0 else element.id)
         if element.isFile():
-            newFileParams.append((newId,element.path,element.length))
+            try:
+                hash = db.query('SELECT hash FROM {}newfiles WHERE path = ?'.format(db.prefix), element.path).getSingle()
+                db.query('DELETE FROM {}newfiles WHERE path = ?'.format(db.prefix), element.path)
+            except EmptyResultException:
+                hash = None
+            newFileParams.append((newId,element.path, hash, element.length))
         result[element.id] = newId
         
     if len(newFileParams) > 0:
-        db.multiQuery("INSERT INTO {}files SET element_id = ?, path = ?, length = ?"
+        db.multiQuery("INSERT INTO {}files SET element_id = ?, path = ?, hash = ?, length = ?"
                       .format(db.prefix),newFileParams)
     return result
 

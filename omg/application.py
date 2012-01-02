@@ -141,13 +141,13 @@ def run(cmdConfig = []):
     # Launch application
     mainWindow.show()
     returnValue = app.exec_()
-
+    logger.debug('main application quit')
     # Close operations
+    sync.shutdown()
     search.shutdown()
     mainWindow.saveLayout()
     delegateconfiguration.save()
     plugins.shutdown()
     config.shutdown()
     logging.shutdown()
-    sync.shutdown()
     sys.exit(returnValue)

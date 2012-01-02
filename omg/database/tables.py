@@ -160,5 +160,12 @@ tables = [SQLTable(createQuery) for createQuery in (
         state        ENUM('unknown','nomusic','ok','unsynced')    NOT NULL DEFAULT 'unknown',
         verified     TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE InnoDB, CHARACTER SET 'utf8';
-""".format(db.prefix),        
+""".format(db.prefix),
+"""CREATE TABLE {}newfiles (
+        path       VARCHAR(511)       NOT NULL,
+        hash       VARCHAR(63),
+        verified   TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX path_idx(path(333)),
+        INDEX hash_idx(hash)) ENGINE InnoDB, CHARACTER SET 'utf8' ;
+""".format(db.prefix),
 )]

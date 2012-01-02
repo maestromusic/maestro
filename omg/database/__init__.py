@@ -318,6 +318,10 @@ def hash(elid):
         raise sql.EmptyResultException(
                  "Element with id {} is not a file (or at least not in the files table).".format(elid))
 
+def setHash(elid, hash):
+    """Set the hash of file with id *elid* to the given string and update the timestamp."""
+    query("UPDATE {}files SET hash=? WHERE element_id=?".format(prefix), hash, elid)
+    
 def length(elid):
     """Return the length of the file with id *elid* or raise an sql.EmptyResultException if that element does 
     not exist.""" 

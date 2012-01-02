@@ -172,7 +172,7 @@ except ImportError:
 try:
     import taglib
     class TagLibFile(RealFile):
-        """A RealFile implementation using cutags, the wrapper for UTagLib."""
+        """A RealFile implementation using pytaglib, the wrapper for taglib."""
         def __init__(self, path):
             RealFile.__init__(self, path)
             self._f = taglib.File(path)
