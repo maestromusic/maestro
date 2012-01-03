@@ -67,7 +67,7 @@ def groupFilePaths(paths):
         dir, filename = os.path.split(path)
         if dir not in filesByFolder:
             filesByFolder[dir] = []
-            filesByFolder[dir].append(filename)
+        filesByFolder[dir].append(filename)
     return filesByFolder
             
 def hasKnownExtension(file):

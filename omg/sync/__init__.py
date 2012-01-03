@@ -28,9 +28,11 @@ RESCAN_INTERVAL = 100 # seconds between rescans of the music directory
 def init():
     global syncThread, notifier
     syncThread = FileSystemSynchronizer()
-    syncThread.start()
+    
     modify.dispatcher.changes.connect(syncThread.handleEvent, Qt.QueuedConnection)
     notifier = Notifier()
+    syncThread.missingFilesDetected.connect(notifier.notifyAboutMissingFiles)
+    syncThread.start()
     
 def shutdown():
     """Terminates this module; waits for all threads to complete."""
@@ -63,8 +65,10 @@ def computeHash(path):
 
 class Notifier(QtCore.QObject):
     
+    @QtCore.pyqtSlot(list)
     def notifyAboutMissingFiles(self, paths):
-        
+        from . import dialogs
+        dialogs.MissingFilesDialog(paths)
     
 def mTimeStamp(path):
     """Returns a datetime.datetime object representing the modification timestamp
@@ -211,12 +215,12 @@ class FileSystemSynchronizer(QtCore.QThread):
         if recurse and path not in ('', '.'):
             path = os.path.dirname(path)
             state = self.knownFolders[path]
-            newState = self.updateStateFromSubfolders(utils.absPath(path), state)
+            newState = self.updateStateFromSubfolders(utils.absPath(path), 'nomusic', files = True)
             if newState != state:
                 self.updateFolderState(path, newState, True)
             
         
-    def updateStateFromSubfolders(self, root, folderState, dirs = None):
+    def updateStateFromSubfolders(self, root, folderState, dirs = None, files = False):
         """Returns the updated folderState of abspath *root* when the states
         of the subdirectories are considered. E.g. if root is 'ok' and a subdir
         is 'unsynced', return 'unsynced'. The optional *dirs* parameter is
@@ -226,9 +230,14 @@ class FileSystemSynchronizer(QtCore.QThread):
             for elem in os.listdir(root):
                 if os.path.isdir(os.path.join(root, elem)):
                     # tuning: stop directory testing as soon as an unsynced dir is found
-                    if self.knownFolders[utils.relPath(os.path.join(root, dir))] == 'unsynced':
+                    if self.knownFolders[utils.relPath(os.path.join(root, elem))] == 'unsynced':
                         return 'unsynced'
                     dirs.append(elem)
+                elif files and utils.hasKnownExtension(elem):
+                    if utils.relPath(os.path.join(root, elem)) not in self.dbFiles:
+                        return 'unsynced'
+                    else:
+                        folderState = 'ok'
         for dir in dirs:
             path = utils.relPath(os.path.join(root, dir))
             if self.knownFolders[path] == 'unsynced':
@@ -260,10 +269,11 @@ class FileSystemSynchronizer(QtCore.QThread):
         
     @QtCore.pyqtSlot(list)
     def handleEvent(self, event):
-        print('EVENT IN SYNC')
         if isinstance(event, modify.events.FilesAddedEvent):
             # files added to DB -> check if folders have changed
             paths = event.paths
+            for path in paths:
+                self.hashJobs.put(path)
             filesByFolder = utils.groupFilePaths(paths)
             for folder, files in filesByFolder.items():
                 dirContent = os.listdir(utils.absPath(folder))
@@ -284,6 +294,7 @@ class FileSystemSynchronizer(QtCore.QThread):
                         folderStillUnsynced = True
                         break
                 if not folderStillUnsynced:
+                    logger.debug('previously unsynced folder now ok: {}'.format(folder))
                     self.updateFolderState(folder, 'ok', True)
                 
         elif isinstance(event, modify.events.FilesRemovedEvent):
@@ -301,12 +312,18 @@ class FileSystemSynchronizer(QtCore.QThread):
                         
                 else:
                     self.updateFolderState(folder, 'unsynced', True)
-                    
+    
+    def computeAndStoreHash(self, path):
+        logger.debug('computing hash for {}'.format(path))
+        hash = computeHash(path)
+        db.setHash(path, hash)
+        self.dbFiles.append(path)
+        db.query('DELETE FROM {}newfiles WHERE path = ?'.format(db.prefix), path)
+        
     def pollJobs(self):
         try:
             while True:
-                id, path = self.hashJobs.get_nowait()
-                hash = computeHash(path)
+                self.computeAndStoreHash(self.hashJobs.get_nowait())
         except queue.Empty:
             pass
         if time.time() - self.lastScan > RESCAN_INTERVAL:
