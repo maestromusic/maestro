@@ -480,6 +480,13 @@ def flags(elid):
                     "SELECT flag_id FROM {}flags WHERE element_id = ?".format(prefix),elid)
               .getSingleColumn()]
 
+# folders table
+#=======================================================================
+def addFolder(path, state):
+    query('INSERT INTO {}folders SET path=?, state=?'.format(prefix), path, state)
+    
+def updateFolder(path, state):
+    query('UPDATE {}folders SET state=? WHERE path=?'.format(prefix), state, path)
 
 # Help methods
 #=======================================================================
