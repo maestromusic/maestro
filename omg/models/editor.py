@@ -41,25 +41,25 @@ class EditorModel(rootedtreemodel.RootedTreeModel):
         self.metacontainer_regex=r" ?[([]?(?:cd|disc|part|teil|disk|vol)\.? ?([iI0-9]+)[)\]]?"
 
     
+    ignoredEventClasses = ( events.ElementsDeletedEvent,
+                            events.FilesAddedEvent,
+                            events.TagTypeChangedEvent,
+                            events.FlagTypeChangedEvent,
+                            events.SortValueChangedEvent,
+                            events.HiddenAttributeChangedEvent)
+    
     def handleChangeEvent(self, event):
         """React on an incoming ChangeEvent by applying all changes that affect the
         current model."""
         if isinstance(event, events.ElementChangeEvent):
             if event.level == EDITOR:
                 self.handleElementChangeEvent(event)
-        elif isinstance(event, events.ElementsDeletedEvent):
-            pass
-        elif isinstance(event, events.TagTypeChangedEvent):
-            pass #TODO: was macht man da??
-        elif isinstance(event, events.FlagTypeChangedEvent):
-            pass
-        elif isinstance(event, events.SortValueChangedEvent):
-            pass # editor contents are only sorted by hand
-        elif isinstance(event, events.HiddenAttributeChangedEvent):
-            pass # editor does not use this
-        else:
-            logger.warning('WARNING UNKNOWN EVENT {}, RESETTING EDITOR'.format(event))
-            self.clear()
+            return
+        for cls in self.ignoredEventClasses:
+            if isinstance(event, cls):
+                return
+        logger.warning('WARNING UNKNOWN EVENT {}, RESETTING EDITOR'.format(event))
+        self.clear()
         
     def flags(self,index):
         defaultFlags = super().flags(index)

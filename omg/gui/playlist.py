@@ -144,7 +144,6 @@ class PlaylistWidget(QtGui.QDockWidget):
         return self.backendChooser.currentProfile()
     
     def setBackend(self, name):
-        logger.debug("playlist gui sets backend: {}".format(name))
         if hasattr(self, 'backend'):
             self.backend.unregisterFrontend(self)
             self.treeview.songSelected.disconnect(self.backend.setCurrentSong)

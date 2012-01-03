@@ -20,7 +20,7 @@
 
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
-from .. import logging, config, utils, database as db, realfiles
+from .. import logging, config, utils, database as db, realfiles, modify
 import os.path, subprocess, hashlib, datetime, threading, queue, time
 logger = logging.getLogger(__name__)
 RESCAN_INTERVAL = 100 # seconds between rescans of the music directory
@@ -29,8 +29,8 @@ def init():
     global syncThread, notifier
     syncThread = FileSystemSynchronizer()
     syncThread.start()
+    modify.dispatcher.changes.connect(syncThread.handleEvent, Qt.QueuedConnection)
     notifier = Notifier()
-    notifier.newFileElementsCreated.connect(syncThread.handleFileElementCreation, Qt.QueuedConnection)
     
 def shutdown():
     """Terminates this module; waits for all threads to complete."""
@@ -63,14 +63,8 @@ def computeHash(path):
 
 class Notifier(QtCore.QObject):
     
-    
-    def requestHashComputation(self, elements):
-        """Asynchronously starts to compute hashes for the given elements
-        (a list of (id, path) tuples) and fills them into the files table."""
-        for tup in elements:
-            syncThread.hashJobs.put(tup)
-
-    newFileElementsCreated = QtCore.pyqtSignal(list)
+    def notifyAboutMissingFiles(self, paths):
+        
     
 def mTimeStamp(path):
     """Returns a datetime.datetime object representing the modification timestamp
@@ -81,6 +75,8 @@ def mTimeStamp(path):
 class FileSystemSynchronizer(QtCore.QThread):
     
     folderStateChanged = QtCore.pyqtSignal(str, str)
+    missingFilesDetected = QtCore.pyqtSignal(list)
+    
     def __init__(self):
         super().__init__(None)
         
@@ -147,7 +143,7 @@ class FileSystemSynchronizer(QtCore.QThread):
                 goneFolders.append((folder,))
         if len(goneFolders) > 0:
             db.multiQuery('DELETE FROM {}folders WHERE path=?'.format(db.prefix), goneFolders)
-    
+        
     def checkFileSystem(self):
         """Walks through the collection, updating folders and searching for new files.
         
@@ -156,7 +152,7 @@ class FileSystemSynchronizer(QtCore.QThread):
         - compute hashes of files which are not yet in the database
         - doing the latter, moved files can be detected
         """
-        for root, dirs, files in os.walk(config.options.main.collection):
+        for root, dirs, files in os.walk(config.options.main.collection, topdown = False):
             folderState = 'nomusic'
             for file in files:
                 if self.should_stop.is_set():
@@ -179,7 +175,7 @@ class FileSystemSynchronizer(QtCore.QThread):
                                          newHash, relPath)
                     else:
                         # case 2: file is completely new
-                        logger.debug('computing hash of not-in-db file {}'.format(relPath))
+                        logger.debug('hashing newfile {}'.format(relPath))
                         hash = computeHash(relPath)
                         if hash in self.missingFiles:
                             # found a file that was missing -> detected move!
@@ -197,16 +193,49 @@ class FileSystemSynchronizer(QtCore.QThread):
                                      hash, relPath)
                 elif folderState == 'nomusic':
                     folderState = 'ok'
+            if folderState != 'unsynced':
+                folderState = self.updateStateFromSubfolders(root, folderState, dirs)
+                
             relRoot = utils.relPath(root)
-            # now update folder folders table and emit events for FileSystemBrowser
-            if relRoot not in self.knownFolders:
-                logger.debug('added "{}" {} to folders table'.format(folderState, relRoot))
-                db.addFolder(relRoot, folderState)
-                self.folderStateChanged.emit(relRoot, folderState)
-            elif folderState != self.knownFolders[relRoot]:
-                logger.debug('updated state of {} to {}'.format(relRoot, folderState))
-                db.updateFolder(relRoot, folderState)
-                self.folderStateChanged.emit(relRoot, folderState)        
+            # now update folders table and emit events for FileSystemBrowser
+            if relRoot not in self.knownFolders or folderState != self.knownFolders[relRoot]:
+                self.updateFolderState(relRoot, folderState)        
+    
+    def updateFolderState(self, path, state, recurse = False):
+        if path not in self.knownFolders:
+            db.addFolder(path, state)
+        else:
+            db.updateFolder(path, state)
+        self.folderStateChanged.emit(path, state)
+        self.knownFolders[path] = state
+        if recurse and path not in ('', '.'):
+            path = os.path.dirname(path)
+            state = self.knownFolders[path]
+            newState = self.updateStateFromSubfolders(utils.absPath(path), state)
+            if newState != state:
+                self.updateFolderState(path, newState, True)
+            
+        
+    def updateStateFromSubfolders(self, root, folderState, dirs = None):
+        """Returns the updated folderState of abspath *root* when the states
+        of the subdirectories are considered. E.g. if root is 'ok' and a subdir
+        is 'unsynced', return 'unsynced'. The optional *dirs* parameter is
+        a list of given subdirectories; if not specified, they are computed first."""
+        if dirs == None:
+            dirs = []
+            for elem in os.listdir(root):
+                if os.path.isdir(os.path.join(root, elem)):
+                    # tuning: stop directory testing as soon as an unsynced dir is found
+                    if self.knownFolders[utils.relPath(os.path.join(root, dir))] == 'unsynced':
+                        return 'unsynced'
+                    dirs.append(elem)
+        for dir in dirs:
+            path = utils.relPath(os.path.join(root, dir))
+            if self.knownFolders[path] == 'unsynced':
+                return 'unsynced'
+            elif self.knownFolders[path] == 'ok' and folderState == 'nomusic':
+                folderState = 'ok'
+        return folderState
     
     def rescanCollection(self):
         """Checks the audio hashes in the files table.
@@ -225,31 +254,54 @@ class FileSystemSynchronizer(QtCore.QThread):
         self.checkFolders()
         self.checkFileSystem()
        
-        #if len(self.lostFiles) + len(self.missingFiles) > 0:
+        if len(self.lostFiles) + len(self.missingFiles) > 0:
+            self.missingFilesDetected.emit(self.lostFiles + list(self.missingFiles.values()))
             
         
     @QtCore.pyqtSlot(list)
-    def handleFileElementCreation(self, paths):
-        filesByFolder = {}
-        for path in paths:
-            dir, filename = os.path.split(path)
-            if dir not in filesByFolder:
-                filesByFolder[dir] = []
-            filesByFolder[dir].append(filename)
-        for folder, files in filesByFolder.items():
-            filesInDir = set(map(utils.relPath, filter(utils.hasKnownExtension, filter(os.path.isfile,
-                map(lambda f: os.path.join(folder, f), os.listdir(utils.absPath(folder)))))))
-            files = set(files)
-            print(filesInDir)
-            print(files)
-            if files == filesInDir:
-                db.updateFolder(folder, 'ok')
-                self.folderStateChanged.emit(folder, 'ok')
-            elif all( (file in self.dbFiles) for file in (filesInDir - files) ):
-                db.updateFolder(folder, 'ok')
-                self.folderStateChanged.emit(folder, 'ok')
-            
-    
+    def handleEvent(self, event):
+        print('EVENT IN SYNC')
+        if isinstance(event, modify.events.FilesAddedEvent):
+            # files added to DB -> check if folders have changed
+            paths = event.paths
+            filesByFolder = utils.groupFilePaths(paths)
+            for folder, files in filesByFolder.items():
+                dirContent = os.listdir(utils.absPath(folder))
+                folderStillUnsynced = False
+                for elem in dirContent:
+                    relElemPath = os.path.join(folder, elem)
+                    if elem in files:
+                        files.remove(elem)
+                    elif os.path.isdir(utils.absPath(relElemPath)):
+                        if relElemPath in self.knownFolders \
+                                and self.knownFolders[relElemPath] == 'unsynced':
+                            folderStillUnsynced = True
+                            break
+                        continue
+                    elif not utils.hasKnownExtension(elem):
+                        continue
+                    elif elem not in self.dbFiles:
+                        folderStillUnsynced = True
+                        break
+                if not folderStillUnsynced:
+                    self.updateFolderState(folder, 'ok', True)
+                
+        elif isinstance(event, modify.events.FilesRemovedEvent):
+            byFolder = utils.groupFilePaths(event.paths)
+            for folder, files in byFolder.items():
+                if event.disk:
+                    stillMusicThere = False
+                    for thing in os.listdir(utils.absPath(folder)):
+                        if os.path.isfile(utils.absPath(os.path.join(folder, thing))):
+                            if utils.hasKnownExtension(thing):
+                                stillMusicThere = True
+                                break
+                    if not stillMusicThere:
+                        self.updateFolderState(folder, 'nomusic', True)
+                        
+                else:
+                    self.updateFolderState(folder, 'unsynced', True)
+                    
     def pollJobs(self):
         try:
             while True:

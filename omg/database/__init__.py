@@ -482,6 +482,10 @@ def flags(elid):
 
 # folders table
 #=======================================================================
+
+def folderState(path):
+    return query('SELECT state FROM {}folders WHERE path=?'.format(prefix), path).getSingle()
+
 def addFolder(path, state):
     query('INSERT INTO {}folders SET path=?, state=?'.format(prefix), path, state)
     

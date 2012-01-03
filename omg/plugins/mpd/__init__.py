@@ -357,13 +357,11 @@ class MPDPlayerBackend(player.PlayerBackend):
     def registerFrontend(self, obj):
         self._numFrontends += 1
         if self._numFrontends == 1:
-            logger.debug('frontend {} registered at {} -- starting poll'.format(obj, self))
             self.mpdthread.doPolling.set()
     
     def unregisterFrontend(self, obj):
         self._numFrontends -= 1
         if self._numFrontends == 0:
-            logger.debug('frontend {} deregistered at {} -- stopping poll'.format(obj, self))
             self.mpdthread.doPolling.clear()
     
     @staticmethod

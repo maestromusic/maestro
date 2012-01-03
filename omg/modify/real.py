@@ -21,9 +21,8 @@ This module will really modify database and filesystem (using database.write and
 do any Undo-/Redo-stuff.
 """
  
-from .. import database as db, tags as tagsModule, realfiles, logging, utils, sync
+from .. import database as db, tags as tagsModule, realfiles, logging, utils
 from ..database import write
-from ..database.sql import EmptyResultException
 from . import dispatcher, events
 from ..constants import REAL
 import os
@@ -41,27 +40,18 @@ def createNewElements(elements):
     """
     result = {}
     newFileParams = []
-    missingHashes = []
     for element in elements:
         newId = db.write.createNewElement(element.isFile(),
                                           element.major if element.isContainer() else False,
                                           id = None if element.id < 0 else element.id)
         if element.isFile():
-            try:
-                hash = db.query('SELECT hash FROM {}newfiles WHERE path = ?'.format(db.prefix), element.path).getSingle()
-                db.query('DELETE FROM {}newfiles WHERE path = ?'.format(db.prefix), element.path)
-            except EmptyResultException:
-                hash = None
-                missingHashes.append((newId, element.path))
-            newFileParams.append((newId,element.path, hash, element.length))
+            newFileParams.append((newId,element.path, element.length))
         result[element.id] = newId
         
     if len(newFileParams) > 0:
-        db.multiQuery("INSERT INTO {}files SET element_id = ?, path = ?, hash = ?, length = ?"
+        db.multiQuery("INSERT INTO {}files SET element_id = ?, path = ?, length = ?"
                       .format(db.prefix),newFileParams)
-        sync.notifier.newFileElementsCreated.emit([param[1] for param in newFileParams])
-    if len(missingHashes) > 0:
-        sync.notifier.requestHashComputation(missingHashes)
+        dispatcher.changes.emit(events.FilesAddedEvent([params[1] for params in newFileParams]))
     return result
 
 def newContainer(tags, flags, major, id = None):

@@ -34,8 +34,8 @@ class EditorDelegate(StandardDelegate):
     
     @staticmethod
     def getDefaultDataPieces():
-        left = [configuration.DataPiece(tags.get(name)) for name in ['album','composer','artist','performer']]
-        right = [configuration.DataPiece(tags.get(name)) for name in ['date','genre','conductor']]
+        left = [configuration.DataPiece(tags.get(name, True)) for name in ['album','composer','artist','performer']]
+        right = [configuration.DataPiece(tags.get(name, True)) for name in ['date','genre','conductor']]
         return left,right
 
 

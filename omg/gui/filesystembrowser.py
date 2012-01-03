@@ -23,6 +23,7 @@ from .. import config, database as db
 from . import mainwindow
 from ..utils import relPath, absPath
 from .. import sync
+from ..database.sql import EmptyResultException
 
 """This module contains a dock widget that displays the music in directory view, i.e. without
 considering the container structure in the database. It is meant to help building up the database.
@@ -61,15 +62,11 @@ class FileSystemBrowserModel(QtGui.QFileSystemModel):
                 dir = relPath(info.absoluteFilePath())
                 if dir == '..':
                     return super().data(index, role)
-                stati = set(db.query('''SELECT state FROM {}folders WHERE path = ? OR path LIKE CONCAT(?, "/%")
-                GROUP BY state'''.format(db.prefix),
-                                 dir, dir).getSingleColumn())
-                if 'unsynced' in stati:
-                    return self.icons['unsynced']
-                elif 'ok' in stati:
-                    return self.icons['ok']
-                else:
-                    return self.icons['nomusic']
+                try:
+                    status = db.folderState(dir)
+                except EmptyResultException:
+                    status = 'unsynced'
+                return self.icons[status]
         return super().data(index, role)
     
 class FileSystemBrowser(QtGui.QTreeView):

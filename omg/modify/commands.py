@@ -342,10 +342,12 @@ class RemoveElementsCommand(UndoCommand):
             if self.mode == CONTENTS:
                 real.removeContents(self.positionOnlyChanges)
             else:
-                real.deleteElements(list(self.elementPool.keys()))
-            if self.mode == DISK:
                 paths = [f.path for f in self.elementPool.values() if f.isFile() ]
-                real.deleteFilesFromDisk(paths)
+                real.deleteElements(list(self.elementPool.keys()))
+                if self.mode == DISK:
+                    real.deleteFilesFromDisk(paths)
+                if len(paths) > 0:
+                    dispatcher.changes.emit(events.FilesRemovedEvent(paths, self.mode == DISK))
         else:
             dispatcher.changes.emit(events.RemoveContentsEvent(self.level, self.positionOnlyChanges))
     
