@@ -32,6 +32,7 @@ def init():
     modify.dispatcher.changes.connect(syncThread.handleEvent, Qt.QueuedConnection)
     notifier = Notifier()
     syncThread.missingFilesDetected.connect(notifier.notifyAboutMissingFiles)
+    syncThread.modifiedTagsDetected.connect(notifier.changeModifiedTags)
     syncThread.start()
     
 def shutdown():
@@ -69,7 +70,23 @@ class Notifier(QtCore.QObject):
     def notifyAboutMissingFiles(self, paths):
         from . import dialogs
         dialogs.MissingFilesDialog(paths)
+        syncThread.dialogFinished.set()
     
+    @QtCore.pyqtSlot(object)
+    def changeModifiedTags(self, changes):
+        from .. import tags
+        for id, (dbTags, fileTags) in changes.items():
+            
+            for tag, values in dbTags.items(): # preserve private tags
+                if tag.private:
+                    fileTags[tag] = values
+            db.write.setTags(id, fileTags)
+        QtGui.QMessageBox.information(None, self.tr('detected tag changes'),
+                                      self.tr('The tags of the files with ids {} were '
+                                              'changed from outside OMG. The database'
+                                              'has now been updated accordingly.').format(list(changes.keys())))
+            
+        
 def mTimeStamp(path):
     """Returns a datetime.datetime object representing the modification timestamp
     of the file given by the (relative) path *path*."""
@@ -80,11 +97,13 @@ class FileSystemSynchronizer(QtCore.QThread):
     
     folderStateChanged = QtCore.pyqtSignal(str, str)
     missingFilesDetected = QtCore.pyqtSignal(list)
+    modifiedTagsDetected = QtCore.pyqtSignal(object)
     
     def __init__(self):
         super().__init__(None)
         
         self.should_stop = threading.Event()
+        self.dialogFinished = threading.Event()
         self.timer = QtCore.QTimer(self)
         self.moveToThread(self)
         self.timer.moveToThread(self)
@@ -116,9 +135,9 @@ class FileSystemSynchronizer(QtCore.QThread):
                 dbTags = db.tags(id)
                 rfile = realfiles.get(absPath)
                 rfile.read()
-                if dbTags != rfile.tags:
+                if dbTags.withoutPrivateTags() != rfile.tags:
                     logger.debug('Detected modification on file "{}": tags differ'.format(path))
-                    self.modifiedTags[path] = (dbTags, rfile.tags)
+                    self.modifiedTags[id] = (dbTags, rfile.tags)
                 newHash = computeHash(path)
                 if newHash != hash:
                     logger.debug('Detected modification of audio data on "{}"'.format(path))
@@ -265,11 +284,17 @@ class FileSystemSynchronizer(QtCore.QThread):
         self.checkFolders()
         self.checkFileSystem()
        
+        if len(self.modifiedTags) > 0:
+            self.modifiedTagsDetected.emit(self.modifiedTags)
+        
         if len(self.lostFiles) + len(self.missingFiles) > 0:
             missingIDs = self.lostFiles[:]
             if len(self.missingFiles) > 0:
                 missingIDs.extend(list(zip(*self.missingFiles.values()))[1])
+            self.dialogFinished.clear()
             self.missingFilesDetected.emit(missingIDs)
+            self.dialogFinished.wait()
+        
             
         
     @QtCore.pyqtSlot(list)
