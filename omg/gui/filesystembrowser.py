@@ -22,7 +22,7 @@ import os
 from .. import config, database as db
 from . import mainwindow
 from ..utils import relPath, absPath
-from .. import sync
+from .. import filesystem
 from ..database.sql import EmptyResultException
 
 """This module contains a dock widget that displays the music in directory view, i.e. without
@@ -42,7 +42,7 @@ class FileSystemBrowserModel(QtGui.QFileSystemModel):
     def __init__(self, parent = None):
         QtGui.QFileSystemModel.__init__(self, parent)
         self.setFilter(QtCore.QDir.AllEntries | QtCore.QDir.NoDotAndDotDot)
-        sync.syncThread.folderStateChanged.connect(self.handleStateChange)
+        filesystem.syncThread.folderStateChanged.connect(self.handleStateChange)
 
     def columnCount(self, index):
         return 1

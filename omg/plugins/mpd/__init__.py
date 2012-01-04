@@ -438,7 +438,6 @@ def enable():
     player.notifier.profileAdded.connect(_handleNewProfile)
     player.notifier.profileRenamed.connect(_handleRenameProfile)
     player.notifier.profileRemoved.connect(_handleRemoveProfile)
-    logger.debug("mpd plugin enabled -- added 'mpd' playerClass")
 
 def disable():
     del player.backendClasses['mpd']
