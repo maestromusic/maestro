@@ -110,7 +110,14 @@ class FileSystemSynchronizer(QtCore.QThread):
         self.timer.timeout.connect(self.pollJobs)
         self.hashJobs = queue.Queue()
         self.lastScan = 0
-        
+    
+    def compareTagsWithDB(self, id, path):
+        dbTags = db.tags(id)
+        rfile = realfiles.get(utils.absPath(path))
+        rfile.read()
+        if dbTags.withoutPrivateTags() != rfile.tags:
+            logger.debug('Detected modification on file "{}": tags differ'.format(path))
+            self.modifiedTags[id] = (dbTags, rfile.tags)
     
     def checkFilesTable(self):
         """go through the files table, add missing hashes and find modified files"""
@@ -132,12 +139,7 @@ class FileSystemSynchronizer(QtCore.QThread):
                 logger.debug('Computed hash of {} as {}'.format(path, hash))
                 db.setHash(id, hash)
             elif verified < mTimeStamp(path):
-                dbTags = db.tags(id)
-                rfile = realfiles.get(absPath)
-                rfile.read()
-                if dbTags.withoutPrivateTags() != rfile.tags:
-                    logger.debug('Detected modification on file "{}": tags differ'.format(path))
-                    self.modifiedTags[id] = (dbTags, rfile.tags)
+                self.compareTagsWithDB(id, path)
                 newHash = computeHash(path)
                 if newHash != hash:
                     logger.debug('Detected modification of audio data on "{}"'.format(path))
@@ -206,10 +208,14 @@ class FileSystemSynchronizer(QtCore.QThread):
                                 folderState = 'ok'
                             logger.info('detected a move: {} -> {}'.format(self.missingFiles[hash][0],
                                                                               relPath))
-                            db.query('UPDATE {}files SET path=? WHERE id=?'.format(db.prefix),
+                            db.query('UPDATE {}files SET path=? WHERE element_id=?'.format(db.prefix),
                                      relPath,
                                      self.missingFiles[hash][1])
+                            
+                            # check if tags were also changed
+                            self.compareTagsWithDB(self.missingFiles[hash][1], relPath)
                             del self.missingFiles[hash]
+                            
                         else:
                             folderState = 'unsynced'
                             db.query('INSERT INTO {}newfiles SET hash=?, path=?'.format(db.prefix),
