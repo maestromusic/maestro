@@ -340,7 +340,7 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
             self.endInsertRows()
     
     def remove(self, parent, removals):
-        """Remove nodes below *parent*. The elements to remove are defined by *removals*, a list of IDs."""
+        """Remove nodes below *parent*. The elements to remove are defined by *removals*, a list of iPositions."""
         modelIndex = self.getIndex(parent)
         i = [ i for i,elem in enumerate(parent.contents) if elem.iPosition() in removals ]
         for start, end in reversed(ranges(i)):

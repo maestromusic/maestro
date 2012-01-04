@@ -19,9 +19,12 @@
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
-from .. import models
+from .. import models, database as db, modify, constants
+from ..modify import commands
 from ..models.rootedtreemodel import RootedTreeModel, RootNode
 from ..gui import mainwindow, treeview
+from ..gui.delegates.editor import EditorDelegate
+import itertools
 
 class MissingFilesDialog(QtGui.QDialog):
     """A dialog that notifies the user about missing files.
@@ -32,28 +35,77 @@ class MissingFilesDialog(QtGui.QDialog):
     this leads to empty containers, the user is asked if they should
     be removed, too.
     """
-    def __init__(self, paths):
+    def __init__(self, ids):
+        """Open the dialog for the files given by *ids*, a list of file IDs."""
         super().__init__(mainwindow.mainWindow)
         self.setModal(True)
-        self.model = RootedTreeModel(RootNode())
-        elements = [ models.File.fromFilesystem(path) for path in sorted(paths)]
-        self.model.root.setContents(elements)
-        
-        self.treeview = treeview.TreeView()
-        self.treeview.setModel(self.model)
-        
-        
+        self.setWindowTitle(self.tr('Detected Missing Files'))
         layout = QtGui.QVBoxLayout()
-        layout.addWidget(self.treeview)
+        label = QtGui.QLabel(self.tr("The following files were removed from the filesystem with another program. "
+                             "Please select those that should also be removed from OMG's database, and "
+                             "provide a new path for the others."))
+        label.setWordWrap(True)
+        layout.addWidget(label)
+        self.filemodel = RootedTreeModel(RootNode())
+        
+        elements = [ models.File.fromId(id) for id in sorted(ids)]
+        self.candidateContainers = []
+        for pid in set(itertools.chain(*(db.parents(id) for id in ids))):
+            contentIDs = db.contents(pid, False)
+            if all(cid in ids for cid in contentIDs):
+                container = models.Container.fromId(pid)
+                container.check_ids = contentIDs
+                self.candidateContainers.append(container)
+        self.filemodel.root.setContents(elements)
+        
+        self.fileview = treeview.TreeView()        
+        self.fileview.setModel(self.filemodel)
+        self.fileview.setItemDelegate(EditorDelegate(self.fileview, EditorDelegate.defaultConfig))
+        self.fileview.selectionModel().selectionChanged.connect(self.updateEmptyContainers)
+        layout.addWidget(self.fileview)
+        
+        label = QtGui.QLabel(self.tr("After deleting those files, the following containers will be empty. "
+                                     "Please select which of them are also to be deleted."))
+        label.setWordWrap(True)
+        layout.addWidget(label)
+        self.containermodel = RootedTreeModel(RootNode())
+        self.containerview = treeview.TreeView()
+        self.containerview.setModel(self.containermodel)
+        self.containerview.setItemDelegate(EditorDelegate(self.fileview, EditorDelegate.defaultConfig))
+        layout.addWidget(self.containerview)
         buttonLayout = QtGui.QHBoxLayout()
         
         self.cancelButton = QtGui.QPushButton(self.tr('Cancel'))
-        self.deleteSelectedButton = QtGui.QPushButton(self.tr('Delete selected'))
+        self.deleteButton = QtGui.QPushButton(self.tr('Delete selected'))
         buttonLayout.addStretch()
         buttonLayout.addWidget(self.cancelButton)
-        buttonLayout.addWidget(self.deleteSelectedButton)
+        buttonLayout.addWidget(self.deleteButton)
         
         self.cancelButton.clicked.connect(self.reject)
+        self.deleteButton.clicked.connect(self.deleteElements)
         layout.addLayout(buttonLayout)
         self.setLayout(layout)
+        self.resize(400,600)
         self.exec_()
+        
+    def deleteElements(self):
+        files = self.fileview.nodeSelection.elements()
+        containers = self.containerview.nodeSelection.elements()
+        modify.push(commands.RemoveElementsCommand(constants.REAL, files + containers, constants.DB,
+                                       self.tr('remove deleted files from DB')))
+        self.accept()
+        
+        
+    
+    def updateEmptyContainers(self, *args):
+        selectedFileIds = [elem.id for elem in self.fileview.nodeSelection.elements()]
+        root = self.containermodel.root
+        for container in self.candidateContainers:
+            empty = all( id in selectedFileIds for id in container.check_ids)
+            index = root.find(container, True)
+            if empty and index == -1:
+                self.containermodel.insert(root,  [(len(root.contents), container)])
+            elif (not empty) and index >= 0:
+                self.containermodel.remove(root, [index] )
+                
+            

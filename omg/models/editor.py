@@ -43,6 +43,7 @@ class EditorModel(rootedtreemodel.RootedTreeModel):
     
     ignoredEventClasses = ( events.ElementsDeletedEvent,
                             events.FilesAddedEvent,
+                            events.FilesRemovedEvent,
                             events.TagTypeChangedEvent,
                             events.FlagTypeChangedEvent,
                             events.SortValueChangedEvent,

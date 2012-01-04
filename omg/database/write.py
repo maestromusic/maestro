@@ -82,8 +82,9 @@ def setContents(data):
 def addContents(data):
     """Add contents relations to the database without touching existing ones. *data* is a list of
     (parentID, position, elementID) tuples."""
-    db.multiQuery("INSERT INTO {}contents (container_id, position, element_id) VALUES (?,?,?)"
-                  .format(db.prefix), data)
+    if len(data) > 0:
+        db.multiQuery("INSERT INTO {}contents (container_id, position, element_id) VALUES (?,?,?)"
+                      .format(db.prefix), data)
     
 def removeContents(data):
     """Remove contents of one or more elements. *data* is a list of (parentID, position) tuples."""

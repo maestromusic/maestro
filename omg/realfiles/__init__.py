@@ -174,6 +174,11 @@ try:
     class TagLibFile(RealFile):
         """A RealFile implementation using pytaglib, the wrapper for taglib."""
         def __init__(self, path):
+            # TODO: this is due to a bug in taglib, which
+            # crashes on opening non-existing OGG files
+            # instead of just reporting an error.
+            if not os.path.exists(path):
+                raise OSError('file does not exist')
             RealFile.__init__(self, path)
             self._f = taglib.File(path)
         

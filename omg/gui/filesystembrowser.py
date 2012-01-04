@@ -35,9 +35,10 @@ translate = QtCore.QCoreApplication.translate
 class FileSystemBrowserModel(QtGui.QFileSystemModel):
     
     icons = {
-        'unsynced' : QtGui.QIcon("images/icons/folder_unknown.svg"),
+        'unsynced' : QtGui.QIcon("images/icons/folder_unsynced.svg"),
         'ok'       : QtGui.QIcon("images/icons/folder_ok.svg"),
-        'nomusic'  : QtGui.QIcon("images/icons/folder.svg") }
+        'nomusic'  : QtGui.QIcon("images/icons/folder.svg"),
+        'unknown'  : QtGui.QIcon("images/icons/folder_unknown.svg") }
     
     def __init__(self, parent = None):
         QtGui.QFileSystemModel.__init__(self, parent)
@@ -63,8 +64,10 @@ class FileSystemBrowserModel(QtGui.QFileSystemModel):
                 if dir == '..':
                     return super().data(index, role)
                 try:
-                    status = db.folderState(dir)
-                except EmptyResultException:
+                    #status = db.folderState(dir)
+                    status = filesystem.syncThread.knownFolders[dir]
+                #except EmptyResultException:
+                except KeyError:
                     status = 'unsynced'
                 return self.icons[status]
         return super().data(index, role)

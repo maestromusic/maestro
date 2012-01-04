@@ -102,10 +102,10 @@ class FileSystemSynchronizer(QtCore.QThread):
             absPath = utils.absPath(path)
             if not os.path.exists(absPath):
                 if db.isNull(hash):
-                    self.lostFiles.append(path) # file without hash deleted -> no chance to find somewhere else
+                    self.lostFiles.append(id) # file without hash deleted -> no chance to find somewhere else
                 else:
                     logger.info('file {} is missing'.format(path))
-                    self.missingFiles[hash] = path
+                    self.missingFiles[hash] = (path,id)
                 continue
             self.dbFiles.append(path)
             if db.isNull(hash):
@@ -185,11 +185,11 @@ class FileSystemSynchronizer(QtCore.QThread):
                             # found a file that was missing -> detected move!
                             if folderState == 'nomusic':
                                 folderState = 'ok'
-                            logger.info('whoa, found a move: {} -> {}'.format(self.missingFiles[hash],
+                            logger.info('detected a move: {} -> {}'.format(self.missingFiles[hash][0],
                                                                               relPath))
-                            db.query('UPDATE {}files SET path=? WHERE path=?'.format(db.prefix),
+                            db.query('UPDATE {}files SET path=? WHERE id=?'.format(db.prefix),
                                      relPath,
-                                     self.missingFiles[hash])
+                                     self.missingFiles[hash][1])
                             del self.missingFiles[hash]
                         else:
                             folderState = 'unsynced'
@@ -214,6 +214,8 @@ class FileSystemSynchronizer(QtCore.QThread):
         self.knownFolders[path] = state
         if recurse and path not in ('', '.'):
             path = os.path.dirname(path)
+            if path == '':
+                path = '.'
             state = self.knownFolders[path]
             newState = self.updateStateFromSubfolders(utils.absPath(path), 'nomusic', files = True)
             if newState != state:
@@ -264,7 +266,10 @@ class FileSystemSynchronizer(QtCore.QThread):
         self.checkFileSystem()
        
         if len(self.lostFiles) + len(self.missingFiles) > 0:
-            self.missingFilesDetected.emit(self.lostFiles + list(self.missingFiles.values()))
+            missingIDs = self.lostFiles[:]
+            if len(self.missingFiles) > 0:
+                missingIDs.extend(list(zip(*self.missingFiles.values()))[1])
+            self.missingFilesDetected.emit(missingIDs)
             
         
     @QtCore.pyqtSlot(list)

@@ -127,14 +127,13 @@ class Node:
                     return i
         raise ValueError("Node.index: Node {0} is not contained in element {1}.".format(node,self))
         
-    def find(self,node):
+    def find(self,node, compareById):
         """Return the index of *node* in this node's contents or -1 if *node* is not found. See also index."""
-        contents = self.getContents()
-        for i in range(0,len(contents)):
-            if contents[i] == node:
+        for i, elem in enumerate(self.contents):
+            if elem == node or (compareById and elem.id == node.id):
                 return i
         return -1
-
+    
     def getAllNodes(self, skipSelf = False):
         """Generator which will return all nodes contained in this node or in children of it, including the
         node itself if *skipSelf* is not set True."""

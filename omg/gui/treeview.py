@@ -113,10 +113,11 @@ class TreeView(QtGui.QTreeView):
     """
     level = REAL
     
-    treeActions = [ NamedList('tags', [EditTagsSingleAction, EditTagsRecursiveAction]) ]
+    treeActions = []
     treeActionsVersion = 0
-    def __init__(self,parent):
-        QtGui.QTreeView.__init__(self,parent)
+    
+    def __init__(self,parent = None):
+        QtGui.QTreeView.__init__(self, parent)
         
         self.setHeaderHidden(True)
         self.setExpandsOnDoubleClick(False)
@@ -136,6 +137,10 @@ class TreeView(QtGui.QTreeView):
         #self.header().setStretchLastSection(False)
         #self.header().setResizeMode(0,QtGui.QHeaderView.ResizeToContents)
         self._treeActionsVersion = -1
+        
+    def setModel(self, model):
+        super().setModel(model)
+        self.updateNodeSelection()
     
     def focusInEvent(self, event):
         self.updateNodeSelection()
@@ -172,13 +177,16 @@ class TreeView(QtGui.QTreeView):
                 action.initialize()
         
     def contextMenuEvent(self, event):
-        menu = QtGui.QMenu(self)
-        menu.addAction(modify.createUndoAction(self))
-        menu.addAction(modify.createRedoAction(self))
-        for action in self.actions():
-            menu.addAction(action)
-        menu.popup(event.globalPos())
-        event.accept()
+        if len(self.actions()) > 0:
+            menu = QtGui.QMenu(self)
+            menu.addAction(modify.createUndoAction(self))
+            menu.addAction(modify.createRedoAction(self))
+            for action in self.actions():
+                menu.addAction(action)
+            menu.popup(event.globalPos())
+            event.accept()
+        else:
+            event.ignore()
         
     def keyPressEvent(self, event):
         self.updateNodeSelection()
@@ -209,4 +217,3 @@ class TreeView(QtGui.QTreeView):
         if len(globalSelection):
             from . import mainwindow
             mainwindow.setGlobalSelection(globalSelection,self)
-        
