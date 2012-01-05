@@ -329,8 +329,7 @@ class BrowserTreeView(treeview.TreeView):
                                             MergeAction,
                                             FlattenAction,
                                             ToggleMajorAction])
-                   ]
-
+                    ]
     def __init__(self,parent,layers,delegateConfig):
         treeview.TreeView.__init__(self,parent)
         self.setModel(browsermodel.BrowserModel(layers,parent))

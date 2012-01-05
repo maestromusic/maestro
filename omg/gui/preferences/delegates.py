@@ -161,6 +161,7 @@ class DataColumnEditor(QtGui.QWidget):
         grid.addWidget(removeDataButton,0,mainColumn+1)
         
         self.listWidget = QtGui.QListWidget()
+        #self.listWidget.setDragDropMode(QtGui.QAbstractItemView.InternalMove)
         # Effectively this sets the minimum size of listWidget. Note that QListWidgets have a fixed sizeHint
         # by default, but the default is too large for our purposes here. So we decrease it.
         self.listWidget.sizeHint = lambda: QtCore.QSize(150,140)
@@ -204,6 +205,7 @@ class DataColumnEditor(QtGui.QWidget):
         self.listWidget.clear()
         for dataPiece in self.panel.config.getDataPieces(self.left):
             item = QtGui.QListWidgetItem(dataPiece.title)
+            item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsDragEnabled | Qt.ItemIsEnabled)
             if dataPiece.tag is not None and dataPiece.tag.icon is not None:
                 item.setIcon(dataPiece.tag.icon)
             item.setData(Qt.UserRole,dataPiece)
