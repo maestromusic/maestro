@@ -26,9 +26,9 @@ logger = logging.getLogger(__name__)
 RESCAN_INTERVAL = 100 # seconds between rescans of the music directory
 
 def init():
-    global syncThread, notifier
+    global syncThread, notifier, null
     syncThread = FileSystemSynchronizer()
-    
+    null = open(os.devnull)    
     modify.dispatcher.changes.connect(syncThread.handleEvent, Qt.QueuedConnection)
     notifier = Notifier()
     syncThread.missingFilesDetected.connect(notifier.notifyAboutMissingFiles)
@@ -40,6 +40,9 @@ def shutdown():
     syncThread.should_stop.set()
     syncThread.exit()
     syncThread.wait()
+    null.close()
+
+
 
 def computeHash(path):
     """Compute the audio hash of a single file. This method uses
@@ -56,7 +59,7 @@ def computeHash(path):
              '-f', 's16le',
              '-t', '15',
              '-'],
-            stdout=subprocess.PIPE, stderr=None
+            stdout=subprocess.PIPE, stderr=null # this is due to a bug that ffmpeg ignores -v quiet
         )
         data = proc.stdout.readall()
         hash = hashlib.md5(data).hexdigest()
@@ -144,6 +147,8 @@ class FileSystemSynchronizer(QtCore.QThread):
                 if newHash != hash:
                     logger.debug('Detected modification of audio data on "{}"'.format(path))
                     db.setHash(id, newHash)
+                db.query('UPDATE {}files SET verified=CURRENT_TIMESTAMP() '
+                         'WHERE element_id=?'.format(db.prefix),id)
     
     def checkNewFiles(self):
         """Go through the newfiles table and remove entries of files which are deleted on disk."""
@@ -300,8 +305,8 @@ class FileSystemSynchronizer(QtCore.QThread):
             self.dialogFinished.clear()
             self.missingFilesDetected.emit(missingIDs)
             self.dialogFinished.wait()
-        
             
+        logger.debug('rescanned collection')    
         
     @QtCore.pyqtSlot(list)
     def handleEvent(self, event):
@@ -350,8 +355,14 @@ class FileSystemSynchronizer(QtCore.QThread):
                     self.updateFolderState(folder, 'unsynced', True)
     
     def computeAndStoreHash(self, path):
+        """Compute the hash of the file at *path* (or fetch it from self.knownNewFiles
+        if available) and set it in the database."""
         logger.debug('computing hash for {}'.format(path))
-        hash = computeHash(path)
+        if path in self.knownNewFiles:
+            hash = self.knownNewFiles[hash]
+            del self.knownNewFiles[hash]
+        else:
+            hash = computeHash(path)
         db.setHash(path, hash)
         self.dbFiles.append(path)
         db.query('DELETE FROM {}newfiles WHERE path = ?'.format(db.prefix), path)
