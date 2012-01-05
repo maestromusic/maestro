@@ -53,6 +53,7 @@ def computeHash(path):
     https://github.com/sampsyo/audioread/tree/master/audioread
     that determines an available backend automatically."""
     try:
+        logger.debug('computing hash for {}'.format(path))
         proc = subprocess.Popen(
             ['ffmpeg', '-i', utils.absPath(path),
              '-v', 'quiet',
@@ -357,11 +358,11 @@ class FileSystemSynchronizer(QtCore.QThread):
     def computeAndStoreHash(self, path):
         """Compute the hash of the file at *path* (or fetch it from self.knownNewFiles
         if available) and set it in the database."""
-        logger.debug('computing hash for {}'.format(path))
         if path in self.knownNewFiles:
-            hash = self.knownNewFiles[hash]
-            del self.knownNewFiles[hash]
+            hash = self.knownNewFiles[path]
+            del self.knownNewFiles[path]
         else:
+            print('no hash found for {}'.format(path))
             hash = computeHash(path)
         db.setHash(path, hash)
         self.dbFiles.append(path)
