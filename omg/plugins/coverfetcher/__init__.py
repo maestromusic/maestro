@@ -24,38 +24,54 @@ import itertools
 from PyQt4 import QtCore,QtGui,QtNetwork
 from PyQt4.QtCore import Qt
 
-from omg import covers, constants, models, tags, config
-from omg.gui import formatter, treeview
+from ... import covers, constants, models, tags, config
+from ...modify import treeactions
 
 translate = QtGui.QApplication.translate
 
 LASTFM_API_KEY = 'b25b959554ed76058ac220b7b2e0a026'
 
-def config():
-    return ("coverfetcher",{
-            "cover_fetcher_cover_size": (int,400,"Cover size in the coverfetcher.")
-        })
+
+def defaultConfig():
+    return {"coverfetcher": {
+            "cover_size": (int,400,"Cover size in the coverfetcher.")
+        }}
     
+
 def enable():
-    treeview.contextMenuProviders['all'].append(contextMenuProvider)
-    config.config.addPlugin(
+    from ...gui import browser, editor, playlist
+    for tree in (browser.BrowserTreeView,editor.EditorTreeView,playlist.PlaylistTreeView):
+        tree.treeActions.append(CoverFetcherAction)
+    
     
 def disable():
-    treeview.contextMenuProviders['all'].remove(contextMenuProvider)
+    from ...gui import browser, editor, playlist
+    for tree in (browser.BrowserTreeView,editor.EditorTreeView,playlist.PlaylistTreeView):
+        tree.treeActions.remove(CoverFetcherAction)
+    
 
-def contextMenuProvider(playlist,actions,currentIndex):
-    """Provides an action for the playlist's context menu (confer playlist.contextMenuProvider). The action will only be enabled if at least one album is selected and in this case open a CoverFetcher-dialog for the selected albums."""
-    action = QtGui.QAction(translate("CoverFetcher","Add cover..."),playlist)
-    elements = [element for element in playlist.getSelectedNodes() if isinstance(element,models.Element)]
-    if len(elements) == 0:
-        action.setEnabled(False)
-    else: action.triggered.connect(lambda: CoverFetcher(QtGui.QApplication.activeWindow(),elements).open())
-    actions.append(action)
-
+class CoverFetcherAction(treeactions.TreeAction):
+    """Action to edit tags; exists both in a recursive and non-recursive variant, depending on the argument
+    to the constructor."""
+    
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.setText(self.tr('Fetch cover...'))
+    
+    def initialize(self):
+        self.setEnabled(self.parent().nodeSelection.hasElements())
+    
+    def doAction(self):
+        """Open a dialog to edit the tags of the currently selected elements (and the children, if
+        *recursive* is True). This is called by the edit tags actions in the contextmenu.
+        """
+        elements = self.parent().nodeSelection.elements(False)
+        CoverFetcher(QtGui.QApplication.activeWindow(),elements).open()
+        
 
 class CoverData:
     def __init__(self,cover,text):
-        coverSize = options.gui.cover_fetcher_cover_size
+        coverSize = config.options.coverfetcher.cover_size
         self.cover = cover
         self.text = text
         if cover.width() > coverSize or cover.height() > coverSize:
@@ -85,7 +101,7 @@ class CoverFetcher(QtGui.QDialog):
         layout.addLayout(rightLayout)
         
         self.imageLabel = QtGui.QLabel(self)
-        coverSize = options.gui.cover_fetcher_cover_size
+        coverSize = config.options.coverfetcher.cover_size
         self.imageLabel.setMinimumSize(coverSize+2,coverSize+2) # two pixels for the border
         self.imageLabel.setSizePolicy(QtGui.QSizePolicy.Fixed,QtGui.QSizePolicy.Fixed)
         self.imageLabel.setAlignment(Qt.AlignLeft|Qt.AlignTop)
@@ -275,7 +291,7 @@ class CoverFetcher(QtGui.QDialog):
         if self.elementIndex < len(self.elements) - 1:
             self.elementIndex = self.elementIndex + 1
             element = self.elements[self.elementIndex]
-            self.detailViewLabel.setText(formatter.HTMLFormatter(element).detailView())
+            #self.detailViewLabel.setText(formatter.HTMLFormatter(element).detailView())
             self.skipButton.setEnabled(self.elementIndex != len(self.elements) - 1)
             self.clear()
             if element.hasCover():
@@ -291,12 +307,8 @@ class CoverFetcher(QtGui.QDialog):
                                  QtGui.QMessageBox.Yes|QtGui.QMessageBox.No,self).exec_() \
                      != QtGui.QMessageBox.Yes:
                 return
-        if not covers.setCover(element.id,self.coverData[self.position].cover):
-            QtGui.QMessageBox(QtGui.QMessageBox.Warning,self.tr("Saving cover failed"),
-                              self.tr("The cover could not be saved."),
-                              QtGui.QMessageBox.Ok,self).exec_()
-        else:
-            self.nextElement()
+        covers.setCover(element.id,self.coverData[self.position].cover)
+        self.nextElement()
         
 
 class LastFmLabel(QtGui.QLabel):

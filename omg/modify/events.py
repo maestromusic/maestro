@@ -377,7 +377,25 @@ class SortValueChangedEvent(ChangeEvent):
     def __init__(self,tag,valueId,oldValue,newValue):
         self.tag,self.valueId,self.oldValue,self.newValue = tag,valueId,oldValue,newValue
         
+        
 class HiddenAttributeChangedEvent(ChangeEvent):
     """This event is emitted when the "hidden" attribute of a tag value changes."""
     def __init__(self, tag, valueId, newState):
         self.tag, self.valueId, self.newState = tag, valueId, newState
+
+
+class CoverChangeEvent(ElementChangeEvent):
+    """Emit this event when the cover of the element with the given id has changed."""
+    def __init__(self,id):
+        from . import REAL
+        super().__init__(REAL,None)
+        self.tagsChanged = False
+        self.flagsChanged = False
+        self.id = id
+        
+    def applyTo(self,element):
+        element.deleteCoverCache()
+    
+    def ids(self):
+        return (self.id,)
+    

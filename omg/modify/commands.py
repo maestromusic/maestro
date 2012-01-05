@@ -588,3 +588,31 @@ class FlagTypeUndoCommand(UndoCommand):
         elif self.action == CHANGED:
             flagsModule.changeFlagType(self.flagType,*self.oldData)
         else: raise ValueError("Invalid action {}".format(self.action))
+
+    
+class CoverUndoCommand(UndoCommand):
+    """Change a cover of a single element."""
+    def __init__(self,id,pixmap):
+        super().__init__(REAL,{})
+        self.id = id
+        self.newPixmap = pixmap
+        from .. import covers
+        if covers.hasCover(id):
+            self.oldPixmap = covers.getCover(id)
+        else: self.oldPixmap = None
+        
+    def redo(self):
+        from .. import covers
+        if not covers.saveCover(self.id,self.newPixmap):
+            QtGui.QMessageBox(QtGui.QMessageBox.Warning,self.tr("Saving cover failed"),
+                              self.tr("The cover could not be saved."),
+                              QtGui.QMessageBox.Ok).exec_()
+        
+    def undo(self):
+        from .. import covers
+        if not covers.saveCover(self.id,self.oldPixmap):
+            QtGui.QMessageBox(QtGui.QMessageBox.Warning,self.tr("Saving cover failed"),
+                              self.tr("The cover could not be saved."),
+                              QtGui.QMessageBox.Ok).exec_()
+            
+        

@@ -252,6 +252,8 @@ class StandardDelegate(AbstractDelegate):
                 break
             elif isinstance(parent,browsermodel.ValueNode):
                 parentValues = parent.values
+            else:
+                parentValues = []
             
             for value in parentValues:
                 if value in values:

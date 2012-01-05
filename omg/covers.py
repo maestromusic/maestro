@@ -95,21 +95,41 @@ def cacheAll(size):
                 cacheCover(path,size)
             except IOError as e:
                 print(e)
-                
-
+      
+      
 def setCover(id,cover):
+    """Set the cover of the element with the given id to the QPixmap *cover*. If *cover* is None remove any
+    previous cover. This method will push a CoverUndoCommand on the stack so the change can be undone."""
+    if not isinstance(cover,QtGui.QPixmap) or not isinstance(id,int):
+        raise TypeError("cover must be a QPixmap, id an int")
+    from . import modify
+    modify.push(modify.commands.CoverUndoCommand(id,cover))
+    
+        
+def saveCover(id,cover):
+    """Set the cover of the element with the given id to the QPixmap *cover*.  If *cover* is None remove any
+    previous cover. This method will not push a CoverUndoCommand on the stack, use setCover instead. Return
+    whether saving was successful."""
     assert isinstance(id,int)
     if not os.path.exists(COVER_DIR):
         os.mkdir(COVER_DIR)
     if not os.path.exists(os.path.join(COVER_DIR,'large')):
         os.mkdir(os.path.join(COVER_DIR,'large'))
-    if not cover.save(os.path.join(COVER_DIR,'large',str(id)),"png"):
-        return False
+        
+    if cover is not None:
+        success = cover.save(os.path.join(COVER_DIR,'large',str(id)),"png")
     else:
+        if os.path.exists(os.path.join(COVER_DIR,'large',str(id))):
+            os.remove(os.path.join(COVER_DIR,'large',str(id)))
+        success = True
+    
+    if success:
         # Remove cached files
         for path in os.listdir(COVER_DIR):
             if path[0:6] == "cache_" and os.path.isfile(os.path.join(COVER_DIR,path,str(id))):
                 os.remove(os.path.join(COVER_DIR,path,str(id)))
-        # Distribute the change
-        distributor.indicesChanged.emit(distributor.DatabaseChangeNotice(id,cover=True))
-        return True
+        
+        from . import modify
+        modify.dispatcher.changes.emit(modify.events.CoverChangeEvent(id))
+        
+    return success

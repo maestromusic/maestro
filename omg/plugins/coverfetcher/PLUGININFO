@@ -2,4 +2,3 @@ name=Coverfetcher
 author=Martin Altmayer
 version=1.0alpha
 description=Provides a dialog and fetches covers from Last.fm.
-maxomgversion=0.1.99
