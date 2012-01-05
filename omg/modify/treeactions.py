@@ -21,7 +21,8 @@ from PyQt4.QtCore import Qt
 
 from .. import modify, tags, models, logging
 from ..modify import commands
-from ..constants import DB, DISK, CONTENTS, REAL
+from ..constants import DB, DISK, CONTENTS, REAL, EDITOR
+from omg.modify.commands import RemoveElementsCommand, InsertElementsCommand
 
 logger = logging.getLogger(__name__)
 translate = QtGui.QApplication.translate
@@ -106,7 +107,6 @@ class DeleteAction(TreeAction):
             self.setEnabled(self.parent().level == REAL and selection.hasFiles())
         
     def doAction(self):
-        from ..modify.commands import RemoveElementsCommand
         if self.mode == DISK:
             from ..gui.dialogs import question
             if not question(self.tr('WARNING'),
@@ -165,13 +165,41 @@ class MergeAction(TreeAction):
         dialog = MergeDialog(hintTitle, hintRemove, len(mergeIndices) < numSiblings and not belowRoot,
                              self.parent())
         if dialog.exec_() == QtGui.QDialog.Accepted:
-            modify.merge(self.parent().level,
+            modify.commands.merge(self.parent().level,
                          elements[0].parent,
                          mergeIndices,
                          dialog.newTitle(),
                          dialog.removeString(),
                          dialog.adjustPositions())
-            
+
+class FlattenAction(TreeAction):
+    """Action to "flatten out" containers, i.e. remove them and replace them by their
+    children."""
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.setText(self.tr("flatten..."))
+        
+    def initialize(self):
+        self.setEnabled(self.parent().nodeSelection.hasContainers())
+        
+    def doAction(self):
+        from ..gui.dialogs import FlattenDialog
+        dialog = FlattenDialog(parent = self.parent())
+        if dialog.exec_() == QtGui.QDialog.Accepted:
+            modify.commands.flatten(self.parent().level,
+                                    self.parent().nodeSelection.elements(),
+                                    dialog.recursive()
+                                    )
+
+class CommitAction(TreeAction):
+    """Action to commit all current editors."""
+    def __init__(self, parent):
+        super().__init__(parent, shortcut = 'Ctrl+Return')
+        self.setText(self.tr("commit (all editors)"))
+        
+    def doAction(self):
+        modify.push(modify.commands.CommitCommand())
+
 class MatchTagsFromFilenamesAction(TreeAction):
     """An action to trigger a dialog that matches tags from file names. Will be enabled only if at least
     one file is selected."""
@@ -218,7 +246,7 @@ class RemoveFromPlaylistAction(TreeAction):
     
     def __init__(self, parent):
         super().__init__(parent, shortcut = "Del")
-        self.setText(self.tr('Remove from playlist'))
+        self.setText(self.tr('remove from playlist'))
     
     def initialize(self):
         self.setDisabled(self.parent().nodeSelection.empty())
@@ -231,14 +259,63 @@ class ClearPlaylistAction(TreeAction):
     
     def __init__(self, parent):
         super().__init__(parent, shortcut = "Shift+Del")
-        self.setText(self.tr('Clear playlist'))
+        self.setText(self.tr('clear playlist'))
         
     def initialize(self):
         self.setEnabled(len(self.parent().backend.paths) > 0)
         
     def doAction(self):
         self.parent().backend.clearPlaylist()
+
+class ClearEditorAction(TreeAction):
+    """This action clears an editor."""
     
+    def __init__(self, parent):
+        super().__init__(parent, shortcut = "Shift+Del")
+        self.setText(self.tr('clear editor'))
+    
+    def initialize(self):
+        self.setEnabled(len(self.parent().model().root.contents) > 0)
+    
+    def doAction(self):
+        modify.push(RemoveElementsCommand(EDITOR, self.parent().model().root.contents, CONTENTS,
+                                  self.tr('clear editor')))
+        
+class NewContainerAction(TreeAction):
+    """Action to create a new container inside an editor. Opens a tag editor dialog
+    and then inserts the container."""
+    
+    def __init__(self, parent):
+        super().__init__(parent, shortcut = "Ctrl+N")
+        self.setText(self.tr('new container'))
+        
+    def doAction(self):
+        
+        self.container = models.Container(id = modify.newEditorId(),
+                                     contents = None,
+                                     tags = tags.Storage(),
+                                     flags = [],
+                                     position = None,
+                                     major = False )
+        
+        from ..gui.tageditor import TagEditorDialog
+        dialog = TagEditorDialog(EDITOR, [self.container], self.parent())
+        modify.dispatcher.changes.connect(self.catchTagEvent) #TODO: omg...
+        if dialog.exec_() == QtGui.QDialog.Accepted:
+            root = self.parent().model().root
+            pos = len(root.contents)
+            modify.push(InsertElementsCommand(EDITOR,
+                                              {root.id: [(pos, self.container)]},
+                                              self.tr('new container')))
+        modify.dispatcher.changes.disconnect(self.catchTagEvent)
+        
+    def catchTagEvent(self, event):
+        print(event.ids())
+        print(self.container.id)
+        if list(event.ids()) == [self.container.id]:
+            event.applyTo(self.container)
+            
+        
             
 #class TagValueAction(TreeAction):
 #    """This action triggers a dialog to edit the tag value (set sort value, hidden flag, and rename

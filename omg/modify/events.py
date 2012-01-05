@@ -78,6 +78,24 @@ class ElementChangeEvent(ChangeEvent):
                 self.level, self.contentsChanged, self.tagsChanged, self.flagsChanged)
 
 
+class FilesAddedEvent(ChangeEvent):
+    """An event notifying that files have been added to the database."""
+    
+    def __init__(self, paths):
+        """Create the event. *paths* is a list of file paths created."""         
+        super().__init__()
+        self.paths = paths
+        
+class FilesRemovedEvent(ChangeEvent):
+    """An event notifying that files have been removed from the database."""
+    
+    def __init__(self, paths, disk = False):
+        """Create the event. *paths* is a list of paths. If *disk = True*,
+        the files have also been deleted from disk (not only from the database)."""
+        super().__init__()
+        self.paths = paths
+        self.disk = disk
+    
 class ElementsDeletedEvent(ChangeEvent):
     """Special event that is sent when elements are completely deleted from the database."""
     def __init__(self,elids):

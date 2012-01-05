@@ -58,6 +58,17 @@ def walk(element):
     for child in contents:
         for x in walk(child):
             yield x
+
+def groupFilePaths(paths):
+    """Takes a list of file paths, splits them into dirname and basename, and groups
+    them by the dirname."""
+    filesByFolder = {}
+    for path in paths:
+        dir, filename = os.path.split(path)
+        if dir not in filesByFolder:
+            filesByFolder[dir] = []
+        filesByFolder[dir].append(filename)
+    return filesByFolder
             
 def hasKnownExtension(file):
     """Return True if the given path has a known extension (i.e., appears in options.main.extension).

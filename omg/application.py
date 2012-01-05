@@ -122,8 +122,8 @@ def run(cmdConfig = []):
     from omg import plugins
     plugins.enablePlugins()
     
-    from . import sync
-    sync.init()
+    from . import filesystem
+    filesystem.init()
     
     # Create GUI
     # First import all modules that want to add WidgetData
@@ -141,13 +141,13 @@ def run(cmdConfig = []):
     # Launch application
     mainWindow.show()
     returnValue = app.exec_()
-
+    logger.debug('main application quit')
     # Close operations
+    filesystem.shutdown()
     search.shutdown()
     mainWindow.saveLayout()
     delegateconfiguration.save()
     plugins.shutdown()
     config.shutdown()
     logging.shutdown()
-    sync.shutdown()
     sys.exit(returnValue)

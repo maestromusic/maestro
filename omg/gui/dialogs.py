@@ -140,7 +140,8 @@ class FancyTabbedPopup(FancyPopup):
         
 
 class MergeDialog(QtGui.QDialog):
-    """This dialog is shown if the user requests to merge some children into a new intermediate container."""
+    """This dialog is shown if the user requests to merge some children into a new
+    intermediate container."""
     
     def __init__(self, hintTitle, hintRemove, askForPositionAdjusting, parent = None):
         super().__init__(parent)
@@ -171,12 +172,36 @@ class MergeDialog(QtGui.QDialog):
         layout.addLayout(hLayout, 3 if askForPositionAdjusting else 2, 0, 1, 2)
         layout.setColumnStretch(1, 1)
         self.setLayout(layout)
+        
     def newTitle(self):
         return self.titleEdit.text()
+    
     def removeString(self):
         return self.removeEdit.text() if self.checkBox.isChecked() else ''
+    
     def adjustPositions(self):
         if hasattr(self, 'positionCheckBox'):
             return self.positionCheckBox.isChecked()
         else:
             return False
+
+class FlattenDialog(QtGui.QDialog):
+    """A dialog for the "flatten" operation."""
+    
+    def __init__(self, hintRecursive = False, parent = None):
+        super().__init__(parent)
+        
+        layout = QtGui.QVBoxLayout()
+        layout.addWidget(QtGui.QLabel(self.tr("Flatten out containers"), self))
+        self.recursiveBox = QtGui.QCheckBox(self.tr("recursively"))
+        self.recursiveBox.setChecked(hintRecursive)
+        layout.addWidget(self.recursiveBox)
+        buttons = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Cancel | QtGui.QDialogButtonBox.Ok)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+        self.setLayout(layout)
+        
+    def recursive(self):
+        return self.recursiveBox.isChecked()
+        

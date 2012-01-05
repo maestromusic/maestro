@@ -357,13 +357,11 @@ class MPDPlayerBackend(player.PlayerBackend):
     def registerFrontend(self, obj):
         self._numFrontends += 1
         if self._numFrontends == 1:
-            logger.debug('frontend {} registered at {} -- starting poll'.format(obj, self))
             self.mpdthread.doPolling.set()
     
     def unregisterFrontend(self, obj):
         self._numFrontends -= 1
         if self._numFrontends == 0:
-            logger.debug('frontend {} deregistered at {} -- stopping poll'.format(obj, self))
             self.mpdthread.doPolling.clear()
     
     @staticmethod
@@ -440,7 +438,6 @@ def enable():
     player.notifier.profileAdded.connect(_handleNewProfile)
     player.notifier.profileRenamed.connect(_handleRenameProfile)
     player.notifier.profileRemoved.connect(_handleRemoveProfile)
-    logger.debug("mpd plugin enabled -- added 'mpd' playerClass")
 
 def disable():
     del player.backendClasses['mpd']

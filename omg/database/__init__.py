@@ -318,6 +318,15 @@ def hash(elid):
         raise sql.EmptyResultException(
                  "Element with id {} is not a file (or at least not in the files table).".format(elid))
 
+def setHash(element, hash):
+    """Set the hash of file given by *element* to the given string and update the timestamp.
+    
+    *element* must either be the pathname or the id of the file."""
+    if isinstance(element, str):
+        query("UPDATE {}files SET hash=? WHERE path=?".format(prefix), hash, element)
+    else:
+        query("UPDATE {}files SET hash=? WHERE element_id=?".format(prefix), hash, element)
+    
 def length(elid):
     """Return the length of the file with id *elid* or raise an sql.EmptyResultException if that element does 
     not exist.""" 
@@ -476,6 +485,17 @@ def flags(elid):
                     "SELECT flag_id FROM {}flags WHERE element_id = ?".format(prefix),elid)
               .getSingleColumn()]
 
+# folders table
+#=======================================================================
+
+def folderState(path):
+    return query('SELECT state FROM {}folders WHERE path=?'.format(prefix), path).getSingle()
+
+def addFolder(path, state):
+    query('INSERT INTO {}folders SET path=?, state=?'.format(prefix), path, state)
+    
+def updateFolder(path, state):
+    query('UPDATE {}folders SET state=? WHERE path=?'.format(prefix), state, path)
 
 # Help methods
 #=======================================================================

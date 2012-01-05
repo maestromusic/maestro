@@ -17,10 +17,13 @@
 #
 
 from PyQt4 import QtGui, QtCore
+from PyQt4.QtCore import Qt
 import os
 from .. import config, database as db
 from . import mainwindow
-from ..utils import relPath
+from ..utils import relPath, absPath
+from .. import filesystem
+from ..database.sql import EmptyResultException
 
 """This module contains a dock widget that displays the music in directory view, i.e. without
 considering the container structure in the database. It is meant to help building up the database.
@@ -29,43 +32,46 @@ special icon."""
 
 translate = QtCore.QCoreApplication.translate
 
-class IconProvider(QtGui.QFileIconProvider):
-    
-    def __init__(self):
-        super().__init__()
-        self.dirtyFolderIcon = QtGui.QIcon("images/icons/folder_unknown.svg")
-        self.musicFolderIcon = QtGui.QIcon("images/icons/folder_ok.svg")
-        self.defaultFolderIcon = QtGui.QIcon("images/icons/folder.svg")
-    
-    def icon(self, arg):
-        if os.path.isdir(arg.absoluteFilePath()):
-            dir = relPath(arg.absoluteFilePath())
-            if dir == '..':
-                return super().icon(arg)
-            stati = set(db.query('''SELECT state FROM {}folders WHERE path = ? OR path LIKE CONCAT(?, "/%")
-            GROUP BY state'''.format(db.prefix),
-                             dir, dir).getSingleColumn())
-            if 'unsynced' in stati:
-                return self.dirtyFolderIcon
-            elif 'ok' in stati:
-                return self.musicFolderIcon
-            else:
-                return self.defaultFolderIcon
-        return super().icon(arg)  
-        
-
 class FileSystemBrowserModel(QtGui.QFileSystemModel):
+    
+    icons = {
+        'unsynced' : QtGui.QIcon("images/icons/folder_unsynced.svg"),
+        'ok'       : QtGui.QIcon("images/icons/folder_ok.svg"),
+        'nomusic'  : QtGui.QIcon("images/icons/folder.svg"),
+        'unknown'  : QtGui.QIcon("images/icons/folder_unknown.svg") }
     
     def __init__(self, parent = None):
         QtGui.QFileSystemModel.__init__(self, parent)
         self.setFilter(QtCore.QDir.AllEntries | QtCore.QDir.NoDotAndDotDot)
-       
-        self.setIconProvider(IconProvider())
+        filesystem.syncThread.folderStateChanged.connect(self.handleStateChange)
 
     def columnCount(self, index):
         return 1
-                
-        
+    
+    @QtCore.pyqtSlot(str, str)
+    def handleStateChange(self, folder, state):
+        index = self.index(absPath(folder))
+        self.dataChanged.emit(index, index)
+        while(index.parent().isValid()):
+            index = index.parent()
+            self.dataChanged.emit(index, index)    
+    
+    def data(self, index, role = Qt.DisplayRole):
+        if role == Qt.DecorationRole:
+            info = self.fileInfo(index)
+            if os.path.isdir(info.absoluteFilePath()):
+                dir = relPath(info.absoluteFilePath())
+                if dir == '..':
+                    return super().data(index, role)
+                try:
+                    #status = db.folderState(dir)
+                    status = filesystem.syncThread.knownFolders[dir]
+                #except EmptyResultException:
+                except KeyError:
+                    status = 'unsynced'
+                return self.icons[status]
+        return super().data(index, role)
+    
 class FileSystemBrowser(QtGui.QTreeView):
     
     def __init__(self, rootDirectory = config.options.main.collection, parent = None):

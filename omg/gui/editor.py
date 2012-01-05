@@ -94,10 +94,14 @@ class EditorTreeView(treeview.TreeView):
     level = EDITOR
     treeActions = [ NamedList('tags', [EditTagsSingleAction,
                                        EditTagsRecursiveAction,
-                                       MatchTagsFromFilenamesAction]),
-                    NamedList('structure', [DeleteFromParentAction,
+                                       MatchTagsFromFilenamesAction])
+                  , NamedList('structure', [DeleteFromParentAction,
                                             MergeAction,
-                                            ToggleMajorAction]) ]
+                                            FlattenAction,
+                                            ToggleMajorAction,
+                                            NewContainerAction])
+                  , NamedList('editor', [ClearEditorAction,
+                                         CommitAction]) ]
     def __init__(self, parent = None):
         super().__init__(parent)
         self.setSelectionMode(self.ExtendedSelection)
@@ -174,14 +178,6 @@ class EditorWidget(QtGui.QDockWidget):
         hb = QtGui.QHBoxLayout()
         vb.addLayout(hb)
         
-        self.clearButton = QtGui.QPushButton(self.tr("clear"))
-        self.clearButton.clicked.connect(self.editor.model().clear)
-        hb.addWidget(self.clearButton)
-        
-        self.newContainerButton = QtGui.QPushButton(self.tr("new container"))
-        self.newContainerButton.clicked.connect(self.newContainerDialog)
-        hb.addWidget(self.newContainerButton)
-        
         self.autoExpandCheckbox = QtGui.QCheckBox(self.tr('auto expand'))
         self.autoExpandCheckbox.setChecked(expand)
         self.autoExpandCheckbox.stateChanged.connect(self.editor.setAutoExpand)
@@ -205,11 +201,7 @@ class EditorWidget(QtGui.QDockWidget):
                     break
         hb.addWidget(self.guessProfileCombo)
         
-        hb.addStretch()
-        self.commitButton = QtGui.QPushButton(self.tr('commit'))
-        hb.addWidget(self.commitButton)
-        self.commitButton.clicked.connect(modify.commitEditors)
-        
+        hb.addStretch()        
         profileNotifier.profilesChanged.connect(self._handleProfilesChanged)
 
     def _handleProfilesChanged(self):
@@ -261,25 +253,6 @@ class EditorWidget(QtGui.QDockWidget):
             self.editor.model().albumGroupers = profiles()[self.guessProfileCombo.itemText(index)]
             self.guessIndex = index
     
-    def newContainerDialog(self):
-        """Display a dialog for creating a new container. This is a very simple dialog that does not
-        query for anything but the title tag."""
-        title, ok = QtGui.QInputDialog.getText(self, "Title", "Title of the container:")
-        if not ok:
-            return
-        changes = OrderedDict()
-        c_tags = tags.Storage()
-        c_tags[tags.TITLE] = [title]
-        container = Container(id = modify.newEditorId(),contents = None, tags = c_tags, flags = [],
-                              position = None,major=False )
-        oldRoot = self.editor.model().root
-        newRoot = oldRoot.copy()
-        newRoot.contents.append(container)
-        container.parent = newRoot
-        changes[oldRoot.id] = (oldRoot, newRoot)
-        comm = modify.commands.UndoCommand(EDITOR, changes, contentsChanged = True, text=self.tr('new container'))
-        modify.push(comm)
-        
     def saveState(self):
         if self.guessProfileCombo.currentIndex() == 0:
             profile = "dontguess"
