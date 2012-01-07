@@ -21,8 +21,9 @@ from PyQt4.QtCore import Qt
 
 from .. import models, logging
 from .. import modify
-from ..modify.treeactions import *
+from ..modify import treeactions
 from ..constants import REAL
+from collections import OrderedDict
 
 translate = QtGui.QApplication.translate
 logger = logging.getLogger(__name__)
@@ -105,6 +106,72 @@ class NodeSelection:
         return any(el.isFile() for el in self._elements)
         
 
+class TreeActionConfiguration(QtCore.QObject):
+    """Objects of this class define an action configuration for a treeview."""
+    
+    globalUndoRedo = True # specifies whether or not to add global undo/redo actions to context menu
+    actionDefinitionAdded = QtCore.pyqtSignal(object)
+    actionDefinitionRemoved = QtCore.pyqtSignal(object)
+    
+    def __init__(self, toplevel = True):
+        super().__init__()
+        self.toplevel = toplevel
+        self.sections = OrderedDict()
+        
+    def addActionDefinition(self, path, callable, *args, **kwargs):
+        section, name = path[0]
+        if section not in self.sections:
+                self.sections[section] = OrderedDict()
+        if len(path) > 1:
+            if name not in self.sections[section]:
+                self.sections[section][name] = TreeActionConfiguration()
+            self.sections[section][name].addActionDefinition(path[1:], callable, *args, **kwargs)
+        else:
+            self.sections[section][name] = (callable, args, kwargs)
+        if self.toplevel:
+            self.actionDefinitionAdded.emit(path)
+            
+    def removeActionDefinition(self, path):
+        section, name = path[0]
+        if len(path) > 1:
+            self.sections[section][name].removeActionDefinition(path[1:])
+            if len(self.sections[section][name]) == 0:
+                del self.sections[section][name]
+        if len(self.sections[section]) == 0:
+            del self.sections[section]
+        if self.toplevel:
+            self.actionDefinitionRemoved.emit(path)
+    
+    def __len__(self):
+        return len(self.sections)
+    
+    def __iter__(self):
+        return self.actionIterator()
+        
+    def actionIterator(self):
+        """Iterates over the actions and subactions in this configuration in the defined order."""
+        for section, actions in self.sections.items():
+            for name, definition in actions.items():
+                if isinstance(definition, TreeActionConfiguration):
+                    for a in definition:
+                        yield a
+                else:
+                    yield name, definition 
+            
+    def createMenu(self, parent, treeActions):
+        menu = QtGui.QMenu(parent)
+        for section, actions in self.sections.items():
+            sep = menu.addSeparator()
+            sep.setText(section)
+            
+            for name, definition in actions.items():
+                if isinstance(definition, TreeActionConfiguration):
+                    subMenu = definition.createMenu(menu, treeActions)
+                    subMenu.setTitle(name)
+                    menu.addMenu(subMenu)
+                else:
+                    menu.addAction(treeActions[name])
+        return menu
         
 class TreeView(QtGui.QTreeView):
     """Base class for tree views that contain mainly elements. This class handles mainly the
@@ -113,8 +180,7 @@ class TreeView(QtGui.QTreeView):
     """
     level = REAL
     
-    treeActions = []
-    treeActionsVersion = 0
+    actionConfig = TreeActionConfiguration()
     
     def __init__(self,parent = None):
         QtGui.QTreeView.__init__(self, parent)
@@ -129,14 +195,11 @@ class TreeView(QtGui.QTreeView):
         palette.setColor(QtGui.QPalette.Base,QtGui.QColor(0xE9,0xE9,0xE9))
         palette.setColor(QtGui.QPalette.AlternateBase,QtGui.QColor(0xD9,0xD9,0xD9))
         self.setPalette(palette)
-        #self.setContextMenuPolicy(Qt.ActionsContextMenu)
-    
-        # These rows enable a horizontal scrollbar. The length that can be scrolled will be determined by
-        # the column length and _not_ by the delegate's sizehint (though you may use resizeColumnToContents).
-        #self.header().setHorizontalScrollMode(QtGui.QAbstractItemView.ScrollPerPixel)
-        #self.header().setStretchLastSection(False)
-        #self.header().setResizeMode(0,QtGui.QHeaderView.ResizeToContents)
-        self._treeActionsVersion = -1
+        
+        self.treeActions = {}
+        for name,  (callable, args, kwargs) in self.actionConfig:
+            if callable is not None:
+                self.treeActions[name] = callable(self, *args, **kwargs)
         
     def setModel(self, model):
         super().setModel(model)
@@ -146,43 +209,15 @@ class TreeView(QtGui.QTreeView):
         self.updateNodeSelection()
         super().focusInEvent(event)
     
-    def checkTreeActions(self):
-        if self._treeActionsVersion != TreeView.treeActionsVersion:
-            self.rebuildTreeActions()
-    
-    def rebuildTreeActions(self):
-        for action in self.actions():
-            if isinstance(action, TreeAction):
-                self.removeAction(action)
-        for thing in self.treeActions:
-            if isinstance(thing, NamedList):
-                sep = QtGui.QAction(thing.name, self)
-                sep.setSeparator(True)
-                self.addAction(sep)
-                grp = QtGui.QActionGroup(self)
-                for cls in thing:
-                    act = cls(self)
-                    grp.addAction(act)
-                    self.addAction(act)
-            else:
-                act = thing(self)
-                self.addAction(act)
-        self._treeActionsVersion = TreeView.treeActionsVersion
-                
     def updateNodeSelection(self):
         self.nodeSelection = NodeSelection(self.selectionModel())
-        self.checkTreeActions()
-        for action in self.actions():
-            if isinstance(action, TreeAction):
+        for action in self.treeActions.values():
+            if isinstance(action, treeactions.TreeAction):
                 action.initialize()
         
     def contextMenuEvent(self, event):
-        if len(self.actions()) > 0:
-            menu = QtGui.QMenu(self)
-            menu.addAction(modify.createUndoAction(self))
-            menu.addAction(modify.createRedoAction(self))
-            for action in self.actions():
-                menu.addAction(action)
+        menu = self.actionConfig.createMenu(self, self.treeActions)
+        if menu is not None:
             menu.popup(event.globalPos())
             event.accept()
         else:

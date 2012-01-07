@@ -74,16 +74,6 @@ class EditTagsAction(TreeAction):
                                            self.parent().nodeSelection.elements(self.recursive),
                                            self.parent())
         dialog.exec_()
-
-class EditTagsSingleAction(EditTagsAction):
-    
-    def __init__(self, parent):
-        super().__init__(parent, False)
-        
-class EditTagsRecursiveAction(EditTagsAction):
-    
-    def __init__(self, parent):
-        super().__init__(parent, True)
         
 class DeleteAction(TreeAction):
     """Action to remove selected elements."""
@@ -121,18 +111,6 @@ class DeleteAction(TreeAction):
         if self.mode == DISK:
             modify.stack.clearBoth()
 
-class DeleteFromParentAction(DeleteAction):    
-    def __init__(self, parent):
-        super().__init__(parent, CONTENTS, shortcut = "Del")
-
-class DeleteFromDatabaseAction(DeleteAction):    
-    def __init__(self, parent):
-        super().__init__(parent, DB)
-        
-class DeleteFromDiskAction(DeleteAction):    
-    def __init__(self, parent):
-        super().__init__(parent, DISK)
-             
 class MergeAction(TreeAction):
     """Action to merge selected elements into a new container."""
     

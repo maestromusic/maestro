@@ -23,7 +23,7 @@ translate = QtCore.QCoreApplication.translate
 
 # --------- OMG imports ----------------------
 from ..models import editor, Container
-from ..constants import EDITOR
+from ..constants import EDITOR, DB, CONTENTS, DISK
 from . import treeview, mainwindow
 from ..modify.treeactions import *
 from .delegates import editor as editordelegate
@@ -92,16 +92,24 @@ class TestAction(QtGui.QAction):
 class EditorTreeView(treeview.TreeView):
     """This is the main widget of an editor: The tree view showing the current element tree."""
     level = EDITOR
-    treeActions = [ NamedList('tags', [EditTagsSingleAction,
-                                       EditTagsRecursiveAction,
-                                       MatchTagsFromFilenamesAction])
-                  , NamedList('structure', [DeleteFromParentAction,
-                                            MergeAction,
-                                            FlattenAction,
-                                            ToggleMajorAction,
-                                            NewContainerAction])
-                  , NamedList('editor', [ClearEditorAction,
-                                         CommitAction]) ]
+    actionConfig = treeview.TreeActionConfiguration()
+    sect = translate(__name__, "tags")
+    actionConfig.addActionDefinition(((sect, 'edittagsS'),), EditTagsAction, recursive = False)
+    actionConfig.addActionDefinition(((sect, 'edittagsR'),), EditTagsAction, recursive = True)
+    actionConfig.addActionDefinition(((sect, 'advanced'),
+                                      ('misc', 'matchTags')), MatchTagsFromFilenamesAction)
+    
+    sect = translate(__name__, "structure")
+    actionConfig.addActionDefinition(((sect, 'deleteP'),), DeleteAction, CONTENTS, shortcut = 'Del')
+    actionConfig.addActionDefinition(((sect, 'merge'),), MergeAction)
+    actionConfig.addActionDefinition(((sect, 'flatten'),), FlattenAction)
+    actionConfig.addActionDefinition(((sect, 'major'),), ToggleMajorAction)
+    actionConfig.addActionDefinition(((sect, 'newContainer'),), NewContainerAction)
+    
+    sect = translate(__name__, "editor")
+    actionConfig.addActionDefinition(((sect, 'clearEditor'),), ClearEditorAction)
+    actionConfig.addActionDefinition(((sect, 'commit'),), CommitAction)
+
     def __init__(self, parent = None):
         super().__init__(parent)
         self.setSelectionMode(self.ExtendedSelection)
