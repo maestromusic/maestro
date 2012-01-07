@@ -111,7 +111,7 @@ class TreeActionConfiguration(QtCore.QObject):
     
     globalUndoRedo = True # specifies whether or not to add global undo/redo actions to context menu
     actionDefinitionAdded = QtCore.pyqtSignal(object)
-    actionDefinitionRemoved = QtCore.pyqtSignal(object)
+    actionDefinitionRemoved = QtCore.pyqtSignal(str)
     
     def __init__(self, toplevel = True):
         super().__init__()
@@ -124,7 +124,7 @@ class TreeActionConfiguration(QtCore.QObject):
                 self.sections[section] = OrderedDict()
         if len(path) > 1:
             if name not in self.sections[section]:
-                self.sections[section][name] = TreeActionConfiguration()
+                self.sections[section][name] = TreeActionConfiguration(False)
             self.sections[section][name].addActionDefinition(path[1:], callable, *args, **kwargs)
         else:
             self.sections[section][name] = (callable, args, kwargs)
@@ -137,17 +137,26 @@ class TreeActionConfiguration(QtCore.QObject):
             self.sections[section][name].removeActionDefinition(path[1:])
             if len(self.sections[section][name]) == 0:
                 del self.sections[section][name]
+        else:
+            del self.sections[section][name]
         if len(self.sections[section]) == 0:
             del self.sections[section]
         if self.toplevel:
-            self.actionDefinitionRemoved.emit(path)
+            self.actionDefinitionRemoved.emit(path[-1][1])
     
     def __len__(self):
         return len(self.sections)
     
     def __iter__(self):
         return self.actionIterator()
-        
+    
+    def getDefinition(self, path):
+        section, name = path[0]
+        if len(path) == 1:
+            return self.sections[section][name]
+        section, name = path[0]
+        return self.sections[section][name].getDefinition(path[1:])
+
     def actionIterator(self):
         """Iterates over the actions and subactions in this configuration in the defined order."""
         for section, actions in self.sections.items():
@@ -199,8 +208,22 @@ class TreeView(QtGui.QTreeView):
         self.treeActions = {}
         for name,  (callable, args, kwargs) in self.actionConfig:
             if callable is not None:
-                self.treeActions[name] = callable(self, *args, **kwargs)
+                self.treeActions[name] = action = callable(self, *args, **kwargs)
+                self.addAction(action)
+        self.actionConfig.actionDefinitionAdded.connect(self.addTreeAction)
+        self.actionConfig.actionDefinitionRemoved.connect(self.removeTreeAction)
         
+    def removeTreeAction(self, name):
+        action = self.treeActions[name]
+        self.removeAction(action)
+        del self.treeActions[name]
+        
+    def addTreeAction(self, path):
+        callable, args, kwargs = self.actionConfig.getDefinition(path)
+        if callable is not None:
+            action = self.treeActions[path[-1][1]] = callable(self, *args, **kwargs)
+            self.addAction(action)
+    
     def setModel(self, model):
         super().setModel(model)
         self.updateNodeSelection()
