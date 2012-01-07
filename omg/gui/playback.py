@@ -45,11 +45,13 @@ class PlaybackWidget(QtGui.QDockWidget):
         
         policy = QtGui.QSizePolicy()
         policy.setHorizontalPolicy(QtGui.QSizePolicy.Fixed)
-        self.previousButton = QtGui.QPushButton(utils.getIcon("previous.png"),'',self)
+        standardIcon = QtGui.qApp.style().standardIcon
+        self.previousButton = QtGui.QPushButton(standardIcon(QtGui.QStyle.SP_MediaSkipBackward),'',self)
         
         self.ppButton = PlayPauseButton(self)
-        self.stopButton = QtGui.QPushButton(utils.getIcon("stop_small.png"),'',self)
-        self.nextButton = QtGui.QPushButton(utils.getIcon("next.png"),'',self)
+        
+        self.stopButton = QtGui.QPushButton(standardIcon(QtGui.QStyle.SP_MediaStop),'',self)
+        self.nextButton = QtGui.QPushButton(standardIcon(QtGui.QStyle.SP_MediaSkipForward),'',self)
         self.ppButton.setIconSize(QtCore.QSize(10,16))
         self.stopButton.setIconSize(QtCore.QSize(10,16))
         self.previousButton.setIconSize(QtCore.QSize(16,16))
@@ -183,8 +185,8 @@ class PlayPauseButton(QtGui.QPushButton):
     # Signals and icons used for the two states
     play = QtCore.pyqtSignal()
     pause = QtCore.pyqtSignal()
-    playIcon = utils.getIcon("play_small.png")
-    pauseIcon = utils.getIcon("pause_small.png")
+    playIcon = QtGui.qApp.style().standardIcon(QtGui.QStyle.SP_MediaPlay)
+    pauseIcon = QtGui.qApp.style().standardIcon(QtGui.QStyle.SP_MediaPause)
     stateChanged = QtCore.pyqtSignal(int)
     
     def __init__(self,parent):
