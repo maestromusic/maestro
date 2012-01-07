@@ -281,7 +281,6 @@ class MPDPlayerBackend(player.PlayerBackend):
         self.mpdthread = MPDThread(self, data)
         self.mpdthread.changeFromMPD.connect(self._handleMPDChange, Qt.QueuedConnection)
         self.changeFromMain.connect(self.mpdthread._handleMainChange)
-        self.currentSongChanged.connect(self.playlist.setCurrent)
         self.mpdthread.start()
         self._numFrontends = 0
         
@@ -323,6 +322,7 @@ class MPDPlayerBackend(player.PlayerBackend):
             
         elif what == 'currentSong':
             self.currentSong, self.currentSongLength = how
+            self.playlist.setCurrent(self.currentSong)
             self.currentSongChanged.emit(self.currentSong)
         
         elif what == 'remove':

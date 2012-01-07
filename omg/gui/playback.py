@@ -68,8 +68,9 @@ class PlaybackWidget(QtGui.QDockWidget):
         self.seekSlider = QtGui.QSlider(Qt.Horizontal,self)
         self.seekSlider.setRange(0,1000)
         self.seekSlider.setTracking(False)
+        
         bottomLayout = QtGui.QHBoxLayout()
-        self.seekLabel = QtGui.QLabel("0-0", self)
+        self.seekLabel = QtGui.QLabel("", self)
         topLayout.addWidget(self.previousButton)
         topLayout.addWidget(self.ppButton)
         topLayout.addWidget(self.stopButton)
@@ -80,16 +81,19 @@ class PlaybackWidget(QtGui.QDockWidget):
         mainLayout.addLayout(topLayout)
         mainLayout.addLayout(bottomLayout)
         self.backendChooser.backendChanged.connect(self.setBackend)
+        self.seekSlider.sliderMoved.connect(self.updateSeekLabel)
         if not self.backendChooser.setCurrentProfile(state):
             self.setBackend(self.backendChooser.currentProfile())
     
+    def updateSeekLabel(self, value):
+        self.seekLabel.setText("{}-{}".format(formatTime(value), formatTime(self.seekSlider.maximum())))
+        
     def updateSlider(self, current, total):
-        if self.seekSlider.isSliderDown():
-            return
-        if self.seekSlider.maximum() != total:
-            self.seekSlider.setRange(0, int(total))
-        self.seekSlider.setValue(current)
-        self.seekLabel.setText("{}-{}".format(formatTime(current), formatTime(total)))
+        if not self.seekSlider.isSliderDown():
+            if self.seekSlider.maximum() != total:
+                self.seekSlider.setRange(0, int(total))
+            self.seekSlider.setValue(current)
+        self.updateSeekLabel(current)
     
     def updateCurrent(self, pos):
         current = self.backend.playlist.current
@@ -100,6 +104,12 @@ class PlaybackWidget(QtGui.QDockWidget):
     
     def updateState(self, state):
         self.ppButton.setPlaying(state == player.PLAY)
+        if state == player.STOP:
+            self.seekSlider.setValue(0)
+            self.seekLabel.setText("")
+            self.seekSlider.setEnabled(False)
+        else:
+            self.seekSlider.setEnabled(True)
     
     def handleStop(self):
         self.backend.setState(player.STOP)
