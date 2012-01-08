@@ -118,6 +118,7 @@ def run(cmdConfig = []):
     # Load remaining modules
     from omg import tags, search
     search.init()
+    
     # Load Plugins
     from omg import plugins
     plugins.enablePlugins()

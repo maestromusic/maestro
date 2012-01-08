@@ -23,24 +23,39 @@ from PyQt4.QtCore import Qt
 
 from ... import utils, tags, modify
 from ..delegates import configuration
+from .. import dialogs
 
 
 class DelegatesPanel(QtGui.QWidget):
-    def __init__(self,dialog,parent = None):
-        super().__init__(parent)
+    """Panel widget for the delegates panel in the preferences dialog. The user can choose a delegate
+    configuration and then edit its properties. With *startConfig* you can specify which configuration is
+    shown at the beginning."""
+    def __init__(self,dialog,startConfig=None):
+        super().__init__()
         self.setLayout(QtGui.QVBoxLayout())
         self.panels = {}
+        self._currentConfig = startConfig
         
-        self.topLayout = QtGui.QHBoxLayout()
-        self.layout().addLayout(self.topLayout)
-        self.topLayout.addWidget(QtGui.QLabel(self.tr("Choose a delegate configuration: ")))
+        topLayout = QtGui.QHBoxLayout()
+        self.layout().addLayout(topLayout)
+        topLayout.addWidget(QtGui.QLabel(self.tr("Choose a configuration: ")))
         
         self.delegateBox = QtGui.QComboBox()
-        self.delegateBox.currentIndexChanged.connect(
-                    # get the config having the current item's text as title
-                    lambda i: self.showPanel(configuration.getConfiguration(self.delegateBox.itemText(i))))
-        self.topLayout.addWidget(self.delegateBox)
-        self.topLayout.addStretch(1)
+        self.delegateBox.setSizeAdjustPolicy(QtGui.QComboBox.AdjustToContents)
+        self._populateDelegateBox()
+        if startConfig is not None:
+            for i in range(self.delegateBox.count()):
+                if self.delegateBox.itemData(i) == startConfig:
+                    self.delegateBox.setCurrentIndex(i)
+                    break
+        self.delegateBox.currentIndexChanged.connect(self._handleCurrentConfigChanged)
+        topLayout.addWidget(self.delegateBox)
+        
+        manageConfigurationsButton = QtGui.QPushButton(self.tr("Manage configurations..."))
+        manageConfigurationsButton.clicked.connect(self._handleManageConfigsButton)
+        topLayout.addWidget(manageConfigurationsButton)
+        
+        topLayout.addStretch(1)
         
         self.stackedWidget = QtGui.QStackedWidget()
         self.layout().addWidget(self.stackedWidget)
@@ -49,27 +64,48 @@ class DelegatesPanel(QtGui.QWidget):
         resetButton = QtGui.QPushButton(self.tr("Reset this configuration"))
         resetButton.clicked.connect(self._handleResetButton)
         bottomLayout.addWidget(resetButton)
-        bottomLayout.addStretch(1)
+        bottomLayout.addStretch()
         closeButton = QtGui.QPushButton(self.tr("Close"))
         closeButton.clicked.connect(dialog.close)
         bottomLayout.addWidget(closeButton)
         self.layout().addLayout(bottomLayout)
         
-        self._populateDelegateBox()
-        self.showPanel(configuration.getConfiguration(self.delegateBox.itemText(0)))
+        if startConfig is None:
+            self.showConfig(configuration.getConfiguration(self.delegateBox.itemText(0)))
+        else: self.showConfig(startConfig)
         configuration.dispatcher.changes.connect(self._handleDispatcher)
         
-    def _handleDispatcher(self,event):
-        if event.type != modify.CHANGED:
-            # Only events of type ADDED or REMOVED change the DelegateBox
-            self._populateDelegateBox()
-        
     def _populateDelegateBox(self):
+        """Fill the delegate configuration combo box with a list of all configurations.""" 
         self.delegateBox.clear()
         for config in configuration.getConfigurations():
-            self.delegateBox.addItem(config.title)
+            self.delegateBox.addItem(config.title,config)
+        
+    def _handleCurrentConfigChanged(self,i):
+        """Handle delegateBox.currentIndexChanged."""
+        self.showConfig(self.delegateBox.itemData(i))
+        
+    def _handleDispatcher(self,event):
+        """Handle the delegate configuration dispatcher: Update the delegate box."""
+        if event.type != modify.CHANGED:
+            # Only events of type ADDED or DELETED change the entry list
+            self.delegateBox.currentIndexChanged.disconnect(self._handleCurrentConfigChanged)
+            self._populateDelegateBox()
+            if self._currentConfig is not None:
+                for i in range(self.delegateBox.count()):
+                    if self.delegateBox.itemData(i) == self._currentConfig:
+                        self.delegateBox.setCurrentIndex(i)
+                        break
+            self.delegateBox.currentIndexChanged.connect(self._handleCurrentConfigChanged)
+        else:
+            # Update the title
+            for i in range(self.delegateBox.count()):
+                if self.delegateBox.itemData(i) == event.config:
+                    self.delegateBox.setItemText(i,event.config.title)
+                    break
     
-    def showPanel(self,config):
+    def showConfig(self,config):
+        """Choose and display the given delegate configuration."""
         if config not in self.panels:
             panel = DelegateOptionsPanel(self,config)
             self.stackedWidget.addWidget(panel)
@@ -78,22 +114,35 @@ class DelegatesPanel(QtGui.QWidget):
         self._currentConfig = config
             
     def _handleResetButton(self):
+        """Reset the current configuration."""
         self._currentConfig.resetToDefaults()
+        
+    def _handleManageConfigsButton(self):
+        """Open a dialog to add/rename/delete configurations."""
+        dialog = ManageConfigurationsDialog(self)
+        dialog.exec_()
         
         
 class DelegateOptionsPanel(QtGui.QScrollArea):
+    """This panel allows the user to edit a single delegate configuration. It consists of three parts:
+    Two DataPiecesEditors to edit the datapieces displayed in the left and those displayed in the right
+    column and a list of widgets (checkboxes, comboboxes etc.) to edit the configuration's options.
+    """
     def __init__(self,parent,config):
         super().__init__(parent)
         self.config = config
         
         innerWidget = QtGui.QWidget()
-        innerWidget.setLayout(QtGui.QVBoxLayout())
-        innerWidget.layout().setSizeConstraint(QtGui.QLayout.SetFixedSize)
+        layout = QtGui.QVBoxLayout(innerWidget)
+        layout.setSizeConstraint(QtGui.QLayout.SetFixedSize)
         self.setWidget(innerWidget)
         
-        self.datapieceEditor = DataPiecesEditor(self)
-        innerWidget.layout().addWidget(self.datapieceEditor)
+        dataLayout = QtGui.QHBoxLayout()
+        layout.addLayout(dataLayout)
+        dataLayout.addWidget(DataPiecesEditor(self,True,))
+        dataLayout.addWidget(DataPiecesEditor(self,False))
         
+        # A horizontal ruler between datapiece editors and option editors
         frame = QtGui.QFrame()
         frame.setFrameStyle(QtGui.QFrame.Sunken | QtGui.QFrame.HLine)
         innerWidget.layout().addWidget(frame)
@@ -102,6 +151,7 @@ class DelegateOptionsPanel(QtGui.QScrollArea):
         grid.setContentsMargins(0,0,0,0)
         innerWidget.layout().addLayout(grid)
         
+        # Create an editor for each option
         row = 0
         self._editors = {}
         for id,option in config.options.items():
@@ -117,72 +167,55 @@ class DelegateOptionsPanel(QtGui.QScrollArea):
         configuration.dispatcher.changes.connect(self._handleConfigurationDispatcher)
         
     def _handleValueChanged(self,option,editor):
+        """Handle a value change in the editor for the given *option*."""
         self.config.setOption(option,editor.value)
     
     def _handleConfigurationDispatcher(self,event):
+        """Handle an event from the delegate configuration dispatcher."""
         if event.type == configuration.CHANGED and event.config == self.config:
             for id,option in self.config.options.items():
                 if option.value != self._editors[id].value:
-                    print("{} {}".format(option.value,self._editors[id].value))
                     self._editors[id].value = option.value
-        
+               
     
 class DataPiecesEditor(QtGui.QWidget):
-    def __init__(self,panel):
-        super().__init__()
-        self.setLayout(QtGui.QHBoxLayout())
-        
-        self.leftEditor = DataColumnEditor(panel,True,)
-        self.rightEditor = DataColumnEditor(panel,False)
-        
-        self.layout().addWidget(self.leftEditor)
-        self.layout().addWidget(self.rightEditor)
-            
-    
-class DataColumnEditor(QtGui.QWidget):
+    """A widget to edit one column of datapieces (tags, filetype, length etc.)."""
     def __init__(self,panel,left):
         super().__init__()
+        layout = QtGui.QVBoxLayout(self)
+        layout.setContentsMargins(0,0,0,0)
         self.panel = panel
         self.left = left
-        grid = QtGui.QGridLayout()
-        grid.setContentsMargins(0,0,0,0)
-        self.setLayout(grid)
         
         mainColumn = 0 if left else 1
+        
+        topLayout = QtGui.QHBoxLayout()
+        layout.addLayout(topLayout)
         
         self.addDataBox = QtGui.QComboBox()
         self._fillAddDataBox()
         self.addDataBox.currentIndexChanged.connect(self._handleAddData)
-        grid.addWidget(self.addDataBox,0,mainColumn)
+        topLayout.addWidget(self.addDataBox)
         
         removeDataButton = QtGui.QPushButton()
         removeDataButton.setIcon(utils.getIcon('delete.png'))
         removeDataButton.clicked.connect(self._handleRemoveData)
-        grid.addWidget(removeDataButton,0,mainColumn+1)
+        topLayout.addWidget(removeDataButton)
+        
+        topLayout.addStretch(1)
         
         self.listWidget = QtGui.QListWidget()
-        #self.listWidget.setDragDropMode(QtGui.QAbstractItemView.InternalMove)
+        
         # Effectively this sets the minimum size of listWidget. Note that QListWidgets have a fixed sizeHint
         # by default, but the default is too large for our purposes here. So we decrease it.
-        self.listWidget.sizeHint = lambda: QtCore.QSize(150,140)
+        self.listWidget.sizeHint = lambda: QtCore.QSize(150,120)
         self._updateList()
-        grid.addWidget(self.listWidget,1,mainColumn,2,2)
+        layout.addWidget(self.listWidget)
         
-        upButton = QtGui.QPushButton()
-        upButton.setIcon(utils.getIcon('go-up.png'))
-        downButton = QtGui.QPushButton()
-        downButton.setIcon(utils.getIcon('go-down.png'))
-        
-        if left:
-            grid.addWidget(upButton,1,2)
-            grid.addWidget(downButton,2,2)
-        else:
-            grid.addWidget(upButton,1,0)
-            grid.addWidget(downButton,2,0)
-            
         configuration.dispatcher.changes.connect(self._handleConfigurationDispatcher)
             
     def _fillAddDataBox(self):
+        """Fill the combobox with a list of all available datapieces."""
         self.addDataBox.clear()
         self.addDataBox.addItem(
                         self.tr("Add to left column...") if self.left else self.tr("Add to right column..."))
@@ -199,9 +232,11 @@ class DataColumnEditor(QtGui.QWidget):
                 self.addDataBox.addItem(data.title,data)
     
     def getDataPieces(self):
+        """Return a list of all datapieces chosen by the user."""
         return [self.listWidget.item(row).data(Qt.UserRole) for row in range(self.listWidget.count())]
     
     def _updateList(self):
+        """Update the list based on the configuration (e.g. on configuration dispatcher events)."""
         self.listWidget.clear()
         for dataPiece in self.panel.config.getDataPieces(self.left):
             item = QtGui.QListWidgetItem(dataPiece.title)
@@ -212,6 +247,8 @@ class DataColumnEditor(QtGui.QWidget):
             self.listWidget.addItem(item)
     
     def _handleAddData(self,index):
+        """Add the datapiece with the given index in the combobox to the list if it is not already contained
+        in this _or_ the other column."""
         if index == 0:
             return # 'Add to left column...' was selected
         dataPiece = self.addDataBox.itemData(index)
@@ -226,18 +263,20 @@ class DataColumnEditor(QtGui.QWidget):
         self.addDataBox.setCurrentIndex(0)
     
     def _handleRemoveData(self):
+        """Handle a click on the remove button."""
         allItems = [self.listWidget.item(row) for row in range(self.listWidget.count())]
         remainingData = [item.data(Qt.UserRole) for item in allItems if not item.isSelected()]
         self.panel.config.setDataPieces(self.left,remainingData)
         
     def _handleConfigurationDispatcher(self,event):
+        """Update the list on CHANGE events."""
         if event.type == configuration.CHANGED and event.config == self.panel.config:
             self._updateList()
         
-    
-    
 
 def createEditor(type,value,options=None):
+    """Create an editor for the given *type* (a checkbox for 'bool', a QLineEdito for 'string' and so on).
+    Ínitialize it with *value*. *options* are passed to the editor's constructor and depend on the type."""
     return {
         "string": StringEditor,
         "bool": BoolEditor,
@@ -248,7 +287,11 @@ def createEditor(type,value,options=None):
     }[type](value,options)
     
     
+# The next classes are used as editors for the different option types. They all must provide a property 
+# value and a signal valueChanged.
+
 class StringEditor(QtGui.QLineEdit):
+    """Editor for options of type 'string'."""
     def __init__(self,value,options):
         super().__init__(value)
         
@@ -257,6 +300,7 @@ class StringEditor(QtGui.QLineEdit):
     
     
 class BoolEditor(QtGui.QCheckBox):
+    """Editor for options of type 'bool'."""
     def __init__(self,value,options):
         super().__init__()
         self.setCheckState(Qt.Checked if value else Qt.Unchecked)
@@ -273,6 +317,7 @@ class BoolEditor(QtGui.QCheckBox):
     
 
 class IntEditor(QtGui.QSpinBox):
+    """Editor for options of type 'int'."""
     def __init__(self,value,options):
         super().__init__()
         self.value = value
@@ -287,15 +332,17 @@ class IntEditor(QtGui.QSpinBox):
 
 
 class TagEditor(QtGui.QComboBox):
+    """Editor for options of type 'tag'."""
     valueChanged = QtCore.pyqtSignal()
     
     def __init__(self,value,options):
         super().__init__()
-        self._fillBox(value)
+        self._updateBox(value)
         self.currentIndexChanged.connect(self.valueChanged)
         modify.dispatcher.changes.connect(self._handleTagTypeChanged)
             
-    def _fillBox(self,defaultTag):
+    def _updateBox(self,defaultTag):
+        """Fill/update the list of tags."""
         self.clear()
         self.addItem(self.tr("None"),None)
         self.insertSeparator(1)
@@ -322,19 +369,21 @@ class TagEditor(QtGui.QComboBox):
     def _handleTagTypeChanged(self,event):
         """React upon tagTypeChanged-signals from the dispatcher."""
         if isinstance(event, modify.events.TagTypeChangedEvent):
-            self._fillBox(self.getValue())
+            self._updateBox(self.getValue())
             
 
 class DataPieceEditor(QtGui.QComboBox):
+    """Editor for options of type 'datapiece'."""
     valueChanged = QtCore.pyqtSignal()
     
     def __init__(self,value,options):
         super().__init__()
-        self._fillBox(value)
+        self._updateBox(value)
         self.currentIndexChanged.connect(self.valueChanged)
         modify.dispatcher.changes.connect(self._handleTagTypeChanged)
             
-    def _fillBox(self,default):
+    def _updateBox(self,default):
+        """Fill/update the list of datapieces."""
         self.clear()
         self.addItem(self.tr("None"),None)
         self.insertSeparator(1)
@@ -364,5 +413,128 @@ class DataPieceEditor(QtGui.QComboBox):
     def _handleTagTypeChanged(self,event):
         """React upon tagTypeChanged-signals from the dispatcher."""
         if isinstance(event, modify.events.TagTypeChangedEvent):
-            self._fillBox(self.getValue())
+            self._updateBox(self.getValue())
             
+            
+class ManageConfigurationsDialog(QtGui.QDialog):
+    """Dialog to add, rename and delete delegate configurations."""
+    def __init__(self,parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(self.tr("Manage configurations"))
+        layout = QtGui.QVBoxLayout(self)
+        
+        layout.addWidget(QtGui.QLabel(
+                            self.tr("<i>Italic configurations</i> are built in and cannot be deleted.")))
+        layout.addWidget(QtGui.QLabel(self.tr("Click on a name to change it.")))
+        
+        mainLayout = QtGui.QHBoxLayout()
+        layout.addLayout(mainLayout)
+        self.table = QtGui.QTableWidget()
+        self.table.verticalHeader().hide()
+        self.table.setSelectionBehavior(QtGui.QAbstractItemView.SelectRows)
+        self._updateTable()
+        self.table.itemSelectionChanged.connect(self._handleSelectionChanged)
+        self.table.itemChanged.connect(self._handleItemChanged)
+        mainLayout.addWidget(self.table)
+        
+        buttonLayout = QtGui.QVBoxLayout()
+        mainLayout.addLayout(buttonLayout)
+        
+        self.addBox = QtGui.QComboBox()
+        self.addBox.addItem(self.tr("Add configuration"))
+        for type in configuration.getTypes():
+            self.addBox.addItem(type.title,type)
+        self.addBox.currentIndexChanged.connect(self._handleAddBox)
+        buttonLayout.addWidget(self.addBox)
+            
+        self.resetButton = QtGui.QPushButton(self.tr("Reset to defaults"))
+        self.resetButton.setEnabled(False)
+        self.resetButton.clicked.connect(self._handleResetButton)
+        buttonLayout.addWidget(self.resetButton)
+        
+        self.deleteButton = QtGui.QPushButton(self.tr("Delete"))
+        self.deleteButton.setEnabled(False)
+        self.deleteButton.clicked.connect(self._handleDeleteButton)
+        buttonLayout.addWidget(self.deleteButton)
+        
+        buttonLayout.addStretch(1)
+        
+        closeButton = QtGui.QPushButton(self.tr("Close"))
+        closeButton.clicked.connect(self.close)
+        buttonLayout.addWidget(closeButton)
+        closeButton.setFocus(Qt.PopupFocusReason)
+        
+    def _updateTable(self):
+        """Fill/update the table of delegate configurations."""
+        self.table.clear()
+        self.table.setColumnCount(2)
+        self.table.setHorizontalHeaderLabels([self.tr("Name"),self.tr("Type")])
+        
+        configs = configuration.getConfigurations()
+        self.table.setRowCount(len(configs))
+        
+        for row,config in enumerate(configs):
+            item = QtGui.QTableWidgetItem(config.title)
+            if config.builtin:
+                font = item.font()
+                font.setItalic(True)
+                item.setFont(font)
+                item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled)
+            else: item.setFlags(Qt.ItemIsEditable | Qt.ItemIsSelectable | Qt.ItemIsEnabled)
+            self.table.setItem(row,0,item)
+            
+            item = QtGui.QTableWidgetItem(config.type.title)
+            item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled)
+            self.table.setItem(row,1,item)
+            
+    def _handleAddBox(self,index):
+        """Add a new delegate configuration for the type with the given index in addBox."""
+        if index != 0:
+            type = self.addBox.itemData(index)
+            configuration.createDelegateConfiguration(type)
+            self.addBox.setCurrentIndex(0)
+            self._updateTable()
+    
+    def _selectedConfigs(self):
+        """Return a list of currently selected configurations."""
+        configs = configuration.getConfigurations()
+        return [configs[rowIndex.row()] for rowIndex in self.table.selectionModel().selectedRows()]
+    
+    def _handleSelectionChanged(self):
+        """Enable/disable buttons according to the selection: Built-in configurations must not be deleted."""
+        self.resetButton.setEnabled(self.table.selectionModel().hasSelection())
+        self.deleteButton.setEnabled(self.table.selectionModel().hasSelection()
+                                     and all(not config.builtin for config in self._selectedConfigs()))
+        
+    def _handleDeleteButton(self):
+        """Delete the selected configurations if the user confirms this."""
+        if dialogs.question(
+                    self.tr("Delete configurations"),
+                    self.tr("Should I really delete %n configuration(s)?",'',len(self._selectedConfigs())),
+                    parent=self):
+            for config in self._selectedConfigs():
+                configuration.removeDelegateConfiguration(config)
+            self._updateTable()
+    
+    def _handleResetButton(self):
+        """Reset the selected configurations if the user confirms this."""
+        if dialogs.question(
+                    self.tr("Reset configurations"),
+                    self.tr("Should I really reset %n configuration(s)?",'',len(self._selectedConfigs())),
+                    parent=self):
+            for config in self._selectedConfigs():
+                config.resetToDefaults()
+                
+    def _handleItemChanged(self,item):
+        """React to changes to the item texts in the table: Rename the corresponding configuration."""
+        if item.column() != 0:
+            return
+        config = configuration.getConfigurations()[item.row()]
+        if config.title != item.text():
+            if configuration.exists(item.text()):
+                dialogs.warning("Invalid title","There is already a configuration with this title.",
+                               parent=self)
+                item.setText(config.title)
+            else:
+                config.setTitle(item.text())
+                

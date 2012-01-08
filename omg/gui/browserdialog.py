@@ -22,6 +22,7 @@ from PyQt4.QtCore import Qt
 from .. import config, tags, utils, database as db, flags
 from . import dialogs
 from ..search import criteria as criteriaModule
+from .delegates import browser as browserdelegate, configuration as delegateconfig
 
 from functools import partial
 
@@ -66,6 +67,15 @@ class BrowserDialog(dialogs.FancyTabbedPopup):
         optionTab.setLayout(optionLayout)
         self.tabWidget.addTab(optionTab,self.tr("Options"))
         
+        lineLayout = QtGui.QHBoxLayout()
+        optionLayout.addLayout(lineLayout)
+        lineLayout.addWidget(QtGui.QLabel(self.tr("Item Display:")))
+        configurationCombo = delegateconfig.ConfigurationCombo(
+                                                    browserdelegate.BrowserDelegate.configurationType,
+                                                    self.browser.views)
+        configurationCombo.view().installEventFilter(self)
+        lineLayout.addWidget(configurationCombo)
+        
         instantSearchBox = QtGui.QCheckBox(self.tr("Instant search"))
         instantSearchBox.setChecked(self.browser.searchBox.getInstantSearch())
         instantSearchBox.clicked.connect(self.browser.searchBox.setInstantSearch)
@@ -83,16 +93,30 @@ class BrowserDialog(dialogs.FancyTabbedPopup):
         
         optionLayout.addStretch(1)
         
+    def hideEvent(self,event):
+        super().hideEvent(event)
+        self.close()
+        
     def close(self):
         self.browser._handleDialogClosed()
-        dialogs.FancyTabbedPopup.close(self)
+        super().close()
         
     def _handleSelectionChanged(self):
         if len(self.flagView.selectedFlagTypes) > 0:
             self.browser.setCriterionFilter([criteriaModule.FlagsCriterion(self.flagView.selectedFlagTypes)])
         else: self.browser.setCriterionFilter([])
 
-
+    def eventFilter(self,obj,event):
+        # obj is configurationCombo's view. Usually the BrowserDialog closes when the mouse leaves. Thus
+        # we have to prevent the dialog from closing while the view is shown (view is a popup, so the mouse
+        # leaves BrowserDialog).
+        if event.type() == QtCore.QEvent.Show:
+            self.fixPopup = True
+        if event.type() == QtCore.QEvent.Hide:
+            self.fixPopup = False
+        return False # do not filter
+          
+            
 class FlagView(QtGui.QTableWidget):
     selectionChanged = QtCore.pyqtSignal(list)
     
@@ -129,6 +153,8 @@ class FlagView(QtGui.QTableWidget):
             item.setData(Qt.UserRole,flagType)
             item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsUserCheckable)
             item.setCheckState(Qt.Checked if flagType in self.selectedFlagTypes else Qt.Unchecked)
+            if flagType.icon is not None:
+                item.setIcon(flagType.icon)
             self.setItem(row % rowCount,column,item)
         
         self.resizeColumnsToContents()

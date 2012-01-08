@@ -21,21 +21,25 @@ from PyQt4.QtCore import Qt
 from .. import utils
 
 
-def question(title, text):
+def question(title,text,parent=None):
     """Display a modal question dialog with the given *title* and *text*. Return True if the
-    user selected "Yes" and False otherwise."""
-    from . import mainwindow
-    ans = QtGui.QMessageBox.question(mainwindow.mainWindow,
-                                     title,
-                                     text,
+    user selected "Yes" and False otherwise. The optional argument is the parent widget and default to the
+    main window."""
+    if parent is None:
+        from . import mainwindow
+        parent = mainwindow.mainWindow
+    ans = QtGui.QMessageBox.question(parent,title,text,
                                      buttons = QtGui.QMessageBox.No | QtGui.QMessageBox.Yes)
     return ans == QtGui.QMessageBox.Yes
 
 
-def warning(title, text):
-    """Display a modal warning dialog with the given *title* and *text*."""
-    from . import mainwindow
-    QtGui.QMessageBox.warning(mainwindow.mainWindow, title, text)
+def warning(title,text,parent=None):
+    """Display a modal warning dialog with the given *title* and *text*. The optional argument is the parent
+    widget and default to the main window."""
+    if parent is None:
+        from . import mainwindow
+        parent = mainwindow.mainWindow
+    QtGui.QMessageBox.warning(parent, title, text)
     
     
 class FancyPopup(QtGui.QFrame):
@@ -49,9 +53,12 @@ class FancyPopup(QtGui.QFrame):
     # A set of parents whose popup is open (static). Confer isActive
     _activeParents = set()
     
+    # While fixPopup is True, the popup will not close when the mouse leaves.
+    fixPopup = False
+    
     def __init__(self,parent = None):
         QtGui.QFrame.__init__(self,parent)
-        self.setWindowFlags(self.windowFlags() | Qt.ToolTip)
+        self.setWindowFlags(self.windowFlags() | Qt.Popup)
         parent.installEventFilter(self)
         FancyPopup._activeParents.add(parent)
         
@@ -89,7 +96,8 @@ class FancyPopup(QtGui.QFrame):
         QtGui.QFrame.enterEvent(self,event)
     
     def leaveEvent(self,event):
-        if self.isVisible():
+        print("leave")
+        if self.isVisible() and not self.fixPopup:
             self.close()
              
     def eventFilter(self,object,event):

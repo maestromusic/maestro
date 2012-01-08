@@ -30,11 +30,18 @@ class BrowserDelegate(StandardDelegate):
     """Delegate used in the Browser. Does some effort to put flag icons at the optimal place using free space
     in the title row and trying not to increase the overall number of rows.
     """
-    options = configuration.copyOptions(StandardDelegate.options)
-    options["fitInTitleRowData"].value = configuration.DataPiece(tags.get("date")) if tags.exists("date") else None
-    options["showSortValues"] = configuration.DelegateOption("showSortValues",
-                            translate("Delegates","Display sort values instead of real values"),"bool",False)
- 
+    configurationType, defaultConfiguration = configuration.createConfigType(
+                    'browser',
+                    translate("Delegate","Browser"),
+                    StandardDelegate.options,
+                    ['t:composer','t:artist','t:performer'],
+                    ['t:date','t:conductor'],
+                    overwrite={"fitInTitleRowData": configuration.DataPiece(tags.get("date"))
+                                            if tags.exists("date") else None},
+                    addOptions={"showSortValues": configuration.DelegateOption("showSortValues",
+                            translate("Delegates","Display sort values instead of real values"),"bool",False)}
+    )
+    
     def layout(self,index,availableWidth):
         node = self.model.data(index)
         
@@ -51,14 +58,3 @@ class BrowserDelegate(StandardDelegate):
             self.addCenter(TextItem(self.tr("Loading..."),ITALIC_STYLE))
         elif isinstance(node,models.Element):
             super().layout(index,availableWidth)
-            
-    @staticmethod
-    def getDefaultDataPieces():
-        left = [configuration.DataPiece(tags.get(name)) for name in ['composer','artist','performer']]
-        right = [configuration.DataPiece(tags.get(name)) for name in ['date','conductor']]
-        return left,right
-
-
-BrowserDelegate.defaultConfig = configuration.DelegateConfiguration(
-                                            translate("Delegates","Browser"),BrowserDelegate,builtin=True)
-configuration.addDelegateConfiguration(BrowserDelegate.defaultConfig)
