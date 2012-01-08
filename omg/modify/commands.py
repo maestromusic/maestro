@@ -596,8 +596,8 @@ class FlagTypeUndoCommand(UndoCommand):
 
 class CoverUndoCommand(UndoCommand):
     """Change a cover of a single element."""
-    def __init__(self,id,pixmap):
-        super().__init__(REAL,{})
+    def __init__(self,id,pixmap, text = translate(__name__, 'change cover')):
+        super().__init__(REAL,{}, text = text)
         self.id = id
         self.newPixmap = pixmap
         from .. import covers

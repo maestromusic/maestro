@@ -30,11 +30,17 @@ class PlaylistTreeView(treeview.TreeView):
     """This is the main widget of a playlist: The tree view showing the current element tree."""
     level = None
     
-    treeActions = [ NamedList('tags', [EditTagsSingleAction,
-                                       EditTagsRecursiveAction])
-                  , NamedList('playlist', [ RemoveFromPlaylistAction
-                                          , ClearPlaylistAction
-                                          , ]) ]
+    actionConfig = treeview.TreeActionConfiguration()
+    sect = translate(__name__, "tags")
+    actionConfig.addActionDefinition(((sect, 'edittagsS'),), EditTagsAction, recursive = False)
+    actionConfig.addActionDefinition(((sect, 'edittagsR'),), EditTagsAction, recursive = True)
+    
+    sect = translate(__name__, "playlist")
+    actionConfig.addActionDefinition(((sect, 'removeFromPL'),), RemoveFromPlaylistAction)
+    actionConfig.addActionDefinition(((sect, 'clearPL'),), ClearPlaylistAction)
+    actionConfig.addActionDefinition(((sect, 'pl_undo'),), None) # special action
+    actionConfig.addActionDefinition(((sect, 'pl_redo'),), None)
+
     songSelected = QtCore.pyqtSignal(int)
     
     def __init__(self, parent = None):
@@ -50,6 +56,11 @@ class PlaylistTreeView(treeview.TreeView):
 
     def setBackend(self, backend):
         self.backend = backend
+        if 'pl_undo' in self.treeActions:
+            self.removeAction(self.treeActions['pl_undo'])
+            self.removeAction(self.treeActions['pl_redo'])
+        self.treeActions['pl_undo'] = self.backend.stack.createUndoAction(self, self.tr('Undo(playlist)'))
+        self.treeActions['pl_redo'] = self.backend.stack.createRedoAction(self, self.tr('Redo(playlist)'))
         model = backend.playlist
         if self.selectionModel():
             self.selectionModel().selectionChanged.disconnect(self.updateGlobalSelection)
@@ -57,17 +68,9 @@ class PlaylistTreeView(treeview.TreeView):
         self.itemDelegate().model = model
         self.selectionModel().selectionChanged.connect(self.updateGlobalSelection)
         self.songSelected.connect(backend.setCurrentSong)
-        self.treeActionsVersion += 1
         self.updateNodeSelection()
-    
-    def rebuildTreeActions(self):
-        """Overridden method. Adds playlist-scope undo/redo methods and calls the backend
-        for backend-specific actions.""" 
-        super().rebuildTreeActions()
-        self.addAction(self.backend.stack.createUndoAction(self, self.tr('Playlist-Undo')))
-        self.addAction(self.backend.stack.createRedoAction(self, self.tr('Playlist-Redo')))
-        self.backend.addTreeActions(self)
         
+    
     def _handleDoubleClick(self, idx):
         if idx.isValid():
             offset = idx.internalPointer().offset()

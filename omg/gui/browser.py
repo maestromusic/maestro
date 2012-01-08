@@ -28,7 +28,6 @@ from .delegates import browser as browserdelegate, configuration as delegateconf
 from ..models import browser as browsermodel, Element, Container
 from ..constants import EDITOR, REAL
 from ..modify.treeactions import *
-from omg.modify.treeactions import DeleteFromDatabaseAction
 translate = QtCore.QCoreApplication.translate
 
 
@@ -321,16 +320,21 @@ class BrowserTreeView(treeview.TreeView):
     # List of optimizers which will improve the display after reloading.
     _optimizers = None
     
-    treeActions = [ NamedList('tags', [EditTagsSingleAction,
-                                       EditTagsRecursiveAction,
-                                       MatchTagsFromFilenamesAction]),
-                    NamedList('structure', [DeleteFromParentAction,
-                                            DeleteFromDatabaseAction,
-                                            DeleteFromDiskAction,
-                                            MergeAction,
-                                            FlattenAction,
-                                            ToggleMajorAction])
-                    ]
+    actionConfig = treeview.TreeActionConfiguration()
+    sect = translate(__name__, "tags")
+    actionConfig.addActionDefinition(((sect, 'edittagsS'),), EditTagsAction, recursive = False)
+    actionConfig.addActionDefinition(((sect, 'edittagsR'),), EditTagsAction, recursive = True)
+    actionConfig.addActionDefinition(((sect, 'advanced'),
+                                      ('misc', 'matchTags')), MatchTagsFromFilenamesAction)
+    
+    sect = translate(__name__, "structure")
+    actionConfig.addActionDefinition(((sect, 'deleteP'),), DeleteAction, CONTENTS, shortcut = 'Del')
+    actionConfig.addActionDefinition(((sect, 'deleteDB'),), DeleteAction, DB, shortcut = 'Shift+Del')
+    actionConfig.addActionDefinition(((sect, 'deleteDisk'),), DeleteAction, DISK)
+    actionConfig.addActionDefinition(((sect, 'merge'),), MergeAction)
+    actionConfig.addActionDefinition(((sect, 'flatten'),), FlattenAction)
+    actionConfig.addActionDefinition(((sect, 'major'),), ToggleMajorAction)
+    
     def __init__(self,parent,layers,delegateConfig):
         treeview.TreeView.__init__(self,parent)
         self.setModel(browsermodel.BrowserModel(layers,parent))

@@ -45,11 +45,13 @@ class PlaybackWidget(QtGui.QDockWidget):
         
         policy = QtGui.QSizePolicy()
         policy.setHorizontalPolicy(QtGui.QSizePolicy.Fixed)
-        self.previousButton = QtGui.QPushButton(utils.getIcon("previous.png"),'',self)
+        standardIcon = QtGui.qApp.style().standardIcon
+        self.previousButton = QtGui.QPushButton(standardIcon(QtGui.QStyle.SP_MediaSkipBackward),'',self)
         
         self.ppButton = PlayPauseButton(self)
-        self.stopButton = QtGui.QPushButton(utils.getIcon("stop_small.png"),'',self)
-        self.nextButton = QtGui.QPushButton(utils.getIcon("next.png"),'',self)
+        
+        self.stopButton = QtGui.QPushButton(standardIcon(QtGui.QStyle.SP_MediaStop),'',self)
+        self.nextButton = QtGui.QPushButton(standardIcon(QtGui.QStyle.SP_MediaSkipForward),'',self)
         self.ppButton.setIconSize(QtCore.QSize(10,16))
         self.stopButton.setIconSize(QtCore.QSize(10,16))
         self.previousButton.setIconSize(QtCore.QSize(16,16))
@@ -68,8 +70,9 @@ class PlaybackWidget(QtGui.QDockWidget):
         self.seekSlider = QtGui.QSlider(Qt.Horizontal,self)
         self.seekSlider.setRange(0,1000)
         self.seekSlider.setTracking(False)
+        
         bottomLayout = QtGui.QHBoxLayout()
-        self.seekLabel = QtGui.QLabel("0-0", self)
+        self.seekLabel = QtGui.QLabel("", self)
         topLayout.addWidget(self.previousButton)
         topLayout.addWidget(self.ppButton)
         topLayout.addWidget(self.stopButton)
@@ -80,16 +83,19 @@ class PlaybackWidget(QtGui.QDockWidget):
         mainLayout.addLayout(topLayout)
         mainLayout.addLayout(bottomLayout)
         self.backendChooser.backendChanged.connect(self.setBackend)
+        self.seekSlider.sliderMoved.connect(self.updateSeekLabel)
         if not self.backendChooser.setCurrentProfile(state):
             self.setBackend(self.backendChooser.currentProfile())
     
+    def updateSeekLabel(self, value):
+        self.seekLabel.setText("{}-{}".format(formatTime(value), formatTime(self.seekSlider.maximum())))
+        
     def updateSlider(self, current, total):
-        if self.seekSlider.isSliderDown():
-            return
-        if self.seekSlider.maximum() != total:
-            self.seekSlider.setRange(0, int(total))
-        self.seekSlider.setValue(current)
-        self.seekLabel.setText("{}-{}".format(formatTime(current), formatTime(total)))
+        if not self.seekSlider.isSliderDown():
+            if self.seekSlider.maximum() != total:
+                self.seekSlider.setRange(0, int(total))
+            self.seekSlider.setValue(current)
+        self.updateSeekLabel(current)
     
     def updateCurrent(self, pos):
         current = self.backend.playlist.current
@@ -100,6 +106,12 @@ class PlaybackWidget(QtGui.QDockWidget):
     
     def updateState(self, state):
         self.ppButton.setPlaying(state == player.PLAY)
+        if state == player.STOP:
+            self.seekSlider.setValue(0)
+            self.seekLabel.setText("")
+            self.seekSlider.setEnabled(False)
+        else:
+            self.seekSlider.setEnabled(True)
     
     def handleStop(self):
         self.backend.setState(player.STOP)
@@ -173,8 +185,8 @@ class PlayPauseButton(QtGui.QPushButton):
     # Signals and icons used for the two states
     play = QtCore.pyqtSignal()
     pause = QtCore.pyqtSignal()
-    playIcon = utils.getIcon("play_small.png")
-    pauseIcon = utils.getIcon("pause_small.png")
+    playIcon = QtGui.qApp.style().standardIcon(QtGui.QStyle.SP_MediaPlay)
+    pauseIcon = QtGui.qApp.style().standardIcon(QtGui.QStyle.SP_MediaPause)
     stateChanged = QtCore.pyqtSignal(int)
     
     def __init__(self,parent):

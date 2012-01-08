@@ -41,13 +41,14 @@ def defaultConfig():
 def enable():
     from ...gui import browser, editor, playlist
     for tree in (browser.BrowserTreeView,editor.EditorTreeView,playlist.PlaylistTreeView):
-        tree.treeActions.append(CoverFetcherAction)
+        tree.actionConfig.addActionDefinition( ((translate(__name__,"plugins"), "fetchcover"),),
+                                               CoverFetcherAction)
     
     
 def disable():
     from ...gui import browser, editor, playlist
     for tree in (browser.BrowserTreeView,editor.EditorTreeView,playlist.PlaylistTreeView):
-        tree.treeActions.remove(CoverFetcherAction)
+        tree.actionConfig.removeActionDefinition( ((translate(__name__,"plugins"), "fetchcover"),))
     
 
 class CoverFetcherAction(treeactions.TreeAction):

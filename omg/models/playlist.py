@@ -35,12 +35,17 @@ class Playlist(rootedtreemodel.RootedTreeModel):
         """Initialize with an empty playlist."""
         rootedtreemodel.RootedTreeModel.__init__(self,models.RootNode())
         self.backend = backend
-        self.current = self.currentModelIndex = None
-        self.currentParents = self.currentParentsModelIndices = []
+        self.clearCurrent()
         modify.dispatcher.changes.connect(self.handleChangeEvent)
     
+    def clearCurrent(self):
+        """Unsets the current song and all its helper attributes."""
+        self.current = self.currentModelIndex = None
+        self.currentParents = self.currentParentsModelIndices = []
+    
     def setCurrent(self, index):
-        if index == -1:
+        if index == -1:       
+            self.clearCurrent() 
             return
         elem = self.root.fileAtOffset(index)
         assert elem.isFile()
