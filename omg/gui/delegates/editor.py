@@ -27,18 +27,13 @@ translate = QtCore.QCoreApplication.translate
 
 class EditorDelegate(StandardDelegate):
     """Delegate for the editor."""
-    options = configuration.copyOptions(StandardDelegate.options)
-    options['showPaths'].value = True
-    options['showMajor'].value = True
-    options['appendRemainingTags'].value = True
     
-    @staticmethod
-    def getDefaultDataPieces():
-        left = [configuration.DataPiece(tags.get(name, True)) for name in ['album','composer','artist','performer']]
-        right = [configuration.DataPiece(tags.get(name, True)) for name in ['date','genre','conductor']]
-        return left,right
-
-
-EditorDelegate.defaultConfig = configuration.DelegateConfiguration(
-                                                translate("Delegates","Editor"),EditorDelegate,builtin=True)
-configuration.addDelegateConfiguration(EditorDelegate.defaultConfig)
+    configurationType, defaultConfiguration = configuration.createConfigType(
+                'editor',
+                translate("Delegates","Editor"),
+                StandardDelegate.options,
+                ['t:album','t:composer','t:artist','t:performer'],
+                ['t:date','t:genre','t:conductor'],
+                {"showPaths": True, 'showMajor': True, 'appendRemainingTags': True}
+    )
+    

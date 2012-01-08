@@ -153,7 +153,7 @@ class Browser(QtGui.QWidget):
         
         # Restore state
         viewsToRestore = config.storage.browser.views
-        self.delegateConfig = browserdelegate.BrowserDelegate.defaultConfig
+        self.delegateConfig = None # will load default delegate
         if state is not None and isinstance(state,dict):
             if 'instant' in state:
                 self.searchBox.setInstantSearch(state['instant'])
@@ -169,7 +169,7 @@ class Browser(QtGui.QWidget):
                 try:
                     from .preferences import delegates as delegatePreferences
                     self.delegateConfig = delegateconfiguration.getConfiguration(
-                                                            state['delegate'],browserdelegate.BrowserDelegate)
+                                        state['delegate'],browserdelegate.BrowserDelegate.configurationType)
                 except ValueError:
                     pass # Use default delegate (see above)
         
@@ -272,8 +272,9 @@ class Browser(QtGui.QWidget):
     def _handleDialogClosed(self):
         """Close the option dialog."""
         # Note: This is called by the dialog and not by a signal
-        self._lastDialogTabIndex = self._dialog.tabWidget.currentIndex()
-        self._dialog = None
+        if self._dialog is not None:
+            self._lastDialogTabIndex = self._dialog.tabWidget.currentIndex()
+            self._dialog = None
         
     def _handleSearchFinished(self,request):
         """React to searchFinished signals: Set the table to self.bigResult and reset the model."""

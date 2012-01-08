@@ -28,8 +28,8 @@ YES_ANSWERS = ["y", "Y", ""]
 REAL, EDITOR, PLAYLIST = "REAL", "EDITOR", "PLAYLIST" # Levels for commands and events
 DISK, DB, CONTENTS = range(3) # modes for removing elements
 
-#VERSION = '0.2alpha'
-VERSION = '0.2.1' # major, minor, revision
+VERSION = '0.2.0' # major, minor, revision
+
 def compareVersion(v):
     """Returns 1 if the program version is larger than v, 0 if it is equal, and -1 if it is lower."""
     myVersion =  tuple(map(int, VERSION.split('.')))
@@ -40,6 +40,7 @@ def compareVersion(v):
         return 0
     else:
         return -1
+    
 # Maximum length of encoded(!) tag-values of type varchar and the length of the MySQL-columns to hold them.
 TAG_VARCHAR_LENGTH = 255
 

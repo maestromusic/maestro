@@ -28,22 +28,17 @@ translate = QtCore.QCoreApplication.translate
 class PlaylistDelegate(StandardDelegate):
     """Delegate for the playlist."""
     
-    options = configuration.copyOptions(StandardDelegate.options)
-    options["fitInTitleRowData"].value = configuration.DataPiece("filecount+length")
+    configurationType, defaultConfiguration = configuration.createConfigType(
+                'playlist',
+                translate("Delegates","Playlist"),
+                StandardDelegate.options,
+                ['t:composer','t:artist','t:performer'],
+                ['t:date','t:genre','t:conductor'],
+                {"fitInTitleRowData": configuration.DataPiece("filecount+length")}
+    )
     
     def background(self, index):
         if index == self.model.currentModelIndex:
             return QtGui.QBrush(QtGui.QColor(110,149,229))
         elif index in self.model.currentParentsModelIndices:
             return QtGui.QBrush(QtGui.QColor(140,179,255))    
-    
-    @staticmethod
-    def getDefaultDataPieces():
-        left = [configuration.DataPiece(tags.get(name)) for name in ['album','composer','artist','performer']]
-        right = [configuration.DataPiece(tags.get(name)) for name in ['date','genre','conductor']]
-        return left,right
-
-
-PlaylistDelegate.defaultConfig = configuration.DelegateConfiguration(
-                                            translate("Delegates","Playlist"),PlaylistDelegate,builtin=True)
-configuration.addDelegateConfiguration(PlaylistDelegate.defaultConfig)

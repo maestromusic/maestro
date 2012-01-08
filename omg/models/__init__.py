@@ -638,6 +638,8 @@ class File(Element):
     
     def getExtension(self):
         """Return the filename extension of this file."""
+        if self.path is None:
+            self.path = db.path(self.id)
         ext = os.path.splitext(self.path)[1]
         if len(ext) > 0:
             return ext[1:].lower() # remove the dot

@@ -91,13 +91,20 @@ class AbstractDelegate(QtGui.QStyledItemDelegate):
     options = utils.OrderedDict()
     options["fontSize"] = configuration.DelegateOption("fontSize",translate("Delegates","Fontsize"),"int",8)
             
-    def __init__(self,view,config):
+    def __init__(self,view,config=None):
         super().__init__(view)
         self.view = view
         self.model = view.model()
         self.font = QtGui.QFont()
-        self.config = config
+        if config is not None:
+            self.config = config
+        else: self.config = self.defaultConfiguration
         configuration.dispatcher.changes.connect(self._handleDispatcher)
+    
+    def setConfiguration(self,config):
+        """Set the DelegateConfiguration and redraw the whole view."""
+        self.config = config
+        self.view.scheduleDelayedItemsLayout()
     
     def addLeft(self,item):
         """Add an item to the left region. It will be drawn on the right of all previous items
@@ -129,7 +136,7 @@ class AbstractDelegate(QtGui.QStyledItemDelegate):
         """React to the configuration dispatcher."""
         if event.config == self.config:
             if event.type == configuration.DELETED:
-                self.config = self.config.theClass.defaultConfig # default configs are never removed
+                self.config = self.defaultConfiguration # default configs are never removed
             self.view.scheduleDelayedItemsLayout()
                     
     def layout(self,index):

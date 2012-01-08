@@ -438,15 +438,15 @@ class MainWindow(QtGui.QMainWindow):
 
     def showPreferences(self):
         from . import preferences
-        preferences.show(self,"main/delegates")
+        preferences.show("main/delegates")
         
     def showTagManager(self):
         from . import preferences
-        preferences.show(self,"main/tagmanager")
+        preferences.show("main/tagmanager")
         
     def showFlagManager(self):
         from . import preferences
-        preferences.show(self,"main/flagmanager")
+        preferences.show("main/flagmanager")
 
     def showAboutDialog(self):
         """Display the About dialog."""

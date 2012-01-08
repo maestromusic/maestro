@@ -21,7 +21,7 @@
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 from .. import logging, config, utils, database as db, realfiles, modify
-import os.path, subprocess, hashlib, datetime, threading, queue, time
+import os, os.path, subprocess, hashlib, datetime, threading, queue, time
 logger = logging.getLogger(__name__)
 RESCAN_INTERVAL = 100 # seconds between rescans of the music directory
 
@@ -44,6 +44,8 @@ def shutdown():
 
 
 
+null = open(os.devnull)
+
 def computeHash(path):
     """Compute the audio hash of a single file. This method uses
     the "ffmpeg" binary ot extract the first 15 seconds in raw
@@ -56,7 +58,7 @@ def computeHash(path):
         logger.debug('computing hash for {}'.format(path))
         proc = subprocess.Popen(
             ['ffmpeg', '-i', utils.absPath(path),
-             '-v', 'quiet',
+             '-v', '0',
              '-f', 's16le',
              '-t', '15',
              '-'],

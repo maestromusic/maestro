@@ -20,7 +20,7 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from . import treeview, mainwindow, playerwidgets
-from .delegates import playlist as playlistdelegate
+from .delegates import playlist as playlistdelegate, configuration as delegateconfig
 from .. import logging, player, utils
 from ..modify.treeactions import *
 translate = QtCore.QCoreApplication.translate
@@ -52,6 +52,7 @@ class PlaylistTreeView(treeview.TreeView):
         self.setDropIndicatorShown(True)
         self.viewport().setMouseTracking(True)
         self.doubleClicked.connect(self._handleDoubleClick)
+        self.setItemDelegate(playlistdelegate.PlaylistDelegate(self))
 
     def setBackend(self, backend):
         self.backend = backend
@@ -64,7 +65,7 @@ class PlaylistTreeView(treeview.TreeView):
         if self.selectionModel():
             self.selectionModel().selectionChanged.disconnect(self.updateGlobalSelection)
         self.setModel(model)
-        self.setItemDelegate(playlistdelegate.PlaylistDelegate(self,playlistdelegate.PlaylistDelegate.defaultConfig))
+        self.itemDelegate().model = model
         self.selectionModel().selectionChanged.connect(self.updateGlobalSelection)
         self.songSelected.connect(backend.setCurrentSong)
         self.updateNodeSelection()
@@ -136,6 +137,11 @@ class PlaylistWidget(QtGui.QDockWidget):
         self.backendChooser.backendChanged.connect(self.setBackend)
         
         bottomLayout.addWidget(self.backendChooser)
+        
+        bottomLayout.addWidget(QtGui.QLabel(self.tr("Item Display:")))
+        bottomLayout.addWidget(delegateconfig.ConfigurationCombo(
+                                                    playlistdelegate.PlaylistDelegate.configurationType,
+                                                    [self.treeview]))
         bottomLayout.addStretch()
         
         layout.addLayout(bottomLayout)

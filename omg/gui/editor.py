@@ -26,7 +26,7 @@ from ..models import editor, Container
 from ..constants import EDITOR, DB, CONTENTS, DISK
 from . import treeview, mainwindow
 from ..modify.treeactions import *
-from .delegates import editor as editordelegate
+from .delegates import editor as editordelegate, configuration as delegateconfig
 from .. import logging, modify, tags, config
 logger = logging.getLogger(__name__)
 
@@ -118,7 +118,7 @@ class EditorTreeView(treeview.TreeView):
         self.setDefaultDropAction(Qt.MoveAction)
         self.setDropIndicatorShown(True)
         self.setModel(editor.EditorModel())
-        self.setItemDelegate(editordelegate.EditorDelegate(self,editordelegate.EditorDelegate.defaultConfig))
+        self.setItemDelegate(editordelegate.EditorDelegate(self))
         
         self.viewport().setMouseTracking(True)
         
@@ -209,6 +209,9 @@ class EditorWidget(QtGui.QDockWidget):
                     break
         hb.addWidget(self.guessProfileCombo)
         
+        hb.addWidget(QtGui.QLabel(self.tr("Item Display:")))
+        hb.addWidget(delegateconfig.ConfigurationCombo(editordelegate.EditorDelegate.configurationType,
+                                                       [self.editor]))
         hb.addStretch()        
         profileNotifier.profilesChanged.connect(self._handleProfilesChanged)
 
