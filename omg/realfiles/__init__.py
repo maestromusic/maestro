@@ -23,11 +23,11 @@ from ..utils import absPath
 from ..config import options
 logger = logging.getLogger(__name__)
 
-def get(path):
+def get(path, ignoreUnknownTags = False):
     """Create a RealFile-instance for the given path, which may be a relative or absolute path."""
     if not os.path.isabs(path):
         path = absPath(path)
-    return rfClass(path)
+    return rfClass(path, ignoreUnknownTags)
 
 def parsePosition(string):
         """Parse a string like "7" or "2/5" to a (integer) position. If <string> has the form "2/5", the first number will be returned."""
@@ -173,7 +173,7 @@ try:
     import taglib
     class TagLibFile(RealFile):
         """A RealFile implementation using pytaglib, the wrapper for taglib."""
-        def __init__(self, path):
+        def __init__(self, path, ignoreUnknownTags = False):
             # TODO: this is due to a bug in taglib, which
             # crashes on opening non-existing OGG files
             # instead of just reporting an error.
@@ -181,6 +181,7 @@ try:
                 raise OSError('file does not exist')
             RealFile.__init__(self, path)
             self._f = taglib.File(path)
+            self.ignoreUnknownTags = ignoreUnknownTags
         
         def read(self):
             self.tags = tags.Storage()
@@ -198,9 +199,13 @@ try:
                     try:
                         self._parseAndAdd(key, values)
                     except tags.UnknownTagError as e:
-                        e.values = values
-                        self.remove(toDelete)
-                        raise e
+                        if self.ignoreUnknownTags:
+                            logger.warning('Ignored unknown tag {} on reading file'.format(key))
+                        else:
+                            e.values = values
+                            self.remove(toDelete)
+                            raise e
+                        
             self.remove(toDelete)        
             self.length = self._f.length
             

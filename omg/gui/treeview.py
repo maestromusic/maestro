@@ -262,6 +262,11 @@ class TreeView(QtGui.QTreeView):
         super().selectionChanged(selected, deselected)
         self.updateGlobalSelection(selected, deselected)
         self.updateNodeSelection()
+    
+    def currentNode(self):
+        current = self.currentIndex()
+        if current.isValid():
+            return current.internalPointer()
         
     def updateGlobalSelection(self, selected, deselected):
         """Change the global selection if some any elements are selected in any views. Connect the

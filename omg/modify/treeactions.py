@@ -90,7 +90,8 @@ class DeleteAction(TreeAction):
     def initialize(self):
         selection = self.parent().nodeSelection
         if self.mode == CONTENTS:
-            self.setEnabled(selection.hasElements())
+            self.setEnabled(all(isinstance(element.parent, models.Element)
+                                for element in selection.elements()))
         elif self.mode == DB:
             self.setEnabled(self.parent().level == REAL and selection.hasElements())
         elif self.mode == DISK:
@@ -295,52 +296,32 @@ class NewContainerAction(TreeAction):
             
         
             
-#class TagValueAction(TreeAction):
-#    """This action triggers a dialog to edit the tag value (set sort value, hidden flag, and rename
-#    the value in all occurences)."""
-#    
-#    text = translate(__name__, 'edit value')
-#    
-#    def __init__(self, tag, value, valueId, multiple = False):
-#        super().__init__()
-#        if multiple:
-#            self.setText(self.tr('as {}').format(tag))
-#        else:
-#            self.setText(self.tr('edit {} value "{}"').format(tag, value))
-#        self.valueId = valueId
-#        self.tag = tag
-#    
-#    def initialize(self, *args):
-#        pass
-#       
-#    def doAction(self):
-#        from ..gui.tagwidgets import TagValuePropertiesWidget
-#        TagValuePropertiesWidget.showDialog(self.tag, self.valueId)
-
-#class TagValueHybridAction(HybridTreeAction):
-#    
-#    def initialize(self, selection, treeview):
-#        if selection.empty():
-#            self.visible = False
-#            return
-#        from ..models.browser import ValueNode
-#        valueNode = None
-#        for node in selection.nodes():
-#            while not isinstance(node, ValueNode):
-#                node = node.parent
-#                if valueNode or node.parent is None:
-#                    # Either there is more than one ValueNode or none
-#                    # (the latter happens for elements sorted under a Various/Unknown node
-#                    self.visible = False
-#                    return
-#            else:
-#                valueNode = node
-#        self.visible = True
-#        self.actions = []
-#        multiple = len(valueNode.valueIds) > 1
-#        
-#        for tagId, valueId in valueNode.valueIds.items():
-#            self.actions.append(TagValueAction(tags.get(tagId), valueNode.values[0], valueId, multiple))
-#        if multiple:
-#            subActions = self.actions
-#            self.actions = [NamedList(translate(__name__,'edit value "{}"').format(valueNode.values[0]), subActions)]
+class TagValueAction(TreeAction):
+    """This action triggers a dialog to edit the tag value (set sort value, hidden flag, and rename
+    the value in all occurences)."""
+    
+    def initialize(self):
+        node = self.parent().currentNode()
+        from ..models.browser import ValueNode
+        if not isinstance(node, ValueNode):
+            self.setText(self.tr('edit tagvalue'))
+            self.setEnabled(False)
+            return
+        self.setEnabled(True)
+        self.value = node.values[0]
+        self.tagValueSpec = { tags.get(tagId): valueId for tagId, valueId in node.valueIds.items() }
+        self.setText(self.tr('edit tagvalue "{}"').format(self.value))
+    
+    def doAction(self):
+        from ..gui.tagwidgets import TagValuePropertiesWidget
+        if len(self.tagValueSpec) > 1:
+            items = list(map(str, self.tagValueSpec.keys()))
+            ans, ok = QtGui.QInputDialog.getItem(self.parent(), self.tr("choose tag type"),
+                                       self.tr('tag:'), items)
+            if not ok:
+                return
+            else:
+                tag = tags.get(ans)
+        else:
+            tag = next(iter(self.tagValueSpec))
+        TagValuePropertiesWidget.showDialog(tag, self.tagValueSpec[tag])

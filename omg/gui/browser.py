@@ -325,11 +325,17 @@ class BrowserTreeView(treeview.TreeView):
     actionConfig.addActionDefinition(((sect, 'edittagsR'),), EditTagsAction, recursive = True)
     actionConfig.addActionDefinition(((sect, 'advanced'),
                                       ('misc', 'matchTags')), MatchTagsFromFilenamesAction)
+    actionConfig.addActionDefinition(((sect, 'advanced'),
+                                      ('misc', 'editTagValue')), TagValueAction)
     
     sect = translate(__name__, "structure")
-    actionConfig.addActionDefinition(((sect, 'deleteP'),), DeleteAction, CONTENTS, shortcut = 'Del')
-    actionConfig.addActionDefinition(((sect, 'deleteDB'),), DeleteAction, DB, shortcut = 'Shift+Del')
-    actionConfig.addActionDefinition(((sect, 'deleteDisk'),), DeleteAction, DISK)
+    subsect = translate(__name__,"delete...")
+    actionConfig.addActionDefinition(((sect, subsect),
+                                      ('misc', 'deleteP'),), DeleteAction, CONTENTS, shortcut = 'Del')
+    actionConfig.addActionDefinition(((sect, subsect),
+                                      ('misc', 'deleteDB'),), DeleteAction, DB, shortcut = 'Shift+Del')
+    actionConfig.addActionDefinition(((sect, subsect),
+                                      ('misc', 'deleteDisk'),), DeleteAction, DISK)
     actionConfig.addActionDefinition(((sect, 'merge'),), MergeAction)
     actionConfig.addActionDefinition(((sect, 'flatten'),), FlattenAction)
     actionConfig.addActionDefinition(((sect, 'major'),), ToggleMajorAction)

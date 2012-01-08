@@ -81,7 +81,7 @@ class Playlist(rootedtreemodel.RootedTreeModel):
             if id is not None:
                 elements.append(models.File.fromId(id))
             else:
-                elements.append(models.File.fromFilesystem(path))
+                elements.append(models.File.fromFilesystem(path, ignoreUnknownTags = True))
         elements = self.restructure(elements)
         self.root.setContents(elements)
         self.endResetModel()

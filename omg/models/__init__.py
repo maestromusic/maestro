@@ -593,10 +593,10 @@ class File(Element):
         return File(id,tags,flags,path,length,position)
         
     @staticmethod
-    def fromFilesystem(path):
+    def fromFilesystem(path, ignoreUnknownTags = False):
         rpath = relPath(path)
         try:
-            real = realfiles.get(path)
+            real = realfiles.get(path, ignoreUnknownTags)
             real.read()
             fileTags = real.tags
             length = real.length

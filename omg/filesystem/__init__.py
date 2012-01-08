@@ -198,12 +198,12 @@ class FileSystemSynchronizer(QtCore.QThread):
                         folderState = 'unsynced'
                         knownHash, knownStamp = self.knownNewFiles[relPath]
                         # check if the file's modification time is newer than the DB timestamp
+                        # -> recompute hash
                         if mTimeStamp(relPath) > knownStamp:
                             newHash = computeHash(relPath)
-                            if newHash != knownHash:
-                                logger.debug('updating hash of not-in-db file {}'.format(relPath))
-                                db.query('UPDATE {}newfiles SET hash=? WHERE path = ?'.format(db.prefix),
-                                         newHash, relPath)
+                            # update DB anyway so that timestamp gets updated
+                            db.query('UPDATE {}newfiles SET hash=? WHERE path = ?'.format(db.prefix),
+                                     newHash, relPath)
                     else:
                         # case 2: file is completely new
                         logger.debug('hashing newfile {}'.format(relPath))
