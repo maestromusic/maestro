@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import weakref, functools
+import functools
 
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
@@ -177,7 +177,96 @@ class DelegateOptionsPanel(QtGui.QScrollArea):
                 if option.value != self._editors[id].value:
                     self._editors[id].value = option.value
                
+
+class DataPiecesModel(QtCore.QAbstractListModel):
     
+    # This is used to temporarily ignore the dispatcher
+    _reactToEvents = True
+    
+    def __init__(self,config,left):
+        super().__init__()
+        self.config = config
+        self.left = left
+        configuration.dispatcher.changes.connect(self._handleDispatcher)
+    
+    def setConfig(self,config):
+        self.config = config
+        self.reset()
+    
+    def rowCount(self,parent):
+        if not parent.isValid():
+            return len(self.config.getDataPieces(self.left))
+        
+    def data(self,index,role):
+        dataPiece = self.config.getDataPieces(self.left)[index.row()]
+        if role == Qt.DisplayRole:
+            return dataPiece.title
+        elif role == Qt.DecorationRole:
+            if dataPiece.tag is not None:
+                return dataPiece.tag.icon # may be None
+        elif role == Qt.EditRole:
+            return dataPiece
+    
+    def flags(self,index):
+        return (Qt.ItemIsSelectable | Qt.ItemIsDragEnabled | Qt.ItemIsDropEnabled | Qt.ItemIsEnabled)
+
+    def dropMimeData(self,mimeData,action,row,column,parent):
+        if isinstance(mimeData,MimeData):
+            if row == -1:
+                row = self.rowCount(QtCore.QModelIndex())
+                
+            # Now here's a problem:
+            # Usually: Insert the rows. Return True so that Qt calls removeRows in the source widget to
+            # conclude the move action.
+            # Problem: Following the insert the models of both listviews will be reset via the configuration
+            # dispatcher. Qt will not call removeRows in this case.
+            # Hack: For internal moves: do not react to the dispatcher event following insert. Thus
+            # removeRows is called. React to the dispatcher event following removeRows. Thus both views are
+            # reset.
+            # For moves between the two listviews: Use the argument left of DelegateConfigurationEvent.
+            # If someone turns up with a better idea that does not include writing more detailed events
+            # and event handling than change->reset, please tell me :-)
+            self._reactToEvents = False
+            self.beginInsertRows(QtCore.QModelIndex(),row,row+len(mimeData.dataPieces)-1)
+            self.config.insertDataPieces(self.left,row,mimeData.dataPieces)
+            self.endInsertRows()
+            self._reactToEvents = True
+            return True
+        return False
+    
+    def removeRows(self,row,count,parent=None):
+        # This is called by Qt when a row was dragged to another place.
+        # There is no need to use beginRemoveRows/endRemoveRows as the model is reset via the dispatcher.
+        self.config.removeDataPieces(self.left,row,count)
+        return True
+        
+    def supportedDropActions(self):
+        return Qt.MoveAction
+    
+    def supportedDragActions(self):
+        return Qt.MoveAction
+    
+    def mimeTypes(self):
+        return ["application/x-omg-datapieces"]
+    
+    def mimeData(self,indexList):
+        return MimeData([self.data(index,Qt.EditRole) for index in indexList])
+    
+    def _handleDispatcher(self,event):
+        if self._reactToEvents and event.config == self.config and event.type == configuration.CHANGED \
+                and (event.left is None or event.left == self.left):
+            self.reset()
+                
+        
+class MimeData(QtCore.QMimeData):
+    def __init__(self,dataPieces):
+        super().__init__()
+        self.dataPieces = dataPieces
+        
+    def formats(self):
+        return ["application/x-omg-datapieces"]
+        
+        
 class DataPiecesEditor(QtGui.QWidget):
     """A widget to edit one column of datapieces (tags, filetype, length etc.)."""
     def __init__(self,panel,left):
@@ -198,26 +287,28 @@ class DataPiecesEditor(QtGui.QWidget):
         topLayout.addWidget(self.addDataBox)
         
         removeDataButton = QtGui.QPushButton()
-        removeDataButton.setIcon(utils.getIcon('delete.png'))
+        removeDataButton.setIcon(utils.getIcon('remove.png'))
         removeDataButton.clicked.connect(self._handleRemoveData)
         topLayout.addWidget(removeDataButton)
         
-        topLayout.addStretch(1)
+        topLayout.addStretch()
         
-        self.listWidget = QtGui.QListWidget()
-        
+        self.model = DataPiecesModel(panel.config,left)
+        self.listView = QtGui.QListView()
+        self.listView.setModel(self.model)
+        self.listView.setDragEnabled(True)
+        self.listView.viewport().setAcceptDrops(True)
+        self.listView.setDropIndicatorShown(True)
+        self.listView.setDragDropOverwriteMode(False)
         # Effectively this sets the minimum size of listWidget. Note that QListWidgets have a fixed sizeHint
         # by default, but the default is too large for our purposes here. So we decrease it.
-        self.listWidget.sizeHint = lambda: QtCore.QSize(150,120)
-        self._updateList()
-        layout.addWidget(self.listWidget)
-        
-        configuration.dispatcher.changes.connect(self._handleConfigurationDispatcher)
+        self.listView.sizeHint = lambda: QtCore.QSize(150,120)
+        layout.addWidget(self.listView)
             
     def _fillAddDataBox(self):
         """Fill the combobox with a list of all available datapieces."""
         self.addDataBox.clear()
-        self.addDataBox.addItem(
+        self.addDataBox.addItem(utils.getIcon('add.png'),
                         self.tr("Add to left column...") if self.left else self.tr("Add to right column..."))
         separatorInserted = False
         for data in configuration.availableDataPieces():
@@ -230,22 +321,7 @@ class DataPiecesEditor(QtGui.QWidget):
                     self.addDataBox.insertSeparator(self.addDataBox.count())
                     separatorInserted = True
                 self.addDataBox.addItem(data.title,data)
-    
-    def getDataPieces(self):
-        """Return a list of all datapieces chosen by the user."""
-        return [self.listWidget.item(row).data(Qt.UserRole) for row in range(self.listWidget.count())]
-    
-    def _updateList(self):
-        """Update the list based on the configuration (e.g. on configuration dispatcher events)."""
-        self.listWidget.clear()
-        for dataPiece in self.panel.config.getDataPieces(self.left):
-            item = QtGui.QListWidgetItem(dataPiece.title)
-            item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsDragEnabled | Qt.ItemIsEnabled)
-            if dataPiece.tag is not None and dataPiece.tag.icon is not None:
-                item.setIcon(dataPiece.tag.icon)
-            item.setData(Qt.UserRole,dataPiece)
-            self.listWidget.addItem(item)
-    
+     
     def _handleAddData(self,index):
         """Add the datapiece with the given index in the combobox to the list if it is not already contained
         in this _or_ the other column."""
@@ -254,28 +330,36 @@ class DataPiecesEditor(QtGui.QWidget):
         dataPiece = self.addDataBox.itemData(index)
         if not self.panel.config.hasDataPiece(dataPiece):
             self.panel.config.addDataPiece(self.left,dataPiece)
-#            item = QtGui.QListWidgetItem(dataPiece.title)
-#            if dataPiece.tag is not None and dataPiece.tag.icon is not None:
-#                item.setIcon(dataPiece.tag.icon)
-#            item.setData(Qt.UserRole,dataPiece)
-#            self.listWidget.addItem(item)
-#            self.panel.config.setDataPieces(self.left,self.getDataPieces())
         self.addDataBox.setCurrentIndex(0)
-    
+
     def _handleRemoveData(self):
         """Handle a click on the remove button."""
-        allItems = [self.listWidget.item(row) for row in range(self.listWidget.count())]
-        remainingData = [item.data(Qt.UserRole) for item in allItems if not item.isSelected()]
+        allData = self.panel.config.getDataPieces(self.left)
+        remainingData = [allData[i] for i in range(len(allData))
+                            if not self.listView.selectionModel().isRowSelected(i,QtCore.QModelIndex())]
         self.panel.config.setDataPieces(self.left,remainingData)
         
-    def _handleConfigurationDispatcher(self,event):
-        """Update the list on CHANGE events."""
-        if event.type == configuration.CHANGED and event.config == self.panel.config:
-            self._updateList()
+        
+class ListWidget(QtGui.QListWidget):
+    def __init__(self):
+        super().__init__()
+        self.setDragEnabled(True)
+        self.viewport().setAcceptDrops(True)
+        self.setDropIndicatorShown(True)
+        self.setDefaultDropAction(Qt.MoveAction)
+        
+    def sizeHint(self):
+        # Effectively this sets the minimum size of listWidget. Note that QListWidgets have a fixed sizeHint
+        # by default, but the default is too large for our purposes here. So we decrease it.
+        return QtCore.QSize(150,120)
+    
+    def dropEvent(self,event):
+        if isinstance(event.source(),ListWidget):
+            super().dropEvent(event)
         
 
 def createEditor(type,value,options=None):
-    """Create an editor for the given *type* (a checkbox for 'bool', a QLineEdito for 'string' and so on).
+    """Create an editor for the given *type* (a checkbox for 'bool', a QLineEdit for 'string' and so on).
     Ínitialize it with *value*. *options* are passed to the editor's constructor and depend on the type."""
     return {
         "string": StringEditor,
