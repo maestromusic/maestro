@@ -103,14 +103,10 @@ def createConfigType(id,title,options,leftData,rightData,overwrite={},addOptions
     
 class DelegateConfigurationEvent:
     """A event for the delegate configuration dispatcher. It simply stores a configuration and a type from
-    ADDED,CHANGED,DELETED. Additionally it may store which column of datapieces was affected (True: left
-    column, False: right column, None: none/both/no idea). Drag and drop would not work without this
-    parameter (reset between dropMimeData and removeRows causes the view not to remove the dragged datapiece).
-    """
-    def __init__(self,config,type=CHANGED,left=None):
+    ADDED,CHANGED,DELETED."""
+    def __init__(self,config,type=CHANGED):
         self.config = config
         self.type = type
-        self.left = left
         
 
 class Dispatcher(QtCore.QObject):
@@ -322,30 +318,33 @@ class DelegateConfiguration:
         """Add *datapiece* to the left or right column depending on the parameter *left*.""" 
         self.insertDataPieces(left,len(self.getDataPieces(left)),[dataPiece])
     
-    def insertDataPieces(self,left,pos,dataPieces):
+    def insertDataPieces(self,left,pos,dataPieces,emitEvent=True):
         """Insert a list of DataPieces at position *pos* to the left or right column depending on the
-        parameter *left*."""
+        parameter *left*. If *emitEvent* is False, no event is send over the dispatcher. This is only needed
+        by Drag and Drop between the datapieces listviews (see dropMimeData).
+        """
         theList = self.leftData if left else self.rightData
         theList[pos:pos] = dataPieces
-        dispatcher.changes.emit(DelegateConfigurationEvent(self,CHANGED,left))
+        if emitEvent:
+            dispatcher.changes.emit(DelegateConfigurationEvent(self,CHANGED))
     
     def removeDataPieces(self,left,index,count):
         """Remove *count* datapieces beginning with index *index* from the left or right column (depending on
         *left*."""
         theList = self.leftData if left else self.rightData
         del theList[index:index+count]
-        dispatcher.changes.emit(DelegateConfigurationEvent(self,CHANGED,left))
+        dispatcher.changes.emit(DelegateConfigurationEvent(self,CHANGED))
         
     def setDataPieces(self,left,dataPieces):
         """Set the datapieces of the left or right column depending on the parameter *left*."""
         if left:
             if self.leftData != dataPieces:
                 self.leftData = dataPieces
-                dispatcher.changes.emit(DelegateConfigurationEvent(self,CHANGED,True))
+                dispatcher.changes.emit(DelegateConfigurationEvent(self,CHANGED))
         else:
             if self.rightData != dataPieces:
                 self.rightData = dataPieces
-                dispatcher.changes.emit(DelegateConfigurationEvent(self,CHANGED,False))
+                dispatcher.changes.emit(DelegateConfigurationEvent(self,CHANGED))
     
     def setOption(self,option,value):
         """Set the value of the given option."""

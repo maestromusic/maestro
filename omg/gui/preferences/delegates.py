@@ -179,10 +179,6 @@ class DelegateOptionsPanel(QtGui.QScrollArea):
                
 
 class DataPiecesModel(QtCore.QAbstractListModel):
-    
-    # This is used to temporarily ignore the dispatcher
-    _reactToEvents = True
-    
     def __init__(self,config,left):
         super().__init__()
         self.config = config
@@ -213,24 +209,15 @@ class DataPiecesModel(QtCore.QAbstractListModel):
     def dropMimeData(self,mimeData,action,row,column,parent):
         if isinstance(mimeData,MimeData):
             if row == -1:
-                row = self.rowCount(QtCore.QModelIndex())
-                
-            # Now here's a problem:
-            # Usually: Insert the rows. Return True so that Qt calls removeRows in the source widget to
-            # conclude the move action.
-            # Problem: Following the insert the models of both listviews will be reset via the configuration
-            # dispatcher. Qt will not call removeRows in this case.
-            # Hack: For internal moves: do not react to the dispatcher event following insert. Thus
-            # removeRows is called. React to the dispatcher event following removeRows. Thus both views are
-            # reset.
-            # For moves between the two listviews: Use the argument left of DelegateConfigurationEvent.
-            # If someone turns up with a better idea that does not include writing more detailed events
-            # and event handling than change->reset, please tell me :-)
-            self._reactToEvents = False
+                if parent.isValid():
+                    # The user dropped the items on an existing item -> insert below
+                    row = parent.row() + 1
+                else: row = self.rowCount(QtCore.QModelIndex())
+            # Insert rows and return True so that Qt will call removeRows in the source view to conclude
+            # the move action.
             self.beginInsertRows(QtCore.QModelIndex(),row,row+len(mimeData.dataPieces)-1)
-            self.config.insertDataPieces(self.left,row,mimeData.dataPieces)
+            self.config.insertDataPieces(self.left,row,mimeData.dataPieces,emitEvent=False)
             self.endInsertRows()
-            self._reactToEvents = True
             return True
         return False
     
@@ -253,8 +240,7 @@ class DataPiecesModel(QtCore.QAbstractListModel):
         return MimeData([self.data(index,Qt.EditRole) for index in indexList])
     
     def _handleDispatcher(self,event):
-        if self._reactToEvents and event.config == self.config and event.type == configuration.CHANGED \
-                and (event.left is None or event.left == self.left):
+        if event.config == self.config and event.type == configuration.CHANGED:
             self.reset()
                 
         
