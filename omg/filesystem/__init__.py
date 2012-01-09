@@ -201,13 +201,8 @@ class FileSystemSynchronizer(QtCore.QThread):
                         # -> recompute hash
                         if mTimeStamp(relPath) > knownStamp:
                             newHash = computeHash(relPath)
-                            if newHash != knownHash:
-                                logger.debug('updating hash of not-in-db file {}'.format(relPath))
-                                db.query('UPDATE {}newfiles SET hash=? WHERE path = ?'.format(db.prefix),
-                                         newHash, relPath)
-                            else:
-                                db.query('UPDATE{}newfiles SET verified=CURRENT_TIMESTAMP() WHERE ' 
-                                         'path=?)'.format(db.prefix), relPath)
+                            db.query('UPDATE {}newfiles SET hash=?, verified=CURRENT_TIMESTAMP() '
+                                     'WHERE path = ?'.format(db.prefix), newHash, relPath)
                     else:
                         # case 2: file is completely new
                         logger.debug('hashing newfile {}'.format(relPath))
