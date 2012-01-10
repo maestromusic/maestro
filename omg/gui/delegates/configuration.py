@@ -316,11 +316,25 @@ class DelegateConfiguration:
     
     def addDataPiece(self,left,dataPiece):
         """Add *datapiece* to the left or right column depending on the parameter *left*.""" 
-        if dataPiece not in self.leftData and dataPiece not in self.rightData:
-            theList = self.leftData if left else self.rightData
-            theList.append(dataPiece)
+        self.insertDataPieces(left,len(self.getDataPieces(left)),[dataPiece])
+    
+    def insertDataPieces(self,left,pos,dataPieces,emitEvent=True):
+        """Insert a list of DataPieces at position *pos* to the left or right column depending on the
+        parameter *left*. If *emitEvent* is False, no event is send over the dispatcher. This is only needed
+        by Drag and Drop between the datapieces listviews (see dropMimeData).
+        """
+        theList = self.leftData if left else self.rightData
+        theList[pos:pos] = dataPieces
+        if emitEvent:
             dispatcher.changes.emit(DelegateConfigurationEvent(self,CHANGED))
-            
+    
+    def removeDataPieces(self,left,index,count):
+        """Remove *count* datapieces beginning with index *index* from the left or right column (depending on
+        *left*."""
+        theList = self.leftData if left else self.rightData
+        del theList[index:index+count]
+        dispatcher.changes.emit(DelegateConfigurationEvent(self,CHANGED))
+        
     def setDataPieces(self,left,dataPieces):
         """Set the datapieces of the left or right column depending on the parameter *left*."""
         if left:
@@ -489,7 +503,7 @@ class ConfigurationCombo(QtGui.QComboBox):
         """Handle the delegate configuration dispatcher."""
         if event.config.type != self.type:
             return
-        if event.type != modify.CHANGED:
+        if event.type != CHANGED:
             self.currentIndexChanged.disconnect(self._handleCurrentIndexChanged)
             current = self.itemData(self.currentIndex())
             self._update()
