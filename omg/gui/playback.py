@@ -56,11 +56,11 @@ class PlaybackWidget(QtGui.QDockWidget):
         self.stopButton.setIconSize(QtCore.QSize(10,16))
         self.previousButton.setIconSize(QtCore.QSize(16,16))
         self.nextButton.setIconSize(QtCore.QSize(16,16))
+        self.volumeLabel = VolumeLabel(self)
         for w in (self.backendChooser, self.previousButton, self.ppButton,
-                       self.stopButton, self.nextButton):
+                       self.stopButton, self.nextButton, self.volumeLabel):
             w.setSizePolicy(policy)
             
-        #    widget.setSizePolicy(policy)
         self.titleLabel = QtGui.QLabel(self)
         self.titleLabel.setTextFormat(Qt.AutoText)
         self.titleLabel.setWordWrap(True)
@@ -77,6 +77,7 @@ class PlaybackWidget(QtGui.QDockWidget):
         topLayout.addWidget(self.ppButton)
         topLayout.addWidget(self.stopButton)
         topLayout.addWidget(self.nextButton)
+        topLayout.addWidget(self.volumeLabel)
         bottomLayout.addWidget(self.seekSlider)
         bottomLayout.addWidget(self.seekLabel)
         mainLayout = QtGui.QVBoxLayout(widget)
@@ -126,11 +127,14 @@ class PlaybackWidget(QtGui.QDockWidget):
         else:
             self.updateCurrent(self.backend.currentSong)
             self.updateState(self.backend.state)
+            self.volumeLabel.setVolume(self.backend.volume)
             
     def setBackend(self, name):
         logger.debug("setBackend {}".format(name))
         if hasattr(self, 'backend'):
             self.backend.elapsedChanged.disconnect(self.updateSlider)
+            self.backend.volumeChanged.disconnect(self.volumeLabel.setVolume)
+            self.volumeLabel.volumeRequested.disconnect(self.backend.volumeChanged)
             self.backend.stateChanged.disconnect(self.updateState)
             self.backend.currentSongChanged.disconnect(self.updateCurrent)
             self.ppButton.stateChanged.disconnect(self.backend.setState)
@@ -157,6 +161,8 @@ class PlaybackWidget(QtGui.QDockWidget):
         self.seekSlider.sliderMoved.connect(self.backend.setElapsed)
         self.previousButton.clicked.connect(self.backend.previousSong)
         self.nextButton.clicked.connect(self.backend.nextSong)
+        self.volumeLabel.volumeRequested.connect(self.backend.setVolume)
+        self.backend.volumeChanged.connect(self.volumeLabel.setVolume)
         self.backend.registerFrontend(self)
         if self.backend.connectionState == player.CONNECTED:
             self.handleConnectionChange(player.CONNECTED)
@@ -202,3 +208,68 @@ class PlayPauseButton(QtGui.QPushButton):
         if playing != self.playing:
             self.playing = playing
             self.setIcon(self.pauseIcon if playing else self.playIcon)
+            
+class VolumeLabel(QtGui.QLabel):
+    """Special label displaying an icon that visualizes the current volume setting and
+    emits signals when clicked (which means mute/unmute) or mouse-scrolled (to change
+    volume)."""
+   
+    volumeRequested = QtCore.pyqtSignal(int)
+    
+    mutedIcon = utils.getIcon('volume_muted.png').pixmap(24,24)
+    lowIcon = utils.getIcon('volume_low.png').pixmap(24,24)
+    mediumIcon = utils.getIcon('volume_medium.png').pixmap(24,24)
+    highIcon = utils.getIcon('volume_high.png').pixmap(24,24)
+    
+    def __init__(self,parent = None):
+        """Initialize this label with the given parent."""
+        QtGui.QLabel.__init__(self, parent)
+        self.volume = -1
+        self.lastVolume = 0
+        self.setVolume(0)
+        self.emitTimer = QtCore.QTimer(self)
+        self.emitTimer.setSingleShot(True)
+        self.emitTimer.timeout.connect(self._emit)
+        self.changeRequest = None
+   
+    def setVolume(self, volume):
+        """Display the appropriate icon for the given volume."""
+        if volume != self.volume:
+            self.setPixmap(self.volumeIcon(volume))
+            if volume == 0:
+                self.lastVolume = self.volume
+            self.volume = volume
+            self.setToolTip(self.tr('{}%').format(volume))
+    
+    @staticmethod
+    def volumeIcon(volume):
+        """Maps the given volume to the appropriate icon."""
+        if volume == 0:
+            return VolumeLabel.mutedIcon
+        elif volume <= 33:
+            return VolumeLabel.lowIcon
+        elif volume <= 66:
+            return VolumeLabel.mediumIcon
+        return VolumeLabel.highIcon
+       
+    def mousePressEvent(self, event):
+        if self.volume == 0:
+            self.volumeRequested.emit(self.lastVolume)
+        else:
+            self.volumeRequested.emit(0)
+        event.accept()
+    
+    def _emit(self):
+        if self.changeRequest is not None:
+            self.volumeRequested.emit(self.changeRequest)
+            self.changeRequest = None
+            
+    def wheelEvent(self, event):
+        volume = self.changeRequest if self.changeRequest is not None else self.volume
+        req = volume + event.delta()//20
+        if req > 100:
+            req = 100
+        if req < 0:
+            req = 0
+        self.changeRequest = req
+        self.emitTimer.start(25)

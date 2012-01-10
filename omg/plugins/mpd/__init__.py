@@ -53,7 +53,7 @@ class MPDThread(QtCore.QThread):
         self.connectionData = connectionData
         self.playlistVersion = self.state   = \
             self.currentSong = self.elapsed = \
-            self.currentSongLength = None
+            self.currentSongLength = self.volume = None
         self.doPolling = threading.Event()
         self.seekRequest = None
         self.connected = False
@@ -83,6 +83,9 @@ class MPDThread(QtCore.QThread):
             self.seekRequest = how
             self.seekTimer.start(20)
         
+        elif what == "setVolume":
+            self.client.setvol(how)
+            
         elif what == "setState":
             if how == player.PLAY:
                 self.client.play()
@@ -182,6 +185,12 @@ class MPDThread(QtCore.QThread):
         # fetch information from MPD
         self.mpd_status = self.client.status()
         
+        # check for volume change
+        volume = int(self.mpd_status['volume'])
+        if volume != self.volume:
+            self.changeFromMPD.emit('volume', volume)
+            self.volume = volume
+            
         # check for a playlist change
         playlistVersion = int(self.mpd_status["playlist"])
         if playlistVersion != self.playlistVersion:
@@ -298,7 +307,7 @@ class MPDPlayerBackend(player.PlayerBackend):
             self.changeFromMain.emit(what, *args)
         for what in ("setElapsed", "setState", "setCurrentSong", "_setPlaylist",
                 "_insertIntoPlaylist", "_removeFromPlaylist", "nextSong",
-                "previousSong"):
+                "previousSong", "setVolume"):
             setattr(self, what, functools.partial(_emitChange, what))
     
     @QtCore.pyqtSlot(str, object)
@@ -325,6 +334,10 @@ class MPDPlayerBackend(player.PlayerBackend):
             self.playlist.setCurrent(self.currentSong)
             self.currentSongChanged.emit(self.currentSong)
         
+        elif what == 'volume':
+            self.volume = how
+            self.volumeChanged.emit(how)
+            
         elif what == 'remove':
             self.playlist.removeSongs(how)
             self.stack.push(player.RemoveFromPlaylistCommand(self, how, '[ext] remove', True))
