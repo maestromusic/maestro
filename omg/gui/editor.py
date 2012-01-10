@@ -74,20 +74,6 @@ class ProfileChangeNotifier(QtCore.QObject):
     profilesChanged = QtCore.pyqtSignal()     
 profileNotifier = ProfileChangeNotifier()
 profileNotifier.profilesChanged.connect(storeProfiles)
-
-class TestAction(QtGui.QAction):
-    def __init__(self, parent):
-        super().__init__("&Test", parent)
-        self.setToolTip('print info about selected nodes')
-        self.setShortcut(QtGui.QKeySequence(self.tr("Ctrl+T")))
-        #self.setShortcutContext(Qt.WindowShortcut)
-        self.triggered.connect(self.do)
-        print('wf')
-
-    def do(self):
-        idxs = self.parent().selectedIndexes()
-        elems = [ idx.internalPointer() for idx in idxs ]
-        print(elems)
     
 class EditorTreeView(treeview.TreeView):
     """This is the main widget of an editor: The tree view showing the current element tree."""
@@ -119,7 +105,6 @@ class EditorTreeView(treeview.TreeView):
         self.setDropIndicatorShown(True)
         self.setModel(editor.EditorModel())
         self.setItemDelegate(editordelegate.EditorDelegate(self))
-        
         self.viewport().setMouseTracking(True)
         
 
@@ -128,7 +113,8 @@ class EditorTreeView(treeview.TreeView):
             event.setDropAction(Qt.MoveAction)
         else:
             event.setDropAction(Qt.CopyAction)
-        treeview.TreeView.dragEnterEvent(self, event)
+        event.acceptProposedAction()
+        super().dragEnterEvent(event)
         
     def dragMoveEvent(self, event):
         if isinstance(event.source(), EditorTreeView):
@@ -136,9 +122,13 @@ class EditorTreeView(treeview.TreeView):
                 event.setDropAction(Qt.MoveAction)
             elif event.keyboardModifiers() & Qt.ControlModifier:
                 event.setDropAction(Qt.CopyAction)
-        treeview.TreeView.dragMoveEvent(self, event)
+        super().dragMoveEvent(event)
         
     def dropEvent(self, event):
+        # workaround due to bug #67
+        if event.mouseButtons() & Qt.LeftButton:
+            event.ignore()
+            return
         if isinstance(event.source(), EditorTreeView):
             if event.keyboardModifiers() & Qt.ShiftModifier:
                 event.setDropAction(Qt.MoveAction)
@@ -149,7 +139,8 @@ class EditorTreeView(treeview.TreeView):
             else:
                 event.setDropAction(Qt.CopyAction)
         self.model().dropFromOutside = not isinstance(event.source(), EditorTreeView)
-        treeview.TreeView.dropEvent(self, event)
+        super().dropEvent(event)
+        
     
     def _expandInsertedRows(self, parent, start, end):
         for row in range(start, end+1):
@@ -212,7 +203,10 @@ class EditorWidget(QtGui.QDockWidget):
         hb.addWidget(QtGui.QLabel(self.tr("Item Display:")))
         hb.addWidget(delegateconfig.ConfigurationCombo(editordelegate.EditorDelegate.configurationType,
                                                        [self.editor]))
-        hb.addStretch()        
+        hb.addStretch()
+        self.toolbar = QtGui.QToolBar(self)
+        self.toolbar.addAction(self.editor.treeActions['commit'])
+        hb.addWidget(self.toolbar)
         profileNotifier.profilesChanged.connect(self._handleProfilesChanged)
 
     def _handleProfilesChanged(self):

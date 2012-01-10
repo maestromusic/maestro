@@ -38,6 +38,7 @@ class EditorModel(rootedtreemodel.RootedTreeModel):
         super().__init__(RootNode())
         modify.dispatcher.changes.connect(self.handleChangeEvent)
         self.albumGroupers = []
+        self.dropInProgress = False
         self.metacontainer_regex=r" ?[([]?(?:cd|disc|part|teil|disk|vol)\.? ?([iI0-9]+)[)\]]?"
 
     
@@ -73,9 +74,12 @@ class EditorModel(rootedtreemodel.RootedTreeModel):
 
     def dropMimeData(self,mimeData,action,row,column,parentIndex):
         """This function does all the magic that happens if elements are dropped onto this editor."""
+        
         QtGui.QApplication.changeOverrideCursor(Qt.ArrowCursor) # dont display the DnD cursor during the warning
         if action == Qt.IgnoreAction:
             return True
+        elif action == Qt.TargetMoveAction:
+            print('wtf target')
         parent = self.data(parentIndex, Qt.EditRole)
         # if something is dropped on a file, make it a sibling instead of a child of that file
         if parent is not self.root and parent.isFile():
@@ -118,6 +122,8 @@ class EditorModel(rootedtreemodel.RootedTreeModel):
             modify.push(command)
             modify.endMacro()
             return True
+        else:
+            logger.error('HÄÄÄ')
     
     def importNode(self, node):
         """Helper function to import a node into the editor. Checks if a node with the same ID already

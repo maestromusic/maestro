@@ -175,6 +175,7 @@ class CommitAction(TreeAction):
     def __init__(self, parent):
         super().__init__(parent, shortcut = 'Ctrl+Return')
         self.setText(self.tr("commit (all editors)"))
+        self.setIcon(QtGui.qApp.style().standardIcon(QtGui.QStyle.SP_DialogSaveButton))
         
     def doAction(self):
         modify.push(modify.commands.CommitCommand())
