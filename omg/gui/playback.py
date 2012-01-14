@@ -134,7 +134,7 @@ class PlaybackWidget(QtGui.QDockWidget):
         if hasattr(self, 'backend'):
             self.backend.elapsedChanged.disconnect(self.updateSlider)
             self.backend.volumeChanged.disconnect(self.volumeLabel.setVolume)
-            self.volumeLabel.volumeRequested.disconnect(self.backend.volumeChanged)
+            self.volumeLabel.volumeRequested.disconnect(self.backend.setVolume)
             self.backend.stateChanged.disconnect(self.updateState)
             self.backend.currentSongChanged.disconnect(self.updateCurrent)
             self.ppButton.stateChanged.disconnect(self.backend.setState)
