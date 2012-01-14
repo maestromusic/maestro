@@ -90,7 +90,8 @@ class DeleteAction(TreeAction):
     def initialize(self):
         selection = self.parent().nodeSelection
         if self.mode == CONTENTS:
-            self.setEnabled(all(isinstance(element.parent, models.Element)
+            self.setEnabled(all(isinstance(element.parent, models.Element) \
+                                    or isinstance(element.parent, models.RootNode)
                                 for element in selection.elements()))
         elif self.mode == DB:
             self.setEnabled(self.parent().level == REAL and selection.hasElements())

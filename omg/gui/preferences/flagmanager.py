@@ -202,14 +202,11 @@ class FlagManager(QtGui.QWidget):
     def _openIconDialog(self,flagType):
         """Open a file dialog so that the user may choose an icon for the given flag."""
         # Choose a sensible directory as starting point
-        if flagType.iconPath is None:
-            dir = os.path.join('images','flags')
-            print(dir)
-        else: dir = flagType.iconPath
-        fileName = QtGui.QFileDialog.getOpenFileName(self,self.tr("Choose flag icon"),dir,
-                                                     self.tr("Images (*.png *.xpm *.jpg)"))
-        if fileName:
-            self._setIcon(flagType,fileName)
+        from .. import iconchooser
+        result = iconchooser.IconChooser.getIcon([':omg/flags'], self)
+        
+        if result:
+            self._setIcon(flagType,result[1])
             
     def _setIcon(self,flagType,iconPath):
         """Set the icon(-path) of *flagType* to *iconPath* and update the GUI.""" 
