@@ -116,6 +116,7 @@ def run(cmdConfig = []):
     
     # Load Plugins
     from . import plugins
+    plugins.init()
     plugins.enablePlugins()
     
     from . import filesystem

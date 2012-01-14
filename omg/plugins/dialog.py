@@ -24,7 +24,7 @@ from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
 from omg import logging, config, constants
-from . import PLUGINDIR, PLUGININFO_OPTIONS, plugins
+#from . import PLUGINDIR, PLUGININFO_OPTIONS, plugins
 
 translate = QtCore.QCoreApplication.translate
 

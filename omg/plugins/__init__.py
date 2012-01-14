@@ -28,13 +28,10 @@ from omg.gui import mainwindow
 translate = QtCore.QCoreApplication.translate
 logger = logging.getLogger(__name__)
 
-# Directory containing the plugins
-#TODO: what happens if this is in a zip/egg file?
-PLUGINDIR = os.path.join(os.path.dirname(omg.__file__), "plugins")
+
 PLUGININFO_OPTIONS = collections.OrderedDict(
         ( ("name",None),  ("author",None) , ("version",None) , ("description", None), ("minomgversion","0.0.0"),
                       ("maxomgversion", "9999.0.0") ))
-
 class Plugin(object):
     """A plugin that is available somewhere on the filesystem. May or may not be compatible with the current omg version,
     and may or may not be loaded."""
@@ -45,7 +42,7 @@ class Plugin(object):
         self.loaded = False
         self.module = None
         self.data = None
-        self._readInfoFile(os.path.join(PLUGINDIR, name, 'PLUGININFO'))
+        self._readInfoFile()
         self.version_ok = constants.compareVersion(self.data['minomgversion']) >= 0 and constants.compareVersion(self.data['maxomgversion']) <= 0
     
     def load(self):
@@ -95,25 +92,26 @@ class Plugin(object):
         if hasattr(self.module, 'mainWindowInit'):
             self.module.mainWindowInit()
             
-    def _readInfoFile(self, path):
+    def _readInfoFile(self):
         """Reads the data contained in the PLUGININFO file."""
-        with open(path,"r") as file:
-            data = {}
-            for line in file:
-                key,value = line.split("=",1)
-                key = key.strip().lower()
-                value = value.strip()
-                if key in PLUGININFO_OPTIONS:
-                    data[key] = value
-                else: logger.warning("Unknown key '{}' in {}".format(key,path))
+        from pkg_resources import resource_string
+        lines = resource_string('omg.plugins.' + self.name, 'PLUGININFO').decode('utf8').splitlines()
+        data = {}
+        for line in lines:
+            key,value = line.split("=",1)
+            key = key.strip().lower()
+            value = value.strip()
+            if key in PLUGININFO_OPTIONS:
+                data[key] = value
+            else: logger.warning("Unknown key '{}' in {}".format(key,path))
 
-            for (key,default) in PLUGININFO_OPTIONS.items():
-                if key not in data:
-                    if default is not None:
-                        data[key] = default
-                    else:
-                        logger.warning("Missing key '{}' in {}".format(key,path))
-                        data[key] = ""
+        for (key,default) in PLUGININFO_OPTIONS.items():
+            if key not in data:
+                if default is not None:
+                    data[key] = default
+                else:
+                    logger.warning("Missing key '{}' in {}".format(key,path))
+                    data[key] = ""
             self.data = data
     def __str__(self):
         if self.data is not None:
@@ -122,23 +120,30 @@ class Plugin(object):
             return 'unknown plugin'
     def __repr__(self):
         return str(self)
-plugins = {}
-if not os.path.isdir(PLUGINDIR):
-    logger.error("Plugin directory '{}' does not exist.".format(PLUGINDIR))
-else:
-    # List of all plugins (or to be precise: all subdirectories of PLUGINDIR which contain a PLUGININFO file)
-    plugins = {path:Plugin(path) for path in os.listdir(PLUGINDIR) if os.path.isdir(os.path.join(PLUGINDIR,path)) 
-                                                          and os.path.isfile(os.path.join(PLUGINDIR,path,"PLUGININFO"))}
+
+def init():
+    global plugins, loadedPlugins, enabledPlugins
+    # Dict mapping plugin-names to loaded modules. Contains all plugin-modules which have been loaded
+    loadedPlugins = {}
+    # List of all plugin-names that are currently enabled
+    enabledPlugins = []
+    plugins = {}
+    from pkg_resources import resource_listdir, resource_exists, resource_isdir
+    for plugindir in resource_listdir('omg', 'plugins'):
+        try:
+            if resource_isdir('omg.plugins', plugindir) and resource_exists('omg.plugins', plugindir):
+                if resource_exists('omg.plugins.' + plugindir, 'PLUGININFO'):
+                    plugins[plugindir] = Plugin(plugindir)
+        except ImportError as e:
+            # for plugin.py, __pycache__ etc.
+            pass
+
     plug_ordered = collections.OrderedDict()
     for pname in sorted(plugins.keys(), key = lambda k: plugins[k].data['name'].lower()):
         plug_ordered[pname] = plugins[pname]
     plugins = plug_ordered
 
-# Dict mapping plugin-names to loaded modules. Contains all plugin-modules which have been loaded
-loadedPlugins = {}
 
-# List of all plugin-names that are currently enabled
-enabledPlugins = []
 
 def enablePlugins():
     """Import all plugins which should be loaded and enable them."""

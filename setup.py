@@ -29,5 +29,6 @@ setup(name='OMG',
       #install_requires=['taglib>=0.0.1'],
       packages=find_packages(),
       py_modules=['mpd'],
-      scripts=['bin/omg']
+      scripts=['bin/omg'],
     )
+
