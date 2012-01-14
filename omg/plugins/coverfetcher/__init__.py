@@ -121,13 +121,13 @@ class CoverFetcher(QtGui.QDialog):
         leftLayout.addLayout(bottomLeftLayout)
         
         bottomLeftLayout.addStretch(1)
-        self.prevButton = QtGui.QPushButton(QtGui.QIcon("images/icons/go-previous.png"),"",self)
+        self.prevButton = QtGui.QPushButton(QtGui.QIcon(":omg/icons/go-previous.png"),"",self)
         self.prevButton.setEnabled(False)
         self.prevButton.clicked.connect(self.previous)
         bottomLeftLayout.addWidget(self.prevButton)
         self.numberLabel = QtGui.QLabel(self)
         bottomLeftLayout.addWidget(self.numberLabel)
-        self.nextButton = QtGui.QPushButton(QtGui.QIcon("images/icons/go-next.png"),"",self)
+        self.nextButton = QtGui.QPushButton(QtGui.QIcon(":omg/icons/go-next.png"),"",self)
         self.nextButton.setEnabled(False)
         self.nextButton.clicked.connect(self.next)
         bottomLeftLayout.addWidget(self.nextButton)
@@ -315,7 +315,7 @@ class CoverFetcher(QtGui.QDialog):
 class LastFmLabel(QtGui.QLabel):
     def __init__(self,parent):
         QtGui.QLabel.__init__(self,parent)
-        self.setPixmap(QtGui.QPixmap(constants.IMAGES+"lastfm.gif"))
+        self.setPixmap(QtGui.QPixmap(":omg/lastfm.gif"))
         self.setCursor(Qt.PointingHandCursor)
         
     def mouseReleaseEvent(self,event):

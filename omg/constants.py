@@ -20,7 +20,6 @@ import os
 import logging
 
 HOME    = os.path.expanduser("~")
-IMAGES = "images"
 
 
 YES_ANSWERS = ["y", "Y", ""]

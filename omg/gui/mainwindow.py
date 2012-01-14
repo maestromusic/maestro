@@ -167,7 +167,7 @@ class MainWindow(QtGui.QMainWindow):
         super().__init__(parent)
         self.setDockNestingEnabled(True)
         self.setWindowTitle(self.tr('OMG version {}').format(constants.VERSION))
-        self.setWindowIcon(QtGui.QIcon("images/omg.png"))
+        self.setWindowIcon(QtGui.QIcon(":omg/omg.png"))
         self.setCentralWidget(QtGui.QTabWidget())
         self.initMenus()
         self.statusBar()
@@ -451,7 +451,7 @@ class MainWindow(QtGui.QMainWindow):
     def showAboutDialog(self):
         """Display the About dialog."""
         box = QtGui.QMessageBox(QtGui.QMessageBox.NoIcon,self.tr("About OMG"),
-                '<div align="center"><img src="images/omg.png" /><br />'
+                '<div align="center"><img src=":omg/omg.png" /><br />'
                 + self.tr("This is OMG version {} by Martin Altmayer and Michael Helmling.")
                              .format(constants.VERSION)
                 + '</div>',

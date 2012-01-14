@@ -1,9 +1,7 @@
 <!DOCTYPE RCC><RCC version="1.0">
-<qresource prefix="/flagicons">
-    <file alias="star.png">flags/silk/star.png</file>
-</qresource>
 <qresource prefix="/omg">
     <file>omg.png</file>
+    <file>lastfm.gif</file>
     <file>icons/volume_high.png</file>
     <file>icons/volume_medium.png</file>
     <file>icons/volume_low.png</file>
@@ -22,6 +20,8 @@
     <file>icons/options.png</file>
     <file>icons/goto.png</file>
     <file>icons/delete.png</file>
+    <file>icons/go-previous.png</file>
+    <file>icons/go-next.png</file>
     <file>tags/album.png</file>
     <file>tags/artist.png</file>
     <file>tags/comment.png</file>

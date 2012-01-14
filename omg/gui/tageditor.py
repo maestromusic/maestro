@@ -244,7 +244,7 @@ class TagEditorWidget(QtGui.QWidget):
             if not self.vertical: # Not when this function is called for the first time
                 self.topLayout.removeWidget(self.label)
             self.layout().insertWidget(1,self.label)
-            self.flagLabel.setText('<img src="images/icons/flag_blue.png">')
+            self.flagLabel.setText('<img src=":omg/icons/flag_blue.png">')
         else:
             self.addButton.setText(self.tr("Add tag"))
             self.removeButton.setText(self.tr("Remove selected"))
@@ -259,7 +259,7 @@ class TagEditorWidget(QtGui.QWidget):
             if self.vertical: # Not when this function is called for the first time
                 self.layout().removeWidget(self.label)
             self.topLayout.insertWidget(self.topLayout.count()-1,self.label) # -1 due to the stretch
-            self.flagLabel.setText('<img src="images/icons/flag_blue.png"> '+self.tr("Flags: "))
+            self.flagLabel.setText('<img src=":omg/icons/flag_blue.png"> '+self.tr("Flags: "))
             
         self.vertical = vertical
             

@@ -164,7 +164,7 @@ class DataPiece:
         identifiers (e.g. 'length') or something like 't:artist' to construct a datapiece containing a tag.
         """
         if string.startswith('t:'):
-            return DataPiece(tags.get(string[2:]))
+            return DataPiece(tags.get(string[2:], True))
         else: 
             for dataPiece in availableDataPieces():
                 if dataPiece.tag is None and dataPiece.data == string:
