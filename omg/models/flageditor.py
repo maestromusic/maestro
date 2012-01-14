@@ -175,7 +175,7 @@ class FlagEditorModel(QtCore.QObject):
     def createUndoAction(self,parent=None,prefix=""):
         """Create an action undoing the last change in this model."""
         if self.saveDirectly:
-            return modify.createUndoAction(self.level,parent,prefix)
+            return modify.createUndoAction(parent,prefix)
         else: return self.undoStack.createUndoAction(parent,prefix)
     
     def getFlagsOfElement(self,element):
