@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2009-2011 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2012 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 import datetime, os, functools
 from omg import config
 from omg import constants
-from PyQt4 import QtGui
+from PyQt4 import QtGui, QtCore
 from collections import OrderedDict
 
 
@@ -120,20 +120,15 @@ def collectFiles(paths):
                 dirs.sort()
     return filePaths
 
+def getIcon(name):
+    """Return a QIcon for the icon with the given name."""
+    if not QtCore.QFile.exists(':omg/icons/' + name):
+        print(name + ' does not exist')
+    return QtGui.QIcon(":omg/icons/" + name)
 
-def getIconPath(name,plugin=None):
-    """Return the path of the icon with the given name. If the icon belongs to a plugin, specify the name of
-    that plugin as second parameter."""
-    if plugin is None:
-        return os.path.join(constants.IMAGES, "icons", name)
-    else: return os.path.join(constants.IMAGES,"plugins",plugin,"icons",name)
-
-
-def getIcon(name,plugin=None):
-    """Return a QIcon for the icon with the given name. If the icon belongs to a plugin, specify the name of
-    that plugin as second parameter."""
-    return QtGui.QIcon(getIconPath(name,plugin))
-
+def getPixmap(name):
+    """Return a QPixmap for the icon with the given name."""
+    return QtGui.QPixmap(":omg/icons/" + name)
 
 class FlexiDate(object):
     """A FlexiDate is a date which can store a date consisting simply of a year or of a year and a month or of

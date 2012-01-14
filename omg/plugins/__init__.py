@@ -16,11 +16,12 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import os, sys, collections
+import os, sys, collections, os.path
 
 from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
+import omg
 from omg import logging, config, constants
 from omg.gui import mainwindow
 
@@ -28,7 +29,8 @@ translate = QtCore.QCoreApplication.translate
 logger = logging.getLogger(__name__)
 
 # Directory containing the plugins
-PLUGINDIR = os.path.join("omg", "plugins")
+#TODO: what happens if this is in a zip/egg file?
+PLUGINDIR = os.path.join(os.path.dirname(omg.__file__), "plugins")
 PLUGININFO_OPTIONS = collections.OrderedDict(
         ( ("name",None),  ("author",None) , ("version",None) , ("description", None), ("minomgversion","0.0.0"),
                       ("maxomgversion", "9999.0.0") ))
@@ -122,7 +124,7 @@ class Plugin(object):
         return str(self)
 plugins = {}
 if not os.path.isdir(PLUGINDIR):
-    logger.error("Plugin directory does not exist.")
+    logger.error("Plugin directory '{}' does not exist.".format(PLUGINDIR))
 else:
     # List of all plugins (or to be precise: all subdirectories of PLUGINDIR which contain a PLUGININFO file)
     plugins = {path:Plugin(path) for path in os.listdir(PLUGINDIR) if os.path.isdir(os.path.join(PLUGINDIR,path)) 

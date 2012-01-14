@@ -38,7 +38,9 @@ def disable():
 
 class LogoDock(QtGui.QDockWidget):
     def __init__(self,parent=None,location=None):
-        QtGui.QDockWidget.__init__(self,parent)
-        label = QtGui.QLabel('<img src="images/omg.png" />')
+        super().__init__(parent)
+        pm = QtGui.QPixmap(':/omg/logo.png')
+        label = QtGui.QLabel()
+        label.setPixmap(pm)
         label.setAlignment(Qt.AlignCenter)
         self.setWidget(label)

@@ -40,11 +40,11 @@ from collections import Sequence
 from functools import reduce
 
 from omg import config, constants, logging
-from omg.utils import FlexiDate, getIconPath
+from omg.utils import FlexiDate
 from PyQt4 import QtGui
 
 translate = QtGui.QApplication.translate
-logger = logging.getLogger("omg.tags")
+logger = logging.getLogger(__name__)
 
 
 # Module variables - Will be initialized with the first call of init.

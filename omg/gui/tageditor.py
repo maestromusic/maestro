@@ -154,8 +154,7 @@ class TagEditorWidget(QtGui.QWidget):
         self.layout().addLayout(self.topLayout)
         
         iconLabel = QtGui.QLabel()
-        path = utils.getIconPath('real.png' if level == REAL else 'editor.png')
-        iconLabel.setPixmap(QtGui.QPixmap(path))
+        iconLabel.setPixmap(utils.getPixmap('real.png' if level == REAL else 'editor.png'))
         iconLabel.setToolTip(self.tr("Real level") if level == REAL else self.tr("Editor level"))
         self.topLayout.addWidget(iconLabel)
 

@@ -53,11 +53,6 @@ def init(cmdConfig = [],initTags=True,testDB=False):
     # Some Qt-classes need a running QApplication before they can be created
     app = QtGui.QApplication(sys.argv)
 
-    # Switch to the application's directory (one level above this file's directory)
-    if os.path.dirname(__file__):
-        os.chdir(os.path.dirname(__file__))
-    os.chdir("../")
-
     # Initialize config and logging
     config.init(cmdConfig)
     logging.init()
@@ -116,11 +111,11 @@ def run(cmdConfig = []):
         sys.exit(-1)
     
     # Load remaining modules
-    from omg import tags, search
+    from omg import resources, tags, search
     search.init()
     
     # Load Plugins
-    from omg import plugins
+    from . import plugins
     plugins.enablePlugins()
     
     from . import filesystem

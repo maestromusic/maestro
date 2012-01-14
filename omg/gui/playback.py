@@ -216,10 +216,10 @@ class VolumeLabel(QtGui.QLabel):
    
     volumeRequested = QtCore.pyqtSignal(int)
     
-    mutedIcon = utils.getIcon('volume_muted.png').pixmap(24,24)
-    lowIcon = utils.getIcon('volume_low.png').pixmap(24,24)
-    mediumIcon = utils.getIcon('volume_medium.png').pixmap(24,24)
-    highIcon = utils.getIcon('volume_high.png').pixmap(24,24)
+    mutedIcon = utils.getPixmap('volume_muted.png')
+    lowIcon = utils.getPixmap('volume_low.png')
+    mediumIcon = utils.getPixmap('volume_medium.png')
+    highIcon = utils.getPixmap('volume_high.png')
     
     def __init__(self,parent = None):
         """Initialize this label with the given parent."""

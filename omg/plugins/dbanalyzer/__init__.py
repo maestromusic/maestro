@@ -27,7 +27,7 @@ from omg import database as db, application, constants, config, utils, tags as t
 from omg.gui import mainwindow
 
 # don't use relative import since this file may be executed directly and is not a package in that case.
-from omg.plugins.dbanalyzer import checks
+from . import resources, checks
 
 _action = None # the action that is inserted into the Extras menu
 _widget = None # the dialog widget must be stored in a variable or it will vanish immediately
@@ -42,7 +42,7 @@ def enable():
     mainwindow.addWidgetData(mainwindow.WidgetData(
         "dbanalyzer",QtGui.QApplication.translate("DBAnalyzerDialog","DB Analyzer"),DBAnalyzerDialog,
         True,False,False,
-        icon=utils.getIcon("dbanalyzer.png","dbanalyzer")))
+        icon=QtGui.QIcon(":/omg/plugins/dbanalyzer/dbanalyzer.png")))
 
 
 def mainWindowInit():

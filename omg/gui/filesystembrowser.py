@@ -21,7 +21,7 @@ from PyQt4.QtCore import Qt
 import os
 from .. import config, database as db
 from . import mainwindow
-from ..utils import relPath, absPath
+from ..utils import relPath, absPath, getIcon
 from .. import filesystem
 from ..database.sql import EmptyResultException
 
@@ -35,10 +35,10 @@ translate = QtCore.QCoreApplication.translate
 class FileSystemBrowserModel(QtGui.QFileSystemModel):
     
     icons = {
-        'unsynced' : QtGui.QIcon("images/icons/folder_unsynced.svg"),
-        'ok'       : QtGui.QIcon("images/icons/folder_ok.svg"),
-        'nomusic'  : QtGui.QIcon("images/icons/folder.svg"),
-        'unknown'  : QtGui.QIcon("images/icons/folder_unknown.svg") }
+        'unsynced' : getIcon("folder_unsynced.svg"),
+        'ok'       : getIcon("folder_ok.svg"),
+        'nomusic'  : getIcon("folder.svg"),
+        'unknown'  : getIcon("folder_unknown.svg") }
     
     def __init__(self, parent = None):
         QtGui.QFileSystemModel.__init__(self, parent)

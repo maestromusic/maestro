@@ -8,7 +8,6 @@
 #
 import os, sys, getopt
 
-sys.path.append(os.path.normpath(os.path.join(os.path.dirname(__file__), "..")))
 from omg import application, constants
 
 if __name__=="__main__":

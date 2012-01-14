@@ -2,3 +2,6 @@
 .project
 .settings
 .pydevproject
+OMG.egg-info/
+dist
+resources.py
