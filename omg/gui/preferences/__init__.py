@@ -20,8 +20,6 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from ... import utils, logging, config
-from . import tagmanager, flagmanager
-from ...plugins import dialog as plugindialog
 
 translate = QtCore.QCoreApplication.translate
 logger = logging.getLogger(__name__)
@@ -261,4 +259,4 @@ addPanel("main/flagmanager",translate("PreferencesPanel","Flag Manager"),
 addPanel("main/delegates",translate("PreferencesPanel","Element display"),
             ('gui.preferences.delegates','DelegatesPanel'))
                    
-addPanel("plugins",translate("PreferencesPanel","Plugins"),plugindialog.PluginDialog)
+addPanel("plugins",translate("PreferencesPanel","Plugins"),('plugins.dialog','PluginDialog'))

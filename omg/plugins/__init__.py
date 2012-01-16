@@ -134,9 +134,11 @@ def init():
             if resource_isdir('omg.plugins', plugindir) and resource_exists('omg.plugins', plugindir):
                 if resource_exists('omg.plugins.' + plugindir, 'PLUGININFO'):
                     plugins[plugindir] = Plugin(plugindir)
-        except ImportError as e:
-            # for plugin.py, __pycache__ etc.
-            pass
+        except ImportError:
+            if plugindir != '__pycache__':
+                # Print an error and continue
+                import traceback
+                traceback.print_exc()
 
     plug_ordered = collections.OrderedDict()
     for pname in sorted(plugins.keys(), key = lambda k: plugins[k].data['name'].lower()):

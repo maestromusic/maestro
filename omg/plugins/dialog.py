@@ -16,7 +16,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-"""This module provides a dialog to display all plugins with the info from the PLUGININFO file and allow the user to enable or disable them."""
+"""This module provides a dialog to display all plugins with the info from the PLUGININFO file and allow
+the user to enable or disable them."""
 
 import os, sys
 
@@ -24,7 +25,7 @@ from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
 from omg import logging, config, constants
-#from . import PLUGINDIR, PLUGININFO_OPTIONS, plugins
+from . import PLUGININFO_OPTIONS, plugins
 
 translate = QtCore.QCoreApplication.translate
 
