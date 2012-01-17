@@ -32,7 +32,7 @@ EXPAND_LIMIT = 2
 class SingleTagEditor(QtGui.QWidget):
     """A SingleTagEditor is the part of an editor used to edit the values of a single tag. It consists of a 
     misc.widgetlist.WidgetList that displays foreach record one RecordEditor wrapped in an
-    misc.editorwidget.EditorWidget. Additionally it may contain a ExpandLine that allows to expand/hide the
+    misc.hiddeneditor.HiddenEditor. Additionally it may contain a ExpandLine that allows to expand/hide the
     records which are not common (i.e. those whose value is not contained in all currently edited elements).
     
     Constructor parameters:
@@ -211,7 +211,7 @@ class RecordEditor(QtGui.QWidget):
         self.layout().addLayout(self.secondLineLayout)
         
         # Create the editor
-        self.valueEditor = tagwidgets.TagValueEditor(record.tag,useEditorWidget=True)
+        self.valueEditor = tagwidgets.TagValueEditor(record.tag,hideEditor=True)
         self.valueEditor.valueChanged.connect(self._handleValueChanged)
         firstLineLayout.addWidget(self.valueEditor)
         

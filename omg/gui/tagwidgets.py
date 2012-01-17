@@ -160,13 +160,16 @@ class TagTypeBox(QtGui.QStackedWidget):
     def __init__(self,defaultTag = None,parent = None,editable=True,useCoverLabel=False):
         QtGui.QStackedWidget.__init__(self,parent)
         self.setSizePolicy(QtGui.QSizePolicy(QtGui.QSizePolicy.Minimum,QtGui.QSizePolicy.Fixed))
-        self.setFocusPolicy(Qt.StrongFocus)
         self._tag = defaultTag
         
         if useCoverLabel:
             self.label = TagLabel(defaultTag)
             self.addWidget(self.label)
-        else: self.label = None
+            # Do not accept focus by tabbing when hidden behind a label
+            self.setFocusPolicy(Qt.ClickFocus)
+        else:
+            self.setFocusPolicy(Qt.StrongFocus)
+            self.label = None
         
         if editable:
             self.box = EnhancedComboBox()
@@ -311,7 +314,11 @@ class TagTypeBox(QtGui.QStackedWidget):
 
 
 class TagValueEditor(QtGui.QWidget):
-    #TODO: Comments
+    """A flexible editor to edit tag values. Depending on the tag type which may change during runtime a
+    TagValueEditor will use different widgets as actual editor (QLineEdit, QTextEdit etc.). A TagValueEditor
+    can use a HiddenEditor to hide the actual editor behind a label as long as it doesn't have the focus. Set 
+    *hideEditor* to True to enable this behavior.
+    """
     
     # Dictionary mapping tags to all the values which have been entered in a TagLineEdit during this
     # application. Will be used in the completer.
@@ -320,23 +327,27 @@ class TagValueEditor(QtGui.QWidget):
     tagChanged = QtCore.pyqtSignal(tags.Tag)
     valueChanged = QtCore.pyqtSignal()
     
-    def __init__(self,tag,parent=None,useEditorWidget=False):
+    def __init__(self,tag,parent=None,hideEditor=False):
         QtGui.QWidget.__init__(self,parent)
         assert tag is not None
         self.setLayout(QtGui.QStackedLayout()) # doesn't matter...we just need a layout for one child widget
-        self.useEditorWidget = useEditorWidget
+        self.hideEditor = hideEditor
         self.editor = None
         self.tag = None # Create the variable
         self.valid = tag.isValid('')
         self.setTag(tag)
 
     def canSwitchTag(self,newTag):
+        """Return whether the current value is valid for the given tag, i.e. whether it is possible to
+        change the tag of this editor to *newTag*."""
         return newTag.isValid(self.getText())
         
     def getTag(self):
+        """Return the tag type of this editor."""
         return self.tag
 
     def setTag(self,tag,setValue=True):
+        """Set the tag type of this editor. This will change the editor widget if necessary."""
         if tag == self.tag:
             return
         
@@ -379,21 +390,25 @@ class TagValueEditor(QtGui.QWidget):
         self.tagChanged.emit(tag)
 
     def _getActualEditor(self):
-        if self.useEditorWidget:
+        """Return the actual editor widget (e.g. a QLineEdit)."""
+        if self.hideEditor:
             return self.editor.getEditor()
         else: return self.editor
 
     def _createEditor(self,tag):
+        """Return an editor widget suitable to edit values of the given tag."""
         editor = self._editorClass(tag)() # Create a new instance of that class
-        if self.useEditorWidget:
-            from .misc import editorwidget
-            self.editor = editorwidget.EditorWidget(editor=editor)
+        if self.hideEditor:
+            from .misc import hiddeneditor
+            shrink = self._editorClass(tag) == EnhancedTextEdit
+            self.editor = hiddeneditor.HiddenEditor(editor=editor,shrink=shrink)
             self.editor.valueChanged.connect(self._handleValueChanged)
         else:
             self.editor = editor
             self.editor.editingFinished.connect(self._handleValueChanged)
 
     def _editorClass(self,tag=None):
+        """Return a class of widgets suitable to edit values of the given tag (e.g. QLineEdit)."""
         if tag is None:
             tag = self.tag
         if tag.type == tags.TYPE_TEXT:
@@ -401,24 +416,29 @@ class TagValueEditor(QtGui.QWidget):
         else: return QtGui.QLineEdit
                 
     def getText(self):
-        if self.useEditorWidget:
+        """Return the current text of this editor. This might be invalid for the current tag type."""
+        if self.hideEditor:
             return self.editor.getValue()
         elif isinstance(self.editor,QtGui.QLineEdit):
             return self.editor.text()
         else: return self.editor.toPlainText()
 
     def getValue(self):
+        """Return the current value. Contrary to getText, convert the text according to the current tag type
+        (e.g. creating a FlexiDate) and return None if the current text is not valid."""
         if not self.tag.isValid(self.getText()):
             return None
         else: return self.tag.type.valueFromString(self.getText())
         
     def setValue(self,value):
+        """Set the current value. *value* must be either a string or FlexiDate if the current tag type is
+        date."""
         if self.tag.type == tags.TYPE_DATE and isinstance(value,utils.FlexiDate):
             text = utils.FlexiDate.strftime(value)
         else: text = str(value)
         
         if text != self.getText():
-            if self.useEditorWidget:
+            if self.hideEditor:
                 self.editor.setValue(text)
             elif isinstance(self.editor,QtGui.QLineEdit):
                 self.editor.setText(text)
@@ -428,14 +448,16 @@ class TagValueEditor(QtGui.QWidget):
                 self.valueChanged.emit()
 
     def clear(self):
+        """Clear the current value."""
         self.setValue('')
 
     def _handleValueChanged(self):
+        """Handle valueChanged or editingFinished-signals from the actual editor."""
         if self.tag.isValid(self.getText()):
             if not self.valid: # The last value was invalid
                 self._getActualEditor().setPalette(QtGui.QPalette()) # use inherited palette
                 self.valid = True
-                if self.useEditorWidget:
+                if self.hideEditor:
                     self.editor.setFixed(False)
                 
             if isinstance(self._getActualEditor(),QtGui.QLineEdit):
@@ -452,7 +474,7 @@ class TagValueEditor(QtGui.QWidget):
             palette = self._getActualEditor().palette()
             palette.setColor(QtGui.QPalette.Base,QtGui.QColor(255,112,148))
             self._getActualEditor().setPalette(palette)
-            if self.useEditorWidget:
+            if self.hideEditor:
                 self.editor.showEditor()
                 self.editor.setFixed(True)
 
@@ -563,7 +585,7 @@ class EnhancedTextEdit(QtGui.QTextEdit):
             self.changed = False
             self.editingFinished.emit()
         QtGui.QTextEdit.focusOutEvent(self,event)
-
+        
 
 class EnhancedComboBox(QtGui.QComboBox):
     """Enhanced version of QtGui.QComboBox which has an editingFinished-signal like QLineEdit."""

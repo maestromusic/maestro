@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2009-2011 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2012 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -20,8 +20,8 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 
-class EditorWidget(QtGui.QStackedWidget):
-    """An EditorWidget contains two child-widgets stacked upon each other: An editor (either a QLineEdit or
+class HiddenEditor(QtGui.QStackedWidget):
+    """An HiddenEditor contains two child-widgets stacked upon each other: An editor (either a QLineEdit or
     a QComboBox or a QTextEdit) and a QLabel showing the editor's value. Usually the label is displayed,
     but when the user clicks on it, the editor appears and the value can be edited. When the editor looses
     focus, the label reappears.
@@ -33,42 +33,49 @@ class EditorWidget(QtGui.QStackedWidget):
     popup = None # Contains the context-menu, while the editor displays one. This is necessary to prevent hiding the editor, when it looses focus to its context-menu.
     fixed = False # If True, the currently active widget (editor and label) will remain active until fixed is set to false again. You may still use showEditor or showLabel to switch programmatically, though.
     
-    def __init__(self,label=None,editor=None,parent=None):
-        """Create a new EditorWidget. You may specify a label, an editor and a parent. By default a QLabel
-        and an empty QLineEdit are created."""
+    def __init__(self,label=None,editor=None,parent=None,shrink=False):
+        """Create a new HiddenEditor. You may specify a label, an editor and a parent. By default a QLabel
+        and an empty QLineEdit are created. If *shrink* is True the HiddenEditor will only occupy the space
+        of the currently visible widget. This is useful if a big editor (e.g. QTextEdit) contains only a
+        short text, so that the label is small.
+        """
         QtGui.QStackedWidget.__init__(self,parent)
+        self.shrink = shrink
         self.setLabel(label)
         self.setEditor(editor)
         self.setFocusPolicy(Qt.StrongFocus)
     
     def getLabel(self):
-        """Return the label used in this EditorWidget."""
+        """Return the label used in this HiddenEditor."""
         return self.label
     
     def setLabel(self,label):
-        """Set the label used in this EditorWidget. The label will be updated to hold the editor's value. If
+        """Set the label used in this HiddenEditor. The label will be updated to hold the editor's value. If
         label is None, a QLabel is created and used."""
         if self.label is not None:
             self.removeWidget(self.label)
         self.label = label if label is not None else QtGui.QLabel()
+        # Keep at least the height of an QLineEdit. TODO: Improve this hack. 
+        if self.shrink:
+            self.label.setMinimumHeight(26)
         if self.editor is not None:
             self.label.setText(self._editorText())
         self.insertWidget(0,self.label)
 
     def isFixed(self):
-        """Return whether this EditorWidget is fixed, i.e. it does not switch between label and editor."""
+        """Return whether this HiddenEditor is fixed, i.e. it does not switch between label and editor."""
         return self.fixed
 
     def setFixed(self,fixed):
-        """Set whether this EditorWidget is fixed, i.e. it does not switch between label and editor."""
+        """Set whether this HiddenEditor is fixed, i.e. it does not switch between label and editor."""
         self.fixed = fixed
         
     def getEditor(self):
-        """Return the editor used in this EditorWidget."""
+        """Return the editor used in this HiddenEditor."""
         return self.editor
     
     def setEditor(self,editor):
-        """Set the editor used in this EditorWidget. The editor must either be a QLineEdit or a QComboBox or
+        """Set the editor used in this HiddenEditor. The editor must either be a QLineEdit or a QComboBox or
         a QTextEdit or None in which case an empty QLineEdit is created. The label will be updated to hold
         the editor's value.
         """
@@ -111,11 +118,11 @@ class EditorWidget(QtGui.QStackedWidget):
                 self.editor.selectAll()
 
     def getValue(self):
-        """Return the value contained in this EditorWidget."""
+        """Return the value contained in this HiddenEditor."""
         return self._editorText()
 
     def setValue(self,value):
-        """Set the value contained in this EditorWidget."""
+        """Set the value contained in this HiddenEditor."""
         if value != self._editorText():
             if isinstance(self.editor,QtGui.QLineEdit):
                 self.editor.setText(value)
@@ -162,6 +169,9 @@ class EditorWidget(QtGui.QStackedWidget):
                 return True
             elif event.type() == QtCore.QEvent.KeyPress:
                 if event.key() == Qt.Key_Return or event.key() == Qt.Key_Enter:
+                    # Allow Shift+Enter in a QTextEdit
+                    if isinstance(self.editor,QtGui.QTextEdit) and Qt.ShiftModifier & event.modifiers():
+                        return False
                     self.setValue(self._editorText())
                     if not self.fixed:
                         self.showLabel()
@@ -182,3 +192,13 @@ class EditorWidget(QtGui.QStackedWidget):
             return True
             
         return False # don't stop the event
+    
+    def sizeHint(self):
+        if self.shrink: 
+            return self.currentWidget().sizeHint()
+        else: return super().sizeHint()
+    
+    def minimumSizeHint(self):
+        if self.shrink:
+            return self.currentWidget().minimumSizeHint()
+        else: return super().minimumSizeHint()

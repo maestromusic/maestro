@@ -110,7 +110,7 @@ class TagEditorDialog(QtGui.QDialog):
         self.tagedit = TagEditorWidget(level,elements,dialog=self)
         self.layout().addWidget(self.tagedit)
         self.setWindowTitle(self.tr("Edit tags"))
-        self.resize(600,450) #TODO: klüger
+        self.resize(600,450) #TODO: cleverer
         self.tagedit.saved.connect(self.accept)
         
         
