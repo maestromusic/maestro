@@ -66,7 +66,7 @@ def _openDialog():
     global _widget # store the widget in a variable or it will immediately destroyed
     _widget = DBAnalyzerDialog(dialog=True)
     _widget.setWindowTitle("OMG version {} – Database Analyzer".format(constants.VERSION))
-    _widget.setWindowIcon(utils.getIcon("dbanalyzer.png","dbanalyzer"))
+    _widget.setWindowIcon(QtGui.QIcon(":/omg/plugins/dbanalyzer/dbanalyzer.png"))
 
     # TODO: use restoreGeometry
     screen = QtGui.QDesktopWidget().screenGeometry()
@@ -141,7 +141,8 @@ class DBAnalyzerDialog(QtGui.QDialog):
         # Buttons
         buttonLayout = QtGui.QHBoxLayout()
         problemsLayout.addLayout(buttonLayout)
-        self.fixButton = QtGui.QPushButton(utils.getIcon("edit-clear.png"),self.tr("Fix problem"))
+        self.fixButton = QtGui.QPushButton(QtGui.QIcon(":/omg/plugins/dbanalyzer/edit-clear.png"),
+                                           self.tr("Fix problem"))
         self.fixButton.setEnabled(False)
         self.fixButton.clicked.connect(self._handleFixButton)
         buttonLayout.addWidget(self.fixButton,0)

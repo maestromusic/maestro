@@ -1,81 +1,81 @@
-<!DOCTYPE RCC><RCC version="1.0">
-<qresource prefix="/omg">
-    <file>omg.png</file>
-    <file>lastfm.gif</file>
-    <file>icons/volume_high.png</file>
-    <file>icons/volume_medium.png</file>
-    <file>icons/volume_low.png</file>
-    <file>icons/volume_muted.png</file>
-    <file>icons/folder_unsynced.svg</file>
-    <file>icons/folder_ok.svg</file>
-    <file>icons/folder.svg</file>
-    <file>icons/folder_unknown.svg</file>
-    <file>icons/expand.png</file>
-    <file>icons/collapse.png</file>
-    <file>icons/clear.png</file>
-    <file>icons/clear_16.png</file>
-    <file>icons/add.png</file>
-    <file>icons/remove.png</file>
-    <file>icons/flag_blue.png</file>
-    <file>icons/options.png</file>
-    <file>icons/goto.png</file>
-    <file>icons/delete.png</file>
-    <file>icons/go-previous.png</file>
-    <file>icons/go-next.png</file>
-    <file>tags/album.png</file>
-    <file>tags/artist.png</file>
-    <file>tags/comment.png</file>
-    <file>tags/composer.png</file>
-    <file>tags/date.png</file>
-    <file>tags/genre.png</file>
-    <file>tags/title.png</file>
-</qresource>
-<qresource prefix="/omg/flags">
-    <file alias="creative-commons.png">flags/fugue/creative-commons.png</file>
-    <file alias="guitar.png">flags/fugue/guitar.png</file>
-    <file alias="media-player-medium-blue.png">flags/fugue/media-player-medium-blue.png</file>
-    <file alias="media-player-medium-green.png">flags/fugue/media-player-medium-green.png</file>
-    <file alias="media-player-medium-orange.png">flags/fugue/media-player-medium-orange.png</file>
-    <file alias="media-player-medium-pink.png">flags/fugue/media-player-medium-pink.png</file>
-    <file alias="media-player-medium-purple.png">flags/fugue/media-player-medium-purple.png</file>
-    <file alias="media-player-medium-red.png">flags/fugue/media-player-medium-red.png</file>
-    <file alias="metronome.png">flags/fugue/metronome.png</file>
-    <file alias="microphone.png">flags/fugue/microphone.png</file>
-    <file alias="piano.png">flags/fugue/piano.png</file>
-    <file alias="present.png">flags/fugue/present.png</file>
-    <file alias="thumb.png">flags/fugue/thumb.png</file>
-    <file alias="thumb-up.png">flags/fugue/thumb-up.png</file>
-    <file alias="yin-yang.png">flags/fugue/yin-yang.png</file>
-    <file alias="car.png">flags/silk/car.png</file>
-    <file alias="cart.png">flags/silk/cart.png</file>
-    <file alias="cd.png">flags/silk/cd.png</file>
-    <file alias="cup.png">flags/silk/cup.png</file>
-    <file alias="drink.png">flags/silk/drink.png</file>
-    <file alias="emoticon_smile.png">flags/silk/emoticon_smile.png</file>
-    <file alias="emoticon_unhappy.png">flags/silk/emoticon_unhappy.png</file>
-    <file alias="female.png">flags/silk/female.png</file>
-    <file alias="flag_blue.png">flags/silk/flag_blue.png</file>
-    <file alias="flag_green.png">flags/silk/flag_green.png</file>
-    <file alias="flag_orange.png">flags/silk/flag_orange.png</file>
-    <file alias="flag_pink.png">flags/silk/flag_pink.png</file>
-    <file alias="flag_purple.png">flags/silk/flag_purple.png</file>
-    <file alias="flag_red.png">flags/silk/flag_red.png</file>
-    <file alias="flag_yellow.png">flags/silk/flag_yellow.png</file>
-    <file alias="heart.png">flags/silk/heart.png</file>
-    <file alias="lightning.png">flags/silk/lightning.png</file>
-    <file alias="male.png">flags/silk/male.png</file>
-    <file alias="money.png">flags/silk/money.png</file>
-    <file alias="rainbow.png">flags/silk/rainbow.png</file>
-    <file alias="rosette.png">flags/silk/rosette.png</file>
-    <file alias="ruby.png">flags/silk/ruby.png</file>
-    <file alias="script.png">flags/silk/script.png</file>
-    <file alias="star.png">flags/silk/star.png</file>
-    <file alias="tick.png">flags/silk/tick.png</file>
-    <file alias="time.png">flags/silk/time.png</file>
-    <file alias="tux.png">flags/silk/tux.png</file>
-    <file alias="wand.png">flags/silk/wand.png</file>
-    <file alias="weather_rain.png">flags/silk/weather_rain.png</file>
-    <file alias="weather_sun.png">flags/silk/weather_sun.png</file>
-    <file alias="world.png">flags/silk/world.png</file>
-</qresource>
+<RCC>
+    <qresource prefix="/omg">
+        <file>omg.png</file>
+        <file>lastfm.gif</file>
+        <file>icons/volume_high.png</file>
+        <file>icons/volume_medium.png</file>
+        <file>icons/volume_low.png</file>
+        <file>icons/volume_muted.png</file>
+        <file>icons/folder_unsynced.svg</file>
+        <file>icons/folder_ok.svg</file>
+        <file>icons/folder.svg</file>
+        <file>icons/folder_unknown.svg</file>
+        <file>icons/expand.png</file>
+        <file>icons/collapse.png</file>
+        <file>icons/clear.png</file>
+        <file>icons/clear_16.png</file>
+        <file>icons/add.png</file>
+        <file>icons/remove.png</file>
+        <file>icons/flag_blue.png</file>
+        <file>icons/options.png</file>
+        <file>icons/goto.png</file>
+        <file>icons/delete.png</file>
+        <file>icons/go-previous.png</file>
+        <file>icons/go-next.png</file>
+        <file>tags/album.png</file>
+        <file>tags/artist.png</file>
+        <file>tags/comment.png</file>
+        <file>tags/composer.png</file>
+        <file>tags/date.png</file>
+        <file>tags/genre.png</file>
+        <file>tags/title.png</file>
+    </qresource>
+    <qresource prefix="/omg/flags">
+        <file alias="creative-commons.png">flags/fugue/creative-commons.png</file>
+        <file alias="guitar.png">flags/fugue/guitar.png</file>
+        <file alias="media-player-medium-blue.png">flags/fugue/media-player-medium-blue.png</file>
+        <file alias="media-player-medium-green.png">flags/fugue/media-player-medium-green.png</file>
+        <file alias="media-player-medium-orange.png">flags/fugue/media-player-medium-orange.png</file>
+        <file alias="media-player-medium-pink.png">flags/fugue/media-player-medium-pink.png</file>
+        <file alias="media-player-medium-purple.png">flags/fugue/media-player-medium-purple.png</file>
+        <file alias="media-player-medium-red.png">flags/fugue/media-player-medium-red.png</file>
+        <file alias="metronome.png">flags/fugue/metronome.png</file>
+        <file alias="microphone.png">flags/fugue/microphone.png</file>
+        <file alias="piano.png">flags/fugue/piano.png</file>
+        <file alias="present.png">flags/fugue/present.png</file>
+        <file alias="thumb.png">flags/fugue/thumb.png</file>
+        <file alias="thumb-up.png">flags/fugue/thumb-up.png</file>
+        <file alias="yin-yang.png">flags/fugue/yin-yang.png</file>
+        <file alias="car.png">flags/silk/car.png</file>
+        <file alias="cart.png">flags/silk/cart.png</file>
+        <file alias="cd.png">flags/silk/cd.png</file>
+        <file alias="cup.png">flags/silk/cup.png</file>
+        <file alias="drink.png">flags/silk/drink.png</file>
+        <file alias="emoticon_smile.png">flags/silk/emoticon_smile.png</file>
+        <file alias="emoticon_unhappy.png">flags/silk/emoticon_unhappy.png</file>
+        <file alias="female.png">flags/silk/female.png</file>
+        <file alias="flag_blue.png">flags/silk/flag_blue.png</file>
+        <file alias="flag_green.png">flags/silk/flag_green.png</file>
+        <file alias="flag_orange.png">flags/silk/flag_orange.png</file>
+        <file alias="flag_pink.png">flags/silk/flag_pink.png</file>
+        <file alias="flag_purple.png">flags/silk/flag_purple.png</file>
+        <file alias="flag_red.png">flags/silk/flag_red.png</file>
+        <file alias="flag_yellow.png">flags/silk/flag_yellow.png</file>
+        <file alias="heart.png">flags/silk/heart.png</file>
+        <file alias="lightning.png">flags/silk/lightning.png</file>
+        <file alias="male.png">flags/silk/male.png</file>
+        <file alias="money.png">flags/silk/money.png</file>
+        <file alias="rainbow.png">flags/silk/rainbow.png</file>
+        <file alias="rosette.png">flags/silk/rosette.png</file>
+        <file alias="ruby.png">flags/silk/ruby.png</file>
+        <file alias="script.png">flags/silk/script.png</file>
+        <file alias="star.png">flags/silk/star.png</file>
+        <file alias="tick.png">flags/silk/tick.png</file>
+        <file alias="time.png">flags/silk/time.png</file>
+        <file alias="tux.png">flags/silk/tux.png</file>
+        <file alias="wand.png">flags/silk/wand.png</file>
+        <file alias="weather_rain.png">flags/silk/weather_rain.png</file>
+        <file alias="weather_sun.png">flags/silk/weather_sun.png</file>
+        <file alias="world.png">flags/silk/world.png</file>
+    </qresource>
 </RCC>
