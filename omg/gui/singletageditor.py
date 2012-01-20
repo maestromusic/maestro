@@ -145,7 +145,8 @@ class SingleTagEditor(QtGui.QWidget):
                 self.expandLine.setParent(None)
                 self.expandLine = None
                 self.setExpanded(True)
-            else: # We have an ExpandLine and we need it...fine. But maybe the text or position must be updated
+            else:
+                # We have an ExpandLine and we need it...fine. But maybe the text or position must be updated
                 exPos = self.widgetList.index(self.expandLine)
                 if exPos != self._commonCount():
                     self.widgetList.moveWidget(self.expandLine,self._commonCount())
@@ -172,11 +173,13 @@ class SingleTagEditor(QtGui.QWidget):
                 
     def _commonCount(self):
         """Return the number of common records in this SingleTagEditor."""
-        return sum(isinstance(widget,RecordEditor) and widget.getRecord().isCommon() for widget in self.widgetList)
+        return sum(isinstance(widget,RecordEditor) and widget.getRecord().isCommon()
+                   for widget in self.widgetList)
         
     def _uncommonCount(self):
         """Return the number of uncommon records in this SingleTagEditor."""
-        return sum(isinstance(widget,RecordEditor) and not widget.getRecord().isCommon() for widget in self.widgetList)
+        return sum(isinstance(widget,RecordEditor) and not widget.getRecord().isCommon()
+                   for widget in self.widgetList)
 
     def contextMenuEvent(self,contextMenuEvent):
         record = None
@@ -191,6 +194,9 @@ class SingleTagEditor(QtGui.QWidget):
 
 
 class RecordEditor(QtGui.QWidget):
+    """A RecordEditor is used to edit a single record. It consist of a HiddenEditor to edit the value, a
+     label which is empty for common records and contains something like "in 4/8 pieces" for other records
+     and a listview showing the titles of the elements in record.elementsWithValue."""
     def __init__(self,model,record,parent=None):
         QtGui.QWidget.__init__(self,parent)
         self.model = model
@@ -224,9 +230,11 @@ class RecordEditor(QtGui.QWidget):
         self.setRecord(record)
     
     def getRecord(self):
+        """Return the record that can be edited in this RecordEditor."""
         return self.record
         
     def setRecord(self,record):
+        """Set the record that can be edited in this RecordEditor."""
         self.record = record
         if record.tag != self.valueEditor.getTag():
             # Do not change the value when changing the tag since it may be invalid for the new tag
@@ -254,6 +262,7 @@ class RecordEditor(QtGui.QWidget):
                 self.setExpanded(len(elements) <= EXPAND_LIMIT)
 
     def _updateElementsLabel(self):
+        """Set the correct text in the label, e.g. "in 4/8 pieces"."""
         if self.record.isCommon():
             self.elementsLabel.clear()
             self.elementsLabel.setVisible(False)
@@ -267,17 +276,20 @@ class RecordEditor(QtGui.QWidget):
                                     .format(len(elements)))
             else:
                 elements = self.record.elementsWithValue
-                if len(elements) == 1:
-                    if self.record.tag != tags.TITLE:
-                        self.elementsLabel.setText(self.tr("in {}").format(elements[0].title))
-                    else: pass # In this case we would display the elements own title which doesn't help 
+                if len(elements) == 1 and self.record.tag != tags.TITLE:
+                    # displaying the title is not necessary if the tag is TITLE
+                    self.elementsLabel.setText(self.tr("in {}").format(elements[0].title))
                 else: self.elementsLabel.setText(
                             self.tr("in {}/%n pieces","",len(self.record.allElements)).format(len(elements)))
         
     def isExpanded(self):
+        """Return whether this RecordEditor is expanded, i.e. the list of elements with the record's value
+        is visible."""
         return self.expanded
         
     def setExpanded(self,expanded):
+        """Set whether this RecordEditor is expanded, i.e. the list of elements with the record's value
+        is visible."""
         if expanded != self.expanded:
             self.expanded = expanded
             self.expandButton.setExpanded(expanded)
@@ -285,9 +297,11 @@ class RecordEditor(QtGui.QWidget):
                 self.listView.setVisible(expanded)
 
     def isValid(self):
+        """Return whether this RecordEditor contains a value that is valid for the record's tag."""
         return self.valueEditor.getValue() is not None
         
     def _handleValueChanged(self):
+        """Handle valueChanged signals from the editor."""
         value = self.valueEditor.getValue()
         assert self.record.tag.isValid(value) # the tagwidget only emits this signal if the value is valid
         if self.record.value != value:
@@ -296,19 +310,22 @@ class RecordEditor(QtGui.QWidget):
             self.model.changeRecord(self.record,newRecord)
 
     def _handleRecordChanged(self,tag,oldRecord,newRecord):
-        if oldRecord == self.record:
+        """Handle recordChanged signals from the model."""
+        if oldRecord is self.record:
             self.setRecord(newRecord)
 
 
 class ExpandLine(QtGui.QWidget):
-    """An ExpandLine is used by SingleTagEditors which contain a lot of uncommon records. It is inserted into the list of RecordEditors and allows the user to collapse the uncommon records and expand them again."""
+    """An ExpandLine is used by SingleTagEditors which contain a lot of uncommon records. It is inserted into
+    the list of RecordEditors and allows the user to collapse the uncommon records and expand them again."""
     def __init__(self,number,parent=None):
         QtGui.QWidget.__init__(self,parent)
         self.setLayout(QtGui.QHBoxLayout())
         self.label = QtGui.QLabel()
         self.expandButton = ExpandButton()
-        self.layout().addWidget(self.label,1)
+        self.layout().addWidget(self.label)
         self.layout().addWidget(self.expandButton)
+        self.layout().addStretch()
         self.setNumber(number)
         
     def setNumber(self,number):
@@ -317,14 +334,19 @@ class ExpandLine(QtGui.QWidget):
 
 
 class ExpandButton(QtGui.QPushButton):
-    """Special button that displays an arrow pointing up (expanded-state) or down (not expanded). After it has been clicked by the user it will change its state and emit the triggered-signal with the new state."""
+    """Special button that displays an arrow pointing up (expanded-state) or down (not expanded). After it
+    has been clicked by the user it will change its state and emit the triggered-signal with the new state.
+    """
     expandIcon = utils.getIcon("expand.png")
     collapseIcon = utils.getIcon("collapse.png")
 
-    triggered = QtCore.pyqtSignal(bool) # Emitted when the button is clicked. The parameter will be True if the button is in expanded-state _after_ changing its state due to the click.
+    # Emitted when the button is clicked. The parameter will be True if the button is in expanded-state
+    # _after_ changing its state due to the click.
+    triggered = QtCore.pyqtSignal(bool)
     
     def __init__(self,expanded = False,parent=None):
-        """Initialize this button with the given parent. If expanded is True, the button will be in expanded-state, i.e. show the collapse-icon."""
+        """Initialize this button with the given parent. If expanded is True, the button will be in
+        expanded-state, i.e. show the collapse-icon."""
         QtGui.QPushButton.__init__(self,self.collapseIcon if expanded else self.expandIcon,'',parent)
         self.setFlat(True)
         self.expanded = expanded

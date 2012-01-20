@@ -48,9 +48,11 @@ class Record:
         self.allElements = allElements
         self.elementsWithValue = elementsWithValue
     
-    def copy(self):
-        """Return a copy of this record."""
-        return Record(self.tag,self.value,self.allElements,self.elementsWithValue)
+    def copy(self,copyList=False):
+        """Return a copy of this record. Note that the elementsWithValue list is NOT copied by default. Set
+        *copyList* to True to change this."""
+        elementsWithValue = self.elementsWithValue[:] if copyList else self.elementsWithValue
+        return Record(self.tag,self.value,self.allElements,elementsWithValue)
         
     def isCommon(self):
         """Return whether the value of this record is present in all elements."""
@@ -210,7 +212,6 @@ class UndoCommand(QtGui.QUndoCommand):
     \ """
     def __init__(self,model,method,*params,text=None):
         QtGui.QUndoCommand.__init__(self,text)
-        #print("REDO: {} [{}]".format(method.__name__,", ".join(str(p) for p in params)))
         self.model = model
         self.method = method
         self.params = params
@@ -278,6 +279,7 @@ class UndoCommand(QtGui.QUndoCommand):
                         self._execute('change',changeList,oldRecord.tag,oldRecord.value,newRecord.value)
         
     def redo(self):
+        #print("REDO: {} [{}]".format(self.method.__name__,", ".join(str(p) for p in self.params)))
         # First modify the inner model
         self.method(*self.params)
         # Then modify the editor or the database
@@ -454,17 +456,13 @@ class TagEditorModel(QtCore.QObject):
         else:
             # Now things get complicated: Add the record's elements to those of (a copy of)
             # the existing record.
-            copy = existingRecord.copy()
+            copy = existingRecord.copy(True)
             copy.extend(record.elementsWithValue)
             command = UndoCommand(self,self.inner.changeRecord,record.tag,existingRecord,copy)
             self._push(command)
-            # Now here's a problem: If the changed record is common, whereas the old one is not, we have
-            # to ensure correct sorting (common records to the top).
             if existingRecord.isCommon() != copy.isCommon():
-                # Because we add elements, it must be this way:
-                assert not existingRecord.isCommon() and copy.isCommon()
-                pos = self.inner.tags[record.tag].index(existingRecord)
-                self.commonChanged.emit(copy.tag)
+                self._checkCommonAndMove(copy,undoable=True)
+                self.commonChanged.emit(record.tag)
             return False
             
     def removeRecord(self,record):
@@ -500,18 +498,8 @@ class TagEditorModel(QtCore.QObject):
             self.removeRecord(oldRecord)
             self.addRecord(newRecord)
         else:
-            # I am not sure, but the order of changing, moving end emitting commonChanged maybe important
-            # Change the record
             command = UndoCommand(self,self.inner.changeRecord,oldRecord.tag,oldRecord,newRecord)
             self._push(command)
-            # Maybe we have to move the record as the common records are sorted to the top
-            if oldRecord.isCommon() != newRecord.isCommon():
-                pos = self.inner.tags[oldRecord.tag].index(oldRecord)
-                newPos = self._commonCount(oldRecord.tag) # Move to the border
-                if pos != newPos:
-                    command = UndoCommand(self,self.inner.moveRecord,pos,newPos)
-                    self._push(command)
-                self.commonChanged.emit(newRecord.tag)
         self._endMacro()
 
     def removeTag(self,tag):
@@ -584,7 +572,20 @@ class TagEditorModel(QtCore.QObject):
             
         return {element.id: (element.originalTags,self.getTagsOfElement(element))
                 for element in self.inner.elements}
-            
+        
+    def _checkCommonAndMove(self,record,undoable):
+            # Maybe we have to move the record as the common records are sorted to the top
+            pos = self.inner.tags[record.tag].index(record)
+            border = self._commonCount(record.tag)
+            if (record.isCommon() and pos < border) or (not record.isCommon() and pos >= border):
+                return # nothing to do
+            newPos = border - 1 if record.isCommon() else border
+            if not undoable:
+                self.inner.moveRecord(record.tag,pos,newPos)
+            else:
+                command = UndoCommand(self,self.inner.moveRecord,pos,newPos)
+                self._push(command)
+                
     def _addElementsWithValue(self,tag,value,elements):
         """Add *elements* to the record defined by *tag* and *value*. Create the record when necessary."""
         if len(elements) == 0:
@@ -594,7 +595,8 @@ class TagEditorModel(QtCore.QObject):
             if tag not in self.inner.tags:
                 self.inner.insertTag(len(self.inner.tags),tag)
             record = Record(tag,value,self.inner.elements,elements)
-            self.inner.insertRecord(len(self.inner.tags[tag]),record)
+            pos = self._commonCount(tag) if record.isCommon() else len(self.inner.tags[tag])
+            self.inner.insertRecord(pos,record)
         else:
             newElementsWithValue = [el for el in self.inner.elements if el in record.elementsWithValue
                                                                          or el in elements]
@@ -602,6 +604,9 @@ class TagEditorModel(QtCore.QObject):
                 newRecord = record.copy()
                 newRecord.elementsWithValue = newElementsWithValue
                 self.inner.changeRecord(record.tag,record,newRecord)
+                if newRecord.isCommon() and not record.isCommon():
+                    self._checkCommonAndMove(record,undoable=False)
+                    self.commonChanged.emit(record.tag)
 
     def _removeElementsWithValue(self,tag,value,elements):
         """Remove *elements* from the record defined by *tag* and *value*. Delete the record if it is
@@ -617,6 +622,9 @@ class TagEditorModel(QtCore.QObject):
                 newRecord = record.copy()
                 newRecord.elementsWithValue = remaining
                 self.inner.changeRecord(record.tag,record,newRecord)
+                if record.isCommon():
+                    self._checkCommonAndMove(record,undoable=False)
+                    self.commonChanged.emit(record.tag)
             
     def _handleDispatcher(self,event):
         """React to change events. We have to
@@ -662,7 +670,6 @@ class TagEditorModel(QtCore.QObject):
                     self._addElementsWithValue(event.tag,event.newValue,affected)
                 # Finally update the title attribute
                 if event.tag == tags.TITLE and len(affected) > 0:
-                    print("updating titles")
                     for element in affected:
                         elementTags = self.getTagsOfElement(element)
                         if tags.TITLE in elementTags:
@@ -776,9 +783,4 @@ class TagEditorModel(QtCore.QObject):
     def _commonCount(self,tag):
         """Return the number of records of the given tag that are common (i.e. all elements have the
         record's value)."""
-        c = 0
-        for record in self.inner.tags[tag]:
-            if record.isCommon():
-                c = c + 1
-            else: break
-        return c
+        return sum(record.isCommon() for record in self.inner.tags[tag])
