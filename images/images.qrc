@@ -29,6 +29,7 @@
         <file>tags/date.png</file>
         <file>tags/genre.png</file>
         <file>tags/title.png</file>
+        <file>icons/close_button.png</file>
     </qresource>
     <qresource prefix="/omg/flags">
         <file alias="creative-commons.png">flags/fugue/creative-commons.png</file>

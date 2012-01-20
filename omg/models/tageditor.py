@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2009-2011 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2012 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -267,7 +267,6 @@ class UndoCommand(QtGui.QUndoCommand):
                 newElements = set(newRecord.elementsWithValue)
                 removeList = list(oldElements - newElements)
                 addList = list(newElements - oldElements)
-                actions = []
                 if len(removeList):
                     self._execute('remove',removeList,oldRecord.tag,oldRecord.value)
                 if len(addList):
@@ -663,6 +662,7 @@ class TagEditorModel(QtCore.QObject):
                     self._addElementsWithValue(event.tag,event.newValue,affected)
                 # Finally update the title attribute
                 if event.tag == tags.TITLE and len(affected) > 0:
+                    print("updating titles")
                     for element in affected:
                         elementTags = self.getTagsOfElement(element)
                         if tags.TITLE in elementTags:

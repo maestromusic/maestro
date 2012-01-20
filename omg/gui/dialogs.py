@@ -96,7 +96,6 @@ class FancyPopup(QtGui.QFrame):
         QtGui.QFrame.enterEvent(self,event)
     
     def leaveEvent(self,event):
-        print("leave")
         if self.isVisible() and not self.fixPopup:
             self.close()
              

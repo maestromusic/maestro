@@ -320,8 +320,10 @@ class AddFlagPopup(dialogs.FancyPopup):
         self.flagList.itemClicked.connect(self._handleItemClicked)
         self.layout().addWidget(self.flagList)
         
-        for flag in flags.allFlags():
-            if self.model.getRecord(flag) is None:
+        _flagTypes = sorted(flags.allFlags(),key=lambda f: f.name)
+        for flag in _flagTypes:
+            # Do not show flags which are already contained in all elements
+            if self.model.getRecord(flag) is None or not self.model.getRecord(flag).isCommon():
                 item = QtGui.QListWidgetItem(flag.name)
                 item.setData(Qt.UserRole,flag)
                 if flag.icon is not None:
@@ -347,9 +349,8 @@ class AddFlagPopup(dialogs.FancyPopup):
         
     def _handleManagerButton(self):
         """Open the flagmanager."""
-        from .preferences import flagmanager
-        flagManager = flagmanager.FlagManager(self.parent())
-        flagManager.exec_()
+        from . import preferences
+        preferences.show('main/flagmanager')
         self.close()
         
     def _handleItemClicked(self,item):
