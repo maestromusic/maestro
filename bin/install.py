@@ -37,12 +37,11 @@ import collections
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-app = QtGui.QApplication([])
-
 # This script tries to include as few modules as possible
 from omg import config, logging, database as db
 from omg.application import loadTranslators
 from omg.tags import isValidTagname
+from omg.gui import iconchooser
 
 logger = logging.getLogger("Install tool")
 
@@ -78,13 +77,16 @@ class InstallToolWindow(QtGui.QWidget):
         layout.addLayout(self.stackedLayout)
         
         buttonLayout = QtGui.QHBoxLayout()
+        style = QtGui.QApplication.style()
         layout.addLayout(buttonLayout)
         self.prevButton = QtGui.QPushButton(self.tr("Previous"))
+        self.prevButton.setIcon(style.standardIcon(QtGui.QStyle.SP_ArrowLeft))
         self.prevButton.clicked.connect(self._handlePrevButton)
         self.prevButton.setEnabled(False)
         buttonLayout.addWidget(self.prevButton)
         buttonLayout.addStretch()
         self.nextButton = QtGui.QPushButton(self.tr("Next"))
+        self.nextButton.setIcon(style.standardIcon(QtGui.QStyle.SP_ArrowRight))
         self.nextButton.clicked.connect(self._handleNextButton)
         buttonLayout.addWidget(self.nextButton)
         
@@ -235,7 +237,8 @@ class GeneralSettingsWidget(SettingsWidget):
         collectionLayout = QtGui.QHBoxLayout()
         self.collectionLineEdit = QtGui.QLineEdit(config.options.main.collection)
         collectionLayout.addWidget(self.collectionLineEdit)
-        fileChooserButton = QtGui.QPushButton(self.tr("Use dialog"))
+        fileChooserButton = QtGui.QPushButton()
+        fileChooserButton.setIcon(QtGui.QApplication.style().standardIcon(QtGui.QStyle.SP_DirIcon))
         fileChooserButton.clicked.connect(self._handleFileChooserButton)
         collectionLayout.addWidget(fileChooserButton)
         formLayout.addRow(self.tr("Music directory"),collectionLayout)
@@ -414,6 +417,7 @@ class TagWidget(SettingsWidget):
         buttonBarLayout = QtGui.QHBoxLayout()
         self.layout().addLayout(buttonBarLayout)
         addButton = QtGui.QPushButton(self.tr("Add tag"))
+        addButton.setIcon(getIcon('add.png'))
         addButton.clicked.connect(self._handleAddButton)
         buttonBarLayout.addWidget(addButton)
         buttonBarLayout.addStretch()
@@ -436,6 +440,8 @@ class TagWidget(SettingsWidget):
     def _addTag(self,row,name,valueType):
         """Create items/widgets for a new tagtype in row *row* of the QTableWidget. *name* and *valueType*
         are attributes of the new tagtype."""
+        self.tableWidget.setRowHeight(row,36) # Enough space for icons
+        
         column = 0
         item = QtGui.QTableWidgetItem(name)
         if row <= 1:
@@ -457,10 +463,8 @@ class TagWidget(SettingsWidget):
             self.tableWidget.setIndexWidget(self.tableWidget.model().index(row,column),box)
         
         column += 1
-        item = QtGui.QTableWidgetItem()
-        item.setFlags(Qt.ItemIsEnabled)
-        self.tableWidget.setItem(row,column,item)
-        # TODO: icons
+        label = IconLabel(':omg/tags/{}.png'.format(name))
+        self.tableWidget.setIndexWidget(self.tableWidget.model().index(row,column),label)
         
         column += 1
         item = QtGui.QTableWidgetItem()
@@ -498,10 +502,11 @@ class TagWidget(SettingsWidget):
             if row <= 1:
                 valueType = self.tableWidget.item(row,column).text()
             else: valueType = self.tableWidget.indexWidget(
-                                                self.tableWidget.model().index(row,1)).currentText()
+                                                self.tableWidget.model().index(row,column)).currentText()
             
             column = self._getColumnIndex('icon')
-            icon = None # TODO self.tableWidget.item(row,column).icon()
+            iconLabel = self.tableWidget.indexWidget(self.tableWidget.model().index(row,column))
+            icon = iconLabel.path
             
             column = self._getColumnIndex('private')
             private = self.tableWidget.item(row,column).checkState() == Qt.Checked
@@ -585,7 +590,51 @@ class SpecialTagsWidget(SettingsWidget):
         return True
         
         
+def getIcon(name):
+    """Return a QIcon for the icon with the given name."""
+    return QtGui.QIcon(":omg/icons/" + name)
+
+
+class IconLabel(QtGui.QLabel):
+    """Label for the icon column in TagWidget. It displays the icon and provides a contextmenu to change
+    or remove it.
+    """
+    def __init__(self,path):
+        super().__init__()
+        self.setAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
+        self.setPath(path)
+        
+    def setPath(self,path):
+        """Set the icon path."""
+        pixmap = QtGui.QPixmap()
+        if path is not None and pixmap.load(path):
+            pixmap = pixmap.scaled(32,32,transformMode=Qt.SmoothTransformation)
+        self.path = path
+        self.setPixmap(pixmap)
+                
+    def contextMenuEvent(self,event):
+        menu = QtGui.QMenu(self)
+        if self.path is None:
+            changeAction = QtGui.QAction(self.tr("Add icon..."),menu)
+        else:changeAction = QtGui.QAction(self.tr("Change icon..."),menu)
+        changeAction.triggered.connect(lambda: self.mouseDoubleClickEvent(None))
+        menu.addAction(changeAction)
+        
+        removeAction = QtGui.QAction(self.tr("Remove icon"),menu)
+        removeAction.setEnabled(self.path is not None)
+        removeAction.triggered.connect(lambda: self.setPath(None))
+        menu.addAction(removeAction)
+        menu.exec_(event.globalPos())
+        
+    def mouseDoubleClickEvent(self,event):
+        result = iconchooser.IconChooser.getIcon([':omg/tags'], self)
+        if result:
+            self.setPath(result[1])
+
+
 if __name__ == "__main__":
+    app = QtGui.QApplication([])
+    from omg import resources
     widget = InstallToolWindow()
     widget.show()
     app.exec_()

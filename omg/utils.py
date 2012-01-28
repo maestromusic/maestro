@@ -17,8 +17,7 @@
 #
 
 import datetime, os, functools
-from omg import config
-from omg import constants
+from omg import config, constants
 from PyQt4 import QtGui, QtCore
 from collections import OrderedDict
 
@@ -120,15 +119,16 @@ def collectFiles(paths):
                 dirs.sort()
     return filePaths
 
+
 def getIcon(name):
     """Return a QIcon for the icon with the given name."""
-    if not QtCore.QFile.exists(':omg/icons/' + name):
-        print(name + ' does not exist')
     return QtGui.QIcon(":omg/icons/" + name)
+
 
 def getPixmap(name):
     """Return a QPixmap for the icon with the given name."""
     return QtGui.QPixmap(":omg/icons/" + name)
+
 
 class FlexiDate(object):
     """A FlexiDate is a date which can store a date consisting simply of a year or of a year and a month or of
