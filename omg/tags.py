@@ -170,12 +170,14 @@ TYPES = [TYPE_VARCHAR,TYPE_TEXT,TYPE_DATE]
 
 class Tag:
     """
-        A tagtype like ``'artist'``. ``'title'``, etc.. Tags have four public attributes:
+        A tagtype like ``'artist'``. ``'title'``, etc.. Tags have five public attributes:
         
             * ``id``: The id of the tag if it is in the database or None otherwise,
             * ``name``: The name of the tag,
             * ``type``: The value-type of this tag (e.g. varchar) as instance of :class:`omg.tags.ValueType`,
-            * ``title``: A nice title to be displayed to the user (usually a translation of the name).
+            * ``title``: A nice title to be displayed to the user (usually a translation of the name),
+            * ``rawTitle``: The title as set in the database. If a tag does not have a title set in the
+                database this will be None, while ``title`` will be the name.
 
         Usually you should get tag instances via the :func:`get-method<omg.tags.get>`. The exception is for
         tags that are not (yet) in the database (use :func:`exists` to check this). For these tags
@@ -191,7 +193,7 @@ class Tag:
         self.id = id
         self.name = name.lower()
         self.type = valueType
-        self._title = title
+        self.rawTitle = title
         self.setIconPath(iconPath)
         self.sortTags = sortTags
         self.private = private
@@ -230,12 +232,12 @@ class Tag:
         return self.title
     
     def getTitle(self):
-        return self._title if self._title is not None else self.name
+        return self.rawTitle if self.rawTitle is not None else self.name
     
     def setTitle(self,title):
         if title != '':
-            self._title = title
-        else: self._title = None
+            self.rawTitle = title
+        else: self.rawTitle = None
         
     title = property(getTitle,setTitle)
 

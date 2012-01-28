@@ -443,7 +443,7 @@ class TagWidget(SettingsWidget):
         *title* are attributes of the new tagtype."""
         self.tableWidget.setRowHeight(row,36) # Enough space for icons
         
-        column = 0
+        column = self._getColumnIndex('name')
         item = QtGui.QTableWidgetItem(name)
         if row <= 1:
             item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsEditable)
@@ -451,7 +451,7 @@ class TagWidget(SettingsWidget):
         item.setCheckState(Qt.Checked)
         self.tableWidget.setItem(row,column,item)
         
-        column += 1
+        column = self._getColumnIndex('type')
         if row <= 1:
             item = QtGui.QTableWidgetItem('varchar')
             item.setFlags(Qt.ItemIsEnabled)
@@ -463,16 +463,16 @@ class TagWidget(SettingsWidget):
             box.setCurrentIndex(types.index(valueType))
             self.tableWidget.setIndexWidget(self.tableWidget.model().index(row,column),box)
         
-        column += 1
+        column = self._getColumnIndex('title')
         item = QtGui.QTableWidgetItem(title)
         item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsEditable)
         self.tableWidget.setItem(row,column,item)
         
-        column += 1
+        column = self._getColumnIndex('icon')
         label = IconLabel(':omg/tags/{}.png'.format(name))
         self.tableWidget.setIndexWidget(self.tableWidget.model().index(row,column),label)
         
-        column += 1
+        column = self._getColumnIndex('private')
         item = QtGui.QTableWidgetItem()
         if row <= 1:
             item.setFlags(Qt.ItemIsEnabled) # Insert an empty item that is not editable

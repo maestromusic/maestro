@@ -39,7 +39,8 @@ class TagManager(QtGui.QWidget):
         self.columns = [
                 ("icon",   self.tr("Icon")),
                 ("name",   self.tr("Name")),
-                ("type",   self.tr("Value-Type")),
+                ("type",   self.tr("Type")),
+                ("title",  self.tr("Title")),
                 ("private",self.tr("Private?")),
                 ("sort",   self.tr("Sort-Tags")),
                 ("number", self.tr("# of elements")),
@@ -114,13 +115,16 @@ class TagManager(QtGui.QWidget):
                 item.setFlags(Qt.ItemIsEnabled)
                 self.tableWidget.setItem(row,column,item)
             
+            column = self._getColumnIndex("title")
+            item = QtGui.QTableWidgetItem(tag.rawTitle if tag.rawTitle is not None else '')
+            self.tableWidget.setItem(row,column,item)
+            
             column = self._getColumnIndex("private")
             item = CheckedSortItem()
             if allowChanges:
                 item.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
             else: item.setFlags(Qt.ItemIsUserCheckable)
             item.setCheckState(Qt.Checked if tag.private else Qt.Unchecked)
-            #check.stateChanged.connect(functools.partial(self._handlePrivateChanged,tag))
             self.tableWidget.setItem(row,column,item)
         
             column = self._getColumnIndex("sort")
@@ -189,8 +193,14 @@ class TagManager(QtGui.QWidget):
                     return
             modify.push(modify.commands.TagTypeUndoCommand(modify.CHANGED,tag,name=newName))
             self._loadTags()
-                
-        elif item.column() == self._getColumnIndex("private"): 
+        
+        elif item.column() == self._getColumnIndex('title'):
+            tag = tags.tagList[item.row()]
+            if item.text() != tag.title:
+                modify.push(modify.commands.TagTypeUndoCommand(modify.CHANGED,tag,title=item.text()))
+                self._loadTags()
+            
+        elif item.column() == self._getColumnIndex('private'): 
             tag = tags.tagList[item.row()]
             number,allowChanges = self._appearsInElements(tag)
             newPrivate = item.checkState() == Qt.Checked
