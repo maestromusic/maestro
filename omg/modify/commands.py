@@ -518,7 +518,8 @@ class TagTypeUndoCommand(UndoCommand):
         - ``modify.DELETED``: *tagType* will be removed. All other parameters are useless.
     
     \ """
-    def __init__(self,action,tagType=None,name=None,valueType=None,iconPath='',private=None,sortTags=None):
+    def __init__(self,action,tagType=None,name=None,valueType=None,title='',
+                 iconPath='',private=None,sortTags=None):
         texts = {ADDED:   translate("TagTypeUndoCommand","Add tagtype"),
                  DELETED: translate("TagTypeUndoCommand","Delete tagtype"),
                  CHANGED: translate("TagTypeUndoCommand","Change tagtype")
@@ -527,8 +528,9 @@ class TagTypeUndoCommand(UndoCommand):
         self.action = action
         self.tagType = tagType
         if action != ADDED:
-            self.oldData = (tagType.name,tagType.type,tagType.iconPath,tagType.private,tagType.sortTags)
-        self.newData = (name,valueType,iconPath,private,sortTags)
+            self.oldData = (tagType.name,tagType.type,tagType.title,
+                            tagType.iconPath,tagType.private,tagType.sortTags)
+        self.newData = (name,valueType,title,iconPath,private,sortTags)
         
     def redo(self):
         if self.action == ADDED:

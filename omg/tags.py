@@ -24,7 +24,7 @@ information in the ``tagids``-table and use one of the following ways to get tag
 
     * The easiest way is the :func:`get-method<omg.tags.get>` which takes a tag-id or a tag-name as
       parameter.
-    * Use :func:`fromTranslation` to get tags from user input which may be in the user's language
+    * Use :func:`fromTitle` to get tags from user input which may be in the user's language
       (e.g. ``'Künstler'``).
     * For some tags which have a special meaning to the program and cannot always be treated generically
       (e.g. the title-tag) there exist constants (e.g. ``TITLE``). This allows to use tags.TITLE instead of
@@ -76,8 +76,12 @@ class ValueType:
     """Class for the type of tag-values. Currently only three types are possible: varchar, date and text.
     For each of them there is an instance (e.g. ``tags.TYPE_VARCHAR``) and you can get all of them via
     ``tags.TYPES``. You should never create your own instances.
-    """
-    def __init__(self,name, description = ''):
+        
+        - *name* is one of ''varchar'', ''date'', ''text''
+        - *description* is a description that will be displayed to the user
+        
+    \ """
+    def __init__(self,name,description):
         self.name = name
         self.description = description
 
@@ -156,6 +160,7 @@ class ValueType:
     def __str__(self):
         return self.name
 
+
 # Module variables for the existing types
 TYPE_VARCHAR = ValueType('varchar', translate('tags', 'a tag type for normal (not too long) text values'))
 TYPE_TEXT = ValueType('text', translate('tags', 'a tag type for long texts (like e.g. lyrics)'))
@@ -165,25 +170,28 @@ TYPES = [TYPE_VARCHAR,TYPE_TEXT,TYPE_DATE]
 
 class Tag:
     """
-        A tagtype like ``'artist'``. ``'title'``, etc.. Tags have three public attributes:
+        A tagtype like ``'artist'``. ``'title'``, etc.. Tags have four public attributes:
         
             * ``id``: The id of the tag if it is in the database or None otherwise,
             * ``name``: The name of the tag,
-            * ``type``: The valuetype of this tag (e.g. varchar) as instance of :class:`omg.tags.ValueType`.
+            * ``type``: The value-type of this tag (e.g. varchar) as instance of :class:`omg.tags.ValueType`,
+            * ``title``: A nice title to be displayed to the user (usually a translation of the name).
 
         Usually you should get tag instances via the :func:`get-method<omg.tags.get>`. The exception is for
         tags that are not (yet) in the database (use :func:`exists` to check this). For these tags
         :func:`get` will fail and you have to create your own instances. If you use the common instance, it
         will get automatically updated on TagTypeChangeEvents.
     """
-    def __init__(self,id,name,valueType,iconPath,sortTags,private=False):
-        if not isinstance(id,int) or not isinstance(name,str) or not isinstance(valueType,ValueType):
-            raise TypeError("Invalid type (id,name,valueType): ({},{},{}) of types ({},{},{})"
-                                .format(id,name,valueType,type(id),type(name),type(valueType)))
+    def __init__(self,id,name,valueType,title,iconPath,sortTags,private=False):
+        if not isinstance(id,int) or not isinstance(name,str) or not isinstance(valueType,ValueType) \
+                or (title is not None and not isinstance(title,str)):
+            raise TypeError("Invalid type (id,name,valueType,title): ({},{},{},{}) of types ({},{},{},{})"
+                            .format(id,name,valueType,title,type(id),type(name),type(valueType),type(title)))
         assert isValidTagname(name)
         self.id = id
         self.name = name.lower()
         self.type = valueType
+        self._title = title
         self.setIconPath(iconPath)
         self.sortTags = sortTags
         self.private = private
@@ -219,18 +227,21 @@ class Tag:
         return '"{0}"'.format(self.name)
 
     def __str__(self):
-        return self.name
+        return self.title
+    
+    def getTitle(self):
+        return self._title if self._title is not None else self.name
+    
+    def setTitle(self,title):
+        if title != '':
+            self._title = title
+        else: self._title = None
         
-    def translated(self):
-        """Return the translation of this tag in the user's language. In most cases you will want to display
-        this string rather than ``tag.name``.
-        """
-        # if self.name is not contained in the dict, return the name itself
-        return _translation.get(self.name,self.name) 
+    title = property(getTitle,setTitle)
 
         
 class UnknownTagError(RuntimeError):
-    """This exception class is raised by get and fromTranslation, if they cannot find a tag
+    """This exception class is raised by get and fromTitle, if they cannot find a tag
     matching the parameters.
     """
     def __init__(self, tagname):
@@ -273,7 +284,8 @@ def get(identifier, createDialogIfNew = False):
     This method does not create new instances of the tags but returns always the same instance.
     
     If *createDialogIfNew* is True, and there is no tag matching *identifier*, a dialog is popped up
-    to create the new tag."""
+    to create the new tag.
+    """
     if isinstance(identifier,int):
         return _tagsById[identifier]
     elif isinstance(identifier,str):
@@ -292,24 +304,24 @@ def get(identifier, createDialogIfNew = False):
                             .format(identifier,type(identifier)))
 
 
-def isTranslation(name):
-    """Return whether *name* is the translation of a known tag (comparison is case-insensitive!)."""
-    return name.lower() in map(str.lower,_translation.values())
+def isTitle(title):
+    """Return whether *name* is the title of a known tag (comparison is case-insensitive!)."""
+    return title.lower() in [str.lower(tag.title) for tag in tagList if tag.title is not None]
 
 
-def fromTranslation(translation):
-    """Return the tag whose translation is *translation* (comparison is case-insensitive!). If no such tag
+def fromTitle(title):
+    """Return the tag of the given title (comparison is case-insensitive!). If no such tag
     exists, invoke get to return a tag. Use this method to get a tag from user input, especially when using
-    combo-boxes with predefined values containing translated tags.
+    combo-boxes with predefined values containing tag titles.
     """
-    translation = translation.lower()
-    for key,name in _translation.items():
-        if name.lower() == translation:
-            return get(key)
-    else: return get(translation)
+    title = title.lower()
+    for tag in tagList:
+        if title == tag.title.lower():
+            return tag
+    else: return get(title)
 
     
-def addTagType(name,valueType,iconPath=None,private=False,sortTags=None,tagType=None):
+def addTagType(name,valueType,title=None,iconPath=None,private=False,sortTags=None,tagType=None):
     """Adds a new tag named *name* of type *valueType* to the database. The parameter *sort* is a list of
     tags by which elements should be sorted if displayed below a ValueNode of this new tag; this defaults to
     the title tag. If *private* is True, a private tag is created.
@@ -322,10 +334,10 @@ def addTagType(name,valueType,iconPath=None,private=False,sortTags=None,tagType=
     from . import database as db
     from .modify import dispatcher, events, ADDED
     if tagType is not None:
-        data = (tagType.id,tagType.name,tagType.type.name,tagType.iconPath,
+        data = (tagType.id,tagType.name,tagType.type.name,tagType.title,tagType.iconPath,
                 ','.join(str(tag.id) for tag in tagType.sortTags), tagType. private)
         db.query(
-            "INSERT INTO {}tagids (id,tagname,tagtype,icon,sorttags,private) VALUES (?,?,?,?,?,?)"
+            "INSERT INTO {}tagids (id,tagname,tagtype,title,icon,sorttags,private) VALUES (?,?,?,?,?,?,?)"
               .format(db.prefix),*data)
         _tagsByName[tagType.name] = tagType
         _tagsById[tagType.id] = tagType
@@ -341,10 +353,10 @@ def addTagType(name,valueType,iconPath=None,private=False,sortTags=None,tagType=
         sortTags = [TITLE] if TITLE is not None else []
     
     id = db.query(
-        "INSERT INTO {}tagids (tagname,tagtype,icon,sorttags, private) VALUES (?,?,?,?,?)"
-              .format(db.prefix),
-        name,valueType.name,iconPath,','.join(str(tag.id) for tag in sortTags), private).insertId()
-    newTag = Tag(id,name,valueType,iconPath,sortTags,private)
+        "INSERT INTO {}tagids (tagname,tagtype,title,icon,sorttags,private) "
+        "VALUES (?,?,?,?,?,?)".format(db.prefix),
+        name,valueType.name,title,iconPath,','.join(str(tag.id) for tag in sortTags), private).insertId()
+    newTag = Tag(id,name,valueType,title,iconPath,sortTags,private)
     _tagsByName[name] = newTag
     _tagsById[id] = newTag
     tagList.append(newTag)
@@ -366,8 +378,6 @@ def removeTagType(tag):
     database.query("DELETE FROM {}tagids WHERE id=?".format(database.prefix),tag.id)
     del _tagsByName[tag.name]
     del _tagsById[tag.id]
-    if tag.name in _translation:
-        del _translation[tag.name]
     tagList.remove(tag)
     # TODO: The removed tag may still appear in the sorttags of other tags
             
@@ -375,7 +385,7 @@ def removeTagType(tag):
     dispatcher.changes.emit(events.TagTypeChangedEvent(DELETED,tag))
 
 
-def changeTagType(tag,name=None,valueType=None,iconPath='',private=None,sortTags=None):
+def changeTagType(tag,name=None,valueType=None,title='',iconPath='',private=None,sortTags=None):
     """Change a tagtype. In particular update the instance *tag* (this is usually the only instance of this
     tag) and the database. The other arguments determine what to change. Omit them to leave a property
     unchanged. This method will not touch any files though!
@@ -403,6 +413,11 @@ def changeTagType(tag,name=None,valueType=None,iconPath='',private=None,sortTags
         params.append(valueType.name)
         tag.type = valueType
     
+    if title != '' and title != tag.title:
+        assignments.append('title = ?')
+        params.append(title)
+        tag.title = title
+        
     if iconPath != '' and iconPath != tag.iconPath:
         assignments.append('icon = ?')
         params.append(iconPath)
@@ -436,23 +451,26 @@ def loadTagTypesFromDB():
     """Initialize _tagsById, _tagsByName and tagList from the database. Raise a runtime error when the 
     tags cannot be fetched from the database (e.g. because the tagids table is missing)."""
     global _tagsByName, _tagsById, tagList
-    from omg import database
+    from omg import database as db
     _tagsById = {}
     _tagsByName = {}
     
     try:
-        result = database.query("SELECT id,tagname,tagtype,icon,sorttags,private FROM {}tagids"
-                                  .format(database.prefix))
-    except database.sql.DBException:
+        result = db.query("SELECT id,tagname,tagtype,title,icon,sorttags,private FROM {}tagids"
+                                  .format(db.prefix))
+    except db.sql.DBException:
         logger.error("Could not fetch tags from tagids table.")
         raise RuntimeError()
         
     for row in result:
-        id,tagName,valueType,iconPath,sortTags,private = row
-        if database.isNull(iconPath):
+        id,tagName,valueType,title,iconPath,sortTags,private = row
+        if db.isNull(title):
+            title = None
+            
+        if db.isNull(iconPath):
             iconPath = None
         valueType = ValueType.byName(valueType)
-        newTag = Tag(id,tagName,valueType,iconPath,sortTags,private)
+        newTag = Tag(id,tagName,valueType,title,iconPath,sortTags,private)
         _tagsById[newTag.id] = newTag
         _tagsByName[newTag.name] = newTag
         
@@ -489,22 +507,6 @@ def init():
         except KeyError:
             logger.error("Tag {} contains an invalid sortTag.".format(tag.name))
             tag.sortTags = (TITLE,)
-            
-    # Initialize _translation
-    _translation = {}
-    files = [os.path.join('i18n','tags.'+config.options.i18n.locale+'.xml'),
-             os.path.join('i18n','tags.'+config.options.i18n.locale[:2]+'.xml')] #try de instead of de_DE
-    if all(not os.path.exists(file) for file in files):
-        logger.warning("I could not find a tag translation file for locale '{}'."
-                          .format(config.options.i18n.locale))
-    else:
-        for file in files:
-            if os.path.exists(file):
-                try:
-                    xml.sax.parse(file,TranslationFileHandler())
-                except xml.sax.SAXParseException as e:
-                    logger.warning("I could not parse tag translation file '{}'. Error message: {}"
-                                        .format(file,e.message()))
 
 
 class TagValueList(list):
@@ -669,18 +671,3 @@ def findCommonTags(elements, recursive = True):
     for tag in sameTags:
         tags[tag] = commonTagValues[tag]
     return tags
-
-
-class TranslationFileHandler(xml.sax.handler.ContentHandler):
-    """Content handler for tag translation files. When it parses a file it will store all translations in
-    the internal module variable ``_translation``.
-    """
-    def startElement(self,name,attributes):
-        if name == 'tag':
-            if 'key' not in attributes:
-                logger.warning("Incorrect tag translation file (key is missing).")
-                return
-            if 'name' not in attributes:
-                logger.warning("Incorrect tag translation file (name is missing).")
-
-            _translation[attributes['key']] = attributes['name']

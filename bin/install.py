@@ -402,6 +402,7 @@ class TagWidget(SettingsWidget):
         self.columns = [
                 ("name",   self.tr("Name")),
                 ("type",   self.tr("Value-Type")),
+                ("title",  self.tr("Title")),
                 ("icon",   self.tr("Icon")),
                 ("private",self.tr("Private?")),
                 ]
@@ -423,23 +424,23 @@ class TagWidget(SettingsWidget):
         buttonBarLayout.addStretch()
         
         tagList = [
-                ('title','varchar'),
-                ('album','varchar'),
-                ('composer','varchar'),
-                ('artist','varchar'),
-                ('performer','varchar'),
-                ('genre','varchar'),
-                ('conductor','varchar'),
-                ('date','date'),
-                ('comment','text'),
+                ('title','varchar',self.tr("Title")),
+                ('album','varchar',self.tr("Album")),
+                ('composer','varchar',self.tr("Composer")),
+                ('artist','varchar',self.tr("Artist")),
+                ('performer','varchar',self.tr("Performer")),
+                ('genre','varchar',self.tr("Genre")),
+                ('conductor','varchar',self.tr("Conductor")),
+                ('date','date',self.tr("Date")),
+                ('comment','text',self.tr("Comment")),
         ]
         self.tableWidget.setRowCount(len(tagList))
         for row,data in enumerate(tagList):
             self._addTag(row,*data)
         
-    def _addTag(self,row,name,valueType):
-        """Create items/widgets for a new tagtype in row *row* of the QTableWidget. *name* and *valueType*
-        are attributes of the new tagtype."""
+    def _addTag(self,row,name,valueType,title):
+        """Create items/widgets for a new tagtype in row *row* of the QTableWidget. *name*, *valueType* and
+        *title* are attributes of the new tagtype."""
         self.tableWidget.setRowHeight(row,36) # Enough space for icons
         
         column = 0
@@ -461,6 +462,11 @@ class TagWidget(SettingsWidget):
             box.addItems(types)
             box.setCurrentIndex(types.index(valueType))
             self.tableWidget.setIndexWidget(self.tableWidget.model().index(row,column),box)
+        
+        column += 1
+        item = QtGui.QTableWidgetItem(title)
+        item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsEditable)
+        self.tableWidget.setItem(row,column,item)
         
         column += 1
         label = IconLabel(':omg/tags/{}.png'.format(name))
@@ -504,17 +510,22 @@ class TagWidget(SettingsWidget):
             else: valueType = self.tableWidget.indexWidget(
                                                 self.tableWidget.model().index(row,column)).currentText()
             
+            column = self._getColumnIndex('title')
+            title = self.tableWidget.item(row,column).text()
+            if title == '':
+                title = None
+                
             column = self._getColumnIndex('icon')
             iconLabel = self.tableWidget.indexWidget(self.tableWidget.model().index(row,column))
             icon = iconLabel.path
             
             column = self._getColumnIndex('private')
             private = self.tableWidget.item(row,column).checkState() == Qt.Checked
-            tags[name] = (name,valueType,icon,1 if private else 0)
+            tags[name] = (name,valueType,title,icon,1 if private else 0)
         
         # Write tags to database
         assert db.query("SELECT COUNT(*) FROM {}tagids".format(db.prefix)).getSingle() == 0   
-        db.multiQuery("INSERT INTO {}tagids (tagname,tagtype,icon,private) VALUES (?,?,?,?)"
+        db.multiQuery("INSERT INTO {}tagids (tagname,tagtype,title,icon,private) VALUES (?,?,?,?,?)"
                       .format(db.prefix),tags.values())
         
         # The first two tags are used as title and album. popitem returns a (key,value) tuple.
@@ -526,7 +537,7 @@ class TagWidget(SettingsWidget):
         """Add a new line/tagtype to the table."""
         rowCount = self.tableWidget.rowCount()
         self.tableWidget.setRowCount(rowCount+1)
-        self._addTag(rowCount,'','varchar')
+        self._addTag(rowCount,'','varchar','')
         # Scroll to last line
         self.tableWidget.scrollTo(self.tableWidget.model().index(rowCount,0))
         

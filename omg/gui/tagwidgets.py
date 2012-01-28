@@ -42,13 +42,13 @@ class TagLabel(QtGui.QLabel):
 
     def text(self):
         if self.tag is not None:
-            return self.tag.translated()
+            return self.tag.title
         else: return ''
         
     def setText(self,text):
         if text == '':
             self.setTag(None)
-        else: self.setTag(tags.fromTranslation(text))
+        else: self.setTag(tags.fromTitle(text))
         
     def getTag(self):
         """Return the tag which is currently shown or None if no tag is shown."""
@@ -66,16 +66,16 @@ class TagLabel(QtGui.QLabel):
                                       .format(tag.iconPath,self.iconSize.width(),self.iconSize.height()))
                 else: super().setText('<img src="{}" widht="{}" height="{}"> {}'
                                       .format(tag.iconPath,self.iconSize.width(),
-                                              self.iconSize.height(),tag.translated()))
+                                              self.iconSize.height(),tag.title))
             else:
                 if self.iconOnly:
                     # Display only the beginning of the tagname, occupying two times the width of an icon
                     # (in most cases this should suffice to guess the tag).
                     fm = QtGui.QFontMetrics(self.font())
-                    text = fm.elidedText(tag.translated(),Qt.ElideRight,2*self.iconSize.width())
-                    self.setToolTip(tag.translated())
+                    text = fm.elidedText(tag.title,Qt.ElideRight,2*self.iconSize.width())
+                    self.setToolTip(tag.title)
                 else:
-                    text = tag.translated()
+                    text = tag.title
                     self.setToolTip(None)
                 super().setText(text)
         
@@ -137,7 +137,7 @@ class ValueTypeBox(QtGui.QComboBox):
         
 class TagTypeBox(QtGui.QStackedWidget):
     """A combobox to select a tagtype from those in the tagids table. By default the box will be editable
-    and in this case the box will handle tag translations and if the entered tagname is unknown it will add
+    and in this case the box will handle tag titles and if the entered tagname is unknown it will add
     a new tag to the table (querying the user for a type). If the entered text is invalid it will reset the
     box. Thus getTag will always return a valid tag. Use the tagChanged-signal to get informed about
     changes.
@@ -194,10 +194,10 @@ class TagTypeBox(QtGui.QStackedWidget):
         modify.dispatcher.changes.connect(self._handleTagTypeChanged)
     
     def _addTagToBox(self,tag):
-        """Add a tag to the box. Display icon and translation if available."""
+        """Add a tag to the box. Display icon and title if available."""
         if tag.icon is not None:
-            self.box.addItem(tag.icon,tag.translated(),tag)
-        else: self.box.addItem(tag.translated(),tag)
+            self.box.addItem(tag.icon,tag.title,tag)
+        else: self.box.addItem(tag.title,tag)
         
     def showLabel(self):
         """Display the label and hide the editor."""
@@ -220,14 +220,14 @@ class TagTypeBox(QtGui.QStackedWidget):
         if self.label is not None and tag != self.label.getTag():
             self.label.setTag(tag)
         if tag != self._parseTagFromBox():
-            self.box.setEditText(tag.translated())
+            self.box.setEditText(tag.title)
         if tag != self._tag:
             self._tag = tag
             self.tagChanged.emit(tag)
     
     def _parseTagFromBox(self):
-        """Return the tag that is currently selected. This method uses tags.fromTranslation to get a tag 
-        from the text in the combobox: If the tag is the translation of a tagname, that tag will be returned.
+        """Return the tag that is currently selected. This method uses tags.fromTitle to get a tag 
+        from the text in the combobox: If the tag is the title of a tag, that tag will be returned.
         Otherwise tags.get will be used. If the user really wants to create a tag with a name that is the 
         translation of another tag into his language (e.g. he wants to create a 'titel'-tag that is not the
         usual 'title'-tag), he has to quote the tagname (using " or '): inserting "titel" into the combobox 
@@ -239,7 +239,7 @@ class TagTypeBox(QtGui.QStackedWidget):
         try:
             if text[0] == text[-1] and text[0] in ['"',"'"]: # Don't translate if the text is quoted
                 return tags.get(text[1:-1])
-            else: return tags.fromTranslation(text)
+            else: return tags.fromTitle(text)
         except tags.UnknownTagError:
             return None
         
@@ -265,7 +265,7 @@ class TagTypeBox(QtGui.QStackedWidget):
             if text[0] == text[-1] and text[0] in ['"',"'"]:
                 text = text[1:-1]
             if not tags.isValidTagname(text):
-                self.box.setEditText(self._tag.translated()) # Reset
+                self.box.setEditText(self._tag.title) # Reset
                 self._dialogOpen = True
                 QtGui.QMessageBox.warning(self,self.tr("Invalid tagname"),
                                           self.tr("'{}' is not a valid tagname").format(text))
@@ -280,11 +280,11 @@ class TagTypeBox(QtGui.QStackedWidget):
                     self.setTag(newTag)
                     self.showLabel()
                 else:
-                    self.box.setEditText(self._tag.translated()) # Reset
+                    self.box.setEditText(self._tag.title) # Reset
     
     def keyPressEvent(self,keyEvent):
         if keyEvent.key() == Qt.Key_Escape:
-            self.box.setEditText(self._tag.translated()) # Reset
+            self.box.setEditText(self._tag.title) # Reset
             self.showLabel()
         else: QtGui.QStackedWidget.keyPressEvent(self,keyEvent)
     
@@ -306,7 +306,7 @@ class TagTypeBox(QtGui.QStackedWidget):
         elif event.action == modify.CHANGED:
             for i in range(self.box.count()):
                 if self.box.itemData(i) == event.tagType:
-                    self.box.setItemText(i,event.tagType.translated())
+                    self.box.setItemText(i,event.tagType.title)
                     if event.tagType.icon is not None:
                         self.box.setItemIcon(i,event.tagType.icon)
                     # Do not change the tag because there is only one instance

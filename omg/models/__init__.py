@@ -445,7 +445,7 @@ class Element(Node):
     def toolTipText(self):
         parts = []
         if self.tags is not None:
-            parts.append('\n'.join('{}: {}'.format(tag.translated(),', '.join(map(str,values)))
+            parts.append('\n'.join('{}: {}'.format(tag.title,', '.join(map(str,values)))
                                     for tag,values in self.tags.items()))
         if self.flags is not None and len(self.flags) > 0:
             parts.append('Flags: ' + ', '.join(flag.name for flag in self.flags))

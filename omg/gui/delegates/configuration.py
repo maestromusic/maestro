@@ -137,7 +137,7 @@ class DataPiece:
         
     def getTitle(self):
         if self.tag is not None:
-            return self.tag.translated()
+            return self.tag.title
         else: return self._title
         
     # The title of this datapiece.

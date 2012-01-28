@@ -418,8 +418,8 @@ class TagEditor(QtGui.QComboBox):
         self.insertSeparator(1)
         for tag in tags.tagList:
             if tag.icon is not None:
-                self.addItem(tag.icon,tag.translated(),tag)
-            else: self.addItem(tag.translated(),tag)
+                self.addItem(tag.icon,tag.title,tag)
+            else: self.addItem(tag.title,tag)
             if tag == defaultTag:
                 self.setCurrentIndex(self.count()-1)
                 
