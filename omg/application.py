@@ -33,7 +33,7 @@ mainWindow = None
 
 global logger
 
-def init(cmdConfig = [],initTags=True,testDB=False):
+def init(cmdConfig = [],initTags=True,testDB=False,useInstallTool=False):
     """Initialize the application, modules (config, logging, database and tags) but do not create a GUI or
     load any plugins. Return the QApplication instance. This is useful for scripts which need OMG's framework,
     but not its GUI and for testing (or playing around) in Python's shell::
@@ -49,42 +49,47 @@ def init(cmdConfig = [],initTags=True,testDB=False):
     If *initTags* is False, the modules ''tags'' and ''flags'' will not be initialized.
     If *testDB* is True, the database connection will be build using :func:`database.testConnect`.
     Warning: In this case you may want to set *initTags* to False because the test database is usually empty.
+    If *useInstallTool* is True, the Install tool is opened in several cases (e.g. if the database connection
+    cannot be established. Otherwise the application will terminate with an error (this is the default
+    since this method is also used to initialize OMG's framework for terminal applications). 
     """
     # Some Qt-classes need a running QApplication before they can be created
     app = QtGui.QApplication(sys.argv)
 
     # Initialize config and logging
     config.init(cmdConfig)
-    logging.init()
     global logger
     logger = logging.getLogger("omg")
+    logging.init()
     logger.debug("START")
+    if config.options.main.collection == '':
+        logger.error("No collection directory defined.")
+        if useInstallTool:
+            startInstallTool() # Will exit the application with value 0
+        else: sys.exit(1)
     
-    # Load translators
-    qtTranslator = QtCore.QTranslator(app) # Translator for Qt's own strings
-    translatorDir = QtCore.QLibraryInfo.location(QtCore.QLibraryInfo.TranslationsPath)
-    translatorFile = "qt_" + QtCore.QLocale.system().name()
-    if qtTranslator.load(translatorFile,translatorDir):
-        app.installTranslator(qtTranslator)
-    else: logger.warning("Unable to load Qt's translator file {} from directory {}."
-                            .format(translatorFile,translatorDir))
-
-    translator = QtCore.QTranslator(app) # Translator for our strings
-    translatorDir = os.path.join(os.getcwd(),'i18n')
-    translatorFile = 'omg.'+config.options.i18n.locale
-    if translator.load(translatorFile,translatorDir):
-        app.installTranslator(translator)
-    else: logger.warning("Unable to load translator file {} from directory {}."
-                            .format(translatorFile,translatorDir))
+    loadTranslators(app,logger)
 
     # Initialize remaining modules
-    if not testDB:
-        database.connect()
-    else: database.testConnect()
+    try:
+        if not testDB:
+            database.connect()
+        else: database.testConnect()
+    except database.sql.DBException as e:
+        logger.error("I cannot connect to the database. Did you provide the correct information in the config"
+                     " file? MySQL error: {}".format(e.message))
+        if useInstallTool:
+            startInstallTool() # Will exit the application with value 0
+        else: sys.exit(1)
 
     if initTags:
         from omg import tags,flags
-        tags.init()
+        try:
+            tags.init()
+        except RuntimeError:
+            if useInstallTool:
+                startInstallTool() # Will exit the application with value 0
+            else: sys.exit(1)
         flags.init()
 
     return app
@@ -95,23 +100,13 @@ def run(cmdConfig = []):
     corresponding option from the file or the default. Each list item has to be a string like
     ``main.collection=/var/music``.
     """
-    app = init(cmdConfig)
+    app = init(cmdConfig,useInstallTool=True)
+    
     # Lock the lockfile to prevent a second OMG-instance from starting.
-    # Confer http://packages.python.org/tendo/_modules/tendo/singleton.html#SingleInstance
-    lockFile = os.path.join(config.CONFDIR,'lock')
-    try:
-        fileDescriptor = open(lockFile,'w')
-    except IOError:
-        logger.error("Cannot open lock file {}".format(lockFile))
-        sys.exit(-1)
-    try:
-        fcntl.lockf(fileDescriptor,fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except IOError:
-        logger.error("Another instance is already running, quitting.")
-        sys.exit(-1)
+    lock()
     
     # Load remaining modules
-    from omg import resources, tags, search
+    from omg import resources, search
     search.init()
     
     # Load Plugins
@@ -139,6 +134,7 @@ def run(cmdConfig = []):
     mainWindow.show()
     returnValue = app.exec_()
     logger.debug('main application quit')
+    
     # Close operations
     filesystem.shutdown()
     search.shutdown()
@@ -148,3 +144,67 @@ def run(cmdConfig = []):
     config.shutdown()
     logging.shutdown()
     sys.exit(returnValue)
+
+
+def lock():
+    """Lock the lockfile so that no other instance can be started. Quit the application if it is already
+    locked."""
+    # Confer http://packages.python.org/tendo/_modules/tendo/singleton.html#SingleInstance
+    lockFile = os.path.join(config.CONFDIR,'lock')
+    try:
+        fileDescriptor = open(lockFile,'w')
+    except IOError:
+        logger.error("Cannot open lock file {}".format(lockFile))
+        sys.exit(-1)
+    try:
+        fcntl.lockf(fileDescriptor,fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except IOError:
+        logger.error("Another instance is already running, quitting.")
+        sys.exit(-1)
+        
+
+_translators = []
+
+def loadTranslators(app,logger):
+    """Load a translator for Qt's strings and one for OMG's strings."""
+    # Try up to two different locales
+    for translator in _translators:
+        app.removeTranslator(translator)
+    locales = [QtCore.QLocale.system().name()]
+    if config.options.i18n.locale:
+        locales.insert(0,config.options.i18n.locale)
+        QtCore.QLocale.setDefault(QtCore.QLocale(config.options.i18n.locale))
+        
+    # Install a translator for Qt's own strings
+    qtTranslator = QtCore.QTranslator(app)
+    translatorDir = QtCore.QLibraryInfo.location(QtCore.QLibraryInfo.TranslationsPath)
+    for locale in locales:
+        if locale == 'en':
+            continue # This is the default and qt_en does therefore not exist
+        translatorFile = "qt_" + locale
+        if qtTranslator.load(translatorFile,translatorDir):
+            app.installTranslator(qtTranslator)
+            _translators.append(qtTranslator)
+            break
+        else: logger.warning("Unable to load Qt's translator file {} from directory {}."
+                                .format(translatorFile,translatorDir))
+
+    # Load a translator for our strings
+    translator = QtCore.QTranslator(app)
+    translatorDir = os.path.join(os.getcwd(),'i18n')
+    for locale in locales:
+        translatorFile = 'omg.'+locale
+        if translator.load(translatorFile,translatorDir):
+            app.installTranslator(translator)
+            _translators.append(translator)
+            break
+        else: logger.warning("Unable to load translator file {} from directory {}."
+                                .format(translatorFile,translatorDir))
+
+
+def startInstallTool():
+    import subprocess, sys
+    logger.info("I will launch the install tool and terminate this application.")
+    subprocess.Popen(['python3','bin/install.py'])
+    sys.exit()
+    

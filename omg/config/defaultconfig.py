@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2009-2011 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2012 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -40,13 +40,14 @@ from collections import OrderedDict
 # No use to translate strings here, as this is executed before any translators have been loaded.
 defaults = OrderedDict((
 ("main", {
-    "collection": (str,".","Music collection base directory"),
-    "plugins": (list,["dbanalyzer","logodock"],"List of plugin names (i.e. the name of the corresponding directory in /omg/plugins/."),
+    "collection": (str,"","Music collection base directory"),
+    "plugins": (list,[],"List of plugin names (i.e. the name of the corresponding directory in /omg/plugins/."),
     "extensions": (list, ["flac", "m4a", "mp3", "mp4", "mpc", "oga", "ogg", "spx"], "file extensions")
 }),
     
 ("i18n", {
-    "locale": (str,QtCore.QLocale.system().name(), "The locale used by OMG (e.g. de_DE)."),
+    # An empty locale will start the install tool
+    "locale": (str,'', "The locale used by OMG (e.g. de_DE)."),
 }),
 
 ("database",{

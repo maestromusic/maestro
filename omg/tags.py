@@ -433,13 +433,21 @@ def changeTagType(tag,name=None,valueType=None,iconPath='',private=None,sortTags
 
 
 def loadTagTypesFromDB():
-    """Initialize _tagsById, _tagsByName and tagList from the database"""
+    """Initialize _tagsById, _tagsByName and tagList from the database. Raise a runtime error when the 
+    tags cannot be fetched from the database (e.g. because the tagids table is missing)."""
     global _tagsByName, _tagsById, tagList
     from omg import database
     _tagsById = {}
     _tagsByName = {}
-    for row in database.query("SELECT id,tagname,tagtype,icon,sorttags,private FROM {}tagids"
-                              .format(database.prefix)):
+    
+    try:
+        result = database.query("SELECT id,tagname,tagtype,icon,sorttags,private FROM {}tagids"
+                                  .format(database.prefix))
+    except database.sql.DBException:
+        logger.error("Could not fetch tags from tagids table.")
+        raise RuntimeError()
+        
+    for row in result:
         id,tagName,valueType,iconPath,sortTags,private = row
         if database.isNull(iconPath):
             iconPath = None
@@ -457,22 +465,19 @@ def loadTagTypesFromDB():
 def init():
     """Initialize the variables of this module based on the information of the tagids-table and config-file.
     At program start or after changes of that table this method must be called to ensure the module has the
-    correct tags and their IDs.
+    correct tags and their IDs. Raise a RuntimeError when tags cannot be fetched from the database correctly.
     """
-    global TITLE,ALBUM, _translation 
-    loadTagTypesFromDB()
+    global TITLE,ALBUM, _translation
     
-    # Init TITLE AND ALBUM
+    loadTagTypesFromDB()
+        
     if config.options.tags.title_tag not in _tagsByName:
-        from .gui.tagwidgets import NewTagTypeDialog
-        NewTagTypeDialog.createTagType(config.options.tags.title_tag,
-                                       text = 'need TITLE-tag to start omg')
-        loadTagTypesFromDB()
+        logger.error("Title tag '{}' is missing in tagids table.".format(config.options.tags.title_tag))
+        raise RuntimeError()
     if config.options.tags.album_tag not in _tagsByName:
-        from .gui.tagwidgets import NewTagTypeDialog
-        NewTagTypeDialog.createTagType(config.options.tags.album_tag,
-                                       text = 'need ALBUM-tag to start omg')
-        loadTagTypesFromDB()
+        logger.error("Album tag '{}' is missing in tagids table.".format(config.options.tags.album_tag))
+        raise RuntimeError()
+
     TITLE = _tagsByName[config.options.tags.title_tag]
     ALBUM = _tagsByName[config.options.tags.album_tag]
 

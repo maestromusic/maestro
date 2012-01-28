@@ -574,17 +574,21 @@ class TagEditorModel(QtCore.QObject):
                 for element in self.inner.elements}
         
     def _checkCommonAndMove(self,record,undoable):
-            # Maybe we have to move the record as the common records are sorted to the top
-            pos = self.inner.tags[record.tag].index(record)
-            border = self._commonCount(record.tag)
-            if (record.isCommon() and pos < border) or (not record.isCommon() and pos >= border):
-                return # nothing to do
-            newPos = border - 1 if record.isCommon() else border
-            if not undoable:
-                self.inner.moveRecord(record.tag,pos,newPos)
-            else:
-                command = UndoCommand(self,self.inner.moveRecord,pos,newPos)
-                self._push(command)
+        """Check whether *record* is at a valid position (uncommon records come after common ones) and if
+        not move it to a valid position. If *undoable* is True this move operation will be undoable.
+        *undoable* should be True if the change in common-state was triggered directly by the user in this
+        tageditor and False if it happened while the tageditor reacted to an event.
+        """
+        pos = self.inner.tags[record.tag].index(record)
+        border = self._commonCount(record.tag)
+        if (record.isCommon() and pos < border) or (not record.isCommon() and pos >= border):
+            return # nothing to do
+        newPos = border - 1 if record.isCommon() else border
+        if not undoable:
+            self.inner.moveRecord(record.tag,pos,newPos)
+        else:
+            command = UndoCommand(self,self.inner.moveRecord,pos,newPos)
+            self._push(command)
                 
     def _addElementsWithValue(self,tag,value,elements):
         """Add *elements* to the record defined by *tag* and *value*. Create the record when necessary."""

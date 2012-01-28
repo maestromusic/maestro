@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2009-2011 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2012 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -86,8 +86,9 @@ class ConnectionContextManager:
 def connect():
     """Connect to the database server with information from the config file. The drivers specified in
     ``config.options.database.drivers`` are tried in the given order. This method must be called exactly
-    once for each thread that wishes to access the database. It returns a :class:`ConnectionContextManager`
-    that will automatically close the connection if used in a ``with`` statement.
+    once for each thread that wishes to access the database. If successful, it returns a
+    :class:`ConnectionContextManager` that will automatically close the connection if used in a ``with``
+    statement. If the connection fails, it will raise a DBException.
     """
     threadId = threading.current_thread().ident
     if threadId in connections:
@@ -96,8 +97,7 @@ def connect():
         return connections[threadId]
 
     global prefix
-    if prefix is None:
-        prefix = config.options.database.prefix
+    prefix = config.options.database.prefix
     authValues = [config.options.database["mysql_"+key] for key in sql.AUTH_OPTIONS]
     return _connect(config.options.database.drivers,authValues)
         
@@ -109,7 +109,8 @@ def testConnect(driver=None):
     if it is empty. For safety this method will abort the program if prefix, db-name and host coincide with
     the standard values used by connect.
 
-    As :func:`connect`, this method returns a :class:`ConnectionContextManager`.
+    As :func:`connect`, this method returns a :class:`ConnectionContextManager` on success or throw a
+    DBException on failure.
     """
     threadId = threading.current_thread().ident
     if threadId in connections:
@@ -148,14 +149,12 @@ def testConnect(driver=None):
 
 
 def _connect(drivers,authValues):
-    try:
-        connection = sql.newConnection(drivers)
-        connection.connect(*authValues)
-        connections[threading.current_thread().ident] = connection
-        return ConnectionContextManager()
-    except sql.DBException as e:
-        logger.error("I cannot connect to the database. Did you provide the correct information in the config file? MySQL error: {}".format(e.message))
-        sys.exit(1)
+    """Connect to the database using the given parameters which are submitted to the connect method of the
+    driver. Throw a DBException if connection fails."""
+    connection = sql.newConnection(drivers)
+    connection.connect(*authValues)
+    connections[threading.current_thread().ident] = connection
+    return ConnectionContextManager()
     
 
 def close():
@@ -166,6 +165,11 @@ def close():
     connection = connections[threading.current_thread().ident]
     del connections[threading.current_thread().ident]
     connection.close()
+    
+
+def listTables():
+    """Return a list of all table names in the database."""
+    return list(query("SHOW TABLES").getSingleColumn())
     
     
 def resetDatabase():
@@ -184,9 +188,17 @@ def resetDatabase():
         table.create()
 
 
-def listTables():
-    """Return a list of all table names in the database."""
-    return list(query("SHOW TABLES").getSingleColumn())
+def createTables():
+    """Create all tables in an empty database (without inserting any data)."""
+    from . import tables
+    # Some tables are referenced by other tables and must therefore be dropped last and created first
+    referencedTables = [table for table in tables.tables if table.name in
+        [prefix+"elements",prefix+"tagids",prefix+"flag_names"]]
+    otherTables = [table for table in tables.tables if table not in referencedTables]
+    for table in referencedTables:
+        table.create()
+    for table in otherTables:
+        table.create()
 
 
 # Standard methods which are redirected to this thread's connection object
@@ -237,11 +249,13 @@ def contents(elids,recursive=False):
     """
     return _contentsParentsHelper(elids,recursive,"element_id","container_id")
 
+
 def parents(elids,recursive = False):
     """Return a set containing the ids of all parents of the elements with ids *elids* (which may be a list
     or a single id). If *recursive* is True all ancestors will be added recursively.
     """
     return _contentsParentsHelper(elids,recursive,"container_id","element_id")
+
 
 def _contentsParentsHelper(elids,recursive,selectColumn,whereColumn):
     if isinstance(elids,int):
@@ -309,6 +323,7 @@ def path(elid):
         raise sql.EmptyResultException(
                  "Element with id {} is not a file (or at least not in the files table).".format(elid))
 
+
 def hash(elid):
     """Return the hash of the file with id *elid* or raise an sql.EmptyResultException if that element does
     not exist.""" 
@@ -318,14 +333,15 @@ def hash(elid):
         raise sql.EmptyResultException(
                  "Element with id {} is not a file (or at least not in the files table).".format(elid))
 
+
 def setHash(element, hash):
     """Set the hash of file given by *element* to the given string and update the timestamp.
-    
     *element* must either be the pathname or the id of the file."""
     if isinstance(element, str):
         query("UPDATE {}files SET hash=? WHERE path=?".format(prefix), hash, element)
     else:
         query("UPDATE {}files SET hash=? WHERE element_id=?".format(prefix), hash, element)
+    
     
 def length(elid):
     """Return the length of the file with id *elid* or raise an sql.EmptyResultException if that element does 
@@ -336,6 +352,7 @@ def length(elid):
         raise sql.EmptyResultException(
                  "Element with id {} is not a file (or at least not in the files table).".format(elid))
 
+
 def verified(elid):
     """Return the verified-timestamp of the file with id *elid* or raise an sql.EmptyResultException if that
     element does not exist.""" 
@@ -344,13 +361,15 @@ def verified(elid):
     except sql.EmptyResultException:
         raise sql.EmptyResultException(
                  "Element with id {} is not a file (or at least not in the files table).".format(elid))
-    
+
+
 def idFromPath(path):
     """Return the element_id of a file from the given path or None if that element does not exist."""
     try:
         return query("SELECT element_id FROM {}files WHERE path=?".format(prefix),path).getSingle()
     except sql.EmptyResultException:
         return None
+
 
 def idFromHash(hash):
     """Return the element_id of a file from its hash, or None if it is not found."""
@@ -430,7 +449,8 @@ def tags(elid):
     for (tagId,value) in listTags(elid):
         result.add(tagId,value)
     return result
- 
+
+
 def listTags(elid,tagList=None):
     if tagList is not None:
         if isinstance(tagList,int) or isinstance(tagList,str) or isinstance(tagList,tagsModule.Tag):
@@ -454,11 +474,13 @@ def listTags(elid,tagList=None):
         else: tags.append((tag,val))
     return tags
 
+
 def tagValues(elid,tagList):
     """Return all values which the element with id *elid* possesses in any of the tags in tagList (which may
     be a list of tag-specifiers or simply a single tag-specifier).
     """
     return [value for tag,value in listTags(elid,tagList)] # return only the second tuple part
+
 
 def allTagValues(tagSpec):
     """Return all tag values in the database for the given tag."""
@@ -466,8 +488,10 @@ def allTagValues(tagSpec):
     return query("SELECT value FROM {}values_{} WHERE tag_id = ?"
                  .format(prefix,tag.type.name), tag.id).getSingleColumn()
     
+
 def elementsWithTagValue(tagSpec, valueSpec):
-    """Return (as list) the IDs of all elements that have a tag given by *tagSpec* with a the given *valueSpec*."""
+    """Return (as list) the IDs of all elements that have a tag given by *tagSpec* with a the given
+    *valueSpec*."""
     tag = tagsModule.get(tagSpec)
     if isinstance(valueSpec, str):
         valueID = idFromValue(tag, valueSpec)
@@ -485,17 +509,21 @@ def flags(elid):
                     "SELECT flag_id FROM {}flags WHERE element_id = ?".format(prefix),elid)
               .getSingleColumn()]
 
+
 # folders table
 #=======================================================================
 
 def folderState(path):
     return query('SELECT state FROM {}folders WHERE path=?'.format(prefix), path).getSingle()
 
+
 def addFolder(path, state):
     query('INSERT INTO {}folders SET path=?, state=?'.format(prefix), path, state)
     
+    
 def updateFolder(path, state):
     query('UPDATE {}folders SET state=? WHERE path=?'.format(prefix), state, path)
+
 
 # Help methods
 #=======================================================================
@@ -503,7 +531,9 @@ def _encodeValue(tagType,value):
     if tagType == tagsModule.TYPE_VARCHAR:
         value = str(value)
         if len(value.encode()) > constants.TAG_VARCHAR_LENGTH:
-            logger.error("Attempted to encode the following string for a varchar column although its encoded size exceeds constants.TAG_VARCHAR_LENGTH. The string will be truncated. '{}'.".format(value))
+            logger.error("Attempted to encode the following string for a varchar column although its encoded"
+                         " size exceeds constants.TAG_VARCHAR_LENGTH. The string will be truncated. '{}'."
+                         .format(value))
         return value
     elif tagType == tagsModule.TYPE_TEXT:
         return str(value)

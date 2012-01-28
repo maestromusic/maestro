@@ -1,5 +1,6 @@
 
-SOURCES = ../omg/application.py\
+SOURCES = ../bin/install.py\
+      ../omg/application.py\
 	  ../omg/gui/browserdialog.py\
 	  ../omg/gui/browser.py\
 	  ../omg/gui/dialogs.py\
