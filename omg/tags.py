@@ -35,7 +35,6 @@ information in the ``tagids``-table and use one of the following ways to get tag
       the :class:`Tag`-instance using the constructor of :class:`Tag`.
     
 \ """
-import os.path, xml.sax
 from collections import Sequence
 from functools import reduce
 

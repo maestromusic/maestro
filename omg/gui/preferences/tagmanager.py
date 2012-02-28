@@ -74,7 +74,7 @@ class TagManager(QtGui.QWidget):
         
         self._loadTags()
         self.tableWidget.itemChanged.connect(self._handleItemChanged)
-        
+    
     def _loadTags(self):
         """Load tag information from tags-module to GUI."""
         self.tableWidget.clear()
@@ -196,8 +196,9 @@ class TagManager(QtGui.QWidget):
         
         elif item.column() == self._getColumnIndex('title'):
             tag = tags.tagList[item.row()]
-            if item.text() != tag.title:
-                modify.push(modify.commands.TagTypeUndoCommand(modify.CHANGED,tag,title=item.text()))
+            itemText = item.text() if item.text() != '' else None
+            if itemText != tag.rawTitle:
+                modify.push(modify.commands.TagTypeUndoCommand(modify.CHANGED,tag,title=itemText))
                 self._loadTags()
             
         elif item.column() == self._getColumnIndex('private'): 
