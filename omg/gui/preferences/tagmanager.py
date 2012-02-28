@@ -64,6 +64,13 @@ class TagManager(QtGui.QWidget):
         addButton.clicked.connect(self._handleAddButton)
         buttonBarLayout.addWidget(addButton)
         
+        self.undoButton = QtGui.QPushButton(self.tr("Undo"))
+        self.undoButton.clicked.connect(modify.stack.undo)
+        buttonBarLayout.addWidget(self.undoButton)
+        self.redoButton = QtGui.QPushButton(self.tr("Redo"))
+        self.redoButton.clicked.connect(modify.stack.redo)
+        buttonBarLayout.addWidget(self.redoButton)
+        
         buttonBarLayout.addStretch(1)
         
         style = QtGui.QApplication.style()
@@ -73,8 +80,16 @@ class TagManager(QtGui.QWidget):
         buttonBarLayout.addWidget(closeButton)
         
         self._loadTags()
+        self._checkUndoRedoButtons()
         self.tableWidget.itemChanged.connect(self._handleItemChanged)
+        modify.stack.indexChanged.connect(self._checkUndoRedoButtons)
+        modify.dispatcher.changes.connect(self._handleDispatcher)
     
+    def _handleDispatcher(self,event):
+        """React to TagTypeChangedEvents from the dispatcher."""
+        if isinstance(event,modify.events.TagTypeChangedEvent):
+            self._loadTags()
+            
     def _loadTags(self):
         """Load tag information from tags-module to GUI."""
         self.tableWidget.clear()
@@ -158,8 +173,6 @@ class TagManager(QtGui.QWidget):
     def _handleAddButton(self):
         """Open a NewTagTypeDialog and create a new tag."""
         tag = tagwidgets.NewTagTypeDialog.createTagType(tagname='',tagnameEditable=True,privateEditable=True)
-        if tag is not None:
-            self._loadTags()
     
     def _handleRemoveButton(self,tag):
         """Ask the user if he really wants this and if so, remove the tag."""
@@ -168,9 +181,7 @@ class TagManager(QtGui.QWidget):
             dialogs.warning(self.tr("Cannot remove tag"),
                             self.tr("Cannot remove a tag that appears in elements."))
             return
-        
         modify.push(modify.commands.TagTypeUndoCommand(modify.DELETED,tag))
-        self._loadTags()
 
     def _handleItemChanged(self,item):
         """Handle changes to the name or private state of a tag."""
@@ -192,14 +203,12 @@ class TagManager(QtGui.QWidget):
                     item.setText(oldName) # Reset
                     return
             modify.push(modify.commands.TagTypeUndoCommand(modify.CHANGED,tag,name=newName))
-            self._loadTags()
         
         elif item.column() == self._getColumnIndex('title'):
             tag = tags.tagList[item.row()]
             itemText = item.text() if item.text() != '' else None
             if itemText != tag.rawTitle:
                 modify.push(modify.commands.TagTypeUndoCommand(modify.CHANGED,tag,title=itemText))
-                self._loadTags()
             
         elif item.column() == self._getColumnIndex('private'): 
             tag = tags.tagList[item.row()]
@@ -213,8 +222,16 @@ class TagManager(QtGui.QWidget):
                 item.setText(oldName)
                 return
             modify.push(modify.commands.TagTypeUndoCommand(modify.CHANGED,tag,private=newPrivate))
-            self._loadTags()
-                
+
+    def _checkUndoRedoButtons(self):
+        """Enable or disable the undo and redo buttons depending on stack state."""
+        self.undoButton.setEnabled(modify.stack.canUndo()
+                            and isinstance(modify.stack.command(modify.stack.index()-1),
+                                           modify.commands.TagTypeUndoCommand))
+        self.redoButton.setEnabled(modify.stack.canRedo()
+                            and isinstance(modify.stack.command(modify.stack.index()),
+                                           modify.commands.TagTypeUndoCommand))
+        
     def _handleValueTypeChanged(self,tag,type):
         """Handle changes to the comboboxes containing valuetypes."""
         number,allowChanges = self._appearsInElements(tag)
