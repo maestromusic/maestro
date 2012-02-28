@@ -19,81 +19,74 @@
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
+
 class IconChooser(QtGui.QDialog):
-    
-    maxCols = 10
-    iconSize = 32
-    def __init__(self, defaultPaths, parent = None):
+    """Lets the user choose an icon from a list or using a file dialog to choose an arbitrary icon. *folders*
+    is a list of directory paths. The dialog will display all files in these directories. If *defaultPath*
+    is the path of a displayed icon, it will be selected.
+    """
+    def __init__(self, folders, defaultPath, parent = None):
         super().__init__(parent)
+        self.setWindowTitle(self.tr("Choose an icon"))
         
-        layout = QtGui.QVBoxLayout()
+        layout = QtGui.QVBoxLayout(self)
         icons = []
-        for path in defaultPaths:
+        for path in folders:
             for file in QtCore.QDir(path).entryInfoList(filters=QtCore.QDir.Files):
                 try:
                     icon = QtGui.QIcon(file.canonicalFilePath())
                     icons.append( (icon, file) )
                 except Exception as e:
-                    print(e)
-        self.table = QtGui.QTableWidget(self)
-        self.table.setColumnCount(min(self.maxCols, len(icons)))
-        self.table.setRowCount( (len(icons)-1) // self.maxCols + 1)
-        self.table.verticalHeader().setVisible(False)
-        self.table.horizontalHeader().setVisible(False)
-        self.table.setShowGrid(False)
-        self.table.setIconSize(QtCore.QSize(self.iconSize, self.iconSize))
-        self.table.doubleClicked.connect(self.accept)
+                    print(e) # TODO remove print
+        self.view = QtGui.QListWidget(self)
+        self.view.setViewMode(QtGui.QListView.IconMode)
+        self.view.doubleClicked.connect(self.accept)
+       
         self.row = self.col = 0
+        if defaultPath is not None:
+            defaultFile = QtCore.QFileInfo(defaultPath)
+        else: defaultFile = None
         for icon, file in icons:
-            item = QtGui.QTableWidgetItem(icon, "")
+            item = QtGui.QListWidgetItem(icon,'')
             item.setData(Qt.UserRole, file.canonicalFilePath())
             item.setToolTip(file.baseName())
-            self.addItem(item)
+            self.view.addItem(item)
+            if file == defaultFile:
+                self.view.setItemSelected(item,True)
+                self.view.setCurrentItem(item)
                 
-        self.table.resizeColumnsToContents()
-        self.table.resizeRowsToContents()
-        layout.addWidget(self.table)
-        
-        buttonBox = QtGui.QHBoxLayout()
+        layout.addWidget(self.view)
+        buttonBox = QtGui.QDialogButtonBox()
+        layout.addWidget(buttonBox)
         
         addButton = QtGui.QPushButton(self.tr("Add..."))
-        cancelButton = QtGui.QPushButton(self.tr("Cancel"))
-        okButton = QtGui.QPushButton(self.tr("Ok"))
-        
-        buttonBox.addWidget(addButton)
-        buttonBox.addStretch()
-        buttonBox.addWidget(cancelButton)
-        buttonBox.addWidget(okButton)
+        addButton.clicked.connect(self._handleAdd)
+        buttonBox.addButton(addButton,QtGui.QDialogButtonBox.ActionRole)
+        cancelButton = buttonBox.addButton(QtGui.QDialogButtonBox.Cancel)
         cancelButton.clicked.connect(self.reject)
+        okButton = buttonBox.addButton(QtGui.QDialogButtonBox.Ok)
         okButton.clicked.connect(self.accept)
-        addButton.clicked.connect(self.handleAdd)
-        layout.addLayout(buttonBox)
-        self.setLayout(layout)
+        
         self.resize(320, 350)
     
     @staticmethod
-    def getIcon(defaultPaths, parent = None):
-        chooser = IconChooser(defaultPaths, parent)
+    def getIcon(folders,defaultPath,parent = None):
+        """Let the user choose an icon using an IconChooser dialog. Return the icon and its path if the user
+        selected an icon. Return None otherwise."""
+        chooser = IconChooser(folders,defaultPath,parent)
         if chooser.exec_() == QtGui.QDialog.Accepted:
-            item = chooser.table.currentItem()
+            item = chooser.view.currentItem()
             return (item.data(Qt.DecorationRole), item.data(Qt.UserRole))
-        else:
-            return None
-        
-    def addItem(self, item):
-        self.table.setItem(self.row, self.col, item)
-        if self.col < self.maxCols - 1:
-            self.col += 1
-        else:
-            self.col = 0
-            self.row += 1
+        else: return None
                 
-    def handleAdd(self):
-        fileName = QtGui.QFileDialog.getOpenFileName(self,self.tr("Choose flag icon"),
+    def _handleAdd(self):
+        """Handle clicks on the add button: Open a file dialog."""
+        fileName = QtGui.QFileDialog.getOpenFileName(self,self.tr("Choose an icon"),
                                                      filter = self.tr("Images (*.png *.xpm *.jpg)"))
         if fileName:
             icon = QtGui.QIcon(fileName)
-            item = QtGui.QTableWidgetItem(icon, "")
+            item = QtGui.QListWidgetItem(icon,'')
             item.setData(Qt.UserRole, fileName)
             item.setToolTip(fileName)
-            self.addItem(item)
+            self.view.addItem(item)
+            
