@@ -190,8 +190,10 @@ class StandardDelegate(AbstractDelegate):
                         texts.append(text)
         
         if appendRemainingTags:
-            leftTexts.extend('{}: {}'.format(tag.title,self.getFormattedTagValues(tag,element))
-                             for tag in element.tags if tag not in seenTags)
+            remainingTagValues = {tag: self.getFormattedTagValues(tag,element)
+                                    for tag in element.tags if tag not in seenTags}
+            leftTexts.extend('{}: {}'.format(tag.title,values)
+                                    for tag,values in remainingTagValues.items() if values != '')
             
         return leftTexts,rightTexts
 
