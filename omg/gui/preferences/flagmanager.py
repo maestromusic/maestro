@@ -224,7 +224,7 @@ class FlagManager(QtGui.QWidget):
     def _openIconDialog(self,flagType):
         """Open a file dialog so that the user may choose an icon for the given flag."""
         # Choose a sensible directory as starting point
-        from .. import iconchooser
+        from ..misc import iconchooser
         result = iconchooser.IconChooser.getIcon([':omg/flags'],flagType.iconPath,self)
         
         if result and result[1] != tagType.iconPath:

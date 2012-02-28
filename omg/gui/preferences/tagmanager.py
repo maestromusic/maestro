@@ -269,7 +269,7 @@ class TagManager(QtGui.QWidget):
     def _openIconDialog(self,tagType):
         """Open a file dialog so that the user may choose an icon for the given tag."""
         # Choose a sensible directory as starting point
-        from .. import iconchooser
+        from ..misc import iconchooser
         result = iconchooser.IconChooser.getIcon([':omg/tags'],tagType.iconPath,self)
         
         if result and result[1] != tagType.iconPath:
