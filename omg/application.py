@@ -152,7 +152,8 @@ def lock():
     # Confer http://packages.python.org/tendo/_modules/tendo/singleton.html#SingleInstance
     lockFile = os.path.join(config.CONFDIR,'lock')
     try:
-        fileDescriptor = open(lockFile,'w')
+        # For a long time the built-in function open was used here. But one day it stopped working oO
+        fileDescriptor = os.open(lockFile,os.O_WRONLY)
     except IOError:
         logger.error("Cannot open lock file {}".format(lockFile))
         sys.exit(-1)
@@ -164,6 +165,7 @@ def lock():
         
 
 _translators = []
+
 
 def loadTranslators(app,logger):
     """Load a translator for Qt's strings and one for OMG's strings."""
