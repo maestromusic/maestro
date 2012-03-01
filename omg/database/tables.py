@@ -96,7 +96,6 @@ tables = [SQLTable(createQuery) for createQuery in (
         tagtype  ENUM('varchar','date','text') NOT NULL DEFAULT 'varchar',
         title    VARCHAR(63)                   DEFAULT NULL,
         icon     VARCHAR(255)                  DEFAULT NULL,
-        sorttags VARCHAR(20)                   NOT NULL,
         private  BOOLEAN                       NOT NULL,
         PRIMARY KEY(id),
         UNIQUE INDEX(tagname)

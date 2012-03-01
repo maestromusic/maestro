@@ -261,8 +261,9 @@ class OrderedDict(dict):
     in contrast to :class:`collections.OrderedDict`. By default new mappings will be appended at the end of
     the order. Use the insert*-methods to insert somewhere else.
     
-    Note that currently the views returned by :meth:`keys <dict.keys>`, :meth:`values <dict.values>` and
-    :meth:`items <dict.items>` do not respect the order."""
+    Note that currently the views returned by :meth:`keys <dict.keys>` and :meth:`values <dict.values>` do
+    not respect the order.
+    """
     def __init__(self):
         dict.__init__(self)
         self._keyList = []

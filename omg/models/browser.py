@@ -52,11 +52,11 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
     
     nodeLoaded = QtCore.pyqtSignal(Node)
     
-    def __init__(self,layers,browser):
+    def __init__(self,layers,sortTags):
         rootedtreemodel.RootedTreeModel.__init__(self,RootNode(self))
         self.table = None
-        self.browser = browser
         self.layers = layers
+        self.sortTags = sortTags
         self._searchRequests = []
         
         if searchEngine is None:
@@ -239,13 +239,23 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
                 element.loadContents(recursive=True,table=self.table,loadData=False)
         
         # Finally sort the contents
-        for sortTag in reversed(node.getSortTags()):
+        sortTags = [tags.TITLE] # by default sort for titles
+        if isinstance(node,ValueNode):
+            # In the rare case that the ValueNode's value belongs to two tags (i.e. artist and composer)
+            # with different sortTags, we simply choose the first
+            tagToDetermineSortTags = tags.get(list(node.valueIds.keys())[0])
+            if tagToDetermineSortTags in self.sortTags:
+                sortTags = self.sortTags[tagToDetermineSortTags]
+            
+        for sortTag in reversed(sortTags):
             reverse = sortTag.type == tags.TYPE_DATE
             p = utils.PointAtInfinity(not reverse)
             node.contents.sort(
+                # TODO: respect sortvalues for e.g. composers
                 key = lambda el: el.tags[sortTag][0] if sortTag in el.tags else p,
                 reverse = reverse
             )
+                
         if contentsNone:
             self.endInsertRows()
 
@@ -333,7 +343,7 @@ class ValueNode(CriterionNode):
     """
     def __init__(self,parent,model,value,valueIds,sortValue):
         """Initialize this ValueNode with the parent-node *parent* and the given model. *valueIds* is a dict
-        mapping tags to value-ids of the tag. This node will contain elements having at least one of the
+        mapping tag-ids to value-ids of the tag. This node will contain elements having at least one of the
         value-ids in the corresponding tag. *value* is the value of the value-ids (which should be the same
         for all tags) and will be displayed on the node.
         """
@@ -344,11 +354,6 @@ class ValueNode(CriterionNode):
     
     def getCriterion(self):
         return search.criteria.TagIdCriterion(self.valueIds)
-    
-    def getSortTags(self):
-        """Return the tags that should be used to sort the nodes below this one."""
-        # TODO: Do something if there are several tags with different sorttags
-        return tags.get(list(self.valueIds.keys())[0]).sortTags
 
     def addValues(self,other):
         """Add the values (and sortValues) of *other* to this node. This won't affect the contents of this
@@ -388,11 +393,6 @@ class VariousNode(CriterionNode):
     def getCriterion(self):
         return search.criteria.MissingTagCriterion(self.tagSet)
     
-    def getSortTags(self):
-        """Return the tags that should be used to sort the nodes below this one."""
-        # TODO: Do something if there are several tags with different sorttags
-        return tags.get(list(self.tagSet)[0]).sortTags
-        
     def __str__(self):
         return "<VariousNode>"
         

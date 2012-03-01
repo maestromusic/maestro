@@ -42,7 +42,6 @@ class TagManager(QtGui.QWidget):
                 ("type",   self.tr("Type")),
                 ("title",  self.tr("Title")),
                 ("private",self.tr("Private?")),
-                ("sort",   self.tr("Sort-Tags")),
                 ("number", self.tr("# of elements")),
                 ("actions",self.tr("Actions"))
                 ]
@@ -140,11 +139,6 @@ class TagManager(QtGui.QWidget):
                 item.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
             else: item.setFlags(Qt.ItemIsUserCheckable)
             item.setCheckState(Qt.Checked if tag.private else Qt.Unchecked)
-            self.tableWidget.setItem(row,column,item)
-        
-            column = self._getColumnIndex("sort")
-            item = QtGui.QTableWidgetItem(', '.join(t.name for t in tag.sortTags))
-            item.setFlags(Qt.ItemIsEnabled)
             self.tableWidget.setItem(row,column,item)
             
             column = self._getColumnIndex("number")

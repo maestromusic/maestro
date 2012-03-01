@@ -154,6 +154,7 @@ class Browser(QtGui.QWidget):
         # Restore state
         viewsToRestore = config.storage.browser.views
         self.delegateConfig = None # will load default delegate
+        self.sortTags = {}
         if state is not None and isinstance(state,dict):
             if 'instant' in state:
                 self.searchBox.setInstantSearch(state['instant'])
@@ -172,7 +173,16 @@ class Browser(QtGui.QWidget):
                                         state['delegate'],browserdelegate.BrowserDelegate.configurationType)
                 except ValueError:
                     pass # Use default delegate (see above)
-        
+            if 'sortTags' in state:
+                for tagName,tagList in state['sortTags'].items():
+                    if tags.exists(tagName):
+                        tagList = [tags.get(name) for name in tagList if tags.exists(name)]
+                        if len(tagList) > 0:
+                            self.sortTags[tags.get(tagName)] = tagList
+            elif tags.exists('artist') and tags.exists('date'):
+                # Load a reasonable default
+                self.sortTags = {tags.get('artist'): [tags.get('date')]}
+            
         modify.dispatcher.changes.connect(self._handleDispatcher)
         
         # Convert tag names to tags, leaving the nested list structure unchanged.
@@ -192,7 +202,8 @@ class Browser(QtGui.QWidget):
             'showHiddenValues': self.showHiddenValues,
             'views': utils.mapRecursively(lambda tag: tag.name,[view.model().layers for view in self.views]),
             'flags': [flagType.name for flagType in flags],
-            'delegate': self.delegateConfig.title
+            'delegate': self.delegateConfig.title,
+            'sortTags': {tag.name: [t.name for t in sortTags] for tag,sortTags in self.sortTags.items()}
         }
     
     def load(self,restoreExpanded=False):
@@ -237,7 +248,7 @@ class Browser(QtGui.QWidget):
             view.setParent(None)
         self.views = []
         for layers in layersList:
-            newView = BrowserTreeView(self,layers,self.delegateConfig)
+            newView = BrowserTreeView(self,layers,self.sortTags,self.delegateConfig)
             self.views.append(newView)
             newView.selectionModel().selectionChanged.connect(
                                     functools.partial(self.selectionChanged.emit,newView.selectionModel()))
@@ -341,9 +352,9 @@ class BrowserTreeView(treeview.TreeView):
     actionConfig.addActionDefinition(((sect, 'flatten'),), FlattenAction)
     actionConfig.addActionDefinition(((sect, 'major'),), ToggleMajorAction)
     
-    def __init__(self,parent,layers,delegateConfig):
+    def __init__(self,parent,layers,sortTags,delegateConfig):
         treeview.TreeView.__init__(self,parent)
-        self.setModel(browsermodel.BrowserModel(layers,parent))
+        self.setModel(browsermodel.BrowserModel(layers,sortTags))
         self.header().sectionResized.connect(self.model().layoutChanged)
         self.setItemDelegate(browserdelegate.BrowserDelegate(self,delegateConfig))
         self._optimizers = []

@@ -492,22 +492,6 @@ class RenameTagValueCommand(UndoCommand):
             
 
 class TagTypeUndoCommand(UndoCommand):
-    """This command changes *tagType* according to the other parameters and vice versa (default values won't
-    change the corresponding attribute). For the attributes see ``tags.changeTagType``."""
-    def __init__(self,tagType,name=None,valueType=None,iconPath='',private=None,sortTags=None):
-        super().__init__(level=None,changes=None)
-        self.tagType = tagType
-        self.oldData = (tagType.name,tagType.type,tagType.iconPath,tagType.private,tagType.sortTags)
-        self.newData = (name,valueType,iconPath,private,sortTags)
-        
-    def redo(self):
-        tagsModule.changeTagType(self.tagType,*self.newData)
-
-    def undo(self):
-        tagsModule.changeTagType(self.tagType,*self.oldData)
-        
-
-class TagTypeUndoCommand(UndoCommand):
     """This command adds, changes or deletes a tagtype. What parameters are necessary depends on the
     first parameter *action* which may be one of
     
@@ -519,7 +503,7 @@ class TagTypeUndoCommand(UndoCommand):
     
     \ """
     def __init__(self,action,tagType=None,name=None,valueType=None,title='',
-                 iconPath='',private=None,sortTags=None):
+                 iconPath='',private=None):
         texts = {ADDED:   translate("TagTypeUndoCommand","Add tagtype"),
                  DELETED: translate("TagTypeUndoCommand","Delete tagtype"),
                  CHANGED: translate("TagTypeUndoCommand","Change tagtype")
@@ -528,9 +512,8 @@ class TagTypeUndoCommand(UndoCommand):
         self.action = action
         self.tagType = tagType
         if action != ADDED:
-            self.oldData = (tagType.name,tagType.type,tagType.title,
-                            tagType.iconPath,tagType.private,tagType.sortTags)
-        self.newData = (name,valueType,title,iconPath,private,sortTags)
+            self.oldData = (tagType.name,tagType.type,tagType.title,tagType.iconPath,tagType.private)
+        self.newData = (name,valueType,title,iconPath,private)
         
     def redo(self):
         if self.action == ADDED:

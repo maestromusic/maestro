@@ -80,7 +80,8 @@ def _openDialog():
 
 
 class DBAnalyzerDialog(QtGui.QDialog):
-    """A dialog that displays statistics about the database, finds errors in it and allows the user to correct them."""
+    """A dialog that displays statistics about the database, finds errors in it and allows the user to
+    correct them."""
     currentCheck = None # The check that is currently displayed in the details view.
     
     def __init__(self,parent=None,dialog=False):
@@ -178,8 +179,7 @@ class DBAnalyzerDialog(QtGui.QDialog):
         # Tags
         tags = self.getTags()
         self.tagTable.setRowCount(len(tags))
-        for i,header in enumerate(("id","tagname","tagtype","sorttags","private",
-                                   self.tr("Values"),self.tr("Refs"))):
+        for i,header in enumerate(("id","tagname","tagtype","private",self.tr("Values"),self.tr("Refs"))):
             self.tagTable.setHorizontalHeaderItem(i,QtGui.QTableWidgetItem(header))
         for i,tuple in enumerate(tags):
             for j,data in enumerate(tuple):
@@ -216,7 +216,9 @@ class DBAnalyzerDialog(QtGui.QDialog):
                 if check.getNumber() > 0:
                     self.loadDetails(check)
                     break
-            else: self.loadDetails(self.checks[0]) # Everything is fine. Simply display the first check (disabled).
+            else:
+                # Everything is fine. Simply display the first check (disabled).
+                self.loadDetails(self.checks[0])
         else: self.loadDetails(self.currentCheck)
 
     def _handleCellClicked(self,row,column):
@@ -225,7 +227,8 @@ class DBAnalyzerDialog(QtGui.QDialog):
         self.loadDetails(check)
 
     def loadDetails(self,check):
-        """Load details for the current check into the details table and label. Deactivate the table if there are no problems with the current check."""
+        """Load details for the current check into the details table and label. Deactivate the table if there
+        are no problems with the current check."""
         self.currentCheck = check
         self.fixButton.setEnabled(check.getNumber() > 0)
 
@@ -283,21 +286,13 @@ class DBAnalyzerDialog(QtGui.QDialog):
     def getTags(self):
         """Gather and return the data for the tags table."""
         tags = []
-        result = db.query("SELECT id,tagname,tagtype,sorttags,private FROM {}tagids ORDER BY id".format(db.prefix))
+        result = db.query("SELECT id,tagname,tagtype,private FROM {}tagids ORDER BY id".format(db.prefix))
         for id,name,type,sort,private in result:
-            sortTags = []
-            if len(sort) > 0:
-                for sortId in sort.split(','):
-                    try:
-                        sortTags.append(db.query("SELECT tagname FROM {}tagids WHERE id = {}"
-                                                   .format(db.prefix,sortId)).getSingle())
-                    except db.sql.EmptyResultException:
-                        sortTags.append('{} (INVALID!)'.format(sortId))
-            sortTags = ", ".join(sortTags) 
-                        
-            tuple = (id,name,type,sortTags,private,
-                db.query("SELECT COUNT(*) FROM {}values_{} WHERE tag_id={}".format(db.prefix,type,id)).getSingle(),
-                db.query("SELECT COUNT(*) FROM {}tags WHERE tag_id={}".format(db.prefix,id)).getSingle()
+            tuple = (id,name,type,private,
+                db.query("SELECT COUNT(*) FROM {}values_{} WHERE tag_id={}"
+                         .format(db.prefix,type,id)).getSingle(),
+                db.query("SELECT COUNT(*) FROM {}tags WHERE tag_id={}"
+                         .format(db.prefix,id)).getSingle()
              )
             tags.append(tuple)
         return(tags)

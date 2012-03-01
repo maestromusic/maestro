@@ -32,6 +32,10 @@ from omg import config, logging, database
 mainWindow = None
 
 global logger
+        
+# Store translators so that they are not garbage-collected
+_translators = []
+
 
 def init(cmdConfig = [],initTags=True,testDB=False,useInstallTool=False):
     """Initialize the application, modules (config, logging, database and tags) but do not create a GUI or
@@ -162,9 +166,6 @@ def lock():
     except IOError:
         logger.error("Another instance is already running, quitting.")
         sys.exit(-1)
-        
-
-_translators = []
 
 
 def loadTranslators(app,logger):

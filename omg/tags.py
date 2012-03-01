@@ -183,7 +183,7 @@ class Tag:
         :func:`get` will fail and you have to create your own instances. If you use the common instance, it
         will get automatically updated on TagTypeChangeEvents.
     """
-    def __init__(self,id,name,valueType,title,iconPath,sortTags,private=False):
+    def __init__(self,id,name,valueType,title,iconPath,private=False):
         if not isinstance(id,int) or not isinstance(name,str) or not isinstance(valueType,ValueType) \
                 or (title is not None and not isinstance(title,str)):
             raise TypeError("Invalid type (id,name,valueType,title): ({},{},{},{}) of types ({},{},{},{})"
@@ -194,7 +194,6 @@ class Tag:
         self.type = valueType
         self.rawTitle = title
         self.setIconPath(iconPath)
-        self.sortTags = sortTags
         self.private = private
 
     def setIconPath(self,iconPath):
@@ -322,10 +321,9 @@ def fromTitle(title):
     else: return get(title)
 
     
-def addTagType(name,valueType,title=None,iconPath=None,private=False,sortTags=None,tagType=None):
-    """Adds a new tag named *name* of type *valueType* to the database. The parameter *sort* is a list of
-    tags by which elements should be sorted if displayed below a ValueNode of this new tag; this defaults to
-    the title tag. If *private* is True, a private tag is created.
+def addTagType(name,valueType,title=None,iconPath=None,private=False,tagType=None):
+    """Adds a new tag named *name* of type *valueType* and with title *title* to the database.
+    If *private* is True, a private tag is created.
     
     Alternatively, if *tagType* is given, this tagtype with its id and data will be added to
     the database ignoring all other arguments. This is only used to undo a tagtype's deletion.
@@ -335,10 +333,9 @@ def addTagType(name,valueType,title=None,iconPath=None,private=False,sortTags=No
     from . import database as db
     from .modify import dispatcher, events, ADDED
     if tagType is not None:
-        data = (tagType.id,tagType.name,tagType.type.name,tagType.title,tagType.iconPath,
-                ','.join(str(tag.id) for tag in tagType.sortTags), tagType. private)
+        data = (tagType.id,tagType.name,tagType.type.name,tagType.title,tagType.iconPath,tagType.private)
         db.query(
-            "INSERT INTO {}tagids (id,tagname,tagtype,title,icon,sorttags,private) VALUES (?,?,?,?,?,?,?)"
+            "INSERT INTO {}tagids (id,tagname,tagtype,title,icon,private) VALUES (?,?,?,?,?,?)"
               .format(db.prefix),*data)
         _tagsByName[tagType.name] = tagType
         _tagsById[tagType.id] = tagType
@@ -350,14 +347,12 @@ def addTagType(name,valueType,title=None,iconPath=None,private=False,sortTags=No
     name = name.lower()
     if name in _tagsByName:
         raise RuntimeError("Requested creation of tag {} which is already there".format(name))
-    if sortTags is None:
-        sortTags = [TITLE] if TITLE is not None else []
     
     id = db.query(
-        "INSERT INTO {}tagids (tagname,tagtype,title,icon,sorttags,private) "
-        "VALUES (?,?,?,?,?,?)".format(db.prefix),
-        name,valueType.name,title,iconPath,','.join(str(tag.id) for tag in sortTags), private).insertId()
-    newTag = Tag(id,name,valueType,title,iconPath,sortTags,private)
+        "INSERT INTO {}tagids (tagname,tagtype,title,icon,private) VALUES (?,?,?,?,?)".format(db.prefix),
+        name,valueType.name,title,iconPath,private
+        ).insertId()
+    newTag = Tag(id,name,valueType,title,iconPath,private)
     _tagsByName[name] = newTag
     _tagsById[id] = newTag
     tagList.append(newTag)
@@ -380,13 +375,12 @@ def removeTagType(tag):
     del _tagsByName[tag.name]
     del _tagsById[tag.id]
     tagList.remove(tag)
-    # TODO: The removed tag may still appear in the sorttags of other tags
             
     from .modify import dispatcher, events, DELETED
     dispatcher.changes.emit(events.TagTypeChangedEvent(DELETED,tag))
 
 
-def changeTagType(tag,name=None,valueType=None,title='',iconPath='',private=None,sortTags=None):
+def changeTagType(tag,name=None,valueType=None,title='',iconPath='',private=None):
     """Change a tagtype. In particular update the instance *tag* (this is usually the only instance of this
     tag) and the database. The other arguments determine what to change. Omit them to leave a property
     unchanged. This method will not touch any files though!
@@ -427,13 +421,6 @@ def changeTagType(tag,name=None,valueType=None,title='',iconPath='',private=None
     if private is not None and bool(private) != tag.private:
         assignments.append('private = 1' if private else 'private = 0')
         tag.private = bool(private)
-        
-    if sortTags is not None and sortTags != tag.sortTags:
-        if not all(isinstance(sortTag,Tag) for sortTag in sortTags):
-            raise ValueError("SortTags must be a list of tags.")
-        assignments.append('sorttags = ?')
-        params.append(','.join(str(sortTag.id) for sortTag in sortTags))
-        tag.sortTags = sortTags
     
     if len(assignments) > 0:
         if tag.name != oldName:
@@ -457,25 +444,25 @@ def loadTagTypesFromDB():
     _tagsByName = {}
     
     try:
-        result = db.query("SELECT id,tagname,tagtype,title,icon,sorttags,private FROM {}tagids"
+        result = db.query("SELECT id,tagname,tagtype,title,icon,private FROM {}tagids"
                                   .format(db.prefix))
     except db.sql.DBException:
         logger.error("Could not fetch tags from tagids table.")
         raise RuntimeError()
         
     for row in result:
-        id,tagName,valueType,title,iconPath,sortTags,private = row
+        id,tagName,valueType,title,iconPath,private = row
         if db.isNull(title):
             title = None
             
         if db.isNull(iconPath):
             iconPath = None
         valueType = ValueType.byName(valueType)
-        newTag = Tag(id,tagName,valueType,title,iconPath,sortTags,private)
+        newTag = Tag(id,tagName,valueType,title,iconPath,private)
         _tagsById[newTag.id] = newTag
         _tagsByName[newTag.name] = newTag
         
-    # tagList contains the tags in the order specified by tags->tag_order...
+    # tagList contains the tags in the order specified by config.options.tags.tag_order...
     tagList = [ _tagsByName[name] for name in config.options.tags.tag_order if name in _tagsByName ]
     # ...and then all remaining tags in arbitrary order
     tagList.extend(set(_tagsByName.values()) - set(tagList))
@@ -499,15 +486,6 @@ def init():
 
     TITLE = _tagsByName[config.options.tags.title_tag]
     ALBUM = _tagsByName[config.options.tags.album_tag]
-
-    # Replace comma separated list of sorttags-ids by tuples of tags. This cannot be done in Tag.__init__ as
-    # all tags need to be created already.
-    for tag in _tagsById.values():
-        try:
-            tag.sortTags = tuple(_tagsById[int(id)] for id in tag.sortTags.split(',') if id != "")
-        except KeyError:
-            logger.error("Tag {} contains an invalid sortTag.".format(tag.name))
-            tag.sortTags = (TITLE,)
 
 
 class TagValueList(list):
