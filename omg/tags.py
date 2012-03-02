@@ -452,7 +452,7 @@ def loadTagTypesFromDB():
         
     for row in result:
         id,tagName,valueType,title,iconPath,private = row
-        if db.isNull(title):
+        if db.isNull(title) or title == "":
             title = None
             
         if db.isNull(iconPath):
