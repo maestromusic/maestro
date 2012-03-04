@@ -41,7 +41,7 @@ from PyQt4.QtCore import Qt
 from omg import config, logging, database as db
 from omg.application import loadTranslators
 from omg.tags import isValidTagname
-from omg.gui import iconchooser
+from omg.gui.misc import iconchooser
 
 logger = logging.getLogger("Install tool")
 
@@ -643,7 +643,8 @@ class IconLabel(QtGui.QLabel):
             self.setPath(result[1])
 
 
-if __name__ == "__main__":
+def run():
+    global app
     app = QtGui.QApplication([])
     from omg import resources
     widget = InstallToolWindow()
