@@ -125,10 +125,9 @@ class InstallToolWindow(QtGui.QWidget):
         # Write config values
         config.shutdown()
         
-        import subprocess, sys
+        import sys
         logger.info("Install tool finished. Ready to start OMG.")
-        subprocess.Popen(['bin/omg'])
-        sys.exit()
+        sys.exit(0)
     
     def _handlePrevButton(self):
         """Handle the previous button."""

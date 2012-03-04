@@ -171,7 +171,7 @@ def lock():
     lockFile = os.path.join(config.CONFDIR,'lock')
     try:
         # For a long time the built-in function open was used here. But one day it stopped working oO
-        fileDescriptor = os.open(lockFile,os.O_WRONLY)
+        fileDescriptor = os.open(lockFile,os.O_WRONLY| os.O_CREAT)
     except IOError:
         logger.error("Cannot open lock file {}".format(lockFile))
         sys.exit(-1)
