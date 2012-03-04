@@ -3,7 +3,7 @@
 <context>
     <name>AbstractDelegate</name>
     <message numerus="yes">
-        <location filename="../omg/gui/delegates/__init__.py" line="218"/>
+        <location filename="../omg/gui/delegates/__init__.py" line="220"/>
         <source>%n piece(s)</source>
         <translation>
             <numerusform>%n piece</numerusform>
@@ -112,12 +112,12 @@
 <context>
     <name>ConfigureGuessProfilesDialog</name>
     <message>
-        <location filename="../omg/gui/editor.py" line="292"/>
+        <location filename="../omg/gui/editor.py" line="293"/>
         <source>Configure Album Guessing Profiles</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/gui/editor.py" line="294"/>
+        <location filename="../omg/gui/editor.py" line="295"/>
         <source>Configuration of the &quot;album guessing&quot; profiles. These profiles determine how the editor tries to 
 guess the album structure of files which are dropped into the editor.
 
@@ -127,42 +127,42 @@ is on, files will only be grouped together if they are in the same directory.</s
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/gui/editor.py" line="309"/>
+        <location filename="../omg/gui/editor.py" line="310"/>
         <source>new</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/gui/editor.py" line="311"/>
+        <location filename="../omg/gui/editor.py" line="312"/>
         <source>remove</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/gui/editor.py" line="322"/>
+        <location filename="../omg/gui/editor.py" line="323"/>
         <source>profile name:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/gui/editor.py" line="332"/>
+        <location filename="../omg/gui/editor.py" line="333"/>
         <source>add tag...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/gui/editor.py" line="345"/>
+        <location filename="../omg/gui/editor.py" line="346"/>
         <source>remove tag</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/gui/editor.py" line="347"/>
+        <location filename="../omg/gui/editor.py" line="348"/>
         <source>directory mode</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/gui/editor.py" line="356"/>
+        <location filename="../omg/gui/editor.py" line="357"/>
         <source>set to main</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/gui/editor.py" line="380"/>
+        <location filename="../omg/gui/editor.py" line="381"/>
         <source>newProfile</source>
         <translation type="unfinished"></translation>
     </message>
@@ -175,42 +175,42 @@ is on, files will only be grouped together if they are in the same directory.</s
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="103"/>
+        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="104"/>
         <source>Statistics</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="114"/>
+        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="115"/>
         <source>Tags</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="124"/>
+        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="125"/>
         <source>Problems</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="144"/>
+        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="145"/>
         <source>Fix problem</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="149"/>
+        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="150"/>
         <source>Refresh</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="155"/>
+        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="156"/>
         <source>Close</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="181"/>
+        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="182"/>
         <source>Values</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="181"/>
+        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="182"/>
         <source>Refs</source>
         <translation type="unfinished"></translation>
     </message>
@@ -225,42 +225,42 @@ is on, files will only be grouped together if they are in the same directory.</s
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="239"/>
+        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="242"/>
         <source>OK</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="244"/>
+        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="247"/>
         <source>Details for check &apos;{}&apos;:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="263"/>
+        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="266"/>
         <source>Elements</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="266"/>
+        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="269"/>
         <source>Files</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="269"/>
+        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="272"/>
         <source>Containers</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="272"/>
+        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="275"/>
         <source>Toplevel elements</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="275"/>
+        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="278"/>
         <source>Content relations</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="278"/>
+        <location filename="../omg/plugins/dbanalyzer/__init__.py" line="281"/>
         <source>Tag relations</source>
         <translation type="unfinished"></translation>
     </message>
@@ -311,7 +311,7 @@ is on, files will only be grouped together if they are in the same directory.</s
 <context>
     <name>Editor</name>
     <message>
-        <location filename="../omg/gui/editor.py" line="268"/>
+        <location filename="../omg/gui/editor.py" line="269"/>
         <source>editor</source>
         <translation type="unfinished"></translation>
     </message>
@@ -319,32 +319,32 @@ is on, files will only be grouped together if they are in the same directory.</s
 <context>
     <name>EditorModel</name>
     <message>
-        <location filename="../omg/models/editor.py" line="232"/>
+        <location filename="../omg/models/editor.py" line="237"/>
         <source>Importing {0} files...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/models/editor.py" line="163"/>
+        <location filename="../omg/models/editor.py" line="168"/>
         <source>recursion error</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/models/editor.py" line="163"/>
+        <location filename="../omg/models/editor.py" line="168"/>
         <source>Cannot place a container below itself.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/models/editor.py" line="220"/>
+        <location filename="../omg/models/editor.py" line="225"/>
         <source>drop elements</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/models/editor.py" line="214"/>
+        <location filename="../omg/models/editor.py" line="219"/>
         <source>adjust positions</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/models/editor.py" line="252"/>
+        <location filename="../omg/models/editor.py" line="257"/>
         <source>Unknown tag
 {1}={2}
  found in 
@@ -353,12 +353,12 @@ is on, files will only be grouped together if they are in the same directory.</s
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/models/editor.py" line="112"/>
+        <location filename="../omg/models/editor.py" line="117"/>
         <source>drop URIs</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/models/editor.py" line="287"/>
+        <location filename="../omg/models/editor.py" line="292"/>
         <source>Error guessing albums</source>
         <translation type="unfinished"></translation>
     </message>
@@ -425,65 +425,78 @@ is on, files will only be grouped together if they are in the same directory.</s
 <context>
     <name>GeneralSettingsWidget</name>
     <message>
-        <location filename="../bin/install.py" line="230"/>
+        <location filename="../bin/install.py" line="232"/>
         <source>General settings</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../bin/install.py" line="238"/>
-        <source>Use dialog</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../bin/install.py" line="241"/>
+        <location filename="../bin/install.py" line="244"/>
         <source>Music directory</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../bin/install.py" line="245"/>
+        <location filename="../bin/install.py" line="248"/>
         <source>SQLite</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../bin/install.py" line="248"/>
+        <location filename="../bin/install.py" line="251"/>
         <source>MySQL</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../bin/install.py" line="255"/>
+        <location filename="../bin/install.py" line="258"/>
         <source>Database type</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../bin/install.py" line="258"/>
+        <location filename="../bin/install.py" line="261"/>
         <source>MPD</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../bin/install.py" line="261"/>
+        <location filename="../bin/install.py" line="264"/>
         <source>Audio backend</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../bin/install.py" line="281"/>
+        <location filename="../bin/install.py" line="284"/>
         <source>Choose music collection directory</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../bin/install.py" line="268"/>
+        <location filename="../bin/install.py" line="271"/>
         <source>No music directory</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../bin/install.py" line="268"/>
+        <location filename="../bin/install.py" line="271"/>
         <source>You must choose a directory for your music collection.</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>IconLabel</name>
+    <message>
+        <location filename="../bin/install.py" line="629"/>
+        <source>Add icon...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../bin/install.py" line="630"/>
+        <source>Change icon...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../bin/install.py" line="634"/>
+        <source>Remove icon</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
     <name>InstallToolWindow</name>
     <message>
-        <location filename="../bin/install.py" line="71"/>
+        <location filename="../bin/install.py" line="70"/>
         <source>OMG Install Tool</source>
         <translation type="unfinished"></translation>
     </message>
@@ -493,12 +506,12 @@ is on, files will only be grouped together if they are in the same directory.</s
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../bin/install.py" line="119"/>
+        <location filename="../bin/install.py" line="121"/>
         <source>Next</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../bin/install.py" line="118"/>
+        <location filename="../bin/install.py" line="120"/>
         <source>Finish</source>
         <translation type="unfinished"></translation>
     </message>
@@ -506,27 +519,27 @@ is on, files will only be grouped together if they are in the same directory.</s
 <context>
     <name>LanguageWidget</name>
     <message>
-        <location filename="../bin/install.py" line="201"/>
+        <location filename="../bin/install.py" line="203"/>
         <source>Language</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../bin/install.py" line="212"/>
+        <location filename="../bin/install.py" line="214"/>
         <source>Please choose a language: </source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../bin/install.py" line="219"/>
+        <location filename="../bin/install.py" line="221"/>
         <source>Next</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../bin/install.py" line="220"/>
+        <location filename="../bin/install.py" line="222"/>
         <source>Previous</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../bin/install.py" line="221"/>
+        <location filename="../bin/install.py" line="223"/>
         <source>OMG Install Tool</source>
         <translation type="unfinished"></translation>
     </message>
@@ -658,82 +671,82 @@ is on, files will only be grouped together if they are in the same directory.</s
 <context>
     <name>MySQLWidget</name>
     <message>
-        <location filename="../bin/install.py" line="304"/>
+        <location filename="../bin/install.py" line="307"/>
         <source>MySQL settings</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../bin/install.py" line="306"/>
+        <location filename="../bin/install.py" line="309"/>
         <source>Please create an empty database for OMG. The password will be stored as plain text.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../bin/install.py" line="316"/>
+        <location filename="../bin/install.py" line="319"/>
         <source>Database name</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../bin/install.py" line="318"/>
+        <location filename="../bin/install.py" line="321"/>
         <source>Database user</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../bin/install.py" line="327"/>
+        <location filename="../bin/install.py" line="330"/>
         <source>Database password</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../bin/install.py" line="329"/>
+        <location filename="../bin/install.py" line="332"/>
         <source>Database host</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../bin/install.py" line="331"/>
+        <location filename="../bin/install.py" line="334"/>
         <source>Database port</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../bin/install.py" line="333"/>
+        <location filename="../bin/install.py" line="336"/>
         <source>Table prefix (optional)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../bin/install.py" line="347"/>
+        <location filename="../bin/install.py" line="350"/>
         <source>Invalid port</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../bin/install.py" line="347"/>
+        <location filename="../bin/install.py" line="350"/>
         <source>Please enter a correct port number.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../bin/install.py" line="357"/>
+        <location filename="../bin/install.py" line="360"/>
         <source>Database connection failed</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../bin/install.py" line="357"/>
+        <location filename="../bin/install.py" line="360"/>
         <source>I cannot connect to the database.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../bin/install.py" line="366"/>
+        <location filename="../bin/install.py" line="369"/>
         <source>I cannot create the database tables. Please make sure that the specified user has the necessary permissions.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../bin/install.py" line="366"/>
+        <location filename="../bin/install.py" line="369"/>
         <source>Cannot create tables</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../bin/install.py" line="376"/>
+        <location filename="../bin/install.py" line="379"/>
         <source>Database table missing</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../bin/install.py" line="376"/>
+        <location filename="../bin/install.py" line="379"/>
         <source>Although the database is not empty, it does not contain a table &apos;{}tagids&apos;. Did you provide the correct table prefix?</source>
         <translation type="unfinished"></translation>
     </message>
@@ -989,7 +1002,7 @@ is on, files will only be grouped together if they are in the same directory.</s
 <context>
     <name>SQLiteWidget</name>
     <message>
-        <location filename="../bin/install.py" line="291"/>
+        <location filename="../bin/install.py" line="294"/>
         <source>SQLite settings</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1015,42 +1028,42 @@ is on, files will only be grouped together if they are in the same directory.</s
 <context>
     <name>SpecialTagsWidget</name>
     <message>
-        <location filename="../bin/install.py" line="545"/>
+        <location filename="../bin/install.py" line="561"/>
         <source>Special tag settings</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../bin/install.py" line="547"/>
+        <location filename="../bin/install.py" line="563"/>
         <source>One of the special tags (usually called &apos;title&apos; and &apos;album&apos;) is missing in the tagids-table. If you chose different names for these tags, please specify those names below. If not, something is wrong with your database.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../bin/install.py" line="560"/>
+        <location filename="../bin/install.py" line="576"/>
         <source>Title tag</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../bin/install.py" line="561"/>
+        <location filename="../bin/install.py" line="577"/>
         <source>Album tag</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../bin/install.py" line="572"/>
+        <location filename="../bin/install.py" line="588"/>
         <source>Tag does not exist</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../bin/install.py" line="572"/>
+        <location filename="../bin/install.py" line="588"/>
         <source>There is no tag of name &apos;{}&apos;.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../bin/install.py" line="578"/>
+        <location filename="../bin/install.py" line="594"/>
         <source>Invalid tag</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../bin/install.py" line="578"/>
+        <location filename="../bin/install.py" line="594"/>
         <source>The tag &apos;{}&apos; is either not of type &apos;varchar&apos; or private.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1261,58 +1274,103 @@ is on, files will only be grouped together if they are in the same directory.</s
 <context>
     <name>TagWidget</name>
     <message>
-        <location filename="../bin/install.py" line="391"/>
+        <location filename="../bin/install.py" line="394"/>
         <source>Tag settings (optional)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../bin/install.py" line="400"/>
+        <location filename="../bin/install.py" line="403"/>
         <source>Name</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../bin/install.py" line="401"/>
+        <location filename="../bin/install.py" line="404"/>
         <source>Value-Type</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../bin/install.py" line="402"/>
+        <location filename="../bin/install.py" line="406"/>
         <source>Icon</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../bin/install.py" line="403"/>
+        <location filename="../bin/install.py" line="407"/>
         <source>Private?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../bin/install.py" line="416"/>
+        <location filename="../bin/install.py" line="420"/>
         <source>Add tag</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../bin/install.py" line="493"/>
+        <location filename="../bin/install.py" line="503"/>
         <source>Some tags have the same name</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../bin/install.py" line="493"/>
+        <location filename="../bin/install.py" line="503"/>
         <source>There is more than one tag with name &apos;{}&apos;.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../bin/install.py" line="392"/>
+        <location filename="../bin/install.py" line="395"/>
         <source>Uncheck tags that you do not want to be created. The first two tags play a special role: They are used for songtitles and albumtitles. Do not change their names unless you really know what you do!</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../bin/install.py" line="487"/>
+        <location filename="../bin/install.py" line="497"/>
         <source>Invalid tagname</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../bin/install.py" line="487"/>
+        <location filename="../bin/install.py" line="497"/>
         <source>&apos;{}&apos; is not a valid tagname.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../bin/install.py" line="427"/>
+        <source>Title</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../bin/install.py" line="428"/>
+        <source>Album</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../bin/install.py" line="429"/>
+        <source>Composer</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../bin/install.py" line="430"/>
+        <source>Artist</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../bin/install.py" line="431"/>
+        <source>Performer</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../bin/install.py" line="432"/>
+        <source>Genre</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../bin/install.py" line="433"/>
+        <source>Conductor</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../bin/install.py" line="434"/>
+        <source>Date</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../bin/install.py" line="435"/>
+        <source>Comment</source>
         <translation type="unfinished"></translation>
     </message>
 </context>

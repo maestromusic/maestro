@@ -170,6 +170,7 @@ def lock():
 
 def loadTranslators(app,logger):
     """Load a translator for Qt's strings and one for OMG's strings."""
+    import omg.translations
     # Try up to two different locales
     for translator in _translators:
         app.removeTranslator(translator)
@@ -194,7 +195,7 @@ def loadTranslators(app,logger):
 
     # Load a translator for our strings
     translator = QtCore.QTranslator(app)
-    translatorDir = os.path.join(os.getcwd(),'i18n')
+    translatorDir = os.path.join(":omg/i18n")
     for locale in locales:
         translatorFile = 'omg.'+locale
         if translator.load(translatorFile,translatorDir):
