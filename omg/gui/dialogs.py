@@ -173,6 +173,7 @@ class MergeDialog(QtGui.QDialog):
         self.okButton = QtGui.QPushButton(self.tr('OK'))
         self.cancelButton.clicked.connect(self.reject)
         self.okButton.clicked.connect(self.accept)
+        self.okButton.setDefault(True)
         hLayout.addStretch()
         hLayout.addWidget(self.cancelButton)
         hLayout.addWidget(self.okButton)
