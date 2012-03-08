@@ -55,9 +55,9 @@ def disable():
 
 
 def defaultStorage():
-    return {"dbanalyzer": {
-            "size": ((800,600),"Size of the window."),
-            "pos": (None,"Position of the window as tuple or None to center the window")
+    return {"SECTION:dbanalyzer": {
+            "size": (800,600),
+            "pos": None # Position of the window as tuple or None to center the window
         }}
 
 
@@ -287,7 +287,7 @@ class DBAnalyzerDialog(QtGui.QDialog):
         """Gather and return the data for the tags table."""
         tags = []
         result = db.query("SELECT id,tagname,tagtype,private FROM {}tagids ORDER BY id".format(db.prefix))
-        for id,name,type,sort,private in result:
+        for id,name,type,private in result:
             tuple = (id,name,type,private,
                 db.query("SELECT COUNT(*) FROM {}values_{} WHERE tag_id={}"
                          .format(db.prefix,type,id)).getSingle(),
@@ -304,6 +304,7 @@ class DBAnalyzerDialog(QtGui.QDialog):
 
 
 if __name__ == "__main__":
+    # The DBAnalyzer may be run as separate application
     app = application.init()
     config.storageObject.loadPlugins(defaultStorage())
          

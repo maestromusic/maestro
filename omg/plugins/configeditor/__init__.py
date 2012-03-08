@@ -42,10 +42,8 @@ def populateSections(section, parent):
     string = prefix + str(section)
     item.setData(0, Qt.UserRole, string)
     item.setToolTip(0, string)
-    for subname in section:
-        subsect = section[subname]
-        if isinstance(subsect, config.ConfigSection):
-            populateSections(subsect, item)
+    for subsect in section.getSubsections():
+        populateSections(subsect, item)
     item.setExpanded(True)
 
 
@@ -53,50 +51,47 @@ class ConfigItem(QtGui.QTableWidgetItem):
     def __init__(self, widget, option):
         super().__init__()
         self.option = option
-        if option.fileValue is None:
-            self.setText(option._export(option.default))
-        else:
-            self.setText(option._export(option.fileValue))
-            if self.text() != option._export(option.default):
-                f = self.font()
-                f.setBold(True)
-                self.setFont(f)
+        self.setText(option.export())
+        if option.getValue() != option.default:
+            f = self.font()
+            f.setBold(True)
+            self.setFont(f)
         self.dirty = False
 
         self.widget = widget
         
     def data(self, role = Qt.DisplayRole):
         if role == Qt.ToolTipRole:
-            if self.option.fileValue is None:
-                return translate('default value: not set in config file')
-            elif self.text() != self.option._export(self.option.default):
-                return translate('value differs from default')
-            else:
-                return translate('set to default value in config file')
+            if self.option.getValue() == self.option.default:
+                return translate('default value')
+            else: return translate('value differs from default')
         return super().data(role)
+    
     def setData(self, role, value):
         
         if role == Qt.EditRole:
             try:
-                self.option._import(value)
+                self.option.fromString(value)
             except config.ConfigError:
                 QtGui.QMessageBox.critical(self.widget, translate('invalid entry'),
                                            translate('the data you entered is not valid for this option'))
                 return
             self.dirty = True
             self.widget.dirty = True
-            if (self.option.fileValue is None and value != self.option._export(self.option.default)) or \
-                        (self.option.fileValue is not None and value != self.option._export(self.option.fileValue)):
+            if (self.option.getValue() != self.option.default):
                 f = self.font()
                 f.setBold(True)
                 self.setFont(f)
         super().setData(role, value)
     
     def resetToDefault(self):
-        self.setData(Qt.EditRole, self.option._export(self.option.default))
+        self.option.resetToDefault()
+        self.dirty = True
+        self.widget.dirty = True
+        super().setData(Qt.EditRole,self.option.export())
         
     def save(self):
-        self.option.updateFileValue(self.text())
+        self.option.fromString(self.text())
         self.dirty = False
         
         
@@ -123,9 +118,9 @@ class ConfigSectionWidget(QtGui.QTableWidget):
             parts = section.split('.')[1:]
             s = config.optionObject
             for p in parts:
-                s = s[p]
+                s = s.members[p]
             section = s
-        options = [section[x] for x in section if isinstance(section[x], config.ConfigOption)]
+        options = list(section.getOptions())
         self.setRowCount(len(options))
         for i, opt in enumerate(options):
             nameItem = QtGui.QTableWidgetItem(opt.name)
@@ -162,7 +157,7 @@ class PreferencesDialog(QtGui.QDialog):
         self.tree.setHeaderLabel('section')
         options = config.optionObject
         populateSections(options, self.tree)
-        self.sectionWidget = ConfigSectionWidget('<Default>')
+        self.sectionWidget = ConfigSectionWidget('<Main>')
         self.tree.currentItemChanged.connect(self._handleCurrentItemChanged)
         self.tree.setSelectionMode(self.tree.NoSelection)
         self.tree.setSizePolicy(QtGui.QSizePolicy.Fixed, QtGui.QSizePolicy.Minimum)

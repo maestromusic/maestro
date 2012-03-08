@@ -25,7 +25,7 @@ The three files are:
 
     * ``config``. This is the main configuration file and the one that is mainly edited by the user.
       But it may be written from the program, too. It contains several sections which may contain options
-      and nested sections. Options must have a type (str,int or list) and a default value stored in
+      and nested sections. Options must have a type (str,int,bool or list) and a default value stored in
       defaultconfig. To get the option ``size`` from the section ``gui`` simply use ::
     
         config.options.gui.size
@@ -33,19 +33,17 @@ The three files are:
       This will directly return the option's value. In the rare cases you need
       the option itself as :class:`ConfigOption`-instance use ``config.optionObject.gui.size``.
       
-      Instead of
-      attribute access you may also use item access::
+      Instead of attribute access you may also use item access::
       
           config.options['gui']['size']
         
       Both types of access allow to write values via assignment.
       Note that values will not be written to the file before the application terminates, though.
 
-    * ``storage``. This file also holds persistent information but is mainly written by the program. It is
-      human readable and can be edited by the user, though. The most important difference to ``config`` is
-      that this file uses ConfigObj's ``unrepr``-mode. Therefore you may store any combination of Python's
-      standard types including lists and dicts. Access works like for config, but with the variables
-      ``config.storage`` and ``config.storageObject``.
+    * ``storage``. This file also holds persistent information but is mainly written by the program. It uses
+      JSON notation, so it can store any combination of Python's standard types including lists and dicts.
+      The file is human readable and can be edited by the user (less comfortable than config).
+      Access works like for config, but with the variables ``config.storage`` and ``config.storageObject``.
 
     * ``binary``. The last file contains simply a pickled dict to store arbitrary binary data. During the
       application this dict can be accessed via ``config.binary`` which really is simply a dict, so there are
@@ -54,17 +52,16 @@ The three files are:
 
 Both ``config`` and ``storage`` may only contain options which are defined in the
 :mod:`defaultconfig <omg.config.defaultconfig>` module or in the default configuration of a plugin that
-is returned by its ``defaultConfig`` or ``defaultStorage`` method (to be precise they may contain
+is returned by its ``defaultConfig`` or ``defaultStorage`` method (to be precise the first level may contain
 sections which are not defined. OMG will assume that they belong to a plugin that is not loaded).
 
 Call :func:`init` at application start to read options and call :func:`shutdown` at the end to write the
 options. Use :func:`loadPlugins` and :func:`removePlugins` to add or remove plugin configuration.
 """
 
-import os, sys, pickle
-from collections import OrderedDict
+import os, sys, pickle, collections, copy
 from omg import constants, logging
-from . import configobj
+from . import configio
 
 CONFDIR = None
 
@@ -105,9 +102,9 @@ def init(cmdOptions = []):
 
     # Initialize config and storage
     global options, storage, optionObject, storageObject
-    optionObject = Config(cmdOptions,storage=False)
+    optionObject = MainSection(cmdOptions,storage=False)
+    storageObject = MainSection([],storage=True)
     options = ValueSection(optionObject)
-    storageObject = Config([],storage=True)
     storage = ValueSection(storageObject)
 
     # Initialize pickled
@@ -115,7 +112,8 @@ def init(cmdOptions = []):
     path = _getPath("binary")
     if os.path.exists(path):
         try:
-            binary = pickle.load(open(path,"rb"))
+            with open(path,'rb') as file:
+                binary = pickle.load(file)
         except:
             logger.exception("Could not load binary configuration from '{}'.".format(path))
             binary = {}
@@ -134,44 +132,76 @@ class Option:
     
             * “name”: Its name,
             * “default”: the default value,
-            * “fileValue”: the value in the config file or “None“ if the file does not contain this option,
-            * “value”:  “None” or a value set from the program which will overwrite fileValue during runtime,
-              but will not be written to the config file (this is used when options are specified on the
-              command line).
-            * description (optional): A short text describing the option.
+            * “value”: the current value from the file or defaults. When this value differs from default, it
+              will be written to the file it shutdown.
             
     \ """
     def __init__(self,name,default,description=""):
         self.name = name
         self.default = default
-        self.value = None
-        self.fileValue = None
-        self.description = description
-    
+        self.resetToDefault()
+        
     def getValue(self):
-        """Return the current value of this option. The value is the first of the attributes ``value``,
-        ``fileValue`` which is not ``None`` or ``default`` if both are ``None``.
-        """
-        if self.value is not None:
-            return self.value
-        elif self.fileValue is not None:
-            return self.fileValue
-        else: return self.default
+        """Return current value."""
+        return self.value
+        
+    def setValue(self,value):
+        """Set current value."""
+        self.value = value
+        
+    def export(self):
+        """Return current value in a format suitable for writing it to the config file (this need not be a
+        string)."""
+        return self.value
+    
+    def resetToDefault(self):
+        """Set the value to a deep copy of the default value."""
+        self.value = copy.deepcopy(self.default) # value may be edited, default must not change
 
     
 class ConfigOption(Option):
-    """Subclass of :class:`Option` which has additionally a type. This class is used for the options in the
-    config file."""
+    """Subclass of :class:`Option` which has additional attributes:
+    
+        * type: one of bool,int,str or list
+        * description: an optional description
+        * tempValue: None or a value set from the program which will overwrite value during runtime,
+          but will not be written to the config file (this is used when options are specified on the
+          command line).
+    
+    This class is used for the options in the config file.
+    """
     def __init__(self,name,type,default,description=""):
         Option.__init__(self,name,default,description)
         self.type = type
+        self.tempValue = None
+        self.description = description
+    
+    def getValue(self,temp=True):
+        """Return current value. If *temp* is True (default) and there is a temporary value, it will be
+        returned."""
+        if temp and self.tempValue is not None:
+            return self.tempValue
+        else: return self.value
 
-    def _import(self,value):
-        """Convert the string *value* (from the config file) into the type of this option. Raise a
-        :class:`ConfigError` if that fails."""
-        if isinstance(value,self.type):
-            return value
-
+    def setValue(self,value):
+        """Set the option's value (or its temporary value, if *temp* is True)."""
+        # At first this method deleted temporary values when a new value was written. But as we cannot
+        # properly detect when values are changed (for type list), this leads to inconsistent behaviour.
+        # Thus the behaviour is this: As soon as a temporary value is set you can only change the temporary
+        # value. No change will be written to the file at the end.
+        assert value is not None
+        if self.tempValue is not None:
+            self.tempValue = value
+        else: self.value = value
+            
+    def fromString(self,value):
+        """Convert the string *value* to the type of this option. Raise a ConfigError if that fails."""
+        self.setValue(self.parseString(value))
+        
+    def parseString(self,value):
+        """Convert the string *value* to the type of this option and return it. Raise a ConfigError
+        if that fails."""
+        assert isinstance(value,str)
         try:
             if self.type == bool:
                 # bool("0") or bool("False") are True, but we want them to be false as this is what you
@@ -183,16 +213,14 @@ class ConfigOption(Option):
                 return self.type(value)
             elif self.type == list and isinstance(value, str):
                 values = [x.strip(" \t") for x in value.split(",")]
-                return [x for x in values if len(x) > 0]
-            else: error = True
+                return  [x for x in values if len(x) > 0]
+            else: raise ValueError()
         except ValueError as e:
-            error = True
-        if error:
-            raise ConfigError("{} has type {} which does not match type {} of this option and can't be converted"
-                                 .format(value,type(value),self.type))
+            raise ConfigError("{} has type {} which does not match type {} of this option and "
+                              "can't be converted".format(value,type(value),self.type))
 
-    def _export(self,value):
-        """Convert *value* (of type “self.type”) into a string (for the config file)."""
+    def export(self):
+        value = self.getValue(temp=False)
         if self.type == bool:
             return "True" if value else "False"
         elif self.type == list:
@@ -201,232 +229,182 @@ class ConfigOption(Option):
             return ", ".join(str(v) for v in value)
         else: return str(value)
 
-    def updateValue(self,value,fileValue):
-        """Set the value of this option to *value*. If *fileValue* is true, the value will be written to the
-        config file at application end."""
-        if fileValue:
-            self.fileValue = self._import(value)
-            self.value = None # Otherwise getValue would return self.value
-        else: self.value = self._import(value)
 
-    def _write(self,fileSection):
-        """Write the ``fileValue`` of this option in *fileSection* which must be a
-        ``confobj.Section``-instance. If ``fileValue`` is ``None`` the option will be deleted from
-        *fileSection*.
-        """
-        if self.name in fileSection:
-            # Do not remove the value from the file even if it is the default.
-            if self.fileValue is None:
-                del fileSection[self.name]
-            # Overwrite only if the string in the config gives a different value
-            elif self.fileValue != self._import(fileSection[self.name]):
-                fileSection[self.name] = self._export(self.fileValue)
-        elif self.fileValue is not None:
-            fileSection[self.name] = self._export(self.fileValue)
-    
-    def updateFileValue(self,value):
-        self.value = self.getValue() # Store the old value, so that the effective value does not change
-        self.fileValue = self._import(value)
-        
-        
-class StorageOption(Option):
-    """Subclass of :class:`Option` for options in the Storage file. These options do not have a type but may
-    store dicts, list, tuples of basic datatypes."""
-    def updateValue(self,value,fileValue):
-        """Set the value of this option to *value*. If *fileValue* is true, the value will be written to the
-        config file at application end."""
-        if fileValue:
-            self.fileValue = value
-            self.value = None # Otherwise getValue would return self.value
-        else: self.value = value
-        
-    def _write(self,fileSection):
-        """Write the ``fileValue`` of this option in *fileSection* which must be a
-        ``confobj.Section``-instance. If ``fileValue`` is ``None`` the option will be deleted from
-        *fileSection*.
-        """
-        if self.name in fileSection:
-            if self.fileValue is None or self.fileValue == self.default:
-                del fileSection[self.name]
-            elif isinstance(self.fileValue,dict):
-                fileSection.__setitem__(self.name,self.fileValue,unrepr=True)
-            else: fileSection[self.name] = self.fileValue
-        elif self.fileValue is not None and self.fileValue != self.default:
-            if isinstance(self.fileValue,dict):
-                fileSection.__setitem__(self.name,self.fileValue,unrepr=True)
-            else: fileSection[self.name] = self.fileValue
-
-
-class ConfigSection:
-    """A section of the configuration. It may contain options and other sections (its "members")
-    which can be accessed via attribute- or item-access (e.g. ``main.collection`` or ``main['collection']``.
-    The parameter *storage* holds whether this section is from the storage file."""
-    def __init__(self,name,storage,members):
-        self._name = name
-        self._storage = storage
-        self._members = OrderedDict()
-        for name,member in members.items():
-            if isinstance(member,dict):
-                self._members[name] = ConfigSection(name,storage,member)
+class Section:
+    """A section of the configuration. It may contain options and other sections which can be accessed via
+    the attribute ''members''. The parameter *storage* holds whether this section is from the storage file.
+    The parameter *defaults* is used to initialize the section and determine the available options. There is
+    no way to add options later on (but see MainSection.loadPlugins).
+    """
+    def __init__(self,name,storage,defaults):
+        self.name = name
+        self.storage = storage
+        self.members = collections.OrderedDict()
+        for name,member in defaults.items():
+            if isinstance(member,dict) and (not storage or name.startswith('SECTION:')):
+                self._addSection(name,member)
             else:
                 if storage:
-                    self._members[name] = StorageOption(name,*member)
-                else: self._members[name] = ConfigOption(name,*member)
-
-    def __getitem__(self,member):
-        return self._members[member]
-    
-    def __len__(self):
-        return len(self._members)
-    
-    def __iter__(self):
-        return self._members.__iter__()
-    
-    def __getattr__(self,member):
-        if member in self._members:
-            return self._members[member]
-        else: raise AttributeError("Section '{}' has no member '{}'".format(self._name,member))
-
-    def __contains__(self,member):
-        return member in self._members
+                    self.members[name] = Option(name,member)
+                else: self.members[name] = ConfigOption(name,*member)
 
     def __str__(self):
-        return self._name
+        return self.name
 
-    def updateFromFile(self,fileSection,path):
-        """Read the *fileSection* (of type ``configobj.Section``) and update this section (options and
-        subsections) with the values from the file. If *fileSection* contains an unknown option, skip it and
-        log a warning. The parameter *path* is only used for these warnings and should contain the path to
-        the config file.
+    def getOptions(self):
+        """Return all members which are options."""
+        return (member for member in self.members.values() if isinstance(member,Option))
+    
+    def getSubsections(self):
+        """Return all members which are nested sections."""
+        return (member for member in self.members.values() if isinstance(member,Section))
+        
+    def updateFromDict(self,rawDict,allowUnknownSections=False):
+        """Read the *rawDict* and update this section (options and subsections) with the values from
+        *rawDict*. If *rawDict* contains an unknown option, skip it and log a warning. If it
+        contains an unknown section, log a warning -- except when *allowUnknownSections* is True (the config
+        module allows unknown sections on the first level because they might belong to plugins that are
+        currently not enabled).
+        
+        The format of *rawDict* depends on ''self.storage'' and is the same that is returned by the
+        corresponding read-methods in configio.
         """
-        for name,member in fileSection.items():
-            if isinstance(member,configobj.Section):
-                if name not in self._members:
-                    logger.warning("Error in config file '{}': Unknown section '{}' in section '{}'."
-                                    .format(path,name,self._name))
-                elif isinstance(self._members[name],Option):
+        path = _getPath('storage' if self.storage else 'config')
+        for name,member in rawDict.items():
+            if isinstance(member,dict) and (not self.storage or name.startswith('SECTION:')):
+                if self.storage:
+                    name = name[len('SECTION:'):]
+                if name not in self.members:
+                    if not allowUnknownSections:
+                        logger.warning("Error in config file '{}': Unknown section '{}' in section '{}'."
+                                        .format(path,name,self.name))
+                elif isinstance(self.members[name],Option):
                     logger.warning("Error in config file '{}': '{}' is not a section in section '{}'."
-                                    .format(path,name,self._name))
-                else:
-                    self._members[name].updateFromFile(member,path)
+                                    .format(path,name,self.name))
+                else: self.members[name].updateFromDict(member)
             else:
-                if name not in self._members:
+                if name not in self.members:
                     logger.warning("Error in config file '{}': Unknown option '{}' in section '{}'."
-                                    .format(path,name,self._name))
-                elif isinstance(self._members[name],ConfigSection):
+                                    .format(path,name,self.name))
+                elif isinstance(self.members[name],Section):
                     logger.warning("Error in config file '{}': '{}' is not an option in section '{}'."
-                                    .format(path,name,self._name))
+                                    .format(path,name,self.name))
                 else:
-                    self._members[name].updateValue(member,fileValue=True)
+                    option = self.members[name]
+                    if self.storage:
+                        option.setValue(member)
+                    else: option.fromString(member)
+                
+    def _addSection(self,name,defaults):
+        """Add a section as nested section. *name* is the name of the section and must start with 'SECTION:'
+        in the storage case. *defaults* are the default values (usually a part of the dicts in
+        defaultconfig).
+        """
+        if self.storage:
+            assert name.startswith('SECTION:')
+            name = name[len('SECTION:'):]
+        self.members[name] = Section(name,self.storage,defaults)
+        return self.members[name]
+    
+    def _toRawDict(self):
+        """Return the values of this section as a raw dict. The format of this dict depends on
+        ''self.storage'' and is the same that is expected by the corresponding write functions in configio.
+        """
+        items = []
+        for name,member in self.members.items():
+            if isinstance(member,Section):
+                if self.storage:
+                    name = 'SECTION:'+name
+                items.append((name,member._toRawDict()))
+            else: items.append((name,member.export()))
+        return collections.OrderedDict(items)
 
-    def _write(self,fileSection):
-        """Write this section and its options and subsections into *fileSection* (of type
-        ``configobj.Section``). This will not really write the file."""
-        if self._name not in fileSection or not isinstance(fileSection[self._name],configobj.Section):
-            fileSection[self._name] = {}
-        for name,member in self._members.items():
-            member._write(fileSection[self._name])
 
-
-class Config(ConfigSection):
+class MainSection(Section):
     """This is the main object of the config-module and stores the configuration of one config file.
-    It is itself a section with the name “<Default>”. Upon creation this class will read the defaults
+    It is itself a section with the name ''<Main>''. Upon creation this class will read the defaults
     and then the config/storage-file.The parameters are:
 
         * *cmdOptions*: a list of strings of the form “main.collection=/var/music”. The options given in
           these strings will overwrite the options from the file or the defaults.
         * *storage*: whether this object corresponds to a storage file (confer module documentation).
 
+    On initialization this object will read the correct default values, overwrite them with values from
+    the corresponding file and (if storage is False) finally set temporary values according to *cmdConfig*.
     \ """
     def __init__(self,cmdConfig,storage):
-        ConfigSection.__init__(self,"<Default>",storage,OrderedDict())
-
-        self._path = _getPath("storage" if self._storage else "config")
-
-        # First read the default config
+        # First initialize with default values
         from . import defaultconfig
         defaults = defaultconfig.storage if storage else defaultconfig.defaults
-        for sectionName,sectionDict in defaults.items():
-            self._addSection(sectionName,sectionDict)
+        Section.__init__(self,"<Main>",storage,defaults)
 
-        # Then read the config file
-        self._openFile()
-        for sectionName,section in self._configObj.items():
-            if not isinstance(section,configobj.Section):
-                logger.warning("Error in config file '{}': Option '{}' does not belong to any section."
-                                .format(self._path,sectionName))
-            if sectionName in self._members:
-                self._members[sectionName].updateFromFile(section,self._path)
-        # Let the file open until plugin config is loaded
-        
-        # Then consider cmdConfig
-        for line in cmdConfig:
-            try:
-                option, value = (s.strip() for s in line.split('=',2))
-                keys = option.split('.')
-                section = self
-                for key in keys[:-1]:
-                    section = section[key]
-                section[keys[-1]].updateValue(value,fileValue=False)
-            except KeyError:
-                logger.error("Unknown config option on command line '{}'.".format(option))
-            except Exception:
-                logger.error("Invalid config option on command line '{}'.".format(line))
-
-    def _openFile(self):
-        """Open the file this object corresponds to and store a ``configobj.ConfigObj``-object in
-        ``self._configObj``."""
-        self._configObj = configobj.ConfigObj(self._path,encoding='UTF-8',
-                                              write_empty_values=True,
-                                              create_empty=True,unrepr=self._storage)
-        
-    def _addSection(self,name,options):
-        """Add a section with the given name and options."""
-        if name in self._members:
-            raise ConfigError("Error in config file '{}': Cannot add section '{}' twice."
-                               .format(self._path,name))
-        else: self._members[name] = ConfigSection(name,self._storage,options)
-
+        # Then update with values from config/storage file
+        self._path = _getPath("storage" if self.storage else "config")
+        from . import configio
+        try:
+            if storage:
+                self._rawDict = configio.readStorage(self._path)
+            else: self._rawDict = configio.readConfig(self._path)
+            # Allow unknown sections on first level as they might be plugin configurations
+            self.updateFromDict(self._rawDict,allowUnknownSections=True)
+        except configio.ConfigError as e:
+            logger.critical(str(e))
+            sys.exit(1)
+            
+        # Finally set temporary values from cmdConfig
+        if not storage:
+            for line in cmdConfig:
+                try:
+                    option, value = (s.strip() for s in line.split('=',2))
+                    keys = option.split('.')
+                    section = self
+                    for key in keys[:-1]:
+                        section = section[key]
+                    section[keys[-1]].tempValue = value
+                except KeyError:
+                    logger.error("Unknown config option on command line '{}'.".format(option))
+                except Exception:
+                    logger.error("Invalid config option on command line '{}'.".format(line))
+    
     def loadPlugins(self,sections):
         """Load plugin configuration. *sections* stores the default configuration of the plugins. It is a
         dict mapping section names (usually the plugin name) to a section dict like in the defaultconfig
-        module. After storing this default configuration check if these sections exist in the config and
-        storage file and read them.
+        module. After storing this default configuration, check if these sections exist in the config and
+        storage file and read values from there.
         """
         for name,section in sections.items():
-            self._addSection(name,section)
-            if self._configObj is None: # This is the case if plugins are loaded during runtime
-                self._openFile()
-            if name in self._configObj:
-                self._members[name].updateFromFile(self._configObj[name],self._path)
-        self._configObj = None
+            section = self._addSection(name,section)
+            if name in self._rawDict:
+                section.updateFromDict(self._rawDict[name])
 
     def removePlugins(self,sectionNames):
         """Remove the plugin configuration of one or more plugins. *sectionNames* contains the names of the
         sections used by the plugins that should be removed."""
         for name in sectionNames:
-            if name not in self._members:
+            if storage:
+                assert name.startswith('SECTION:')
+                name = name[len('SECTION:'):]
+            if name not in self.members:
                 raise ConfigError("Cannot remove plugin section '{}' from config because it doesn't exist."
                                   .format(name))
-            del self._members[name]
-
+            del self.members[name]
+    
     def write(self):
-        """Write the configuration to the correct file."""
-        self._openFile()
-        for section in self._members.values():
-            section._write(self._configObj)
-        self._configObj.write()
-        self._configObj = None
-            
+        """Write this configuration to the correct file."""
+        if self.storage:
+            configio.writeStorage(self._path,self)
+        else: configio.writeConfig(self._path,self)
+        
     def pprint(self):
         """Debug method: Print this configuration."""
-        for section in self._members.values():
+        for section in self.members.values():
             self._pprintSection(section,1)
 
     def _pprintSection(self,section,nesting):
+        """Helper for pprint: PPrint a section."""
         print(("    "*(nesting-1))+('['*nesting)+section._name+(']'*nesting))
-        for member in section._members.values():
-            if isinstance(member,ConfigSection):
+        for member in section.members.values():
+            if isinstance(member,Section):
                 print()
                 self._pprintSection(member,nesting+1)
             else: print("{}{}: {}".format("    "*(nesting-1),member.name,member.getValue()))
@@ -434,13 +412,16 @@ class Config(ConfigSection):
 
 
 class ValueSection:
-    """A ValueSection wraps a ConfigSection. On attribute access or item access it will directly return
-    the option's value. This class is used by ``config.options`` and ``config.storage``."""
+    """A ValueSection wraps a Section to provide easy access to the actual configuration values (by-passing
+    instances of Option and Section). On attribute access or item access it will directly return the option's
+    value or -- when accessing a subsection -- a ValueSection wrapping the subsection.
+    This class is used by ``config.options`` and ``config.storage``.
+    """
     def __init__(self,section):
         self._section = section
 
     def __getattr__(self,name):
-        result = self._section.__getattr__(name)
+        result = self._section.members[name]
         if isinstance(result,Option):
             return result.getValue()
         else: return ValueSection(result)
@@ -449,37 +430,30 @@ class ValueSection:
         if name == '_section':
             super().__setattr__(name,value)
         else:
-            option = self._section.__getattr__(name)
+            option = self._section.members[name]
             if not isinstance(option,Option):
                 raise ConfigError("Cannot write sections via ValueSection (section name '{}').".format(name))
-            else: option.updateValue(value,fileValue=True)
+            else: option.setValue(value)
 
     def __getitem__(self,key):
-        result = self._section.__getitem__(key)
+        result = self._section.members[key]
         if isinstance(result,Option):
             return result.getValue()
         else: return ValueSection(result)
 
     def __setitem__(self,key,value):
-        option = self._section.__getitem__(key)
+        option = self._section.members[key]
         if not isinstance(option,Option):
-            raise ConfigError("Cannot write sections via ValueSection (section name '{}').".format(name))
-        else: option.updateValue(value,fileValue=True)
+            raise ConfigError("Cannot write sections via ValueSection (section name '{}').".format(key))
+        else: option.setValue(value)
 
 
 def _getPath(fileName):
     """Get the path to a configugation file. *fileName* may be ``'config'`` or ``'storage'`` or``'binary'``.
+    This method checks for version-dependent config-files.
     """
     path = os.path.join(CONFDIR,fileName)
     if os.path.exists("{}.{}".format(path,constants.VERSION)):
         return "{}.{}".format(path,constants.VERSION) # Load version specific config
     else: return path
-
-
-class ConfigError(Exception):
-    """A ConfigError is for example raised if the config file contains invalid syntax."""
-    def __init__(self, message):
-        self.message = message
     
-    def __str__(self):
-        return "ConfigError: {}".format(self.message)
