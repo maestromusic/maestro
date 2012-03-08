@@ -197,14 +197,16 @@ class Browser(QtGui.QWidget):
         for criterion in self.criterionFilter:
             if isinstance(criterion,criteriaModule.FlagsCriterion):
                 flags.extend(criterion.flags)
-        return {
+        state = {
             'instant': self.searchBox.getInstantSearch(),
             'showHiddenValues': self.showHiddenValues,
             'views': utils.mapRecursively(lambda tag: tag.name,[view.model().layers for view in self.views]),
             'flags': [flagType.name for flagType in flags],
-            'delegate': self.delegateConfig.title,
             'sortTags': {tag.name: [t.name for t in sortTags] for tag,sortTags in self.sortTags.items()}
         }
+        if self.delegateConfig is not None:
+            state['delegate'] = self.delegateConfig.title
+        return state
     
     def load(self,restoreExpanded=False):
         """Load contents into the browser, based on the current criterionFilter and searchCriteria. If a
