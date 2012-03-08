@@ -1,29 +1,13 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-# Copyright 2010 Martin Altmayer
+# Copyright 2010-2012 Martin Altmayer, Michael Helmling
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 3 as
 # published by the Free Software Foundation
 #
-import os, sys, getopt
+import sys, subprocess
 
-from omg import application, constants
-
-if __name__=="__main__":
-    opts, args = getopt.getopt(sys.argv[1:],
-        "pVc:",
-        ['populate','version','config='])
-
-    config = []
-    for opt,arg in opts:
-        if opt in ('-V', '--version'):
-            print('This is OMG version {}. Nice to meet you.'.format(constants.VERSION))
-            sys.exit(0)
-        elif opt in ('-p', '--populate'):
-            config.append('gui.startTab=populate')
-        elif opt in ('-c','--config'):
-            config.append(arg)
-        else: print("Unknown option '{}'.".format(opt))
-        
-    application.run(config)
+returncode = subprocess.call([sys.executable, '-m', 'omg.application'] + sys.argv[1:])
+if returncode == 117:
+    import omg.install
+    omg.install.run()

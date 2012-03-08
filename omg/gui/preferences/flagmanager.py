@@ -227,7 +227,7 @@ class FlagManager(QtGui.QWidget):
         from ..misc import iconchooser
         result = iconchooser.IconChooser.getIcon([':omg/flags'],flagType.iconPath,self)
         
-        if result and result[1] != tagType.iconPath:
+        if result and result[1] != flagType.iconPath:
             self._setIcon(flagType,result[1])
             
     def _setIcon(self,flagType,iconPath):

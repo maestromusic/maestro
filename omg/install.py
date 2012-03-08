@@ -125,10 +125,9 @@ class InstallToolWindow(QtGui.QWidget):
         # Write config values
         config.shutdown()
         
-        import subprocess, sys
+        import sys
         logger.info("Install tool finished. Ready to start OMG.")
-        subprocess.Popen(['bin/omg'])
-        sys.exit()
+        sys.exit(0)
     
     def _handlePrevButton(self):
         """Handle the previous button."""
@@ -643,7 +642,8 @@ class IconLabel(QtGui.QLabel):
             self.setPath(result[1])
 
 
-if __name__ == "__main__":
+def run():
+    global app
     app = QtGui.QApplication([])
     from omg import resources
     widget = InstallToolWindow()

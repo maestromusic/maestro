@@ -5,4 +5,5 @@
 OMG.egg-info/
 dist
 resources.py
+translations.py
 docs/

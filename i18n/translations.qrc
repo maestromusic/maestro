@@ -1,0 +1,6 @@
+<RCC>
+    <qresource prefix="/omg/i18n">
+        <file>omg.de.qm</file>
+        <file>omg.en.qm</file>
+    </qresource>
+</RCC>

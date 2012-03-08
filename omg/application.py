@@ -21,12 +21,12 @@ This module controls the startup and finishing process of OMG. :func:`run` runs 
 :func:`init` only initializes the most basic modules without starting a graphical interface.
 """
 
-import sys, os, fcntl
+import sys, os, fcntl, getopt
 
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from omg import config, logging, database
+from omg import config, logging, database, constants
 
 # The application's main window
 mainWindow = None
@@ -35,6 +35,7 @@ global logger
         
 # Store translators so that they are not garbage-collected
 _translators = []
+INSTALL_RETURNCODE=117
 
 
 def init(cmdConfig = [],initTags=True,testDB=False,useInstallTool=False):
@@ -69,7 +70,7 @@ def init(cmdConfig = [],initTags=True,testDB=False,useInstallTool=False):
     if config.options.main.collection == '':
         logger.error("No collection directory defined.")
         if useInstallTool:
-            startInstallTool() # Will exit the application with value 0
+            sys.exit(INSTALL_RETURNCODE)
         else: sys.exit(1)
     
     loadTranslators(app,logger)
@@ -83,7 +84,7 @@ def init(cmdConfig = [],initTags=True,testDB=False,useInstallTool=False):
         logger.error("I cannot connect to the database. Did you provide the correct information in the config"
                      " file? MySQL error: {}".format(e.message))
         if useInstallTool:
-            startInstallTool() # Will exit the application with value 0
+            sys.exit(INSTALL_RETURNCODE)
         else: sys.exit(1)
 
     if initTags:
@@ -92,18 +93,31 @@ def init(cmdConfig = [],initTags=True,testDB=False,useInstallTool=False):
             tags.init()
         except RuntimeError:
             if useInstallTool:
-                startInstallTool() # Will exit the application with value 0
+                sys.exit(INSTALL_RETURNCODE)
             else: sys.exit(1)
         flags.init()
 
     return app
 
 
-def run(cmdConfig = []):
-    """Run OMG. *cmdOptions* is a list of options given on the command line that will overwrite the
-    corresponding option from the file or the default. Each list item has to be a string like
-    ``main.collection=/var/music``.
-    """
+def run():
+    """Run OMG."""
+    opts, args = getopt.getopt(sys.argv[1:],
+        "Vc:",
+        ['version','config=', 'install'])
+
+    cmdConfig = []
+    for opt,arg in opts:
+        if opt in ('-V', '--version'):
+            print('This is OMG version {}. Nice to meet you.'.format(constants.VERSION))
+            sys.exit(0)
+        elif opt in ('-c','--config'):
+            cmdConfig.append(arg)
+        elif opt == '--install':
+            sys.exit(INSTALL_RETURNCODE)
+        else:
+            logger.warning("Unknown option '{}'.".format(opt))
+        
     app = init(cmdConfig,useInstallTool=True)
     
     # Lock the lockfile to prevent a second OMG-instance from starting.
@@ -157,7 +171,7 @@ def lock():
     lockFile = os.path.join(config.CONFDIR,'lock')
     try:
         # For a long time the built-in function open was used here. But one day it stopped working oO
-        fileDescriptor = os.open(lockFile,os.O_WRONLY)
+        fileDescriptor = os.open(lockFile,os.O_WRONLY| os.O_CREAT)
     except IOError:
         logger.error("Cannot open lock file {}".format(lockFile))
         sys.exit(-1)
@@ -194,7 +208,7 @@ def loadTranslators(app,logger):
 
     # Load a translator for our strings
     translator = QtCore.QTranslator(app)
-    translatorDir = os.path.join(os.getcwd(),'i18n')
+    translatorDir = os.path.join(":omg/i18n")
     for locale in locales:
         translatorFile = 'omg.'+locale
         if translator.load(translatorFile,translatorDir):
@@ -204,10 +218,7 @@ def loadTranslators(app,logger):
         else: logger.warning("Unable to load translator file {} from directory {}."
                                 .format(translatorFile,translatorDir))
 
-
-def startInstallTool():
-    import subprocess, sys
-    logger.info("I will launch the install tool and terminate this application.")
-    subprocess.Popen(['python3','bin/install.py'])
-    sys.exit()
+    
+if __name__ == "__main__":
+    run()
     
