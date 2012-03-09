@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
  
-import re, collections, json
+import re, collections, json, os
 from omg import logging
 
 logger = logging.getLogger(__name__)
@@ -37,8 +37,12 @@ class ConfigError(Exception):
 
 
 def readConfig(path):
-    """Read a configuration file at the specified path and return a raw dict containing the option values."""
+    """Read a configuration file at the specified path and return a raw dict containing the option values.
+    Return an empty dict when the file does not exist.
+    """
     try:
+        if not os.path.exists(path):
+            return {}
         with open(path,'r') as file:
             lines = [line.rstrip() for line in file.readlines()]
     except:
@@ -229,8 +233,12 @@ def _writeSection(section,depth,outputLines):
 
 
 def readStorage(path):
-    """Read a storage file at the given path and return whatever is contained in it."""
+    """Read a storage file at the given path and return whatever is contained in it. Return an empty dict
+    when the file does not exist.
+    """
     try:
+        if not os.path.exists(path):
+            return {}
         with open(path,'r') as file:
             return json.load(file,object_pairs_hook=collections.OrderedDict)
     except Exception as e:

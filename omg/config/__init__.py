@@ -391,9 +391,12 @@ class MainSection(Section):
     
     def write(self):
         """Write this configuration to the correct file."""
-        if self.storage:
-            configio.writeStorage(self._path,self)
-        else: configio.writeConfig(self._path,self)
+        try:
+            if self.storage:
+                configio.writeStorage(self._path,self)
+            else: configio.writeConfig(self._path,self)
+        except configio.ConfigError as e:
+            logger.error(e)
         
     def pprint(self):
         """Debug method: Print this configuration."""
@@ -408,7 +411,7 @@ class MainSection(Section):
                 print()
                 self._pprintSection(member,nesting+1)
             else: print("{}{}: {}".format("    "*(nesting-1),member.name,member.getValue()))
-        print()
+        print() # empty line
 
 
 class ValueSection:
