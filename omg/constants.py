@@ -26,7 +26,7 @@ YES_ANSWERS = ["y", "Y", ""]
 REAL, EDITOR, PLAYLIST = "REAL", "EDITOR", "PLAYLIST" # Levels for commands and events
 DISK, DB, CONTENTS = range(3) # modes for removing elements
 
-VERSION = '0.2.0' # major, minor, revision
+VERSION = '0.3.0' # major, minor, revision
 
 
 def compareVersion(v):
