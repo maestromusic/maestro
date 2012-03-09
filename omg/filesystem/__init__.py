@@ -63,6 +63,7 @@ def computeHash(path):
             stdout=subprocess.PIPE, stderr=null # this is due to a bug that ffmpeg ignores -v quiet
         )
         data = proc.stdout.readall()
+        proc.wait()
         hash = hashlib.md5(data).hexdigest()
         return hash
     except OSError:

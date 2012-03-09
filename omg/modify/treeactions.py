@@ -253,6 +253,7 @@ class ClearEditorAction(TreeAction):
     
     def __init__(self, parent):
         super().__init__(parent, shortcut = "Shift+Del")
+        self.setIcon(QtGui.qApp.style().standardIcon(QtGui.QStyle.SP_TrashIcon))
         self.setText(self.tr('clear editor'))
     
     def initialize(self):

@@ -333,6 +333,8 @@ def addTagType(name,valueType,title=None,iconPath=None,private=False,tagType=Non
     from . import database as db
     from .modify import dispatcher, events, ADDED
     if tagType is not None:
+        if title is None:
+            title = name
         data = (tagType.id,tagType.name,tagType.type.name,tagType.title,tagType.iconPath,tagType.private)
         db.query(
             "INSERT INTO {}tagids (id,tagname,tagtype,title,icon,private) VALUES (?,?,?,?,?,?)"
@@ -452,7 +454,7 @@ def loadTagTypesFromDB():
         
     for row in result:
         id,tagName,valueType,title,iconPath,private = row
-        if db.isNull(title):
+        if db.isNull(title) or title == "":
             title = None
             
         if db.isNull(iconPath):

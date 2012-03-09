@@ -506,10 +506,9 @@ class RecordDialog(QtGui.QDialog):
                 self.elementsBox.selectionModel().select(self.elementsBox.model().index(i,0),
                                                          QtGui.QItemSelectionModel.Select)
                 
-        abortButton = QtGui.QPushButton(self.tr("Cancel"),self)
-        abortButton.clicked.connect(self.reject)
-        okButton = QtGui.QPushButton(self.tr("OK"),self)
-        okButton.clicked.connect(self._handleOkButton)
+        buttonBox = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Cancel | QtGui.QDialogButtonBox.Ok)
+        buttonBox.rejected.connect(self.reject)
+        buttonBox.accepted.connect(self._handleOkButton)
         
         layout = QtGui.QVBoxLayout()
         self.setLayout(layout)
@@ -524,11 +523,8 @@ class RecordDialog(QtGui.QDialog):
         secondLineLayout.addWidget(self.valueEditor)
         layout.addWidget(QtGui.QLabel(self.tr("Elements: "),self))
         layout.addWidget(self.elementsBox)
-        lastLineLayout = QtGui.QHBoxLayout()
-        lastLineLayout.addStretch(1)
-        lastLineLayout.addWidget(abortButton,0)
-        lastLineLayout.addWidget(okButton,0)
-        layout.addLayout(lastLineLayout)
+
+        layout.addWidget(buttonBox)
     
     def _handleOkButton(self):
         """Check whether at least one element is selected and the current value is valid and if so, exit."""

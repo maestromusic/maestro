@@ -20,7 +20,7 @@ from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
 from .. import logging, modify, tags, realfiles, config
-from ..models import rootedtreemodel, RootNode, File, albumguesser
+from ..models import rootedtreemodel, RootNode, Element, File, albumguesser
 from ..modify import events, commands
 from ..utils import collectFiles, relPath
 from ..constants import EDITOR, CONTENTS
@@ -45,9 +45,8 @@ class EditorModel(rootedtreemodel.RootedTreeModel):
     ignoredEventClasses = ( events.ElementsDeletedEvent,
                             events.FilesAddedEvent,
                             events.FilesRemovedEvent,
-                            events.TagTypeChangedEvent,
-                            events.FlagTypeChangedEvent,
                             events.SortValueChangedEvent,
+                            events.TagTypeChangedEvent, # only possible if tag not present in any element
                             events.HiddenAttributeChangedEvent)
     
     def handleChangeEvent(self, event):
@@ -57,11 +56,17 @@ class EditorModel(rootedtreemodel.RootedTreeModel):
             if event.level == EDITOR:
                 self.handleElementChangeEvent(event)
             return
-        for cls in self.ignoredEventClasses:
-            if isinstance(event, cls):
-                return
-        logger.warning('WARNING UNKNOWN EVENT {}, RESETTING EDITOR'.format(event))
-        self.clear()
+        elif isinstance(event, events.FlagTypeChangedEvent):
+            for node in self.getAllNodes():
+                if isinstance(node, Element) and event.flagType in node.flags:
+                    idx = self.getIndex(node)
+                    self.dataChanged.emit(idx, idx)
+        else:                                                                         
+            for cls in self.ignoredEventClasses:
+                if isinstance(event, cls):
+                    return
+            logger.warning('WARNING UNKNOWN EVENT {}, RESETTING EDITOR'.format(event))
+            self.clear()
         
     def flags(self,index):
         defaultFlags = super().flags(index)
