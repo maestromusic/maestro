@@ -21,13 +21,13 @@ import logging
 
 HOME    = os.path.expanduser("~")
 
-
 YES_ANSWERS = ["y", "Y", ""]
 
 REAL, EDITOR, PLAYLIST = "REAL", "EDITOR", "PLAYLIST" # Levels for commands and events
 DISK, DB, CONTENTS = range(3) # modes for removing elements
 
 VERSION = '0.2.0' # major, minor, revision
+
 
 def compareVersion(v):
     """Returns 1 if the program version is larger than v, 0 if it is equal, and -1 if it is lower."""

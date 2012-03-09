@@ -32,7 +32,7 @@ Currently the order of pages is:
     or
     Special tags settings (if tagids is not empty, but either 'title' or 'album' are missing)
 """
-import collections
+import collections, sys
 
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
@@ -127,7 +127,7 @@ class InstallToolWindow(QtGui.QWidget):
         
         import sys
         logger.info("Install tool finished. Ready to start OMG.")
-        sys.exit(0)
+        QtCore.QCoreApplication.exit(117)
     
     def _handlePrevButton(self):
         """Handle the previous button."""
@@ -642,11 +642,12 @@ class IconLabel(QtGui.QLabel):
             self.setPath(result[1])
 
 
-def run():
+if __name__ == '__main__':
     global app
     app = QtGui.QApplication([])
     from omg import resources
     widget = InstallToolWindow()
     widget.show()
-    app.exec_()
+    returnCode = app.exec_()
+    sys.exit(returnCode)
     
