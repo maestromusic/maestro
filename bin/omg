@@ -9,5 +9,6 @@ import sys, subprocess
 
 returncode = subprocess.call([sys.executable, '-m', 'omg.application'] + sys.argv[1:])
 if returncode == 117:
-    import omg.install
-    omg.install.run()
+    returncode = subprocess.call([sys.executable, '-m', 'omg.install'])
+    if returncode == 117:
+        returncode = subprocess.call([sys.executable, '-m', 'omg.application'] + sys.argv[1:])
