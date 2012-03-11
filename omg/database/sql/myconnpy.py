@@ -17,7 +17,7 @@
 #
 
 import mysql.connector
-from . import DBException, AbstractSql, AbstractSqlResult
+from . import DBException, AbstractSql, AbstractSqlResult, EmptyResultException
 
 
 class Sql(AbstractSql):
@@ -82,7 +82,9 @@ class SqlResult(AbstractSqlResult):
             return self.single
         except AttributeError:
             row = self._cursor.fetchone()
-            self.single = row[0] if row is not None else None
+            if row is None:
+                raise EmptyResultException()
+            self.single = row[0]
             return self.single
         
     def getSingleColumn(self):
