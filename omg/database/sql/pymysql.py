@@ -18,45 +18,38 @@
 
 import pymysql
 from . import DBException, AbstractSql, AbstractSqlResult
-import threading
 
 
 class Sql(AbstractSql):
     def connect(self,username,password,database,host="localhost",port=3306):
         self._db = pymysql.connect(db=database,user=username,passwd=password,
                                    host=host,port=port,charset='utf8')
-        self.lock = threading.Lock()
 
     def close(self):
-        with self.lock:
-            self._db.close()
+        self._db.close()
             
     def query(self,queryString,*args):
-        with self.lock:
-            if args:
-                queryString = queryString.replace('?','%s')
-            cursor = self._db.cursor()
-            cursor.execute(queryString,args)
-            return SqlResult(cursor)
+        if args:
+            queryString = queryString.replace('?','%s')
+        cursor = self._db.cursor()
+        cursor.execute(queryString,args)
+        return SqlResult(cursor)
     
     def multiQuery(self,queryString,argSets):
-        with self.lock:
-            if argSets:
-                queryString = queryString.replace('?','%s')
-            cursor = self._db.cursor()
-            cursor.executemany(queryString,argSets)
-            return SqlResult(cursor)
+        if argSets:
+            queryString = queryString.replace('?','%s')
+        cursor = self._db.cursor()
+        cursor.executemany(queryString,argSets)
+        return SqlResult(cursor)
         
     def transaction(self):
         self.query('START TRANSACTION')
         
     def commit(self):
-        with self.lock:
-            self._db.commit()
+        self._db.commit()
         
     def rollback(self):
-        with self.lock:
-            self._db.rollback()
+        self._db.rollback()
 
 
 class SqlResult(AbstractSqlResult):
