@@ -359,11 +359,12 @@ class MainSection(Section):
                     keys = option.split('.')
                     section = self
                     for key in keys[:-1]:
-                        section = section[key]
-                    section[keys[-1]].tempValue = value
+                        section = section.members[key]
+                    option = section.members[keys[-1]]
+                    option.tempValue = option.parseString(value)
                 except KeyError:
-                    logger.error("Unknown config option on command line '{}'.".format(option))
-                except Exception:
+                    logger.error("Unknown config option on command line '{}'.".format(line))
+                except Exception as e:
                     logger.error("Invalid config option on command line '{}'.".format(line))
     
     def loadPlugins(self,sections):
