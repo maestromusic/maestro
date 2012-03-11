@@ -32,7 +32,7 @@ Currently the order of pages is:
     or
     Special tags settings (if tagids is not empty, but either 'title' or 'album' are missing)
 """
-import collections, sys
+import collections, sys, os
 
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
@@ -246,10 +246,10 @@ class GeneralSettingsWidget(SettingsWidget):
         dbButtonGroup = QtGui.QButtonGroup()
         self.sqliteBox = QtGui.QRadioButton(self.tr("SQLite"))
         dbButtonGroup.addButton(self.sqliteBox)
-        self.sqliteBox.setEnabled(False) # TODO
+        self.sqliteBox.setChecked(config.options.database.type == 'sqlite')
         self.mysqlBox = QtGui.QRadioButton(self.tr("MySQL"))
         dbButtonGroup.addButton(self.mysqlBox)
-        self.mysqlBox.setChecked(True) # TODO
+        self.sqliteBox.setChecked(config.options.database.type == 'mysql')
         dbChooserLayout.addWidget(self.sqliteBox)
         dbChooserLayout.addWidget(self.mysqlBox)
         dbButtonGroup.addButton(self.sqliteBox)
@@ -266,16 +266,13 @@ class GeneralSettingsWidget(SettingsWidget):
         """Store user input in config variables."""
         if self.collectionLineEdit.text():
             config.options.main.collection = self.collectionLineEdit.text()
+            config.options.database.type = 'mysql' if self.mysqlBox.isChecked() else 'sqlite'
         else:
             QtGui.QMessageBox.warning(self,self.tr("No music directory"),
                                       self.tr("You must choose a directory for your music collection."))
             return False
-        if self.mpdBox.isChecked():
-            # TODO improve when ticket #73 is closed
-            plugins = config.options.main.plugins
-            if "mpd" not in plugins:
-                plugins.append("mpd")
-                config.options.main.plugins = plugins
+        if self.mpdBox.isChecked() and "mpd" not in config.options.main.plugins:
+            config.options.main.plugins.append("mpd")
         return True
     
     def _handleFileChooserButton(self):
@@ -285,21 +282,89 @@ class GeneralSettingsWidget(SettingsWidget):
         if result:
             self.collectionLineEdit.setText(result)
                 
-            
-class SQLiteWidget(SettingsWidget):
+
+class DBSettingsWidget(SettingsWidget):
+    """Superclass for SQLiteWidget and MySQLWidget."""
+    def finish(self):
+        """Store user input in config variables and establish a connection. If the database is empty, create
+        tables. If it is not empty check whether tagids-table exist. If anything goes wrong, display an
+        error and close the connection again.
+        """
+        # Check database access and if necessary create tables
+        try:
+            db.connect()
+        except db.sql.DBException as e:
+            logger.error("I cannot connect to the database. SQL error: {}".format(e.message))
+            QtGui.QMessageBox.warning(self,self.tr("Database connection failed"),
+                                      self.tr("I cannot connect to the database."))
+            return False 
+        
+        try:
+            if len(db.listTables()) == 0:
+                db.createTables()
+        except db.sql.DBException as e:
+            logger.error("I cannot create database tables. SQL error: {}".format(e.message))
+            QtGui.QMessageBox.warning(self,self.tr("Cannot create tables"),
+                                      self.tr("I cannot create the database tables. Please make sure that "
+                                              "the specified user has the necessary permissions."))
+            db.close()
+            return False 
+        
+        # If the database was not empty (thus no new tables were created) it might happen, that the user
+        # specified the wrong prefix.
+        if db.prefix+'tagids' not in db.listTables():
+            logger.error("Cannot find table '{}tagids'".format(db.prefix))
+            QtGui.QMessageBox.warning(self,self.tr("Database table missing"),
+                                      self.tr("Although the database is not empty, it does not contain a "
+                                              "table '{}tagids'. Did you provide the correct table prefix?")
+                                                .format(db.prefix))
+            db.close()
+            return False 
+        return True
+    
+    
+class SQLiteWidget(DBSettingsWidget):
     """Settings for SQLite (mainly the path to the database file)."""
     def __init__(self,installTool,titleNumber):
         super().__init__(installTool,titleNumber)
         self.setTitle(self.tr("SQLite settings"))
+        
+        label = QtGui.QLabel(self.tr(
+            "Choose an existing SQLite database file or enter a path where a new database should be created. "
+            "Use the prefix 'config:' to specify a path relative the configuration directory."))
+        label.setWordWrap(True)
+        self.layout().addWidget(label)
+        
         formLayout = QtGui.QFormLayout()
         self.layout().addLayout(formLayout)
+        
+        pathLayout = QtGui.QHBoxLayout()
+        self.pathLineEdit = QtGui.QLineEdit(config.options.database.sqlite_path)
+        pathLayout.addWidget(self.pathLineEdit)
+        fileChooserButton = QtGui.QPushButton()
+        fileChooserButton.setIcon(QtGui.QApplication.style().standardIcon(QtGui.QStyle.SP_DirIcon))
+        fileChooserButton.clicked.connect(self._handleFileChooserButton)
+        pathLayout.addWidget(fileChooserButton)
+        formLayout.addRow(self.tr("Database file"),pathLayout)
+        
         self.layout().addStretch()
-    
+        
+    def _handleFileChooserButton(self):
+        """Handle the button next to the collection directory field: Open a file dialog."""
+        # Replace config: prefix before opening the dialog
+        path = config.options.database.sqlite_path.strip()
+        if path.startswith('config:'):
+            path = os.path.join(config.CONFDIR,path[len('config:'):])
+        result = QtGui.QFileDialog.getSaveFileName(self,self.tr("Choose database file"),path)
+        if result:
+            self.pathLineEdit.setText(result)
+            
     def finish(self):
-        return True # TODO
+        config.options.database.sqlite_path = self.pathLineEdit.text()
+        return super().finish()
 
 
-class MySQLWidget(SettingsWidget):
+class MySQLWidget(DBSettingsWidget):
     """Settings for SQL (database name, user etc.)"""
     def __init__(self,installTool,titleNumber):
         super().__init__(installTool,titleNumber)
@@ -335,10 +400,6 @@ class MySQLWidget(SettingsWidget):
         formLayout.addRow(self.tr("Table prefix (optional)"),self.dbPrefixLineEdit)
     
     def finish(self):
-        """Store user input in config variables and establish a connection. If the database is empty, create
-        tables. If it is not empty check whether tagids-table exist. If anything goes wrong, display an
-        error and close the connection again.
-        """
         config.options.database.mysql_db = self.dbNameLineEdit.text()
         config.options.database.mysql_user = self.dbUserLineEdit.text()
         config.options.database.mysql_password = self.dbPasswordLineEdit.text()
@@ -351,37 +412,7 @@ class MySQLWidget(SettingsWidget):
             return False
         config.options.database.prefix = self.dbPrefixLineEdit.text()
             
-        # Check database access and if necessary create tables
-        try:
-            db.connect()
-        except db.sql.DBException as e:
-            logger.error("I cannot connect to the database. MySQL error: {}".format(e.message))
-            QtGui.QMessageBox.warning(self,self.tr("Database connection failed"),
-                                      self.tr("I cannot connect to the database."))
-            return False 
-        
-        try:
-            if len(db.listTables()) == 0:
-                db.createTables()
-        except db.sql.DBException as e:
-            logger.error("I cannot create database tables. MySQL error: {}".format(e.message))
-            QtGui.QMessageBox.warning(self,self.tr("Cannot create tables"),
-                                      self.tr("I cannot create the database tables. Please make sure that "
-                                              "the specified user has the necessary permissions."))
-            db.close()
-            return False 
-        
-        # If the database was not empty (thus no new tables were created) it might happen, that the user
-        # specified the wrong prefix.
-        if db.prefix+'tagids' not in db.listTables():
-            logger.error("Cannot find table '{}tagids'".format(db.prefix))
-            QtGui.QMessageBox.warning(self,self.tr("Database table missing"),
-                                      self.tr("Although the database is not empty, it does not contain a "
-                                              "table '{}tagids'. Did you provide the correct table prefix?")
-                                                .format(db.prefix))
-            db.close()
-            return False 
-        return True
+        return super().finish()
     
     
 class TagWidget(SettingsWidget):
@@ -523,7 +554,7 @@ class TagWidget(SettingsWidget):
             tags[name] = (name,valueType,title,icon,1 if private else 0)
         
         # Write tags to database
-        assert db.query("SELECT COUNT(*) FROM {}tagids".format(db.prefix)).getSingle() == 0   
+        assert db.query("SELECT COUNT(*) FROM {}tagids".format(db.prefix)).getSingle() == 0
         db.multiQuery("INSERT INTO {}tagids (tagname,tagtype,title,icon,private) VALUES (?,?,?,?,?)"
                       .format(db.prefix),tags.values())
         

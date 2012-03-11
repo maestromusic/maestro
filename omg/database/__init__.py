@@ -54,7 +54,7 @@ each thread and use a ``with`` statement to ensure the connection is finally clo
 
 \ """
 
-import sys, threading, functools
+import os, sys, threading, functools
 
 from omg import strutils, config, logging, utils, tags as tagsModule, constants
 from . import sql
@@ -85,8 +85,8 @@ class ConnectionContextManager:
 
 def connect():
     """Connect to the database server with information from the config file. The drivers specified in
-    ``config.options.database.drivers`` are tried in the given order. This method must be called exactly
-    once for each thread that wishes to access the database. If successful, it returns a
+    ``config.options.database.mysql_drivers`` are tried in the given order. This method must be called 
+    exactly once for each thread that wishes to access the database. If successful, it returns a
     :class:`ConnectionContextManager` that will automatically close the connection if used in a ``with``
     statement. If the connection fails, it will raise a DBException.
     """
@@ -98,8 +98,15 @@ def connect():
 
     global prefix
     prefix = config.options.database.prefix
-    authValues = [config.options.database["mysql_"+key] for key in sql.AUTH_OPTIONS]
-    return _connect(config.options.database.drivers,authValues)
+    if config.options.database.type == 'sqlite':
+        # Replace 'config:' prefix in path
+        path = config.options.database.sqlite_path.strip()
+        if path.startswith('config:'):
+            path = os.path.join(config.CONFDIR,path[len('config:'):])
+        return _connect(['sqlite'],[path])
+    else: 
+        authValues = [config.options.database["mysql_"+key] for key in sql.AUTH_OPTIONS]
+        return _connect(config.options.database.mysql_drivers,authValues)
         
 
 def testConnect(driver=None):
@@ -111,6 +118,8 @@ def testConnect(driver=None):
 
     As :func:`connect`, this method returns a :class:`ConnectionContextManager` on success or throw a
     DBException on failure.
+    
+    testConnect only works for MySQL connections. For SQLite simply use another file.
     """
     threadId = threading.current_thread().ident
     if threadId in connections:
@@ -139,12 +148,13 @@ def testConnect(driver=None):
     if (prefix == config.options.database.prefix
             and dbName == config.options.database.mysql_db
             and host == config.options.database.mysql_host):
-        logger.critical("Safety stop: Test database connection information coincides with the usual information. Please supply at least a different prefix.")
+        logger.critical("Safety stop: Test database connection information coincides with the usual "
+                        " information. Please supply at least a different prefix.")
         sys.exit(1)
 
     if driver is not None:
         drivers = [driver]
-    else: drivers = config.options.database.drivers
+    else: drivers = config.options.database.mysql_drivers
     return _connect(drivers,authValues)
 
 
@@ -169,7 +179,9 @@ def close():
 
 def listTables():
     """Return a list of all table names in the database."""
-    return list(query("SHOW TABLES").getSingleColumn())
+    if config.options.database.type == 'mysql':
+        return list(query("SHOW TABLES").getSingleColumn())
+    else: return list(query("SELECT name FROM sqlite_master WHERE type = 'table'").getSingleColumn())
     
     
 def resetDatabase():
@@ -409,12 +421,15 @@ def idFromValue(tagSpec,value,insert=False):
             return query("SELECT id FROM {}values_date WHERE tag_id = ? AND value = ?"
                             .format(prefix),tag.id,value).getSingle()
         else:
-            # Compare exactly (using binary collation
-            return query("SELECT id FROM {}values_{} WHERE tag_id = ? AND value COLLATE utf8_bin = ?"
-                            .format(prefix,tag.type),tag.id,value).getSingle()
+            if config.options.database.type == 'mysql':
+                # Compare exactly (using binary collation)
+                q = "SELECT id FROM {}values_{} WHERE tag_id = ? AND value COLLATE utf8_bin = ?"\
+                     .format(prefix,tag.type)
+            else: q = "SELECT id FROM {}values_{} WHERE tag_id = ? AND value = ?".format(prefix,tag.type)
+            return query(q,tag.id,value).getSingle()
     except sql.EmptyResultException as e:
         if insert:
-            result = query("INSERT INTO {}values_{} SET tag_id = ?,value = ?"
+            result = query("INSERT INTO {}values_{} (tag_id,value) VALUES (?,?)"
                              .format(prefix,tag.type),tag.id,value)
             return result.insertId()
         else: raise e
@@ -518,7 +533,7 @@ def folderState(path):
 
 
 def addFolder(path, state):
-    query('INSERT INTO {}folders SET path=?, state=?'.format(prefix), path, state)
+    query('INSERT INTO {}folders VALUES(path,state) VALUES (?,?)'.format(prefix), path, state)
     
     
 def updateFolder(path, state):

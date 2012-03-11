@@ -43,7 +43,8 @@ class FileSystemBrowserModel(QtGui.QFileSystemModel):
     def __init__(self, parent = None):
         QtGui.QFileSystemModel.__init__(self, parent)
         self.setFilter(QtCore.QDir.AllEntries | QtCore.QDir.NoDotAndDotDot)
-        filesystem.syncThread.folderStateChanged.connect(self.handleStateChange)
+        if filesystem.syncThread is not None:
+            filesystem.syncThread.folderStateChanged.connect(self.handleStateChange)
 
     def columnCount(self, index):
         return 1
@@ -67,6 +68,8 @@ class FileSystemBrowserModel(QtGui.QFileSystemModel):
                     #status = db.folderState(dir)
                     status = filesystem.syncThread.knownFolders[dir]
                 #except EmptyResultException:
+                except AttributeError:
+                    status = 'unsynced'
                 except KeyError:
                     status = 'unsynced'
                 return self.icons[status]

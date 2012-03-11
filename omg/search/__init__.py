@@ -161,18 +161,33 @@ class SearchEngine(QtCore.QObject):
             while "{}_{}".format(tableName,i) in db.listTables():
                 i += 1
             tableName = "{}_{}".format(tableName,i)
-            db.query("""
-                CREATE TABLE {} (
-                    id MEDIUMINT UNSIGNED NOT NULL,
-                    {}
-                    file BOOLEAN NOT NULL,
-                    toplevel BOOLEAN NOT NULL DEFAULT 0,
-                    direct BOOLEAN NOT NULL DEFAULT 1,
-                    major BOOLEAN NOT NULL DEFAULT 0,
-                    new BOOLEAN NOT NULL DEFAULT 0,
-                    PRIMARY KEY(id))
-                    ENGINE MEMORY;
-                """.format(tableName,customColumns))
+            if config.options.database.type == 'mysql':
+                # Do not create a temporary table, because such a table can only be accessed from the thread
+                # that created it. Use ENGINE MEMORY instead.
+                createQuery = """
+                    CREATE TABLE {} (
+                        id MEDIUMINT UNSIGNED NOT NULL,
+                        {}
+                        file BOOLEAN NOT NULL,
+                        toplevel BOOLEAN NOT NULL DEFAULT 0,
+                        direct BOOLEAN NOT NULL DEFAULT 1,
+                        major BOOLEAN NOT NULL DEFAULT 0,
+                        new BOOLEAN NOT NULL DEFAULT 0,
+                        PRIMARY KEY(id))
+                        ENGINE MEMORY;
+                    """.format(tableName,customColumns)
+            else:
+                createQuery = """
+                    CREATE TEMPORARY TABLE {} (
+                        id INTEGER PRIMARY KEY,
+                        {}
+                        file BOOLEAN NOT NULL,
+                        toplevel BOOLEAN NOT NULL DEFAULT 0,
+                        direct BOOLEAN NOT NULL DEFAULT 1,
+                        major BOOLEAN NOT NULL DEFAULT 0,
+                        new BOOLEAN NOT NULL DEFAULT 0)
+                    """.format(tableName,customColumns)
+            db.query(createQuery)
         self._thread.tables[tableName] = None
         return tableName
         
@@ -296,12 +311,20 @@ class SearchThread(threading.Thread):
         """        
         # -*- coding: utf-8 -*-
         with db.connect():
-            db.query("""
-            CREATE TEMPORARY TABLE IF NOT EXISTS {0} (
-                id MEDIUMINT UNSIGNED NOT NULL,
-                value MEDIUMINT UNSIGNED NULL)
-                CHARACTER SET 'utf8';
-            """.format(TT_HELP))
+            if config.options.database.type == 'mysql':
+                createQuery = """
+                    CREATE TEMPORARY TABLE IF NOT EXISTS {} (
+                        id MEDIUMINT UNSIGNED NOT NULL,
+                        value MEDIUMINT UNSIGNED NULL)
+                        CHARACTER SET 'utf8'
+                    """.format(TT_HELP)
+            else:
+                createQuery = """
+                    CREATE TEMPORARY TABLE IF NOT EXISTS {} (
+                        id  MEDIUMINT UNSIGNED NOT NULL,
+                        value MEDIUMINT UNSIGNED NULL)
+                    """.format(TT_HELP)
+            db.query(createQuery)
         
             while True:
                 self.lock.acquire()

@@ -49,7 +49,7 @@ def createNewElements(elements):
         result[element.id] = newId
         
     if len(newFileParams) > 0:
-        db.multiQuery("INSERT INTO {}files SET element_id = ?, path = ?, length = ?"
+        db.multiQuery("INSERT INTO {}files (element_id,path,length) VALUES(?,?,?)"
                       .format(db.prefix),newFileParams)
         dispatcher.changes.emit(events.FilesAddedEvent([params[1] for params in newFileParams]))
     return result
@@ -284,7 +284,7 @@ def changeTags(changes,elements=[],emitEvent = True):
                       .format(db.prefix),removeParams)
   
     if len(addParams) > 0:
-        db.multiQuery("INSERT INTO {}tags SET element_id = ?,tag_id = ?,value_id = ?"
+        db.multiQuery("INSERT INTO {}tags (element_id,tag_id,value_id) VALUES (?,?,?)"
                       .format(db.prefix),addParams) 
     if len(successful) > 0 and emitEvent:
         changes = {k: v[1] for k,v in changes.items() if k in successful}
@@ -322,7 +322,7 @@ def changeFlags(changes,emitEvent = True):
                       .format(db.prefix),removeParams)
         
     if len(addParams) > 0:
-        db.multiQuery("INSERT INTO {}flags SET element_id = ?, flag_id = ?"
+        db.multiQuery("INSERT INTO {}flags (element_id,flag_id) VALUES (?,?)"
                       .format(db.prefix),addParams)
         
     if emitEvent:

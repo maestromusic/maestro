@@ -49,8 +49,10 @@ defaults = OrderedDict((
 }),
 
 ("database",{
-    "drivers": (list,["qtsql"], "List of drivers OMG will use to try to connect to the database."),
+    "type": (str,"mysql","Either 'mysql' or 'sqlite'."),
     "prefix":  (str,"","Prefix which will be prepended to the table names."),
+    
+    "mysql_drivers": (list,["qtsql"], "List of drivers OMG will use to try to connect to a MySQL database."),
     "mysql_db": (str,"omg","Name of the database"),
     "mysql_user": (str,"","MySQL user name"),
     "mysql_password": (str,"","MySQL password"),
@@ -63,6 +65,8 @@ defaults = OrderedDict((
     "test_host": (str,"localhost","MySQL host name for test scripts"),
     "test_port": (int,3306,"MySQL port for test scripts"),
     "test_prefix": (str,"omgtest_","Table prefix for the test tables."),
+    
+    "sqlite_path": (str,"config:omg.db","Path to the SQLite database. May start with 'config:' indicating that the path is relative to the configuration directory.")
 }),
 
 ("mpd", {
