@@ -510,6 +510,10 @@ class NewTagTypeDialog(QtGui.QDialog):
         self.combo = ValueTypeBox()
         self.layout().addWidget(self.combo)
         
+        self.layout().addWidget(QtGui.QLabel(self.tr("Title:")))
+        self.titleLineEdit = QtGui.QLineEdit(tagname)
+        self.layout().addWidget(self.titleLineEdit)
+        
         self.privateBox = QtGui.QCheckBox(self.tr("Private?"))
         self.privateBox.setEnabled(privateEditable)
         self.layout().addWidget(self.privateBox)
@@ -551,9 +555,15 @@ class NewTagTypeDialog(QtGui.QDialog):
                                           self.tr("'{}' is not a valid tagname.").format(tagname))
                 return
             self.tagname = tagname
+            
+        if len(self.titleLineEdit.text()) == 0 or self.titleLineEdit.text().isspace():
+            QtGui.QMessageBox.warning(self,self.tr("Empty title"),
+                                      self.tr("The title must not be empty."))
+            return
         if self._newTag is None:
             modify.push(modify.commands.TagTypeUndoCommand(modify.ADDED,None,name=self.tagname,
                                                            valueType=self.combo.getType(),
+                                                           title=self.titleLineEdit.text(),
                                                            iconPath=None,
                                                            private=self.privateBox.isChecked()))
             self._newTag = tags.get(self.tagname)

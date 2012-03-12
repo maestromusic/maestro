@@ -198,8 +198,13 @@ class CoverFetcher(QtGui.QDialog):
         else: self.loadFromUrl(url,url.toString())
     
     def _handleLastFMCoverButton(self):
-        urls = []
         element = self.elements[self.elementIndex]
+        if tags.get("artist") not in element.tags or tags.ALBUM not in element.tags:
+            QtGui.QMessageBox.warning(self,self.tr("Missing tag"),
+                              self.tr("I need an artist tag and an album tag to fetch covers."))
+            return
+                              
+        urls = []
         for artist,album in itertools.product(element.tags[tags.get("artist")],element.tags[tags.ALBUM]):
             try:
                 lastFMUrl = 'http://ws.audioscrobbler.com/2.0/?method=album.getinfo&artist={0}&album={1}&api_key={2}'\
