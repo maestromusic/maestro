@@ -88,6 +88,7 @@ class InstallToolWindow(QtGui.QWidget):
         self.nextButton = QtGui.QPushButton(self.tr("Next"))
         self.nextButton.setIcon(style.standardIcon(QtGui.QStyle.SP_ArrowRight))
         self.nextButton.clicked.connect(self._handleNextButton)
+        self.nextButton.setDefault(True)
         buttonLayout.addWidget(self.nextButton)
         
         self.stateWidgets['language'] = LanguageWidget(self,1)
@@ -125,9 +126,9 @@ class InstallToolWindow(QtGui.QWidget):
         # Write config values
         config.shutdown()
         
-        import sys
+        import os, sys, os.path
         logger.info("Install tool finished. Ready to start OMG.")
-        sys.exit(0)
+        os.execl(sys.executable, os.path.basename(sys.executable), "-m", "omg.application")
     
     def _handlePrevButton(self):
         """Handle the previous button."""
@@ -649,4 +650,7 @@ def run():
     widget = InstallToolWindow()
     widget.show()
     app.exec_()
+    
+if __name__ == "__main__":
+    run()
     

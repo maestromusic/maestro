@@ -28,7 +28,10 @@ setup(name='OMG',
       
       #install_requires=['taglib>=0.0.1'],
       packages=find_packages(),
-      scripts=['bin/omg'],
+      #scripts=['bin/omg'],
       py_modules=['mpd'],
+      entry_points = {
+          'console_scripts' : ['omg = omg.application:run']
+        }
     )
 
