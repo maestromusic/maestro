@@ -16,6 +16,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
+import distribute_setup
+distribute_setup.use_setuptools()
 from setuptools import setup, find_packages
 
 setup(name='OMG',
@@ -29,7 +31,7 @@ setup(name='OMG',
       #install_requires=['taglib>=0.0.1'],
       packages=find_packages(),
       #scripts=['bin/omg'],
-      py_modules=['mpd'],
+      py_modules=['mpd', 'distribute_setup'],
       entry_points = {
           'console_scripts' : ['omg = omg.application:run']
         }
