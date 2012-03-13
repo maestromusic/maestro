@@ -67,7 +67,7 @@ def computeHash(path):
         hash = hashlib.md5(data).hexdigest()
         return hash
     except OSError:
-        logger.error('need ffmpeg binary to compute hashes')
+        raise OSError('please install the "ffmpeg" binary to compute hashes')
 
 class Notifier(QtCore.QObject):
     

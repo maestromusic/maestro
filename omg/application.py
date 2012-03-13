@@ -184,6 +184,7 @@ def lock():
 
 def loadTranslators(app,logger):
     """Load a translator for Qt's strings and one for OMG's strings."""
+    from . import translations
     # Try up to two different locales
     for translator in _translators:
         app.removeTranslator(translator)

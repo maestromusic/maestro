@@ -28,9 +28,7 @@ setup(name='OMG',
       url='http://omg.mathematik.uni-kl.de',
       license='GPL3',
       
-      #install_requires=['taglib>=0.0.1'],
       packages=find_packages(),
-      #scripts=['bin/omg'],
       py_modules=['mpd', 'distribute_setup'],
       entry_points = {
           'console_scripts' : ['omg = omg.application:run']
