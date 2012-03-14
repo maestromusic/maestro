@@ -178,6 +178,9 @@ class PositionChangeEvent(ElementChangeEvent):
     
     def applyTo(self, element):
         raise NotImplementedError("PositionChangeEvent to complicated for applyTo -- use RootedTreeModel.changePositions!")
+    
+    def __str__(self):
+        return "PositionChangeEvent(level={}, {}, {})".format(self.level, self.parentId, self.positionMap)
 
         
     

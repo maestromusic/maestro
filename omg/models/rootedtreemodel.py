@@ -256,7 +256,7 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
                 
     def changePositions(self, parent, changes):
         """Changes positions of elements below *parent*, according to the
-        oldPosition->newPosition dict *changes.*"""
+        oldPosition->newPosition dict *changes*."""
         def argsort(seq):
             # http://stackoverflow.com/questions/3382352/equivalent-of-numpy-argsort-in-basic-python/3383106#3383106
             #lambda version by Tony Veijalainen
@@ -280,12 +280,20 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
         J = list(range(len(sortedIndices)))
         i = len(I)-1
         # start from the end
+        breakOuter = False
         while i >= 0:
             # decrease i until there is a wrong position
             while sortedIndices[i] == I[i]:
                 i -= 1
                 if i < 0:
-                    return
+                    breakOuter = True
+                    break
+                    #return
+            if breakOuter:
+                break
+            print(i)
+            print(sortedIndices[i])
+            print(I[i])
             # here: sortedIndices[i] != I[i]
             end = sortedIndices[i]
             start = end
@@ -306,6 +314,7 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
             J[start:end+1] = []
             J[iStart:iStart] = tmp
             i -= 1
+        #self.dataChanged.emit(parentIndex.child(0, 0), parentIndex.child(len(parent.contents)-1, 0))
         self.dataChanged.emit(parentIndex.child(0, 0), parentIndex.child(0, len(I)))
           
     def insert(self,parent,insertions):
