@@ -13,7 +13,7 @@
 # GNU General Public License for more details.
 # 
 # You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
 import pymysql
@@ -23,7 +23,7 @@ from . import DBException, AbstractSql, AbstractSqlResult, EmptyResultException
 class Sql(AbstractSql):
     def connect(self,username,password,database,host="localhost",port=3306):
         self._db = pymysql.connect(db=database,user=username,passwd=password,
-                                   host=host,port=port,charset='utf8')
+                                   host=host,port=port,use_unicode=True,charset='utf8')
 
     def close(self):
         self._db.close()

@@ -45,9 +45,9 @@ def shutdown():
     for engine in engines[:]:
         engine.shutdown()
     # Drop remaining search tables (maybe the last run of OMG crashed and did not remove them).
-    #for table in db.listTables():
-    #    if table.startswith("{}tmp_search_".format(db.prefix)):
-    #        db.query("DROP TABLE {}".format(table))
+    for table in db.listTables():
+        if table.startswith("{}tmp_search_".format(db.prefix)):
+            db.query("DROP TABLE {}".format(table))
 
 
 class SearchRequest:
@@ -178,7 +178,7 @@ class SearchEngine(QtCore.QObject):
                     """.format(tableName,customColumns)
             else:
                 createQuery = """
-                    CREATE TABLE IF NOT EXISTS {} (
+                    CREATE TABLE {} (
                         id INTEGER PRIMARY KEY,
                         {}
                         file BOOLEAN NOT NULL DEFAULT 0,
@@ -189,7 +189,6 @@ class SearchEngine(QtCore.QObject):
                     """.format(tableName,customColumns)
             db.query(createQuery)
         self._thread.tables[tableName] = None
-        print(tableName)
         return tableName
         
     def search(self,*args,**kargs):
@@ -233,8 +232,8 @@ class SearchEngine(QtCore.QObject):
         self._thread.searchEvent.set()
         # Wait for the thread to finish before dropping the tables
         self._thread.join()
-        #for table in self._thread.tables:
-         #   db.query("DROP TABLE {}".format(table))
+        for table in self._thread.tables:
+           db.query("DROP TABLE {}".format(table))
         self._thread = None
 
 
