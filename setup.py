@@ -19,19 +19,27 @@
 import distribute_setup
 distribute_setup.use_setuptools()
 from setuptools import setup, find_packages
+from setuptools.command.sdist import sdist
+original_run = sdist.run
+def sdist_run(self):
+    import subprocess
+    subprocess.check_call(["/bin/sh", "update_resources.sh"])
+    original_run(self)
+    
+sdist.run = sdist_run
 
-setup(name='OMG',
-      version='0.2',
+setup(name='omg',
+      version='0.2-beta2',
       description='OMG music GUI',
       author='Martin Altmayer, Michael Helmling',
       author_email='{altmayer,helmling}@mathematik.uni-kl.de',
       url='http://omg.mathematik.uni-kl.de',
       license='GPL3',
-      
       packages=find_packages(),
+      include_package_data = True,
       py_modules=['mpd', 'distribute_setup'],
       entry_points = {
-          'console_scripts' : ['omg = omg.application:run']
-        }
+          'gui_scripts' : ['omg = omg.application:run'], 
+          }
     )
 
