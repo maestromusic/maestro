@@ -171,6 +171,42 @@ class FlattenAction(TreeAction):
                                     dialog.recursive()
                                     )
 
+class ChangePositionAction(TreeAction):
+    
+    def __init__(self, parent, type = "free", *args, **kwargs):
+        super().__init__(parent, *args, **kwargs)
+        self.type = type
+        if type == "free":
+            self.setText(self.tr("choose position..."))
+        elif type == "+1":
+            self.setText(self.tr("increase position"))
+        elif type == "-1":
+            self.setText(self.tr("decrease position"))
+        else:
+            raise ValueError("{0} is not a valid ChangePositionAction type".format(type))
+    
+    def initialize(self):
+        selection = self.parent().nodeSelection
+        if self.type == "free":
+            self.setEnabled(False)
+        elif self.type == "+1":
+            self.setEnabled(selection.singleElement() and selection.elements()[0].position is not None)
+        else:
+            self.setEnabled(selection.singleElement()
+                            and selection.elements()[0].position is not None 
+                            and selection.elements()[0].position> 1)
+    
+    def doAction(self):
+        selection = self.parent().nodeSelection
+        element = selection.elements()[0]
+        parentId = element.parent.id
+        if self.type == "+1":
+            modify.push(commands.PositionChangeCommand(self.parent().level,
+                                                       parentId, [(element.position, element.position+1)]))
+        elif self.type == "-1":
+            modify.push(commands.PositionChangeCommand(self.parent().level,
+                                                       parentId, [(element.position, element.position-1)]))
+            
 class CommitAction(TreeAction):
     """Action to commit all current editors."""
     def __init__(self, parent):

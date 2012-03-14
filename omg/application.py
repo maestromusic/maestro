@@ -35,7 +35,7 @@ global logger
         
 # Store translators so that they are not garbage-collected
 _translators = []
-INSTALL_RETURNCODE=117
+
 
 
 def init(cmdConfig = [],initTags=True,testDB=False,useInstallTool=False):
@@ -70,7 +70,7 @@ def init(cmdConfig = [],initTags=True,testDB=False,useInstallTool=False):
     if config.options.main.collection == '':
         logger.error("No collection directory defined.")
         if useInstallTool:
-            sys.exit(INSTALL_RETURNCODE)
+            runInstaller()
         else: sys.exit(1)
     
     loadTranslators(app,logger)
@@ -84,7 +84,7 @@ def init(cmdConfig = [],initTags=True,testDB=False,useInstallTool=False):
         logger.error("I cannot connect to the database. Did you provide the correct information in the config"
                      " file? MySQL error: {}".format(e.message))
         if useInstallTool:
-            sys.exit(INSTALL_RETURNCODE)
+            runInstaller()
         else: sys.exit(1)
 
     if initTags:
@@ -93,7 +93,7 @@ def init(cmdConfig = [],initTags=True,testDB=False,useInstallTool=False):
             tags.init()
         except RuntimeError:
             if useInstallTool:
-                sys.exit(INSTALL_RETURNCODE)
+                runInstaller()
             else: sys.exit(1)
         flags.init()
 
@@ -114,7 +114,7 @@ def run():
         elif opt in ('-c','--config'):
             cmdConfig.append(arg)
         elif opt == '--install':
-            sys.exit(INSTALL_RETURNCODE)
+            runInstaller()
         else:
             logger.warning("Unknown option '{}'.".format(opt))
         
@@ -184,6 +184,7 @@ def lock():
 
 def loadTranslators(app,logger):
     """Load a translator for Qt's strings and one for OMG's strings."""
+    from . import translations
     # Try up to two different locales
     for translator in _translators:
         app.removeTranslator(translator)
@@ -218,7 +219,8 @@ def loadTranslators(app,logger):
         else: logger.warning("Unable to load translator file {} from directory {}."
                                 .format(translatorFile,translatorDir))
 
+def runInstaller():
+    os.execl(sys.executable, os.path.basename(sys.executable), "-m", "omg.install")
     
 if __name__ == "__main__":
-    run()
-    
+    run() 

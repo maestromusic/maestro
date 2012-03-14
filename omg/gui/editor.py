@@ -87,6 +87,8 @@ class EditorTreeView(treeview.TreeView):
     
     sect = translate(__name__, "structure")
     actionConfig.addActionDefinition(((sect, 'deleteP'),), DeleteAction, CONTENTS, shortcut = 'Del')
+    actionConfig.addActionDefinition(((sect, 'increasePos'),), ChangePositionAction, "+1", shortcut = 'Ctrl++')
+    actionConfig.addActionDefinition(((sect, 'decreasePos'),), ChangePositionAction, "-1", shortcut = 'Ctrl+-')
     actionConfig.addActionDefinition(((sect, 'merge'),), MergeAction)
     actionConfig.addActionDefinition(((sect, 'flatten'),), FlattenAction)
     actionConfig.addActionDefinition(((sect, 'major'),), ToggleMajorAction)
