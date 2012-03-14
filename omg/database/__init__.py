@@ -59,7 +59,8 @@ import os, sys, threading, functools
 from omg import strutils, config, logging, utils, tags as tagsModule, constants
 from . import sql
 
-# Table prefix
+# Table type and prefix
+type = None
 prefix = None
 
 # Logger for database warnings
@@ -96,9 +97,11 @@ def connect():
             "database.connect has been called although a connection for this thread was already open.")
         return connections[threadId]
 
-    global prefix
+    global prefix, type
+    type = config.options.database.type
     prefix = config.options.database.prefix
-    if config.options.database.type == 'sqlite':
+    
+    if type == 'sqlite':
         # Replace 'config:' prefix in path
         path = config.options.database.sqlite_path.strip()
         if path.startswith('config:'):
@@ -179,7 +182,7 @@ def close():
 
 def listTables():
     """Return a list of all table names in the database."""
-    if config.options.database.type == 'mysql':
+    if type == 'mysql':
         return list(query("SHOW TABLES").getSingleColumn())
     else: return list(query("SELECT name FROM sqlite_master WHERE type = 'table'").getSingleColumn())
     
@@ -421,7 +424,7 @@ def idFromValue(tagSpec,value,insert=False):
             return query("SELECT id FROM {}values_date WHERE tag_id = ? AND value = ?"
                             .format(prefix),tag.id,value).getSingle()
         else:
-            if config.options.database.type == 'mysql':
+            if type == 'mysql':
                 # Compare exactly (using binary collation)
                 q = "SELECT id FROM {}values_{} WHERE tag_id = ? AND value COLLATE utf8_bin = ?"\
                      .format(prefix,tag.type)

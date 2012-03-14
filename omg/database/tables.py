@@ -66,11 +66,11 @@ class SQLTable:
 tables = []
 
 def _addMySQL(*queries):
-    if config.options.database.type == 'mysql':
+    if db.type == 'mysql':
         tables.append(queries)
         
 def _addSQLite(*queries):
-    if config.options.database.type == 'sqlite':
+    if db.type == 'sqlite':
         tables.append(queries)
 
 #----------#

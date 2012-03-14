@@ -220,7 +220,7 @@ def addFlag(elids,flag):
     """Add the given flag to the elements with the given ids, ignoring elements that already have the
     flag."""
     values = ','.join('({},{})'.format(elid,flag.id) for elid in elids)
-    db.query("INSERT IGNORE INTO {}flags (element_id,flag_id) VALUES {}".format(db.prefix,values))
+    db.query("REPLACE INTO {}flags (element_id,flag_id) VALUES {}".format(db.prefix,values))
     
     
 def removeFlag(elids,flag):

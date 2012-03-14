@@ -18,7 +18,7 @@
 
 import re
 
-from omg import database as db, tags, utils
+from omg import database as db, tags, utils, config
 
 # Initialized in search.init
 SEARCH_TAGS = set()
@@ -134,10 +134,12 @@ class TextCriterion(Criterion):
         for valueType in self.getSearchTypes():
             tagIdList = ",".join(str(tag.id) for tag in self.tagSet if tag.type == valueType)
             if valueType != tags.TYPE_DATE:
-                # INSTR does not respect the collation correctly: INSTR('a','ä') = 0, INSTR('ä','á') = 1
-                # whereClause = "INSTR(v.value,?)"
-                # Therefore we have to use LIKE '%...%' and this means escaping...
-                whereClause = "v.value LIKE CONCAT('%',?,'%')"
+                if db.type == 'mysql':
+                    # INSTR does not respect the collation correctly: INSTR('a','ä') = 0, INSTR('ä','á') = 1
+                    # whereClause = "INSTR(v.value,?)"
+                    # Therefore we have to use LIKE '%...%' and this means escaping...
+                    whereClause = "v.value LIKE CONCAT('%',?,'%')"
+                else: whereClause = "v.value LIKE '%' || ? || '%'"
                 parameters.append(self.value.replace('\\','\\\\').replace('_','\\_').replace('%','\\%'))
             else:
                 assert self.years is not None
@@ -148,12 +150,12 @@ class TextCriterion(Criterion):
                             utils.FlexiDate(self.years[0]).toSql(),
                             utils.FlexiDate(self.years[1]).toMaximalSql())
         
-            subQueries.append("""(
+            subQueries.append("""
                     SELECT DISTINCT {1}
                     FROM {2} AS el JOIN {0}tags AS t ON el.id = t.element_id
                                    JOIN {0}values_{3} AS v ON t.tag_id = v.tag_id AND t.value_id = v.id
                     WHERE t.tag_id IN ({4}) AND {5}
-                )""".format(db.prefix,_formatColumns(columns,"el"),fromTable,
+                """.format(db.prefix,_formatColumns(columns,"el"),fromTable,
                             valueType.name,tagIdList,whereClause))
 
         if self.ids is not None:
