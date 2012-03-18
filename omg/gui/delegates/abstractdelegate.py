@@ -209,7 +209,6 @@ class AbstractDelegate(QtGui.QStyledItemDelegate):
         
         # Initialize. Subclasses or delegate items may access painter and option.
         self.painter = painter
-        painter.setRenderHint(QtGui.QPainter.Antialiasing)
         background = self.background(index)
         if background is not None:
             option.backgroundBrush = background
