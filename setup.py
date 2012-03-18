@@ -29,7 +29,7 @@ def sdist_run(self):
 sdist.run = sdist_run
 
 setup(name='omg',
-      version='0.2-beta2',
+      version='0.2',
       description='OMG music GUI',
       author='Martin Altmayer, Michael Helmling',
       author_email='{altmayer,helmling}@mathematik.uni-kl.de',

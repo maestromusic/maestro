@@ -214,7 +214,22 @@ class MainWindow(QtGui.QMainWindow):
         aboutAction.setText(self.tr("&About"))
         aboutAction.triggered.connect(self.showAboutDialog)
         self.menus['help'].addAction(aboutAction)
-
+        
+        fullscreenAction = QtGui.QAction(self)
+        fullscreenAction.setText(self.tr("&Fullscreen"))
+        fullscreenAction.setCheckable(True)
+        fullscreenAction.setChecked(False)
+        fullscreenAction.setShortcut(self.tr("F12"))
+        fullscreenAction.toggled.connect(self._handleFullscreen)
+        self.fullscreenAction = fullscreenAction
+        
+        
+    def _handleFullscreen(self, state):
+        if state:
+            self.showFullScreen()
+        else:
+            self.showNormal()
+            
     def getCentralWidgets(self):
         return self._centralWidgets
     
@@ -269,6 +284,9 @@ class MainWindow(QtGui.QMainWindow):
                 if data.icon is not None:
                     action.setIcon(data.icon)
                 self.menus['dockwidgets'].addAction(action)
+        
+        self.menus['view'].addSeparator()
+        self.menus['view'].addAction(self.fullscreenAction)
                 
     def _toggleCentralWidget(self,data,checked):
         """Show or hide the central widget corresponding to *data* according to *checked*."""
