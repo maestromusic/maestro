@@ -147,6 +147,10 @@ class WidgetData:
                 return data
         else: return None
 
+class SmallTabWidget(QtGui.QTabWidget):
+
+    def minimumSizeHint(self):
+        return QtCore.QSize(0,0)
 
 class MainWindow(QtGui.QMainWindow):
     """The main window of OMG. It contains a QTabWidget as actual central widget (in Qt sense) so that using
@@ -168,7 +172,7 @@ class MainWindow(QtGui.QMainWindow):
         self.setDockNestingEnabled(True)
         self.setWindowTitle(self.tr('OMG version {}').format(constants.VERSION))
         self.setWindowIcon(QtGui.QIcon(":omg/omg.png"))
-        self.setCentralWidget(QtGui.QTabWidget())
+        self.setCentralWidget(SmallTabWidget())
         self.initMenus()
         self.statusBar()
         global mainWindow
