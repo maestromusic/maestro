@@ -103,7 +103,7 @@ class TreeBuilder:
             if pid not in self.containerNodes:
                 parentContainer = ContainerNode(pid)
                 self.containerNodes[pid] = parentContainer
-                parentContainer.parentIds = [id for id in db.parents(pid) if db.isMajor(pid)]
+                parentContainer.parentIds = [id for id in db.parents(pid) if db.isMajor(id)]
                 # Recursive call to create all ancestors of the new node
                 self._buildContainerNodes(parentContainer)
             else:
