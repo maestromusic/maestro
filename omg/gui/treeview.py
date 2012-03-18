@@ -200,11 +200,6 @@ class TreeView(QtGui.QTreeView):
         self.setSelectionMode(QtGui.QAbstractItemView.ExtendedSelection)
         self.setDragEnabled(True)
         
-        palette = QtGui.QPalette()
-        palette.setColor(QtGui.QPalette.Base,QtGui.QColor(0xE9,0xE9,0xE9))
-        palette.setColor(QtGui.QPalette.AlternateBase,QtGui.QColor(0xD9,0xD9,0xD9))
-        self.setPalette(palette)
-        
         self.treeActions = {}
         for name,  (callable, args, kwargs) in self.actionConfig:
             if callable is not None:

@@ -171,7 +171,7 @@ class StandardDelegate(AbstractDelegate):
                 element.path = db.path(element.id)
             self.addCenter(TextItem(element.path,ITALIC_STYLE))
             self.newRow()
-                
+    
     def prepareColumns(self,element,exclude=[]):
         """Collect the texts displayed in both columns based on the configured datapieces. Exclude datapieces
         contained in *exclude* (this is used if a datapiece is displayed in the title row)."""

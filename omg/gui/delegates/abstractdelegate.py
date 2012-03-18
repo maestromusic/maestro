@@ -209,6 +209,7 @@ class AbstractDelegate(QtGui.QStyledItemDelegate):
         
         # Initialize. Subclasses or delegate items may access painter and option.
         self.painter = painter
+        painter.setRenderHint(QtGui.QPainter.Antialiasing)
         background = self.background(index)
         if background is not None:
             option.backgroundBrush = background
@@ -395,6 +396,28 @@ class ColorBarItem(DelegateItem):
                                   self.background)
         return self.width,height
 
+class PlayTriangleItem(DelegateItem):
+    """An item that displays a small triangle, indicating the currenty playing element in
+    a playlist."""
+    def __init__(self, color, width):
+        self.color = color
+        self.width = width
+        
+        poly = QtGui.QPolygonF()
+        poly.append(QtCore.QPointF(0, 2))
+        poly.append(QtCore.QPointF(9, 6))
+        poly.append(QtCore.QPointF(0, 10))
+        poly.append(QtCore.QPointF(0, 2))
+        self.pp = QtGui.QPainterPath()
+        self.pp.addPolygon(poly)
+    
+    def sizeHint(self, delegate, availableWidth = None):
+        return self.width, self.width
+    
+    def paint(self, delegate, rect, align = LEFT):
+        delegate.painter.fillPath(self.pp.translated(rect.x(), rect.y()), self.color)
+        delegate.painter.drawPath(self.pp.translated(rect.x(), rect.y()))
+        return self.width,self.width
 
 class IconBarItem(DelegateItem):
     """An IconBarItem displays a list of icons in a grid. The size of the grid is specified by the parameters

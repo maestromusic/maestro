@@ -20,7 +20,7 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from ... import tags, config, models
-from . import StandardDelegate,configuration
+from . import StandardDelegate, configuration, abstractdelegate
 
 translate = QtCore.QCoreApplication.translate
 
@@ -36,9 +36,8 @@ class PlaylistDelegate(StandardDelegate):
                 ['t:date','t:genre','t:conductor'],
                 {"fitInTitleRowData": configuration.DataPiece("filecount+length")}
     )
+    def layout(self, index, availableWidth):
+        if index == self.model.currentModelIndex or index in self.model.currentParentsModelIndices:
+            self.addCenter(abstractdelegate.PlayTriangleItem(QtGui.QColor(20,200,20),9))
+        super().layout(index, availableWidth)
     
-    def background(self, index):
-        if index == self.model.currentModelIndex:
-            return QtGui.QBrush(QtGui.QColor(110,149,229))
-        elif index in self.model.currentParentsModelIndices:
-            return QtGui.QBrush(QtGui.QColor(140,179,255))    
