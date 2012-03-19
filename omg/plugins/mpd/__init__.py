@@ -423,8 +423,8 @@ class MPDConfigWidget(QtGui.QWidget):
         
         
 def defaultStorage():
-    return {"mpd":
-            {'profiles': ({},) } }
+    return {"SECTION:mpd":
+            {'profiles': {} } }
 
 def _handleNewProfile(name):
     if player.configuredBackends[name] == 'mpd':

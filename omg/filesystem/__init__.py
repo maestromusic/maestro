@@ -25,6 +25,10 @@ import os.path, subprocess, hashlib, datetime, threading, queue, time
 logger = logging.getLogger(__name__)
 RESCAN_INTERVAL = 100 # seconds between rescans of the music directory
 
+
+syncThread = None
+
+
 def init():
     global syncThread, notifier, null
     syncThread = FileSystemSynchronizer()
@@ -224,7 +228,7 @@ class FileSystemSynchronizer(QtCore.QThread):
                             
                         else:
                             folderState = 'unsynced'
-                            db.query('INSERT INTO {}newfiles SET hash=?, path=?'.format(db.prefix),
+                            db.query('INSERT INTO {}newfiles (hash,path) VALUES (?,?)'.format(db.prefix),
                                      hash, relPath)
                 elif folderState == 'nomusic':
                     folderState = 'ok'

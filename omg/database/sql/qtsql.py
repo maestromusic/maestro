@@ -19,12 +19,11 @@
 """Database driver using QtSql. Have a look at database.sql.AbstractSQL for docstrings."""
 
 from PyQt4 import QtSql, QtCore
-import threading
-
 from . import DBException, EmptyResultException, AbstractSql, AbstractSqlResult
 from ... import utils, logging
 
 logger = logging.getLogger(__name__)
+
 
 class Sql(AbstractSql):
     def __init__(self):
@@ -37,79 +36,72 @@ class Sql(AbstractSql):
         ok = self._db.open(username,password)
         if not ok:
             raise DBException("DB-connection failed: {}".format(self._db.lastError().databaseText()))
-        self.lock = threading.Lock()
 
     def close(self):
-        with self.lock:
-            self._db.close()
-            del self._db
+        self._db.close()
+        del self._db
         
     def query(self,queryString,*args):
-        with self.lock:
-            query = QtSql.QSqlQuery(self._db)
-            query.setForwardOnly(True) # improves performance
+        query = QtSql.QSqlQuery(self._db)
+        query.setForwardOnly(True) # improves performance
 
-            # Prepare
-            if not query.prepare(queryString):
-                if self._db.lastError() is not None:
-                    raise DBException("Query failed: {}".format(self._db.lastError().text()),queryString,args)
-                else: raise DBException("Query failed",queryString,args)
+        # Prepare
+        if not query.prepare(queryString):
+            if self._db.lastError() is not None:
+                raise DBException("Query failed: {}".format(self._db.lastError().text()),queryString,args)
+            else: raise DBException("Query failed",queryString,args)
 
-            # Bind
-            for i,arg in enumerate(args):
-                query.bindValue(i,_convertBindParameter(arg))
+        # Bind
+        for i,arg in enumerate(args):
+            query.bindValue(i,_convertBindParameter(arg))
 
-            # Execute
-            if query.exec_():
-                return SqlResult(query)
-            else:
-                if self._db.lastError() is not None:
-                    raise DBException("Query failed: {}".format(self._db.lastError().text()),queryString,args)
-                else: raise DBException("Query failed",queryString,args)
+        # Execute
+        if query.exec_():
+            return SqlResult(query)
+        else:
+            if self._db.lastError() is not None:
+                raise DBException("Query failed: {}".format(self._db.lastError().text()),queryString,args)
+            else: raise DBException("Query failed",queryString,args)
         
     def multiQuery(self,queryString,argSets):
-        with self.lock:
-            if not isinstance(argSets,list):
-                argSets = list(argSets)
-            if len(argSets) == 0:
-                raise ValueError("You must give at least one set of arguments.")
-            
-            # Prepare
-            query = QtSql.QSqlQuery(self._db)
-            query.setForwardOnly(True) # improves performance
-            query.prepare(queryString)
+        if not isinstance(argSets,list):
+            argSets = list(argSets)
+        if len(argSets) == 0:
+            raise ValueError("You must give at least one set of arguments.")
+        
+        # Prepare
+        query = QtSql.QSqlQuery(self._db)
+        query.setForwardOnly(True) # improves performance
+        query.prepare(queryString)
 
-            # Bind
-            for i in range(len(argSets[0])):
-                values = [_convertBindParameter(argSet[i]) for argSet in argSets]
-                query.addBindValue(values)
+        # Bind
+        for i in range(len(argSets[0])):
+            values = [_convertBindParameter(argSet[i]) for argSet in argSets]
+            query.addBindValue(values)
 
-            # Execute
-            if query.execBatch():
-                return SqlResult(query)
-            else:
-                if self._db.lastError() is not None:
-                    raise DBException("Query failed: {}".format(self._db.lastError().text()),queryString,argSets)
-                else: raise DBException("Query failed",queryString,argSets)
+        # Execute
+        if query.execBatch():
+            return SqlResult(query)
+        else:
+            if self._db.lastError() is not None:
+                raise DBException("Query failed: {}".format(self._db.lastError().text()),queryString,argSets)
+            else: raise DBException("Query failed",queryString,argSets)
 
     def transaction(self):
-        with self.lock:
-            if not self._db.transaction():
-                raise DBException("Could not start a transaction.")
+        if not self._db.transaction():
+            raise DBException("Could not start a transaction.")
 
     def commit(self):
-        with self.lock:
-            if not self._db.commit():
-                if self._db.lastError() is not None:
-                    raise DBException("Commit failed: {}".format(self._db.lastError().text()))
-                else: raise DBException("Commit failed.")
+        if not self._db.commit():
+            if self._db.lastError() is not None:
+                raise DBException("Commit failed: {}".format(self._db.lastError().text()))
+            else: raise DBException("Commit failed.")
                     
     def rollback(self):
-        with self.lock:
-            if not self._db.rollback():
-                if self._db.lastError() is not None:
-                    raise DBException("Rollback failed: {}".format(self._db.lastError().text()))
-                else: raise DBException("Rollback failed.")
+        if not self._db.rollback():
+            if self._db.lastError() is not None:
+                raise DBException("Rollback failed: {}".format(self._db.lastError().text()))
+            else: raise DBException("Rollback failed.")
 
     def isNull(self,value):
         return isinstance(value,QtCore.QPyNullVariant)

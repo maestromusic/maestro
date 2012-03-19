@@ -19,17 +19,15 @@
 """
 This module stores the default configuration of OMG' core. Plugin default configuration is returned by the
 plugin's ``defaultConfig`` and ``defaultStorage`` methods. The return values of these methods use the same
-format as the dicts in this module:
+format as the corresponding dicts in this module.
 
-``defaults`` and ``defaultStorage`` are dicts mapping section names to other dicts which store the options
-and nested sections of that section (using their names as keys again). Nested sections are again dicts, of
-course.
-Options are tuples consisting of:
+``defaults`` is a dict mapping section names to other dicts which store the options and nested sections of
+that section. Options are tuples consisting of: type (one of str,list or int), default value and optionally 
+a description string. Nested sections are again dicts, of course.
 
-    * For ``default``: type (one of str,list or int),default value and optionally a description string.
-    * For ``defaultStorage``: default value and optionally a description string. If you don't specify a
-      description, you must use tuples with only one element!
-
+``defaultStorage`` works similar, but options are simply stored as values (no tuple necessary as there is no
+type and description). To distinguish dicts which are nested sections from dicts which are values, section
+names must be prepended with 'SECTION:' (this is not part of the section name).
 """
 
 import os, logging, sys
@@ -51,8 +49,10 @@ defaults = OrderedDict((
 }),
 
 ("database",{
-    "drivers": (list,["qtsql"], "List of drivers OMG will use to try to connect to the database."),
+    "type": (str,"mysql","Either 'mysql' or 'sqlite'."),
     "prefix":  (str,"","Prefix which will be prepended to the table names."),
+    
+    "mysql_drivers": (list,["qtsql"], "List of drivers OMG will use to try to connect to a MySQL database."),
     "mysql_db": (str,"omg","Name of the database"),
     "mysql_user": (str,"","MySQL user name"),
     "mysql_password": (str,"","MySQL password"),
@@ -65,6 +65,8 @@ defaults = OrderedDict((
     "test_host": (str,"localhost","MySQL host name for test scripts"),
     "test_port": (int,3306,"MySQL port for test scripts"),
     "test_prefix": (str,"omgtest_","Table prefix for the test tables."),
+    
+    "sqlite_path": (str,"config:omg.db","Path to the SQLite database. May start with 'config:' indicating that the path is relative to the configuration directory.")
 }),
 
 ("mpd", {
@@ -102,13 +104,15 @@ defaults = OrderedDict((
 })
 ))
 
-# The default values must be stored in tuples of length 1, since dicts will start a new section
+
+# To distinguish sections from values of type dict,
+# mark sections with 'SECTION:' (this is not part of the section name).
 storage = OrderedDict((
-("main", {
+("SECTION:main", {
     # Configuration for logging.config.dictConfig.
     # Confer http://docs.python.org/py3k/library/logging.config.html#logging-config-dictschema
     # To change logging temporarily, copy this into your storage file and change it.
-    'logging': ({
+    'logging': {
         "version": 1,
         "formatters": {
             "consoleFormatter": {"format": "%(asctime)s: %(levelname)s - %(name)s - %(message)s"},
@@ -136,23 +140,22 @@ storage = OrderedDict((
             "handlers": ["consoleHandler","fileHandler"]
         }
       },
-    ),
 }),
-("editor", {
-    'format_string' : ("%{artist}/%{date} - %{album}/%{tracknumber} - %{title}.%{*}",),
-    'guess_profiles' : ({"default" : ["album", "DIRECTORY"]},),
+("SECTION:editor", {
+    'format_string' : "%{artist}/%{date} - %{album}/%{tracknumber} - %{title}.%{*}",
+    'guess_profiles' : {"default" : ["album", "DIRECTORY"]},
 }),
-("gui", {
-    'central_widgets': ([],),
-    'dock_widgets': ([],),
-    'central_tab_index': (-1,),
+("SECTION:gui", {
+    'central_widgets': [],
+    'dock_widgets': [],
+    'central_tab_index': -1,
     # List of all delegate configurations. Built-in configurations will be added regardless of this list.
-    'delegate_configurations': ([],),
+    'delegate_configurations': [],
 }),
-("browser", {
-    'views': ([[['composer','artist','performer']],[['genre'],['composer','artist','performer']]],),
+("SECTION:browser", {
+    'views': [[['composer','artist','performer']],[['genre'],['composer','artist','performer']]],
 }),
-("player", {
-    'configured_players': ([],),
+("SECTION:player", {
+    'configured_players': [],
 }),
 ))

@@ -161,18 +161,33 @@ class SearchEngine(QtCore.QObject):
             while "{}_{}".format(tableName,i) in db.listTables():
                 i += 1
             tableName = "{}_{}".format(tableName,i)
-            db.query("""
-                CREATE TABLE {} (
-                    id MEDIUMINT UNSIGNED NOT NULL,
-                    {}
-                    file BOOLEAN NOT NULL,
-                    toplevel BOOLEAN NOT NULL DEFAULT 0,
-                    direct BOOLEAN NOT NULL DEFAULT 1,
-                    major BOOLEAN NOT NULL DEFAULT 0,
-                    new BOOLEAN NOT NULL DEFAULT 0,
-                    PRIMARY KEY(id))
-                    ENGINE MEMORY;
-                """.format(tableName,customColumns))
+            if db.type == 'mysql':
+                # Do not create a temporary table, because such a table can only be accessed from the thread
+                # that created it. Use ENGINE MEMORY instead.
+                createQuery = """
+                    CREATE TABLE {} (
+                        id MEDIUMINT UNSIGNED NOT NULL,
+                        {}
+                        file BOOLEAN NOT NULL DEFAULT 0,
+                        toplevel BOOLEAN NOT NULL DEFAULT 0,
+                        direct BOOLEAN NOT NULL DEFAULT 1,
+                        major BOOLEAN NOT NULL DEFAULT 0,
+                        new BOOLEAN NOT NULL DEFAULT 0,
+                        PRIMARY KEY(id))
+                        ENGINE MEMORY;
+                    """.format(tableName,customColumns)
+            else:
+                createQuery = """
+                    CREATE TABLE {} (
+                        id INTEGER PRIMARY KEY,
+                        {}
+                        file BOOLEAN NOT NULL DEFAULT 0,
+                        toplevel BOOLEAN NOT NULL DEFAULT 0,
+                        direct BOOLEAN NOT NULL DEFAULT 1,
+                        major BOOLEAN NOT NULL DEFAULT 0,
+                        new BOOLEAN NOT NULL DEFAULT 0)
+                    """.format(tableName,customColumns)
+            db.query(createQuery)
         self._thread.tables[tableName] = None
         return tableName
         
@@ -218,7 +233,7 @@ class SearchEngine(QtCore.QObject):
         # Wait for the thread to finish before dropping the tables
         self._thread.join()
         for table in self._thread.tables:
-            db.query("DROP TABLE {}".format(table))
+           db.query("DROP TABLE {}".format(table))
         self._thread = None
 
 
@@ -296,12 +311,20 @@ class SearchThread(threading.Thread):
         """        
         # -*- coding: utf-8 -*-
         with db.connect():
-            db.query("""
-            CREATE TEMPORARY TABLE IF NOT EXISTS {0} (
-                id MEDIUMINT UNSIGNED NOT NULL,
-                value MEDIUMINT UNSIGNED NULL)
-                CHARACTER SET 'utf8';
-            """.format(TT_HELP))
+            if db.type == 'mysql':
+                createQuery = """
+                    CREATE TEMPORARY TABLE IF NOT EXISTS {} (
+                        id MEDIUMINT UNSIGNED NOT NULL,
+                        value MEDIUMINT UNSIGNED NULL)
+                        CHARACTER SET 'utf8'
+                    """.format(TT_HELP)
+            else:
+                createQuery = """
+                    CREATE TEMPORARY TABLE IF NOT EXISTS {} (
+                        id  MEDIUMINT UNSIGNED NOT NULL,
+                        value MEDIUMINT UNSIGNED NULL)
+                    """.format(TT_HELP)
+            db.query(createQuery)
         
             while True:
                 self.lock.acquire()
@@ -345,19 +368,19 @@ class SearchThread(threading.Thread):
                 if self.tables[resultTable] is None or fromTable != self.tables[resultTable][0]:
                     # This is a new search to a new table or to a table that already contains search results,
                     # but from a different fromTable.
-                    db.query("TRUNCATE TABLE {}".format(resultTable))
+                    truncate(resultTable)
                     self.tables[resultTable] = [fromTable,[] ]
                 else:
                     # Check whether the result table contains results that we can use or if we have to
                     # truncate it. 
                     if not criteriaModule.isNarrower(criteria,self.tables[resultTable][1]):
-                        db.query("TRUNCATE TABLE {}".format(resultTable))
+                        truncate(resultTable)
                         self.tables[resultTable] = [fromTable,[] ]
                 
                 # Invalid criteria like 'date:foo' do not have results. Calling criterion.getQuery will fail.
                 if any(c.isInvalid() for c in criteria):
                     #print("Search: Invalid criterion")
-                    db.query("TRUNCATE TABLE {}".format(resultTable))                                                                    
+                    truncate(resultTable)                                                                    
                     self.tables[resultTable][1] = []  
                     self.finishRequest(currentRequest)
                     continue
@@ -403,7 +426,7 @@ class SearchThread(threading.Thread):
         if len(self.tables[resultTable][1]) == 0:
             # We firstly search for the direct results of the first query... 
             #print("Starting search...")
-            db.query("TRUNCATE TABLE {0}".format(resultTable))
+            truncate(resultTable)
             queryData = criterion.getQuery(fromTable,columns=('id','file','major'))
             # Prepend the returned query with INSERT INTO...
             queryData[0] = "INSERT INTO {0} (id,file,major) {1}".format(resultTable,queryData[0])
@@ -414,7 +437,7 @@ class SearchThread(threading.Thread):
             # As we cannot modify a table of which we select from, we have to store the direct
             # search results in TT_HELP. Then we remove everything from the result table that is
             # not contained in TT_HELP.
-            db.query("TRUNCATE TABLE {0}".format(TT_HELP))
+            truncate(TT_HELP)
             queryData = criterion.getQuery(resultTable,columns=('id',))
             queryData[0] = "INSERT INTO {0} (id) {1}".format(TT_HELP,queryData[0])
             #print(*queryData)
@@ -467,7 +490,7 @@ class SearchThread(threading.Thread):
             args = [data for haveToAdd,data in processedIds.values() if haveToAdd]
             if len(args) > 0:
                 db.multiQuery(
-                    "INSERT IGNORE INTO {} (id,file,major,direct) VALUES (?,?,?,0)"
+                    "REPLACE INTO {} (id,file,major,direct) VALUES (?,?,?,0)"
                     .format(resultTable),args)
         
         setTopLevelFlags(resultTable)
@@ -481,7 +504,7 @@ def addChildren(resultTable,fromTable):
     # In the first step select direct results which have children, in the other steps select new results.
     attribute = 'direct'
     while True:
-        db.query("TRUNCATE TABLE {0}".format(TT_HELP))
+        truncate(TT_HELP)
         result = db.query("""
             INSERT INTO {2} (id)
                 SELECT res.id
@@ -492,7 +515,7 @@ def addChildren(resultTable,fromTable):
             return
         db.query("UPDATE {} SET new = 0".format(resultTable))
         db.query("""
-            INSERT IGNORE INTO {1} (id,file,toplevel,direct,major,new)
+            REPLACE INTO {1} (id,file,toplevel,direct,major,new)
                 SELECT c    .element_id,el.file,0,0,el.major,1
                 FROM {2} AS p JOIN {0}contents AS c ON p.id = c.container_id
                               JOIN {3} AS el ON el.id = c.element_id
@@ -504,7 +527,7 @@ def addChildren(resultTable,fromTable):
 def setTopLevelFlags(table):
     """Set the toplevel flags in *table* to 1 if and only if the element has no parent in *table*. Of course
     *table* must have at least the columns ''id'' and ''toplevel''."""
-    db.query("TRUNCATE TABLE {0}".format(TT_HELP))
+    truncate(TT_HELP)
     if table == db.prefix + "elements":
         db.query("""
             INSERT INTO {1} (id)
@@ -520,5 +543,12 @@ def setTopLevelFlags(table):
                 """.format(db.prefix,TT_HELP,table))
 
     db.query("UPDATE {} SET toplevel = 1".format(table))
-    db.query("INSERT INTO {0} (id) (SELECT id FROM {1}) ON DUPLICATE KEY UPDATE toplevel = 0"
-                .format(table,TT_HELP))
+    db.query("REPLACE INTO {} (id,toplevel) SELECT id,0 FROM {}".format(table,TT_HELP))
+
+
+def truncate(tableName):
+    if db.type == 'mysql':
+        # truncate may be much faster than delete
+        db.query('TRUNCATE {}'.format(tableName))
+    else: db.query('DELETE FROM {}'.format(tableName))
+    

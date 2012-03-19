@@ -103,12 +103,12 @@ def init(cmdConfig = [],initTags=True,testDB=False,useInstallTool=False):
 def run():
     """Run OMG."""
     opts, args = getopt.getopt(sys.argv[1:],
-        "Vc:",
+        "vVc:",
         ['version','config=', 'install'])
 
     cmdConfig = []
     for opt,arg in opts:
-        if opt in ('-V', '--version'):
+        if opt in ('-v','-V', '--version'):
             print('This is OMG version {}. Nice to meet you.'.format(constants.VERSION))
             sys.exit(0)
         elif opt in ('-c','--config'):
@@ -133,7 +133,7 @@ def run():
     plugins.enablePlugins()
     
     from . import filesystem
-    filesystem.init()
+    #filesystem.init()
     
     # Create GUI
     # First import all modules that want to add WidgetData
@@ -154,7 +154,7 @@ def run():
     logger.debug('main application quit')
     
     # Close operations
-    filesystem.shutdown()
+    #filesystem.shutdown()
     search.shutdown()
     mainWindow.saveLayout()
     delegateconfiguration.save()

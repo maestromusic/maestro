@@ -146,20 +146,21 @@ class AbstractSql:
         for parameters in args:
             self.query(queryString,*parameters)
 
-    def transaction():
+    def transaction(self):
         """Start a transaction."""
         
-    def commit():
+    def commit(self):
         """Commit a transaction."""
         
-    def rollback():
+    def rollback(self):
         """Rollback a transaction."""
 
-    def isNull(value):
-        """Return whether *value* represents a NULL value from a MySQL table. What is returned for NULL
-        values depends on the driver."""
+    def isNull(self,value):
+        """Return whether *value* represents a NULL value from a MySQL table (how null values are
+        represented in result sets depends on the driver)."""
+        return value is None
 
-    def close():
+    def close(self):
         """Close this driver."""
 
 

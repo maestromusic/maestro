@@ -53,9 +53,9 @@ def disable():
 
 
 def defaultStorage():
-    return {"searchanalyzer": {
-            "size": ((800,600),"Size of the window."),
-            "pos": (None,"Position of the window as tuple or None to center the window")
+    return {"SECTION:searchanalyzer": {
+            "size": (800,600),
+            "pos": None # Position of the window as tuple or None to center the window
         }}
 
 

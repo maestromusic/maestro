@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2009-2011 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2012 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,34 +16,37 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import mysql.connector
+import sqlite3
 from . import DBException, AbstractSql, AbstractSqlResult, EmptyResultException
 
 
 class Sql(AbstractSql):
-    def connect(self,username,password,database,host="localhost",port=3306):
-        self._db = mysql.connector.Connect(database=database,user=username,password=password,host=host,
-                                           port=port,buffered=True)
+    def connect(self,path):
+        # There doesn't seem to be a real documentation of the isolation_level parameter. 
+        # But I like the conclusion of this discussion:
+        # http://mail.python.org/pipermail/python-list/2010-March/1239395.html
+        self._db = sqlite3.connect(path,isolation_level=None)
+        # Foreign keys must be enabled in each connection
+        self._db.execute("PRAGMA foreign_keys = ON")
 
     def close(self):
         self._db.close()
             
     def query(self,queryString,*args):
-        if args:
-            queryString = queryString.replace('?','%s')
-        cursor = self._db.cursor()
-        cursor.execute(queryString,args)
-        return SqlResult(cursor)
+        try:
+            result = self._db.execute(queryString,args)
+        except Exception as e:
+            raise DBException(str(e),query=queryString,args=args)
+        return SqlResult(result)
     
     def multiQuery(self,queryString,argSets):
-        if argSets:
-            queryString = queryString.replace('?','%s')
-        cursor = self._db.cursor()
-        cursor.executemany(queryString,argSets)
-        return SqlResult(cursor)
+        try:
+            result = self._db.executemany(queryString,argSets)
+        except Exception as e:
+            raise DBException(str(e),query=queryString,args=argSets)
         
     def transaction(self):
-        self.query('START TRANSACTION')
+        self.query('BEGIN TRANSACTION')
         
     def commit(self):
         self._db.commit()
@@ -55,18 +58,23 @@ class Sql(AbstractSql):
 class SqlResult(AbstractSqlResult):
     def __init__(self,cursor):
         self._cursor = cursor
+        if cursor.rowcount == -1: # chances are that this is a SELECT query
+            self._rows = cursor.fetchall()
+            self._index = -1
+        else: self._rows = None 
     
     def __iter__(self):
-        return self._cursor.__iter__()
+        return self._rows.__iter__()
         
     def __len__(self):
-        return self._cursor.rowcount
+        return len(self._rows)
         
     def size(self):
-        return self._cursor.rowcount
+        return len(self._rows)
     
     def next(self):
-        return self._cursor.fetchone()
+        self._index += 1
+        return self._rows[self._index]
         
     def executedQuery(self):
         return self._cursor._executed.decode('utf-8')
@@ -78,14 +86,9 @@ class SqlResult(AbstractSqlResult):
         return self._cursor.lastrowid
     
     def getSingle(self):
-        try:
-            return self.single
-        except AttributeError:
-            row = self._cursor.fetchone()
-            if row is None:
-                raise EmptyResultException()
-            self.single = row[0]
-            return self.single
+        if len(self._rows) == 0:
+            raise EmptyResultException()
+        else: return self._rows[0][0]
         
     def getSingleColumn(self):
-        return (row[0] for row in self._cursor.fetchall())
+        return (row[0] for row in self._rows)

@@ -13,17 +13,17 @@
 # GNU General Public License for more details.
 # 
 # You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-import mysql.connector
+import pymysql
 from . import DBException, AbstractSql, AbstractSqlResult, EmptyResultException
 
 
 class Sql(AbstractSql):
     def connect(self,username,password,database,host="localhost",port=3306):
-        self._db = mysql.connector.Connect(database=database,user=username,password=password,host=host,
-                                           port=port,buffered=True)
+        self._db = pymysql.connect(db=database,user=username,passwd=password,
+                                   host=host,port=port,use_unicode=True,charset='utf8')
 
     def close(self):
         self._db.close()
@@ -69,7 +69,7 @@ class SqlResult(AbstractSqlResult):
         return self._cursor.fetchone()
         
     def executedQuery(self):
-        return self._cursor._executed.decode('utf-8')
+        return self._cursor._executed
         
     def affectedRows(self):
         return self._cursor.rowcount

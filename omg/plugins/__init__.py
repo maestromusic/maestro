@@ -151,10 +151,10 @@ def enablePlugins():
     """Import all plugins which should be loaded and enable them."""
     for pluginName in config.options.main.plugins:
         if pluginName != '':
-            try:
+            if pluginName in plugins:
                 plugins[pluginName].enable()
-            except KeyError:
-                logger.error('could not enable plugin {} since it does not exist – check your config!'.format(pluginName))
+            else: logger.error("could not enable plugin {} since it does not exist – check your config!"
+                                .format(pluginName))
 
 
 def mainWindowInit():
