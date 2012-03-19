@@ -101,8 +101,9 @@ class TreeBuilder:
         for pid in listOfPids:
             # If no ContainerNode for this pid exists, create one
             if pid not in self.containerNodes:
-                parentContainer = self.containerNodes[pid] = ContainerNode(pid)
-                parentContainer.parentIds = db.parents(pid)
+                parentContainer = ContainerNode(pid)
+                self.containerNodes[pid] = parentContainer
+                parentContainer.parentIds = [id for id in db.parents(pid) if db.isMajor(id)]
                 # Recursive call to create all ancestors of the new node
                 self._buildContainerNodes(parentContainer)
             else:

@@ -398,19 +398,6 @@ class BrowserTreeView(treeview.TreeView):
         optimizer.finished.disconnect(self._handleOptimizerFinished)
         if len(self._optimizers) > 0:
             self._optimizers[0].start()
-        
-    def contextMenuProvider(self, actions, currentIndex):
-        if currentIndex.isValid():
-            node = currentIndex.internalPointer()
-            if isinstance(node, browsermodel.ValueNode):
-                for tag, id in node.valueIds.items():
-                    action = TagValueAction(tags.get(tag), id, self)
-                    actions.append(action)
-                    action.tagActionTriggered.connect(tagwidgets.TagValuePropertiesWidget.showDialog)
-        super().contextMenuProvider(actions, currentIndex)
-    
-    def _handleValueEditAction(self):
-        tagwidgets.TagValuePropertiesWidget.showDialog()
     
        
 class Optimizer(QtCore.QObject):

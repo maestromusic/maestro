@@ -133,7 +133,10 @@ def addFile(elid,path,hash,length):
     """Add a file with the given data to the file table."""
     db.query("INSERT INTO {}files (element_id,path,hash,length) VALUES (?,?,?,?)"
                 .format(db.prefix),elid,path,hash,length)
-                
+
+def changeFilePath(elid, path):
+    """Change the path of a file."""
+    db.query("UPDATE {}files SET path = ? WHERE element_id = ?".format(db.prefix), path, elid)
   
 def addTagValuesById(elids,tag,valueIds):
     """Add tag values given by their id to some elements. *elids* is either a single id or a list of ids,

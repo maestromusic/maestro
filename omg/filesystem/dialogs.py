@@ -19,7 +19,7 @@
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
-from .. import models, database as db, modify, constants
+from .. import models, database as db, modify, constants, utils
 from ..modify import commands
 from ..models.rootedtreemodel import RootedTreeModel, RootNode
 from ..gui import mainwindow, treeview
@@ -60,8 +60,9 @@ class MissingFilesDialog(QtGui.QDialog):
         
         self.fileview = treeview.TreeView()        
         self.fileview.setModel(self.filemodel)
-        self.fileview.setItemDelegate(EditorDelegate(self.fileview, EditorDelegate.defaultConfig))
+        self.fileview.setItemDelegate(EditorDelegate(self.fileview, EditorDelegate.defaultConfiguration))
         self.fileview.selectionModel().selectionChanged.connect(self.updateEmptyContainers)
+        self.fileview.doubleClicked.connect(self.startFileSelection)
         layout.addWidget(self.fileview)
         
         label = QtGui.QLabel(self.tr("After deleting those files, the following containers will be empty. "
@@ -71,7 +72,7 @@ class MissingFilesDialog(QtGui.QDialog):
         self.containermodel = RootedTreeModel(RootNode())
         self.containerview = treeview.TreeView()
         self.containerview.setModel(self.containermodel)
-        self.containerview.setItemDelegate(EditorDelegate(self.fileview, EditorDelegate.defaultConfig))
+        self.containerview.setItemDelegate(EditorDelegate(self.fileview, EditorDelegate.defaultConfiguration))
         layout.addWidget(self.containerview)
         buttonLayout = QtGui.QHBoxLayout()
         
@@ -95,8 +96,16 @@ class MissingFilesDialog(QtGui.QDialog):
                                        self.tr('remove deleted files from DB')))
         self.accept()
         
-        
-    
+    def startFileSelection(self, index):
+        import os
+        file = index.internalPointer()
+        newPath = utils.relPath(QtGui.QFileDialog.getOpenFileName(self, self.tr("Select new file location"),
+                                                    utils.absPath(os.path.dirname(file.path))))
+        if newPath != "":
+            db.write.changeFilePath(file.id, newPath)
+            self.filemodel.remove(self.filemodel.root, [file.iPosition()])
+            
+
     def updateEmptyContainers(self, *args):
         selectedFileIds = [elem.id for elem in self.fileview.nodeSelection.elements()]
         root = self.containermodel.root

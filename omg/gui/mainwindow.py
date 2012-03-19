@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2009-2011 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2012 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -147,6 +147,10 @@ class WidgetData:
                 return data
         else: return None
 
+class SmallTabWidget(QtGui.QTabWidget):
+
+    def minimumSizeHint(self):
+        return QtCore.QSize(0,0)
 
 class MainWindow(QtGui.QMainWindow):
     """The main window of OMG. It contains a QTabWidget as actual central widget (in Qt sense) so that using
@@ -168,7 +172,7 @@ class MainWindow(QtGui.QMainWindow):
         self.setDockNestingEnabled(True)
         self.setWindowTitle(self.tr('OMG version {}').format(constants.VERSION))
         self.setWindowIcon(QtGui.QIcon(":omg/omg.png"))
-        self.setCentralWidget(QtGui.QTabWidget())
+        self.setCentralWidget(SmallTabWidget())
         self.initMenus()
         self.statusBar()
         global mainWindow
@@ -214,7 +218,22 @@ class MainWindow(QtGui.QMainWindow):
         aboutAction.setText(self.tr("&About"))
         aboutAction.triggered.connect(self.showAboutDialog)
         self.menus['help'].addAction(aboutAction)
-
+        
+        fullscreenAction = QtGui.QAction(self)
+        fullscreenAction.setText(self.tr("&Fullscreen"))
+        fullscreenAction.setCheckable(True)
+        fullscreenAction.setChecked(False)
+        fullscreenAction.setShortcut(self.tr("F12"))
+        fullscreenAction.toggled.connect(self._handleFullscreen)
+        self.fullscreenAction = fullscreenAction
+        
+        
+    def _handleFullscreen(self, state):
+        if state:
+            self.showFullScreen()
+        else:
+            self.showNormal()
+            
     def getCentralWidgets(self):
         return self._centralWidgets
     
@@ -269,6 +288,9 @@ class MainWindow(QtGui.QMainWindow):
                 if data.icon is not None:
                     action.setIcon(data.icon)
                 self.menus['dockwidgets'].addAction(action)
+        
+        self.menus['view'].addSeparator()
+        self.menus['view'].addAction(self.fullscreenAction)
                 
     def _toggleCentralWidget(self,data,checked):
         """Show or hide the central widget corresponding to *data* according to *checked*."""
