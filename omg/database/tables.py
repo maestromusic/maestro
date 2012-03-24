@@ -372,5 +372,23 @@ END
 """.format(db.prefix)
 )
 
+#-------#
+# media #
+#-------#
+_addMySQL("""
+CREATE TABLE {}media (
+    id          MEDIUMINT UNSIGNED  NOT NULL AUTO_INCREMENT,
+    path        VARCHAR(512)    NOT NULL,
+    type        VARCHAR(255)    NOT NULL,
+    PRIMARY KEY(id)
+) ENGINE InnoDB, CHARACTER SET 'utf8'
+""".format(db.prefix))
+_addSQLite("""
+CREATE TABLE {}media (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    path        VARCHAR(512)    NOT NULL,
+    type        VARCHAR(255)    NOT NULL
+)
+""".format(db.prefix))
 
 tables = [SQLTable(queries) for queries in tables]
