@@ -123,6 +123,9 @@ def run():
     # Lock the lockfile to prevent a second OMG-instance from starting.
     lock()
     
+    from omg.models import levels
+    levels.init()
+    
     # Load remaining modules
     from omg import resources, search
     search.init()
@@ -219,8 +222,11 @@ def loadTranslators(app,logger):
         else: logger.warning("Unable to load translator file {} from directory {}."
                                 .format(translatorFile,translatorDir))
 
+
 def runInstaller():
+    logger.error
     os.execl(sys.executable, os.path.basename(sys.executable), "-m", "omg.install")
+    
     
 if __name__ == "__main__":
     run() 

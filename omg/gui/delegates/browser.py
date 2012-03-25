@@ -56,5 +56,5 @@ class BrowserDelegate(StandardDelegate):
             self.addCenter(TextItem(self.tr("Hidden"),ITALIC_STYLE))
         elif isinstance(node,browsermodel.LoadingNode):
             self.addCenter(TextItem(self.tr("Loading..."),ITALIC_STYLE))
-        elif isinstance(node,models.Element):
+        elif isinstance(node,models.Wrapper):
             super().layout(index,availableWidth)

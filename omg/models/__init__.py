@@ -22,6 +22,7 @@ import copy, os.path
 
 from .. import tags, logging, config, covers, realfiles, database as db
 from ..utils import relPath
+tagsModule = tags
 
 logger = logging.getLogger(__name__)
 
@@ -51,8 +52,8 @@ class Node:
             return sum(child.getContentsCount(True)+1 for child in self.getContents())   
 
     def setContents(self,contents):
-        """Set the list of contents of this container to *contents*. Note that the list won't be copied and in
-        fact altered: the parents will be set to this node."""
+        """Set the list of contents of this container to *contents*. Note that the list won't be copied but
+        in fact altered: the parents will be set to this node."""
         assert isinstance(contents,list)
         self.contents = contents
         for element in self.contents:
@@ -66,13 +67,13 @@ class Node:
         self.contents[index:index] = nodes
         
     def isFile(self):
-        """Return whether this node holds a file. Note that this is in general not the opposite of isContainer
-        as e.g. rootnodes are neither."""
+        """Return whether this node holds a file. Note that this is in general not the opposite of 
+        isContainer as e.g. rootnodes are neither."""
         return False
     
     def isContainer(self):
-        """Return whether this node holds a container. Note that this is in general not the opposite of isFile
-        as e.g. rootnodes are neither."""
+        """Return whether this node holds a container. Note that this is in general not the opposite of
+        isFile as e.g. rootnodes are neither."""
         return False
 
     def copy(self,contents=None):
@@ -250,169 +251,51 @@ class RootNode(Node):
         if copyContents:
             self.setContents([c.copy() for c in other.contents])
         self.id = other.id
+    
+
+class Wrapper(Node):
+    """A node that holds an element."""
+    def __init__(self,element,contents=None):
+        self.element = element
+        if element.isContainer():
+            if contents is not None:
+                self.contents = contents
+            else: self.contents = []
+        else:
+            assert contents is None
         
-        
-class Element(Node):
+    def isFile(self):
+        return self.element.isFile()
+    
+    def isContainer(self):
+        return self.element.isContainer()
+    
+    def hasContents(self):
+        return self.element.isContainer() and len(self.contents) > 0
+    
+    def getContentsCount(self):
+        return len(self.contents) if self.element.isContainer() else 0
+    
+    def getContents(self):
+        return self.contents if self.element.isContainer() else []
+    
+    def loadContents(self,level,recursive):
+        if self.element.isContainer():
+            self.setContents([Wrapper(level.get(id)) for id in self.element.contents])
+            if recursive:
+                for child in self.contents:
+                    child.loadContents(level,recursive)
+
+
+class Element:
     """Abstract base class for elements (files or containers) in playlists, browser, etc.. Contains methods
-    to load tags and contents from the database or from files."""
-    tags = None # tags.Storage to store the tags. None until they are loaded
-    position = None
-    id = None
-    
+    to load tags and contents from the database or from files."""   
     def __init__(self):
-        raise RuntimeError(
-                "Cannot instantiate abstract base class Element. Use Element.fromId.")
+        raise RuntimeError("Cannot instantiate abstract base class Element. Use Element.fromId.")
+
+    def isInDB(self):
+        return self.id > 0
     
-    @staticmethod
-    def fromId(id, *, position=None, parentId=None, loadData=True):
-        if db.isFile(id):
-            return File.fromId(id, position=position, parentId=parentId,loadData=loadData)
-        else:
-            return Container.fromId(id, position=position, parentId=parentId, loadData=loadData)
-
-    def isInDB(self, recursive = False):
-        """Return whether this element is contained in the database, that is whether it has an id. If
-        *recursive* is True, only return True if this element and all of its recursive children are in the
-        database."""
-        if not recursive:
-            return self.id > 0
-        else:
-            return self.id is not None and (self.isFile() or all(e.isInDB(True) for e in self.contents))
-
-    def export(self,attributes,copyList=['contents'],replace={}):
-        """Return a copy of this element with a specified set of attributes. In contrast to copy this method
-        allows to control what attributes the result will have and loads missing attributes from the
-        database. Therefore this method is particularly useful when elements are exported from one component
-        to another (e.g. drops, events).
-        
-            - *attributes* is the list of attributes the result will have. It must not include ''id'',
-              because this attribute is always copied. Attributes that are missing in the original node will
-              be loaded from the database/filesystem.
-            - usually attributes will be copied by reference. *copyList* is a list that may contain
-              ''contents'',''flags'' and/or ''tags''. When contained in *copyList*, these attributes will be
-              really copied. In case of ''contents'' this implies applying this method with the same
-              parameters recursively to the children.
-              Warning: Usually you will want a real copy of the contents. Elements in a shallow copy will
-              have broken parent pointers. Therefore ''['contents']'' is the default value.
-            - finally you may give a dict *replace* mapping attribute names to values. These values will
-              overwrite corresponding values from the original.
-        
-        \ """ 
-        if isinstance(self,Container):
-            result = Container(self.id,None,None,None,None,None)
-        else: result = File(self.id,None,None,None,None,None)
-        for attr in attributes:
-            if attr in replace:
-                setattr(result,attr,replace[attr])
-            elif not hasattr(self,attr) or getattr(self,attr) is None:
-                if attr == 'contents':
-                    if isinstance(result,Container):
-                        result.loadContents()
-                elif attr == 'tags':
-                    result.tags = db.tags(result.id)
-                elif attr == 'flags':
-                    result.flags = db.flags(result.id)
-                elif attr == 'path':
-                    if isinstance(result,File):
-                        path = db.path(result.id)
-                elif attr == 'length':
-                    if isinstance(result,File):
-                        path = db.length(result.id)
-                else: setattr(result,attr,None)
-            else:
-                if attr == 'contents' and 'contents' in copyList:
-                    result.setContents([child.export(attributes,copyList,replace) for child in self.contents])
-                if attr == 'tags' and 'tags' in copyList:
-                    result.tags = self.tags.copy()
-                elif attr == 'flags' and 'flags' in copyList:
-                    result.flags = self.flags[:]
-                else: setattr(result,attr,getattr(self,attr))
-        return result
-    
-    def copy(self,contents=None,copyTags=True):
-        """Reimplementation of Node.copy: If *copyTags* is True, the element's copy will contain a copy of
-        this node's tags.Storage-instance and its flaglist. Otherwise the tags and flags will be copied by
-        reference."""
-        newNode = Node.copy(self,contents)
-        if copyTags:
-            newNode.tags = self.tags.copy() if self.tags is not None else None
-            newNode.flags = self.flags[:] if self.flags is not None else None
-        return newNode
-    
-    def copyFrom(self, other, copyContents = False):
-        """Set the data of this element to the data of *other*. This includes all data (even the id!) except
-        for the contents which are only touched if *copyContents* is True. Contents, tags and flags will be
-        copied deeply. This is used by ElementChangeEvent.applyTo.
-        """
-        if copyContents and not self.isFile():
-            self.setContents([c.copy() for c in other.contents])
-        if self.tags != other.tags:
-            self.tags = other.tags.copy()
-        if self.flags != other.flags:
-            self.flags = other.flags[:]
-        self.position = other.position
-        if self.isFile():
-            self.path = other.path
-        else: self.major = other.major
-        self.length = other.length
-        self.id = other.id
-        
-    def loadTags(self,recursive=False,fromFS=False): 
-        """Delete the stored tags and load them again. If this element is contained in the DB, tags will be
-        loaded from there. Otherwise if this is a file, tags will be loaded from that file or no tags will be
-        loaded if this is a container. 
-        If *recursive* is True, all tags from children of this node (recursively) will be loaded, too.
-        If *fromFS* is True, then tags are read from the file even if this element is in the DB (if it is a
-        file).""" 
-        if fromFS or not self.isInDB(): 
-            if self.isFile(): 
-                self.readFromFilesystem(tags=True) 
-            else: self.tags = tags.Storage() 
-        else: 
-            self.tags = db.tags(self.id) 
-        
-        if recursive: 
-            for element in self.getContents(): 
-                element.loadTags(recursive, fromFS) 
-
-    def loadFlags(self,recursive=False):
-        """Load flags from the database. If the element is not contained in the database, set self.flags to
-        an empty list.
-        If *recursive* is True, all tags from children of this node (recursively) will be loaded, too.
-        """
-        if self.isInDB():
-            self.flags = db.flags(self.id)
-        else: self.flags = []
-        if recursive:
-            for element in self.getContents():
-                element.loadFlags(recursive)
-        
-    def hasCover(self):
-        """Return whether this element has a cover."""
-        return self.isInDB() and covers.hasCover(self.id)
-        
-    def getCover(self,size=None,fromFS=False):
-        """Get this elements's cover with *size*x*size* pixels or the large version if *size* is None.
-        The cover will be cached and returned from the cache in subsequent calls. Set *fromFS* to True to
-        enforce that the cover is read from the filesystem and not from cache.
-        """
-        if not fromFS:
-            try:
-                return self._covers[size]
-            except AttributeError: pass
-            except KeyError: pass
-        cover = covers.getCover(self.id,size)
-        # Cache the cover
-        if not hasattr(self,"_covers"):
-            self._covers = {}
-        self._covers[size] = cover
-        return cover
-
-    def deleteCoverCache(self):
-        """Delete all covers from the built-in cover cache."""
-        if hasattr(self,"_covers"):
-            del self._covers
-
     # Misc
     #====================================================
     def getTitle(self,prependPosition=False,usePath=True,titles=None):
@@ -423,9 +306,6 @@ class Element(Node):
         the titles stored in ''self.tags'' (this is in particular useful if the element does not store tags).
         """
         result = ''
-        
-        if prependPosition and self.position is not None:
-            result += "{} - ".format(self.position)
         
         if hasattr(self,'id') and config.options.misc.show_ids:
             result += "[{0}] ".format(self.id)
@@ -476,73 +356,50 @@ class Container(Element):
     
     contents = None
     
-    def __init__(self, id, contents, tags, flags, position, major):
-        """Initialize this container, optionally with a contents list.
-        Note that the list won't be copied but the parents will be changed to this container."""
+    def __init__(self, id, major,*, contents=None, parents=None, tags=None, flags=None):
+        """Initialize this container, optionally with a contents list."""
         self.id = id
-        if contents is None:
-            self.contents = []
-        else: self.setContents(contents)
-        self.tags = tags
-        self.flags = flags
-        self.position = position
         self.major = major
+        if contents is not None:
+            if isinstance(contents,ContentsList):
+                self.contents = contents
+            else: self.contents = ContentsList(contents)
+        else: self.contents = ContentsList()
+        if parents is not None:
+            self.parents = parents
+        else: self.parents = []
+        if tags is not None:
+            self.tags = tags
+        else: self.tags = tagsModule.Storage()
+        if flags is not None:
+            self.flags = flags
+        else: self.flags = []
     
-    @staticmethod
-    def fromId(id, *, contents=None, tags=None, flags=None, position=None,
-               parentId=None, major = None, loadData=True):
-        if loadData:
-            if tags is None:
-                tags = db.tags(id)
-            if flags is None:
-                flags = db.flags(id)
-            if position is None and parentId is not None:
-                position = db.position(parentId,id)
-            if major is None:
-                major = db.isMajor(id)
-        return Container(id,contents,tags,flags,position, major)
-
     def isContainer(self):
         return True
     
-    def loadContents(self,recursive=False,table=None,loadData=True):
-        """Delete the stored contents-list and fetch the contents from the database. You may use the
-        *table*-parameter to restrict the child elements to a specific table: The table with name *table*
-        must contain a column 'id' and this method will only fetch elements which appear in that column.
-        If *recursive* is true loadContents will be called recursively for all child elements.
-        If this container is not contained in the DB, this method won't do anything (except the recursive
-        call if *recursive* is True)."""
-        if self.isInDB():
-            if table is None:
-                table = db.prefix + "elements"
-                
-            result = db.query("""
-                    SELECT c.element_id,c.position,res.file
-                    FROM {0}contents AS c JOIN {1} AS res ON c.container_id = {2} AND c.element_id = res.id
-                    ORDER BY c.position
-                    """.format(db.prefix,table,self.id))
-                    
-            contents = [(File if file else Container).fromId(id,position=pos,loadData=loadData) 
-                            for id,pos,file in result]
-            self.setContents(contents)
-        else: raise RuntimeError("Called loadContents on a container that is not in the db.")
-        
-        if recursive:
-            for element in self.contents:
-                if element.isContainer():
-                    element.loadContents(recursive,table,loadData)
-
-    def getLength(self):
-        """Return the length of this element, i.e. the sum of the lengths of all contents."""
-        # Skip elements of length None
-        return sum(element.getLength() for element in self.contents if element.getLength() is not None)
+    def isFile(self):
+        return False
     
-    def getExtension(self):
+    def copy(self):
+        return Container(self.id,self.major,contents=self.contents.copy(),
+                         tags=self.tags.copy(),flags=list(self.flags))
+    
+    def getContents(self,level):
+        return (level.get(id) for id in self.contents)
+    
+    def getLength(self,level):
+        """Return the length of this element, i.e. the sum of the lengths of all contents."""
+        lengths = (c.getLength(level) for c in self.getContents(level))
+        # Skip elements of length None
+        return sum(l for l in lengths if l is not None)
+    
+    def getExtension(self,level):
         """Return the extension of all files in this container. Return None if they have different extension
         or at least one of them does not have an extension."""
         extension = None
-        for element in self.contents:
-            ext = element.getExtension()
+        for element in self.getContents(level):
+            ext = element.getExtension(level)
             if ext is None:
                 return None
             if extension is None:
@@ -550,96 +407,47 @@ class Container(Element):
             elif extension != ext:
                 return None
         return extension
-            
-    def sortContents(self):
-        """Sorts the contents according to their positions."""
-        self.contents.sort(key = lambda el: el.position)
     
     def __repr__(self):
         return "Container[{}] with {} elements".format(self.id, len(self.contents))
 
 
 class File(Element):
-    def __init__(self, id, tags, flags, path, length, position, major = False):
+    def __init__(self, id, path, length,*, parents=None, tags=None, flags=None):
         """Initialize this element with the given id, which must be an integer or None (for external files).
         Optionally you may specify a tags.Storage object holding the tags of this element and/or a file path.
         """
+        if not isinstance(id,int) or not isinstance(path,str) or not isinstance(length,int):
+            raise TypeError("Invalid type (id,path,length): ({},{},{}) of types ({},{},{})"
+                            .format(id,path,length,major,type(id),type(path),type(length)))
         self.id = id
-        self.tags = tags
-        self.flags = flags
-        self.length = length
-        self.position = position
-        self.major = major
-        if path is not None and not isinstance(path,str):
-            raise ValueError("path must be either None or a string. I got {}".format(id))
         self.path = path
-    
-    @staticmethod
-    def fromId(id,*,tags=None,flags=None,path=None,length=None,position=None,
-               parentId=None,loadData=True):
-        if loadData and id > 0:
-            if tags is None:
-                tags = db.tags(id)
-            if flags is None:
-                flags = db.flags(id)
-            if path is None:
-                path = db.path(id)
-            if length is None:
-                length = db.length(id)
-            if position is None and parentId is not None:
-                position = db.position(parentId,id)
-                #TODO: db.position now is db.positions() ... what to do if the 
-                #element appears more than once below the same parent? (e.g. in a playlist)
-        return File(id,tags,flags,path,length,position)
-        
-    @staticmethod
-    def fromFilesystem(path, ignoreUnknownTags = False):
-        rpath = relPath(path)
-        try:
-            real = realfiles.get(path, ignoreUnknownTags)
-            real.read()
-            fileTags = real.tags
-            length = real.length
-            position = real.position
-        except OSError:
-            fileTags = tags.Storage()
-            fileTags[tags.TITLE] = ['<could not open:> {}'.format(rpath)]
-            length = 0
-            position = 0
-        
-        id = db.idFromPath(rpath)
-        if id is None:
-            from .. import modify
-            id = modify.editorIdForPath(rpath)
-            flags = []
-        else:
-            flags = db.flags(id)
-            # TODO: Load private tags!
-        return File(tags=fileTags,flags=flags,path=rpath,length=length,position=position,id = id)
-
-    def hasContents(self):
-        return False
-    
-    def getContents(self):
-        return []
-    
-    def setContents(self):
-        raise RuntimeError("Cannot assign contents to a file!")
-
-    def getContentsCount(self,recursive=False):
-        return 0
+        self.length = length
+        if parents is not None:
+            self.parents = parents
+        else: self.parents = []
+        if tags is not None:
+            self.tags = tags
+        else: self.tags = tagsModule.Storage()
+        if flags is not None:
+            self.flags = flags
+        else: self.flags = []
         
     def isFile(self):
         return True
     
-    def getLength(self):
+    def isContainer(self):
+        return False
+    
+    def copy(self):
+        return File(self.id,self.path,self.length,tags=self.tags.copy(),flags=list(self.flags))
+    
+    def getLength(self,level=None):
         """Return the length of this file."""
         return self.length
     
-    def getExtension(self):
+    def getExtension(self,level=None):
         """Return the filename extension of this file."""
-        if self.path is None:
-            self.path = db.path(self.id)
         ext = os.path.splitext(self.path)[1]
         if len(ext) > 0:
             return ext[1:].lower() # remove the dot
@@ -647,3 +455,20 @@ class File(Element):
         
     def __repr__(self):
         return "File[{}] {}".format(self.id, self.path)
+    
+
+class ContentsList(list):
+    def __init__(self,ids=[]):
+        super().__init__(ids)
+        if len(ids) > 0:
+            self.positions = list(range(1,len(self)+1))
+        else: self.positions = []
+        
+    def add(self,id,position):
+        self.append(id)
+        self.positions.append(position)
+    
+    def copy(self):
+        result = ContentsList(self)
+        result.positions = list(self.positions)
+        return result

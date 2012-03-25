@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2009-2011 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2012 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -73,25 +73,16 @@ ALBUM = None
 
 class ValueType:
     """Class for the type of tag-values. Currently only three types are possible: varchar, date and text.
-    For each of them there is an instance (e.g. ``tags.TYPE_VARCHAR``) and you can get all of them via
-    ``tags.TYPES``. You should never create your own instances.
+    For each of them there is an instance (e.g. tags.TYPE_VARCHAR) and you can get all of them via
+    tags.TYPES or using the tags.TYPE_* constants. You must not create your own instances.
         
         - *name* is one of ''varchar'', ''date'', ''text''
         - *description* is a description that will be displayed to the user
         
-    \ """
+    """
     def __init__(self,name,description):
         self.name = name
         self.description = description
-
-    def __eq__(self,other):
-        return isinstance(other,ValueType) and self.name == other.name
-
-    def __ne__(self,other):
-        return not isinstance(other,ValueType) or self.name != other.name
-        
-    def __hash__(self):
-        return hash(self.name)
         
     def isValid(self,value):
         """Return whether the given value is a valid tag-value for tags of this type."""
@@ -165,6 +156,7 @@ TYPE_VARCHAR = ValueType('varchar', translate('tags', 'a tag type for normal (no
 TYPE_TEXT = ValueType('text', translate('tags', 'a tag type for long texts (like e.g. lyrics)'))
 TYPE_DATE = ValueType('date', translate('tags', 'a tag type for dates'))
 TYPES = [TYPE_VARCHAR,TYPE_TEXT,TYPE_DATE]
+
 
 
 class Tag:
@@ -441,7 +433,6 @@ def loadTagTypesFromDB():
     """Initialize _tagsById, _tagsByName and tagList from the database. Raise a runtime error when the 
     tags cannot be fetched from the database (e.g. because the tagids table is missing)."""
     global _tagsByName, _tagsById, tagList
-    from omg import database as db
     _tagsById = {}
     _tagsByName = {}
     
@@ -475,7 +466,12 @@ def init():
     At program start or after changes of that table this method must be called to ensure the module has the
     correct tags and their IDs. Raise a RuntimeError when tags cannot be fetched from the database correctly.
     """
-    global TITLE,ALBUM, _translation
+    global TITLE,ALBUM, db
+    from omg import database as db
+    
+    if db.prefix+'tagids' not in db.listTables():
+        logger.error("tagids-table is missing")
+        raise RuntimeError()
     
     loadTagTypesFromDB()
         
