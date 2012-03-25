@@ -58,18 +58,14 @@ class FileSystemBrowserModel(QtGui.QFileSystemModel):
             self.dataChanged.emit(index, index)    
     
     def data(self, index, role = Qt.DisplayRole):
-        if role == Qt.DecorationRole:
+        if role == Qt.DecorationRole and filesystem.syncThread is not None:
             info = self.fileInfo(index)
             if os.path.isdir(info.absoluteFilePath()):
                 dir = relPath(info.absoluteFilePath())
                 if dir == '..':
                     return super().data(index, role)
                 try:
-                    #status = db.folderState(dir)
                     status = filesystem.syncThread.knownFolders[dir]
-                #except EmptyResultException:
-                except AttributeError:
-                    status = 'unsynced'
                 except KeyError:
                     status = 'unsynced'
                 return self.icons[status]

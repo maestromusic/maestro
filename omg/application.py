@@ -133,7 +133,7 @@ def run():
     plugins.enablePlugins()
     
     from . import filesystem
-    #filesystem.init()
+    filesystem.init()
     
     # Create GUI
     # First import all modules that want to add WidgetData
@@ -154,7 +154,7 @@ def run():
     logger.debug('main application quit')
     
     # Close operations
-    #filesystem.shutdown()
+    filesystem.shutdown()
     search.shutdown()
     mainWindow.saveLayout()
     delegateconfiguration.save()

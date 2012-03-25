@@ -536,7 +536,7 @@ def folderState(path):
 
 
 def addFolder(path, state):
-    query('INSERT INTO {}folders VALUES(path,state) VALUES (?,?)'.format(prefix), path, state)
+    query('INSERT INTO {}folders (path,state) VALUES (?,?)'.format(prefix), path, state)
     
     
 def updateFolder(path, state):
