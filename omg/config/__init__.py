@@ -349,6 +349,8 @@ class MainSection(Section):
             self.updateFromDict(self._rawDict,allowUnknownSections=True)
         except configio.ConfigError as e:
             logger.critical(str(e))
+            logger.critical("There is an error in config file '{}'. Deleting the file should help (but also "
+                            "erase your configuration...).".format(self._path))
             sys.exit(1)
             
         # Finally set temporary values from cmdConfig
