@@ -379,7 +379,7 @@ class BrowserTreeView(treeview.TreeView):
         if expandVisible:
             self._optimizers.append(ExpandVisibleOptimizer(self))
         self._optimizers.append(ExpandSingleOptimizer(self))
-        self._optimizers.append(MergeValueNodesOptimizer(self))
+        #self._optimizers.append(MergeValueNodesOptimizer(self))
         
         self.model().reset(table)
         

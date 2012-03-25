@@ -49,26 +49,19 @@ class StandardDelegate(AbstractDelegate):
     ]]))
         
     def layout(self,index,availableWidth):
-        element = self.model.data(index)
+        wrapper = self.model.data(index)
+        element = wrapper.element
        
-        # Prepare data
-        if element.tags is None:
-            element.loadTags()
         # These can only be computed when we know whether fitting the fitInTitleRowData did work
         leftTexts,rightTexts = None,None
         
-        if element.flags is None:
-            element.loadFlags()
-        flagIcons = self.prepareFlags(element)[0]
-        
-        if element.isContainer() and element.major is None:
-            element.major = db.isMajor(element.id)
+        flagIcons = self.prepareFlags(wrapper)[0]
         
         # Cover
-        if element.hasCover():
-            coverSize = self.config.options['coverSize'].value
-            self.addLeft(CoverItem(element.getCover(coverSize),coverSize))
-            availableWidth -= coverSize + self.hSpace
+        #if element.hasCover():
+        #    coverSize = self.config.options['coverSize'].value
+        #    self.addLeft(CoverItem(element.getCover(coverSize),coverSize))
+         #   availableWidth -= coverSize + self.hSpace
         
         # Title and Major
         titleItem = TextItem(element.getTitle(prependPosition=self.config.options['showPositions'].value,
@@ -83,7 +76,7 @@ class StandardDelegate(AbstractDelegate):
         # showInTitleRow
         fitInTitleRowData = self.config.options['fitInTitleRowData'].value
         if fitInTitleRowData is not None:
-            fitInTitleRowText = self.getData(fitInTitleRowData,element)
+            fitInTitleRowText = self.getData(fitInTitleRowData,wrapper)
         else: fitInTitleRowText = None
         fittedTextInTitleRow = False
                 
@@ -113,7 +106,7 @@ class StandardDelegate(AbstractDelegate):
                 # center region and thus potentially a lot rows.
                 
                 # In any case we are not going to fit the fitInTitleRowTag, so we can compute the texts:
-                leftTexts,rightTexts = self.prepareColumns(element)
+                leftTexts,rightTexts = self.prepareColumns(wrapper)
 
                 # First we compute a lower bound of the rows used by the tags
                 rowsForSure = max(len(leftTexts),len(rightTexts))
@@ -160,7 +153,7 @@ class StandardDelegate(AbstractDelegate):
         # Tags
         if leftTexts is None: # Tags may have been computed already above 
             leftTexts,rightTexts = self.prepareColumns(
-                                    element,exclude=[fitInTitleRowData] if fittedTextInTitleRow else [])
+                                    wrapper,exclude=[fitInTitleRowData] if fittedTextInTitleRow else [])
 
         if len(leftTexts) > 0 or len(rightTexts) > 0:
             self.addCenter(MultiTextItem(leftTexts,rightTexts))
@@ -172,7 +165,7 @@ class StandardDelegate(AbstractDelegate):
             self.addCenter(TextItem(element.path,ITALIC_STYLE))
             self.newRow()
     
-    def prepareColumns(self,element,exclude=[]):
+    def prepareColumns(self,wrapper,exclude=[]):
         """Collect the texts displayed in both columns based on the configured datapieces. Exclude datapieces
         contained in *exclude* (this is used if a datapiece is displayed in the title row)."""
         leftTexts = []
@@ -185,23 +178,23 @@ class StandardDelegate(AbstractDelegate):
                 seenTags.extend(data.tag for data in dataPieces if data.tag is not None)
             for data in dataPieces:
                 if data not in exclude:
-                    text = self.getData(data,element)
+                    text = self.getData(data,wrapper)
                     if len(text) > 0:
                         texts.append(text)
         
         if appendRemainingTags:
-            remainingTagValues = {tag: self.getFormattedTagValues(tag,element)
-                                    for tag in element.tags if tag not in seenTags}
+            remainingTagValues = {tag: self.getFormattedTagValues(tag,wrapper)
+                                    for tag in wrapper.element.tags if tag not in seenTags}
             leftTexts.extend('{}: {}'.format(tag.title,values)
                                     for tag,values in remainingTagValues.items() if values != '')
             
         return leftTexts,rightTexts
 
-    def getData(self,dataPiece,element):
+    def getData(self,dataPiece,wrapper):
         """Return the data for the given datapiece and element as a string. Return an empty string if no
         data is available."""
         if dataPiece.tag is not None:
-            return self.getFormattedTagValues(dataPiece.tag,element)
+            return self.getFormattedTagValues(dataPiece.tag,wrapper)
         else:
             if dataPiece.data == "filetype":
                 ext = element.getExtension()
@@ -224,31 +217,29 @@ class StandardDelegate(AbstractDelegate):
                 length = self.getData(configuration.DataPiece("length"),element)
                 return _join(', ',[fileCount,length])
 
-    def getFormattedTagValues(self,tagType,element):
+    def getFormattedTagValues(self,tagType,wrapper):
         """Return all values of the tag *tagType* in *element*, excluding values that appear in parent nodes,
         nicely formatted as a string. Return an empty strings if *element* does not have values of that tag.
         """
-        values = self.getTagValues(tagType,element)
+        values = self.getTagValues(tagType,wrapper)
         separator = ' - ' if tagType == tags.TITLE or tagType == tags.ALBUM else ', '
         if tagType.type == tags.TYPE_DATE:
             values = map(str,values)
         return separator.join(values)
         
-    def getTagValues(self,tagType,element):
+    def getTagValues(self,tagType,wrapper):
         """Return all values of the tag *tagType* in *element* excluding values that appear in parent nodes.
         Values from ValueNode-ancestors will also be removed."""
-        if tagType not in element.tags:
+        if tagType not in wrapper.element.tags:
             return []
-        values = list(element.tags[tagType]) # copy!
+        values = list(wrapper.element.tags[tagType]) # copy!
         
-        parent = element
+        parent = wrapper
         while len(values) > 0:
             parent = parent.parent
-            if isinstance(parent,models.Element):
-                if parent.tags is None:
-                    parent.loadTags()
-                if tagType in parent.tags:
-                    parentValues = parent.tags[tagType]
+            if isinstance(parent,models.Wrapper):
+                if tagType in parent.element.tags:
+                    parentValues = parent.element.tags[tagType]
                 else: parentValues = []
             elif isinstance(parent,models.RootNode):
                 break
@@ -263,23 +254,23 @@ class StandardDelegate(AbstractDelegate):
         
         return values
         
-    def prepareFlags(self,element):
+    def prepareFlags(self,wrapper):
         """Return two lists containing the flags of *element*: The first list contains the icons of the flags
         that have one, the second list contains the names of those flags that do not have an icon.
         
         If the ''removeParentFlags'' option is True, flags that are set in an ancestor are removed.
         """
         if self.config.options['removeParentFlags'].value:
-            flags = list(element.flags) # copy!
-            parent = element.parent
+            flags = list(wrapper.element.flags) # copy!
+            parent = wrapper.parent
             while parent is not None:
-                if isinstance(parent,models.Element):
-                    for flag in parent.flags:
+                if isinstance(parent,models.Wrapper):
+                    for flag in parent.element.flags:
                         if flag in flags:
                             flags.remove(flag)
                 parent = parent.parent
         else:
-            flags = element.flags
+            flags = wrapper.element.flags
         return [flag.icon for flag in flags if flag.icon is not None],\
                [flag.name for flag in flags if flag.icon is None]
         
