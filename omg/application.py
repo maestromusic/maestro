@@ -224,7 +224,6 @@ def loadTranslators(app,logger):
 
 
 def runInstaller():
-    logger.error
     os.execl(sys.executable, os.path.basename(sys.executable), "-m", "omg.install")
     
     

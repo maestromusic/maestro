@@ -680,4 +680,5 @@ if __name__ == '__main__':
     from omg import resources
     widget = InstallToolWindow()
     widget.show()
+    app.exec_()
     
