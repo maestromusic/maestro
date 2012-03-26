@@ -110,55 +110,6 @@ def connect():
     else: 
         authValues = [config.options.database["mysql_"+key] for key in sql.AUTH_OPTIONS]
         return _connect(config.options.database.mysql_drivers,authValues)
-        
-
-def testConnect(driver=None):
-    """Connect to the database server using the test connection information (config.options.database.test_*).
-    If any of these options is empty, the standard option will be used instead 
-    (config.options.database.mysql_*). The table prefix will in be config.options.database.test_prefix even
-    if it is empty. For safety this method will abort the program if prefix, db-name and host coincide with
-    the standard values used by connect.
-
-    As :func:`connect`, this method returns a :class:`ConnectionContextManager` on success or throw a
-    DBException on failure.
-    
-    testConnect only works for MySQL connections. For SQLite simply use another file.
-    """
-    threadId = threading.current_thread().ident
-    if threadId in connections:
-        logger.warning(
-            "database.testConnect has been called although a connection for this thread was already open.")
-        return connections[threadId]
-        
-    authValues = []
-    host = None
-    dbName = None
-    for option in sql.AUTH_OPTIONS:
-        value = config.options.database["test_"+option]
-        if not value: # Replace empty values by standard values
-            value = config.options.database["mysql_"+option]
-        authValues.append(value)
-        if option == "host":
-            host = value
-        if option == "db":
-            dbName = value
-
-    global prefix
-    if prefix is None:
-        prefix = config.options.database.test_prefix
-
-    # Abort if the connection information and the prefix is equal
-    if (prefix == config.options.database.prefix
-            and dbName == config.options.database.mysql_db
-            and host == config.options.database.mysql_host):
-        logger.critical("Safety stop: Test database connection information coincides with the usual "
-                        " information. Please supply at least a different prefix.")
-        sys.exit(1)
-
-    if driver is not None:
-        drivers = [driver]
-    else: drivers = config.options.database.mysql_drivers
-    return _connect(drivers,authValues)
 
 
 def _connect(drivers,authValues):

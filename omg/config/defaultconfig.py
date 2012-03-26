@@ -59,13 +59,6 @@ defaults = OrderedDict((
     "mysql_host": (str,"localhost","MySQL host name"),
     "mysql_port": (int,3306,"MySQL port"),
     
-    "test_db": (str,"","Name of the database used by (unit)test scripts. If this is empty the normal database will be used (In this case you must specify a test-prefix which differs from the standard prefix."),
-    "test_user": (str,"","MySQL user name for test scripts"),
-    "test_password": (str,"","MySQL password for test scripts"),
-    "test_host": (str,"localhost","MySQL host name for test scripts"),
-    "test_port": (int,3306,"MySQL port for test scripts"),
-    "test_prefix": (str,"omgtest_","Table prefix for the test tables."),
-    
     "sqlite_path": (str,"config:omg.db","Path to the SQLite database. May start with 'config:' indicating that the path is relative to the configuration directory.")
 }),
 
