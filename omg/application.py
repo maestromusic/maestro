@@ -17,8 +17,8 @@
 #
 
 """
-This module controls the startup and finishing process of OMG. :func:`run` runs the application while
-:func:`init` only initializes the most basic modules without starting a graphical interface.
+This module controls the startup and finishing process of OMG. The run method may also be used to initialize
+OMG's framework without starting a GUI.
 """
 
 import sys, os, fcntl, getopt
@@ -37,96 +37,81 @@ global logger
 _translators = []
 
 
-
-def init(cmdConfig = [],initTags=True,testDB=False,useInstallTool=False):
-    """Initialize the application, modules (config, logging, database and tags) but do not create a GUI or
-    load any plugins. Return the QApplication instance. This is useful for scripts which need OMG's framework,
-    but not its GUI and for testing (or playing around) in Python's shell::
+def run(cmdConfig=[],exitPoint="nogui",console=True):
+    """This method serves two purposes: It is the entry point for OMG and it is used to initialize OMG's
+    framework on the console and without GUI for debugging. Using this method on the console works like this:
 
         >>> from omg import application, tags
-        >>> application.init()
-        <PyQt4.QtGui.QApplication object at 0xb7569f5c>
+        >>> application.run()
         >>> tags.tagList
         ["title", "artist", "album", ...]
-
-    *cmdOptions* is a list of options given on the command line that will overwrite the corresponding option
-    from the file or the default. Each list item has to be a string like ``main.collection=/var/music``.
-    If *initTags* is False, the modules ''tags'' and ''flags'' will not be initialized.
-    If *testDB* is True, the database connection will be build using :func:`database.testConnect`.
-    Warning: In this case you may want to set *initTags* to False because the test database is usually empty.
-    If *useInstallTool* is True, the Install tool is opened in several cases (e.g. if the database connection
-    cannot be established. Otherwise the application will terminate with an error (this is the default
-    since this method is also used to initialize OMG's framework for terminal applications). 
+        
+    Then using this method on the console, use the parameter *exitPoint* to determine how much of the
+    framework should be initialized. Note that the default parameters are chosen to save work on the console
+    and are not the values necessary to get the usual graphical application.
+    
+        * cmdConfig: is a list of options given on the command line that will overwrite the corresponding
+          option from the file or the default. Each list item has to be a string like
+          ``main.collection=/var/music``.
+        * exitPoint: Determines when to stop the startup process. Set this to None to run OMG's usual GUI.
+          Other allowed values are 'database','tags' and 'nogui'. The run script will stop after the database
+          connection has been established, after the tags module has been initialized or just before the GUI 
+          would be created, respectively.
+        * console: Set this to True on the console to turn off the lockfile and the (graphical) installer.
     """
+    handleCommandLineOptions(cmdConfig)
+    
     # Some Qt-classes need a running QApplication before they can be created
     app = QtGui.QApplication(sys.argv)
 
     # Initialize config and logging
     config.init(cmdConfig)
+    # Initialize logging as early as possible -- but after the config variables have been read.
+    logging.init()
     global logger
     logger = logging.getLogger("omg")
-    logging.init()
     logger.debug("START")
+    
+    # Lock the lockfile to prevent a second OMG-instance from starting.
+    if not console:
+        lock()
+    
+    # Check for a collection directory
     if config.options.main.collection == '':
         logger.error("No collection directory defined.")
-        if useInstallTool:
+        if not console:
             runInstaller()
         else: sys.exit(1)
     
     loadTranslators(app,logger)
 
-    # Initialize remaining modules
+    # Initialize database
     try:
-        if not testDB:
-            database.connect()
-        else: database.testConnect()
+        database.connect()
     except database.sql.DBException as e:
         logger.error("I cannot connect to the database. Did you provide the correct information in the config"
                      " file? MySQL error: {}".format(e.message))
-        if useInstallTool:
+        if not console:
             runInstaller()
         else: sys.exit(1)
-
-    if initTags:
-        from omg import tags,flags
-        try:
-            tags.init()
-        except RuntimeError:
-            if useInstallTool:
-                runInstaller()
-            else: sys.exit(1)
-        flags.init()
-
-    return app
-
-
-def run():
-    """Run OMG."""
-    opts, args = getopt.getopt(sys.argv[1:],
-        "vVc:",
-        ['version','config=', 'install'])
-
-    cmdConfig = []
-    for opt,arg in opts:
-        if opt in ('-v','-V', '--version'):
-            print('This is OMG version {}. Nice to meet you.'.format(constants.VERSION))
-            sys.exit(0)
-        elif opt in ('-c','--config'):
-            cmdConfig.append(arg)
-        elif opt == '--install':
-            runInstaller()
-        else:
-            logger.warning("Unknown option '{}'.".format(opt))
+    if exitPoint == 'database':
+        return
         
-    app = init(cmdConfig,useInstallTool=True)
-    
-    # Lock the lockfile to prevent a second OMG-instance from starting.
-    lock()
-    
+    # Initialize tags
+    from omg import tags,flags
+    try:
+        tags.init()
+    except RuntimeError:
+        if not console:
+            runInstaller()
+        else: sys.exit(1)
+    flags.init()
+    if exitPoint == 'tags':
+        return
+        
+    # Load and initialize remaining modules
     from omg.models import levels
     levels.init()
-    
-    # Load remaining modules
     from omg import resources, search
     search.init()
     
@@ -135,9 +120,12 @@ def run():
     plugins.init()
     plugins.enablePlugins()
     
+    if exitPoint == 'nogui':
+        return
+        
     from . import filesystem
     #filesystem.init()
-    
+        
     # Create GUI
     # First import all modules that want to add WidgetData
     from .gui import filesystembrowser, editor, browser, tageditor, mainwindow, playback, playlist
@@ -154,9 +142,9 @@ def run():
     # Launch application
     mainWindow.show()
     returnValue = app.exec_()
-    logger.debug('main application quit')
     
     # Close operations
+    logger.debug('main application quit')
     #filesystem.shutdown()
     search.shutdown()
     mainWindow.saveLayout()
@@ -167,6 +155,25 @@ def run():
     sys.exit(returnValue)
 
 
+def handleCommandLineOptions(cmdConfig):
+    """Parse command line options and act accordingly (e.g. print version and exit). Add config option
+    overwrites (with the --config/-c option) to the list *cmdConfig*."""
+    opts, args = getopt.getopt(sys.argv[1:],
+        "vVc:",
+        ['version','config=', 'install'])
+
+    for opt,arg in opts:
+        if opt in ('-v','-V', '--version'):
+            print('This is OMG version {}. Nice to meet you.'.format(constants.VERSION))
+            sys.exit(0)
+        elif opt in ('-c','--config'):
+            cmdConfig.append(arg)
+        elif opt == '--install':
+            runInstaller()
+        else:
+            logger.warning("Unknown option '{}'.".format(opt))
+
+         
 def lock():
     """Lock the lockfile so that no other instance can be started. Quit the application if it is already
     locked."""
@@ -224,9 +231,9 @@ def loadTranslators(app,logger):
 
 
 def runInstaller():
-    logger.error
+    """Run the graphical installer."""
     os.execl(sys.executable, os.path.basename(sys.executable), "-m", "omg.install")
     
     
 if __name__ == "__main__":
-    run() 
+    run(exitPoint=None,console=False) 
