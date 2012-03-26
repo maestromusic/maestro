@@ -43,24 +43,33 @@ class Level(QtCore.QObject):
         self.elements = {}
         
     def get(self,param):
+        """Return the element determined by *param* from this level. Load the element, if it is not already
+        present on the level. Currently, *param* may be either the id or the path."""
         if not isinstance(param,int):
             param = idFromPath(param)
-        if param in self.elements:
-            return self.elements[param]
-        else: self.parent.load([param],self.elements)
+        if param not in self.elements:
+            self.parent.loadIntoChild([param],self)
+        return self.elements[param]
+    
+    def load(self,ids,ignoreUnknownTags=False):
+        """Load all elements given by the list of ids *ids* into this level (do nothing for elements which
+        are already loaded."""
+        notFound = []
+        for id in ids:
+            if id not in self.elements:
+                notFound.append(id)
+        self.parent.loadIntoChild(notFound,self,ignoreUnknownTags)
         
-    def load(self,ids,aDict=None,ignoreUnknownTags=False):
-        if aDict is None:
-            aDict = self.elements
+    def loadIntoChild(self,ids,child,ignoreUnknownTags=False):
+        """Load all elements given by the list of ids *ids* into the level *child*. Do not check whether
+        elements are already loaded there."""
         notFound = []
         for id in ids:
             if id in self.elements:
-                if aDict is not self.elements:
-                    aDict[id] = self.elements[id].copy()
+                child.elements[id] = self.elements[id].copy()
             else: notFound.append(id)
-        if len(notFound) > 0:
-            self.parent.load(notFound,aDict,ignoreUnknownTags)
-        
+        self.parent.loadIntoChild(notFound,self,ignoreUnknownTags)
+                
     def loadPaths(self,paths,aDict,ignoreUnknownTags=False):
         ids = [idFromPath(path) for path in paths]
         self.load(ids,aDict,ignoreUnknownTags)
@@ -69,30 +78,23 @@ class Level(QtCore.QObject):
 class RealLevel(Level):
     def __init__(self):
         super().__init__('REAL',None)
-                    
-    def get(self,param):
-        if not isinstance(param,int):
-            param = idFromPath(param)
-        if param in self.elements:
-            return self.elements[param]
-        else: self.load([param],self.elements)
-        
-    def load(self,ids,aDict=None,ignoreUnknownTags=False):
-        if aDict is None:
-            aDict = self.elements
+        # This hack makes the inherited implementations of get and load work with the overwritten
+        # implementation of loadIntoChild
+        self.parent = self
+    
+    def loadIntoChild(self,ids,child,ignoreUnknownTags=False):
         notFound = []
         for id in ids:
             if id in self.elements:
-                if aDict is not self.elements:
-                    aDict[id] = self.elements[id].copy()
+                child.elements[id] = self.elements[id].copy()
             else: notFound.append(id)
         if len(notFound) > 0:
             positiveIds = [id for id in notFound if id > 0]
-            paths = [pathFromVid(id) for id in notFound if id < 0]
+            paths = [pathFromTId(id) for id in notFound if id < 0]
             if len(positiveIds) > 0:
-                self.loadFromDB(positiveIds,aDict)
+                self.loadFromDB(positiveIds,child.elements)
             if len(paths) > 0:
-                self.loadFromFileSystem(paths, aDict, ignoreUnknownTags)
+                self.loadFromFileSystem(paths, child.elements, ignoreUnknownTags)
             
     def loadFromDB(self,idList,aDict):
         if len(idList) == 0: # queries will fail otherwise
@@ -189,20 +191,19 @@ def idFromPath(path):
         return id
     else: return vIdFromPath(path)
 
-_currentVId = 0
-_vIds = {}
-# TODO: Liste wieder leeren?
+_currentTId = 0
+_tIds = {}
 _paths = {}
 
-def vIdFromPath(path):
-    if path in _vIds:
-        return _vIds[path]
+def tIdFromPath(path):
+    if path in _tIds:
+        return _tIds[path]
     else:
-        global _currentVId
-        _currentVId -= 1
-        _paths[_currentVId] = path
-        _vIds[path] = _currentVId
-        return _currentVId
+        global _currentTId
+        _currentTId -= 1
+        _paths[_currentTId] = path
+        _tIds[path] = _currentTId
+        return _currentTId
 
-def pathFromVId(vid):
-    return _paths[vid]
+def pathFromTId(tid):
+    return _paths[tid]
