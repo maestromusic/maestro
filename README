@@ -16,6 +16,23 @@ If you want to install OMG as normal user inside your home directory, run
 
 $ easy_install3 --user omg-0.2.tar.gz
 
+DEVELOPMENT
+=============
+To contribute in development, get the current HEAD from the git repository:
+
+git clone git://omg.mathematik.uni-kl.de/omg.git
+
+In order to get a working copy of the current development status, use the command
+
+python setup.py develop --user
+
+which will install an Egg-link inside your ~/.local/lib/python3.x folder, pointing to the git checkout. If
+you use the "develop" mode instead in some directory which is not in your normal PYTHONPATH, e.g.
+
+python setup.py develop -d ~/python-stage
+
+you can simultaneously work with an installed version of OMG.
+
 
 
 ATTRIBUTIONS
