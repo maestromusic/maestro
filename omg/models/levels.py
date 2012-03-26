@@ -109,7 +109,7 @@ class RealLevel(Level):
             if file:
                 aDict[id] = File(id, self, path=path,length=length)
             else:
-                aDict[id] = Container(id, self, major=major,level=self)
+                aDict[id] = Container(id, self, major=major)
         
         # contents
         result = db.query("""
@@ -121,17 +121,17 @@ class RealLevel(Level):
         
         for row in result:
             id,pos,contentId = row
-            aDict[id].contents.add(contentId,pos)
+            aDict[id].contents[pos] =  contentId
         
         # parents
         result = db.query("""
-                SELECT el.id,c.container_id,c.position
+                SELECT el.id,c.container_id
                 FROM {0}elements AS el JOIN {0}contents AS c ON el.id = c.element_id
                 WHERE el.id IN ({1})
                 """.format(db.prefix,idList))
         
-        for id,contentId,position in result:
-            aDict[id].parents[contentId] = position
+        for id,contentId in result:
+            aDict[id].parents.append(contentId)
         
         # tags
         result = db.query("""

@@ -64,12 +64,12 @@ class StandardDelegate(AbstractDelegate):
          #   availableWidth -= coverSize + self.hSpace
         
         # Title and Major
-        titleItem = TextItem(element.getTitle(prependPosition=self.config.options['showPositions'].value,
+        titleItem = TextItem(wrapper.getTitle(prependPosition=self.config.options['showPositions'].value,
                                            usePath=False),
                              BOLD_STYLE if element.isContainer() else STD_STYLE,
                              minHeight=IconBarItem.iconSize if len(flagIcons) > 0 else 0)
         
-        if self.config.options['showMajor'].value and isinstance(element,models.Container) and element.major:
+        if self.config.options['showMajor'].value and element.isContainer() and element.major:
             self.addCenter(ColorBarItem(QtGui.QColor(255,0,0),5,titleItem.sizeHint(self)[1]))
         self.addCenter(titleItem)
         

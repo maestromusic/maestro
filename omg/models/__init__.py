@@ -19,6 +19,7 @@
 from PyQt4 import QtCore
 
 import copy, os.path
+from collections import OrderedDict
 
 from .. import tags, logging, config, covers, realfiles, database as db
 from ..utils import relPath
@@ -255,8 +256,9 @@ class RootNode(Node):
 
 class Wrapper(Node):
     """A node that holds an element."""
-    def __init__(self,element,contents=None):
+    def __init__(self,element,contents = None, position = None):
         self.element = element
+        self.position = position
         if element.isContainer():
             if contents is not None:
                 self.contents = contents
@@ -279,13 +281,38 @@ class Wrapper(Node):
     def getContents(self):
         return self.contents if self.element.isContainer() else []
     
-    def loadContents(self,level,recursive):
+    def loadContents(self, recursive):
         if self.element.isContainer():
-            self.setContents([Wrapper(level.get(id)) for id in self.element.contents])
+            self.setContents([Wrapper(self.element.level.get(id),position = pos) for pos,id in self.element.contents.items()])
             if recursive:
                 for child in self.contents:
-                    child.loadContents(level,recursive)
+                    child.loadContents(recursive)
 
+    def getTitle(self,prependPosition=False,usePath=True,titles=None):
+        """Return the title of this element or some dummy title, if the element does not have a title tag.
+        Additionally the result may contain a position (if *prependPosition* is True) and/or the element's
+        id (if ''config.options.misc.show_ids'' is True). If *usePath* is True, the path will be used as
+        title for files without title tag. Finally, the optional argument *titles* may be used to overwrite
+        the titles stored in ''self.tags'' (this is in particular useful if the element does not store tags).
+        """
+        result = ''
+        if prependPosition and self.position is not None:
+            result += "{} - ".format(self.position)
+        
+        if hasattr(self,'id') and config.options.misc.show_ids:
+            result += "[{0}] ".format(self.element.id)
+            
+        if titles is not None:
+            result += " - ".join(titles)
+        elif self.element.tags is None:
+            result += translate("Element","<No title>")
+        elif tags.TITLE in self.element.tags:
+            result += " - ".join(self.element.tags[tags.TITLE])
+        elif usePath and self.isFile() and self.element.path is not None:
+            result += self.element.path
+        else: result += translate("Element","<No title>")
+
+        return result
 
 class Element:
     """Abstract base class for elements (files or containers) in playlists, browser, etc.. Contains methods
@@ -298,29 +325,6 @@ class Element:
     
     # Misc
     #====================================================
-    def getTitle(self,prependPosition=False,usePath=True,titles=None):
-        """Return the title of this element or some dummy title, if the element does not have a title tag.
-        Additionally the result may contain a position (if *prependPosition* is True) and/or the element's
-        id (if ''config.options.misc.show_ids'' is True). If *usePath* is True, the path will be used as
-        title for files without title tag. Finally, the optional argument *titles* may be used to overwrite
-        the titles stored in ''self.tags'' (this is in particular useful if the element does not store tags).
-        """
-        result = ''
-        
-        if hasattr(self,'id') and config.options.misc.show_ids:
-            result += "[{0}] ".format(self.id)
-            
-        if titles is not None:
-            result += " - ".join(titles)
-        elif self.tags is None:
-            result += translate("Element","<No title>")
-        elif tags.TITLE in self.tags:
-            result += " - ".join(self.tags[tags.TITLE])
-        elif usePath and self.isFile() and self.path is not None:
-            result += self.path
-        else: result += translate("Element","<No title>")
-
-        return result
     
     def toolTipText(self):
         parts = []
@@ -355,10 +359,10 @@ class Container(Element):
         self.major = major
         if contents is not None:
             self.contents = contents
-        else: self.contents = []
+        else: self.contents = OrderedDict()
         if parents is not None:
             self.parents = parents
-        else: self.parents = {}
+        else: self.parents = []
         if tags is not None:
             self.tags = tags
         else: self.tags = tagsModule.Storage()
@@ -417,7 +421,7 @@ class File(Element):
         self.length = length
         if parents is not None:
             self.parents = parents
-        else: self.parents = {}
+        else: self.parents = []
         if tags is not None:
             self.tags = tags
         else: self.tags = tagsModule.Storage()

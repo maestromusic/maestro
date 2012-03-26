@@ -221,8 +221,7 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
         childIds = ids
         while len(childIds) > 0:
             levels.real.load(childIds)
-            childIds = list(itertools.chain.from_iterable(levels.real.get(id).contents for id in childIds if levels.real.get(id).isContainer()))
-        
+            childIds = list(itertools.chain.from_iterable(levels.real.get(id).contents.values() for id in childIds if levels.real.get(id).isContainer()))        
         if node.contents is not None:
             # Only use beginRemoveRows and friends if there are already contents. If we are going to add the
             # first contents to node (this happens thanks to the directload shortcut), we must not call
@@ -237,7 +236,7 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
             self.beginInsertRows(self.getIndex(node),0,len(ids)-1)
         node.setContents([models.Wrapper(levels.real.get(id)) for id in ids])
         for child in node.getContents():
-            child.loadContents(levels.real,recursive=True)
+            child.loadContents(recursive=True)
         
         # Finally sort the contents
         sortTags = [tags.TITLE] # by default sort for titles
