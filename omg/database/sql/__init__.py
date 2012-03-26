@@ -158,7 +158,12 @@ class AbstractSql:
     def isNull(self,value):
         """Return whether *value* represents a NULL value from a MySQL table (how null values are
         represented in result sets depends on the driver)."""
-        return value is None
+        return value is None # default implementation for drivers that return Null as None
+
+    def getDate(self,value):
+        """Return *value* converted to a datetime.datetime. Use this method on every date returned from
+        the database because different database drivers may return different date formats."""
+        return value # default implementation for drivers that already return datetime.datetime
 
     def close(self):
         """Close this driver."""

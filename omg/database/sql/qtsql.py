@@ -17,6 +17,7 @@
 #
 
 """Database driver using QtSql. Have a look at database.sql.AbstractSQL for docstrings."""
+import datetime
 
 from PyQt4 import QtSql, QtCore
 from . import DBException, EmptyResultException, AbstractSql, AbstractSqlResult
@@ -105,6 +106,9 @@ class Sql(AbstractSql):
 
     def isNull(self,value):
         return isinstance(value,QtCore.QPyNullVariant)
+        
+    def getDate(self,value):
+        return datetime.datetime.fromtimestamp(value.toTime_t())
 
 
 class SqlResult(AbstractSqlResult):

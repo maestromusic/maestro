@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import sqlite3
+import sqlite3, datetime
 from . import DBException, AbstractSql, AbstractSqlResult, EmptyResultException
 
 
@@ -53,6 +53,9 @@ class Sql(AbstractSql):
         
     def rollback(self):
         self._db.rollback()
+        
+    def getDate(self,value):
+        return datetime.datetime.strptime(value,"%Y-%m-%d %H:%M:%S")
 
 
 class SqlResult(AbstractSqlResult):

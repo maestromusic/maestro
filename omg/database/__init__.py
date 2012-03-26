@@ -254,7 +254,13 @@ def isNull(value):
     except KeyError:
         raise RuntimeError("Cannot access database before a connection for this thread has been opened.")
 
-        
+def getDate(value):
+    try:
+        return connections[threading.current_thread().ident].getDate(value)
+    except KeyError:
+        raise RuntimeError("Cannot access database before a connection for this thread has been opened.")
+
+    
 # contents-table
 #=======================================================================
 def contents(elids,recursive=False):
