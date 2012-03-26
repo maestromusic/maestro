@@ -73,9 +73,9 @@ class RealLevel(Level):
     def get(self,param):
         if not isinstance(param,int):
             param = idFromPath(param)
-        if param in self.elements:
-            return self.elements[param]
-        else: self.load([param],self.elements)
+        if param not in self.elements:
+            self.load([param],self.elements)
+        return self.elements[param] 
         
     def load(self,ids,aDict=None,ignoreUnknownTags=False):
         if aDict is None:
@@ -88,7 +88,7 @@ class RealLevel(Level):
             else: notFound.append(id)
         if len(notFound) > 0:
             positiveIds = [id for id in notFound if id > 0]
-            paths = [pathFromVid(id) for id in notFound if id < 0]
+            paths = [pathFromVId(id) for id in notFound if id < 0]
             if len(positiveIds) > 0:
                 self.loadFromDB(positiveIds,aDict)
             if len(paths) > 0:
@@ -107,9 +107,9 @@ class RealLevel(Level):
         for row in result:
             id,file,major,path,length = row
             if file:
-                aDict[id] = File(id,path=path,length=length)
+                aDict[id] = File(id, self, path=path,length=length)
             else:
-                aDict[id] = Container(id,major=major)
+                aDict[id] = Container(id, self, major=major,level=self)
         
         # contents
         result = db.query("""
@@ -125,14 +125,13 @@ class RealLevel(Level):
         
         # parents
         result = db.query("""
-                SELECT el.id,c.container_id
+                SELECT el.id,c.container_id,c.position
                 FROM {0}elements AS el JOIN {0}contents AS c ON el.id = c.element_id
                 WHERE el.id IN ({1})
                 """.format(db.prefix,idList))
         
-        for row in result:
-            id,contentId = row
-            aDict[id].parents.append(contentId)
+        for id,contentId,position in result:
+            aDict[id].parents[contentId] = position
         
         # tags
         result = db.query("""
@@ -180,7 +179,7 @@ class RealLevel(Level):
             else:
                 flags = db.flags(id)
                 # TODO: Load private tags!
-            aDict[rPath] = File(id = id,path=rpath,length=length,tags=fileTags,flags=flags)
+            aDict[rpath] = File(id, self, path=rpath,length=length,tags=fileTags,flags=flags)
     
     
 def idFromPath(path):

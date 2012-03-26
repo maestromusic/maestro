@@ -332,14 +332,6 @@ class Element:
         if len(parts) > 0:
             return '\n'.join(parts)
         else: return str(self)
-    
-    def iPosition(self):
-        """Return the position of the element, if its parent is itself an element, or the index, if
-        the parent is a root node."""
-        if isinstance(self.parent, RootNode):
-            return self.parent.index(self, True)
-        else:
-            return self.position
         
     def __str__(self):
         if self.tags is not None:
@@ -356,18 +348,17 @@ class Container(Element):
     
     contents = None
     
-    def __init__(self, id, major,*, contents=None, parents=None, tags=None, flags=None):
+    def __init__(self, id, level, major,*, contents=None, parents=None, tags=None, flags=None):
         """Initialize this container, optionally with a contents list."""
         self.id = id
+        self.level = level
         self.major = major
         if contents is not None:
-            if isinstance(contents,ContentsList):
-                self.contents = contents
-            else: self.contents = ContentsList(contents)
-        else: self.contents = ContentsList()
+            self.contents = contents
+        else: self.contents = []
         if parents is not None:
             self.parents = parents
-        else: self.parents = []
+        else: self.parents = {}
         if tags is not None:
             self.tags = tags
         else: self.tags = tagsModule.Storage()
@@ -385,21 +376,21 @@ class Container(Element):
         return Container(self.id,self.major,contents=self.contents.copy(),
                          tags=self.tags.copy(),flags=list(self.flags))
     
-    def getContents(self,level):
-        return (level.get(id) for id in self.contents)
+    def getContents(self):
+        return (self.level.get(id) for id in self.contents)
     
-    def getLength(self,level):
+    def getLength(self):
         """Return the length of this element, i.e. the sum of the lengths of all contents."""
-        lengths = (c.getLength(level) for c in self.getContents(level))
+        lengths = (c.getLength() for c in self.getContents())
         # Skip elements of length None
         return sum(l for l in lengths if l is not None)
     
-    def getExtension(self,level):
+    def getExtension(self):
         """Return the extension of all files in this container. Return None if they have different extension
         or at least one of them does not have an extension."""
         extension = None
-        for element in self.getContents(level):
-            ext = element.getExtension(level)
+        for element in self.getContents():
+            ext = element.getExtension()
             if ext is None:
                 return None
             if extension is None:
@@ -413,19 +404,20 @@ class Container(Element):
 
 
 class File(Element):
-    def __init__(self, id, path, length,*, parents=None, tags=None, flags=None):
+    def __init__(self, id, level, path, length,*, parents=None, tags=None, flags=None):
         """Initialize this element with the given id, which must be an integer or None (for external files).
         Optionally you may specify a tags.Storage object holding the tags of this element and/or a file path.
         """
         if not isinstance(id,int) or not isinstance(path,str) or not isinstance(length,int):
             raise TypeError("Invalid type (id,path,length): ({},{},{}) of types ({},{},{})"
-                            .format(id,path,length,major,type(id),type(path),type(length)))
+                            .format(id,path,length,type(id),type(path),type(length)))
         self.id = id
+        self.level = level
         self.path = path
         self.length = length
         if parents is not None:
             self.parents = parents
-        else: self.parents = []
+        else: self.parents = {}
         if tags is not None:
             self.tags = tags
         else: self.tags = tagsModule.Storage()
@@ -442,11 +434,11 @@ class File(Element):
     def copy(self):
         return File(self.id,self.path,self.length,tags=self.tags.copy(),flags=list(self.flags))
     
-    def getLength(self,level=None):
+    def getLength(self):
         """Return the length of this file."""
         return self.length
     
-    def getExtension(self,level=None):
+    def getExtension(self):
         """Return the filename extension of this file."""
         ext = os.path.splitext(self.path)[1]
         if len(ext) > 0:
@@ -455,20 +447,3 @@ class File(Element):
         
     def __repr__(self):
         return "File[{}] {}".format(self.id, self.path)
-    
-
-class ContentsList(list):
-    def __init__(self,ids=[]):
-        super().__init__(ids)
-        if len(ids) > 0:
-            self.positions = list(range(1,len(self)+1))
-        else: self.positions = []
-        
-    def add(self,id,position):
-        self.append(id)
-        self.positions.append(position)
-    
-    def copy(self):
-        result = ContentsList(self)
-        result.positions = list(self.positions)
-        return result

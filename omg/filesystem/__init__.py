@@ -29,6 +29,8 @@ syncThread = None
 
 def init():
     global syncThread, notifier, null
+    if config.options.filesystem.disable:
+        return
     syncThread = FileSystemSynchronizer()
     null = open(os.devnull)    
     modify.dispatcher.changes.connect(syncThread.handleEvent, Qt.QueuedConnection)
@@ -39,6 +41,8 @@ def init():
     
 def shutdown():
     """Terminates this module; waits for all threads to complete."""
+    if config.options.filesystem.disable:
+        return
     global syncThread
     logger.debug("Filesystem module: received shutdown() command")
     syncThread.should_stop.set()
@@ -49,7 +53,13 @@ def shutdown():
     null.close()
     logger.debug("Filesystem module: shutdown complete")
 
-
+def folderStatus(dir):
+    if config.options.filesyste.disable:
+        return 'unknown'
+    elif syncThread is None:
+        return 'unknown'
+    else:
+        return syncThread.knownFolders[dir]
 
 def computeHash(path):
     """Compute the audio hash of a single file. This method uses

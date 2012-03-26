@@ -99,6 +99,7 @@ defaults = OrderedDict((
 ("filesystem", {
     "scan_interval": (int,120,"Interval (in seconds) in which the filesystem will be rescanned for changes"),
     "dump_method": (str,"ffmpeg", "Method used to dump raw audio data from files for hashing"),
+    "disable":(bool,False,"completely disable filesystem synchronization"),
 }),
 ("misc", {
     "show_ids": (bool,False,"Whether OMG should display element IDs"),
