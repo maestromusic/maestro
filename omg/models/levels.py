@@ -66,7 +66,7 @@ class Level(QtCore.QObject):
         notFound = []
         for id in ids:
             if id in self.elements:
-                child.elements[id] = self.elements[id].copy()
+                child.elements[id] = self.elements[id].copy(child)
             else: notFound.append(id)
         self.parent.loadIntoChild(notFound,self,ignoreUnknownTags)
                 
@@ -86,17 +86,17 @@ class RealLevel(Level):
         notFound = []
         for id in ids:
             if id in self.elements:
-                child.elements[id] = self.elements[id].copy()
+                child.elements[id] = self.elements[id].copy(child)
             else: notFound.append(id)
         if len(notFound) > 0:
             positiveIds = [id for id in notFound if id > 0]
             paths = [pathFromTId(id) for id in notFound if id < 0]
             if len(positiveIds) > 0:
-                self.loadFromDB(positiveIds,child.elements)
+                self.loadFromDB(positiveIds,child)
             if len(paths) > 0:
-                self.loadFromFileSystem(paths, child.elements, ignoreUnknownTags)
+                self.loadFromFileSystem(paths,child,ignoreUnknownTags)
             
-    def loadFromDB(self,idList,aDict):
+    def loadFromDB(self,idList,level):
         if len(idList) == 0: # queries will fail otherwise
             return 
         idList = ','.join(str(id) for id in idList)
@@ -109,9 +109,9 @@ class RealLevel(Level):
         for row in result:
             id,file,major,path,length = row
             if file:
-                aDict[id] = File(id,path=path,length=length)
+                level.elements[id] = File(level,id,path=path,length=length)
             else:
-                aDict[id] = Container(id,major=major)
+                level.elements[id] = Container(level,id,major=major)
         
         # contents
         result = db.query("""
@@ -123,7 +123,7 @@ class RealLevel(Level):
         
         for row in result:
             id,pos,contentId = row
-            aDict[id].contents.add(contentId,pos)
+            level.elements[id].contents.add(contentId,pos)
         
         # parents
         result = db.query("""
@@ -134,7 +134,7 @@ class RealLevel(Level):
         
         for row in result:
             id,contentId = row
-            aDict[id].parents.append(contentId)
+            level.elements[id].parents.append(contentId)
         
         # tags
         result = db.query("""
@@ -146,7 +146,7 @@ class RealLevel(Level):
         for row in result:
             id,tagId,valueId = row
             tag = tags.get(tagId)
-            aDict[id].tags.add(tag,db.valueFromId(tag,valueId))
+            level.elements[id].tags.add(tag,db.valueFromId(tag,valueId))
             
         # flags
         result = db.query("""
@@ -157,9 +157,9 @@ class RealLevel(Level):
         
         for row in result:
             id,flagId = row
-            aDict[id].flags.append(flags.get(flagId))
+            level.elements[id].flags.append(flags.get(flagId))
     
-    def loadFromFileSystem(self,paths,aDict,ignoreUnknownTags=False):
+    def loadFromFileSystem(self,paths,level,ignoreUnknownTags=False):
         for path in paths:
             rpath = utils.relPath(path)
             try:
@@ -182,7 +182,7 @@ class RealLevel(Level):
             else:
                 flags = db.flags(id)
                 # TODO: Load private tags!
-            aDict[rPath] = File(id = id,path=rpath,length=length,tags=fileTags,flags=flags)
+            level.elements[id] = File(level,id = id,path=rpath,length=length,tags=fileTags,flags=flags)
     
     
 def idFromPath(path):

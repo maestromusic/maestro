@@ -356,8 +356,9 @@ class Container(Element):
     
     contents = None
     
-    def __init__(self, id, major,*, contents=None, parents=None, tags=None, flags=None):
+    def __init__(self, level, id, major,*, contents=None, parents=None, tags=None, flags=None):
         """Initialize this container, optionally with a contents list."""
+        self.level = level
         self.id = id
         self.major = major
         if contents is not None:
@@ -381,25 +382,27 @@ class Container(Element):
     def isFile(self):
         return False
     
-    def copy(self):
-        return Container(self.id,self.major,contents=self.contents.copy(),
+    def copy(self,level=None):
+        if level is None:
+            level = self.level
+        return Container(level,self.id,self.major,contents=self.contents.copy(),
                          tags=self.tags.copy(),flags=list(self.flags))
     
-    def getContents(self,level):
-        return (level.get(id) for id in self.contents)
+    def getContents(self):
+        return (self.level.get(id) for id in self.contents)
     
-    def getLength(self,level):
+    def getLength(self):
         """Return the length of this element, i.e. the sum of the lengths of all contents."""
-        lengths = (c.getLength(level) for c in self.getContents(level))
+        lengths = (c.getLength() for c in self.getContents())
         # Skip elements of length None
         return sum(l for l in lengths if l is not None)
     
-    def getExtension(self,level):
+    def getExtension(self):
         """Return the extension of all files in this container. Return None if they have different extension
         or at least one of them does not have an extension."""
         extension = None
-        for element in self.getContents(level):
-            ext = element.getExtension(level)
+        for element in self.getContents():
+            ext = element.getExtension()
             if ext is None:
                 return None
             if extension is None:
@@ -413,13 +416,14 @@ class Container(Element):
 
 
 class File(Element):
-    def __init__(self, id, path, length,*, parents=None, tags=None, flags=None):
+    def __init__(self, level, id, path, length,*, parents=None, tags=None, flags=None):
         """Initialize this element with the given id, which must be an integer or None (for external files).
         Optionally you may specify a tags.Storage object holding the tags of this element and/or a file path.
         """
         if not isinstance(id,int) or not isinstance(path,str) or not isinstance(length,int):
             raise TypeError("Invalid type (id,path,length): ({},{},{}) of types ({},{},{})"
                             .format(id,path,length,major,type(id),type(path),type(length)))
+        self.level = level
         self.id = id
         self.path = path
         self.length = length
@@ -439,8 +443,10 @@ class File(Element):
     def isContainer(self):
         return False
     
-    def copy(self):
-        return File(self.id,self.path,self.length,tags=self.tags.copy(),flags=list(self.flags))
+    def copy(self,level=None):
+        if level is None:
+            level = self.level
+        return File(level,self.id,self.path,self.length,tags=self.tags.copy(),flags=list(self.flags))
     
     def getLength(self,level=None):
         """Return the length of this file."""
