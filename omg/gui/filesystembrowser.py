@@ -19,11 +19,9 @@
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 import os
-from .. import config, database as db
 from . import mainwindow
 from ..utils import relPath, absPath, getIcon
-from .. import filesystem
-from ..database.sql import EmptyResultException
+from .. import filesystem, config
 
 """This module contains a dock widget that displays the music in directory view, i.e. without
 considering the container structure in the database. It is meant to help building up the database.
@@ -65,11 +63,7 @@ class FileSystemBrowserModel(QtGui.QFileSystemModel):
                 if dir == '..':
                     return super().data(index, role)
                 try:
-                    #status = db.folderState(dir)
-                    status = filesystem.syncThread.knownFolders[dir]
-                #except EmptyResultException:
-                except AttributeError:
-                    status = 'unsynced'
+                    status = filesystem.folderStatus(dir)
                 except KeyError:
                     status = 'unsynced'
                 return self.icons[status]

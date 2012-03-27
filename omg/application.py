@@ -124,8 +124,8 @@ def run(cmdConfig=[],exitPoint="nogui",console=True):
         return
         
     from . import filesystem
-    #filesystem.init()
-        
+    filesystem.init()
+
     # Create GUI
     # First import all modules that want to add WidgetData
     from .gui import filesystembrowser, editor, browser, tageditor, mainwindow, playback, playlist
@@ -145,7 +145,7 @@ def run(cmdConfig=[],exitPoint="nogui",console=True):
     
     # Close operations
     logger.debug('main application quit')
-    #filesystem.shutdown()
+    filesystem.shutdown()
     search.shutdown()
     mainWindow.saveLayout()
     delegateconfiguration.save()

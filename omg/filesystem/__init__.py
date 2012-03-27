@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2009-2011 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2012 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -23,14 +23,14 @@ from PyQt4.QtCore import Qt
 from .. import logging, config, utils, database as db, realfiles, modify
 import os.path, subprocess, hashlib, datetime, threading, queue, time
 logger = logging.getLogger(__name__)
-RESCAN_INTERVAL = 100 # seconds between rescans of the music directory
-
 
 syncThread = None
 
 
 def init():
     global syncThread, notifier, null
+    if config.options.filesystem.disable:
+        return
     syncThread = FileSystemSynchronizer()
     null = open(os.devnull)    
     modify.dispatcher.changes.connect(syncThread.handleEvent, Qt.QueuedConnection)
@@ -41,12 +41,25 @@ def init():
     
 def shutdown():
     """Terminates this module; waits for all threads to complete."""
+    if config.options.filesystem.disable:
+        return
+    global syncThread
+    logger.debug("Filesystem module: received shutdown() command")
     syncThread.should_stop.set()
+    syncThread.dialogFinished.set()
     syncThread.exit()
     syncThread.wait()
+    syncThread = None
     null.close()
+    logger.debug("Filesystem module: shutdown complete")
 
-
+def folderStatus(dir):
+    if config.options.filesyste.disable:
+        return 'unknown'
+    elif syncThread is None:
+        return 'unknown'
+    else:
+        return syncThread.knownFolders[dir]
 
 def computeHash(path):
     """Compute the audio hash of a single file. This method uses
@@ -56,8 +69,8 @@ def computeHash(path):
     methods, or even better use something like
     https://github.com/sampsyo/audioread/tree/master/audioread
     that determines an available backend automatically."""
-    try:
-        logger.debug('computing hash for {}'.format(path))
+    logger.debug('computing hash for {}'.format(path))
+    if config.options.filesystem.dump_method == "ffmpeg":
         proc = subprocess.Popen(
             ['ffmpeg', '-i', utils.absPath(path),
              '-v', 'quiet',
@@ -66,14 +79,17 @@ def computeHash(path):
              '-'],
             stdout=subprocess.PIPE, stderr=null # this is due to a bug that ffmpeg ignores -v quiet
         )
-        data = proc.stdout.readall()
-        proc.wait()
-        hash = hashlib.md5(data).hexdigest()
-        return hash
-    except OSError:
-        raise OSError('please install the "ffmpeg" binary to compute hashes')
+    else:
+        raise ValueError('Dump method"{}" not supported'.format(config.options.filesystem.dump_method))
+    data = proc.stdout.readall()
+    proc.wait()
+    hash = hashlib.md5(data).hexdigest()
+    assert hash is not None and len(hash) > 10
+    return hash
 
 class Notifier(QtCore.QObject):
+    """This class is responsible for user interaction regarding the filesystem module. Since the
+    filesystem operations run in a distinct thread, we need an asynchronous dialog system."""
     
     @QtCore.pyqtSlot(list)
     def notifyAboutMissingFiles(self, paths):
@@ -119,34 +135,38 @@ class FileSystemSynchronizer(QtCore.QThread):
         self.timer.timeout.connect(self.pollJobs)
         self.hashJobs = queue.Queue()
         self.lastScan = 0
+        self.knownFolders = {}
     
     def compareTagsWithDB(self, id, path):
+        """Checks if the tags inside the file at *path* with id *id* equals those stored in the
+        database. Otherwise, *self.modifiedTags[id]* will be set to a tuple (dbTags, fileTags)."""
+        
         dbTags = db.tags(id)
-        rfile = realfiles.get(utils.absPath(path))
+        rfile = realfiles.get(path)
         rfile.read()
         if dbTags.withoutPrivateTags() != rfile.tags:
             logger.debug('Detected modification on file "{}": tags differ'.format(path))
             self.modifiedTags[id] = (dbTags, rfile.tags)
     
     def checkFilesTable(self):
-        """go through the files table, add missing hashes and find modified files"""
+        """go through the files table, compute missing hashes and find modified files"""
+        
         for id, path, hash, verified in \
                 db.query("SELECT element_id,path,hash,verified FROM {}files".format(db.prefix)):
             if self.should_stop.is_set():
                 return
             absPath = utils.absPath(path)
             if not os.path.exists(absPath):
-                if db.isNull(hash):
+                if db.isNull(hash) or hash == "":
                     self.lostFiles.append(id) # file without hash deleted -> no chance to find somewhere else
                 else:
-                    logger.info('file {} is missing'.format(path))
+                    logger.info('file {} (hash: {}) is missing'.format(path, hash))
                     self.missingFiles[hash] = (path,id)
                 continue
             self.dbFiles.append(path)
-            if db.isNull(hash):
-                hash = computeHash(path)
-                logger.debug('Computed hash of {} as {}'.format(path, hash))
-                db.setHash(id, hash)
+            if db.isNull(hash) or hash == "":
+                self.hashJobs.put(path)
+                logger.debug('Put hash computation of "{}" on job queue'.format(path))
             elif verified < mTimeStamp(path):
                 self.compareTagsWithDB(id, path)
                 newHash = computeHash(path)
@@ -161,6 +181,8 @@ class FileSystemSynchronizer(QtCore.QThread):
         goneNewFiles = []
         for path, hash, timestamp in \
                 db.query('SELECT path, hash, verified FROM {}newfiles'.format(db.prefix)):
+            if self.should_stop.is_set():
+                return
             if os.path.exists(utils.absPath(path)):
                 self.knownNewFiles[path] = (hash, timestamp)
             else:
@@ -173,6 +195,8 @@ class FileSystemSynchronizer(QtCore.QThread):
         goneFolders = []
         
         for folder, state in db.query('SELECT path,state FROM {}folders'.format(db.prefix)):
+            if self.should_stop.is_set():
+                return
             if os.path.exists(utils.absPath(folder)):
                 self.knownFolders[folder] = state
             else:
@@ -292,14 +316,13 @@ class FileSystemSynchronizer(QtCore.QThread):
         self.lostFiles = [] # list of files without hash that are gone
         self.modifiedTags = {}
         self.dbFiles = []
-        self.knownNewFiles = {}
-        self.knownFolders = {}
-        
         self.checkFilesTable()
+        self.knownNewFiles = {}
         self.checkNewFiles()
         self.checkFolders()
         self.checkFileSystem()
-       
+        if self.should_stop.is_set():
+            return
         if len(self.modifiedTags) > 0:
             self.modifiedTagsDetected.emit(self.modifiedTags)
         
@@ -363,27 +386,33 @@ class FileSystemSynchronizer(QtCore.QThread):
         """Compute the hash of the file at *path* (or fetch it from self.knownNewFiles
         if available) and set it in the database."""
         if path in self.knownNewFiles:
-            hash = self.knownNewFiles[path]
+            hash = self.knownNewFiles[path][0]
             del self.knownNewFiles[path]
         else:
-            print('no hash found for {}'.format(path))
             hash = computeHash(path)
         db.setHash(path, hash)
         self.dbFiles.append(path)
         db.query('DELETE FROM {}newfiles WHERE path = ?'.format(db.prefix), path)
         
     def pollJobs(self):
+        """Called periodically by self.timer, this method checks if "compute hash" jobs
+        are available, and executes them.
+        If the scan interval has passed, a complete filesystem rescan is performed."""
         try:
             while True:
                 self.computeAndStoreHash(self.hashJobs.get_nowait())
         except queue.Empty:
             pass
-        if time.time() - self.lastScan > RESCAN_INTERVAL:
+        if config.options.filesystem.scan_interval > 0 and \
+            time.time() - self.lastScan > config.options.filesystem.scan_interval:
             self.rescanCollection()
             self.lastScan = time.time()
            
     def run(self):
         db.connect()
+        # initially fill self.knownFolders so that the FilesystemBrowser displays folder icons
+        for folder, state in db.query('SELECT path,state FROM {}folders'.format(db.prefix)):
+            self.knownFolders[folder] = state
         self.timer.start(100)
         self.exec_()
         db.close()

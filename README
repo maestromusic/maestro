@@ -4,13 +4,40 @@ OMG is a sophisticated music manager that helps you to organize, browse and play
 
 More information can be found on OMG's website http://omg.mathematik.uni-kl.de
 
-OMG is copyright of Martin Altmayer <martin.altmayer@web.de> and Michael Helmling and licensed under the GPL v3 (confer the file COPYING).
+OMG is copyright of Martin Altmayer <martin.altmayer@web.de> and Michael Helmling <helmling@mathematik.uni-kl.de> and licensed under the GPL v3 (confer the file COPYING).
+
+INSTALLATION
+==============
+Download the latest release from the homepage. Be sure to have all the dependencies, then run
+
+# easy_install3 omg-0.2.tar.gz
+
+If you want to install OMG as normal user inside your home directory, run
+
+$ easy_install3 --user omg-0.2.tar.gz
+
+DEVELOPMENT
+=============
+To contribute in development, get the current HEAD from the git repository:
+
+git clone git://omg.mathematik.uni-kl.de/omg.git
+
+In order to get a working copy of the current development status, use the command
+
+python setup.py develop --user
+
+which will install an Egg-link inside your ~/.local/lib/python3.x folder, pointing to the git checkout. If
+you use the "develop" mode instead in some directory which is not in your normal PYTHONPATH, e.g.
+
+python setup.py develop -d ~/python-stage
+
+you can simultaneously work with an installed version of OMG.
+
 
 
 ATTRIBUTIONS
 ==============
 OMG uses an adaption to Python 3 of python-mpd (http://jatreuman.indefero.net/p/python-mpd/) by J. Alexander Treuman licensed under GPL v3.
-OMG uses code from  configobj-py3 (https://bitbucket.org/zubin71/configobj-py3) by Zubin Mithra which is the Python 3 version of ConfigObj (http://www.voidspace.org.uk/python/configobj.html) by Michael Foord and Nicola Larosa, which is licensed under the BSD License.
 
 OMG uses icons from the following software / free icon sets:
 Tango       http://tango.freedesktop.org/            released as public domain.

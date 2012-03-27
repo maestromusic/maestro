@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2009-2011 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2012 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -19,6 +19,7 @@
 from PyQt4 import QtCore
 
 import copy, os.path
+from collections import OrderedDict
 
 from .. import tags, logging, config, covers, realfiles, database as db
 from ..utils import relPath
@@ -255,8 +256,9 @@ class RootNode(Node):
 
 class Wrapper(Node):
     """A node that holds an element."""
-    def __init__(self,element,contents=None):
+    def __init__(self,element,contents = None, position = None):
         self.element = element
+        self.position = position
         if element.isContainer():
             if contents is not None:
                 self.contents = contents
@@ -279,13 +281,38 @@ class Wrapper(Node):
     def getContents(self):
         return self.contents if self.element.isContainer() else []
     
-    def loadContents(self,level,recursive):
+    def loadContents(self, recursive):
         if self.element.isContainer():
-            self.setContents([Wrapper(level.get(id)) for id in self.element.contents])
+            self.setContents([Wrapper(self.element.level.get(id),position = pos) for pos,id in self.element.contents.items()])
             if recursive:
                 for child in self.contents:
-                    child.loadContents(level,recursive)
+                    child.loadContents(recursive)
 
+    def getTitle(self,prependPosition=False,usePath=True,titles=None):
+        """Return the title of this element or some dummy title, if the element does not have a title tag.
+        Additionally the result may contain a position (if *prependPosition* is True) and/or the element's
+        id (if ''config.options.misc.show_ids'' is True). If *usePath* is True, the path will be used as
+        title for files without title tag. Finally, the optional argument *titles* may be used to overwrite
+        the titles stored in ''self.tags'' (this is in particular useful if the element does not store tags).
+        """
+        result = ''
+        if prependPosition and self.position is not None:
+            result += "{} - ".format(self.position)
+        
+        if hasattr(self,'id') and config.options.misc.show_ids:
+            result += "[{0}] ".format(self.element.id)
+            
+        if titles is not None:
+            result += " - ".join(titles)
+        elif self.element.tags is None:
+            result += translate("Element","<No title>")
+        elif tags.TITLE in self.element.tags:
+            result += " - ".join(self.element.tags[tags.TITLE])
+        elif usePath and self.isFile() and self.element.path is not None:
+            result += self.element.path
+        else: result += translate("Element","<No title>")
+
+        return result
 
 class Element:
     """Abstract base class for elements (files or containers) in playlists, browser, etc.. Contains methods
@@ -298,29 +325,6 @@ class Element:
     
     # Misc
     #====================================================
-    def getTitle(self,prependPosition=False,usePath=True,titles=None):
-        """Return the title of this element or some dummy title, if the element does not have a title tag.
-        Additionally the result may contain a position (if *prependPosition* is True) and/or the element's
-        id (if ''config.options.misc.show_ids'' is True). If *usePath* is True, the path will be used as
-        title for files without title tag. Finally, the optional argument *titles* may be used to overwrite
-        the titles stored in ''self.tags'' (this is in particular useful if the element does not store tags).
-        """
-        result = ''
-        
-        if hasattr(self,'id') and config.options.misc.show_ids:
-            result += "[{0}] ".format(self.id)
-            
-        if titles is not None:
-            result += " - ".join(titles)
-        elif self.tags is None:
-            result += translate("Element","<No title>")
-        elif tags.TITLE in self.tags:
-            result += " - ".join(self.tags[tags.TITLE])
-        elif usePath and self.isFile() and self.path is not None:
-            result += self.path
-        else: result += translate("Element","<No title>")
-
-        return result
     
     def toolTipText(self):
         parts = []
@@ -332,14 +336,6 @@ class Element:
         if len(parts) > 0:
             return '\n'.join(parts)
         else: return str(self)
-    
-    def iPosition(self):
-        """Return the position of the element, if its parent is itself an element, or the index, if
-        the parent is a root node."""
-        if isinstance(self.parent, RootNode):
-            return self.parent.index(self, True)
-        else:
-            return self.position
         
     def __str__(self):
         if self.tags is not None:
@@ -355,17 +351,16 @@ class Container(Element):
     """Element-subclass for containers."""
     
     contents = None
-    
+
     def __init__(self, level, id, major,*, contents=None, parents=None, tags=None, flags=None):
         """Initialize this container, optionally with a contents list."""
         self.level = level
         self.id = id
+        self.level = level
         self.major = major
         if contents is not None:
-            if isinstance(contents,ContentsList):
-                self.contents = contents
-            else: self.contents = ContentsList(contents)
-        else: self.contents = ContentsList()
+            self.contents = contents
+        else: self.contents = OrderedDict()
         if parents is not None:
             self.parents = parents
         else: self.parents = []
@@ -422,9 +417,10 @@ class File(Element):
         """
         if not isinstance(id,int) or not isinstance(path,str) or not isinstance(length,int):
             raise TypeError("Invalid type (id,path,length): ({},{},{}) of types ({},{},{})"
-                            .format(id,path,length,major,type(id),type(path),type(length)))
+                            .format(id,path,length,type(id),type(path),type(length)))
         self.level = level
         self.id = id
+        self.level = level
         self.path = path
         self.length = length
         if parents is not None:
@@ -448,11 +444,11 @@ class File(Element):
             level = self.level
         return File(level,self.id,self.path,self.length,tags=self.tags.copy(),flags=list(self.flags))
     
-    def getLength(self,level=None):
+    def getLength(self):
         """Return the length of this file."""
         return self.length
     
-    def getExtension(self,level=None):
+    def getExtension(self):
         """Return the filename extension of this file."""
         ext = os.path.splitext(self.path)[1]
         if len(ext) > 0:
@@ -461,20 +457,3 @@ class File(Element):
         
     def __repr__(self):
         return "File[{}] {}".format(self.id, self.path)
-    
-
-class ContentsList(list):
-    def __init__(self,ids=[]):
-        super().__init__(ids)
-        if len(ids) > 0:
-            self.positions = list(range(1,len(self)+1))
-        else: self.positions = []
-        
-    def add(self,id,position):
-        self.append(id)
-        self.positions.append(position)
-    
-    def copy(self):
-        result = ContentsList(self)
-        result.positions = list(self.positions)
-        return result

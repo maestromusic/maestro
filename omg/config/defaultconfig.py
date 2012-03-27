@@ -49,7 +49,7 @@ defaults = OrderedDict((
 }),
 
 ("database",{
-    "type": (str,"mysql","Either 'mysql' or 'sqlite'."),
+    "type": (str,"mysql",'Either "mysql" or "sqlite".'),
     "prefix":  (str,"","Prefix which will be prepended to the table names."),
     
     "mysql_drivers": (list,["qtsql"], "List of drivers OMG will use to try to connect to a MySQL database."),
@@ -89,12 +89,16 @@ defaults = OrderedDict((
                 "max_view_count": (int,5,"The maximal number of views the browser will allow."),
     }
 }),
-
+("filesystem", {
+    "scan_interval": (int,120,"Interval (in seconds) in which the filesystem will be rescanned for changes"),
+    "dump_method": (str,"ffmpeg", "Method used to dump raw audio data from files for hashing"),
+    "disable":(bool,False,"completely disable filesystem synchronization"),
+}),
 ("misc", {
     "show_ids": (bool,False,"Whether OMG should display element IDs"),
     "consoleLogLevel": (str,"",
                         "Log-messages of this loglevel and higher are additionally printed to stderr. Leave it empty to use the configuration specified in the logging configuration (storage.options.main.logging).")
-})
+}),
 ))
 
 
