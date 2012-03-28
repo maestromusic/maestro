@@ -31,6 +31,26 @@ from ..constants import REAL, EDITOR, CONTENTS, DB, DISK
 translate = QtCore.QCoreApplication.translate
 logger = logging.getLogger(__name__)
 
+class ElementChangeCommand(QtGui.QUndoCommand):
+    """An undo command changing the elements on some level. Has the following attributes:
+     - level: an instance of omg.models.levels.Level
+     - ids: a list of IDs which are affected by the command
+     - contents: a boolean indicating if content relations have changed
+    """
+    
+    def redoChanges(self):
+        raise NotImplementedError()
+    
+    def undoChanges(self):
+        raise NotImplementedError()
+    
+    def redo(self):
+        self.redoChanges()
+        self.level.changed.emit(self.ids, self.contents)
+        
+    def undo(self):
+        self.undoChanges()
+        self.level.changed.emit(self.ids, self.contents)
 
 class UndoCommand(QtGui.QUndoCommand):
     """A generic undo command for arbitrary changes. The constructor gets an OrderedDict mapping

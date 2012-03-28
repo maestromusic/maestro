@@ -20,10 +20,9 @@ from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
 from .. import logging, modify, tags, realfiles, config
-from ..models import rootedtreemodel, RootNode, Element, File, albumguesser
+from ..models import rootedtreemodel, RootNode, Wrapper, albumguesser, levels
 from ..modify import events, commands
 from ..utils import collectFiles, relPath
-from ..constants import EDITOR, CONTENTS
 from collections import OrderedDict
 import itertools
 
@@ -35,38 +34,9 @@ class EditorModel(rootedtreemodel.RootedTreeModel):
     
     def __init__(self):
         """Initializes the model. A new RootNode will be set as root."""
-        super().__init__(RootNode())
-        modify.dispatcher.changes.connect(self.handleChangeEvent)
+        super().__init__(RootNode(), levels.editor)
         self.albumGroupers = []
-        self.dropInProgress = False
         self.metacontainer_regex=r" ?[([]?(?:cd|disc|part|teil|disk|vol)\.? ?([iI0-9]+)[)\]]?"
-
-    
-    ignoredEventClasses = ( events.ElementsDeletedEvent,
-                            events.FilesAddedEvent,
-                            events.FilesRemovedEvent,
-                            events.SortValueChangedEvent,
-                            events.TagTypeChangedEvent, # only possible if tag not present in any element
-                            events.HiddenAttributeChangedEvent)
-    
-    def handleChangeEvent(self, event):
-        """React on an incoming ChangeEvent by applying all changes that affect the
-        current model."""
-        if isinstance(event, events.ElementChangeEvent):
-            if event.level == EDITOR:
-                self.handleElementChangeEvent(event)
-            return
-        elif isinstance(event, events.FlagTypeChangedEvent):
-            for node in self.getAllNodes():
-                if isinstance(node, Element) and event.flagType in node.flags:
-                    idx = self.getIndex(node)
-                    self.dataChanged.emit(idx, idx)
-        else:                                                                         
-            for cls in self.ignoredEventClasses:
-                if isinstance(event, cls):
-                    return
-            logger.warning('WARNING UNKNOWN EVENT {}, RESETTING EDITOR'.format(event))
-            self.clear()
         
     def flags(self,index):
         defaultFlags = super().flags(index)
@@ -80,155 +50,39 @@ class EditorModel(rootedtreemodel.RootedTreeModel):
     def dropMimeData(self,mimeData,action,row,column,parentIndex):
         """This function does all the magic that happens if elements are dropped onto this editor."""
         
-        QtGui.QApplication.changeOverrideCursor(Qt.ArrowCursor) # dont display the DnD cursor during the warning
         if action == Qt.IgnoreAction:
             return True
-        elif action == Qt.TargetMoveAction:
+
+        if action == Qt.TargetMoveAction:
             print('wtf target')
+            raise ValueError()
+        
         parent = self.data(parentIndex, Qt.EditRole)
         # if something is dropped on a file, make it a sibling instead of a child of that file
-        if parent is not self.root and parent.isFile():
+        if parent is not self.root and parent.element.isFile():
             parent = parent.parent
             row = parentIndex.row() + 1
         # if something is dropped on no item, append it to the end of the parent
         if row == -1:
             row = parent.getContentsCount()
-        #parent = parent.copy()
+
         if mimeData.hasFormat(config.options.gui.mime):
-            # first case: OMG mime data -> nodes from an editor, browser etc.
+            # first case: OMG mime data -> wrappers from an editor, browser etc.
             return self._dropOMGMime(mimeData, action, parent, row)
         elif mimeData.hasFormat("text/uri-list"):
             # files and/or folders are dropped from outside or from a filesystembrowser.
-            nodes = self._dropURLMime(mimeData.urls())
-            if not nodes:
-                return False
-            if parent.id == self.root.id:
-                insertPosition = row
-            else:
-                insertPosition = 1 if row == 0 else parent.contents[row-1].position+1
-            ins = []
-            for node in nodes:
-                ins.append( (insertPosition, node) )
-                if parent.id != self.root.id:
-                    node.position = insertPosition
-                else:
-                    node.position = None
-                insertPosition += 1
-            modify.beginMacro(EDITOR, self.tr("drop URIs"))
-            # now check if the positions of the subsequent nodes have to be increased
-            if parent.id != self.root.id and parent.getContentsCount() >= row+1:
-                positionOverflow  = insertPosition - parent.contents[row].position
-                if positionOverflow > 0:
-                    positionChanges = [ (n.position, n.position + positionOverflow) for n in parent.contents[row:] ]
-                    pc = commands.PositionChangeCommand(EDITOR, parent.id, positionChanges, self.tr('adjust positions'))
-                    modify.push(pc)
-                        
-            command = commands.InsertElementsCommand(EDITOR, {parent.id: ins}, 'dropCopy->insert')
-            modify.push(command)
-            modify.endMacro()
-            return True
+            return self._dropURLMime(mimeData.urls(), action, row, parent)
         else:
-            logger.error('HÄÄÄ')
-    
-    def importNode(self, node):
-        """Helper function to import a node into the editor. Checks if a node with the same ID already
-        exists in some editor. If so, a copy of that is returned; otherwise the argument itself is returned."""
-        if self.dropFromOutside:
-            from ..gui import editor
-            for model in editor.activeEditorModels():
-                for e_node in model.root.getAllNodes(True):
-                    if node.id == e_node.id:
-                        return e_node.copy()                 
-        return node
-    
-    def importFile(self, path):
-        """The same as importNode, but for a file given by a path."""
-        if self.dropFromOutside:
-            from ..gui import editor
-            for model in editor.activeEditorModels():
-                for e_file in model.root.getAllFiles():
-                    if e_file.path == relPath(path):
-                        logger.debug('importing existing file ...')
-                        return e_file.copy()
-        file = File.fromFilesystem(path)
-        file.fileTags = file.tags.copy()
-        return file
+            raise RuntimeError('HÄÄÄÄÄ???')
      
     def _dropOMGMime(self, mimeData, action, parent, row):
         """handles drop of OMG mime data into the editor.
         
         Various cases (and combinations thereof)must be handled: Nodes might be copied or moved
         within the same parent, or moved / copied from the "outside"."""
-        orig_nodes = OrderedDict()
-        for node in mimeData.getElements():
-            orig_nodes[node.id] = self.importNode(node) 
-        # check for recursion error
-        for node in itertools.chain.from_iterable( (o.getAllNodes() for o in orig_nodes.values() )):
-            if node.id == parent.id:
-                QtGui.QMessageBox.critical(None, self.tr('recursion error'),
-                                           self.tr('Cannot place a container below itself.'))
-                return False       
+        return False
         
-        move = OrderedDict()
-        insert_same, insert_other = [], []
-        for id, node in orig_nodes.items():
-            if hasattr(node.parent, 'id') and node.parent.id == parent.id:
-                if action == Qt.MoveAction:
-                    move[id] = node
-                else:
-                    insert_same.append(node.copy())
-            else:
-                insert_other.append(node.copy())
-        movedBefore = 0
-        positionChanges = []
-        currentPosition = 0 if isinstance(parent, RootNode) else 1
-        commandsToPush = []
-        for node in parent.contents[:row]:
-            if node.id in move: # node moved away
-                movedBefore += 1
-            else:
-                position = node.iPosition()
-                currentPosition = position - movedBefore + 1
-                if movedBefore > 0:
-                    positionChanges.append( (position, position - movedBefore) )
-        
-        if action == Qt.MoveAction and len(insert_other) > 0:
-            removeCommand = commands.RemoveElementsCommand(EDITOR,
-                                                           insert_other,
-                                                           mode = CONTENTS,
-                                                           text = 'drop->remove')
-            commandsToPush.append(removeCommand)
-        for node in move.values():
-            positionChanges.append( (node.iPosition(), currentPosition) )
-            currentPosition += 1
-        insertions = { parent.id:[] }
-        for node in insert_same + insert_other:
-            insertions[parent.id].append( (currentPosition, node) )
-            if isinstance(parent, RootNode):
-                node.position = None
-            else:
-                node.position = currentPosition
-            currentPosition += 1
-        
-        # adjust positions behind
-        for node in parent.contents[row:]:
-            if node.id not in move and node.iPosition() < currentPosition:
-                positionChanges.append( (node.iPosition(), currentPosition) )
-                currentPosition += 1        
-            
-        command = commands.PositionChangeCommand(EDITOR, parent.id, positionChanges, self.tr('adjust positions'))
-        commandsToPush.append(command)
-        
-        if len(insertions[parent.id]) > 0:
-            insertCommand = commands.InsertElementsCommand(EDITOR, insertions, 'drop->insert')
-            commandsToPush.append(insertCommand)
-        modify.beginMacro(EDITOR, self.tr('drop elements'))
-        for command in commandsToPush:
-            modify.push(command)
-        modify.endMacro()
-        return True
-        
-    def _dropURLMime(self, urls):
+    def _dropURLMime(self, urls, action, row, parent):
         '''This method is called if url MIME data is dropped onto this model, from an external file manager
         or a filesystembrowser widget.'''
         files = collectFiles(sorted(url.path() for url in urls))
@@ -236,66 +90,27 @@ class EditorModel(rootedtreemodel.RootedTreeModel):
         progress = QtGui.QProgressDialog()
         progress.setLabelText(self.tr("Importing {0} files...").format(numFiles))
         progress.setRange(0, numFiles)
-        progress.setMinimumDuration(800)
+        progress.setMinimumDuration(200)
         progress.setWindowModality(Qt.WindowModal)
-        #elements = OrderedDict(files.keys())
-        for path, pFiles in files.items():
-            elems = []
-            for f in pFiles:
-                progress.setValue(progress.value() + 1)
-                QtGui.QApplication.processEvents()
-                if progress.wasCanceled():
-                    return False
-                readOk = False
-                while not readOk:
-                    try:
-                        theFile = self.importFile(f)
-                        elems.append(theFile)
-                        readOk = True
-                    except tags.UnknownTagError as e:
-                        from ..gui.tagwidgets import NewTagTypeDialog
-                        text = self.tr('Unknown tag\n{1}={2}\n found in \n{0}.\n What should its type be?').format(relPath(f), e.tagname, e.values)
-                        dialog = NewTagTypeDialog(e.tagname, text = text,
-                          includeDeleteOption = True)
-                        ret = dialog.exec_()
-                        if ret == dialog.Accepted:
-                            pass
-                        elif ret == dialog.Delete or ret == dialog.DeleteAlways:
-                            
-                            if ret == dialog.DeleteAlways:
-                                config.options.tags.always_delete = config.options.tags.always_delete + [e.tagname]
-                            logger.debug('REMOVE TAG {0} from {1}'.format(e.tagname, f))
-                            real = realfiles.get(f)
-                            real.remove(e.tagname)
-                        else:
-                            progress.cancel()
-                            return False
-            files[path] = elems
-        if len(self.albumGroupers) > 0:            
-            if "DIRECTORY" in self.albumGroupers:
-                albums = []
-                singles = []
-                for k,v in sorted(files.items()):
-                    try:
-                        al, si = albumguesser.guessAlbums(v, self.albumGroupers)
-                        albums.extend(al)
-                        singles.extend(si)
-                    except albumguesser.GuessError as e:
-                        from ..gui.dialogs import warning
-                        warning(self.tr("Error guessing albums"), str(e))
-                        singles.extend(v)
-            else:
-                try:
-                    albums, singles = self.guessAlbums(itertools.chain(*files.values()), self.albumGroupers)
-                except albumguesser.GuessError as e:
-                    from ..gui.dialogs import warning
-                    warning(self.tr("Error guessing albums"), str(e))
-                    singles.extend(itertools.chain(*files.values()))
-            if self.albumGroupers == ["DIRECTORY"]:
-                return albums + singles
-            else:
-                return albumguesser.guessMetaContainers(albums,
-                                                    self.albumGroupers,
-                                                    self.metacontainer_regex) + singles
-        else:
-            return list(itertools.chain(*files.values()))
+        filesByFolder = {}
+        try:
+            for folder, filesInOneFolder in files.items():
+                filesByFolder[folder] = []
+                for file in filesInOneFolder:
+                    progress.setValue(progress.value() + 1)
+                    filesByFolder[folder].append(self.level.get(file))
+            topIDs = albumguesser.guessAlbums(filesByFolder, self.albumGroupers, self.metacontainer_regex)
+            if parent is not self.root:
+                raise NotImplementedError()
+            wrappers = []
+            
+            oldContentIDs = [ node.id for node in self.root.contents ]
+            newContentIDs = oldContentIDs[:]
+            newContentIDs[row:row] = topIDs
+            command = rootedtreemodel.ChangeRootCommand(self, oldContentIDs, newContentIDs)
+            modify.push(command)
+            return True
+        
+        except levels.ElementGetError as e:
+            print(e)
+            return False

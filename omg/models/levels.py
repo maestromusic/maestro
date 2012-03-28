@@ -19,21 +19,26 @@
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from omg import database as db, tags, flags, realfiles, utils
-from omg.models import File, Container
+from .. import database as db, tags, flags, realfiles, utils, config, logging
+from . import File, Container
     
 real = None
 editor = None
 
+logger = logging.getLogger(__name__)
 
 def init():
     global real,editor
     real = RealLevel()
     editor = Level("EDITOR",real)
     
-    
+
+class ElementGetError(RuntimeError):
+    """Error indicating that an element failed to be loaded by some level."""
+    pass
+
 class Level(QtCore.QObject):
-    changed = QtCore.pyqtSignal()
+    changed = QtCore.pyqtSignal(list, bool) # list of affected ids, contents
     
     def __init__(self,name,parent):
         super().__init__()
@@ -46,7 +51,7 @@ class Level(QtCore.QObject):
         """Return the element determined by *param* from this level. Load the element, if it is not already
         present on the level. Currently, *param* may be either the id or the path."""
         if not isinstance(param,int):
-            param = idFromPath(param)
+            param = idFromPath(utils.relPath(param))
         if param not in self.elements:
             self.parent.loadIntoChild([param],self)
         return self.elements[param]
@@ -73,7 +78,9 @@ class Level(QtCore.QObject):
     def loadPaths(self,paths,aDict,ignoreUnknownTags=False):
         ids = [idFromPath(path) for path in paths]
         self.load(ids,aDict,ignoreUnknownTags)
-        
+  
+    def __str__(self):
+        return 'Level({})'.format(self.name)
     
 class RealLevel(Level):
     def __init__(self):
@@ -82,7 +89,7 @@ class RealLevel(Level):
         # implementation of loadIntoChild
         self.parent = self
     
-    def loadIntoChild(self,ids,child,ignoreUnknownTags=False):
+    def loadIntoChild(self,ids,child, askOnNewTags = True):
         notFound = []
         for id in ids:
             if id in self.elements:
@@ -94,7 +101,7 @@ class RealLevel(Level):
             if len(positiveIds) > 0:
                 self.loadFromDB(positiveIds,child)
             if len(paths) > 0:
-                self.loadFromFileSystem(paths,child,ignoreUnknownTags)
+                self.loadFromFileSystem(paths,child,askOnNewTags)
             
     def loadFromDB(self,idList,level):
         if len(idList) == 0: # queries will fail otherwise
@@ -159,25 +166,44 @@ class RealLevel(Level):
             id,flagId = row
             level.elements[id].flags.append(flags.get(flagId))
     
-    def loadFromFileSystem(self,paths,level,ignoreUnknownTags=False):
+    def loadFromFileSystem(self,paths,level, askOnNewTags = True):
         for path in paths:
             rpath = utils.relPath(path)
             try:
-                real = realfiles.get(path, ignoreUnknownTags)
-                real.read()
+                readOk = False
+                while not readOk:
+                    try:
+                        real = realfiles.get(path)
+                        real.read()
+                        readOk = True
+                    except tags.UnknownTagError as e:
+                        # TODO: wrap this up as a separate function stored somewhere else
+                        from ..gui.tagwidgets import NewTagTypeDialog
+                        QtGui.QApplication.changeOverrideCursor(Qt.ArrowCursor)
+                        text = self.tr('Unknown tag\n{1}={2}\n found in \n{0}.\n What should its type be?').format(rpath,
+                                                                                                                   e.tagname,
+                                                                                                                   e.values)
+                        dialog = NewTagTypeDialog(e.tagname, text = text, includeDeleteOption = True)
+                        ret = dialog.exec_()
+                        if ret == dialog.Accepted:
+                            pass
+                        elif ret == dialog.Delete or ret == dialog.DeleteAlways:
+                            if ret == dialog.DeleteAlways:
+                                config.options.tags.always_delete = config.options.tags.always_delete + [e.tagname]
+                            logger.info('REMOVE TAG {0} from {1}'.format(e.tagname, rpath))
+                            re = realfiles.get(path)
+                            re.remove(e.tagname)
+                        else:
+                            raise ElementGetError('User aborted "new tag" dialog')
                 fileTags = real.tags
                 length = real.length
-                position = real.position
+                fileTags.position = real.position
             except OSError:
-                fileTags = tags.Storage()
-                fileTags[tags.TITLE] = ['<could not open:> {}'.format(rpath)]
-                length = 0
-                position = 0
+                raise ElementGetError('could not open file: "{}"'.format(rpath))
             
             id = db.idFromPath(rpath)
             if id is None:
-                from .. import modify
-                id = modify.editorIdForPath(rpath)
+                id = tIdFromPath(rpath)
                 flags = []
             else:
                 flags = db.flags(id)
@@ -189,7 +215,7 @@ def idFromPath(path):
     id = db.idFromPath(path)
     if id is not None:
         return id
-    else: return vIdFromPath(path)
+    else: return tIdFromPath(path)
 
 _currentTId = 0
 _tIds = {}
@@ -204,6 +230,11 @@ def tIdFromPath(path):
         _paths[_currentTId] = path
         _tIds[path] = _currentTId
         return _currentTId
+
+def createTId():
+    global _currentTId
+    _currentTId -= 1
+    return _currentTId
 
 def pathFromTId(tid):
     return _paths[tid]

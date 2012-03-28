@@ -16,15 +16,26 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from PyQt4 import QtCore
+from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-import itertools
-from . import Node, RootNode, mimedata
+from . import Node, Wrapper, mimedata
 from .. import logging, config
-from ..utils import ranges, walk
-from ..modify import events
 logger = logging.getLogger(__name__)
+
+class ChangeRootCommand(QtGui.QUndoCommand):
+    
+    def __init__(self, model, old, new):
+        super().__init__()
+        self.model = model
+        self.old = old
+        self.new = new
+        
+    def redo(self):
+        self.model.changeContents(QtCore.QModelIndex(), self.new )
+        
+    def undo(self):
+        self.model.changeContents(QtCore.QModelIndex(), self.old )
 
 class RootedTreeModel(QtCore.QAbstractItemModel):
     """The RootedTreeModel subclasses QAbstractItemModel to create a simple model for QTreeViews. It takes one
@@ -40,13 +51,11 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
     is expanded the first time.
     """
     
-    # The root node. Use getRoot to retrieve it.
-    root = None
-    
-    def __init__(self,root=None):
+    def __init__(self,root=None, level = None):
         """Initialize a new RootedTreeModel. Optionally you can specify the root of the model."""
         QtCore.QAbstractItemModel.__init__(self)
         self.root = root
+        self.level = level
     
     def getRoot(self):
         """Return the root node of this model."""
@@ -172,187 +181,50 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
                 if child.hasContents():
                     queue.append(child)
                 yield child
-    
                 
-    def handleElementChangeEvent(self, event):
-        """Traverse this model's tree in top-down manner, calling applyChangesToNode for
-        each node. If that function returns True for an element, the subtree of that
-        element is not traversed anymore."""
-        if self.root.id in event.ids():
-            if self.applyChangesToNode(self.root, event):
-                return
-        for parent, children in walk(self.root):
-            toRemove = []
-            for i, node in enumerate(children): 
-                if node.id in event.ids():
-                    skip = self.applyChangesToNode(node, event)
-                    if skip:
-                        toRemove.append(i)
-            for i in reversed(toRemove):
-                del children[i]
-    
-    def noContentsChangedEvent(self, node, event):
-        """Handles events which don't modify the contents of an element, e.g.
-        TagChangeEvent or MajorFlagChangeEvent. The default behavior is to call
-        the event's applyTo method. Override this function in subclasses to change
-        the default behavior."""
-        modelIndex = self.getIndex(node)
-        event.applyTo(node)
-        self.dataChanged.emit(modelIndex, modelIndex)
-        return isinstance(event, events.SingleElementChangeEvent)
-
-    def positionChangeEvent(self, node, event):
-        """Handles incoming position change events. The default is to change positions
-        below the given node if it occurs in the event's position change map."""
-        self.changePositions(node, event.positionMap)
-        return True
-        # PositionChangeEvent handles only _one_ parent -> no children can be affected by the
-        # same event.
-    
-    def insertContentsEvent(self, node, event):
-        self.insert(node, event.insertions[node.id])
-        return False
-    
-    def removeContentsEvent(self, node, event):
-        self.remove(node, event.removals[node.id])
-        return False
-    
-    def elementChangeEvent(self, node, event):
-        """Handle a generic element change event. The default is to call applyTo
-        and reload the contents of the node."""
-        modelIndex = self.getIndex(node)
-        if node.isFile():
-            event.applyTo(node)
-        else:
-            self.beginRemoveRows(modelIndex, 0, node.getContentsCount())
-            temp = node.contents
-            node.contents = []
-            self.endRemoveRows()
-            node.contents = temp
-            self.beginInsertRows(modelIndex, 0, event.getNewContentsCount(node))
-            event.applyTo(node)
-            self.endInsertRows()
-        return True
-    
-    def applyChangesToNode(self, node, event):
-        """Helper function for the handling of ElementChangeEvents. Ensures proper application
-        to a single node."""
-        
-        if not event.contentsChanged:
-            # this handles SingleElementChangeEvent, all TagChangeEvents, FlagChangeEvents, ...
-            ret = self.noContentsChangedEvent(node, event)
-        elif isinstance(event, events.PositionChangeEvent):
-            ret = self.positionChangeEvent(node, event)
-        elif isinstance(event, events.InsertContentsEvent):
-            ret = self.insertContentsEvent(node, event)   
-        elif isinstance(event, events.RemoveContentsEvent):
-            ret = self.removeContentsEvent(node, event)
-        elif event.__class__ == events.ElementChangeEvent:
-            ret = self.elementChangeEvent(node, event)
-        else:
-            logger.warning('unknown element change event: {}'.format(event))
-        
-        return ret
-                
-    def changePositions(self, parent, changes):
-        """Changes positions of elements below *parent*, according to the
-        oldPosition->newPosition dict *changes*."""
-        def argsort(seq):
-            # http://stackoverflow.com/questions/3382352/equivalent-of-numpy-argsort-in-basic-python/3383106#3383106
-            #lambda version by Tony Veijalainen
-            return [x for x,y in sorted(enumerate(seq), key = lambda x: x[1])]
-        def newPosition(i):
+    def changeContents(self, index, new):
+        parent = self.data(index, Qt.EditRole)
+        old = [ node.element.id for node in parent.contents ]
+        iter = enumerate(new)
+        try:
+            i, id = next(iter)
+        except StopIteration:
+            # clear root
+            self.removeContents(index, 0, len(old) - 1)
+            return
+        stop = False
+        while True:
             try:
-                return changes[i]
-            except KeyError:
-                return i
-        sortedIndices = argsort( [ newPosition(node.iPosition()) for node in parent.contents ] )
-        # change position attribute of elements
-        if not isinstance(parent, RootNode):
-            for elem in parent.contents:
-                elem.position = newPosition(elem.position)
-        parentIndex = self.getIndex(parent)
-        # I stores the changes done on the current indexes of the elements in parent.contents
-        I = list(range(len(sortedIndices)))
-        # J[k] stores where to find the element that, before any changes, was at index k; i.e.
-        # at any time parent.contents[J[k]] is the element that was parent.contents[k] before
-        # the call to this method 
-        J = list(range(len(sortedIndices)))
-        i = len(I)-1
-        # start from the end
-        breakOuter = False
-        while i >= 0:
-            # decrease i until there is a wrong position
-            while sortedIndices[i] == I[i]:
-                i -= 1
-                if i < 0:
-                    breakOuter = True
+                existingIndex = old.index(id)
+                if existingIndex > 0:
+                    self.removeContents(index, i, i + existingIndex - 1)
+                try:
+                    i, id = next(iter)
+                except StopIteration:
                     break
-                    #return
-            if breakOuter:
-                break
-            print(i)
-            print(sortedIndices[i])
-            print(I[i])
-            # here: sortedIndices[i] != I[i]
-            end = sortedIndices[i]
-            start = end
-            for j in range(i-1,-1,-1):
-                if sortedIndices[j] == start - 1:
-                    start = sortedIndices[j]
-                else:
+            except ValueError:
+                insertStart = i
+                insertNum = 1
+                while not id in old:
+                    try:
+                        i, id = next(iter)
+                        insertNum += 1
+                    except StopIteration:
+                        stop = True
+                        break
+                self.insertContents(index, insertStart, new[insertStart:insertStart+insertNum])
+                if stop:
                     break
-            iStart, iEnd = J[start], J[end]
-            self.beginMoveRows(parentIndex, iStart, iEnd, parentIndex, i+1)
-            # move elements
-            for lst in parent.contents, I:
-                lst[i+1:i+1] = lst[iStart:iEnd+1]
-                lst[iStart:iEnd+1] = [] 
-            self.endMoveRows()
-            # update J
-            tmp = J[start:end+1]
-            J[start:end+1] = []
-            J[iStart:iStart] = tmp
-            i -= 1
-        #self.dataChanged.emit(parentIndex.child(0, 0), parentIndex.child(len(parent.contents)-1, 0))
-        self.dataChanged.emit(parentIndex.child(0, 0), parentIndex.child(0, len(I)))
-          
-    def insert(self,parent,insertions):
-        """Insert nodes below *parent*. *insertions* is a list of (int, Element) tuples. The integer is
-        either the position (if *parent* is an Element) or the index (otherwise) of the inserted Element.
-        This method always copies elements before insertion."""
-        insertionIter = iter(sorted(insertions))
-        insertPos, insertElem = next(insertionIter)
-        lastIndex = len(parent.contents)
-        offset = 0
-        insertJobs = []
-        allSeen = False
-        for i, node in itertools.chain(enumerate(parent.contents), [(lastIndex, None)]):
-            insertHere = []
-            current = node.iPosition() if node else i
-            try:
-                while node is None or insertPos <= current:
-                    insertHere.append( insertElem.copy() )
-                    insertPos, insertElem = next(insertionIter)
-                    if isinstance(parent, RootNode):
-                        current += 1
-            except StopIteration:
-                allSeen = True
-            if len(insertHere) > 0:
-                insertJobs.append(( i + offset, insertHere))
-                offset += len(insertHere)
-            if allSeen:
-                break
-        for i, nodes in insertJobs:
-            self.beginInsertRows(self.getIndex(parent), i, i+len(nodes)-1)
-            parent.insertContents(i, nodes)
-            self.endInsertRows()
     
-    def remove(self, parent, removals):
-        """Remove nodes below *parent*. The elements to remove are defined by *removals*, a list of iPositions."""
-        modelIndex = self.getIndex(parent)
-        i = [ i for i,elem in enumerate(parent.contents) if elem.iPosition() in removals ]
-        for start, end in reversed(ranges(i)):
-            self.beginRemoveRows(modelIndex, start, end)
-            del parent.contents[start:end+1]
-            self.endRemoveRows()
+    def removeContents(self, index, first, last):
+        self.beginRemoveRows(index, first, last)
+        del self.data(index, Qt.EditRole).contents[first:last+1]
+        self.endRemoveRows()
+        
+    def insertContents(self, index, position, ids):
+        self.beginInsertRows(index, position, position + len(ids) - 1)
+        wrappers = [Wrapper(self.level.get(id)) for id in ids]
+        for wrapper in wrappers:
+            wrapper.loadContents(recursive = True)
+        self.data(index, Qt.EditRole).insertContents(position, wrappers) 
+        self.endInsertRows()

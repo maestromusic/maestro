@@ -241,18 +241,10 @@ class RootNode(Node):
     
     parent = None
     def __init__(self):
-        from .. import modify
         self.contents = []
-        self.id = modify.newEditorId()
     
     def __repr__(self):
-        return 'RootNode[{}] with {} children'.format(self.id, len(self.contents))
-
-    def copyFrom(self, other, copyContents = False):
-        if copyContents:
-            self.setContents([c.copy() for c in other.contents])
-        self.id = other.id
-    
+        return 'RootNode with {} children'.format(len(self.contents))    
 
 class Wrapper(Node):
     """A node that holds an element."""

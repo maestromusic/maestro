@@ -52,25 +52,7 @@ dispatcher.changes.connect(_debugAll)
 
 stack = QtGui.QUndoStack()
 
-
-
-_currentEditorId = 0
-_fileEditorIds = {}
-# TODO: Liste wieder leeren?
-
-def editorIdForPath(path):
-    global _fileEditorIds
-    if path not in _fileEditorIds:
-        _fileEditorIds[path] = newEditorId()
-    return _fileEditorIds[path]
-
-def newEditorId():
-    global _currentEditorId
-    _currentEditorId -= 1
-    return _currentEditorId
-
-
-def beginMacro(level, name):
+def beginMacro(name):
     stack.beginMacro(name)
 
 def endMacro():
@@ -78,6 +60,7 @@ def endMacro():
 
 def push(command):
     stack.push(command)
+        
 
 def createUndoAction(parent, prefix = ""):
     return stack.createUndoAction(parent, prefix)
