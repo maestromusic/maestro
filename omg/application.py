@@ -154,6 +154,8 @@ def run(cmdConfig=[],exitPoint="nogui",console=True):
     logging.shutdown()
     sys.exit(returnValue)
 
+import functools
+runGUI = functools.partial(run, exitPoint=None,console=False)
 
 def handleCommandLineOptions(cmdConfig):
     """Parse command line options and act accordingly (e.g. print version and exit). Add config option
