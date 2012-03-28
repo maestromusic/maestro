@@ -55,7 +55,7 @@ class Sql(AbstractSql):
         self._db.rollback()
         
     def getDate(self,value):
-        return datetime.datetime.strptime(value,"%Y-%m-%d %H:%M:%S")
+        return datetime.datetime.strptime(value,"%Y-%m-%d %H:%M:%S").replace(tzinfo = datetime.timezone.utc)
 
 
 class SqlResult(AbstractSqlResult):

@@ -41,9 +41,9 @@ def init():
     
 def shutdown():
     """Terminates this module; waits for all threads to complete."""
-    if config.options.filesystem.disable:
-        return
     global syncThread
+    if config.options.filesystem.disable or syncThread is None:
+        return
     logger.debug("Filesystem module: received shutdown() command")
     syncThread.should_stop.set()
     syncThread.dialogFinished.set()
@@ -115,7 +115,7 @@ class Notifier(QtCore.QObject):
 def mTimeStamp(path):
     """Returns a datetime.datetime object representing the modification timestamp
     of the file given by the (relative) path *path*."""
-    return datetime.datetime.fromtimestamp(os.path.getmtime(utils.absPath(path)))
+    return datetime.datetime.fromtimestamp(os.path.getmtime(utils.absPath(path)), tz = datetime.timezone.utc)
      
                         
 class FileSystemSynchronizer(QtCore.QThread):
@@ -156,6 +156,7 @@ class FileSystemSynchronizer(QtCore.QThread):
             if self.should_stop.is_set():
                 return
             absPath = utils.absPath(path)
+            verified = db.getDate(verified)
             if not os.path.exists(absPath):
                 if db.isNull(hash) or hash == "":
                     self.lostFiles.append(id) # file without hash deleted -> no chance to find somewhere else
@@ -173,7 +174,7 @@ class FileSystemSynchronizer(QtCore.QThread):
                 if newHash != hash:
                     logger.debug('Detected modification of audio data on "{}"'.format(path))
                     db.setHash(id, newHash)
-                db.query('UPDATE {}files SET verified=CURRENT_TIMESTAMP() '
+                db.query('UPDATE {}files SET verified=CURRENT_TIMESTAMP '
                          'WHERE element_id=?'.format(db.prefix),id)
     
     def checkNewFiles(self):
@@ -183,6 +184,7 @@ class FileSystemSynchronizer(QtCore.QThread):
                 db.query('SELECT path, hash, verified FROM {}newfiles'.format(db.prefix)):
             if self.should_stop.is_set():
                 return
+            timestamp = db.getDate(timestamp)
             if os.path.exists(utils.absPath(path)):
                 self.knownNewFiles[path] = (hash, timestamp)
             else:
@@ -230,7 +232,7 @@ class FileSystemSynchronizer(QtCore.QThread):
                         # -> recompute hash
                         if mTimeStamp(relPath) > knownStamp:
                             newHash = computeHash(relPath)
-                            db.query('UPDATE {}newfiles SET hash=?, verified=CURRENT_TIMESTAMP() '
+                            db.query('UPDATE {}newfiles SET hash=?, verified=CURRENT_TIMESTAMP '
                                      'WHERE path = ?'.format(db.prefix), newHash, relPath)
                     else:
                         # case 2: file is completely new

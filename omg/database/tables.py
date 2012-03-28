@@ -367,7 +367,7 @@ CREATE TABLE {}newfiles (
 """
 CREATE TRIGGER newfiles_timestamp_trg AFTER UPDATE ON {}newfiles
 BEGIN
-UPDATE files SET verified = CURRENT_TIMESTAMP WHERE element_id = new.element_id;
+UPDATE newfiles SET verified = CURRENT_TIMESTAMP WHERE path = new.path;
 END
 """.format(db.prefix)
 )
