@@ -2,7 +2,7 @@
 .project
 .settings
 .pydevproject
-OMG.egg-info/
+omg.egg-info/
 dist
 resources.py
 translations.py
