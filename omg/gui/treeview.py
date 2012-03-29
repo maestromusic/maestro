@@ -227,6 +227,10 @@ class TreeView(QtGui.QTreeView):
         self.updateNodeSelection()
         super().focusInEvent(event)
     
+    def dropEvent(self, event):
+        super().dropEvent(event)
+        self.updateNodeSelection()
+        
     def updateNodeSelection(self):
         self.nodeSelection = NodeSelection(self.selectionModel())
         for action in self.treeActions.values():

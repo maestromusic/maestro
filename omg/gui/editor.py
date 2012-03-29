@@ -22,17 +22,16 @@ from PyQt4.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
 # --------- OMG imports ----------------------
-from ..models import editor, Container
-from ..constants import EDITOR, DB, CONTENTS, DISK
+from ..models import editor, levels, rootedtreemodel
+from ..constants import CONTENTS
 from . import treeview, mainwindow
 from ..modify.treeactions import *
 from .delegates import editor as editordelegate, configuration as delegateconfig
-from .. import logging, modify, tags, config
+from .. import logging, tags, config
 logger = logging.getLogger(__name__)
 
 # --------- Python standard lib imports ------
 import itertools
-from collections import OrderedDict
 
 
 _profiles = None
@@ -77,7 +76,7 @@ profileNotifier.profilesChanged.connect(storeProfiles)
     
 class EditorTreeView(treeview.TreeView):
     """This is the main widget of an editor: The tree view showing the current element tree."""
-    level = EDITOR
+
     actionConfig = treeview.TreeActionConfiguration()
     sect = translate(__name__, "tags")
     actionConfig.addActionDefinition(((sect, 'edittagsS'),), EditTagsAction, recursive = False)
@@ -95,11 +94,12 @@ class EditorTreeView(treeview.TreeView):
     actionConfig.addActionDefinition(((sect, 'newContainer'),), NewContainerAction)
     
     sect = translate(__name__, "editor")
-    actionConfig.addActionDefinition(((sect, 'clearEditor'),), ClearEditorAction)
+    actionConfig.addActionDefinition(((sect, 'clearEditor'),), rootedtreemodel.ClearTreeAction)
     actionConfig.addActionDefinition(((sect, 'commit'),), CommitAction)
 
     def __init__(self, parent = None):
         super().__init__(parent)
+        self.level = levels.editor
         self.setSelectionMode(self.ExtendedSelection)
         self.setDragEnabled(True)
         self.setAcceptDrops(True)

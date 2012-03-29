@@ -283,21 +283,6 @@ class ClearPlaylistAction(TreeAction):
         
     def doAction(self):
         self.parent().backend.clearPlaylist()
-
-class ClearEditorAction(TreeAction):
-    """This action clears an editor."""
-    
-    def __init__(self, parent):
-        super().__init__(parent, shortcut = "Shift+Del")
-        self.setIcon(QtGui.qApp.style().standardIcon(QtGui.QStyle.SP_TrashIcon))
-        self.setText(self.tr('clear editor'))
-    
-    def initialize(self):
-        self.setEnabled(len(self.parent().model().root.contents) > 0)
-    
-    def doAction(self):
-        modify.push(RemoveElementsCommand(EDITOR, self.parent().model().root.contents, CONTENTS,
-                                  self.tr('clear editor')))
         
 class NewContainerAction(TreeAction):
     """Action to create a new container inside an editor. Opens a tag editor dialog

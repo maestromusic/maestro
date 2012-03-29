@@ -20,22 +20,42 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from . import Node, Wrapper, mimedata
-from .. import logging, config
+from .. import logging, config, modify
+from ..modify import treeactions
 logger = logging.getLogger(__name__)
 
 class ChangeRootCommand(QtGui.QUndoCommand):
     
-    def __init__(self, model, old, new):
+    def __init__(self, model, old, new, text = "<change root>"):
         super().__init__()
         self.model = model
         self.old = old
         self.new = new
+        self.setText(text)
         
     def redo(self):
         self.model.changeContents(QtCore.QModelIndex(), self.new )
         
     def undo(self):
         self.model.changeContents(QtCore.QModelIndex(), self.old )
+
+class ClearTreeAction(treeactions.TreeAction):
+    """This action clears a tree model using a simple ChangeRootCommand."""
+    
+    def __init__(self, parent):
+        super().__init__(parent, shortcut = "Shift+Del")
+        self.setIcon(QtGui.qApp.style().standardIcon(QtGui.QStyle.SP_TrashIcon))
+        self.setText(self.tr('clear'))
+    
+    def initialize(self):
+        self.setEnabled(self.parent().model().root.getContentsCount() > 0)
+    
+    def doAction(self):
+        model = self.parent().model()
+        modify.push(ChangeRootCommand(model,
+                                      [node.element.id for node in model.root.contents],
+                                      [],
+                                      self.tr('clear view')))
 
 class RootedTreeModel(QtCore.QAbstractItemModel):
     """The RootedTreeModel subclasses QAbstractItemModel to create a simple model for QTreeViews. It takes one
