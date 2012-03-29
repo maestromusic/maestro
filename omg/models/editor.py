@@ -99,16 +99,18 @@ class EditorModel(rootedtreemodel.RootedTreeModel):
                 for file in filesInOneFolder:
                     progress.setValue(progress.value() + 1)
                     filesByFolder[folder].append(self.level.get(file))
+            modify.beginMacro("drop {} files".format(numFiles))
             topIDs = albumguesser.guessAlbums(filesByFolder, self.albumGroupers, self.metacontainer_regex)
             if parent is not self.root:
                 raise NotImplementedError()
             wrappers = []
             
-            oldContentIDs = [ node.id for node in self.root.contents ]
+            oldContentIDs = [ node.element.id for node in self.root.contents ]
             newContentIDs = oldContentIDs[:]
             newContentIDs[row:row] = topIDs
             command = rootedtreemodel.ChangeRootCommand(self, oldContentIDs, newContentIDs)
             modify.push(command)
+            modify.endMacro()
             return True
         
         except levels.ElementGetError as e:

@@ -185,36 +185,27 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
     def changeContents(self, index, new):
         parent = self.data(index, Qt.EditRole)
         old = [ node.element.id for node in parent.contents ]
-        iter = enumerate(new)
-        try:
-            i, id = next(iter)
-        except StopIteration:
-            # clear root
-            self.removeContents(index, 0, len(old) - 1)
-            return
-        stop = False
-        while True:
+        print('change: {} ---> {}'.format(old, new))
+        i = 0
+        while i < len(new):
+            id = new[i]
             try:
                 existingIndex = old.index(id)
                 if existingIndex > 0:
                     self.removeContents(index, i, i + existingIndex - 1)
-                try:
-                    i, id = next(iter)
-                except StopIteration:
-                    break
+                    del old[:existingIndex]
+                i += 1
             except ValueError:
                 insertStart = i
                 insertNum = 1
-                while not id in old:
-                    try:
-                        i, id = next(iter)
-                        insertNum += 1
-                    except StopIteration:
-                        stop = True
-                        break
+                i += 1
+                while id not in old and i < len(new):
+                    id = new[i]
+                    insertNum += 1
+                    i += 1
                 self.insertContents(index, insertStart, new[insertStart:insertStart+insertNum])
-                if stop:
-                    break
+        if len(old) > 0:
+            self.removeContents(index, i, i + len(old) - 1)
     
     def removeContents(self, index, first, last):
         self.beginRemoveRows(index, first, last)
