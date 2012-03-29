@@ -185,7 +185,6 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
     def changeContents(self, index, new):
         parent = self.data(index, Qt.EditRole)
         old = [ node.element.id for node in parent.contents ]
-        print('change: {} ---> {}'.format(old, new))
         i = 0
         while i < len(new):
             id = new[i]

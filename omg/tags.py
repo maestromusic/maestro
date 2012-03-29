@@ -623,15 +623,9 @@ class Storage(dict):
         else: return self
 
 
-def findCommonTags(elements, recursive = True):
-    """Returns a Storage object containing all tags that are equal in all of the elements. If recursive is
-    True, also all children of the elements are considered.
+def findCommonTags(elements):
+    """Returns a Storage object containing all tags that are equal in all of the elements.
     """
-    if recursive:
-        elems = set()
-        for e in elements:
-            elems.update(e.getAllNodes(skipSelf = False))
-        elements = elems
     commonTags = set(reduce(lambda x,y: x & y, [set(elem.tags.keys()) for elem in elements ]))
     commonTagValues = {}
     differentTags=set()
