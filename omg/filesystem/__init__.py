@@ -38,6 +38,7 @@ def init():
     syncThread.missingFilesDetected.connect(notifier.notifyAboutMissingFiles)
     syncThread.modifiedTagsDetected.connect(notifier.changeModifiedTags)
     syncThread.start()
+    logger.debug("Filesystem module initialized")
     
 def shutdown():
     """Terminates this module; waits for all threads to complete."""
@@ -54,7 +55,7 @@ def shutdown():
     logger.debug("Filesystem module: shutdown complete")
 
 def folderStatus(dir):
-    if config.options.filesyste.disable:
+    if config.options.filesystem.disable:
         return 'unknown'
     elif syncThread is None:
         return 'unknown'

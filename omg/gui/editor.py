@@ -78,24 +78,9 @@ class EditorTreeView(treeview.TreeView):
     """This is the main widget of an editor: The tree view showing the current element tree."""
 
     actionConfig = treeview.TreeActionConfiguration()
-    sect = translate(__name__, "tags")
-    actionConfig.addActionDefinition(((sect, 'edittagsS'),), EditTagsAction, recursive = False)
-    actionConfig.addActionDefinition(((sect, 'edittagsR'),), EditTagsAction, recursive = True)
-    actionConfig.addActionDefinition(((sect, 'advanced'),
-                                      ('misc', 'matchTags')), MatchTagsFromFilenamesAction)
-    
-    sect = translate(__name__, "structure")
-    actionConfig.addActionDefinition(((sect, 'deleteP'),), DeleteAction, CONTENTS, shortcut = 'Del')
-    actionConfig.addActionDefinition(((sect, 'increasePos'),), ChangePositionAction, "+1", shortcut = 'Ctrl++')
-    actionConfig.addActionDefinition(((sect, 'decreasePos'),), ChangePositionAction, "-1", shortcut = 'Ctrl+-')
-    actionConfig.addActionDefinition(((sect, 'merge'),), MergeAction)
-    actionConfig.addActionDefinition(((sect, 'flatten'),), FlattenAction)
-    actionConfig.addActionDefinition(((sect, 'major'),), ToggleMajorAction)
-    actionConfig.addActionDefinition(((sect, 'newContainer'),), NewContainerAction)
-    
+     
     sect = translate(__name__, "editor")
     actionConfig.addActionDefinition(((sect, 'clearEditor'),), rootedtreemodel.ClearTreeAction)
-    actionConfig.addActionDefinition(((sect, 'commit'),), CommitAction)
 
     def __init__(self, parent = None):
         super().__init__(parent)
@@ -208,7 +193,6 @@ class EditorWidget(QtGui.QDockWidget):
         hb.addStretch()
         self.toolbar = QtGui.QToolBar(self)
         self.toolbar.addAction(self.editor.treeActions['clearEditor'])
-        self.toolbar.addAction(self.editor.treeActions['commit'])
         hb.addWidget(self.toolbar)
         profileNotifier.profilesChanged.connect(self._handleProfilesChanged)
 

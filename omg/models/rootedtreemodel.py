@@ -20,7 +20,7 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from . import Node, Wrapper, mimedata
-from .. import logging, config, modify
+from .. import logging, config, modify, utils
 from ..modify import treeactions
 logger = logging.getLogger(__name__)
 
@@ -44,7 +44,7 @@ class ClearTreeAction(treeactions.TreeAction):
     
     def __init__(self, parent):
         super().__init__(parent, shortcut = "Shift+Del")
-        self.setIcon(QtGui.qApp.style().standardIcon(QtGui.QStyle.SP_TrashIcon))
+        self.setIcon(utils.getIcon("clear_playlist.png"))
         self.setText(self.tr('clear'))
     
     def initialize(self):

@@ -64,8 +64,8 @@ class FileSystemBrowserModel(QtGui.QFileSystemModel):
                     return super().data(index, role)
                 try:
                     status = filesystem.folderStatus(dir)
-                except KeyError:
-                    status = 'unsynced'
+                except KeyError as e:
+                    status = 'nomusic'
                 return self.icons[status]
         return super().data(index, role)
     
