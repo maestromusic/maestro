@@ -37,7 +37,7 @@ you can simultaneously work with an installed version of OMG.
 
 ATTRIBUTIONS
 ==============
-OMG uses an adaption to Python 3 of python-mpd (http://jatreuman.indefero.net/p/python-mpd/) by J. Alexander Treuman licensed under GPL v3.
+OMG uses a patched version of python-mpd2 (https://github.com/Mic92/python-mpd2) by J. Thalheim <jthalheim@gmail.com>
 
 OMG uses icons from the following software / free icon sets:
 Tango       http://tango.freedesktop.org/            released as public domain.
