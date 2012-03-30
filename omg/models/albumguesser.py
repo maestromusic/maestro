@@ -94,7 +94,7 @@ class AlbumGuessCommand(commands.ElementChangeCommand):
         for position, childID in self.children.items():
             child = self.level.get(childID)
             child.parents.append(self.containerID)
-            album.contents[position] = childID
+            album.contents.insert(position, childID)
             if self.meta and child.isContainer():
                 child.major = False
     

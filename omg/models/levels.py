@@ -130,7 +130,7 @@ class RealLevel(Level):
         
         for row in result:
             id,pos,contentId = row
-            level.elements[id].contents[pos] = contentId
+            level.elements[id].contents.insert(pos, contentId)
         
         # parents
         result = db.query("""

@@ -125,7 +125,6 @@ class EditorTreeView(treeview.TreeView):
                 event.setDropAction(Qt.MoveAction)
             else:
                 event.setDropAction(Qt.CopyAction)
-        self.model().dropFromOutside = not isinstance(event.source(), EditorTreeView)
         super().dropEvent(event)
         
     

@@ -18,8 +18,7 @@
 
 from PyQt4 import QtCore
 
-import copy, os.path
-from collections import OrderedDict
+import copy, os.path, bisect
 
 from .. import tags, logging, config, covers, realfiles, database as db
 from ..utils import relPath
@@ -351,8 +350,9 @@ class Container(Element):
         self.level = level
         self.major = major
         if contents is not None:
+            assert type(contents) is ContentList
             self.contents = contents
-        else: self.contents = OrderedDict()
+        else: self.contents = ContentList()
         if parents is not None:
             self.parents = parents
         else: self.parents = []
@@ -449,3 +449,43 @@ class File(Element):
         
     def __repr__(self):
         return "File[{}] {}".format(self.id, self.path)
+
+class ContentList:
+    def __init__(self, existing = None):
+        if existing is not None:
+            self.positions = existing.positions[:]
+            self.ids = existing.ids[:]
+        else:
+            self.positions = []
+            self.ids = []
+        
+    def __len__(self):
+        return len(self.ids)
+    
+    def __getitem__(self, i):
+        return self.ids[i], self.positions[i]
+    
+    def insert(self, pos, id):
+        assert pos not in self.positions
+        index = bisect.bisect(self.positions, pos)
+        self.positions.insert(index, pos)
+        self.ids.insert(index, id)
+    
+    def remove(self, *args, pos = None, i = None):
+        if pos is not None:
+            i = self.positions.index(pos)
+        elif i is None:
+                raise ValueError("Either of 'pos' or 'i' must be given to ContentList.remove()")
+        del self.ids[i]
+        del self.positions[i]
+    
+    def items(self):
+        return zip(self.positions, self.ids)
+    def shift(self, delta):
+        """Shift all positions by *delta*"""
+        if len(self) == 0:
+            return
+        # ensure position doesn't drop below 1 after the shift
+        assert self.positions[0] + delta  > 0
+        self.positions[:] = map(lambda x: x + delta, self.positions)
+            

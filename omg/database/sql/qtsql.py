@@ -108,7 +108,7 @@ class Sql(AbstractSql):
         return isinstance(value,QtCore.QPyNullVariant)
         
     def getDate(self,value):
-        return datetime.datetime.fromtimestamp(value.toTime_t())
+        return datetime.datetime.fromtimestamp(value.toTime_t()).replace(tzinfo = datetime.timezone.utc)
 
 
 class SqlResult(AbstractSqlResult):
