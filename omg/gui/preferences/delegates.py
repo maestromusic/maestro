@@ -21,7 +21,7 @@ import functools
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from ... import utils, tags, modify
+from ... import utils, tags, modify, constants
 from ..delegates import configuration
 from .. import dialogs
 
@@ -87,7 +87,7 @@ class DelegatesPanel(QtGui.QWidget):
         
     def _handleDispatcher(self,event):
         """Handle the delegate configuration dispatcher: Update the delegate box."""
-        if event.type != modify.CHANGED:
+        if event.type != constants.CHANGED:
             # Only events of type ADDED or DELETED change the entry list
             self.delegateBox.currentIndexChanged.disconnect(self._handleCurrentConfigChanged)
             self._populateDelegateBox()
@@ -438,7 +438,7 @@ class TagEditor(QtGui.QComboBox):
     
     def _handleTagTypeChanged(self,event):
         """React upon tagTypeChanged-signals from the dispatcher."""
-        if isinstance(event, modify.events.TagTypeChangedEvent):
+        if isinstance(event,tags.TagTypeChangedEvent):
             self._updateBox(self.getValue())
             
 
@@ -482,7 +482,7 @@ class DataPieceEditor(QtGui.QComboBox):
     
     def _handleTagTypeChanged(self,event):
         """React upon tagTypeChanged-signals from the dispatcher."""
-        if isinstance(event, modify.events.TagTypeChangedEvent):
+        if isinstance(event,tags.TagTypeChangedEvent):
             self._updateBox(self.getValue())
             
             

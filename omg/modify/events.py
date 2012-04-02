@@ -18,12 +18,9 @@
 
 from .. import tags
 from .. import logging
+from ..application import ChangeEvent
 
 logger = logging.getLogger(__name__)
-
-class ChangeEvent:
-    """Abstract super class for all changeevents."""
-    pass
 
 
 class ElementChangeEvent(ChangeEvent):
@@ -371,16 +368,6 @@ class FlagRemovedEvent(SingleFlagChangeEvent):
                 element.flags.remove(self.flag)
                 return True
             else: return False
-
-
-class TagTypeChangedEvent(ChangeEvent):
-    """TagTypeChangedEvents are used when a tagtype (like artist, composer...) is added, changed or deleted.
-    Contrary to ModifyEvents these events are sent over the tagTypeChanged-signal of the dispatcher.
-    """
-    def __init__(self,action,tagType):
-        assert action in range(1,4) # ADDED,CHANGED or DELETED
-        self.action = action
-        self.tagType = tagType
 
 
 class FlagTypeChangedEvent(ChangeEvent):

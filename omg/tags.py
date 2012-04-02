@@ -38,9 +38,12 @@ information in the ``tagids``-table and use one of the following ways to get tag
 from collections import Sequence
 from functools import reduce
 
-from omg import config, constants, logging
-from omg.utils import FlexiDate
 from PyQt4 import QtGui
+
+from . import config, constants, logging
+from .constants import ADDED, DELETED, CHANGED
+from .utils import FlexiDate
+from .application import ChangeEvent
 
 translate = QtGui.QApplication.translate
 logger = logging.getLogger(__name__)
@@ -158,33 +161,34 @@ TYPE_DATE = ValueType('date', translate('tags', 'a tag type for dates'))
 TYPES = [TYPE_VARCHAR,TYPE_TEXT,TYPE_DATE]
 
 
-
 class Tag:
     """
-        A tagtype like ``'artist'``. ``'title'``, etc.. Tags have five public attributes:
+        A tagtype like 'artist'. 'title', etc.. Public attributes of tags are
         
-            * ``id``: The id of the tag if it is in the database or None otherwise,
-            * ``name``: The name of the tag,
-            * ``type``: The value-type of this tag (e.g. varchar) as instance of :class:`omg.tags.ValueType`,
-            * ``title``: A nice title to be displayed to the user (usually a translation of the name),
-            * ``rawTitle``: The title as set in the database. If a tag does not have a title set in the
-                database this will be None, while ``title`` will be the name.
+            * id: The id of the tag if it is in the database or None otherwise,
+            * name: The name of the tag,
+            * type: The value-type of this tag (e.g. varchar) as instance of :class:`omg.tags.ValueType`,
+            * title: A nice title to be displayed to the user (usually a translation of the name),
+            * rawTitle: The title as set in the database. If a tag does not have a title set in the
+              database this will be None, while 'title' will be the name.
+            * iconPath: Path to the tagtype's icon or None if if doesn't have an icon.
+            * icon: A QIcon loaded from above path.
+            * private: Whether the flag is private, i.e. stored only in the database and not in files.
 
         Usually you should get tag instances via the :func:`get-method<omg.tags.get>`. The exception is for
         tags that are not (yet) in the database (use :func:`exists` to check this). For these tags
         :func:`get` will fail and you have to create your own instances. If you use the common instance, it
         will get automatically updated on TagTypeChangeEvents.
     """
-    def __init__(self,id,name,valueType,title,iconPath,private=False):
-        if not isinstance(id,int) or not isinstance(name,str) or not isinstance(valueType,ValueType) \
-                or (title is not None and not isinstance(title,str)):
-            raise TypeError("Invalid type (id,name,valueType,title): ({},{},{},{}) of types ({},{},{},{})"
-                            .format(id,name,valueType,title,type(id),type(name),type(valueType),type(title)))
-        assert isValidTagname(name)
+    def __init__(self,id=None,name=None,type=None,title=None,iconPath=None,private=None):
         self.id = id
-        self.name = name.lower()
-        self.type = valueType
-        self.rawTitle = title
+        if name is not None:
+            assert isValidTagname(name)
+        self.name = name
+        self.type = type
+        if title is not None and title != self.name:
+            self.rawTitle = title
+        else: self.rawTitle = None
         self.setIconPath(iconPath)
         self.private = private
 
@@ -225,7 +229,7 @@ class Tag:
         return self.rawTitle if self.rawTitle is not None else self.name
     
     def setTitle(self,title):
-        if title != '':
+        if title != '' and title != self.name:
             self.rawTitle = title
         else: self.rawTitle = None
         
@@ -312,121 +316,182 @@ def fromTitle(title):
             return tag
     else: return get(title)
 
+
+class TagTypeUndoCommand(QtGui.QUndoCommand):
+    """This command adds, changes or deletes a tagtype. Which keyword arguments are necessary depends on the
+    first parameter *action* which may be one of
     
-def addTagType(name,valueType,title=None,iconPath=None,private=False,tagType=None):
-    """Adds a new tag named *name* of type *valueType* and with title *title* to the database.
-    If *private* is True, a private tag is created.
+        - constants.ADDED: In this case *data* must be a subset of the arguments of Tag.__init__ including
+          'name' and 'type' and excluding 'id' (the id is generated automatically by the database).
+        - constants.CHANGED: This will change the tagtype specified in the argument *tagType* according to
+          the other arguments, which may be a subset of the arguments of Tag.__init__ except of 'id':
+          
+              TagTypeUndoCommand(tagType=tagType,name='artist',iconPath=None)
+              
+        - constants.DELETED: A single argument *tagType*. The given tagtype will be removed.
+    """
+    def __init__(self,action,tagType=None,**data):
+        texts = {ADDED:   translate("TagTypeUndoCommand","Add tagtype"),
+                 DELETED: translate("TagTypeUndoCommand","Delete tagtype"),
+                 CHANGED: translate("TagTypeUndoCommand","Change tagtype")
+                }
+        super().__init__(texts[action])
+        self.action = action
+        if self.action == ADDED:
+            self.addData = data
+            self.tagType = None
+        elif self.action == DELETED:
+            self.tagType = tagType
+        else:
+            self.tagType = tagType
+            self.oldData = {'name': tagType.name,'type': tagType.type,'title': tagType.title,
+                            'iconPath': tagType.iconPath, 'private': tagType.private }
+            self.newData = data
+        
+    def redo(self):
+        if self.action == ADDED:
+            if self.tagType is None: # This is the first time this command is redone
+                self.tagType = addTagType(**self.addData)
+                del self.addData
+            else:
+                # On subsequent redos ensure that the same object is recreated,
+                # because it might be used in many elements within the undohistory.
+                addTagType(tagType=self.tagType)
+        elif self.action == DELETED:
+            removeTagType(self.tagType)
+        else: changeTagType(self.tagType,**self.newData)
+
+    def undo(self):
+        if self.action == ADDED:
+            tagsModule.removeTagType(self.tagType)
+        elif self.action == DELETED:
+            # Ensure that the same object is recreated, because it might be used in many elements
+            # within the undohistory.
+            addTagType(tagType=self.tagType)
+        else: changeTagType(self.tagType,**self.oldData)
+
+
+class TagTypeChangedEvent(ChangeEvent):
+    """TagTypeChangedEvents are used when a tagtype (like artist, composer...) is added, changed or deleted.
+    """
+    def __init__(self,action,tagType):
+        assert action in constants.CHANGE_TYPES
+        self.action = action
+        self.tagType = tagType
+        
+        
+def addTagType(**data):
+    """Adds a new tagtype to the database. The keyword arguments may contain either
     
-    Alternatively, if *tagType* is given, this tagtype with its id and data will be added to
-    the database ignoring all other arguments. This is only used to undo a tagtype's deletion.
-    
+        - a single argument 'tagType': In this case the given tagType is inserted into the database and some
+          internal lists. Use this to undo a tagtype's deletion.
+        - a subset of the arguments of Tag.__init__. In this case this data is used to create a new tag.
+          The subset must not contain 'id' and must contain at least 'name' and 'type'.
+          
     After creation the dispatcher's TagTypeChanged signal is emitted.
     """
     from . import database as db
-    from .modify import dispatcher, events, ADDED
-    if tagType is not None:
-        if title is None:
-            title = name
+    if 'tagType' in data:
+        tagType = data['tagType']
         data = (tagType.id,tagType.name,tagType.type.name,tagType.title,tagType.iconPath,tagType.private)
         db.query(
             "INSERT INTO {}tagids (id,tagname,tagtype,title,icon,private) VALUES (?,?,?,?,?,?)"
               .format(db.prefix),*data)
-        _tagsByName[tagType.name] = tagType
-        _tagsById[tagType.id] = tagType
-        tagList.append(tagType)
-        dispatcher.changes.emit(events.TagTypeChangedEvent(ADDED,tagType))
-        return tagType
+    else:
+        # The difference to the if-part is that we have to get the id from the database
+        tagType = Tag(**data)
+        data = (tagType.name,tagType.type.name,tagType.title,tagType.iconPath,tagType.private)
+        tagType.id = db.query(
+            "INSERT INTO {}tagids (tagname,tagtype,title,icon,private) VALUES (?,?,?,?,?)"
+              .format(db.prefix),*data).insertId()
+
+    logger.info("Added new tag '{}' of type '{}'.".format(tagType.name,tagType.type.name))
+    _tagsByName[tagType.name] = tagType
+    _tagsById[tagType.id] = tagType
+    tagList.append(tagType)
+    from . import modify
+    modify.dispatcher.changes.emit(TagTypeChangedEvent(ADDED,tagType))
+    return tagType
         
-    logger.info("Adding new tag '{}' of type '{}'.".format(name,valueType.name))
-    name = name.lower()
-    if name in _tagsByName:
-        raise RuntimeError("Requested creation of tag {} which is already there".format(name))
-    
-    id = db.query(
-        "INSERT INTO {}tagids (tagname,tagtype,title,icon,private) VALUES (?,?,?,?,?)".format(db.prefix),
-        name,valueType.name,title,iconPath,private
-        ).insertId()
-    newTag = Tag(id,name,valueType,title,iconPath,private)
-    _tagsByName[name] = newTag
-    _tagsById[id] = newTag
-    tagList.append(newTag)
-    dispatcher.changes.emit(events.TagTypeChangedEvent(ADDED,newTag))
-    return newTag
 
-
-def removeTagType(tag):
+def removeTagType(tagType):
     """Remove a tagtype from the database, including all its values and relations. This will not touch any
     files though!
     
     After removal the dispatcher's tagTypeChanged signal is emitted.
     """
-    logger.info("Removing tag '{}'.".format(tag.name))
-    if tag == TITLE or tag == ALBUM:
+    logger.info("Removing tag '{}'.".format(tagType.name))
+    if tagType == TITLE or tagType == ALBUM:
         raise ValueError("Cannot remove title or album tag.")
     
-    from . import database
-    database.query("DELETE FROM {}tagids WHERE id=?".format(database.prefix),tag.id)
-    del _tagsByName[tag.name]
-    del _tagsById[tag.id]
-    tagList.remove(tag)
+    from . import database as db
+    db.query("DELETE FROM {}tagids WHERE id=?".format(db.prefix),tagType.id)
+    del _tagsByName[tagType.name]
+    del _tagsById[tagType.id]
+    tagList.remove(tagType)
             
-    from .modify import dispatcher, events, DELETED
-    dispatcher.changes.emit(events.TagTypeChangedEvent(DELETED,tag))
+    from . import modify
+    modify.dispatcher.changes.emit(TagTypeChangedEvent(DELETED,tagType))
 
 
-def changeTagType(tag,name=None,valueType=None,title='',iconPath='',private=None):
-    """Change a tagtype. In particular update the instance *tag* (this is usually the only instance of this
-    tag) and the database. The other arguments determine what to change. Omit them to leave a property
-    unchanged. This method will not touch any files though!
-    
-    After removal the dispatcher's tagTypeChanged signal is emitted.
+def changeTagType(tagType,**data):
+    """Change a tagtype. In particular update the instance *tagType* (this is usually the only instance of
+    this tag) and the database. The keyword arguments determine which properties should be changed::
+
+        changeTagType(tagType,name='artist',iconPath=None)
+        
+    Allowed keyword arguments are the arguments of Tag.__init__ except id. After the change the dispatcher's
+    tagTypeChanged signal is emitted.
     """
-    oldName = tag.name
+    oldName = tagType.name
+    # Below we will build a query like UPDATE tagids SET ... using the list of assignments (e.g. (tagname=?).
+    # The parameters will be sent with the query to replace the questionmarks.
     assignments = []
     params = []
     
-    if name is not None and name != tag.name:
-        name = name.lower()
+    if 'name' in data:
+        name = data['name'].lower()
         if not isValidTagname(name):
             raise ValueError("'{}' is not a valid tagname.".format(name))
-        assignments.append('tagname = ?')
-        params.append(name)
-        del _tagsByName[tag.name]
-        _tagsByName[name] = tag
-        tag.name = name
+        if name != tagType.name:
+            assignments.append('tagname = ?')
+            params.append(name)
+            del _tagsByName[tagType.name]
+            _tagsByName[name] = tagType
+            tagType.name = name
     
-    if valueType is not None and name != tag.type:
-        if not isinstance(valueType,ValueType):
-            raise ValueError("'{}' is not a ValueType.".format(valueType))
+    if 'type' in data and data['type'] != tagType.type:
+        type = data['type']
+        if not isinstance(type,ValueType):
+            raise ValueError("'{}' is not a ValueType.".format(type))
         assignments.append('tagtype = ?')
-        params.append(valueType.name)
-        tag.type = valueType
+        params.append(type.name)
+        tagType.type = type
     
-    if title != '' and title != tag.title:
+    if 'title' in data and data['title'] != tagType.title:
         assignments.append('title = ?')
-        params.append(title)
-        tag.title = title
+        params.append(data['title'])
+        tagType.title = data['title'] 
         
-    if iconPath != '' and iconPath != tag.iconPath:
+    if 'iconPath' in data and data['iconPath'] != tagType.iconPath:
         assignments.append('icon = ?')
-        params.append(iconPath)
-        tag.setIconPath(iconPath)
+        params.append(data['iconPath'])
+        tagType.setIconPath(data['iconPath'])
         
-    if private is not None and bool(private) != tag.private:
-        assignments.append('private = 1' if private else 'private = 0')
-        tag.private = bool(private)
+    if 'private' in data and bool(data['private']) != tagType.private:
+        assignments.append('private = 1' if data['private'] else 'private = 0')
+        tagType.private = bool(data['private'])
     
     if len(assignments) > 0:
-        if tag.name != oldName:
-            logger.info("Changing tag '{}' into {}.".format(oldName,tag.name))
-        else: logger.info("Changing tag '{}'.".format(tag.name))
-        from . import database
-        database.query("UPDATE {}tagids SET {} WHERE id = {}"
-                        .format(database.prefix,','.join(assignments),tag.id),
-                        *params)
+        if tagType.name != oldName:
+            logger.info("Changing tag '{}' into '{}'.".format(oldName,tagType.name))
+        else: logger.info("Changing tag '{}'.".format(tagType.name))
+        from . import database as db
+        db.query("UPDATE {}tagids SET {} WHERE id = {}"
+                    .format(db.prefix,','.join(assignments),tagType.id),*params)
         
-        from .modify import dispatcher, events, CHANGED
-        dispatcher.changes.emit(events.TagTypeChangedEvent(CHANGED,tag))
+        from . import modify
+        modify.dispatcher.changes.emit(TagTypeChangedEvent(CHANGED,tagType))
 
 
 def loadTagTypesFromDB():

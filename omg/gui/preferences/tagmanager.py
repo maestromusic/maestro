@@ -86,7 +86,7 @@ class TagManager(QtGui.QWidget):
     
     def _handleDispatcher(self,event):
         """React to TagTypeChangedEvents from the dispatcher."""
-        if isinstance(event,modify.events.TagTypeChangedEvent):
+        if isinstance(event,tags.TagTypeChangedEvent):
             self._loadTags()
             
     def _loadTags(self):
@@ -175,7 +175,7 @@ class TagManager(QtGui.QWidget):
             dialogs.warning(self.tr("Cannot remove tag"),
                             self.tr("Cannot remove a tag that appears in elements."))
             return
-        modify.push(modify.commands.TagTypeUndoCommand(modify.DELETED,tag))
+        modify.push(tags.TagTypeUndoCommand(constants.DELETED,tagType=tag))
 
     def _handleItemChanged(self,item):
         """Handle changes to the name or private state of a tag."""
@@ -196,13 +196,13 @@ class TagManager(QtGui.QWidget):
                     dialogs.warning(self.tr("Cannot change tag"),message)
                     item.setText(oldName) # Reset
                     return
-            modify.push(modify.commands.TagTypeUndoCommand(modify.CHANGED,tag,name=newName))
+            modify.push(tags.TagTypeUndoCommand(constants.CHANGED,tagType=tag,name=newName))
         
         elif item.column() == self._getColumnIndex('title'):
             tag = tags.tagList[item.row()]
             itemText = item.text() if item.text() != '' else None
             if itemText != tag.rawTitle:
-                modify.push(modify.commands.TagTypeUndoCommand(modify.CHANGED,tag,title=itemText))
+                modify.push(tags.TagTypeUndoCommand(constants.CHANGED,tagType=tag,title=itemText))
             
         elif item.column() == self._getColumnIndex('private'): 
             tag = tags.tagList[item.row()]
@@ -215,16 +215,16 @@ class TagManager(QtGui.QWidget):
                                 self.tr("Cannot change a tag that appears in elements."))
                 item.setText(oldName)
                 return
-            modify.push(modify.commands.TagTypeUndoCommand(modify.CHANGED,tag,private=newPrivate))
+            modify.push(tags.TagTypeUndoCommand(constants.CHANGED,tagType=tag,private=newPrivate))
 
     def _checkUndoRedoButtons(self):
         """Enable or disable the undo and redo buttons depending on stack state."""
         self.undoButton.setEnabled(modify.stack.canUndo()
                             and isinstance(modify.stack.command(modify.stack.index()-1),
-                                           modify.commands.TagTypeUndoCommand))
+                                           tags.TagTypeUndoCommand))
         self.redoButton.setEnabled(modify.stack.canRedo()
                             and isinstance(modify.stack.command(modify.stack.index()),
-                                           modify.commands.TagTypeUndoCommand))
+                                           tags.TagTypeUndoCommand))
         
     def _handleValueTypeChanged(self,tag,type):
         """Handle changes to the comboboxes containing valuetypes."""
@@ -233,7 +233,7 @@ class TagManager(QtGui.QWidget):
             dialogs.warning(self.tr("Cannot change tag"),
                             self.tr("Cannot change a tag that appears in elements."))
             return
-        modify.push(modify.commands.TagTypeUndoCommand(modify.CHANGED,tag,valueType=type))
+        modify.push(tags.TagTypeUndoCommand(constants.CHANGED,tagType=tag,type=type))
     
     def _handleCellDoubleClicked(self,row,column):
         """Handle double clicks on the first column containing icons. A click will open a file dialog to
@@ -271,7 +271,7 @@ class TagManager(QtGui.QWidget):
             
     def _setIcon(self,tagType,iconPath):
         """Set the icon(-path) of *tagType* to *iconPath* and update the GUI."""
-        modify.push(modify.commands.TagTypeUndoCommand(modify.CHANGED,tagType,iconPath=iconPath))
+        modify.push(tags.TagTypeUndoCommand(constants.CHANGED,tagType=tagType,iconPath=iconPath))
         # Update the widget
         row = tags.tagList.index(tagType)
         index = self.tableWidget.model().index(row,0)                     

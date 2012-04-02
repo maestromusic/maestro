@@ -26,7 +26,7 @@ import sys, os, fcntl, getopt
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from omg import config, logging, database, constants
+from omg import config, logging, constants
 
 # The application's main window
 mainWindow = None
@@ -35,6 +35,11 @@ global logger
         
 # Store translators so that they are not garbage-collected
 _translators = []
+
+
+class ChangeEvent:
+    """Abstract super class for all changeevents."""
+    pass
 
 
 def run(cmdConfig=[],exitPoint="nogui",console=True):
@@ -86,6 +91,7 @@ def run(cmdConfig=[],exitPoint="nogui",console=True):
     loadTranslators(app,logger)
 
     # Initialize database
+    from . import database
     try:
         database.connect()
     except database.sql.DBException as e:
@@ -98,7 +104,7 @@ def run(cmdConfig=[],exitPoint="nogui",console=True):
         return
         
     # Initialize tags
-    from omg import tags,flags
+    from . import tags,flags
     try:
         tags.init()
     except RuntimeError:
@@ -110,9 +116,9 @@ def run(cmdConfig=[],exitPoint="nogui",console=True):
         return
         
     # Load and initialize remaining modules
-    from omg.models import levels
+    from .models import levels
     levels.init()
-    from omg import resources, search
+    from . import resources, search
     search.init()
     
     # Load Plugins
@@ -154,8 +160,10 @@ def run(cmdConfig=[],exitPoint="nogui",console=True):
     logging.shutdown()
     sys.exit(returnValue)
 
+
 import functools
 runGUI = functools.partial(run, exitPoint=None,console=False)
+
 
 def handleCommandLineOptions(cmdConfig):
     """Parse command line options and act accordingly (e.g. print version and exit). Add config option

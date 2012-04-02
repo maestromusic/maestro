@@ -19,7 +19,7 @@
 from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
-from .. import tags, utils, database as db, modify
+from .. import tags, utils, database as db, modify, constants
 from ..modify import commands
 
 
@@ -93,7 +93,7 @@ class TagLabel(QtGui.QLabel):
             
     def _handleDispatcher(self,event):
         """Reload the widget on TagTypeChangedEvents applying to our tag."""
-        if isinstance(event,modify.events.TagTypeChangedEvent) and event.tagType == self.tag:
+        if isinstance(event,tags.TagTypeChangedEvent) and event.tagType == self.tag:
             self.setTag(self.tag)
 
 
@@ -290,20 +290,20 @@ class TagTypeBox(QtGui.QStackedWidget):
     
     def _handleTagTypeChanged(self,event):
         """React upon tagTypeChanged-signals from the dispatcher."""
-        if not isinstance(event, modify.events.TagTypeChangedEvent):
+        if not isinstance(event,tags.TagTypeChangedEvent):
             return
-        if event.action == modify.ADDED:
+        if event.action == constants.ADDED:
             # Do not add twice
             for i in range(self.box.count()):
                 if self.box.itemData(i) == event.tagType:
                     return
             else: self._addTagToBox(event.tagType)
-        elif event.action == modify.DELETED:
+        elif event.action == constants.DELETED:
             for i in range(self.box.count()):
                 if self.box.itemData(i) == event.tagType:
                     self.box.removeItem(i)
                     return
-        elif event.action == modify.CHANGED:
+        elif event.action == constants.CHANGED:
             for i in range(self.box.count()):
                 if self.box.itemData(i) == event.tagType:
                     self.box.setItemText(i,event.tagType.title)
@@ -561,11 +561,12 @@ class NewTagTypeDialog(QtGui.QDialog):
                                       self.tr("The title must not be empty."))
             return
         if self._newTag is None:
-            modify.push(modify.commands.TagTypeUndoCommand(modify.ADDED,None,name=self.tagname,
-                                                           valueType=self.combo.getType(),
-                                                           title=self.titleLineEdit.text(),
-                                                           iconPath=None,
-                                                           private=self.privateBox.isChecked()))
+            modify.push(tags.TagTypeUndoCommand(constants.ADDED,
+                                                name=self.tagname,
+                                                type=self.combo.getType(),
+                                                title=self.titleLineEdit.text(),
+                                                iconPath=None,
+                                                private=self.privateBox.isChecked()))
             self._newTag = tags.get(self.tagname)
         self.accept()
         

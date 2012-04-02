@@ -19,35 +19,30 @@
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from .. import tags, logging, database as db
-from ..constants import REAL, EDITOR, CONTENTS
+from ..application import ChangeEvent
+from .. import logging
 from . import events
-# At the end of the file we will import the submodules real and events.
+# At the end of the file we will import the submodules real
+
+# DEPRECATED! Use constants.ADDED etc. instead
+ADDED,CHANGED,DELETED = 1,2,3
 
 translate = QtCore.QCoreApplication.translate
-
 logger = logging.getLogger(__name__)
 
-
-
-# Type of a change
-ADDED,CHANGED,DELETED = 1,2,3
-    
-            
-         
-def _debugAll(event):
-    logger.debug("EVENT: " + str(event))
-
-    
 class ChangeEventDispatcher(QtCore.QObject):
     
-    changes = QtCore.pyqtSignal(events.ChangeEvent)
+    changes = QtCore.pyqtSignal(ChangeEvent)
     
     def __init__(self):
         QtCore.QObject.__init__(self)
 
-
 dispatcher = ChangeEventDispatcher()
+ 
+            
+def _debugAll(event):
+    logger.debug("EVENT: " + str(event))
+    
 dispatcher.changes.connect(_debugAll)
 
 stack = QtGui.QUndoStack()
