@@ -19,7 +19,7 @@
 from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
-from .. import modify, tags
+from .. import modify, tags, flags
 from ..constants import EDITOR 
 
 
@@ -210,7 +210,7 @@ class FlagEditorModel(QtCore.QObject):
                         self._changeRecord(record,Record(record.flag,self.elements,remaining))
             return
         
-        elif isinstance(event,modify.events.FlagTypeChangedEvent):
+        elif isinstance(event,flags.FlagTypeChangedEvent):
             if event.action == modify.CHANGED: # ADDED and REMOVED don't affect us
                 # This finds the record using the flagtype's id and thus also works with the changed flag.
                 record = self.getRecord(event.flagType)

@@ -369,17 +369,7 @@ class FlagRemovedEvent(SingleFlagChangeEvent):
                 return True
             else: return False
 
-
-class FlagTypeChangedEvent(ChangeEvent):
-    """TagTypeChangedEvents are used when a flagtype is added, changed or deleted. Contrary to ModifyEvents
-    these events are sent over the tagTypeChanged-signal of the dispatcher.
-    """
-    def __init__(self,action,flagType):
-        assert action in range(1,4) # ADDED,CHANGED or DELETED
-        self.action = action
-        self.flagType = flagType
-        
-        
+ 
 class SortValueChangedEvent(ChangeEvent):
     """This event is emitted when a sortvalue changes."""
     def __init__(self,tag,valueId,oldValue,newValue):

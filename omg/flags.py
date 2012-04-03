@@ -17,10 +17,13 @@
 #
 
 from . import database as db, modify, logging, constants
+from .constants import ADDED, DELETED, CHANGED
+from .application import ChangeEvent
 from PyQt4 import QtGui
 
 
 logger = logging.getLogger(__name__)
+translate = QtGui.QApplication.translate
 
 _flagsById = None
 _flagsByName = None
@@ -46,12 +49,12 @@ class Flag:
     they are much easier, because they have no values, valuetypes, translations and because they are not
     stored in files.
     
-    Usually you shold get tag instances via the :func:`get-method<omg.tags.get>`. The exception is for
-    tags that are not (yet) in the database (use :func:`exists` to check this). For these tags
+    Usually you shold get flag instances via the :func:`get-method<omg.flags.get>`. The exception is for
+    flags that are not (yet) in the database (use :func:`exists` to check this). For these flags
     :func:`get` will fail and you have to create your own instances. If you use the common instance, it
-    will get automatically updated on TagTypeChangeEvents.
+    will get automatically updated on FlagTypeChangeEvents.
     """
-    def __init__(self,id,name,iconPath):
+    def __init__(self,id=None,name=None,iconPath=None):
         self.id = id
         self.name = name
         self.setIconPath(iconPath)
@@ -103,31 +106,97 @@ def allFlags():
     return _flagsById.values()
 
 
-def addFlagType(name,iconPath,flagType=None):
-    """Add a new flag with the given name and iconPath to the database, emit a FlagTypeChangedEvent and
-    return the new flag. If *flagType* is given, this flagType with its id, name and icon will be added to
-    the database ignoring the other arguments. This is only used to undo a flagtype's deletion.
+class FlagTypeUndoCommand(QtGui.QUndoCommand):
+    """This command adds, changes or deletes a flagtype. Which keyword arguments are necessary depends on the
+    first parameter *action* which may be one of
+    
+        - constants.ADDED: In this case *data* must be a subset of the arguments of Flag.__init__ including
+          'name' and excluding 'id' (the id is generated automatically by the database).
+        - constants.CHANGED: This will change the flagType specified in the argument *flagType* according to
+          the other arguments, which may be a subset of the arguments of Flag.__init__ except of 'id':
+          
+              FlagTypeUndoCommand(flagType=flagType,name='Great',iconPath=None)
+              
+        - constants.DELETED: A single argument *flagType*. The given flagType will be removed.
     """
-    if flagType is not None:
-        db.query("INSERT INTO {}flag_names (id,name,icon) VALUES (?,?,?)"
-                 .format(db.prefix),flagType.id,flagType.name,flagType.iconPath)
-        _flagsById[flagType.id] = flagType
-        _flagsByName[flagType.name] = flagType
-        modify.dispatcher.changes.emit(modify.events.FlagTypeChangedEvent(modify.ADDED,flagType))
-        return flagType
+    def __init__(self,action,flagType=None,**data):
+        texts = {ADDED:   translate("FlagTypeUndoCommand","Add flagType"),
+                 DELETED: translate("FlagTypeUndoCommand","Delete flagType"),
+                 CHANGED: translate("FlagTypeUndoCommand","Change flagType")
+                }
+        super().__init__(texts[action])
+        self.action = action
+        if self.action == ADDED:
+            self.addData = data
+            self.flagType = None
+        elif self.action == DELETED:
+            self.flagType = flagType
+        else:
+            self.flagType = flagType
+            self.oldData = {'name': flagType.name,'iconPath': flagType.iconPath}
+            self.newData = data
         
-    if exists(name):
-        raise ValueError("There is already a flag named '{}'.".format(name))
+    def redo(self):
+        if self.action == ADDED:
+            if self.flagType is None: # This is the first time this command is redone
+                self.flagType = addFlagType(**self.addData)
+                del self.addData
+            else:
+                # On subsequent redos ensure that the same object is recreated,
+                # because it might be used in many elements within the undohistory.
+                addFlagType(flagType=self.flagType)
+        elif self.action == DELETED:
+            removeFlagType(self.flagType)
+        else: changeFlagType(self.flagType,**self.newData)
+
+    def undo(self):
+        if self.action == ADDED:
+            removeFlagType(self.flagType)
+        elif self.action == DELETED:
+            # Ensure that the same object is recreated, because it might be used in many elements
+            # within the undohistory.
+            addFlagType(flagType=self.flagType)
+        else: changeFlagType(self.flagType,**self.oldData)
+
+
+class FlagTypeChangedEvent(ChangeEvent):
+    """FlagTypeChangedEvent are used when a flagtype is added, changed or deleted."""
+    def __init__(self,action,flagType):
+        assert action in constants.CHANGE_TYPES
+        self.action = action
+        self.flagType = flagType
+
+
+def addFlagType(**data):
+    """Adds a new flagType to the database. The keyword arguments may contain either
     
-    logger.info("Adding new flag '{}'.".format(name))
-    id = db.query("INSERT INTO {}flag_names (name,icon) VALUES (?,?)"
-                    .format(db.prefix),name,iconPath).insertId()
-    newFlag = Flag(id,name,iconPath)
-    _flagsById[id] = newFlag
-    _flagsByName[name] = newFlag
+        - a single argument 'flagType': In this case the given flagType is inserted into the database and
+          some internal lists. Use this to undo a flagType's deletion.
+        - a subset of the arguments of Flag.__init__. In this case this data is used to create a new flag.
+          The subset must not contain 'id' and must contain at least 'name'.
+          
+    After creation the a FlagTypeChangedEvent is emitted.
+    """
+    if 'flagType' in data:
+        flagType = data['flagType']
+        data = (flagType.id,flagType.name,flagType.iconPath)
+        db.query(
+            "INSERT INTO {}flag_names (id,name,icon) VALUES (?,?,?)"
+              .format(db.prefix),*data)
+    else:
+        # The difference to the if-part is that we have to get the id from the database
+        flagType = Flag(**data)
+        data = (flagType.name,flagType.iconPath)
+        flagType.id = db.query(
+            "INSERT INTO {}flag_names (name,icon) VALUES (?,?)"
+              .format(db.prefix),*data).insertId()
+
+    logger.info("Added new flag '{}'".format(flagType.name))
     
-    modify.dispatcher.changes.emit(modify.events.FlagTypeChangedEvent(modify.ADDED,newFlag))
-    return newFlag
+    _flagsById[flagType.id] = flagType
+    _flagsByName[flagType.name] = flagType
+    modify.dispatcher.changes.emit(FlagTypeChangedEvent(ADDED,flagType))
+    return flagType
 
 
 def removeFlagType(flagType):
@@ -139,31 +208,40 @@ def removeFlagType(flagType):
     db.query("DELETE FROM {}flag_names WHERE id = ?".format(db.prefix),flagType.id)
     del _flagsById[flagType.id]
     del _flagsByName[flagType.name]
-    modify.dispatcher.changes.emit(modify.events.FlagTypeChangedEvent(modify.DELETED,flagType))
+    modify.dispatcher.changes.emit(FlagTypeChangedEvent(DELETED,flagType))
 
 
-def changeFlagType(flagType,name=None,iconPath=''):
-    """Change the name and/or iconPath of *flagType* in the database and emit an event. If name or iconPath
-    is not given, it will not be changed. Set iconPath to None to remove the icon."""    
-    assignments = []
-    data = []
-    
-    if name is not None and name != flagType.name:
-        if exists(name):
-            raise ValueError("There is already a flag named '{}'.".format(name))
-        logger.info("Changing flag name '{}' to '{}'.".format(flagType.name,name))
-        assignments.append('name = ?')
-        data.append(name)
-        del _flagsByName[flagType.name]
-        _flagsByName[name] = flagType
-        flagType.name = name
+def changeFlagType(flagType,**data):
+    """Change the name and/or iconPath of *flagType* in the database and emit an event. The keyword arguments
+    determine which properties should be changed::
+
+        changeFlagType(flagType,name='Great',iconPath=None)
         
-    if iconPath != '' and iconPath != flagType.iconPath:
+    Allowed keyword arguments are the arguments of Flag.__init__ except id.
+    """
+    # Below we will build a query like UPDATE flag_names SET ... using the list of assignments (e.g. (name=?).
+    # The parameters will be sent with the query to replace the questionmarks.
+    assignments = []
+    params = []
+    
+    if 'name' in data:
+        name = data['name']
+        if name != flagType.name:
+            if exists(name):
+                raise ValueError("There is already a flag named '{}'.".format(name))
+            logger.info("Changing flag name '{}' to '{}'.".format(flagType.name,name))
+            assignments.append('name = ?')
+            params.append(name)
+            del _flagsByName[flagType.name]
+            _flagsByName[name] = flagType
+            flagType.name = name
+        
+    if 'iconPath' in data and data['iconPath'] != flagType.iconPath:
         assignments.append('icon = ?')
-        data.append(iconPath)
-        flagType.setIconPath(iconPath)
+        params.append(data['iconPath'])
+        flagType.setIconPath(data['iconPath'])
     
     if len(assignments) > 0:
-        data.append(flagType.id) # for the where clause
-        db.query("UPDATE {}flag_names SET {} WHERE id = ?".format(db.prefix,','.join(assignments)),*data)
-        modify.dispatcher.changes.emit(modify.events.FlagTypeChangedEvent(modify.CHANGED,flagType))
+        params.append(flagType.id) # for the where clause
+        db.query("UPDATE {}flag_names SET {} WHERE id = ?".format(db.prefix,','.join(assignments)),*params)
+        modify.dispatcher.changes.emit(FlagTypeChangedEvent(CHANGED,flagType))

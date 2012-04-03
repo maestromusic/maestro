@@ -81,7 +81,7 @@ class FlagManager(QtGui.QWidget):
         
     def _handleDispatcher(self,event):
         """React to FlagTypeChangedEvents from the dispatcher."""
-        if isinstance(event,modify.events.FlagTypeChangedEvent):
+        if isinstance(event,flags.FlagTypeChangedEvent):
             self._loadFlags()
             
     def _loadFlags(self):
@@ -151,7 +151,7 @@ class FlagManager(QtGui.QWidget):
             if number > 0:
                 # TODO
                 raise NotImplementedError()
-            modify.push(modify.commands.FlagTypeUndoCommand(modify.DELETED,flagType))
+            modify.push(flags.FlagTypeUndoCommand(constants.DELETED,flagType))
 
     def _handleItemChanged(self,item):
         """When the name of a flag has been changed, ask the user if he really wants this and if so perform
@@ -178,23 +178,24 @@ class FlagManager(QtGui.QWidget):
             return
                                 
         if number > 0:
-            question = self.tr("Do you really want to change the flag '{}'? It will be changed in %n element(s).",None,number).format(oldName)
+            question = self.tr("Do you really want to change the flag '{}'? It will be changed in %n element(s).",
+                               None,number).format(oldName)
             if (QtGui.QMessageBox.question(self,self.tr("Change flag?"),question,
                                    QtGui.QMessageBox.Yes | QtGui.QMessageBox.No,
                                    QtGui.QMessageBox.Yes)
                         != QtGui.QMessageBox.Yes):
                 item.setText(oldName)
                 return
-        modify.push(modify.commands.FlagTypeUndoCommand(modify.CHANGED,flagType,name=newName))
+        modify.push(flags.FlagTypeUndoCommand(constants.CHANGED,flagType,name=newName))
     
     def _checkUndoRedoButtons(self):
         """Enable or disable the undo and redo buttons depending on stack state."""
         self.undoButton.setEnabled(modify.stack.canUndo()
                             and isinstance(modify.stack.command(modify.stack.index()-1),
-                                           modify.commands.FlagTypeUndoCommand))
+                                           flags.FlagTypeUndoCommand))
         self.redoButton.setEnabled(modify.stack.canRedo()
                             and isinstance(modify.stack.command(modify.stack.index()),
-                                           modify.commands.FlagTypeUndoCommand))
+                                           flags.FlagTypeUndoCommand))
         
     def _handleCellDoubleClicked(self,row,column):
         """Handle double clicks on the first column containing icons. A click will open a file dialog to
@@ -232,7 +233,7 @@ class FlagManager(QtGui.QWidget):
             
     def _setIcon(self,flagType,iconPath):
         """Set the icon(-path) of *flagType* to *iconPath* and update the GUI.""" 
-        modify.push(modify.commands.FlagTypeUndoCommand(modify.CHANGED,flagType,iconPath=iconPath))
+        modify.push(flags.FlagTypeUndoCommand(constants.CHANGED,flagType,iconPath=iconPath))
         # Update the widget
         row = self._flagTypes.index(flagType)
         index = self.tableWidget.model().index(row,0)                     
@@ -283,6 +284,6 @@ def createNewFlagType(parent = None):
                                   translate("FlagManager","This is no a valid flagname."))
         return None
     else:
-        modify.push(modify.commands.FlagTypeUndoCommand(modify.ADDED,name=name,iconPath=None))
+        modify.push(flags.FlagTypeUndoCommand(constants.ADDED,name=name))
         return True
     

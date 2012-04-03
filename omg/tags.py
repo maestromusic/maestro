@@ -363,7 +363,7 @@ class TagTypeUndoCommand(QtGui.QUndoCommand):
 
     def undo(self):
         if self.action == ADDED:
-            tagsModule.removeTagType(self.tagType)
+            removeTagType(self.tagType)
         elif self.action == DELETED:
             # Ensure that the same object is recreated, because it might be used in many elements
             # within the undohistory.
@@ -388,7 +388,7 @@ def addTagType(**data):
         - a subset of the arguments of Tag.__init__. In this case this data is used to create a new tag.
           The subset must not contain 'id' and must contain at least 'name' and 'type'.
           
-    After creation the dispatcher's TagTypeChanged signal is emitted.
+    After creation a TagTypeChangedEvent is emitted.
     """
     from . import database as db
     if 'tagType' in data:
@@ -417,8 +417,7 @@ def addTagType(**data):
 def removeTagType(tagType):
     """Remove a tagtype from the database, including all its values and relations. This will not touch any
     files though!
-    
-    After removal the dispatcher's tagTypeChanged signal is emitted.
+    After removal a TagTypeChangedEvent is emitted.
     """
     logger.info("Removing tag '{}'.".format(tagType.name))
     if tagType == TITLE or tagType == ALBUM:
@@ -440,10 +439,9 @@ def changeTagType(tagType,**data):
 
         changeTagType(tagType,name='artist',iconPath=None)
         
-    Allowed keyword arguments are the arguments of Tag.__init__ except id. After the change the dispatcher's
-    tagTypeChanged signal is emitted.
+    Allowed keyword arguments are the arguments of Tag.__init__ except id.
+    After the change a TagTypeChangedEvent is emitted.
     """
-    oldName = tagType.name
     # Below we will build a query like UPDATE tagids SET ... using the list of assignments (e.g. (tagname=?).
     # The parameters will be sent with the query to replace the questionmarks.
     assignments = []
@@ -454,6 +452,7 @@ def changeTagType(tagType,**data):
         if not isValidTagname(name):
             raise ValueError("'{}' is not a valid tagname.".format(name))
         if name != tagType.name:
+            logger.info("Changing tag '{}' to '{}'.".format(tagType.name,name))
             assignments.append('tagname = ?')
             params.append(name)
             del _tagsByName[tagType.name]
@@ -464,6 +463,8 @@ def changeTagType(tagType,**data):
         type = data['type']
         if not isinstance(type,ValueType):
             raise ValueError("'{}' is not a ValueType.".format(type))
+        logger.info("Changing type of tag '{}' from '{}' to '{}'."
+                    .format(tagType.name,tagType.type.name,type.name))
         assignments.append('tagtype = ?')
         params.append(type.name)
         tagType.type = type
@@ -483,12 +484,10 @@ def changeTagType(tagType,**data):
         tagType.private = bool(data['private'])
     
     if len(assignments) > 0:
-        if tagType.name != oldName:
-            logger.info("Changing tag '{}' into '{}'.".format(oldName,tagType.name))
-        else: logger.info("Changing tag '{}'.".format(tagType.name))
+        params.append(tagType.id) # for the where clause
         from . import database as db
-        db.query("UPDATE {}tagids SET {} WHERE id = {}"
-                    .format(db.prefix,','.join(assignments),tagType.id),*params)
+        db.query("UPDATE {}tagids SET {} WHERE id = ?"
+                    .format(db.prefix,','.join(assignments)),*params)
         
         from . import modify
         modify.dispatcher.changes.emit(TagTypeChangedEvent(CHANGED,tagType))
