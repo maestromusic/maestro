@@ -45,6 +45,7 @@ The following example shows basic usage of the module::
 The main class of the module is :class:`AbstractSQL <omg.database.sql.AbstractSQL>` which is subclassed by
 every driver.
 """
+import datetime
 
 from PyQt4 import QtCore
 
@@ -163,7 +164,8 @@ class AbstractSql:
     def getDate(self,value):
         """Return *value* converted to a datetime.datetime. Use this method on every date returned from
         the database because different database drivers may return different date formats."""
-        return value # default implementation for drivers that already return datetime.datetime
+        # default implementation for drivers that already return datetime.datetime
+        return value.replace(tzinfo = datetime.timezone.utc)
 
     def close(self):
         """Close this driver."""
