@@ -192,6 +192,9 @@ class EditorWidget(QtGui.QDockWidget):
         hb.addStretch()
         self.toolbar = QtGui.QToolBar(self)
         self.toolbar.addAction(self.editor.treeActions['clearEditor'])
+        commitAction = levels.CommitAction(levels.editor)
+        self.addAction(commitAction)
+        self.toolbar.addAction(commitAction)
         hb.addWidget(self.toolbar)
         profileNotifier.profilesChanged.connect(self._handleProfilesChanged)
 

@@ -206,16 +206,6 @@ class ChangePositionAction(TreeAction):
         elif self.type == "-1":
             modify.push(commands.PositionChangeCommand(self.parent().level,
                                                        parentId, [(element.position, element.position-1)]))
-            
-class CommitAction(TreeAction):
-    """Action to commit all current editors."""
-    def __init__(self, parent):
-        super().__init__(parent, shortcut = 'Ctrl+Return')
-        self.setText(self.tr("commit (all editors)"))
-        self.setIcon(QtGui.qApp.style().standardIcon(QtGui.QStyle.SP_DialogSaveButton))
-        
-    def doAction(self):
-        modify.push(modify.commands.CommitCommand())
 
 class MatchTagsFromFilenamesAction(TreeAction):
     """An action to trigger a dialog that matches tags from file names. Will be enabled only if at least

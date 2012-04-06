@@ -19,7 +19,8 @@
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from .. import database as db, tags, flags, realfiles, utils, config, logging
+from .. import database as db, tags, flags, realfiles, utils, config, logging, modify
+from ..modify.commands import ElementChangeCommand
 from . import File, Container
     
 real = None
@@ -209,8 +210,34 @@ class RealLevel(Level):
                 flags = db.flags(id)
                 # TODO: Load private tags!
             level.elements[id] = File(level,id = id,path=rpath,length=length,tags=fileTags,flags=flags)
+
+class CommitCommand(ElementChangeCommand):
     
-    
+    def __init__(self, level, text = None):
+        super().__init__(level)
+        
+    def redoChanges(self):
+        print('omg commit')
+        
+    def undoChanges(self):
+        print('omg commit undo')
+        
+
+class CommitAction(QtGui.QAction):
+    """Action to commit a given level into its parent."""
+    def __init__(self, level, text = None):
+        super().__init__(level)
+        self.setShortcut('Ctrl+Return')
+        self.level = level
+        if text is None:
+            text = self.tr('commit level {}'.format(self.level))
+        self.setText(text)
+        self.setIcon(QtGui.qApp.style().standardIcon(QtGui.QStyle.SP_DialogSaveButton))
+        self.triggered.connect(self.doAction)
+        
+    def doAction(self):
+        modify.push(CommitCommand(self.level))
+
 def idFromPath(path):
     id = db.idFromPath(path)
     if id is not None:

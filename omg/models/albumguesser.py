@@ -73,15 +73,11 @@ def guessAlbums(level, filesByFolder, albumGroupers, metacontainer_regex):
 
 class AlbumGuessCommand(commands.ElementChangeCommand):
     
-    contents = True
-    
     def __init__(self, level, containerTags, children, meta = False):
-        super().__init__()
-        self.level = level
+        super().__init__(level, ids = list(children.values()), contents = True)
         self.containerTags = containerTags
         self.containerID = None
         self.children = children
-        self.ids = list(children.values())
         self.meta = meta
     
     def redoChanges(self):

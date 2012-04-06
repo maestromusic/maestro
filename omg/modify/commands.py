@@ -37,6 +37,11 @@ class ElementChangeCommand(QtGui.QUndoCommand):
      - ids: a list of IDs which are affected by the command
      - contents: a boolean indicating if content relations have changed
     """
+    def __init__(self, level, ids = None, contents = None):
+        super().__init__()
+        self.level = level
+        self.ids = ids
+        self.contents = contents
     
     def redoChanges(self):
         raise NotImplementedError()
