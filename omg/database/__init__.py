@@ -171,11 +171,13 @@ def createTables():
 #=========================================================================
 def query(*params):
     try:
+        print("query: ", *params)
         return connections[threading.current_thread().ident].query(*params)
     except KeyError:
         raise RuntimeError("Cannot access database before a connection for this thread has been opened.")
 
 def multiQuery(queryString,args):
+    print("multiquery: ", queryString)
     try:
         return connections[threading.current_thread().ident].multiQuery(queryString,args)
     except KeyError:
@@ -367,32 +369,49 @@ def valueFromId(tagSpec,valueId):
         value = utils.FlexiDate.fromSql(value)
     return value
 
+_cachedValues = None
 
-@functools.lru_cache(1000)
 def idFromValue(tagSpec,value,insert=False):
     """Return the id of the given value in the tag-table of tag *tagSpec*. If the value does not exist,
     raise an sql.EmptyResultException, unless the optional parameter *insert* is set to True. In that case
     insert the value into the table and return its id.
     """
+    global _cachedValues
+    if _cachedValues is None:
+        _cachedValues = dict()
+        for tagType in (tagsModule.TYPE_DATE, tagsModule.TYPE_VARCHAR):
+            _cachedValues[tagType] = dict()
+            result = query("SELECT id, tag_id, value FROM {}values_{}".format(prefix, tagType))
+            for id, tag_id, value in result:
+                _cachedValues[tagType][(tag_id, value)] = id
+    
     tag = tagsModule.get(tagSpec)
     value = _encodeValue(tag.type,value)
-    try:
-        if tag.type == tagsModule.TYPE_DATE:
-            return query("SELECT id FROM {}values_date WHERE tag_id = ? AND value = ?"
-                            .format(prefix),tag.id,value).getSingle()
-        else:
+
+    if tag.type in _cachedValues:
+        try:
+            return _cachedValues[tag.type][(tag.id, value)]
+        except KeyError:
+            if insert:
+                id = query("INSERT INTO {}values_{} (tag_id, value) VALUES (?,?)"
+                           .format(prefix, tag.type), tag.id, value).insertId()
+                _cachedValues[tag.type][(tag.id, value)] = id
+            else:
+                raise KeyError("No value id for tag '{}' and value '{}'".format(tag, value))
+    else:
+        try:
             if type == 'mysql':
                 # Compare exactly (using binary collation)
                 q = "SELECT id FROM {}values_{} WHERE tag_id = ? AND value COLLATE utf8_bin = ?"\
                      .format(prefix,tag.type)
             else: q = "SELECT id FROM {}values_{} WHERE tag_id = ? AND value = ?".format(prefix,tag.type)
             return query(q,tag.id,value).getSingle()
-    except sql.EmptyResultException as e:
-        if insert:
-            result = query("INSERT INTO {}values_{} (tag_id,value) VALUES (?,?)"
-                             .format(prefix,tag.type),tag.id,value)
-            return result.insertId()
-        else: raise e
+        except sql.EmptyResultException as e:
+            if insert:
+                result = query("INSERT INTO {}values_{} (tag_id,value) VALUES (?,?)"
+                                 .format(prefix,tag.type),tag.id,value)
+                return result.insertId()
+            else: raise e
 
 
 def hidden(tagSpec, valueId):

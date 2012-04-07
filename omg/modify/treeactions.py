@@ -237,7 +237,7 @@ class ToggleMajorAction(TreeAction):
     def initialize(self):
         selection = self.parent().nodeSelection
         self.setEnabled(selection.hasElements())
-        self.setChecked(all(element.major for element in selection.elements()))
+        self.setChecked(all(element.element.major for element in selection.elements()))
         self.state = self.isChecked()
         self.selection = selection
         

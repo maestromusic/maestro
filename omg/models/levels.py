@@ -21,7 +21,8 @@ from PyQt4.QtCore import Qt
 
 from .. import database as db, tags, flags, realfiles, utils, config, logging, modify
 from ..modify.commands import ElementChangeCommand
-from . import File, Container
+from ..modify.treeactions import TreeAction
+from . import File, Container, ContentList
     
 real = None
 editor = None
@@ -213,30 +214,117 @@ class RealLevel(Level):
 
 class CommitCommand(ElementChangeCommand):
     
-    def __init__(self, level, text = None):
-        super().__init__(level)
+    def __init__(self, level, ids, text = None):
+        """Sets up a commit command for the given *ids* in *level*."""
+        super().__init__(level, text)
         
+        allIds = set(ids)
+        import itertools
+        # recursively load children's IDs
+        #TODO: only load nodes that actually changed
+        while True:
+            withChildren = allIds | set(itertools.chain.from_iterable(self.level.get(id).contents.ids for id in allIds if self.level.get(id).isContainer()))
+            if withChildren  == allIds:
+                break
+            allIds = withChildren
+        self.ids = list(allIds)
+        self.contents = False
+        if level.parent is real:
+            self.idMap = None
+        self.newElements = []
+        self.flagChanges = {}
+        self.tagChanges = {}
+        self.contentsChanges = {}
+        self.majorChanges = {}
+        for id in allIds:
+            self.recordChanges(id)
+    
+    def recordChanges(self, id):
+        myEl = self.level.get(id)
+        if id in self.level.parent.elements:
+            oldEl = self.level.parent.get(id)
+            oldTags = oldEl.tags
+            oldFlags = oldEl.flags
+            if oldEl.isContainer():
+                oldMajor = oldEl.major
+                oldContents = oldEl.contents
+        else:
+            self.newElements.append(id)
+            oldTags = tags.Storage()
+            oldFlags = []
+            if myEl.isContainer():
+                oldMajor = False
+                oldContents = ContentList()  
+        
+        if oldTags != myEl.tags:
+            self.tagChanges[id] = tags.TagDifference(oldTags, myEl.tags)
+        if oldFlags != myEl.flags:
+            self.flagChanges[id] = flags.FlagDifference(oldFlags, myEl.flags)
+        if myEl.isContainer():
+            if oldContents != myEl.contents:
+                self.contents = True
+                self.contentsChanges[id] = (oldContents.copy(), myEl.contents.copy())
+            if oldMajor != myEl.major:
+                self.majorChanges[id] = (oldMajor, myEl.major)
+        
+            
     def redoChanges(self):
-        print('omg commit')
+        logger.debug("commit from {} to {}".format(self.level, self.level.parent))
+        logger.debug("  {} new elements".format(len(self.newElements)))
+        logger.debug("  {} tag changes".format(len(self.tagChanges)))
+        logger.debug("  {} flag changes".format(len(self.flagChanges)))
+        logger.debug("  {} content changes".format(len(self.contentsChanges)))
+        logger.debug("  {} major changes".format(len(self.majorChanges)))
+        
+        # create new elements in DB to obtain id map, if necessary
+        if len(self.newElements) > 0 and self.level.parent is real:
+            self.idMap = modify.real.createNewElements(self.level, self.newElements, self.idMap)
+        
+        # move commited elements to parent level
+        for id in self.ids:
+            elem = self.level.elements[id]
+            del self.level.elements[id]
+            newId = self.idMap[id] if id in self.newElements and self.level.parent is real else id
+            self.level.parent.elements[newId] = elem
+            elem.id = newId
+        
+        if self.level.parent is real:
+            self.newId = lambda id : self.idMap[id]
+        else:
+            self.newId = lambda id : id    
+        
+        # apply changes in DB, if level real
+        if self.level.parent is real:
+            if len(self.majorChanges) > 0:
+                db.write.setMajor((id, oldMajor) for id,(oldMajor,newMajor) in self.majorChanges.items())
+            if len(self.contentsChanges) > 0:
+                modify.real.changeContents(self.contentsChanges, self.idMap)
+            if len(self.tagChanges) > 0:
+                modify.real.changeTags(self.tagChanges, self.idMap)
+                
         
     def undoChanges(self):
-        print('omg commit undo')
+        logger.debug("undo commit from {} to {}".format(self.level, self.level.parent))
+        newId = self.newId
+        for id in self.ids:
+            element = self.level.parent.elements[newId(id)]
+            del self.level.parent.elements[newId(id)]
+            self.level.elements[id] = element
+            if id in self.newElements:
+                element.id = id
+            else:
+                # restore old state in parent level
+                oldElement = element.copy()
+                if id in self.tagChanges:
+                    self.tagChanges[id].revert(oldElement)
+                if id in self.flagChanges:
+                    self.flagChanges[id].revert(oldElement)
+                if id in self.majorChanges:
+                    oldElement.major = self.majorChanges[id][0]
+                if id in self.contentsChanges:
+                    oldElement.contents = self.contentsChanges[id].copy()
         
 
-class CommitAction(QtGui.QAction):
-    """Action to commit a given level into its parent."""
-    def __init__(self, level, text = None):
-        super().__init__(level)
-        self.setShortcut('Ctrl+Return')
-        self.level = level
-        if text is None:
-            text = self.tr('commit level {}'.format(self.level))
-        self.setText(text)
-        self.setIcon(QtGui.qApp.style().standardIcon(QtGui.QStyle.SP_DialogSaveButton))
-        self.triggered.connect(self.doAction)
-        
-    def doAction(self):
-        modify.push(CommitCommand(self.level))
 
 def idFromPath(path):
     id = db.idFromPath(path)

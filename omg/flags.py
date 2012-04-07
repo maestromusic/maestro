@@ -245,3 +245,20 @@ def changeFlagType(flagType,**data):
         params.append(flagType.id) # for the where clause
         db.query("UPDATE {}flag_names SET {} WHERE id = ?".format(db.prefix,','.join(assignments)),*params)
         modify.dispatcher.changes.emit(FlagTypeChangedEvent(CHANGED,flagType))
+
+class FlagDifference:
+    """See tags.TagDifference"""
+    
+    def __init__(self, flagsA, flagsB):
+        self.removals = set(flagsA) - set(flagsB)
+        self.additions = set(flagsB) - set(flagsA)
+        
+    def apply(self, flagsA):
+        for flag in self.removals:
+            flagsA.remove(flag)
+        flagsA.extend(self.additions)
+        
+    def revert(self, flagsB):
+        for flag in self.additions:
+            flagsB.remove(flag)
+        flagsB.extend(self.removals)

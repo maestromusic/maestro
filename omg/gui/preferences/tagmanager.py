@@ -295,7 +295,7 @@ class TagManager(QtGui.QWidget):
         else:
             from .. import editor
             for model in editor.activeEditorModels():
-                if any(tag in node.tags for node in model.getRoot().getAllNodes(skipSelf=True)):
+                if any(tag in node.element.tags for node in model.getRoot().getAllNodes(skipSelf=True)):
                     return 0,False
             return 0,True
         

@@ -75,25 +75,6 @@ class Node:
         """Return whether this node holds a container. Note that this is in general not the opposite of
         isFile as e.g. rootnodes are neither."""
         return False
-
-    def copy(self,contents=None):
-        """Return a copy of this node. All attributes will be copied by reference, with the exception of the
-        list of contents: If this instance contains a content-attribute, the new node will contain a deep copy
-        of it. Note that a shallow copy makes no sense, because the parent-attributes have to be adjusted. If
-        you do not want this behavior, you may specify the parameter *contents* and the contents will be set
-        to that parameter. The parents of all elements of *contents* will be adjusted in this case, too."""
-        newNode = copy.copy(self)
-        if contents is None:
-            if hasattr(self,'contents'):
-                newNode.contents = [node.copy() for node in self.contents]
-                for node in newNode.contents:
-                    node.parent = newNode
-        else:
-            assert isinstance(contents,list)
-            newNode.contents = contents
-            for node in newNode.contents:
-                node.parent = newNode
-        return newNode
     
     def getParents(self):
         """Returns a generator yielding all parents of this node in the current tree structure, from the
@@ -290,7 +271,7 @@ class Wrapper(Node):
         if prependPosition and self.position is not None:
             result += "{} - ".format(self.position)
         
-        if hasattr(self,'id') and config.options.misc.show_ids:
+        if hasattr(self.element,'id') and config.options.misc.show_ids:
             result += "[{0}] ".format(self.element.id)
             
         if titles is not None:
@@ -363,17 +344,20 @@ class Container(Element):
             self.flags = flags
         else: self.flags = []
     
+    def copy(self):
+        return Container(level = self.level,
+                         id = self.id,
+                         major = self.major,
+                         contents = self.contents.copy(),
+                         parents = self.parents.copy(),
+                         tags = self.tags.copy(),
+                         flags = self.flags.copy())
+        
     def isContainer(self):
         return True
     
     def isFile(self):
         return False
-    
-    def copy(self,level=None):
-        if level is None:
-            level = self.level
-        return Container(level,self.id,self.major,contents=self.contents.copy(),
-                         tags=self.tags.copy(),flags=list(self.flags))
     
     def getContents(self):
         return (self.level.get(id) for id in self.contents)
@@ -403,6 +387,8 @@ class Container(Element):
 
 
 class File(Element):
+    
+    
     def __init__(self, level, id, path, length,*, parents=None, tags=None, flags=None):
         """Initialize this element with the given id, which must be an integer or None (for external files).
         Optionally you may specify a tags.Storage object holding the tags of this element and/or a file path.
@@ -425,16 +411,24 @@ class File(Element):
             self.flags = flags
         else: self.flags = []
         
+    def copy(self):
+        return File( level = self.level,
+                     id = self.id,
+                     path = self.path,
+                     length = self.path,
+                     parents = self.parents.copy(),
+                     tags = self.tags.copy(),
+                     flags = self.flags.copy())
+    
     def isFile(self):
         return True
     
     def isContainer(self):
         return False
     
-    def copy(self,level=None):
-        if level is None:
-            level = self.level
-        return File(level,self.id,self.path,self.length,tags=self.tags.copy(),flags=list(self.flags))
+    @property
+    def major(self):
+        return False
     
     def getLength(self):
         """Return the length of this file."""
@@ -458,6 +452,9 @@ class ContentList:
         else:
             self.positions = []
             self.ids = []
+    
+    def copy(self):
+        return ContentList(existing = self)
         
     def __len__(self):
         return len(self.ids)
@@ -481,6 +478,7 @@ class ContentList:
     
     def items(self):
         return zip(self.positions, self.ids)
+    
     def shift(self, delta):
         """Shift all positions by *delta*"""
         if len(self) == 0:
@@ -488,4 +486,9 @@ class ContentList:
         # ensure position doesn't drop below 1 after the shift
         assert self.positions[0] + delta  > 0
         self.positions[:] = map(lambda x: x + delta, self.positions)
-            
+    
+    def __eq__(self, other):
+        return self.ids == other.ids and self.positions == other.positions
+    
+    def __ne__(self, other):
+        return not self == other

@@ -42,7 +42,7 @@ class NodeSelection:
         all attributes."""
         indexes = model.selectedIndexes()
         self._nodes = [ model.model().data(index) for index in indexes ]
-        self._elements = [ node for node in self._nodes if isinstance(node, models.Element) ]
+        self._elements = [ node for node in self._nodes if isinstance(node, models.Wrapper) ]
         self._parents = set(elem.parent for elem in self._elements)
         self._model = model
     
@@ -64,15 +64,14 @@ class NodeSelection:
             return result
         
     def elements(self, recursive = False):
-        """Returns a list of all selected elements. If *recursive* is True, all children of selected elements
-        are also returned. If *unique* is True, the list does not contain more than one element with the same ID."""
+        """Returns a list of all selected element wrappers. If *recursive* is True, all children of selected wrappers
+        are also returned."""
         if not recursive:
             # Just remove duplicates and nodes which don't have tags
             return self._elements
         else:
             selectedNodes = self.nodes(onlyToplevel=True)
             elements = []
-            ids = set()
             for node in selectedNodes:
                 for child in node.getAllNodes():
                     if isinstance(child,models.Element):

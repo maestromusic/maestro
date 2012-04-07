@@ -20,19 +20,26 @@ import itertools
 from omg import database as db, tags
 
 
-def createNewElement(file,major, id = None):
-    """Insert a new element into the database and return its id. Set the file and major flag as given in the
-    parameters and set the toplevel flag and elements counter to 1 and 0, respectively. If an *id* is given,
-    the new element will have this id, otherwise an id is created automatically."""
-    if id is not None:
-        db.query("INSERT INTO {}elements (id, file, toplevel, elements, major) VALUES (?, ?, 1, 0, ?)"
-                 .format(db.prefix), id, int(file), int(major))
-        return id
-    else:
-        return db.query("INSERT INTO {}elements (file,toplevel,elements,major) VALUES (?,1,0,?)"
-                        .format(db.prefix),int(file),int(major)).insertId()
-                        
-                        
+def createElements(fileMajorParams):
+    """Creates elements in the database and returns their IDs. *fileMajorParams* is a list of
+    (file, major) tuples specifying the new elements."""
+    last = db.multiQuery("INSERT INTO {}elements (file,toplevel, elements, major) VALUES (?,1,0,?)"
+                  .format(db.prefix), fileMajorParams).insertId()
+    first = last - len(fileMajorParams) + 1
+    return list(range(first, last+1))
+
+def createElementsWithIds(idFileMajorParams):
+    """Creates elements in the database whose IDs are given *idFileMajorParams* is a list of
+    (id, file, major) tuples."""
+    db.multiQuery("INSERT INTO {}elements (id, file,toplevel, elements, major) VALUES (?,?,1,0,?)"
+                  .format(db.prefix), idFileMajorParams)                       
+
+def createFiles(idPathLengthParams):
+    """Adds entries to the files table specified by *idPathLengthParams*, a list of
+    (id, path, length) tuples."""
+    db.multiQuery("INSERT INTO {}files (element_id,path,length) VALUES(?,?,?)"
+                  .format(db.prefix),idPathLengthParams)
+                      
 def deleteElements(ids):
     """Delete the elements with the given ids from the database and update element counter and toplevel
     flags. Due to the foreign keys in the database, this will also delete all tag, flag and content relations
@@ -91,6 +98,9 @@ def removeContents(data):
     db.multiQuery("DELETE FROM {}contents WHERE container_id = ? AND position = ?"
                    .format(db.prefix), data)
 
+def removeAllContents(data):
+    """Remove *all* contents of the parents whose IDs are given by the list *data*."""
+    db.multiQuery("DELETE FROM {}contents WHERE container_id = ?".format(db.prefix), data)
 def changePositions(parentID, changes):
     """Change the positions of children of *parentID* as given by *changes*, which is a list of (oldPos, newPos)
     tuples."""
@@ -137,7 +147,36 @@ def addFile(elid,path,hash,length):
 def changeFilePath(elid, path):
     """Change the path of a file."""
     db.query("UPDATE {}files SET path = ? WHERE element_id = ?".format(db.prefix), path, elid)
-  
+
+
+def makeValueIDs(data):
+    """Ensures that tag values are present in values_* tables. *data* must
+    be a list of (*tag*, *value*) tuples."""
+    valuesToAdd = {}
+    for tag, value in data:
+        try:
+            db.idFromValue(tag, value)
+        except KeyError:
+            if tag.type not in valuesToAdd:
+                valuesToAdd[tag.type] = set()
+            valuesToAdd[tag.type].add((tag.id, db._encodeValue(tag.type, value)))
+    for tagType, values in valuesToAdd.items():
+        values = list(values)
+        print('inserting {} tags {}'.format(tagType, values))
+        lastId = db.multiQuery("INSERT INTO {}values_{} (tag_id, value) VALUES (?,?)"
+                      .format(db.prefix, tagType), values).insertId()
+        if tagType in db._cachedValues:
+            # update cache
+            firstId = lastId - len(values) + 1
+            for id, (tagId, value) in enumerate(values, start= firstId):
+                db._cachedValues[tagType][(tagId, value)] = id
+                
+
+def addTagValuesMulti(data):
+    """Add multiple tag values. *data* is a list of (elementID, tagID, valueID) tuples."""
+    db.multiQuery("INSERT INTO {}tags (element_id, tag_id, value_id) VALUES (?,?,?)"
+                  .format(db.prefix), data)
+    
 def addTagValuesById(elids,tag,valueIds):
     """Add tag values given by their id to some elements. *elids* is either a single id or a list of ids,
     *tag* is the affected tag and *valueIds* is a list of values-ids for *tag*.
@@ -176,10 +215,9 @@ def removeTagValuesById(elids,tag,valueIds):
                 .format(db.prefix,db.csList(elids),tag.id,db.csList(valueIds)))
     
     
-def removeTagValues(elids,tag,values):
-    """Remove some values of one tag from some elements. *elids* is either a single id or a list of ids,
-    *tag* is the affected tag, *valueIds* is a list of values of *tag*."""
-    removeTagValuesById(elids,tag,(db.idFromValue(tag,value) for value in values))
+def removeTagValues(data):
+    """Remove tag values from elements. *data* must be a list of (elementID, tagID, valueID) tuples."""
+    db.multiQuery("DELETE FROM {}tags WHERE element_id = ? AND tag_id = ? AND value_id = ?".format(db.prefix), data)
     
     
 def changeTagValueById(elids,tag,oldId,newId):
@@ -240,5 +278,5 @@ def setFlags(elid,flags):
         values = ["({},{})".format(elid,flag.id) for flag in flags]
         db.query("INSERT INTO {}flags (element_id,flag_id) VALUES {}".format(db.prefix,','.join(values)))
     
-def setMajor(elid, major):
-    db.query("UPDATE {}elements SET major = ? WHERE id = ?".format(db.prefix), major, elid)
+def setMajor(idMajorParams):
+    db.multiQuery("UPDATE {}elements SET major = ? WHERE id = ?".format(db.prefix), idMajorParams)

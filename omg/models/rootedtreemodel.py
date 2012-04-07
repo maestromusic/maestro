@@ -57,6 +57,25 @@ class ClearTreeAction(treeactions.TreeAction):
                                       [],
                                       self.tr('clear view')))
 
+class CommitTreeAction(treeactions.TreeAction):
+    
+    def __init__(self, parent):
+        super().__init__(parent, shortcut = "Shift+Enter")
+        self.setIcon(QtGui.qApp.style().standardIcon(QtGui.QStyle.SP_DialogSaveButton))
+        self.setText(self.tr('commit this tree'))
+        
+    def initialize(self):
+        self.setEnabled(self.parent().model().root.getContentsCount() > 0)
+        
+    def doAction(self):
+        from . import levels
+        print(levels.real.elements.keys())
+        print(levels.editor.elements.keys())
+        model = self.parent().model()
+        ids = set(n.element.id for n in self.parent().nodeSelection.elements())
+        print(ids)
+        modify.push(levels.CommitCommand(model.level, ids))
+        
 class RootedTreeModel(QtCore.QAbstractItemModel):
     """The RootedTreeModel subclasses QAbstractItemModel to create a simple model for QTreeViews. It takes one
     root node which is not considered part of the data of this model (and is not displayed by QTreeViews).

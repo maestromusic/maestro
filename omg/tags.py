@@ -686,6 +686,43 @@ class Storage(dict):
             return Storage({tag: l for tag,l in self.items() if not tag.private})
         else: return self
 
+class TagDifference:
+    """A class storing the difference between two Storage() objects, for use in UndoCommands."""
+    
+    def __init__(self, tagsA, tagsB):
+        self.removals = []
+        self.additions = []
+        for tag, valuesA in tagsA.items():
+            if tag not in tagsB:
+                self.removals.append((tag, valuesA[:]))
+            else:
+                valuesB = tagsB[tag]
+                removedValues = [v for v in valuesA if v not in valuesB]
+                if len(removedValues) > 0:
+                    self.removals.append((tag, removedValues))
+                newValues = [v for v in valuesB if v not in valuesA]
+                if len(newValues) > 0:
+                    self.additions.append((tag, newValues))
+        for tag, valuesB in tagsB.items():
+            if tag not in tagsA:
+                self.additions.append((tag, valuesB[:]))
+                
+    def apply(self, tagsA):
+        """Apply the changes to *tagsA*, transforming them into *tagsB* given to the constructor."""
+        for tag, values in self.removals:
+            tagsA.remove(tag, *values)
+        for tag, values in self.additions:
+            tagsA.add(tag, *values)
+            
+    def revert(self, tagsB):
+        """Revert the changes from *tagsB*, transforming them into *tagsA* as given to the constructor."""
+        for tag, values in self.additions:
+            tagsB.remove(tag, *values)
+        for tag, values in self.removals:
+            tagsB.add(tag, *values)
+                    
+                 
+        
 
 def findCommonTags(elements):
     """Returns a Storage object containing all tags that are equal in all of the elements.

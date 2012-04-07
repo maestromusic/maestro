@@ -25,12 +25,12 @@ from .. import database as db, tags as tagsModule, realfiles, logging, utils
 from ..database import write
 from . import dispatcher, events
 from ..constants import REAL
-import os
+import os, itertools
 
 logger = logging.getLogger(__name__)
 
 
-def createNewElements(elements):
+def createNewElements(level, ids, idMap = None):
     """Create new elements. *elements* is a list of preliminary elements. If they have negative IDs, new IDs for
     them are created automatically. Otherwise, they are inserted with the IDs as given in the element.
     This method will insert new entries in the elements and file table. It won't save
@@ -38,31 +38,56 @@ def createNewElements(elements):
     
     This method will return a dict mapping old to new ids.
     """
-    result = {}
-    newFileParams = []
-    for element in elements:
-        newId = db.write.createNewElement(element.isFile(),
-                                          element.major if element.isContainer() else False,
-                                          id = None if element.id < 0 else element.id)
-        if element.isFile():
-            newFileParams.append((newId,element.path, element.length))
-        result[element.id] = newId
-        
-    if len(newFileParams) > 0:
-        db.multiQuery("INSERT INTO {}files (element_id,path,length) VALUES(?,?,?)"
-                      .format(db.prefix),newFileParams)
-        dispatcher.changes.emit(events.FilesAddedEvent([params[1] for params in newFileParams]))
-    return result
+    elements = [ level.get(id) for id in ids ]
+    if idMap is None:
+        newIds = db.write.createElements([ (True, False) if element.isFile() else (False, element.major) for element in elements ])
+        idMap = dict(zip(ids, newIds))
+    else:
+        db.write.createElementsWithIds([ (idMap[element.id], element.isFile(), element.major) for element in elements ])
+    
+    if any(element.isFile() for element in elements):
+        db.write.createFiles([ (idMap[file.id], file.path, file.length) for file in elements if file.isFile() ])
+    return idMap
 
-def newContainer(tags, flags, major, id = None):
-    """Creates a new container in the database with the given attributes. Returns its id.
-    This function does not emit any events."""
-    id = db.write.createNewElement(False, major, id)
-    oldTags = tagsModule.Storage()
-    oldFlags = []
-    changeTags({id:(oldTags,tags)}, emitEvent = False)
-    changeFlags({id:(oldFlags,flags)}, emitEvent = False)
-    return id    
+def changeContents(changes, idMap = None):
+    """Change content relations of containers. *changes* is a dict mapping container ID to (oldContents, newContents)
+    tuples of ContentList instances. If given, *idMap* is a dict mapping temporary to real IDs and will be applied
+    to all container and child IDs in the content change process."""
+    newId = lambda id : idMap[id] if (idMap is not None and id in idMap) else id 
+    idsWithPriorContents = [id for id,changeTup in changes.items() if len(changeTup[0]) > 0 ]
+    if len(idsWithPriorContents) > 0:
+        # first remove old content relations
+        db.write.removeAllContents(idsWithPriorContents)
+    tuples = []
+    for containerId, (oldContents, newContents) in changes.items():
+        tuples.extend( ( (newId(containerId),) + x) for x in map(lambda tup: (tup[0], newId(tup[1])), newContents.items()))
+    db.write.addContents(tuples)
+    
+def changeTags(changes, idMap = None):
+    newId = lambda id : idMap[id] if (idMap is not None and id in idMap) else id
+    removeTuples = []
+    addTuples = []
+    neededValues = set()
+    for id, tagDiff in changes.items():
+        for tag, values in tagDiff.removals:
+            removeTuples.extend( (newId(id), tag.id, db.idFromValue(tag, value)) for value in values)
+        for tag, values in tagDiff.additions:
+            addTuples.extend( (newId(id), tag.id, value) for value in values)
+            neededValues.update(( (tag, value) for value in values ))
+    db.write.removeTagValues(removeTuples)
+    neededValues = list(neededValues)
+    db.write.makeValueIDs(neededValues)
+    addData = []
+    for id, tagId, value in addTuples:
+        addData.append( (id, tagId, db.idFromValue(tagId, value)))
+    db.write.addTagValuesMulti(addData)
+    
+    
+        
+        
+    
+    
+        
 
 def deleteElements(elids):
     """Delete the elements with the given ids from the database. This will delete from the elements table
@@ -236,7 +261,7 @@ def _getPathAndFileTags(id,elements):
     else: return None,None
 
 
-def changeTags(changes,elements=[],emitEvent = True):
+def changeTagsOLD(changes,elements=[],emitEvent = True):
     """Change tags arbitrarily: *changes* is a dict mapping element ids to tuples consisting
     of two tags.Storages - the tags before and after the change. *elements* is a list of affected elements
     and is only used to determine whether an element is a file and to get its path. If an element is not

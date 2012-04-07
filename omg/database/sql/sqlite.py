@@ -34,14 +34,13 @@ class Sql(AbstractSql):
             
     def query(self,queryString,*args):
         try:
-            result = self._db.execute(queryString,args)
+            return SqlResult(self._db.execute(queryString,args))
         except Exception as e:
             raise DBException(str(e),query=queryString,args=args)
-        return SqlResult(result)
     
     def multiQuery(self,queryString,argSets):
         try:
-            result = self._db.executemany(queryString,argSets)
+            return SqlResult(self._db.executemany(queryString,argSets))
         except Exception as e:
             raise DBException(str(e),query=queryString,args=argSets)
         
@@ -86,7 +85,11 @@ class SqlResult(AbstractSqlResult):
         return self._cursor.rowcount
     
     def insertId(self):
-        return self._cursor.lastrowid
+        if self._cursor.lastrowid is None:
+            # lastrowid is None after multiqueries
+            return self._cursor.execute("SELECT last_insert_rowid()").fetchone()[0]
+        else:
+            return self._cursor.lastrowid
     
     def getSingle(self):
         if len(self._rows) == 0:
