@@ -258,7 +258,6 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
         self.endInsertRows()
         
     def levelChanged(self, ids, contents):
-        print('change event: {} / {}'.format(ids, contents))
         for node in self.getAllNodes(skipSelf = True):
             if isinstance(node, Wrapper) and node.element.id in ids:
                 self.dataChanged.emit(self.getIndex(node), self.getIndex(node))

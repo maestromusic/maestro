@@ -25,10 +25,10 @@ import os.path, subprocess, hashlib, datetime, threading, queue, time
 logger = logging.getLogger(__name__)
 
 syncThread = None
-
+enabled = False
 
 def init():
-    global syncThread, notifier, null
+    global syncThread, notifier, null, enabled
     if config.options.filesystem.disable:
         return
     syncThread = FileSystemSynchronizer()
@@ -38,13 +38,15 @@ def init():
     syncThread.missingFilesDetected.connect(notifier.notifyAboutMissingFiles)
     syncThread.modifiedTagsDetected.connect(notifier.changeModifiedTags)
     syncThread.start()
+    enabled = True
     logger.debug("Filesystem module initialized")
     
 def shutdown():
     """Terminates this module; waits for all threads to complete."""
-    global syncThread
+    global syncThread, enabled
     if config.options.filesystem.disable or syncThread is None:
         return
+    enabled = False
     logger.debug("Filesystem module: received shutdown() command")
     syncThread.should_stop.set()
     syncThread.dialogFinished.set()
@@ -55,12 +57,16 @@ def shutdown():
     logger.debug("Filesystem module: shutdown complete")
 
 def folderStatus(dir):
-    if config.options.filesystem.disable:
-        return 'unknown'
-    elif syncThread is None:
+    if not enabled:
         return 'unknown'
     else:
         return syncThread.knownFolders[dir]
+
+def fileHash(path):
+    if enabled:
+        if path in syncThread.knownNewFiles:
+            return syncThread.knownNewFiles[path][0]
+    return None
 
 def computeHash(path):
     """Compute the audio hash of a single file. This method uses
@@ -187,6 +193,7 @@ class FileSystemSynchronizer(QtCore.QThread):
                 return
             timestamp = db.getDate(timestamp)
             if os.path.exists(utils.absPath(path)):
+                
                 self.knownNewFiles[path] = (hash, timestamp)
             else:
                 goneNewFiles.append((path,))

@@ -30,7 +30,7 @@ class Sql(AbstractSql):
     def __init__(self):
         self._db = QtSql.QSqlDatabase("QMYSQL")
                 
-    def connect(self,username,password,database,host="localhost",port=3306):
+    def connect(self,username,password,database,host="localhost",port=3306, **kwargs):
         self._db.setHostName(host)
         self._db.setPort(int(port))
         self._db.setDatabaseName(database)

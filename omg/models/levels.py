@@ -276,16 +276,8 @@ class CommitCommand(ElementChangeCommand):
                 self.majorChanges[id] = (oldMajor, myEl.major)
                 changes = True
         return changes
-        
             
     def redoChanges(self):
-        logger.debug("commit from {} to {}".format(self.level, self.level.parent))
-        logger.debug("  {} new elements".format(len(self.newElements)))
-        logger.debug("  {} tag changes".format(len(self.tagChanges)))
-        logger.debug("  {} flag changes".format(len(self.flagChanges)))
-        logger.debug("  {} content changes".format(len(self.contentsChanges)))
-        logger.debug("  {} major changes".format(len(self.majorChanges)))
-        
         # create new elements in DB to obtain id map, if necessary
         if len(self.newElements) > 0 and self.level.parent is real:
             if self.idMap is None:
@@ -322,14 +314,14 @@ class CommitCommand(ElementChangeCommand):
             if len(self.contentsChanges) > 0:
                 modify.real.changeContents(self.contentsChanges, self.idMap)
             if len(self.tagChanges) > 0:
-                modify.real.changeTags(self.tagChanges, self.idMap)
+                modify.real.changeTags(dict( (newId(id), diff) for id,diff in self.tagChanges.items()))
+            if len(self.flagChanges) > 0:
+                modify.real.changeFlags(dict( (newId(id), diff) for id,diff in self.flagChanges.items()))
             
             db.commit()
         self.level.parent.changed.emit(self.ids, self.contents)
         
     def undoChanges(self):
-        logger.debug("undo commit from {} to {}".format(self.level, self.level.parent))
-        
         newId = self.newId
         oldId = self.oldId
         
@@ -358,7 +350,9 @@ class CommitCommand(ElementChangeCommand):
                 
         if self.level.parent is real:
             if len(self.tagChanges) > 0:
-                modify.real.changeTags(self.tagChanges, self.idMap, reverse = True)
+                modify.real.changeTags(dict( (newId(id),diff) for id,diff in self.tagChanges.items() ), reverse = True)
+            if len(self.flagChanges) > 0:
+                modify.real.changeFlags(dict( (newId(id), diff) for id,diff in self.flagChanges.items() ), reverse = True)
             if len(self.majorChanges) > 0:
                 db.write.setMajor((newId(id), oldMajor) for id,(oldMajor,newMajor) in self.majorChanges.items())
             if len(self.contentsChanges) > 0:
@@ -366,7 +360,6 @@ class CommitCommand(ElementChangeCommand):
             if len(self.newElements) > 0:
                 db.write.deleteElements(list(map(newId, self.newElements)))
             db.commit()
-
 
 def idFromPath(path):
     id = db.idFromPath(path)

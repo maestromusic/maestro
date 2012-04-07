@@ -25,7 +25,7 @@ from .. import database as db, tags as tagsModule, realfiles, logging, utils
 from ..database import write
 from . import dispatcher, events
 from ..constants import REAL
-import os, itertools
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +52,10 @@ def createNewElements(level, ids, idMap = None):
         db.write.createElementsWithIds(specs)
     
     if any(element.isFile() for element in elements):
-        db.write.createFiles([ (idMap[file.id], file.path, file.length) for file in elements if file.isFile() ])
+        def hash(path):
+            from .. import filesystem
+            return filesystem.fileHash(path)
+        db.write.addFiles([ (idMap[file.id], file.path, hash(file.path), file.length) for file in elements if file.isFile() ])
     return idMap
 
 def changeContents(changes, idMap = None):
@@ -69,24 +72,38 @@ def changeContents(changes, idMap = None):
         tuples.extend( ( (newId(containerId),) + x) for x in map(lambda tup: (tup[0], newId(tup[1])), newContents.items()))
     db.write.addContents(tuples)
     
-def changeTags(changes, idMap = None, reverse = False):
-    newId = lambda id : idMap[id] if (idMap is not None and id in idMap) else id
+def changeTags(changes, reverse = False):
     removeTuples = []
     addTuples = []
     neededValues = set()
     for id, tagDiff in changes.items():
         for tag, values in (tagDiff.removals if not reverse else tagDiff.additions):
-            removeTuples.extend( (newId(id), tag.id, db.idFromValue(tag, value)) for value in values)
+            removeTuples.extend( (id, tag.id, db.idFromValue(tag, value)) for value in values)
         for tag, values in (tagDiff.additions if not reverse else tagDiff.removals):
-            addTuples.extend( (newId(id), tag.id, value) for value in values)
+            addTuples.extend( (id, tag.id, value) for value in values)
             neededValues.update(( (tag, value) for value in values ))
-    db.write.removeTagValues(removeTuples)
+    if len(removeTuples) > 0:
+        db.write.removeTagValues(removeTuples)
     neededValues = list(neededValues)
     db.write.makeValueIDs(neededValues)
     addData = []
     for id, tagId, value in addTuples:
         addData.append( (id, tagId, db.idFromValue(tagId, value)))
-    db.write.addTagValuesMulti(addData)
+    if len(addData) > 0:
+        db.write.addTagValuesMulti(addData)
+    
+def changeFlags(changes, reverse = False):
+    removeTuples = []
+    addTuples = []
+    for id, flagDiff in changes.items():
+        addTuples.extend( (id,flag.id) for flag in flagDiff.additions)
+        removeTuples.extend( (id,flag.id) for flag in flagDiff.removals)
+    if reverse:
+        addTuples, removeTuples = removeTuples, addTuples
+    if len(addTuples) > 0:
+        db.write.addFlags(addTuples)
+    if len(removeTuples) > 0:
+        db.write.removeFlags(removeTuples)
 
 def deleteFilesFromDisk(paths):
     """Delete the given files from the filesystem. *paths* is a list of paths."""

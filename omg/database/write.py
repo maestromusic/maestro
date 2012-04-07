@@ -34,11 +34,11 @@ def createElementsWithIds(data):
     db.multiQuery("INSERT INTO {}elements (id, file,toplevel, elements, major) VALUES (?,?,?,?,?)"
                   .format(db.prefix), data)                       
 
-def createFiles(idPathLengthParams):
-    """Adds entries to the files table specified by *idPathLengthParams*, a list of
-    (id, path, length) tuples."""
-    db.multiQuery("INSERT INTO {}files (element_id,path,length) VALUES(?,?,?)"
-                  .format(db.prefix),idPathLengthParams)
+def addFiles(data):
+    """Adds entries to the files table specified by *data*, a list of
+    (id, path, hash, length) tuples."""
+    db.multiQuery("INSERT INTO {}files (element_id, path, hash, length) VALUES(?,?,?,?)"
+                  .format(db.prefix),data)
                       
 def deleteElements(ids):
     """Delete the elements with the given ids from the database and update element counter and toplevel
@@ -55,7 +55,16 @@ def deleteElements(ids):
     updateToplevelFlags(contentsIds)
     db.commit()
 
-
+def addFlags(data):
+    """Add entries to the flags table. *data* is a list of (elementid, flagid) tuples."""
+    db.multiQuery("INSERT INTO {}flags (element_id,flag_id) VALUES (?,?)".format(db.prefix), data)
+    
+    
+def removeFlags(data):
+    """Remove entries from the flags table. *data* is a list of (elementid, flagid) tuples."""
+    db.multiQuery("DELETE FROM {}flags WHERE flag_id = ? AND element_id = ?"
+                .format(db.prefix), data)
+    
 def setContents(data):
     """Set contents of one or more elements. *data* is a dict mapping ids to lists of contents. The lists
     of contents must contain elements with an id and a position. This method is not recursive."""
@@ -139,16 +148,9 @@ def updateToplevelFlags(elids = None):
         {1}
         """.format(db.prefix,whereClause))
 
-
-def addFile(elid,path,hash,length):
-    """Add a file with the given data to the file table."""
-    db.query("INSERT INTO {}files (element_id,path,hash,length) VALUES (?,?,?,?)"
-                .format(db.prefix),elid,path,hash,length)
-
 def changeFilePath(elid, path):
     """Change the path of a file."""
     db.query("UPDATE {}files SET path = ? WHERE element_id = ?".format(db.prefix), path, elid)
-
 
 def makeValueIDs(data):
     """Ensures that tag values are present in values_* tables. *data* must
@@ -278,5 +280,5 @@ def setFlags(elid,flags):
         values = ["({},{})".format(elid,flag.id) for flag in flags]
         db.query("INSERT INTO {}flags (element_id,flag_id) VALUES {}".format(db.prefix,','.join(values)))
     
-def setMajor(idMajorParams):
-    db.multiQuery("UPDATE {}elements SET major = ? WHERE id = ?".format(db.prefix), idMajorParams)
+def setMajor(data):
+    db.multiQuery("UPDATE {}elements SET major = ? WHERE id = ?".format(db.prefix), data)
