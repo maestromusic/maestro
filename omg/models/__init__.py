@@ -123,9 +123,9 @@ class Node:
             yield self
         if self.isFile():
             return
-        for element in self.contents:
-            for node in element.getAllNodes():
-                yield node
+        for node in self.contents:
+            for subnode in node.getAllNodes():
+                yield subnode
  
     def getAllFiles(self):
         """Generator which will return all files contained in this node or in children of it
@@ -285,6 +285,18 @@ class Wrapper(Node):
         else: result += translate("Element","<No title>")
 
         return result
+    
+
+    def toolTipText(self):
+        parts = []
+        if self.element.tags is not None:
+            parts.append('\n'.join('{}: {}'.format(tag.title,', '.join(map(str,values)))
+                                    for tag,values in self.element.tags.items()))
+        if self.element.flags is not None and len(self.element.flags) > 0:
+            parts.append('Flags: ' + ', '.join(flag.name for flag in self.element.flags))
+        if len(parts) > 0:
+            return '\n'.join(parts)
+        else: return str(self)
 
 class Element:
     """Abstract base class for elements (files or containers) in playlists, browser, etc.. Contains methods
@@ -294,20 +306,6 @@ class Element:
 
     def isInDB(self):
         return self.id > 0
-    
-    # Misc
-    #====================================================
-    
-    def toolTipText(self):
-        parts = []
-        if self.tags is not None:
-            parts.append('\n'.join('{}: {}'.format(tag.title,', '.join(map(str,values)))
-                                    for tag,values in self.tags.items()))
-        if self.flags is not None and len(self.flags) > 0:
-            parts.append('Flags: ' + ', '.join(flag.name for flag in self.flags))
-        if len(parts) > 0:
-            return '\n'.join(parts)
-        else: return str(self)
         
     def __str__(self):
         if self.tags is not None:
@@ -415,10 +413,10 @@ class File(Element):
         return File( level = self.level,
                      id = self.id,
                      path = self.path,
-                     length = self.path,
-                     parents = self.parents.copy(),
+                     length = self.length,
+                     parents = self.parents[:],
                      tags = self.tags.copy(),
-                     flags = self.flags.copy())
+                     flags = self.flags[:])
     
     def isFile(self):
         return True

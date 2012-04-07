@@ -19,12 +19,9 @@
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
-from .. import logging, modify, tags, realfiles, config
-from ..models import rootedtreemodel, RootNode, Wrapper, albumguesser, levels
-from ..modify import events, commands
-from ..utils import collectFiles, relPath
-from collections import OrderedDict
-import itertools
+from .. import logging, modify, config
+from ..models import rootedtreemodel, RootNode, albumguesser, levels
+from ..utils import collectFiles
 
 logger = logging.getLogger(__name__)
                     

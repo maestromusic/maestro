@@ -18,7 +18,7 @@
 
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
-
+from ..database import write 
 from .. import database as db, tags, flags, realfiles, utils, config, logging, modify
 from ..modify.commands import ElementChangeCommand
 from ..modify.treeactions import TreeAction
@@ -95,7 +95,7 @@ class RealLevel(Level):
         notFound = []
         for id in ids:
             if id in self.elements:
-                child.elements[id] = self.elements[id].copy(child)
+                child.elements[id] = self.elements[id].copy()
             else: notFound.append(id)
         if len(notFound) > 0:
             positiveIds = [id for id in notFound if id > 0]
@@ -227,7 +227,7 @@ class CommitCommand(ElementChangeCommand):
             if withChildren  == allIds:
                 break
             allIds = withChildren
-        self.ids = list(allIds)
+        
         self.contents = False
         if level.parent is real:
             self.idMap = None
@@ -236,11 +236,15 @@ class CommitCommand(ElementChangeCommand):
         self.tagChanges = {}
         self.contentsChanges = {}
         self.majorChanges = {}
+        self.oldIds = []
         for id in allIds:
-            self.recordChanges(id)
+            if self.recordChanges(id):
+                self.oldIds.append(id)
     
     def recordChanges(self, id):
+        """Store changes, return True if there are any."""
         myEl = self.level.get(id)
+        changes = False
         if id in self.level.parent.elements:
             oldEl = self.level.parent.get(id)
             oldTags = oldEl.tags
@@ -249,6 +253,7 @@ class CommitCommand(ElementChangeCommand):
                 oldMajor = oldEl.major
                 oldContents = oldEl.contents
         else:
+            changes = True
             self.newElements.append(id)
             oldTags = tags.Storage()
             oldFlags = []
@@ -258,14 +263,19 @@ class CommitCommand(ElementChangeCommand):
         
         if oldTags != myEl.tags:
             self.tagChanges[id] = tags.TagDifference(oldTags, myEl.tags)
+            changes = True
         if oldFlags != myEl.flags:
             self.flagChanges[id] = flags.FlagDifference(oldFlags, myEl.flags)
+            changes = True
         if myEl.isContainer():
             if oldContents != myEl.contents:
                 self.contents = True
                 self.contentsChanges[id] = (oldContents.copy(), myEl.contents.copy())
+                changes = True
             if oldMajor != myEl.major:
                 self.majorChanges[id] = (oldMajor, myEl.major)
+                changes = True
+        return changes
         
             
     def redoChanges(self):
@@ -278,38 +288,60 @@ class CommitCommand(ElementChangeCommand):
         
         # create new elements in DB to obtain id map, if necessary
         if len(self.newElements) > 0 and self.level.parent is real:
-            self.idMap = modify.real.createNewElements(self.level, self.newElements, self.idMap)
+            if self.idMap is None:
+                # first redo -> prepare id mapping
+                self.idMap = modify.real.createNewElements(self.level, self.newElements)
+                self.newIds = list(self.idMap.values())
+            else:
+                modify.real.createNewElements(self.level, self.newElements, self.idMap)
+        
+        newId = self.newId = lambda id : self.idMap[id] if self.level.parent is real and id in self.idMap else id
+        if self.level.parent is real:
+            idMapReverse = {b:a for a,b in self.idMap.items() }
+        self.oldId = lambda id : idMapReverse[id] if self.level.parent is real and id in idMapReverse else id
         
         # move commited elements to parent level
-        for id in self.ids:
+        self.ids = []
+        for id in self.oldIds:
             elem = self.level.elements[id]
             del self.level.elements[id]
-            newId = self.idMap[id] if id in self.newElements and self.level.parent is real else id
-            self.level.parent.elements[newId] = elem
-            elem.id = newId
-        
-        if self.level.parent is real:
-            self.newId = lambda id : self.idMap[id]
-        else:
-            self.newId = lambda id : id    
+            nid = newId(id)
+            self.level.parent.elements[nid] = elem
+            elem.id = nid
+            self.ids.append(nid)
+            if self.level.parent is real:
+                # adjust ids in contents ant parents
+                elem.parents = [newId(id) for id in elem.parents]
+                if elem.isContainer():
+                    elem.contents.ids = [newId(id) for id in elem.contents.ids]     
         
         # apply changes in DB, if level real
         if self.level.parent is real:
             if len(self.majorChanges) > 0:
-                db.write.setMajor((id, oldMajor) for id,(oldMajor,newMajor) in self.majorChanges.items())
+                db.write.setMajor((self.newId(id), newMajor) for id,(oldMajor,newMajor) in self.majorChanges.items())
             if len(self.contentsChanges) > 0:
                 modify.real.changeContents(self.contentsChanges, self.idMap)
             if len(self.tagChanges) > 0:
                 modify.real.changeTags(self.tagChanges, self.idMap)
-                
+            
+            db.commit()
+        self.level.parent.changed.emit(self.ids, self.contents)
         
     def undoChanges(self):
         logger.debug("undo commit from {} to {}".format(self.level, self.level.parent))
+        
         newId = self.newId
-        for id in self.ids:
+        oldId = self.oldId
+        
+        for id in self.oldIds:
             element = self.level.parent.elements[newId(id)]
             del self.level.parent.elements[newId(id)]
             self.level.elements[id] = element
+            if self.level.parent is real:
+                # adjust ids in contents ant parents
+                element.parents = [oldId(id) for id in element.parents]
+                if element.isContainer():
+                    element.contents.ids = [oldId(id) for id in element.contents.ids]
             if id in self.newElements:
                 element.id = id
             else:
@@ -322,8 +354,18 @@ class CommitCommand(ElementChangeCommand):
                 if id in self.majorChanges:
                     oldElement.major = self.majorChanges[id][0]
                 if id in self.contentsChanges:
-                    oldElement.contents = self.contentsChanges[id].copy()
-        
+                    oldElement.contents = self.contentsChanges[id][0].copy()
+                
+        if self.level.parent is real:
+            if len(self.tagChanges) > 0:
+                modify.real.changeTags(self.tagChanges, self.idMap, reverse = True)
+            if len(self.majorChanges) > 0:
+                db.write.setMajor((newId(id), oldMajor) for id,(oldMajor,newMajor) in self.majorChanges.items())
+            if len(self.contentsChanges) > 0:
+                modify.real.changeContents({a:(c,b) for a,(b,c) in self.contentsChanges.items()}, self.idMap)
+            if len(self.newElements) > 0:
+                db.write.deleteElements(list(map(newId, self.newElements)))
+            db.commit()
 
 
 def idFromPath(path):

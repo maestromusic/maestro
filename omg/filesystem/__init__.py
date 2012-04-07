@@ -412,7 +412,7 @@ class FileSystemSynchronizer(QtCore.QThread):
             self.lastScan = time.time()
            
     def run(self):
-        db.connect()
+        db.connect(mode = None)
         # initially fill self.knownFolders so that the FilesystemBrowser displays folder icons
         for folder, state in db.query('SELECT path,state FROM {}folders'.format(db.prefix)):
             self.knownFolders[folder] = state

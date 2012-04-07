@@ -39,11 +39,17 @@ def createNewElements(level, ids, idMap = None):
     This method will return a dict mapping old to new ids.
     """
     elements = [ level.get(id) for id in ids ]
+    specs = [ (True, len(element.parents)==0, 0, False)
+                 if element.isFile()
+                 else
+              (False, len(element.parents)==0, len(element.contents), element.major)
+                 for element in elements ]
     if idMap is None:
-        newIds = db.write.createElements([ (True, False) if element.isFile() else (False, element.major) for element in elements ])
+        newIds = db.write.createElements(specs)
         idMap = dict(zip(ids, newIds))
     else:
-        db.write.createElementsWithIds([ (idMap[element.id], element.isFile(), element.major) for element in elements ])
+        specs = [ (idMap[ids[i]],) + spec for i,spec in enumerate(specs) ]
+        db.write.createElementsWithIds(specs)
     
     if any(element.isFile() for element in elements):
         db.write.createFiles([ (idMap[file.id], file.path, file.length) for file in elements if file.isFile() ])
@@ -54,7 +60,7 @@ def changeContents(changes, idMap = None):
     tuples of ContentList instances. If given, *idMap* is a dict mapping temporary to real IDs and will be applied
     to all container and child IDs in the content change process."""
     newId = lambda id : idMap[id] if (idMap is not None and id in idMap) else id 
-    idsWithPriorContents = [id for id,changeTup in changes.items() if len(changeTup[0]) > 0 ]
+    idsWithPriorContents = [(newId(id),) for id,changeTup in changes.items() if len(changeTup[0]) > 0 ]
     if len(idsWithPriorContents) > 0:
         # first remove old content relations
         db.write.removeAllContents(idsWithPriorContents)
@@ -63,15 +69,15 @@ def changeContents(changes, idMap = None):
         tuples.extend( ( (newId(containerId),) + x) for x in map(lambda tup: (tup[0], newId(tup[1])), newContents.items()))
     db.write.addContents(tuples)
     
-def changeTags(changes, idMap = None):
+def changeTags(changes, idMap = None, reverse = False):
     newId = lambda id : idMap[id] if (idMap is not None and id in idMap) else id
     removeTuples = []
     addTuples = []
     neededValues = set()
     for id, tagDiff in changes.items():
-        for tag, values in tagDiff.removals:
+        for tag, values in (tagDiff.removals if not reverse else tagDiff.additions):
             removeTuples.extend( (newId(id), tag.id, db.idFromValue(tag, value)) for value in values)
-        for tag, values in tagDiff.additions:
+        for tag, values in (tagDiff.additions if not reverse else tagDiff.removals):
             addTuples.extend( (newId(id), tag.id, value) for value in values)
             neededValues.update(( (tag, value) for value in values ))
     db.write.removeTagValues(removeTuples)
@@ -81,21 +87,6 @@ def changeTags(changes, idMap = None):
     for id, tagId, value in addTuples:
         addData.append( (id, tagId, db.idFromValue(tagId, value)))
     db.write.addTagValuesMulti(addData)
-    
-    
-        
-        
-    
-    
-        
-
-def deleteElements(elids):
-    """Delete the elements with the given ids from the database. This will delete from the elements table
-    and due to foreign keys also from files, tags, flags and contents and emit an ElementsDeletedEvent."""
-    if len(elids) == 0:
-        return
-    db.write.deleteElements(elids)
-    dispatcher.changes.emit(events.ElementsDeletedEvent(elids))
 
 def deleteFilesFromDisk(paths):
     """Delete the given files from the filesystem. *paths* is a list of paths."""

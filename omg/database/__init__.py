@@ -84,7 +84,7 @@ class ConnectionContextManager:
         return False # If the suite was stopped by an exception, don't stop that exception
 
 
-def connect():
+def connect(**kwargs):
     """Connect to the database server with information from the config file. The drivers specified in
     ``config.options.database.mysql_drivers`` are tried in the given order. This method must be called 
     exactly once for each thread that wishes to access the database. If successful, it returns a
@@ -106,17 +106,17 @@ def connect():
         path = config.options.database.sqlite_path.strip()
         if path.startswith('config:'):
             path = os.path.join(config.CONFDIR,path[len('config:'):])
-        return _connect(['sqlite'],[path])
+        return _connect(['sqlite'],[path], **kwargs)
     else: 
         authValues = [config.options.database["mysql_"+key] for key in sql.AUTH_OPTIONS]
-        return _connect(config.options.database.mysql_drivers,authValues)
+        return _connect(config.options.database.mysql_drivers,authValues, **kwargs)
 
 
-def _connect(drivers,authValues):
+def _connect(drivers,authValues, **kwargs):
     """Connect to the database using the given parameters which are submitted to the connect method of the
     driver. Throw a DBException if connection fails."""
     connection = sql.newConnection(drivers)
-    connection.connect(*authValues)
+    connection.connect(*authValues, **kwargs)
     connections[threading.current_thread().ident] = connection
     return ConnectionContextManager()
     
@@ -171,13 +171,11 @@ def createTables():
 #=========================================================================
 def query(*params):
     try:
-        print("query: ", *params)
         return connections[threading.current_thread().ident].query(*params)
     except KeyError:
         raise RuntimeError("Cannot access database before a connection for this thread has been opened.")
 
 def multiQuery(queryString,args):
-    print("multiquery: ", queryString)
     try:
         return connections[threading.current_thread().ident].multiQuery(queryString,args)
     except KeyError:
@@ -371,19 +369,22 @@ def valueFromId(tagSpec,valueId):
 
 _cachedValues = None
 
+def initCachedValues():
+    global _cachedValues
+    _cachedValues = dict()
+    for tagType in (tagsModule.TYPE_DATE, tagsModule.TYPE_VARCHAR):
+        _cachedValues[tagType] = dict()
+        result = query("SELECT id, tag_id, value FROM {}values_{}".format(prefix, tagType))
+        for id, tag_id, value in result:
+            _cachedValues[tagType][(tag_id, value)] = id
+            
 def idFromValue(tagSpec,value,insert=False):
     """Return the id of the given value in the tag-table of tag *tagSpec*. If the value does not exist,
     raise an sql.EmptyResultException, unless the optional parameter *insert* is set to True. In that case
     insert the value into the table and return its id.
     """
-    global _cachedValues
     if _cachedValues is None:
-        _cachedValues = dict()
-        for tagType in (tagsModule.TYPE_DATE, tagsModule.TYPE_VARCHAR):
-            _cachedValues[tagType] = dict()
-            result = query("SELECT id, tag_id, value FROM {}values_{}".format(prefix, tagType))
-            for id, tag_id, value in result:
-                _cachedValues[tagType][(tag_id, value)] = id
+        initCachedValues()
     
     tag = tagsModule.get(tagSpec)
     value = _encodeValue(tag.type,value)
@@ -411,7 +412,7 @@ def idFromValue(tagSpec,value,insert=False):
                 result = query("INSERT INTO {}values_{} (tag_id,value) VALUES (?,?)"
                                  .format(prefix,tag.type),tag.id,value)
                 return result.insertId()
-            else: raise e
+            else: raise KeyError("No value id for tag '{}' and value '{}'".format(tag, value))
 
 
 def hidden(tagSpec, valueId):

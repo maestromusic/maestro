@@ -259,11 +259,10 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
         if contentsNone:
             self.endInsertRows()
 
-    def applyEvent(self,event):
+    def applyEvent(self, ids, contents):
         """Apply an event to all elements."""
         for node in self.getAllNodes():
-            if isinstance(node,Element) and node.id in event.ids():
-                event.applyTo(node)
+            if isinstance(node, models.Wrapper) and node.element.id in ids:
                 index = self.getIndex(node)
                 self.dataChanged.emit(index,index)
 

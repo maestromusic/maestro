@@ -20,19 +20,19 @@ import itertools
 from omg import database as db, tags
 
 
-def createElements(fileMajorParams):
-    """Creates elements in the database and returns their IDs. *fileMajorParams* is a list of
-    (file, major) tuples specifying the new elements."""
-    last = db.multiQuery("INSERT INTO {}elements (file,toplevel, elements, major) VALUES (?,1,0,?)"
-                  .format(db.prefix), fileMajorParams).insertId()
-    first = last - len(fileMajorParams) + 1
+def createElements(data):
+    """Creates elements in the database and returns their IDs. *data* is a list of
+    (file, toplevel, elementcount, major) tuples specifying the new elements."""
+    last = db.multiQuery("INSERT INTO {}elements (file,toplevel, elements, major) VALUES (?,?,?,?)"
+                  .format(db.prefix), data).insertId()
+    first = last - len(data) + 1
     return list(range(first, last+1))
 
-def createElementsWithIds(idFileMajorParams):
-    """Creates elements in the database whose IDs are given *idFileMajorParams* is a list of
-    (id, file, major) tuples."""
-    db.multiQuery("INSERT INTO {}elements (id, file,toplevel, elements, major) VALUES (?,?,1,0,?)"
-                  .format(db.prefix), idFileMajorParams)                       
+def createElementsWithIds(data):
+    """Creates elements in the database whose IDs are given *data* is a list of
+    (id, file, toplevel, elementcount, major) tuples."""
+    db.multiQuery("INSERT INTO {}elements (id, file,toplevel, elements, major) VALUES (?,?,?,?,?)"
+                  .format(db.prefix), data)                       
 
 def createFiles(idPathLengthParams):
     """Adds entries to the files table specified by *idPathLengthParams*, a list of
@@ -101,6 +101,7 @@ def removeContents(data):
 def removeAllContents(data):
     """Remove *all* contents of the parents whose IDs are given by the list *data*."""
     db.multiQuery("DELETE FROM {}contents WHERE container_id = ?".format(db.prefix), data)
+    
 def changePositions(parentID, changes):
     """Change the positions of children of *parentID* as given by *changes*, which is a list of (oldPos, newPos)
     tuples."""
@@ -162,7 +163,6 @@ def makeValueIDs(data):
             valuesToAdd[tag.type].add((tag.id, db._encodeValue(tag.type, value)))
     for tagType, values in valuesToAdd.items():
         values = list(values)
-        print('inserting {} tags {}'.format(tagType, values))
         lastId = db.multiQuery("INSERT INTO {}values_{} (tag_id, value) VALUES (?,?)"
                       .format(db.prefix, tagType), values).insertId()
         if tagType in db._cachedValues:

@@ -23,9 +23,9 @@ from PyQt4.QtCore import Qt
 
 from .. import database as db, config,utils, tags, modify, flags
 from ..search import searchbox, criteria as criteriaModule
-from . import mainwindow, treeview, browserdialog, tagwidgets
+from . import mainwindow, treeview, browserdialog
 from .delegates import browser as browserdelegate, configuration as delegateconfiguration
-from ..models import browser as browsermodel, Element, Container
+from ..models import browser as browsermodel, levels, Element, Container
 from ..constants import EDITOR, REAL
 from ..modify.treeactions import *
 translate = QtCore.QCoreApplication.translate
@@ -184,6 +184,7 @@ class Browser(QtGui.QWidget):
                 self.sortTags = {tags.get('artist'): [tags.get('date')]}
             
         modify.dispatcher.changes.connect(self._handleDispatcher)
+        levels.real.changed.connect(self._handleLevelChange)
         
         # Convert tag names to tags, leaving the nested list structure unchanged.
         # This will in particular call self.load
@@ -301,9 +302,7 @@ class Browser(QtGui.QWidget):
     def _handleDispatcher(self,event):
         """Handle a change event."""
         # Optimize some cases in which we do not have to start a new search and reload everything.
-        if isinstance(event,modify.events.ElementChangeEvent) and event.level == EDITOR:
-            return # Does not affect us
-        elif isinstance(event,modify.events.SingleTagChangeEvent) \
+        if isinstance(event,modify.events.SingleTagChangeEvent) \
                     and all(event.tag not in criterion.getTags() for criterion in self.searchCriteria) \
                     and all(event.tag not in criterion.getTags() for criterion in self.criterionFilter):
             for view in self.views:
@@ -319,6 +318,9 @@ class Browser(QtGui.QWidget):
                 view.model().applyEvent(event)
             return
 
+        self.load(restoreExpanded = True)
+    
+    def _handleLevelChange(self, ids, contents):
         self.load(restoreExpanded = True)
 
 class BrowserTreeView(treeview.TreeView):

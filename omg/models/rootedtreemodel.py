@@ -65,15 +65,12 @@ class CommitTreeAction(treeactions.TreeAction):
         self.setText(self.tr('commit this tree'))
         
     def initialize(self):
-        self.setEnabled(self.parent().model().root.getContentsCount() > 0)
+        self.setEnabled(self.parent().nodeSelection.hasElements())
         
     def doAction(self):
         from . import levels
-        print(levels.real.elements.keys())
-        print(levels.editor.elements.keys())
         model = self.parent().model()
         ids = set(n.element.id for n in self.parent().nodeSelection.elements())
-        print(ids)
         modify.push(levels.CommitCommand(model.level, ids))
         
 class RootedTreeModel(QtCore.QAbstractItemModel):
@@ -95,6 +92,8 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
         QtCore.QAbstractItemModel.__init__(self)
         self.root = root
         self.level = level
+        if level is not None:
+            level.changed.connect(self.levelChanged)
     
     def getRoot(self):
         """Return the root node of this model."""
@@ -132,11 +131,11 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
     
     def toolTipText(self, index):
         if index:
-            element = index.internalPointer()
-            if hasattr(element, "toolTipText"):
-                return element.toolTipText()
+            node = index.internalPointer()
+            if hasattr(node, "toolTipText"):
+                return node.toolTipText()
             else:
-                return str(element)
+                return str(node)
             
     def hasChildren(self,index):
         if not index.isValid():
@@ -205,9 +204,9 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
             
         return self.createIndex(parent.index(node),0,node)     
 
-    def getAllNodes(self):
+    def getAllNodes(self, skipSelf = False):
         """Generator which will return all nodes contained in the tree in depth-first-manner."""
-        return self.root.getAllNodes()
+        return self.root.getAllNodes(skipSelf)
     
     def breadthFirstTraversal(self):
         """Generator which will return all nodes contained in the tree in breadth-first-manner."""
@@ -257,3 +256,9 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
             wrapper.loadContents(recursive = True)
         self.data(index, Qt.EditRole).insertContents(position, wrappers) 
         self.endInsertRows()
+        
+    def levelChanged(self, ids, contents):
+        print('change event: {} / {}'.format(ids, contents))
+        for node in self.getAllNodes(skipSelf = True):
+            if isinstance(node, Wrapper) and node.element.id in ids:
+                self.dataChanged.emit(self.getIndex(node), self.getIndex(node))
