@@ -110,69 +110,6 @@ def deleteFilesFromDisk(paths):
     for path in paths:
         logger.warning('permanently removing file "{}"'.format(path))
         os.remove(utils.absPath(path))
-def addContents(changes, emitEvent = True):
-    """Add the given content relations to the database and emit a corresponding event.
-    
-    *changes* is a dict mapping parent IDs to a list of (position, element) tuples."""
-    db.write.addContents( [ (parentID,pair[0],pair[1].id) for parentID,pairs in changes.items() for pair in pairs ] )
-    dispatcher.changes.emit(events.InsertContentsEvent(REAL, changes))
-    
-def removeContents(changes):
-    """Remove the given content relations from the database and emit a corresponding event.
-    
-    *changes* should be a dict mapping parent IDs to lists of positions to remove."""
-    db.write.removeContents([ (parentID,p) for parentID,positions in changes.items() for p in positions ])
-    dispatcher.changes.emit(events.RemoveContentsEvent(REAL, changes))
-
-def changePositions(parentID, changes):
-    """Change positions of children of *parentID* according to *changes*, which is a list of tuples
-    (oldPosition, newPosition)."""
-    db.write.changePositions(parentID, changes)
-    dispatcher.changes.emit(events.PositionChangeEvent(REAL, parentID, dict(changes)))
-    
-def commit(changes, emitEvent = True, newIds = tuple()):
-    """Commits all elements, given by an id->(oldElement,newElement) dictionary, into the database.
-    
-    After the commit, the elements in the database will look like those in the argument.
-    If an element in changes.values() is a container, the contents must be loaded, but
-    do not need to have any loaded data besides position and id.
-    
-    You can optionally specify a list of *newIds*; these are the IDs of elements that have
-    been created just for the current commit. It will be used for optimization."""
-    logger.debug("Committing {} elements".format(len(changes)))
-    
-    # Tags
-    changeTags({oldElement.id: (oldElement.tags,newElement.tags)
-                    for oldElement,newElement in changes.values()},
-               [oldElement for oldElement,newElement in changes.values()],
-               emitEvent = False)
-    
-    # Flags
-    changeFlags({oldElement.id: (oldElement.flags, newElement.flags)
-                 for oldElement, newElement in changes.values()},
-                emitEvent = False)
-    
-    # Major
-    for tup in changes.values():
-        if tup[1].id not in newIds:
-            setMajor(tup[1].id, tup[1].major, emitEvent = False)
-    
-    # Contents (including position)
-    contents = {}
-    for id,changesTuple in changes.items():
-        oldElement,newElement = changesTuple
-        cOld = oldElement.getContents()
-        cNew = newElement.getContents()
-        if len(cOld) != len(cNew) or \
-                any(old.id != new.id or old.position != new.position for old,new in zip(cOld,cNew)):
-            contents[oldElement.id] = cNew
-            
-    if len(contents) > 0:
-        db.write.setContents(contents)
-    
-    if emitEvent:
-        dispatcher.changes.emit(events.ElementChangeEvent(REAL,{id: tuple[1] for id,tuple in changes.items()}, True))
-
 
 def addTagValue(tag,value,elements): 
     """Add a tag of type *tag* and value *value* to each element in *elements*, which is a list of either
@@ -253,77 +190,6 @@ def changeTagValue(tag,oldValue,newValue,elements):
         dispatcher.changes.emit(events.TagValueChangedEvent(REAL,tag,oldValue,newValue,successful))
 
 
-def _getPathAndFileTags(id,elements):
-    for element in elements:
-        if element.id == id:
-            if element.isFile():
-                path = getattr(element,'path',None)
-                if path is None:
-                    path = db.path(id)
-                fileTags = getattr(element,'fileTags',None)
-                return path,fileTags
-            else: return None,None
-    # Arriving here means that no element has the given id
-    if db.isFile(id):
-        return db.path(id),None
-    else: return None,None
-
-
-def changeTagsOLD(changes,elements=[],emitEvent = True):
-    """Change tags arbitrarily: *changes* is a dict mapping element ids to tuples consisting
-    of two tags.Storages - the tags before and after the change. *elements* is a list of affected elements
-    and is only used to determine whether an element is a file and to get its path. If an element is not
-    found in this list, that information is read from the database.
-    """
-    abort = False
-        
-    removeParams = []
-    addParams = []
-    successful = [] # list of element ids whose file was written successfully
-    for id,changeTuple in changes.items():
-        oldTags,newTags = changeTuple
-        if oldTags == newTags:
-            continue
-        
-        path,fileTags = _getPathAndFileTags(id,elements)
-              
-        if path is not None and (fileTags is None or fileTags != newTags.withoutPrivateTags()):
-            try:
-                real = realfiles.get(path)
-                real.read()
-                real.tags = newTags.withoutPrivateTags()
-                real.saveTags()
-            except IOError as e:
-                logger.error("Could not change tags of file '{}'.".format(path))
-                logger.error("Error was: {}".format(e))
-                # Do not write the database, if writing the file failed
-                continue
-        successful.append(id)
-        
-        for tag in oldTags:
-            if tag not in newTags:
-                removeParams.extend((id,tag.id,db.idFromValue(tag,value)) for value in oldTags[tag])
-            else:
-                removeParams.extend((id,tag.id,db.idFromValue(tag,value))
-                                        for value in oldTags[tag] if value not in newTags[tag])
-        for tag in newTags:
-            if tag not in oldTags:
-                addParams.extend((id,tag.id,db.idFromValue(tag,value,insert=True)) for value in newTags[tag])
-            else:
-                addParams.extend((id,tag.id,db.idFromValue(tag,value,insert=True))
-                                    for value in newTags[tag] if value not in oldTags[tag])
-    if len(removeParams) > 0:
-        db.multiQuery("DELETE FROM {}tags WHERE element_id = ? AND tag_id = ? AND value_id = ?"
-                      .format(db.prefix),removeParams)
-  
-    if len(addParams) > 0:
-        db.multiQuery("INSERT INTO {}tags (element_id,tag_id,value_id) VALUES (?,?,?)"
-                      .format(db.prefix),addParams) 
-    if len(successful) > 0 and emitEvent:
-        changes = {k: v[1] for k,v in changes.items() if k in successful}
-        dispatcher.changes.emit(events.TagChangeEvent(REAL,changes))
-
-
 def addFlag(flag,elements):
     """Add *flag* to *elements* and emit a FlagAddedEvent."""
     db.write.addFlag((el.id for el in elements),flag)
@@ -335,39 +201,6 @@ def removeFlag(flag,elements):
     db.write.removeFlag((el.id for el in elements),flag)
     dispatcher.changes.emit(events.FlagRemovedEvent(REAL,flag,elements))
     
-
-def changeFlags(changes,emitEvent = True):
-    """Change flags arbitrarily: *changes* is a dict mapping element ids to tuples consisting
-    of two lists of flags - the flags before and after the change."""
-    removeParams, addParams = [],[]
-    
-    for id,changeTuple in changes.items():
-        oldFlags,newFlags = changeTuple
-        for f in oldFlags:
-            if f not in newFlags:
-                removeParams.append((id,f.id))
-        for f in newFlags:
-            if f not in oldFlags:
-                addParams.append((id,f.id))
-    
-    if len(removeParams) > 0:
-        db.multiQuery("DELETE FROM {}flags WHERE element_id = ? AND flag_id = ?"
-                      .format(db.prefix),removeParams)
-        
-    if len(addParams) > 0:
-        db.multiQuery("INSERT INTO {}flags (element_id,flag_id) VALUES (?,?)"
-                      .format(db.prefix),addParams)
-        
-    if emitEvent:
-        changes = {k: v[1] for k,v in changes.items()}
-        dispatcher.changes.emit(events.FlagChangeEvent(REAL,changes))
-
-
-def setMajor(id, flag, emitEvent = True):
-    """Set the major attribute of the element given by *id* to *flag* (True or False)."""
-    db.write.setMajor(id, flag)
-    if emitEvent:
-        dispatcher.changes.emit(events.MajorFlagChangeEvent(REAL, id, flag))
     
 def setSortValue(tag,valueId,newValue,oldValue=-1):
     """Change a sortvalue and emit a SortValueChangedEvent. *tag* and *valueId* specify the affected value,
