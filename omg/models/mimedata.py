@@ -30,9 +30,9 @@ class MimeData(QtCore.QMimeData):
     one is used internally by omg and stores the tree-structure. Its name is stored in the config variable 
     "gui->mime". The second one is "text/uri-list" and contains a list of URLs to all files in the tree. This
     type is used by applications like Amarok and Dolphin."""
-    def __init__(self,elementList):
+    def __init__(self,nodeList):
         QtCore.QMimeData.__init__(self)
-        self.elementList = elementList
+        self.nodeList = nodeList
         
     def hasFormat(self,format):
         return format in self.formats()
@@ -52,13 +52,13 @@ class MimeData(QtCore.QMimeData):
             # return a null variant of the given type (confer the documentation of retrieveData)
             return QtCore.QVariant(type) if type is not None else QtCore.QVariant()
 
-    def getElements(self):
+    def getNodes(self):
         """Return the list of elements stored in this MimeData instance."""
-        return self.elementList
+        return self.nodeList
     
     def getFiles(self):
         """Return all files contained in the elements stored in this MimeData instance."""
-        return itertools.chain.from_iterable(element.getAllFiles() for element in self.getElements())
+        return itertools.chain.from_iterable(node.getAllFiles() for node in self.getNodes())
         
     def paths(self):
         """Return a list of absolute paths to all files contained in this MimeData-instance."""
@@ -73,6 +73,6 @@ class MimeData(QtCore.QMimeData):
         these indexes. This method will remove an index when an ancestor is contained in *indexList*, too.
         """
         nodes = [model.data(index,role=Qt.EditRole) for index in indexList]
-        # Filter away nodes if a parent as also contained in the indexList. 
+        # Filter away nodes if a parent is also contained in the indexList. 
         nodes = [n for n in nodes if not any(parent in nodes for parent in n.getParents())]
         return MimeData(nodes)
