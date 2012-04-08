@@ -25,7 +25,6 @@ HOME    = os.path.expanduser("~")
 
 YES_ANSWERS = ["y", "Y", ""]
 
-REAL, EDITOR, PLAYLIST = "REAL", "EDITOR", "PLAYLIST" # Levels for commands and events
 DISK, DB, CONTENTS = range(3) # modes for removing elements
 
 # Type of a change

@@ -30,6 +30,35 @@ ADDED,CHANGED,DELETED = 1,2,3
 translate = QtCore.QCoreApplication.translate
 logger = logging.getLogger(__name__)
 
+
+class ElementChangeCommand(QtGui.QUndoCommand):
+    """An undo command changing the elements on some level. Has the following attributes:
+     - level: an instance of omg.models.levels.Level
+     - ids: a list of IDs which are affected by the command
+     - contents: a boolean indicating if content relations have changed
+    """
+    def __init__(self, level, ids = None, contents = None, text = None):
+        super().__init__()
+        self.level = level
+        self.ids = ids
+        self.contents = contents
+        if text is not None:
+            self.setText(text)
+    
+    def redoChanges(self):
+        raise NotImplementedError()
+    
+    def undoChanges(self):
+        raise NotImplementedError()
+    
+    def redo(self):
+        self.redoChanges()
+        self.level.changed.emit(self.ids, self.contents)
+        
+    def undo(self):
+        self.undoChanges()
+        self.level.changed.emit(self.ids, self.contents)
+
 class ChangeEventDispatcher(QtCore.QObject):
     
     changes = QtCore.pyqtSignal(ChangeEvent)

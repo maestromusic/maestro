@@ -20,7 +20,6 @@ from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
 from .. import modify, tags, flags
-from ..constants import EDITOR 
 
 
 class Record:

@@ -20,9 +20,7 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from .. import models, logging
-from .. import modify
 from ..modify import treeactions
-from ..constants import REAL
 from collections import OrderedDict
 
 translate = QtGui.QApplication.translate
@@ -186,7 +184,6 @@ class TreeView(QtGui.QTreeView):
     ContextMenuProvider system, that allows plugins to insert entries into the context menus of playlist and
     browser.
     """
-    level = REAL
     
     actionConfig = TreeActionConfiguration()
     

@@ -30,7 +30,7 @@ translate = QtCore.QCoreApplication.translate
 class GuessError(ValueError):
     pass
         
-def guessAlbums(level, filesByFolder, albumGroupers, metacontainer_regex):
+def guessAlbums(level, filesByFolder, parent, albumGroupers, metacontainer_regex):
     """Try to guess the album structure of *filesByFolder*, using *albumGroupers* to group albums together.
     *albumGroupers* is a list of either tags or the string "DIRECTORY"; *filesByFolder* is a dict mapping
     directory to File instances contained therein."""
@@ -110,12 +110,12 @@ def guessAlbumsInDirectory(level, files, albumGroupers):
     if "DIRECTORY" in groupTags:
         groupTags.remove("DIRECTORY")
     byKey = {}
-    byExistingParent = {}
+    existingParents = set()
     returnedAlbumIDs = []
     returnedSingleIDs = []
     for element in files:
         if len(element.parents) > 0:
-            byExistingParent[level.get(element.parents[0])] = element
+            existingParents.add(element.parents[0])
         else:
             if dirMode:
                 key = relPath(os.path.dirname(element.path))
@@ -142,7 +142,7 @@ def guessAlbumsInDirectory(level, files, albumGroupers):
             returnedAlbumIDs.append(command.containerID)
         else:
             returnedSingleIDs.extend(element.id for element in elements)
-    return returnedAlbumIDs, returnedSingleIDs
+    return returnedAlbumIDs + list(existingParents), returnedSingleIDs
                 
                 
     

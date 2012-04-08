@@ -20,7 +20,7 @@ from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
 from .. import logging, modify, config
-from ..models import rootedtreemodel, RootNode, albumguesser, levels
+from ..models import rootedtreemodel, RootNode, Wrapper, albumguesser, levels
 from ..utils import collectFiles
 
 logger = logging.getLogger(__name__)
@@ -63,23 +63,27 @@ class EditorModel(rootedtreemodel.RootedTreeModel):
         if row == -1:
             row = parent.getContentsCount()
 
-        if mimeData.hasFormat(config.options.gui.mime):
-            # first case: OMG mime data -> wrappers from an editor, browser etc.
-            return self._dropOMGMime(mimeData, action, parent, row)
-        elif mimeData.hasFormat("text/uri-list"):
+        if mimeData.hasFormat("text/uri-list"):
             # files and/or folders are dropped from outside or from a filesystembrowser.
-            return self._dropURLMime(mimeData.urls(), action, row, parent)
+            ids = self.prepareURLs(mimeData.urls(), parent)
+            
+        elif mimeData.hasFormat(config.options.gui.mime):
+            ids = [ node.element.id for node in mimeData.getNodes() if isinstance(node, Wrapper) ]
+            # first case: OMG mime data -> wrappers from an editor, browser etc.
         else:
             raise RuntimeError('HÄÄÄÄÄ???')
-     
-    def _dropOMGMime(self, mimeData, action, parent, row):
-        """handles drop of OMG mime data into the editor.
         
-        Various cases (and combinations thereof)must be handled: Nodes might be copied or moved
-        within the same parent, or moved / copied from the "outside"."""
-        return False
+        if len(ids) == 0:
+            return False
+        if parent is self.root:
+            oldContentIDs = [ node.element.id for node in self.root.contents ]
+            newContentIDs = oldContentIDs[:row] + ids + oldContentIDs[row:]
+            modify.push(rootedtreemodel.ChangeRootCommand(self, oldContentIDs, newContentIDs))
+            return True
+        else:
+            return False        
         
-    def _dropURLMime(self, urls, action, row, parent):
+    def prepareURLs(self, urls, parent):
         '''This method is called if url MIME data is dropped onto this model, from an external file manager
         or a filesystembrowser widget.'''
         files = collectFiles(sorted(url.path() for url in urls))
@@ -91,29 +95,20 @@ class EditorModel(rootedtreemodel.RootedTreeModel):
         progress.setWindowModality(Qt.WindowModal)
         filesByFolder = {}
         try:
+            # load files into editor level
             for folder, filesInOneFolder in files.items():
                 filesByFolder[folder] = []
                 for file in filesInOneFolder:
                     progress.setValue(progress.value() + 1)
                     filesByFolder[folder].append(self.level.get(file))
             progress.close()
-            modify.beginMacro("drop {} files".format(numFiles))
-            topIDs = albumguesser.guessAlbums(self.level, filesByFolder, self.albumGroupers, self.metacontainer_regex)
-            if parent is not self.root:
-                raise NotImplementedError()
-            
-            oldContentIDs = [ node.element.id for node in self.root.contents ]
-            newContentIDs = oldContentIDs[:]
-            newContentIDs[row:row] = topIDs
-            command = rootedtreemodel.ChangeRootCommand(self, oldContentIDs, newContentIDs)
-            modify.push(command)
-            modify.endMacro()
-            return True
-        
+            # call album guesser
+            return albumguesser.guessAlbums(self.level, filesByFolder, parent, self.albumGroupers, self.metacontainer_regex)
+
         except levels.ElementGetError as e:
             print(e)
-            return False
+            return []
         except albumguesser.GuessError as e:
             print(e)
-            return False
+            return []
         

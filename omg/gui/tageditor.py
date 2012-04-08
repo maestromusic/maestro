@@ -21,11 +21,10 @@ from PyQt4.QtCore import Qt
 
 import itertools, os.path
 
-from .. import constants, tags, strutils, utils, config, logging, modify, constants
-from ..models import tageditor as tageditormodel, simplelistmodel, File, flageditor as flageditormodel
+from .. import tags, strutils, utils, config, logging, modify, constants
+from ..models import tageditor as tageditormodel, simplelistmodel, File, flageditor as flageditormodel, levels
 from ..gui import singletageditor, dialogs, tagwidgets, mainwindow, editor, flageditor
 from ..gui.misc import widgetlist, dynamicgridlayout
-from ..constants import REAL, EDITOR
 
 translate = QtCore.QCoreApplication.translate
 
@@ -45,8 +44,8 @@ class TagEditorDock(QtGui.QDockWidget):
         self.tabWidget = QtGui.QTabWidget()
         self.tabWidget.setTabPosition(QtGui.QTabWidget.North if vertical else QtGui.QTabWidget.East)
         self.setWidget(self.tabWidget)
-        self.realEditorWidget = TagEditorWidget(REAL,vertical=vertical)
-        self.editorEditorWidget = TagEditorWidget(EDITOR,vertical=vertical)
+        self.realEditorWidget = TagEditorWidget(levels.real,vertical=vertical)
+        self.editorEditorWidget = TagEditorWidget(levels.editor,vertical=vertical)
         self.tabWidget.addTab(self.realEditorWidget,self.tr("Real"))
         self.tabWidget.addTab(self.editorEditorWidget,self.tr("Editor"))
         self.setAcceptDrops(True)
@@ -154,8 +153,8 @@ class TagEditorWidget(QtGui.QWidget):
         self.layout().addLayout(self.topLayout)
         
         iconLabel = QtGui.QLabel()
-        iconLabel.setPixmap(utils.getPixmap('real.png' if level == REAL else 'editor.png'))
-        iconLabel.setToolTip(self.tr("Real level") if level == REAL else self.tr("Editor level"))
+        iconLabel.setPixmap(utils.getPixmap('real.png' if level == levels.real else 'editor.png'))
+        iconLabel.setToolTip(self.tr("Real level") if level == levels.real else self.tr("Editor level"))
         self.topLayout.addWidget(iconLabel)
 
         # Texts will be set in _changeLayout

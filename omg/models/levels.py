@@ -18,10 +18,7 @@
 
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
-from ..database import write 
 from .. import database as db, tags, flags, realfiles, utils, config, logging, modify
-from ..modify.commands import ElementChangeCommand
-from ..modify.treeactions import TreeAction
 from . import File, Container, ContentList
     
 real = None
@@ -46,7 +43,6 @@ class Level(QtCore.QObject):
         super().__init__()
         self.name = name
         self.parent = parent
-        
         self.elements = {}
         
     def get(self,param):
@@ -171,6 +167,7 @@ class RealLevel(Level):
     def loadFromFileSystem(self,paths,level, askOnNewTags = True):
         for path in paths:
             rpath = utils.relPath(path)
+            logger.debug("reading file {} from filesystem".format(rpath))
             try:
                 readOk = False
                 while not readOk:
@@ -212,7 +209,7 @@ class RealLevel(Level):
                 # TODO: Load private tags!
             level.elements[id] = File(level,id = id,path=rpath,length=length,tags=fileTags,flags=flags)
 
-class CommitCommand(ElementChangeCommand):
+class CommitCommand(modify.ElementChangeCommand):
     
     def __init__(self, level, ids, text = None):
         """Sets up a commit command for the given *ids* in *level*."""

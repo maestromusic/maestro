@@ -26,7 +26,6 @@ from ..search import searchbox, criteria as criteriaModule
 from . import mainwindow, treeview, browserdialog
 from .delegates import browser as browserdelegate, configuration as delegateconfiguration
 from ..models import browser as browsermodel, levels, Element, Container
-from ..constants import EDITOR, REAL
 from ..modify.treeactions import *
 translate = QtCore.QCoreApplication.translate
 
@@ -336,25 +335,7 @@ class BrowserTreeView(treeview.TreeView):
     _optimizers = None
     
     actionConfig = treeview.TreeActionConfiguration()
-    sect = translate(__name__, "tags")
-    actionConfig.addActionDefinition(((sect, 'edittagsS'),), EditTagsAction, recursive = False)
-    actionConfig.addActionDefinition(((sect, 'edittagsR'),), EditTagsAction, recursive = True)
-    actionConfig.addActionDefinition(((sect, 'advanced'),
-                                      ('misc', 'matchTags')), MatchTagsFromFilenamesAction)
-    actionConfig.addActionDefinition(((sect, 'advanced'),
-                                      ('misc', 'editTagValue')), TagValueAction)
-    
-    sect = translate(__name__, "structure")
-    subsect = translate(__name__,"delete...")
-    actionConfig.addActionDefinition(((sect, subsect),
-                                      ('misc', 'deleteP'),), DeleteAction, CONTENTS, shortcut = 'Del')
-    actionConfig.addActionDefinition(((sect, subsect),
-                                      ('misc', 'deleteDB'),), DeleteAction, DB, shortcut = 'Shift+Del')
-    actionConfig.addActionDefinition(((sect, subsect),
-                                      ('misc', 'deleteDisk'),), DeleteAction, DISK)
-    actionConfig.addActionDefinition(((sect, 'merge'),), MergeAction)
-    actionConfig.addActionDefinition(((sect, 'flatten'),), FlattenAction)
-    actionConfig.addActionDefinition(((sect, 'major'),), ToggleMajorAction)
+
     
     def __init__(self,parent,layers,sortTags,delegateConfig):
         treeview.TreeView.__init__(self,parent)

@@ -20,7 +20,6 @@ from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
 from .. import constants, tags, utils, modify
-from ..constants import REAL, EDITOR
 
 translate = QtCore.QCoreApplication.translate
 

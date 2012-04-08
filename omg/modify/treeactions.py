@@ -21,8 +21,8 @@ from PyQt4.QtCore import Qt
 
 from .. import modify, tags, models, logging
 from ..modify import commands
-from ..constants import DB, DISK, CONTENTS, REAL, EDITOR
-from omg.modify.commands import RemoveElementsCommand, InsertElementsCommand
+from ..constants import DB, DISK, CONTENTS
+from omg.modify.commands import InsertElementsCommand
 
 logger = logging.getLogger(__name__)
 translate = QtGui.QApplication.translate

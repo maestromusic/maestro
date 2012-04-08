@@ -347,9 +347,9 @@ class Container(Element):
                          id = self.id,
                          major = self.major,
                          contents = self.contents.copy(),
-                         parents = self.parents.copy(),
+                         parents = self.parents[:],
                          tags = self.tags.copy(),
-                         flags = self.flags.copy())
+                         flags = self.flags[:])
         
     def isContainer(self):
         return True

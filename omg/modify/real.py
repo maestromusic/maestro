@@ -24,7 +24,6 @@ do any Undo-/Redo-stuff.
 from .. import database as db, tags as tagsModule, realfiles, logging, utils
 from ..database import write
 from . import dispatcher, events
-from ..constants import REAL
 import os
 
 logger = logging.getLogger(__name__)

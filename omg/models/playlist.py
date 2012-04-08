@@ -23,7 +23,6 @@ from PyQt4.QtCore import Qt
 
 from .. import database as db, models, config, utils, logging, modify
 from ..modify import events
-from ..constants import REAL
 from . import rootedtreemodel, treebuilder
 
 logger = logging.getLogger(__name__)
