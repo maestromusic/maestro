@@ -404,7 +404,7 @@ def addTagType(**data):
         tagType.id = db.query(
             "INSERT INTO {}tagids (tagname,tagtype,title,icon,private) VALUES (?,?,?,?,?)"
               .format(db.prefix),*data).insertId()
-
+    db.commit()
     logger.info("Added new tag '{}' of type '{}'.".format(tagType.name,tagType.type.name))
     _tagsByName[tagType.name] = tagType
     _tagsById[tagType.id] = tagType
@@ -425,6 +425,7 @@ def removeTagType(tagType):
     
     from . import database as db
     db.query("DELETE FROM {}tagids WHERE id=?".format(db.prefix),tagType.id)
+    db.commit()
     del _tagsByName[tagType.name]
     del _tagsById[tagType.id]
     tagList.remove(tagType)
@@ -488,7 +489,7 @@ def changeTagType(tagType,**data):
         from . import database as db
         db.query("UPDATE {}tagids SET {} WHERE id = ?"
                     .format(db.prefix,','.join(assignments)),*params)
-        
+        db.commit()
         from . import modify
         modify.dispatcher.changes.emit(TagTypeChangedEvent(CHANGED,tagType))
 
