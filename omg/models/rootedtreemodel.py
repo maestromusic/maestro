@@ -34,9 +34,11 @@ class ChangeRootCommand(QtGui.QUndoCommand):
         self.setText(text)
         
     def redo(self):
+        logger.debug("change root: {} --> {}".format(self.old, self.new))
         self.model.changeContents(QtCore.QModelIndex(), self.new )
         
     def undo(self):
+        logger.debug("change root: {} --> {}".format(self.new, self.old))
         self.model.changeContents(QtCore.QModelIndex(), self.old )
 
 class ClearTreeAction(treeactions.TreeAction):
@@ -230,7 +232,7 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
                 existingIndex = old.index(id)
                 if existingIndex > 0:
                     self.removeContents(index, i, i + existingIndex - 1)
-                    del old[:existingIndex]
+                del old[:existingIndex+1]
                 i += 1
             except ValueError:
                 insertStart = i
