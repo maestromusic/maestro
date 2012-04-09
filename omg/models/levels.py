@@ -37,7 +37,10 @@ class ElementGetError(RuntimeError):
     pass
 
 class Level(QtCore.QObject):
-    changed = QtCore.pyqtSignal(list, bool) # list of affected ids, contents
+    changed = QtCore.pyqtSignal(list, list)
+    """Signal that is emitted if something changes on this level. The first argument is a list of Ids of elements
+    whose tags, flags, major status, ... has changed (things affecting only the element itself). The second list
+    contains IDs of containers whose contents have changed."""
     
     def __init__(self,name,parent):
         super().__init__()
@@ -77,6 +80,27 @@ class Level(QtCore.QObject):
         ids = [idFromPath(path) for path in paths]
         self.load(ids,aDict,ignoreUnknownTags)
   
+    def changeId(self, old, new):
+        """Change the id of some element from *old* to *new*. This should only be called from within appropriate
+        UndoCommands, and only if (old in self) is True. Takes care of contents and parents, too."""
+        elem = self.elements[old]
+        del self.elements[old]
+        elem.id = new
+        self.elements[new] = elem
+        for parentID in elem.parents:
+            parentContents = self.elements[parentID].contents
+            parentContents.ids = [ new if id == old else id for id in parentContents.ids ]
+        if elem.isContainer():
+            for childID in elem.contents.ids:
+                if childID in self.elements:
+                    self.elements[childID].parents = [ new if id == old else old for id in self.elements[childID].parents ]
+        
+        
+    def __contains__(self, id):
+        """Returns if the given id is loaded in this level. Note that if the id could be loaded from the
+        parent but is not contained in this level, then *False* is returned."""
+        return self.elements.__contains__(id)
+    
     def __str__(self):
         return 'Level({})'.format(self.name)
     
@@ -210,39 +234,50 @@ class RealLevel(Level):
             level.elements[id] = File(level,id = id,path=rpath,length=length,tags=fileTags,flags=flags)
 
 class CommitCommand(modify.ElementChangeCommand):
+    """The CommitCommand is used to "commit" the state of some elements in one level to its parent level.
+    If the parent level is *real*, then also the database and, if needed, files on disk are updated
+    accordingly."""
     
     def __init__(self, level, ids, text = None):
         """Sets up a commit command for the given *ids* in *level*."""
         super().__init__(level, text)
         
         allIds = set(ids)
-        import itertools
-        # recursively load children's IDs
-        #TODO: only load nodes that actually changed
-        while True:
-            withChildren = allIds | set(itertools.chain.from_iterable(self.level.get(id).contents.ids for id in allIds if self.level.get(id).isContainer()))
-            if withChildren  == allIds:
-                break
-            allIds = withChildren
+        # add children's IDs to ensure consistent commit
+        def addChildren(ids):
+            if len(ids) == 0:
+                return set()
+            newIds = set()
+            for id in ids:
+                elem = self.level.get(id)
+                if elem.isContainer():
+                    newIds.update(childId for childId in elem.contents.ids if childId in self.level and childId not in allIds)
+            allIds.update(newIds)
+            addChildren(newIds)                    
+        addChildren(allIds)
         
-        self.contents = False
-        if level.parent is real:
+        self.real = level.parent is real # a handy shortcut
+        if self.real:
+            self.newInDatabase = [ id for id in allIds if id < 0 ]
             self.idMap = None
+        else:
+            self.newId = self.oldId = lambda x : x
+            
         self.newElements = []
-        self.flagChanges = {}
-        self.tagChanges = {}
-        self.contentsChanges = {}
-        self.majorChanges = {}
-        self.oldIds = []
+        self.flagChanges, self.tagChanges, self.contentsChanges, self.majorChanges = {}, {}, {}, {}
+        self.ids, self.contents = [], []
         for id in allIds:
-            if self.recordChanges(id):
-                self.oldIds.append(id)
+            element, contents =  self.recordChanges(id)
+            if element:
+                self.ids.append(id)
+            if contents:
+                self.contents.append(id)
     
     def recordChanges(self, id):
         """Store changes, return True if there are any."""
         myEl = self.level.get(id)
-        changes = False
-        if id in self.level.parent.elements:
+        changeElement, changeContents = False, False
+        if id in self.level.parent:
             oldEl = self.level.parent.get(id)
             oldTags = oldEl.tags
             oldFlags = oldEl.flags
@@ -250,113 +285,130 @@ class CommitCommand(modify.ElementChangeCommand):
                 oldMajor = oldEl.major
                 oldContents = oldEl.contents
         else:
-            changes = True
+            changeElement = True
             self.newElements.append(id)
             oldTags = tags.Storage()
             oldFlags = []
             if myEl.isContainer():
-                oldMajor = False
+                oldMajor = True
                 oldContents = ContentList()  
         
         if oldTags != myEl.tags:
             self.tagChanges[id] = tags.TagDifference(oldTags, myEl.tags)
-            changes = True
+            changeElement = True
         if oldFlags != myEl.flags:
             self.flagChanges[id] = flags.FlagDifference(oldFlags, myEl.flags)
-            changes = True
+            changeElement = True
         if myEl.isContainer():
             if oldContents != myEl.contents:
-                self.contents = True
+                changeContents = True
                 self.contentsChanges[id] = (oldContents.copy(), myEl.contents.copy())
-                changes = True
             if oldMajor != myEl.major:
                 self.majorChanges[id] = (oldMajor, myEl.major)
-                changes = True
-        return changes
+                changeElement = True
+        return changeElement, changeContents
             
-    def redoChanges(self):
+    def redo(self):
         # create new elements in DB to obtain id map, if necessary
-        if len(self.newElements) > 0 and self.level.parent is real:
+        if self.real and len(self.newInDatabase) > 0: 
             if self.idMap is None:
                 # first redo -> prepare id mapping
-                self.idMap = modify.real.createNewElements(self.level, self.newElements)
-                self.newIds = list(self.idMap.values())
+                self.idMap = modify.real.createNewElements(self.level, self.newInDatabase)
+                self.newId = utils.dictOrIdentity(self.idMap)
+                self.oldId = utils.dictOrIdentity({b:a for a,b in self.idMap.items() })
+                # update contentsChanges to use the new ids
+                for _, newContents in self.contentsChanges.values():
+                    newContents.ids[:] = map(self.newId, newContents.ids)
             else:
-                modify.real.createNewElements(self.level, self.newElements, self.idMap)
+                modify.real.createNewElements(self.level, self.newInDatabase, self.idMap)
+            # change IDs for new elements
+            for id in self.newInDatabase:
+                self.level.changeId(id, self.newId(id))
+                if id in self.level.parent:
+                    # happens if the element is loaded in some playlist
+                    self.level.parent.changeId(id, self.newId(id))
+        # nothing else to be changed in the current (child) level. Update elements in parent
         
-        newId = self.newId = lambda id : self.idMap[id] if self.level.parent is real and id in self.idMap else id
-        if self.level.parent is real:
-            idMapReverse = {b:a for a,b in self.idMap.items() }
-        self.oldId = lambda id : idMapReverse[id] if self.level.parent is real and id in idMapReverse else id
-        
-        # move commited elements to parent level
-        self.ids = []
-        for id in self.oldIds:
-            elem = self.level.elements[id]
-            del self.level.elements[id]
-            nid = newId(id)
-            self.level.parent.elements[nid] = elem
-            elem.id = nid
-            self.ids.append(nid)
-            if self.level.parent is real:
-                # adjust ids in contents ant parents
-                elem.parents = [newId(id) for id in elem.parents]
-                if elem.isContainer():
-                    elem.contents.ids = [newId(id) for id in elem.contents.ids]     
-        
-        # apply changes in DB, if level real
-        if self.level.parent is real:
+        for id in set(self.ids + self.contents):
+            elem = self.level.elements[self.newId(id)]
+            nid = self.newId(id)
+            if id in self.newElements:
+                copy = elem.copy()
+                copy.level = self.level.parent
+                self.level.parent.elements[nid] = copy
+            else:
+                pElem = self.parent.level.elements[nid]
+                if id in self.majorChanges:
+                    pElem.major = self.majorChanges[id][1]
+                if id in self.tagChanges:
+                    self.tagChanges[id].apply(pElem)
+                if id in self.flagChanges:
+                    self.flagChanges[id].apply(pElem)
+                if id in self.contentsChanges:
+                    pElem.contents = self.contentsChanges[id][1].copy()
+                        
+        # apply changes in DB, if parent level is real
+        if self.real:
             if len(self.majorChanges) > 0:
-                db.write.setMajor((self.newId(id), newMajor) for id,(oldMajor,newMajor) in self.majorChanges.items())
+                db.write.setMajor((self.newId(id), newMajor) for id,(_,newMajor) in self.majorChanges.items())
             if len(self.contentsChanges) > 0:
-                modify.real.changeContents(self.contentsChanges, self.idMap)
+                modify.real.changeContents({self.newId(id):changes for id, changes in self.contentsChanges.items()})
             if len(self.tagChanges) > 0:
-                modify.real.changeTags(dict( (newId(id), diff) for id,diff in self.tagChanges.items()))
+                modify.real.changeTags({self.newId(id):diff for id,diff in self.tagChanges.items()})
             if len(self.flagChanges) > 0:
-                modify.real.changeFlags(dict( (newId(id), diff) for id,diff in self.flagChanges.items()))
+                modify.real.changeFlags({self.newId(id):diff for id,diff in self.flagChanges.items()})
+            db.commit()
+        self.level.parent.changed.emit([self.newId(id) for id in self.ids], [self.newId(id) for id in self.contents])
+        self.level.changed.emit([self.newId(id) for id in self.ids], []) # no contents changed in current level!
+        
+    def undo(self):
+        if self.real:
+            if len(self.newInDatabase) > 0:
+                db.write.deleteElements(list(self.idMap.values()))
+            majorChangesExisting = [(self.newId(id),oldMajor) for id,(oldMajor,_) in self.majorChanges.items()
+                                        if id not in self.newInDatabase]
+            if len(majorChangesExisting) > 0:
+                db.write.setMajor(majorChangesExisting)
+            contentsChangesExisting = {self.newId(id):(b,a) for id, (a,b) in self.contentsChanges.items()
+                                        if id not in self.newInDatabase}
+            if len(contentsChangesExisting) > 0:
+                modify.real.changeContents(contentsChangesExisting)
+            tagChangesExisting = {self.newId(id):diff for id,diff in self.tagChanges.items()
+                                    if id not in self.newInDatabase}
+            if len(tagChangesExisting) > 0:
+                modify.real.changeTags(tagChangesExisting, reverse = True)
+            flagChangesExisting = {self.newId(id):diff for id,diff in self.tagChanges.items()
+                                    if id not in self.newInDatabase}
+            if len(flagChangesExisting) > 0:
+                modify.real.changeFlags(flagChangesExisting, reverse = True)
+            db.commit()
             
+        for id in set(self.ids + self.contents):
+            if id in self.newElements:
+                del self.level.parent.elements[self.newId(id)]
+            else:
+                pElem = self.level.parent.elements[self.newId(id)]
+                if id in self.majorChanges:
+                    pElem.major = self.majorChanges[id][0]
+                if id in self.tagChanges:
+                    self.tagChanges[id].revert(pElem)
+                if id in self.flagChanges:
+                    self.flagChanges[id].revert(pElem)
+                if id in self.contentsChanges:
+                    pElem.contents = self.contentsChanges[id][0].copy()
+        
+        if self.real:
+            for id in self.newInDatabase:
+                self.level.changeId(self.newId(id), id)
+                if self.newId(id) in self.level.parent:
+                    self.level.parent.changeId(self.newId(id), id)
             db.commit()
         self.level.parent.changed.emit(self.ids, self.contents)
-        
-    def undoChanges(self):
-        newId = self.newId
-        oldId = self.oldId
-        
-        for id in self.oldIds:
-            element = self.level.parent.elements[newId(id)]
-            del self.level.parent.elements[newId(id)]
-            self.level.elements[id] = element
-            if self.level.parent is real:
-                # adjust ids in contents ant parents
-                element.parents = [oldId(id) for id in element.parents]
-                if element.isContainer():
-                    element.contents.ids = [oldId(id) for id in element.contents.ids]
-            if id in self.newElements:
-                element.id = id
-            else:
-                # restore old state in parent level
-                oldElement = element.copy()
-                if id in self.tagChanges:
-                    self.tagChanges[id].revert(oldElement)
-                if id in self.flagChanges:
-                    self.flagChanges[id].revert(oldElement)
-                if id in self.majorChanges:
-                    oldElement.major = self.majorChanges[id][0]
-                if id in self.contentsChanges:
-                    oldElement.contents = self.contentsChanges[id][0].copy()
+        self.level.changed.emit(self.ids, []) # no contents changed in current level!
                 
-        if self.level.parent is real:
-            if len(self.tagChanges) > 0:
-                modify.real.changeTags(dict( (newId(id),diff) for id,diff in self.tagChanges.items() ), reverse = True)
-            if len(self.flagChanges) > 0:
-                modify.real.changeFlags(dict( (newId(id), diff) for id,diff in self.flagChanges.items() ), reverse = True)
-            if len(self.majorChanges) > 0:
-                db.write.setMajor((newId(id), oldMajor) for id,(oldMajor,newMajor) in self.majorChanges.items())
-            if len(self.contentsChanges) > 0:
-                modify.real.changeContents({a:(c,b) for a,(b,c) in self.contentsChanges.items()}, self.idMap)
-            if len(self.newElements) > 0:
-                db.write.deleteElements(list(map(newId, self.newElements)))
-            db.commit()
+            
+
+            
 
 def idFromPath(path):
     id = db.idFromPath(path)

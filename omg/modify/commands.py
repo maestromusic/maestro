@@ -38,10 +38,10 @@ class InsertElementsCommand(ElementChangeCommand):
         will be adjusted if necessary."""
         super().__init__(level = level, ids = [parentId], contents = True, text = text)
         self.row = row
-        self.oldContents = level.get(parentId).contents.copy()
-        newContents = self.oldContents.copy()
+        newContents = level.get(parentId).contents.copy()
         firstPosition = 1 if row == 0 else newContents[row-1][0] 
         newContents.ids[row:row] = insertedIds
+        self.insertedIds = insertedIds
         newContents.positions[row:row] = range(firstPosition, firstPosition + len(insertedIds))
         # adjust subsequent positions
         for i in range(row+len(insertedIds), len(newContents.positions)):
@@ -50,10 +50,20 @@ class InsertElementsCommand(ElementChangeCommand):
         self.newContents = newContents
         
     def redoChanges(self):
+        parentId = self.ids[0]
+        self.oldContents = self.level.get(parentId).contents
+        self.level.get(parentId).contents = self.newContents
+        for id in self.insertedIds:
+            self.level.get(id).parents.append(parentId)
         if self.level is levels.real:
             pass
         
     def undoChanges(self):
+        parentId = self.ids[0]
+        self.newContents = self.level.get(parentId).contents
+        self.level.get(parentId).contents = self.oldContents
+        for id in self.insertedIds:
+            self.level.get(id).parents.remove(parentId)
         if self.level is levels.real:
             pass
 

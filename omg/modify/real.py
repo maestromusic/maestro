@@ -57,18 +57,16 @@ def createNewElements(level, ids, idMap = None):
         db.write.addFiles([ (idMap[file.id], file.path, hash(file.path), file.length) for file in elements if file.isFile() ])
     return idMap
 
-def changeContents(changes, idMap = None):
+def changeContents(changes):
     """Change content relations of containers. *changes* is a dict mapping container ID to (oldContents, newContents)
-    tuples of ContentList instances. If given, *idMap* is a dict mapping temporary to real IDs and will be applied
-    to all container and child IDs in the content change process."""
-    newId = lambda id : idMap[id] if (idMap is not None and id in idMap) else id 
-    idsWithPriorContents = [(newId(id),) for id,changeTup in changes.items() if len(changeTup[0]) > 0 ]
+    tuples of ContentList instances.""" 
+    idsWithPriorContents = [ (id,) for id,changeTup in changes.items() if len(changeTup[0]) > 0 ]
     if len(idsWithPriorContents) > 0:
         # first remove old content relations
         db.write.removeAllContents(idsWithPriorContents)
     tuples = []
-    for containerId, (oldContents, newContents) in changes.items():
-        tuples.extend( ( (newId(containerId),) + x) for x in map(lambda tup: (tup[0], newId(tup[1])), newContents.items()))
+    for containerId, (_, newContents) in changes.items():
+        tuples.extend( ( (containerId,) + x) for x in newContents.items())
     db.write.addContents(tuples)
     
 def changeTags(changes, reverse = False):

@@ -259,7 +259,9 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
         self.data(index, Qt.EditRole).insertContents(position, wrappers) 
         self.endInsertRows()
         
-    def levelChanged(self, ids, contents):
-        for node in self.getAllNodes(skipSelf = True):
-            if isinstance(node, Wrapper) and node.element.id in ids:
-                self.dataChanged.emit(self.getIndex(node), self.getIndex(node))
+    def levelChanged(self, ids, contentsChanged):
+        for node, contents in utils.walk(self.root):
+            if isinstance(node, Wrapper):
+                if node.element.id in ids:
+                    self.dataChanged.emit(self.getIndex(node), self.getIndex(node))
+            

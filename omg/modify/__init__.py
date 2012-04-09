@@ -34,8 +34,8 @@ logger = logging.getLogger(__name__)
 class ElementChangeCommand(QtGui.QUndoCommand):
     """An undo command changing the elements on some level. Has the following attributes:
      - level: an instance of omg.models.levels.Level
-     - ids: a list of IDs which are affected by the command
-     - contents: a boolean indicating if content relations have changed
+     - ids: a list of IDs of elements whose data (tags, flags, major, ...) has changed
+     - contents: a list of IDs of parent elements wohose content relations have changed
     """
     def __init__(self, level, ids = None, contents = None, text = None):
         super().__init__()

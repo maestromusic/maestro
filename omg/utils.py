@@ -48,12 +48,16 @@ def ranges(lst):
         return list(map(lambda x: (x,x), lst))
     return helper(list(enumerate(lst[1:])), lst[0], lst[0], list())
 
+def dictOrIdentity(dct):
+    """Returns a function that returns dct[x] if x in dct and x otherwise."""
+    return lambda x : dct[x] if x in dct else x
 
-def walk(element):
-    """A tree iterator for elements, inspired by os.walk: Returns a tuple (element, contents)
+
+def walk(node):
+    """A tree iterator for elements, inspired by os.walk: Returns a tuple (node, contents)
     where contents may be modified in-place to influence further processing."""
-    contents = element.getContents()[:]
-    yield element, contents
+    contents = node.getContents()[:]
+    yield node, contents
     for child in contents:
         for x in walk(child):
             yield x

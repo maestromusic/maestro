@@ -441,26 +441,25 @@ class BrowserMimeData(mimedata.MimeData):
     """This is the subclass of mimedata.MimeData that is used by the browser. The main differences are that
     the browser contains nodes that are no elements and that they may not have loaded their contents yet.   
     """  
-    def __init__(self,nodeList):
+    def __init__(self, browserNodeList):
         mimedata.MimeData.__init__(self,None) # The element list will be computed when it is needed.
-        self.nodeList = nodeList
+        self.browserNodeList = browserNodeList
 
-    def getElements(self):
-        if self.elementList is not None:
-            return self.elementList
+    def getNodes(self):
+        if self.nodeList is not None:
+            return self.nodeList
         
         # self.elementList may contain CriterionNodes or (unlikely) LoadingNodes.
-        self.elementList = list(itertools.chain.from_iterable(self._getElementsInstantly(node)
-                                                              for node in self.nodeList))
-        self.nodeList = None # Save memory
-        return self.elementList
+        self.nodeList = list(itertools.chain.from_iterable(self._getElementsInstantly(node)
+                                                              for node in self.browserNodeList))
+        self.browserNodeList = None # Save memory
+        return self.nodeList
                                           
     def _getElementsInstantly(self,node):
         """If *node* is a CriterionNode return all (toplevel) elements contained in it. If contents have to
         be loaded, wait for the search to finish. If *node* is an element return ''[node]''.
         """
-        if isinstance(node,Element):
-            _loadData(node)
+        if isinstance(node, models.Wrapper):
             return [node]
         if isinstance(node,CriterionNode):
             node.loadContents(wait=True) # This does not load element data
@@ -470,7 +469,7 @@ class BrowserMimeData(mimedata.MimeData):
     
     def paths(self):
         """Return a list of absolute paths to all files contained in this MimeData-instance."""
-        return [utils.absPath(file.path) for file in self.getFiles()]
+        return [utils.absPath(file.element.path) for file in self.getFiles()]
 
     @staticmethod
     def fromIndexes(model,indexList):
@@ -483,24 +482,4 @@ class BrowserMimeData(mimedata.MimeData):
         return BrowserMimeData(nodes)
 
 
-def _loadData(element):
-    """Load the data of *element* that is not loaded directly by the browser. This method must be called
-    before an element leaves the browser."""
-    if element.tags is None:
-        element.loadTags()
-    
-    if element.flags is None:
-        element.flags = db.flags(element.id)
-        
-    if element.position is None and isinstance(element.parent,Element):
-        position = db.position(element.parent.id,element.id)
-        
-    if element.isFile():
-        if element.path is None:
-            element.path = db.path(element.id)
-        if element.length is None:
-            element.length = db.length(element.id)
-    else:
-        for child in element.contents:
-            _loadData(child)
     

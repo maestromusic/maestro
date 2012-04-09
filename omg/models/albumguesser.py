@@ -19,7 +19,6 @@
 
 from . import Container, levels
 from .. import tags, modify
-from ..modify import commands
 from ..utils import relPath
 
 import os, re, itertools
@@ -71,10 +70,10 @@ def guessAlbums(level, filesByFolder, parent, albumGroupers, metacontainer_regex
         modify.endMacro()
         return complete
 
-class AlbumGuessCommand(commands.ElementChangeCommand):
+class AlbumGuessCommand(modify.ElementChangeCommand):
     
     def __init__(self, level, containerTags, children, meta = False):
-        super().__init__(level, ids = list(children.values()), contents = True)
+        super().__init__(level, ids = list(children.values()))
         self.containerTags = containerTags
         self.containerID = None
         self.children = children
@@ -84,6 +83,7 @@ class AlbumGuessCommand(commands.ElementChangeCommand):
         if self.containerID is None:
             self.containerID = levels.createTId()
             self.ids.append(self.containerID)
+            self.contents = [self.containerID]
         album = Container(self.level, self.containerID, major = True)
         album.tags = self.containerTags
         self.level.elements[self.containerID] = album
