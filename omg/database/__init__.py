@@ -83,7 +83,7 @@ class ConnectionContextManager:
         return False # If the suite was stopped by an exception, don't stop that exception
 
 
-def connect(**kwargs):
+def connect():
     """Connect to the database server with information from the config file. The drivers specified in
     ``config.options.database.mysql_drivers`` are tried in the given order. This method must be called 
     exactly once for each thread that wishes to access the database. If successful, it returns a
@@ -105,17 +105,17 @@ def connect(**kwargs):
         path = config.options.database.sqlite_path.strip()
         if path.startswith('config:'):
             path = os.path.join(config.CONFDIR,path[len('config:'):])
-        return _connect(['sqlite'],[path],**kwargs)
+        return _connect(['sqlite'],[path])
     else: 
         authValues = [config.options.database["mysql_"+key] for key in sql.AUTH_OPTIONS]
-        return _connect(config.options.database.mysql_drivers,authValues, **kwargs)
+        return _connect(config.options.database.mysql_drivers,authValues)
 
 
-def _connect(drivers,authValues, **kwargs):
+def _connect(drivers,authValues):
     """Connect to the database using the given parameters which are submitted to the connect method of the
     driver. Throw a DBException if connection fails."""
     connection = sql.newConnection(drivers)
-    connection.connect(*authValues, **kwargs)
+    connection.connect(*authValues)
     connections[threading.current_thread().ident] = connection
     return ConnectionContextManager()
     

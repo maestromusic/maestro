@@ -47,13 +47,11 @@ def deleteElements(ids):
     """
     if len(ids) == 0:
         return
-    db.transaction()
     parentIds = db.parents(ids)
     contentsIds = db.contents(ids)
     db.query("DELETE FROM {}elements WHERE id IN ({})".format(db.prefix,db.csList(ids)))
     updateElementsCounter(parentIds)
     updateToplevelFlags(contentsIds)
-    db.commit()
 
 def addFlags(data):
     """Add entries to the flags table. *data* is a list of (elementid, flagid) tuples."""
