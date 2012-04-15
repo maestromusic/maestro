@@ -94,6 +94,7 @@ class EditorModel(rootedtreemodel.RootedTreeModel):
         progress.setMinimumDuration(200)
         progress.setWindowModality(Qt.WindowModal)
         filesByFolder = {}
+        modify.stack.beginMacro(self.tr("drop into editor"))
         try:
             # load files into editor level
             for folder, filesInOneFolder in files.items():
@@ -111,4 +112,6 @@ class EditorModel(rootedtreemodel.RootedTreeModel):
         except albumguesser.GuessError as e:
             print(e)
             return []
+        finally:
+            modify.stack.endMacro()
         
