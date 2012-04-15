@@ -365,9 +365,6 @@ class TagEditorModel(QtCore.QObject):
         if stack is None:
             self.stack = modify.stack
         else: self.stack = stack
-        
-        # This may be deactivated if the FlagEditor is run as a dialog...but it should not cause any harm.
-        modify.dispatcher.changes.connect(self._handleDispatcher)
 
     def getTags(self):
         """Return the list of tags that are present in any of the elements currently edited."""
@@ -592,73 +589,6 @@ class TagEditorModel(QtCore.QObject):
                 if record.isCommon():
                     self._checkCommonAndMove(record,undoable=False)
                     self.commonChanged.emit(record.tag)
-            
-    def _handleDispatcher(self,event):
-        """React to change events. We have to
-        
-            - delete elements on ElementsDeletedEvents,
-            - change all affected records on TagTypeChangedEvent. Furthermore the tag is used as a key in
-              self.inner.tags and must be updated here, too.
-            - React to events that change tags.
-             
-        \ """
-        if isinstance(event,modify.events.ElementsDeletedEvent):
-            affectedElements = [el for el in self.inner.elements if el.id in event.ids()]
-            if len(affectedElements) > 0:
-                # All records store a reference to this list, so this will update them, too.
-                self.inner.elements = [el for el in self.inner.elements if el not in affectedElements]
-                if len(self.inner.elements) == 0:
-                    self.createRecords()
-                    return
-                for tag in list(self.inner.tags.keys()): # dict may change
-                    for record in self.inner.tags[tag][:]: # list may change
-                        remaining = [element for element in record.elementsWithValue
-                                        if element not in affectedElements]
-                        if len(remaining) == 0:
-                            self.inner.removeRecord(record)
-                        elif len(remaining) < len(record.elementsWithFlag):
-                            self.inner.changeRecord(record.tag,record,
-                                            Record(record.tag,record.value,self.inner.elements,remaining))
-                    if len(self.inner.tags) == 0:
-                        self.inner.removeTag(tag)
-            return
-        
-        elif isinstance(event,modify.events.ElementChangeEvent):
-            if event.level != self.level:
-                return
-            affected = [el for el in self.inner.elements if el.id in event.ids()]
-            if isinstance(event,modify.events.SingleTagChangeEvent):
-                if isinstance(event,modify.events.TagValueAddedEvent):
-                    self._addElementsWithValue(event.tag,event.value,affected)
-                elif isinstance(event,modify.events.TagValueRemovedEvent):
-                    self._removeElementsWithValue(event.tag,event.value,affected)
-                elif isinstance(event,modify.events.TagValueChangedEvent):
-                    self._removeElementsWithValue(event.tag,event.oldValue,affected)
-                    self._addElementsWithValue(event.tag,event.newValue,affected)
-                # Finally update the title attribute
-                if event.tag == tags.TITLE and len(affected) > 0:
-                    for element in affected:
-                        elementTags = self.getTagsOfElement(element)
-                        if tags.TITLE in elementTags:
-                            element.title = element.getTitle(titles=elementTags[tags.TITLE])
-                        else: element.title = element.getTitle() # Will produce something like 'No title'
-                    self.titlesChanged.emit(affected)
-                    
-            elif event.tagsChanged:          
-                # General ElementChangeEvent
-                if not any(element.id in event.ids() for element in self.inner.elements):
-                    return
-                # Contrary to the detailed event handling above, we do a very simple thing here: We store the
-                # tags in the elements and load them anew using createRecords.
-                for element in self.inner.elements:
-                    if element.id in event.ids():
-                        # No need to copy because the tags will be deleted in createRecords in a moment.
-                        element.tags = event.getTags(element.id)
-                    else: element.tags = self.getTagsOfElement(element)
-                self.createRecords() # This will directly remove the tags-attributes again
-        
-        # else: It is not necessary to process TagTypeChangedEvents because the tag's single instance is
-        # updated automatically and the GUI reacts to the signal itself.
         
     def getPossibleSeparators(self,records):
         """Return all separators (from constants.SEPARATORS) that are present in every value of the given

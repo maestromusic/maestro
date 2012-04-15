@@ -19,6 +19,7 @@
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 from .. import database as db, tags, flags, realfiles, utils, config, logging, modify
+from ..modify import real
 from ..database import write as dbwrite
 from . import File, Container, ContentList
 from ..application import ChangeEvent
@@ -317,25 +318,6 @@ class RealLevel(Level):
                 continue
         return failedElements
             
-    
-class ChangeElementsCommand(QtGui.QUndoCommand):
-    def __init__(self,level,newElements,text):
-        super().__init__(text)
-        self.level = level
-        self.newElements = newElements
-        self.oldElements = {id: level.get(id) for id in newElements.keys()}
-        
-    def redo(self):
-        for id,element in self.newElements.items():
-            level.elements[id] = element
-        level.changed.emit(ElementChangedEvent(newElements.keys(),True))
-        
-    def undo(self):
-        for id,element in self.oldElements.items():
-            level.elements[id] = element
-        level.changed.emit(ElementChangedEvent(oldElements.keys(),True))
-
-
 class ChangeTagFlagsCommand(QtGui.QUndoCommand):
     def __init__(self,level,newTags,text):
         super().__init__(text)
@@ -507,8 +489,8 @@ class CommitCommand(QtGui.QUndoCommand):
             for path,changes in self.realFileChanges.items():
                 logger.debug("changing file tags: {0}-->{1}".format(path, changes))
                 modify.real.changeFileTags(path, changes)
-        self.level.parent.changed.emit([self.newId(id) for id in self.ids], [self.newId(id) for id in self.contents])
-        self.level.changed.emit([self.newId(id) for id in self.ids], []) # no contents changed in current level!
+        self.level.parent.emitEvent([self.newId(id) for id in self.ids], [self.newId(id) for id in self.contents])
+        self.level.emitEvent([self.newId(id) for id in self.ids], []) # no contents changed in current level!
         
     def undo(self):
         if self.real:
@@ -555,8 +537,8 @@ class CommitCommand(QtGui.QUndoCommand):
             for path, changes in self.realFileChanges.items():
                 logger.debug("reverting file tags: {0}<--{1}".format(path, changes))
                 modify.real.changeFileTags(path, changes, reverse = True)
-        self.level.parent.changed.emit(self.ids, self.contents)
-        self.level.changed.emit(self.ids, []) # no contents changed in current level!
+        self.level.parent.emitEvent(self.ids, self.contents)
+        self.level.emitEvent(self.ids, []) # no contents changed in current level!
                 
             
 

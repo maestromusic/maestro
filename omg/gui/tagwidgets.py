@@ -560,7 +560,7 @@ class NewTagTypeDialog(QtGui.QDialog):
                                       self.tr("The title must not be empty."))
             return
         if self._newTag is None:
-            modify.push(tags.TagTypeUndoCommand(constants.ADDED,
+            modify.stack.push(tags.TagTypeUndoCommand(constants.ADDED,
                                                 name=self.tagname,
                                                 type=self.combo.getType(),
                                                 title=self.titleLineEdit.text(),
