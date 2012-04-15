@@ -67,7 +67,7 @@ class Record:
         return [element for element in self.allElements if element not in self.elementsWithValue]
     
     def append(self,element):
-        """Append a element to this record. Call this after adding the value of this record to *element*.
+        """Append an element to this record. Call this after adding the value of this record to *element*.
         Return whether the element was not already contained in ''elementsWithValue''."""
         if element not in self.elementsWithValue:
             self.elementsWithValue.append(element)
@@ -428,11 +428,11 @@ class TagEditorModel(QtCore.QObject):
             # Now things get complicated: Add the record's elements to those of (a copy of)
             # the existing record.
             copy = existingRecord.copy(True)
-            copy.extend(record.elementsWithValue)
-            command.addMethod(self.records.changeRecord,record.tag,existingRecord,copy)
-            # If this makes the record common, move it to the right place
-            if existingRecord.isCommon() != copy.isCommon():
-                self._checkCommonAndMove(command,copy)
+            if copy.extend(record.elementsWithValue):
+                command.addMethod(self.records.changeRecord,record.tag,existingRecord,copy)
+                # If this makes the record common, move it to the right place
+                if existingRecord.isCommon() != copy.isCommon():
+                    self._checkCommonAndMove(command,copy)
             return False
             
     def removeRecord(self,record):

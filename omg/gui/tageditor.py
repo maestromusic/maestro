@@ -42,27 +42,18 @@ class TagEditorDock(QtGui.QDockWidget):
         self.dockLocationChanged.connect(self._handleLocationChanged)
         self.topLevelChanged.connect(self._handleLocationChanged)
         
-        self.levelIcon = QtGui.QLabel()
         self.tabWidget = QtGui.QTabWidget()
-        self.tabWidget.currentChanged.connect(self._handleTabChanged)
         self.tabWidget.setTabPosition(QtGui.QTabWidget.North if vertical else QtGui.QTabWidget.West)
-        self.tabWidget.setCornerWidget(self.levelIcon,Qt.TopLeftCorner)
         self.setWidget(self.tabWidget)
         
         self.realEditorWidget = TagEditorWidget(levels.real,vertical=vertical)
         self.editorEditorWidget = TagEditorWidget(levels.editor,vertical=vertical)
         self.tabWidget.addTab(self.realEditorWidget,self.tr("Real"))
         self.tabWidget.addTab(self.editorEditorWidget,self.tr("Editor"))
-        self._handleTabChanged(0)
         
         self.setAcceptDrops(True)
         
         mainwindow.mainWindow.globalSelectionChanged.connect(self._handleSelectionChanged)
-    
-    def _handleTabChanged(self,index):
-        level = self.tabWidget.currentWidget().level
-        self.levelIcon.setPixmap(utils.getPixmap('real.png' if level == levels.real else 'editor.png'))
-        self.levelIcon.setToolTip(self.tr("Real level") if level == levels.real else self.tr("Editor level"))
         
     def _handleLocationChanged(self,area):
         vertical = self.isFloating() or area in [Qt.LeftDockWidgetArea,Qt.RightDockWidgetArea]
@@ -177,6 +168,10 @@ class TagEditorWidget(QtGui.QWidget):
         self.topLayout = QtGui.QHBoxLayout()
         self.layout().addLayout(self.topLayout)
 
+        label = QtGui.QLabel()
+        label.setPixmap(utils.getPixmap('real.png' if level == levels.real else 'editor.png'))
+        self.topLayout.addWidget(label)
+        
         # Texts will be set in _changeLayout
         self.addButton = QtGui.QPushButton()
         self.addButton.setIcon(utils.getIcon("add.png"))
