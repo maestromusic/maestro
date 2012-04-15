@@ -21,7 +21,7 @@ from . import DBException, AbstractSql, AbstractSqlResult, EmptyResultException
 
 
 class Sql(AbstractSql):
-    def connect(self,username,password,database,host="localhost",port=3306):
+    def connect(self,username,password,database,host="localhost",port=3306,**kwargs):
         self._db = mysql.connector.Connect(database=database,user=username,password=password,host=host,
                                            port=port,buffered=True)
 

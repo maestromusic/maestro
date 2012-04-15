@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2009-2011 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2012 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -691,17 +691,17 @@ class TagValuePropertiesWidget(QtGui.QWidget):
         if self.changeValueCheckbox.isChecked() and self.valueEdit.text() != self.orig_value:
             #TODO: make sure that the new value is not an empty string  
             command = commands.RenameTagValueCommand(self.tag, self.orig_value, self.valueEdit.text())
-            modify.push(command)
+            modify.stack.push(command)
         if self.sortValueCheckbox.isChecked():
             if self.sortEdit.text() != self.orig_sortValue:
                 command = commands.SortValueUndoCommand(self.tag, self.valueId, self.orig_sortValue, self.sortEdit.text())
-                modify.push(command)
+                modify.stack.push(command)
         elif self.orig_sortValue is not None:
             command = commands.SortValueUndoCommand(self.tag, self.valueId, self.orig_sortValue, None)
-            modify.push(command)
+            modify.stack.push(command)
         if self.hiddenCheckbox.isChecked() != self.orig_hidden:
             command = commands.ValueHiddenUndoCommand(self. tag, self.valueId, self.hiddenCheckbox.isChecked())
-            modify.push(command)
+            modify.stack.push(command)
     
     @staticmethod
     def showDialog(tag, valueId):
