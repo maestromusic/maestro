@@ -231,6 +231,9 @@ class RecordModel(QtCore.QObject):
     recordRemoved = QtCore.pyqtSignal(Record)
     recordChanged = QtCore.pyqtSignal(tags.Tag,Record,Record)
     recordMoved = QtCore.pyqtSignal(tags.Tag,int,int)
+    
+    # This signal is emitted, when the number of common records of a tag has changed
+    commonChanged = QtCore.pyqtSignal(tags.Tag)
 
     def __getitem__(self,key):
         return self._records[key]
@@ -274,12 +277,16 @@ class RecordModel(QtCore.QObject):
         exist before you call this method, so you may need to call addTag first."""
         self._records[record.tag].insert(pos,record)
         self.recordInserted.emit(pos,record)
+        if record.isCommon():
+            self.commonChanged.emit(record.tag)
 
     def removeRecord(self,record):
         """Remove a record from the model."""
         pos = self._records[record.tag].index(record)
         del self._records[record.tag][pos]
         self.recordRemoved.emit(record)
+        if record.isCommon():
+            self.commonChanged.emit(record.tag)
             
     def changeRecord(self,tag,oldRecord,newRecord):
         """Replace the record *oldRecord* by *newRecord*. The replacement will take place in the list of
@@ -287,6 +294,8 @@ class RecordModel(QtCore.QObject):
         pos = self._records[tag].index(oldRecord)
         self._records[tag][pos] = newRecord
         self.recordChanged.emit(tag,oldRecord,newRecord)
+        if oldRecord.isCommon() != newRecord.isCommon():
+            self.commonChanged.emit(tag)
 
     def moveRecord(self,tag,oldPos,newPos):
         """Within the list of records of tag *tag* move a record from position *oldPos* to position
@@ -334,7 +343,6 @@ class TagEditorModel(QtCore.QObject):
     title in element.title and update it when necessary.
     """
     resetted = QtCore.pyqtSignal()
-    commonChanged = QtCore.pyqtSignal(tags.Tag)
     
     def __init__(self,level,elements,stack=None):
         QtCore.QObject.__init__(self)
@@ -350,6 +358,7 @@ class TagEditorModel(QtCore.QObject):
         self.recordRemoved = self.records.recordRemoved
         self.recordChanged = self.records.recordChanged
         self.recordMoved = self.records.recordMoved
+        self.commonChanged = self.records.commonChanged
             
         self.setElements(elements)
         
@@ -427,7 +436,6 @@ class TagEditorModel(QtCore.QObject):
             # If this makes the record common, move it to the right place
             if existingRecord.isCommon() != copy.isCommon():
                 self._checkCommonAndMove(command,copy)
-                self.commonChanged.emit(record.tag)
             return False
             
     def removeRecord(self,record):
@@ -725,11 +733,10 @@ class TagEditorModel(QtCore.QObject):
         """Make the given records common, i.e. set ''record.elementsWithValue'' to all elements."""
         command = TagEditorUndoCommand(self,self.tr("Extend records"))
         self.stack.push(command)
-        commonChangedTags = set() # Set of tags where the number of common records changed
+
         for record in records:
             if record.isCommon():
                 continue
-            else: commonChangedTags.add(record.tag)
             
             # Maybe we have to change the record's position, since it is common afterwards
             pos = self.records[record.tag].index(record)
@@ -741,9 +748,6 @@ class TagEditorModel(QtCore.QObject):
             
             if pos != newPos:
                 command.addMethod(self.records.moveRecords,records.tag,pos,newPos)
-        
-        for tag in commonChangedTags:
-            self.commonChanged.emit(tag)
 
     def _commonCount(self,tag):
         """Return the number of records of the given tag that are common (i.e. all elements have the
