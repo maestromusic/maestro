@@ -175,7 +175,7 @@ class TagManager(QtGui.QWidget):
             dialogs.warning(self.tr("Cannot remove tag"),
                             self.tr("Cannot remove a tag that appears in elements."))
             return
-        modify.push(tags.TagTypeUndoCommand(constants.DELETED,tagType=tag))
+        modify.stack.push(tags.TagTypeUndoCommand(constants.DELETED,tagType=tag))
 
     def _handleItemChanged(self,item):
         """Handle changes to the name or private state of a tag."""
@@ -196,13 +196,13 @@ class TagManager(QtGui.QWidget):
                     dialogs.warning(self.tr("Cannot change tag"),message)
                     item.setText(oldName) # Reset
                     return
-            modify.push(tags.TagTypeUndoCommand(constants.CHANGED,tagType=tag,name=newName))
+            modify.stack.push(tags.TagTypeUndoCommand(constants.CHANGED,tagType=tag,name=newName))
         
         elif item.column() == self._getColumnIndex('title'):
             tag = tags.tagList[item.row()]
             itemText = item.text() if item.text() != '' else None
             if itemText != tag.rawTitle:
-                modify.push(tags.TagTypeUndoCommand(constants.CHANGED,tagType=tag,title=itemText))
+                modify.stack.push(tags.TagTypeUndoCommand(constants.CHANGED,tagType=tag,title=itemText))
             
         elif item.column() == self._getColumnIndex('private'): 
             tag = tags.tagList[item.row()]
@@ -215,7 +215,7 @@ class TagManager(QtGui.QWidget):
                                 self.tr("Cannot change a tag that appears in elements."))
                 item.setText(oldName)
                 return
-            modify.push(tags.TagTypeUndoCommand(constants.CHANGED,tagType=tag,private=newPrivate))
+            modify.stack.push(tags.TagTypeUndoCommand(constants.CHANGED,tagType=tag,private=newPrivate))
 
     def _checkUndoRedoButtons(self):
         """Enable or disable the undo and redo buttons depending on stack state."""
@@ -233,7 +233,7 @@ class TagManager(QtGui.QWidget):
             dialogs.warning(self.tr("Cannot change tag"),
                             self.tr("Cannot change a tag that appears in elements."))
             return
-        modify.push(tags.TagTypeUndoCommand(constants.CHANGED,tagType=tag,type=type))
+        modify.stack.push(tags.TagTypeUndoCommand(constants.CHANGED,tagType=tag,type=type))
     
     def _handleCellDoubleClicked(self,row,column):
         """Handle double clicks on the first column containing icons. A click will open a file dialog to
@@ -271,7 +271,7 @@ class TagManager(QtGui.QWidget):
             
     def _setIcon(self,tagType,iconPath):
         """Set the icon(-path) of *tagType* to *iconPath* and update the GUI."""
-        modify.push(tags.TagTypeUndoCommand(constants.CHANGED,tagType=tagType,iconPath=iconPath))
+        modify.stack.push(tags.TagTypeUndoCommand(constants.CHANGED,tagType=tagType,iconPath=iconPath))
         # Update the widget
         row = tags.tagList.index(tagType)
         index = self.tableWidget.model().index(row,0)                     

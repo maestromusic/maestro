@@ -298,23 +298,7 @@ class Browser(QtGui.QWidget):
                 
     def _handleDispatcher(self,event):
         """Handle a change event."""
-        # Optimize some cases in which we do not have to start a new search and reload everything.
-        if isinstance(event,modify.events.SingleTagChangeEvent) \
-                    and all(event.tag not in criterion.getTags() for criterion in self.searchCriteria) \
-                    and all(event.tag not in criterion.getTags() for criterion in self.criterionFilter):
-            for view in self.views:
-                view.model().applyEvent(event)
-                # If the tag is used in a layer of this view, we still have to reset the view.
-                if any(event.tag in layer for layer in view.model().layers):
-                    view.model().reset()
-            return
-        elif isinstance(event,modify.events.SingleFlagChangeEvent) \
-                    and all(event.flag not in criterion.getFlags() for criterion in self.searchCriteria) \
-                    and all(event.flag not in criterion.getFlags() for criterion in self.criterionFilter):
-            for view in self.views:
-                view.model().applyEvent(event)
-            return
-
+        #TODO: Optimize some cases in which we do not have to start a new search and reload everything.
         self.load(restoreExpanded = True)
     
     def _handleLevelChange(self,event):
