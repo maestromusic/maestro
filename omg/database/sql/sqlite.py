@@ -25,8 +25,7 @@ class Sql(AbstractSql):
         # There doesn't seem to be a real documentation of the isolation_level parameter. 
         # But I like the conclusion of this discussion:
         # http://mail.python.org/pipermail/python-list/2010-March/1239395.html
-        isolevel = None if "mode" not in kwargs else kwargs["mode"]
-        self._db = sqlite3.connect(path,isolation_level = isolevel)
+        self._db = sqlite3.connect(path,isolation_level = None)
         # Foreign keys must be enabled in each connection
         self._db.execute("PRAGMA foreign_keys = ON")
 

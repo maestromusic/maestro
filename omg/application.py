@@ -93,7 +93,7 @@ def run(cmdConfig=[],exitPoint="nogui",console=True):
     # Initialize database
     from . import database
     try:
-        database.connect(mode = "DEFERRED")
+        database.connect()
     except database.sql.DBException as e:
         logger.error("I cannot connect to the database. Did you provide the correct information in the config"
                      " file? MySQL error: {}".format(e.message))

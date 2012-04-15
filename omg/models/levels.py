@@ -430,7 +430,8 @@ class CommitCommand(QtGui.QUndoCommand):
             
     def redo(self):
         # create new elements in DB to obtain id map, if necessary
-        if self.real and len(self.newInDatabase) > 0: 
+        if self.real: 
+            db.transaction()
             if self.idMap is None:
                 # first redo -> prepare id mapping
                 self.idMap = modify.real.createNewElements(self.level, self.newInDatabase)
@@ -494,6 +495,7 @@ class CommitCommand(QtGui.QUndoCommand):
         
     def undo(self):
         if self.real:
+            db.transaction()
             if len(self.newInDatabase) > 0:
                 db.write.deleteElements(list(self.idMap.values()))
             majorChangesExisting = [(self.newId(id),oldMajor) for id,(oldMajor,_) in self.majorChanges.items()
