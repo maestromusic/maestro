@@ -7,8 +7,12 @@
 # 
 import sys, subprocess
 
-returncode = subprocess.call([sys.executable, '-m', 'omg.application'] + sys.argv[1:],stdout=sys.stdout,stderr=sys.stderr)
-if returncode == 117:
-    returncode = subprocess.call([sys.executable, '-m', 'omg.install'])
-    if returncode == 117:
-        returncode = subprocess.call([sys.executable, '-m', 'omg.application'] + sys.argv[1:])
+sys.path.insert(0,'/media/daten/Projekte/music')
+from omg import application
+application.runGUI()
+
+#returncode = subprocess.call([sys.executable, '-m', 'omg.application'] + sys.argv[1:],stdout=sys.stdout,stderr=sys.stderr)
+#if returncode == 117:
+#    returncode = subprocess.call([sys.executable, '-m', 'omg.install'])
+#    if returncode == 117:
+#        returncode = subprocess.call([sys.executable, '-m', 'omg.application'] + sys.argv[1:])

@@ -27,7 +27,8 @@ Before logging is configured everything will be printed to the console, so call 
 possible (but after the config module has been initialized).
 """
 
-import logging, logging.config, os, sys
+import sys
+import logging, logging.config
 
 configured = False # Whether logging has been configured (i.e. init has been successfully called).
 
