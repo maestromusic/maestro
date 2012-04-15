@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2009-2011 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2012 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -25,7 +25,7 @@ from .. import database as db, config,utils, tags, modify, flags
 from ..search import searchbox, criteria as criteriaModule
 from . import mainwindow, treeview, browserdialog
 from .delegates import browser as browserdelegate, configuration as delegateconfiguration
-from ..models import browser as browsermodel, levels, Element, Container
+from ..models import browser as browsermodel, levels, Element, Container, Wrapper
 from ..modify.treeactions import *
 translate = QtCore.QCoreApplication.translate
 
@@ -47,10 +47,8 @@ class BrowserDock(QtGui.QDockWidget):
         globalSelection = []
         for index in selectionModel.selectedIndexes():
             node = selectionModel.model().data(index)
-            # The browser does not load tags automatically
-            if isinstance(node,Element):
-                browsermodel._loadData(node)
-                globalSelection.append(node)
+            if isinstance(node,Wrapper):
+                globalSelection.append(node.element)
         if len(globalSelection):
             mainwindow.setGlobalSelection(globalSelection,self.widget())
             
@@ -319,8 +317,9 @@ class Browser(QtGui.QWidget):
 
         self.load(restoreExpanded = True)
     
-    def _handleLevelChange(self, ids, contents):
+    def _handleLevelChange(self,event):
         self.load(restoreExpanded = True)
+
 
 class BrowserTreeView(treeview.TreeView):
     """TreeView for the Browser. A browser may contain more than one view each using its own model. *parent*

@@ -19,7 +19,9 @@
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 from .. import database as db, tags, flags, realfiles, utils, config, logging, modify
+from ..database import write as dbwrite
 from . import File, Container, ContentList
+from ..application import ChangeEvent
     
 real = None
 editor = None
@@ -36,8 +38,19 @@ class ElementGetError(RuntimeError):
     """Error indicating that an element failed to be loaded by some level."""
     pass
 
+
+class ElementChangedEvent(ChangeEvent):
+    def __init__(self,dataIds=None,contentIds=None):
+        if dataIds is None:
+            self.dataIds = []
+        else: self.dataIds = dataIds
+        if contentIds is None:
+            self.contentIds = []
+        else: self.contentIds = contentIds
+
+
 class Level(QtCore.QObject):
-    changed = QtCore.pyqtSignal(list, list)
+    changed = QtCore.pyqtSignal(ChangeEvent)
     """Signal that is emitted if something changes on this level. The first argument is a list of Ids of elements
     whose tags, flags, major status, ... has changed (things affecting only the element itself). The second list
     contains IDs of containers whose contents have changed."""
@@ -79,10 +92,41 @@ class Level(QtCore.QObject):
     def loadPaths(self,paths,aDict,ignoreUnknownTags=False):
         ids = [idFromPath(path) for path in paths]
         self.load(ids,aDict,ignoreUnknownTags)
+        
+    def __contains__(self, id):
+        """Returns if the given id is loaded in this level. Note that if the id could be loaded from the
+        parent but is not contained in this level, then *False* is returned."""
+        return self.elements.__contains__(id)
+    
+    def __str__(self):
+        return 'Level({})'.format(self.name)
+    
+    def emitEvent(self,dataIds=None,contentIds=None):
+        """Simple shortcut to emit an event."""
+        self.changed.emit(ElementChangedEvent(dataIds,contentIds))
   
+    def addTagValue(self,tag,value,elements,emitEvent=True):
+        for element in elements:
+            element.tags.add(tag,value)
+        if emitEvent:
+            self.emitEvent([element.id for element in elements])
+            
+    def removeTagValue(self,tag,value,elements,emitEvent=True):
+        for element in elements:
+            element.tags.remove(tag,value)
+        if emitEvent:
+            self.emitEvent([element.id for element in elements])
+            
+    def changeTagValue(self,tag,oldValue,newValue,elements,emitEvent=True):
+        for element in elements:
+            element.tags.replace(tag,oldValue,newValue)
+        if emitEvent:
+            self.emitEvent([element.id for element in elements])
+        
     def changeId(self, old, new):
-        """Change the id of some element from *old* to *new*. This should only be called from within appropriate
-        UndoCommands, and only if (old in self) is True. Takes care of contents and parents, too."""
+        """Change the id of some element from *old* to *new*. This should only be called from within
+        appropriate UndoCommands, and only if (old in self) is True. Takes care of contents and parents, too.
+        """
         elem = self.elements[old]
         del self.elements[old]
         elem.id = new
@@ -93,16 +137,9 @@ class Level(QtCore.QObject):
         if elem.isContainer():
             for childID in elem.contents.ids:
                 if childID in self.elements:
-                    self.elements[childID].parents = [ new if id == old else old for id in self.elements[childID].parents ]
-        
-        
-    def __contains__(self, id):
-        """Returns if the given id is loaded in this level. Note that if the id could be loaded from the
-        parent but is not contained in this level, then *False* is returned."""
-        return self.elements.__contains__(id)
+                    self.elements[childID].parents = [ new if id == old else old
+                                                      for id in self.elements[childID].parents ]
     
-    def __str__(self):
-        return 'Level({})'.format(self.name)
     
 class RealLevel(Level):
     def __init__(self):
@@ -203,9 +240,8 @@ class RealLevel(Level):
                         # TODO: wrap this up as a separate function stored somewhere else
                         from ..gui.tagwidgets import NewTagTypeDialog
                         QtGui.QApplication.changeOverrideCursor(Qt.ArrowCursor)
-                        text = self.tr('Unknown tag\n{1}={2}\n found in \n{0}.\n What should its type be?').format(rpath,
-                                                                                                                   e.tagname,
-                                                                                                                   e.values)
+                        text = self.tr('Unknown tag\n{1}={2}\n found in \n{0}.\n What should its type be?')\
+                                           .format(rpath,e.tagname,e.values)
                         dialog = NewTagTypeDialog(e.tagname, text = text, includeDeleteOption = True)
                         ret = dialog.exec_()
                         if ret == dialog.Accepted:
@@ -232,15 +268,97 @@ class RealLevel(Level):
                 flags = db.flags(id)
                 # TODO: Load private tags!
             level.elements[id] = File(level,id = id,path=rpath,length=length,tags=fileTags,flags=flags)
+    
+    def addTagValue(self,tag,value,elements,emitEvent=True):
+        super().addTagValue(tag,value,elements,emitEvent=False)
+        failedElements = self.saveTagsToFileSystem(elements)
+        #TODO: Correct failedElements
+        dbwrite.addTagValues([el.id for el in elements if el.isInDB() and not el in failedElements],
+                             tag,[value])
+        if emitEvent:
+            self.emitEvent([element.id for element in elements])
+            
+    def removeTagValue(self,tag,value,elements,emitEvent=True):
+        super().removeTagValue(tag,value,elements,emitEvent=False)
+        failedElements = self.saveTagsToFileSystem(elements)
+        #TODO: Correct failedElements
+        dbwrite.removeTagValuesById([el.id for el in elements if el.isInDB() and not el in failedElements],
+                                 tag,db.idFromValue(tag,value))
+        if emitEvent:
+            self.emitEvent([element.id for element in elements])
+            
+    def changeTagValue(self,tag,oldValue,newValue,elements,emitEvent=True):
+        super().changeTagValue(tag,oldValue,newValue,elements,emitEvent=False)
+        failedElements = self.saveTagsToFileSystem(elements)
+        #TODO: Correct failedElements
+        dbwrite.changeTagValueById([el.id for el in elements if el.isInDB() and not el in failedElements],
+                                 tag,db.idFromValue(tag,oldValue),db.idFromValue(tag,newValue,insert=True))
+        if emitEvent:
+            self.emitEvent([element.id for element in elements])
+        
+    def saveTagsToFileSystem(self,elements):
+        failedElements = []
+        for element in elements:
+            if not element.isFile():
+                continue
+            try:
+                real = realfiles.get(element.path)
+                real.read()
+                real.tags = element.tags.withoutPrivateTags()
+                real.saveTags()
+            except IOError as e:
+                logger.error("Could not save tags of '{}'.".format(element.path))
+                logger.error("Error was: {}".format(e))
+                failedElements.append(elements)
+                continue
+        return failedElements
+            
+    
+class ChangeElementsCommand(QtGui.QUndoCommand):
+    def __init__(self,level,newElements,text):
+        super().__init__(text)
+        self.level = level
+        self.newElements = newElements
+        self.oldElements = {id: level.get(id) for id in newElements.keys()}
+        
+    def redo(self):
+        for id,element in self.newElements.items():
+            level.elements[id] = element
+        level.changed.emit(ElementChangedEvent(newElements.keys(),True))
+        
+    def undo(self):
+        for id,element in self.oldElements.items():
+            level.elements[id] = element
+        level.changed.emit(ElementChangedEvent(oldElements.keys(),True))
+        
 
-class CommitCommand(modify.ElementChangeCommand):
+class ChangeTagFlagsCommand(QtGui.QUndoCommand):
+    def __init__(self,level,newTags,text):
+        super().__init__(text)
+        self.level = level
+        self.newTags = newTags
+        self.oldTags = {id: level.get(id).tags for id in newTags.keys()}
+        
+    def redo(self):
+        for id,tags in self.newTags.items():
+            level.get(id).tags = tags
+        level.changed.emit(ElementChangedEvent(newTags.keys(),False))
+        
+    def undo(self):
+        for id,tags in self.oldTags.items():
+            level.get(id).tags = tags
+        level.changed.emit(ElementChangedEvent(oldTags.keys(),False))
+        
+        
+class CommitCommand(QtGui.QUndoCommand):
     """The CommitCommand is used to "commit" the state of some elements in one level to its parent level.
     If the parent level is *real*, then also the database and, if needed, files on disk are updated
     accordingly."""
     
     def __init__(self, level, ids, text = None):
         """Sets up a commit command for the given *ids* in *level*."""
-        super().__init__(level, text)
+        super().__init__(text)
+        self.level = level
         
         allIds = set(ids)
         # add children's IDs to ensure consistent commit

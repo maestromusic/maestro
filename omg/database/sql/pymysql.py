@@ -21,7 +21,7 @@ from . import DBException, AbstractSql, AbstractSqlResult, EmptyResultException
 
 
 class Sql(AbstractSql):
-    def connect(self,username,password,database,host="localhost",port=3306):
+    def connect(self,username,password,database,host="localhost",port=3306,**kwargs):
         self._db = pymysql.connect(db=database,user=username,passwd=password,
                                    host=host,port=port,use_unicode=True,charset='utf8')
 

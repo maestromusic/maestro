@@ -106,7 +106,7 @@ class AbstractSql:
     :func:`newConnection <omg.database.sql.newConnection>` which will create a non-abstract subclass of
     this depending on the driver.
     """
-    def connect(self,username,password,database,host="localhost",port=3306):
+    def connect(self,username,password,database,host="localhost",port=3306,**kwargs):
         """Connect to a database using the given information."""
             
     def query(self,queryString,*args):

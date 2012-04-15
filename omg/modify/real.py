@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2009-2011 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2012 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -23,7 +23,6 @@ do any Undo-/Redo-stuff.
  
 from .. import database as db, tags as tagsModule, realfiles, logging, utils
 from ..database import write
-from . import dispatcher, events
 import os
 
 logger = logging.getLogger(__name__)
@@ -107,110 +106,3 @@ def deleteFilesFromDisk(paths):
     for path in paths:
         logger.warning('permanently removing file "{}"'.format(path))
         os.remove(utils.absPath(path))
-
-def addTagValue(tag,value,elements): 
-    """Add a tag of type *tag* and value *value* to each element in *elements*, which is a list of either
-    elements or element IDs."""
-    assert isinstance(tag,tagsModule.Tag) and len(elements) > 0
-    
-    if not tag.private:
-        successful = [] # list of element IDs where the file was written successfully
-        for element in elements:
-            isID = isinstance(element, int)
-            if (isID and db.isFile(element)) or element.isFile():
-                try:
-                    real = realfiles.get(db.path(element) if isID else element.path)
-                    real.read()
-                    real.tags.add(tag,value)
-                    real.saveTags()
-                except IOError as e:
-                    logger.error("Could not add tags to '{}'.".format(element.path))
-                    logger.error("Error was: {}".format(e))
-                    continue
-            successful.append(element if isID else element.id)
-    else: successful = [el if isinstance(el, int) else el.id for el in elements]
-
-    if len(successful) > 0:
-        db.write.addTagValues(successful, tag,[value])
-        dispatcher.changes.emit(events.TagValueAddedEvent(REAL,tag,value, successful))
-
-
-def removeTagValue(tag,value,elements):
-    """Remove the given value of tag *tag* from each element in *elements*."""
-    assert isinstance(tag,tagsModule.Tag) and len(elements) > 0
-    
-    if not tag.private:
-        successful = [] # list of elements where the file was written successfully
-        for element in elements:
-            if element.isFile():
-                try:
-                    real = realfiles.get(element.path)
-                    real.read()
-                    real.tags.remove(tag,value)
-                    real.saveTags()
-                except IOError as e:
-                    logger.error("Could not remove tags from '{}'.".format(element.path))
-                    logger.error("Error was: {}".format(e))
-                    continue
-            successful.append(element)
-    else: successful = elements
-    
-    if len(successful) > 0:                
-        db.write.removeTagValues((element.id for element in successful),tag,[value])
-        dispatcher.changes.emit(events.TagValueRemovedEvent(REAL,tag,value,successful))
-
-
-def changeTagValue(tag,oldValue,newValue,elements):
-    """For each element in *elements*, which is a list of either elements or element IDs:
-    If element has a tag of type *tag* and value *oldValue* then remove it.
-    In any case add *newValue*."""
-    assert isinstance(tag,tagsModule.Tag) and len(elements) > 0
-    if not tag.private:
-        successful = [] # list of element IDs where the file was written successfully
-        for element in elements:
-            isID = isinstance(element, int)
-            if (isID and db.isFile(element)) or (not isID and element.isFile()):
-                try:
-                    real = realfiles.get(db.path(element) if isID else element.path)
-                    real.read()
-                    real.tags.replace(tag,oldValue,newValue)
-                    real.saveTags()
-                except IOError as e:
-                    logger.error("Could not change tag value from '{}'.".format(element.path))
-                    logger.error("Error was: {}".format(e))
-                    continue
-            successful.append(element if isID else element.id)
-    else: successful = [el if isinstance(el, int) else el.id for el in elements]
-        
-    if len(successful) > 0:
-        db.write.changeTagValue(successful,tag,oldValue,newValue)
-        dispatcher.changes.emit(events.TagValueChangedEvent(REAL,tag,oldValue,newValue,successful))
-
-
-def addFlag(flag,elements):
-    """Add *flag* to *elements* and emit a FlagAddedEvent."""
-    db.write.addFlag((el.id for el in elements),flag)
-    dispatcher.changes.emit(events.FlagAddedEvent(REAL,flag,elements))
-    
-
-def removeFlag(flag,elements):
-    """Remove *flag* from *elements* and emit a FlagRemovedEvent."""
-    db.write.removeFlag((el.id for el in elements),flag)
-    dispatcher.changes.emit(events.FlagRemovedEvent(REAL,flag,elements))
-    
-    
-def setSortValue(tag,valueId,newValue,oldValue=-1):
-    """Change a sortvalue and emit a SortValueChangedEvent. *tag* and *valueId* specify the affected value,
-    *newValue* is the new value (None if the sortvalue should be deleted) and *oldValue* is used for the
-    event. It may be the oldValue (including None) or -1 (the default) in which case it is fetched from the
-    database.
-    """
-    if oldValue == -1:
-        oldValue = db.sortValue(tag,valueId)
-    db.write.setSortValue(tag,valueId,newValue)
-    dispatcher.changes.emit(events.SortValueChangedEvent(tag,valueId,oldValue,newValue))
-
-def setHidden(tag, valueId, newState):
-    """Set the "hidden" attribute of the given tag value to *newState* which must be a bool."""
-    db.write.setHidden(tag, valueId, newState)
-    dispatcher.changes.emit(events.HiddenAttributeChangedEvent(tag, valueId, newState))

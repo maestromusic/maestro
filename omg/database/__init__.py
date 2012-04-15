@@ -69,7 +69,6 @@ logger = logging.getLogger("omg.database")
 # Each thread must have its own connection object. This maps thread identifiers to the connection object
 connections = {}
 
-
 # Connection and maintenance methods
 #=======================================================================
 class ConnectionContextManager:
@@ -97,7 +96,7 @@ def connect(**kwargs):
             "database.connect has been called although a connection for this thread was already open.")
         return connections[threadId]
 
-    global prefix, type
+    global type, prefix
     type = config.options.database.type
     prefix = config.options.database.prefix
     
@@ -106,7 +105,7 @@ def connect(**kwargs):
         path = config.options.database.sqlite_path.strip()
         if path.startswith('config:'):
             path = os.path.join(config.CONFDIR,path[len('config:'):])
-        return _connect(['sqlite'],[path], **kwargs)
+        return _connect(['sqlite'],[path],mode='DEFERRED')
     else: 
         authValues = [config.options.database["mysql_"+key] for key in sql.AUTH_OPTIONS]
         return _connect(config.options.database.mysql_drivers,authValues, **kwargs)
@@ -367,16 +366,19 @@ def valueFromId(tagSpec,valueId):
         value = utils.FlexiDate.fromSql(value)
     return value
 
+
 _cachedValues = None
+
 
 def initCachedValues():
     global _cachedValues
     _cachedValues = dict()
     for tagType in (tagsModule.TYPE_DATE, tagsModule.TYPE_VARCHAR):
         _cachedValues[tagType] = dict()
-        result = query("SELECT id, tag_id, value FROM {}values_{}".format(prefix, tagType))
+        result = query("SELECT id, tag_id, value FROM {}values_{}".format(prefix, tagType.name))
         for id, tag_id, value in result:
             _cachedValues[tagType][(tag_id, value)] = id
+          
             
 def idFromValue(tagSpec,value,insert=False):
     """Return the id of the given value in the tag-table of tag *tagSpec*. If the value does not exist,
@@ -397,6 +399,7 @@ def idFromValue(tagSpec,value,insert=False):
                 id = query("INSERT INTO {}values_{} (tag_id, value) VALUES (?,?)"
                            .format(prefix, tag.type), tag.id, value).insertId()
                 _cachedValues[tag.type][(tag.id, value)] = id
+                return id
             else:
                 raise KeyError("No value id for tag '{}' and value '{}'".format(tag, value))
     else:

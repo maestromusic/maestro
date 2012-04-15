@@ -93,7 +93,7 @@ def run(cmdConfig=[],exitPoint="nogui",console=True):
     # Initialize database
     from . import database
     try:
-        database.connect(mode = "DEFERRED")
+        database.connect()
     except database.sql.DBException as e:
         logger.error("I cannot connect to the database. Did you provide the correct information in the config"
                      " file? MySQL error: {}".format(e.message))
@@ -122,9 +122,9 @@ def run(cmdConfig=[],exitPoint="nogui",console=True):
     search.init()
     
     # Load Plugins
-    from . import plugins
-    plugins.init()
-    plugins.enablePlugins()
+    #from . import plugins
+    #plugins.init()
+    #plugins.enablePlugins()
     
     if exitPoint == 'nogui':
         return
@@ -143,7 +143,7 @@ def run(cmdConfig=[],exitPoint="nogui",console=True):
     from . import player
     player.init()
     mainWindow = mainwindow.MainWindow()
-    plugins.mainWindowInit()
+    #plugins.mainWindowInit()
     
     # Launch application
     mainWindow.show()
@@ -155,14 +155,10 @@ def run(cmdConfig=[],exitPoint="nogui",console=True):
     search.shutdown()
     mainWindow.saveLayout()
     delegateconfiguration.save()
-    plugins.shutdown()
+    #plugins.shutdown()
     config.shutdown()
     logging.shutdown()
     sys.exit(returnValue)
-
-
-import functools
-runGUI = functools.partial(run, exitPoint=None,console=False)
 
 
 def handleCommandLineOptions(cmdConfig):
@@ -191,7 +187,7 @@ def lock():
     lockFile = os.path.join(config.CONFDIR,'lock')
     try:
         # For a long time the built-in function open was used here. But one day it stopped working oO
-        fileDescriptor = os.open(lockFile,os.O_WRONLY| os.O_CREAT)
+        fileDescriptor = os.open(lockFile,os.O_WRONLY | os.O_CREAT)
     except IOError:
         logger.error("Cannot open lock file {}".format(lockFile))
         sys.exit(-1)
@@ -245,5 +241,10 @@ def runInstaller():
     os.execl(sys.executable, os.path.basename(sys.executable), "-m", "omg.install")
     
     
+def runGUI():
+    """Run the graphical user interface of OMG."""
+    run(exitPoint=None,console=False)
+    
+    
 if __name__ == "__main__":
-    run(exitPoint=None,console=False) 
+    runGUI()

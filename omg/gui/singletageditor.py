@@ -258,7 +258,7 @@ class RecordEditor(QtGui.QWidget):
                 if self.listView is None:
                     self.listView = listview.ListView()
                     self.secondLineLayout.addWidget(self.listView)
-                self.listView.setModel(simplelistmodel.SimpleListModel(elements,lambda el: el.title))
+                self.listView.setModel(simplelistmodel.SimpleListModel(elements,lambda el: el.getTitle()))
                 self.setExpanded(len(elements) <= EXPAND_LIMIT)
 
     def _updateElementsLabel(self):
@@ -270,7 +270,7 @@ class RecordEditor(QtGui.QWidget):
             if self.record.isUsual():
                 elements = self.record.getExceptions()
                 if len(elements) == 1:
-                    self.elementsLabel.setText(self.tr("except in {}").format(elements[0].title))
+                    self.elementsLabel.setText(self.tr("except in {}").format(elements[0].getTitle()))
                 else: self.elementsLabel.setText(
                            self.tr("except in {}/%n pieces","",len(self.record.allElements))
                                     .format(len(elements)))
@@ -278,7 +278,7 @@ class RecordEditor(QtGui.QWidget):
                 elements = self.record.elementsWithValue
                 if len(elements) == 1 and self.record.tag != tags.TITLE:
                     # displaying the title is not necessary if the tag is TITLE
-                    self.elementsLabel.setText(self.tr("in {}").format(elements[0].title))
+                    self.elementsLabel.setText(self.tr("in {}").format(elements[0].getTitle()))
                 else: self.elementsLabel.setText(
                             self.tr("in {}/%n pieces","",len(self.record.allElements)).format(len(elements)))
         

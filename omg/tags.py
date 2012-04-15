@@ -656,6 +656,7 @@ class Storage(dict):
     def replace(self,tag,oldValue,newValue):
         """Replace a value of *tag*. Because *newValue* will be at the same position where *oldValue* was,
         this might look nicer in displays, than simply removing *oldValue* and appending *newValue*.
+        If *oldValue* is not present, add *newValue* anyway.
         """
         if not isinstance(tag,Tag):
             tag = get(tag)
@@ -663,6 +664,7 @@ class Storage(dict):
             if value == oldValue:
                 self[tag][i] = newValue
                 return
+        else: self.add(tag,newValue)
     
     def merge(self,other):
         """Add all tags from *other* to this storage. *other* may be another :class:`omg.tags.Storage`
@@ -687,9 +689,9 @@ class Storage(dict):
             return Storage({tag: l for tag,l in self.items() if not tag.private})
         else: return self
 
+
 class TagDifference:
     """A class storing the difference between two Storage() objects, for use in UndoCommands."""
-    
     def __init__(self, tagsA, tagsB):
         self.removals = []
         self.additions = []
@@ -722,8 +724,6 @@ class TagDifference:
         for tag, values in self.removals:
             tagsB.add(tag, *values)
                     
-                 
-        
 
 def findCommonTags(elements):
     """Returns a Storage object containing all tags that are equal in all of the elements.

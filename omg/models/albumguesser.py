@@ -23,7 +23,7 @@ from ..utils import relPath
 
 import os, re, itertools
 
-from PyQt4 import QtCore 
+from PyQt4 import QtCore, QtGui
 translate = QtCore.QCoreApplication.translate
 
 class GuessError(ValueError):
@@ -70,10 +70,12 @@ def guessAlbums(level, filesByFolder, parent, albumGroupers, metacontainer_regex
         modify.endMacro()
         return complete
 
-class AlbumGuessCommand(modify.ElementChangeCommand):
+class AlbumGuessCommand(QtGui.QUndoCommand):
     
     def __init__(self, level, containerTags, children, meta = False):
-        super().__init__(level, ids = list(children.values()))
+        super().__init__()
+        self.level = level
+        self.ids = list(children.values())
         self.containerTags = containerTags
         self.containerID = None
         self.children = children

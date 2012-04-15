@@ -21,7 +21,7 @@ from . import DBException, AbstractSql, AbstractSqlResult, EmptyResultException
 
 
 class Sql(AbstractSql):
-    def connect(self,path, **kwargs):
+    def connect(self,path,**kwargs):
         # There doesn't seem to be a real documentation of the isolation_level parameter. 
         # But I like the conclusion of this discussion:
         # http://mail.python.org/pipermail/python-list/2010-March/1239395.html
