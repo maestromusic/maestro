@@ -105,7 +105,7 @@ def connect(**kwargs):
         path = config.options.database.sqlite_path.strip()
         if path.startswith('config:'):
             path = os.path.join(config.CONFDIR,path[len('config:'):])
-        return _connect(['sqlite'],[path],mode='DEFERRED')
+        return _connect(['sqlite'],[path],**kwargs)
     else: 
         authValues = [config.options.database["mysql_"+key] for key in sql.AUTH_OPTIONS]
         return _connect(config.options.database.mysql_drivers,authValues, **kwargs)

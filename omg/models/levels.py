@@ -538,7 +538,7 @@ class CommitCommand(QtGui.QUndoCommand):
                 logger.debug("reverting file tags: {0}<--{1}".format(path, changes))
                 modify.real.changeFileTags(path, changes, reverse = True)
         self.level.parent.emitEvent(self.ids, self.contents)
-        self.level.changed.emitEvent(self.ids, []) # no contents changed in current level!
+        self.level.emitEvent(self.ids, []) # no contents changed in current level!
                 
             
 
