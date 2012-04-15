@@ -70,6 +70,9 @@ def changeContents(changes):
     db.write.addContents(tuples)
     
 def changeTags(changes, reverse = False):
+    """Change tags of files in database. *changes* is a mapping from ids to
+    TagDifference objects. If *reverse* is True, changes are made reverted rather than applied."""
+    
     removeTuples = []
     addTuples = []
     neededValues = set()
@@ -102,6 +105,15 @@ def changeFlags(changes, reverse = False):
     if len(removeTuples) > 0:
         db.write.removeFlags(removeTuples)
 
+def changeFileTags(path, tagDiff, reverse = False):
+    file = realfiles.get(path)
+    file.read()
+    if reverse:
+        tagDiff.revert(file.tags, True)
+    else:
+        tagDiff.apply(file.tags, False)
+    file.save()
+    
 def deleteFilesFromDisk(paths):
     """Delete the given files from the filesystem. *paths* is a list of paths."""
     for path in paths:

@@ -20,7 +20,6 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 from .. import database as db, tags, flags, realfiles, utils, config, logging, modify
 from . import File, Container, ContentList
-    
 real = None
 editor = None
 
@@ -230,8 +229,12 @@ class RealLevel(Level):
                 flags = []
             else:
                 flags = db.flags(id)
+                logger.warning("loadFromFilesystem called on '{}', which is in DB. Are you sure "
+                               "this is correct?".format(rpath))
                 # TODO: Load private tags!
-            level.elements[id] = File(level,id = id,path=rpath,length=length,tags=fileTags,flags=flags)
+            elem = File(level,id = id,path=rpath,length=length,tags=fileTags,flags=flags)
+            elem.fileTags = fileTags.copy()
+            level.elements[id] = elem
 
 class CommitCommand(modify.ElementChangeCommand):
     """The CommitCommand is used to "commit" the state of some elements in one level to its parent level.
@@ -259,6 +262,7 @@ class CommitCommand(modify.ElementChangeCommand):
         self.real = level.parent is real # a handy shortcut
         if self.real:
             self.newInDatabase = [ id for id in allIds if id < 0 ]
+            self.realFileChanges = {}
             self.idMap = None
         else:
             self.newId = self.oldId = lambda x : x
@@ -274,7 +278,8 @@ class CommitCommand(modify.ElementChangeCommand):
                 self.contents.append(id)
     
     def recordChanges(self, id):
-        """Store changes, return True if there are any."""
+        """Store changes of a single element, return two booleans (changeElement, changeContents)
+        reflecting whether the elements itself and/or its contents have changed."""
         myEl = self.level.get(id)
         changeElement, changeContents = False, False
         if id in self.level.parent:
@@ -287,14 +292,28 @@ class CommitCommand(modify.ElementChangeCommand):
         else:
             changeElement = True
             self.newElements.append(id)
-            oldTags = tags.Storage()
+            oldTags = None
             oldFlags = []
             if myEl.isContainer():
-                oldMajor = True
+                oldMajor = None
                 oldContents = ContentList()  
         
         if oldTags != myEl.tags:
-            self.tagChanges[id] = tags.TagDifference(oldTags, myEl.tags)
+            changes = tags.TagDifference(oldTags, myEl.tags)
+            self.tagChanges[id] = changes
+            if self.real and myEl.isFile():
+                # check for file tag changes
+                if id not in self.newElements:
+                    if not changes.onlyPrivateChanges():
+                        # element already loaded in real level (already commited or loaded in playlist)
+                        self.realFileChanges[myEl.path] = changes
+                else:
+                     fileTags = myEl.fileTags
+                     fileChanges = tags.TagDifference(fileTags, myEl.tags)
+                     if not fileChanges.onlyPrivateChanges():
+                         self.realFileChanges[myEl.path] = fileChanges
+                        
+                
             changeElement = True
         if oldFlags != myEl.flags:
             self.flagChanges[id] = flags.FlagDifference(oldFlags, myEl.flags)
@@ -354,10 +373,21 @@ class CommitCommand(modify.ElementChangeCommand):
             if len(self.contentsChanges) > 0:
                 modify.real.changeContents({self.newId(id):changes for id, changes in self.contentsChanges.items()})
             if len(self.tagChanges) > 0:
-                modify.real.changeTags({self.newId(id):diff for id,diff in self.tagChanges.items()})
+                # although the difference from our level to the parent might affect only a subset of the tags,
+                # for elements new to the database the complete tags must be written (happens if a non-db file is
+                # loaded in real)
+                def dbDiff(id):
+                    if id in self.newInDatabase:
+                        return tags.TagDifference(None, self.level.get(self.newId(id)).tags)
+                    else:
+                        return self.tagChanges[id]
+                modify.real.changeTags({self.newId(id):dbDiff(id) for id in self.tagChanges.keys()})
             if len(self.flagChanges) > 0:
                 modify.real.changeFlags({self.newId(id):diff for id,diff in self.flagChanges.items()})
             db.commit()
+            for path,changes in self.realFileChanges.items():
+                logger.debug("changing file tags: {0}-->{1}".format(path, changes))
+                modify.real.changeFileTags(path, changes)
         self.level.parent.changed.emit([self.newId(id) for id in self.ids], [self.newId(id) for id in self.contents])
         self.level.changed.emit([self.newId(id) for id in self.ids], []) # no contents changed in current level!
         
@@ -382,7 +412,7 @@ class CommitCommand(modify.ElementChangeCommand):
             if len(flagChangesExisting) > 0:
                 modify.real.changeFlags(flagChangesExisting, reverse = True)
             db.commit()
-            
+        
         for id in set(self.ids + self.contents):
             if id in self.newElements:
                 del self.level.parent.elements[self.newId(id)]
@@ -403,6 +433,9 @@ class CommitCommand(modify.ElementChangeCommand):
                 if self.newId(id) in self.level.parent:
                     self.level.parent.changeId(self.newId(id), id)
             db.commit()
+            for path, changes in self.realFileChanges.items():
+                logger.debug("reverting file tags: {0}<--{1}".format(path, changes))
+                modify.real.changeFileTags(path, changes, reverse = True)
         self.level.parent.changed.emit(self.ids, self.contents)
         self.level.changed.emit(self.ids, []) # no contents changed in current level!
                 

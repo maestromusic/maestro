@@ -693,6 +693,10 @@ class TagDifference:
     def __init__(self, tagsA, tagsB):
         self.removals = []
         self.additions = []
+        if tagsA is None:
+            tagsA = Storage()
+        if tagsB is None:
+            tagsB = Storage()
         for tag, valuesA in tagsA.items():
             if tag not in tagsB:
                 self.removals.append((tag, valuesA[:]))
@@ -708,20 +712,30 @@ class TagDifference:
             if tag not in tagsA:
                 self.additions.append((tag, valuesB[:]))
                 
-    def apply(self, tagsA):
+    def onlyPrivateChanges(self):
+        return all(tag.private for (tag, _) in self.additions) and \
+               all(tag.private for (tag, _) in self.removals)
+               
+    def apply(self, tagsA, includePrivate = True):
         """Apply the changes to *tagsA*, transforming them into *tagsB* given to the constructor."""
         for tag, values in self.removals:
-            tagsA.remove(tag, *values)
+            if includePrivate or not tag.private:
+                tagsA.remove(tag, *values)
         for tag, values in self.additions:
-            tagsA.add(tag, *values)
+            if includePrivate or not tag.private:
+                tagsA.add(tag, *values)
             
-    def revert(self, tagsB):
+    def revert(self, tagsB, includePrivate = True):
         """Revert the changes from *tagsB*, transforming them into *tagsA* as given to the constructor."""
         for tag, values in self.additions:
-            tagsB.remove(tag, *values)
+            if includePrivate or not tag.private:
+                tagsB.remove(tag, *values)
         for tag, values in self.removals:
-            tagsB.add(tag, *values)
-                    
+            if includePrivate or not tag.private:
+                tagsB.add(tag, *values)
+    
+    def __str__(self):
+        return "TagDifference(additions={}, removals={})".format(self.additions, self.removals)
                  
         
 
