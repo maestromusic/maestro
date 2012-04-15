@@ -45,10 +45,15 @@ def warning(title,text,parent=None):
 class FancyPopup(QtGui.QFrame):
     """Fancy popup that looks like a tooltip. It is shown beneath its parent component (usually the button
     that opens the popup).
+    
+    The popup will close itself if the user leaves its parent (the button that opened the popup)
+    unless the popup is entered within a short timespan.
     """
-    # The popup will close itself if the user leaves its parent (the button that opened the popup)
-    # unless the popup is entered within a short timespan.
-    _entered = False
+    
+    # Whether the mouse was inside this widget, its children or its parent at the last mouseMoveEvent.
+    _mouseInside = False
+    # Whether a timer is active that will close this widget (to prevent starting more than one timer)
+    _timerActive = False
     
     # A set of parents whose popup is open (static). Confer isActive
     _activeParents = set()
@@ -56,11 +61,13 @@ class FancyPopup(QtGui.QFrame):
     # While fixPopup is True, the popup will not close when the mouse leaves.
     fixPopup = False
     
-    def __init__(self,parent = None):
-        QtGui.QFrame.__init__(self,parent)
+    def __init__(self,parent,width=300,height=170):
+        super().__init__(parent)
         self.setWindowFlags(self.windowFlags() | Qt.Popup)
-        parent.installEventFilter(self)
         FancyPopup._activeParents.add(parent)
+        
+        # Popup windows get mouse move events even if the pointer is outside the window
+        self.setMouseTracking(True)
         
         # Fancy design code
         self.setAutoFillBackground(True)
@@ -77,37 +84,49 @@ class FancyPopup(QtGui.QFrame):
         effect.setBlurRadius(20)
         self.setGraphicsEffect(effect)
         
-        # Move to correct position
+        # Resize and move to the correct position
+        self.resize(width,height)
         pos = self.parent().mapToGlobal(QtCore.QPoint(0,self.parent().height()))
-        #TODO: It would be nice to ensure that the window does not leave the screen.
-        # Unfortunately there seems to be no way to get the correct size prior to showing the dialog.
         self.move(pos)
+        self._moveToScreen()
         
-        # This is just a reasonable default value. Resize it in subclasses as you like
-        self.resize(300,170)
+    def _moveToScreen(self):
+        # Unfortunately there seems to be no way to get the correct size prior to showing the dialog.
+        # Therefore we correct offscreen positions after the dialog is shown as well as before (to try to
+        # avoid flickering).
+        pos = self.pos()
+        if pos.x()+self.width() > QtGui.QApplication.desktop().width():
+            pos.setX(QtGui.QApplication.desktop().width() - self.width())
+        if pos.y()+self.height() > QtGui.QApplication.desktop().height():
+            pos.setY(QtGui.QApplication.desktop().height() - self.height())
+        self.move(pos)
         
     def close(self):
         self.parent().removeEventFilter(self)
         FancyPopup._activeParents.discard(self.parent())
         QtGui.QFrame.close(self)
     
-    def enterEvent(self,event):
-        self._entered = True
-        QtGui.QFrame.enterEvent(self,event)
+    def showEvent(self,event):
+        super().showEvent(event)
+        self._moveToScreen()
     
-    def leaveEvent(self,event):
-        if self.isVisible() and not self.fixPopup:
-            self.close()
-             
-    def eventFilter(self,object,event):
-        if event.type() == QtCore.QEvent.Leave:
-            QtCore.QTimer.singleShot(100,self._handleTimer)
-        return False
-        
+    def mouseMoveEvent(self,event):
+        super().mouseMoveEvent(event)
+        pos = self.mapToGlobal(event.pos())
+        widget = QtGui.QApplication.widgetAt(pos)
+        if widget is not None and (widget is self.parent() or self.isAncestorOf(widget)):
+            self._mouseInside = True
+        else:
+            self._mouseInside = False
+            if not self._timerActive:
+                QtCore.QTimer.singleShot(100,self._handleTimer)
+                self._timerActive = True
+                
     def _handleTimer(self):
         """Close the window shortly after the parent has been left by the cursor unless the cursor has
         entered the popup in the meantime."""
-        if not self._entered:
+        self._timerActive = False
+        if not self._mouseInside:
             self.close()
     
     @staticmethod
@@ -124,8 +143,8 @@ class FancyTabbedPopup(FancyPopup):
     # unless the popup is entered within a short timespan.
     _entered = False
     
-    def __init__(self,parent = None):
-        super().__init__(parent)
+    def __init__(self,parent,width=370,height=170):
+        super().__init__(parent,width,height)
         # Create components
         self.setLayout(QtGui.QVBoxLayout())
         self.tabWidget = QtGui.QTabWidget(self)
