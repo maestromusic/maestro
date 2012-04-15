@@ -20,7 +20,8 @@
 from . import Container, levels
 from .. import tags, modify
 from ..utils import relPath
-
+from .. import logging
+logger = logging.getLogger(__name__)
 import os, re, itertools
 
 from PyQt4 import QtCore, QtGui
@@ -37,7 +38,7 @@ def guessAlbums(level, filesByFolder, parent, albumGroupers, metacontainer_regex
         # no grouping -> concatenate filesByFolder
         return [f.id for f in itertools.chain(*filesByFolder.values())]
     else:
-        modify.beginMacro('album guessing')
+        modify.stack.beginMacro('album guessing')
         if "DIRECTORY" in albumGroupers:
             albums = []
             singles = []
@@ -67,7 +68,7 @@ def guessAlbums(level, filesByFolder, parent, albumGroupers, metacontainer_regex
                 from ..gui.dialogs import warning
                 warning(translate(__name__, "Error guessing meta-containers"), str(e))
                 complete = albums + singles    
-        modify.endMacro()
+        modify.stack.endMacro()
         return complete
 
 class AlbumGuessCommand(QtGui.QUndoCommand):
@@ -81,7 +82,7 @@ class AlbumGuessCommand(QtGui.QUndoCommand):
         self.children = children
         self.meta = meta
     
-    def redoChanges(self):
+    def redo(self):
         if self.containerID is None:
             self.containerID = levels.createTId()
             self.ids.append(self.containerID)
@@ -96,7 +97,7 @@ class AlbumGuessCommand(QtGui.QUndoCommand):
             if self.meta and child.isContainer():
                 child.major = False
     
-    def undoChanges(self):
+    def undo(self):
         del self.level.elements[self.containerID]
         for childID in self.children.values():
             child = self.level.get(childID)
@@ -140,8 +141,9 @@ def guessAlbumsInDirectory(level, files, albumGroupers):
             albumTags = tags.findCommonTags(elements)
             albumTags[tags.TITLE] = [key] if dirMode else elements[0].tags[albumTag]
             command = AlbumGuessCommand(level, albumTags, children)
-            modify.push(command)
+            modify.stack.push(command)
             returnedAlbumIDs.append(command.containerID)
+            logger.debug("guessed album with id {}".format(command.containerID))
         else:
             returnedSingleIDs.extend(element.id for element in elements)
     return returnedAlbumIDs + list(existingParents), returnedSingleIDs
@@ -181,6 +183,6 @@ def guessMetaContainers(level, albumIDs, albumGroupers, meta_regex):
         metaTags[tags.TITLE] = [key[1]]
         metaTags[albumTag] = [key[1]]
         command = AlbumGuessCommand(level, metaTags, {pos:album.id for pos,album in contents.items()}, meta = True)
-        modify.push(command)
+        modify.stack.push(command)
         returnedTopIDs.append(command.containerID)
     return returnedTopIDs

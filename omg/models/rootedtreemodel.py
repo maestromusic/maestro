@@ -54,7 +54,7 @@ class ClearTreeAction(treeactions.TreeAction):
     
     def doAction(self):
         model = self.parent().model()
-        modify.push(ChangeRootCommand(model,
+        modify.stack.push(ChangeRootCommand(model,
                                       [node.element.id for node in model.root.contents],
                                       [],
                                       self.tr('clear view')))
@@ -73,7 +73,7 @@ class CommitTreeAction(treeactions.TreeAction):
         from . import levels
         model = self.parent().model()
         ids = set(n.element.id for n in self.parent().nodeSelection.elements())
-        modify.push(levels.CommitCommand(model.level, ids))
+        modify.stack.push(levels.CommitCommand(model.level, ids))
         
 class RootedTreeModel(QtCore.QAbstractItemModel):
     """The RootedTreeModel subclasses QAbstractItemModel to create a simple model for QTreeViews. It takes one
@@ -259,7 +259,9 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
         self.data(index, Qt.EditRole).insertContents(position, wrappers) 
         self.endInsertRows()
         
-    def levelChanged(self, ids, contentsChanged):
+    def levelChanged(self, event):
+        ids = event.dataIds
+        contents = event.contentIds
         for node, contents in utils.walk(self.root):
             if isinstance(node, Wrapper):
                 if node.element.id in ids:

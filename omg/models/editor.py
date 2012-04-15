@@ -78,7 +78,7 @@ class EditorModel(rootedtreemodel.RootedTreeModel):
         if parent is self.root:
             oldContentIDs = [ node.element.id for node in self.root.contents ]
             newContentIDs = oldContentIDs[:row] + ids + oldContentIDs[row:]
-            modify.push(rootedtreemodel.ChangeRootCommand(self, oldContentIDs, newContentIDs))
+            modify.stack.push(rootedtreemodel.ChangeRootCommand(self, oldContentIDs, newContentIDs))
             return True
         else:
             return False        
