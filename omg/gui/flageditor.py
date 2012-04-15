@@ -312,7 +312,7 @@ class AddFlagPopup(dialogs.FancyPopup):
     """Fancy popup that displays a list of flags that do not appear in one of the edited elements. If the 
     user clicks a flag, it will be added to all edited elements. Moreover the popup provides two buttons
     to create a new flag and to open the flagmanager."""
-    def __init__(self,model,parent = None):
+    def __init__(self,model,parent):
         super().__init__(parent)
         self.model = model
         self.setLayout(QtGui.QVBoxLayout())
