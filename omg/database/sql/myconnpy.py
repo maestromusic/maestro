@@ -36,6 +36,9 @@ class Sql(AbstractSql):
         return SqlResult(cursor)
     
     def multiQuery(self,queryString,argSets):
+        if not isinstance(argSets,(list,tuple)):
+            # Usually this means that argSets is some other iterable object, but myconnpy will complain.
+            argSets = list(argSets)
         if argSets:
             queryString = queryString.replace('?','%s')
         cursor = self._db.cursor()
