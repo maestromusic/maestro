@@ -31,7 +31,7 @@ class EditorModel(rootedtreemodel.RootedTreeModel):
     
     def __init__(self):
         """Initializes the model. A new RootNode will be set as root."""
-        super().__init__(RootNode(), levels.editor)
+        super().__init__(RootNode(self), levels.editor)
         self.albumGroupers = []
         self.metacontainer_regex=r" ?[([]?(?:cd|disc|part|teil|disk|vol)\.? ?([iI0-9]+)[)\]]?"
         
@@ -63,6 +63,7 @@ class EditorModel(rootedtreemodel.RootedTreeModel):
         if row == -1:
             row = parent.getContentsCount()
 
+        modify.stack.beginMacro(self.tr("drop into editor"))
         if mimeData.hasFormat("text/uri-list"):
             # files and/or folders are dropped from outside or from a filesystembrowser.
             ids = self.prepareURLs(mimeData.urls(), parent)
@@ -74,14 +75,16 @@ class EditorModel(rootedtreemodel.RootedTreeModel):
             raise RuntimeError('HÄÄÄÄÄ???')
         
         if len(ids) == 0:
-            return False
+            ret = False
         if parent is self.root:
             oldContentIDs = [ node.element.id for node in self.root.contents ]
             newContentIDs = oldContentIDs[:row] + ids + oldContentIDs[row:]
             modify.stack.push(rootedtreemodel.ChangeRootCommand(self, oldContentIDs, newContentIDs))
-            return True
+            ret = True
         else:
-            return False        
+            ret = False
+        modify.stack.endMacro()
+        return ret   
         
     def prepareURLs(self, urls, parent):
         '''This method is called if url MIME data is dropped onto this model, from an external file manager
@@ -94,7 +97,7 @@ class EditorModel(rootedtreemodel.RootedTreeModel):
         progress.setMinimumDuration(200)
         progress.setWindowModality(Qt.WindowModal)
         filesByFolder = {}
-        modify.stack.beginMacro(self.tr("drop into editor"))
+        
         try:
             # load files into editor level
             for folder, filesInOneFolder in files.items():
@@ -112,6 +115,4 @@ class EditorModel(rootedtreemodel.RootedTreeModel):
         except albumguesser.GuessError as e:
             print(e)
             return []
-        finally:
-            modify.stack.endMacro()
         

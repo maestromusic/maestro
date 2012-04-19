@@ -19,7 +19,7 @@
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from . import Node, Wrapper, mimedata
+from . import Node, Wrapper, ContentList, mimedata
 from .. import logging, config, modify, utils
 from ..modify import treeactions
 logger = logging.getLogger(__name__)
@@ -41,6 +41,78 @@ class ChangeRootCommand(QtGui.QUndoCommand):
         logger.debug("change root: {} --> {}".format(self.new, self.old))
         self.model.changeContents(QtCore.QModelIndex(), self.old )
 
+class MergeCommand(QtGui.QUndoCommand):
+    """Merge creates a new container between *parent* and the children at the given *indices*.
+    Those child elements will be removed from *parent* and instead inserted as children of
+    the new container at indices[0]. The new container will contain all tags that are equal in
+    all of its new children; its TITLE tag will be set to *newTitle*.
+    
+    removeString defines what to remove from the titles of the elements that are moved below the
+    new container; this will usually be similar to *newTitle* plus possibly some punctutaion.
+    If *adjustPositions* is True, the positions of items that are *not* removed are decreased
+    to fill the gaps arising from moved elements.
+    Example: Consider the following setting of an album containing a Sonata: 
+    
+    * parent
+    |- pos1: child0 (title = Sonata Nr. 5: Allegro)
+    |- pos2: child1 (tilte = Sonata Nr. 5: Adagio)
+    |- pos3: child2 (title = Sonata Nr. 5: Finale. Presto)
+    |- pos4: child3 (title = Nocturne Op. 13/37)
+    |- pos5: child4 (title = Prelude BWV 42)
+    
+    After a call to merge with *indices=(0,1,2)*, *newTitle='Sonata Nr. 5'*, *removeString='Sonata Nr. 5: '*,
+    *adjustPositions = True* the layout would be:
+    
+    * parent
+    |- * pos1: new container (title = Sonata Nr. 5)
+       |- pos1: child0 (title = Allegro)
+       |- pos2: child1 (title = Adagio)
+       |- pos3: child2 (title = Finale. Presto)
+    |- pos2: child3 (title = Nocturne Op. 13/37)
+    |- pos3: child4 (title = Prelude BWV 42)
+    """ 
+    def __init__(self, level, parent, childIdse, newTitle, removeString, adjustPositions):
+            
+        insertIndex = indices[0]        
+        insertPosition = parent.contents[insertIndex][1]
+        newContainerPosition = insertPosition if isinstance(parent, Element) else None
+        newChildren = []
+        toRemove = []    
+        positionChanges = []
+        
+        for i, element in enumerate(parent.contents[insertIndex:], start = insertIndex):
+            if i in indices:
+                copy = parent.contents[i].copy()
+                if tagsModule.TITLE in copy.tags:
+                    copy.tags[tagsModule.TITLE] = [ t.replace(removeString, '') for t in copy.tags[tagsModule.TITLE] ]
+                copy.position = len(newChildren) + 1
+                newChildren.append(copy)
+                toRemove.append(parent.contents[i])
+            elif adjustPositions:# or isinstance(parent, RootNode):
+                positionChanges.append( (element.iPosition(), element.iPosition() - len(newChildren) + 1) )
+        modify.push(RemoveElementsCommand(level, toRemove, mode = CONTENTS))
+        if len(positionChanges) > 0:
+            modify.push(PositionChangeCommand(level, parent.id, positionChanges))
+        t = tagsModule.findCommonTags(newChildren, True)
+        t[tagsModule.TITLE] = [newTitle]
+        if level == EDITOR:
+            newContainer = Container(id = modify.newEditorId(),
+                                     contents = newChildren,
+                                     tags = t,
+                                     flags = [],
+                                     position = newContainerPosition,
+                                     major = False)
+        else:
+            createCommand = CreateContainerCommand(t, None, False)
+            modify.push(createCommand)
+            newContainer = Container.fromId(createCommand.id, loadData = True, position = newContainerPosition)
+    
+        insertions = { parent.id : [(insertPosition, newContainer)] }
+        if level == REAL:
+            insertions[newContainer.id] = [ (elem.position, elem) for elem in newChildren ]
+        modify.push(InsertElementsCommand(level, insertions))
+        modify.endMacro()
+    
 class ClearTreeAction(treeactions.TreeAction):
     """This action clears a tree model using a simple ChangeRootCommand."""
     
@@ -225,6 +297,11 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
     def changeContents(self, index, new):
         parent = self.data(index, Qt.EditRole)
         old = [ node.element.id for node in parent.contents ]
+        if isinstance(new, ContentList):
+            newP = new.positions
+            new = new.ids
+        else:
+            newP = None
         i = 0
         while i < len(new):
             id = new[i]
@@ -233,6 +310,10 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
                 if existingIndex > 0:
                     self.removeContents(index, i, i + existingIndex - 1)
                 del old[:existingIndex+1]
+                if newP and newP[i] != parent.contents[i].position:
+                    parent.contents[i].position = newP[i]
+                    index = self.getIndex(parent.contents[i])
+                    self.dataChanged.emit(index, index)
                 i += 1
             except ValueError:
                 insertStart = i
@@ -260,10 +341,13 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
         self.endInsertRows()
         
     def levelChanged(self, event):
-        ids = event.dataIds
-        contents = event.contentIds
+        dataIds = event.dataIds
+        contentIds = event.contentIds
         for node, contents in utils.walk(self.root):
             if isinstance(node, Wrapper):
-                if node.element.id in ids:
+                if node.element.id in dataIds:
                     self.dataChanged.emit(self.getIndex(node), self.getIndex(node))
+                if node.element.id in contentIds:
+                    self.changeContents(self.getIndex(node), self.level.get(i).contents)
+                    contents[:] = [wrapper for wrapper in contents if wrapper in node.contents ]
             

@@ -220,8 +220,9 @@ class RootNode(Node):
     """Rootnode at the top of a RootedTreeModel."""
     
     parent = None
-    def __init__(self):
+    def __init__(self, model):
         self.contents = []
+        self.model = model
     
     def __repr__(self):
         return 'RootNode with {} children'.format(len(self.contents))    
