@@ -75,12 +75,12 @@ class MergeCommand(QtGui.QUndoCommand):
     def __init__(self, level, parent, indices, newTitle, removeString, adjustPositions):
         
         super().__init__()
-        insertIndex = indices[0] # where the new container will live
+        self.insertIndex = indices[0] # where the new container will live
         self.level = level
         self.newTitle = newTitle
         if isinstance(parent, Wrapper):
             self.elementParent = True
-            self.insertPosition = parent.element.contents[insertIndex][1]
+            self.insertPosition = parent.element.contents[self.insertIndex][1]
             self.positionChanges = {}
             self.parentID = parent.element.id
             self.parentChanges = {} # maps child id to (position under old parent, position under new container) tuples
@@ -118,7 +118,7 @@ class MergeCommand(QtGui.QUndoCommand):
                 if id in self.tagChanges:
                     self.tagChanges[id].apply(element.tags)
             parent.contents.insert(self.insertPosition, self.containerID)
-            for id, (oldPos, newPos) in self.positionChanges.items():
+            for id, (oldPos, newPos) in sorted(self.positionChanges.items()):
                 element = self.level.get(id)
                 parent.contents.positions[parent.contents.positions.index(oldPos)] = newPos
         container.tags = tagsModule.findCommonTags(elements)
@@ -126,40 +126,24 @@ class MergeCommand(QtGui.QUndoCommand):
         self.level.emitEvent(dataIds = list(self.positionChanges.keys()),
                              contentIds = [self.containerID, self.parentID])
                   
-
-    def oldStuff(self):        
-        for i, wrapper in enumerate(parent.contents[insertIndex:], start = insertIndex):
-            if i in indices:
-                copy = parent.contents[i].copy()
-                if tagsModule.TITLE in copy.tags:
-                    copy.tags[tagsModule.TITLE] = [ t.replace(removeString, '') for t in copy.tags[tagsModule.TITLE] ]
-                copy.position = len(newChildren) + 1
-                newChildren.append(copy)
-                toRemove.append(parent.contents[i])
-            elif adjustPositions:# or isinstance(parent, RootNode):
-                positionChanges.append( (element.iPosition(), element.iPosition() - len(newChildren) + 1) )
-        modify.push(RemoveElementsCommand(level, toRemove, mode = CONTENTS))
-        if len(positionChanges) > 0:
-            modify.push(PositionChangeCommand(level, parent.id, positionChanges))
-        t = tagsModule.findCommonTags(newChildren, True)
-        t[tagsModule.TITLE] = [newTitle]
-        if level == EDITOR:
-            newContainer = Container(id = modify.newEditorId(),
-                                     contents = newChildren,
-                                     tags = t,
-                                     flags = [],
-                                     position = newContainerPosition,
-                                     major = False)
-        else:
-            createCommand = CreateContainerCommand(t, None, False)
-            modify.push(createCommand)
-            newContainer = Container.fromId(createCommand.id, loadData = True, position = newContainerPosition)
-    
-        insertions = { parent.id : [(insertPosition, newContainer)] }
-        if level == REAL:
-            insertions[newContainer.id] = [ (elem.position, elem) for elem in newChildren ]
-        modify.push(InsertElementsCommand(level, insertions))
-        modify.endMacro()
+    def undo(self):
+        if self.elementParent:
+            parent = self.level.get(self.parentID)
+            del parent.contents[self.insertIndex]
+            for id, (oldPos, newPos) in self.positionChanges.items():
+                element = self.level.get(id)
+                parent.contents.positions[parent.contents.positions.index(newPos)] = oldPos
+            for id, (oldPos, newPos) in self.parentChanges.items():
+                element = self.level.get(id)
+                parent.contents.insert(oldPos, id)
+                element.parents.append(self.parentID)
+                element.parents.remove(self.containerID)
+                if id in self.tagChanges:
+                    self.tagChanges[id].revert(element.tags)
+        del self.level.elements[self.containerID]
+        self.level.emitEvent(dataIds = list(self.positionChanges.keys()),
+                             contentIds = [self.parentID])
+        
     
 class ClearTreeAction(treeactions.TreeAction):
     """This action clears a tree model using a simple ChangeRootCommand."""
