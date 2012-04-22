@@ -81,6 +81,7 @@ class EditorTreeView(treeview.TreeView):
      
     sect = translate(__name__, "editor")
     actionConfig.addActionDefinition(((sect, 'remove'),), DeleteAction, mode = CONTENTS)
+    actionConfig.addActionDefinition(((sect, 'merge'),), MergeAction)
     actionConfig.addActionDefinition(((sect, 'clearEditor'),), rootedtreemodel.ClearTreeAction)
 
     def __init__(self, parent = None):

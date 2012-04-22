@@ -169,19 +169,21 @@ class MergeAction(TreeAction):
         selection = self.parent().nodeSelection
         from ..gui.dialogs import MergeDialog
         elements = selection.elements()
-        hintTitle, hintRemove = self.createMergeHint(elements)
+        hintTitle, hintRemove = self.createMergeHint([wrap.element for wrap in elements])
         mergeIndices = sorted(elem.parent.index(elem) for elem in elements)
         numSiblings = len(elements[0].parent.contents)
         belowRoot = isinstance(elements[0].parent, models.RootNode)
         dialog = MergeDialog(hintTitle, hintRemove, len(mergeIndices) < numSiblings and not belowRoot,
                              self.parent())
         if dialog.exec_() == QtGui.QDialog.Accepted:
-            modify.commands.merge(self.parent().level,
+            from ..models.rootedtreemodel import MergeCommand
+            command = MergeCommand(self.parent().level,
                          elements[0].parent,
                          mergeIndices,
                          dialog.newTitle(),
                          dialog.removeString(),
                          dialog.adjustPositions())
+            modify.stack.push(command)
 
 class FlattenAction(TreeAction):
     """Action to "flatten out" containers, i.e. remove them and replace them by their

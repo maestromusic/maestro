@@ -20,7 +20,8 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from . import Node, Wrapper, ContentList, mimedata
-from .. import logging, config, modify, utils
+from .. import logging, config, modify, utils, tags as tagsModule
+from . import levels, Container
 from ..modify import treeactions
 logger = logging.getLogger(__name__)
 
@@ -71,16 +72,63 @@ class MergeCommand(QtGui.QUndoCommand):
     |- pos2: child3 (title = Nocturne Op. 13/37)
     |- pos3: child4 (title = Prelude BWV 42)
     """ 
-    def __init__(self, level, parent, childIdse, newTitle, removeString, adjustPositions):
-            
-        insertIndex = indices[0]        
-        insertPosition = parent.contents[insertIndex][1]
-        newContainerPosition = insertPosition if isinstance(parent, Element) else None
-        newChildren = []
-        toRemove = []    
-        positionChanges = []
+    def __init__(self, level, parent, indices, newTitle, removeString, adjustPositions):
         
-        for i, element in enumerate(parent.contents[insertIndex:], start = insertIndex):
+        super().__init__()
+        insertIndex = indices[0] # where the new container will live
+        self.level = level
+        self.newTitle = newTitle
+        if isinstance(parent, Wrapper):
+            self.elementParent = True
+            self.insertPosition = parent.element.contents[insertIndex][1]
+            self.positionChanges = {}
+            self.parentID = parent.element.id
+            self.parentChanges = {} # maps child id to (position under old parent, position under new container) tuples
+            self.tagChanges = {}
+            for index, (position, id) in enumerate(parent.element.contents.items()):
+                element = level.get(id)
+                if index in indices:
+                    self.parentChanges[id] = (position, len(self.parentChanges) + 1)
+                    if tagsModule.TITLE in element.tags:
+                        tagCopy = element.tags.copy()
+                        tagCopy[tagsModule.TITLE] = [ t.replace(removeString, '') for t in tagCopy[tagsModule.TITLE]]
+                        self.tagChanges[id] = tagsModule.TagDifference(element.tags, tagCopy)
+                elif adjustPositions and len(self.parentChanges) > 1:
+                    self.positionChanges[id] = (position, position - len(self.parentChanges) + 1)
+                    
+        else:
+            self.elementParent = False
+    
+    def redo(self):
+        if not hasattr(self, "containerID"):
+            self.containerID = levels.createTId()
+        container = Container(self.level, self.containerID, major = False)
+        elements = []
+        self.level.elements[self.containerID] = container
+        if self.elementParent:
+            parent = self.level.get(self.parentID)
+            
+            for id, (oldPos, newPos) in self.parentChanges.items():
+                element = self.level.get(id)
+                parent.contents.remove(pos = oldPos)
+                element.parents.remove(self.parentID)
+                element.parents.append(self.containerID)
+                container.contents.insert(newPos, id)
+                elements.append(element)
+                if id in self.tagChanges:
+                    self.tagChanges[id].apply(element.tags)
+            parent.contents.insert(self.insertPosition, self.containerID)
+            for id, (oldPos, newPos) in self.positionChanges.items():
+                element = self.level.get(id)
+                parent.contents.positions[parent.contents.positions.index(oldPos)] = newPos
+        container.tags = tagsModule.findCommonTags(elements)
+        container.tags[tagsModule.TITLE] = [self.newTitle]
+        self.level.emitEvent(dataIds = list(self.positionChanges.keys()),
+                             contentIds = [self.containerID, self.parentID])
+                  
+
+    def oldStuff(self):        
+        for i, wrapper in enumerate(parent.contents[insertIndex:], start = insertIndex):
             if i in indices:
                 copy = parent.contents[i].copy()
                 if tagsModule.TITLE in copy.tags:
@@ -323,7 +371,8 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
                     id = new[i]
                     insertNum += 1
                     i += 1
-                self.insertContents(index, insertStart, new[insertStart:insertStart+insertNum])
+                self.insertContents(index, insertStart, new[insertStart:insertStart+insertNum],
+                                    newP[insertStart:insertStart+insertNum] if newP else None)
         if len(old) > 0:
             self.removeContents(index, i, i + len(old) - 1)
     
@@ -332,9 +381,12 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
         del self.data(index, Qt.EditRole).contents[first:last+1]
         self.endRemoveRows()
         
-    def insertContents(self, index, position, ids):
+    def insertContents(self, index, position, ids, positions = None):
         self.beginInsertRows(index, position, position + len(ids) - 1)
         wrappers = [Wrapper(self.level.get(id)) for id in ids]
+        if positions:
+            for pos, wrap in zip(positions, wrappers):
+                wrap.position = pos
         for wrapper in wrappers:
             wrapper.loadContents(recursive = True)
         self.data(index, Qt.EditRole).insertContents(position, wrappers) 
@@ -348,6 +400,6 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
                 if node.element.id in dataIds:
                     self.dataChanged.emit(self.getIndex(node), self.getIndex(node))
                 if node.element.id in contentIds:
-                    self.changeContents(self.getIndex(node), self.level.get(i).contents)
+                    self.changeContents(self.getIndex(node), self.level.get(node.element.id).contents)
                     contents[:] = [wrapper for wrapper in contents if wrapper in node.contents ]
             
