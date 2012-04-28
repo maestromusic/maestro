@@ -415,8 +415,7 @@ class HiddenValuesNode(models.Node):
 class RootNode(models.RootNode):
     """Rootnode of the Browser-TreeModel."""
     def __init__(self,model):
-        models.RootNode.__init__(self)
-        self.model = model
+        super().__init__(model)
         self.layerIndex = -1
         
 

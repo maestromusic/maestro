@@ -19,8 +19,9 @@
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from . import Node, Wrapper, mimedata
-from .. import logging, config, modify, utils
+from . import Node, Wrapper, ContentList, mimedata
+from .. import logging, config, modify, utils, tags as tagsModule
+from . import levels, Container
 from ..modify import treeactions
 logger = logging.getLogger(__name__)
 
@@ -41,6 +42,109 @@ class ChangeRootCommand(QtGui.QUndoCommand):
         logger.debug("change root: {} --> {}".format(self.new, self.old))
         self.model.changeContents(QtCore.QModelIndex(), self.old )
 
+class MergeCommand(QtGui.QUndoCommand):
+    """Merge creates a new container between *parent* and the children at the given *indices*.
+    Those child elements will be removed from *parent* and instead inserted as children of
+    the new container at indices[0]. The new container will contain all tags that are equal in
+    all of its new children; its TITLE tag will be set to *newTitle*.
+    
+    removeString defines what to remove from the titles of the elements that are moved below the
+    new container; this will usually be similar to *newTitle* plus possibly some punctutaion.
+    If *adjustPositions* is True, the positions of items that are *not* removed are decreased
+    to fill the gaps arising from moved elements.
+    Example: Consider the following setting of an album containing a Sonata: 
+    
+    * parent
+    |- pos1: child0 (title = Sonata Nr. 5: Allegro)
+    |- pos2: child1 (tilte = Sonata Nr. 5: Adagio)
+    |- pos3: child2 (title = Sonata Nr. 5: Finale. Presto)
+    |- pos4: child3 (title = Nocturne Op. 13/37)
+    |- pos5: child4 (title = Prelude BWV 42)
+    
+    After a call to merge with *indices=(0,1,2)*, *newTitle='Sonata Nr. 5'*, *removeString='Sonata Nr. 5: '*,
+    *adjustPositions = True* the layout would be:
+    
+    * parent
+    |- * pos1: new container (title = Sonata Nr. 5)
+       |- pos1: child0 (title = Allegro)
+       |- pos2: child1 (title = Adagio)
+       |- pos3: child2 (title = Finale. Presto)
+    |- pos2: child3 (title = Nocturne Op. 13/37)
+    |- pos3: child4 (title = Prelude BWV 42)
+    """ 
+    def __init__(self, level, parent, indices, newTitle, removeString, adjustPositions):
+        
+        super().__init__()
+        self.insertIndex = indices[0] # where the new container will live
+        self.level = level
+        self.newTitle = newTitle
+        if isinstance(parent, Wrapper):
+            self.elementParent = True
+            self.insertPosition = parent.element.contents[self.insertIndex][1]
+            self.positionChanges = {}
+            self.parentID = parent.element.id
+            self.parentChanges = {} # maps child id to (position under old parent, position under new container) tuples
+            self.tagChanges = {}
+            for index, (position, id) in enumerate(parent.element.contents.items()):
+                element = level.get(id)
+                if index in indices:
+                    self.parentChanges[id] = (position, len(self.parentChanges) + 1)
+                    if tagsModule.TITLE in element.tags:
+                        tagCopy = element.tags.copy()
+                        tagCopy[tagsModule.TITLE] = [ t.replace(removeString, '') for t in tagCopy[tagsModule.TITLE]]
+                        self.tagChanges[id] = tagsModule.TagDifference(element.tags, tagCopy)
+                elif adjustPositions and len(self.parentChanges) > 1:
+                    self.positionChanges[id] = (position, position - len(self.parentChanges) + 1)
+                    
+        else:
+            self.elementParent = False
+    
+    def redo(self):
+        if not hasattr(self, "containerID"):
+            self.containerID = levels.createTId()
+        container = Container(self.level, self.containerID, major = False)
+        elements = []
+        self.level.elements[self.containerID] = container
+        if self.elementParent:
+            parent = self.level.get(self.parentID)
+            
+            for id, (oldPos, newPos) in self.parentChanges.items():
+                element = self.level.get(id)
+                parent.contents.remove(pos = oldPos)
+                element.parents.remove(self.parentID)
+                element.parents.append(self.containerID)
+                container.contents.insert(newPos, id)
+                elements.append(element)
+                if id in self.tagChanges:
+                    self.tagChanges[id].apply(element.tags)
+            parent.contents.insert(self.insertPosition, self.containerID)
+            for id, (oldPos, newPos) in sorted(self.positionChanges.items()):
+                element = self.level.get(id)
+                parent.contents.positions[parent.contents.positions.index(oldPos)] = newPos
+        container.tags = tagsModule.findCommonTags(elements)
+        container.tags[tagsModule.TITLE] = [self.newTitle]
+        self.level.emitEvent(dataIds = list(self.positionChanges.keys()),
+                             contentIds = [self.containerID, self.parentID])
+                  
+    def undo(self):
+        if self.elementParent:
+            parent = self.level.get(self.parentID)
+            del parent.contents[self.insertIndex]
+            for id, (oldPos, newPos) in self.positionChanges.items():
+                element = self.level.get(id)
+                parent.contents.positions[parent.contents.positions.index(newPos)] = oldPos
+            for id, (oldPos, newPos) in self.parentChanges.items():
+                element = self.level.get(id)
+                parent.contents.insert(oldPos, id)
+                element.parents.append(self.parentID)
+                element.parents.remove(self.containerID)
+                if id in self.tagChanges:
+                    self.tagChanges[id].revert(element.tags)
+        del self.level.elements[self.containerID]
+        self.level.emitEvent(dataIds = list(self.positionChanges.keys()),
+                             contentIds = [self.parentID])
+        
+    
 class ClearTreeAction(treeactions.TreeAction):
     """This action clears a tree model using a simple ChangeRootCommand."""
     
@@ -225,6 +329,11 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
     def changeContents(self, index, new):
         parent = self.data(index, Qt.EditRole)
         old = [ node.element.id for node in parent.contents ]
+        if isinstance(new, ContentList):
+            newP = new.positions
+            new = new.ids
+        else:
+            newP = None
         i = 0
         while i < len(new):
             id = new[i]
@@ -233,6 +342,10 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
                 if existingIndex > 0:
                     self.removeContents(index, i, i + existingIndex - 1)
                 del old[:existingIndex+1]
+                if newP and newP[i] != parent.contents[i].position:
+                    parent.contents[i].position = newP[i]
+                    index = self.getIndex(parent.contents[i])
+                    self.dataChanged.emit(index, index)
                 i += 1
             except ValueError:
                 insertStart = i
@@ -242,7 +355,8 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
                     id = new[i]
                     insertNum += 1
                     i += 1
-                self.insertContents(index, insertStart, new[insertStart:insertStart+insertNum])
+                self.insertContents(index, insertStart, new[insertStart:insertStart+insertNum],
+                                    newP[insertStart:insertStart+insertNum] if newP else None)
         if len(old) > 0:
             self.removeContents(index, i, i + len(old) - 1)
     
@@ -251,19 +365,25 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
         del self.data(index, Qt.EditRole).contents[first:last+1]
         self.endRemoveRows()
         
-    def insertContents(self, index, position, ids):
+    def insertContents(self, index, position, ids, positions = None):
         self.beginInsertRows(index, position, position + len(ids) - 1)
         wrappers = [Wrapper(self.level.get(id)) for id in ids]
+        if positions:
+            for pos, wrap in zip(positions, wrappers):
+                wrap.position = pos
         for wrapper in wrappers:
             wrapper.loadContents(recursive = True)
         self.data(index, Qt.EditRole).insertContents(position, wrappers) 
         self.endInsertRows()
         
     def levelChanged(self, event):
-        ids = event.dataIds
-        contents = event.contentIds
+        dataIds = event.dataIds
+        contentIds = event.contentIds
         for node, contents in utils.walk(self.root):
             if isinstance(node, Wrapper):
-                if node.element.id in ids:
+                if node.element.id in dataIds:
                     self.dataChanged.emit(self.getIndex(node), self.getIndex(node))
+                if node.element.id in contentIds:
+                    self.changeContents(self.getIndex(node), self.level.get(node.element.id).contents)
+                    contents[:] = [wrapper for wrapper in contents if wrapper in node.contents ]
             

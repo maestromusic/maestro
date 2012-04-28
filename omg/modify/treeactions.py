@@ -74,6 +74,37 @@ class EditTagsAction(TreeAction):
                                            self.parent().nodeSelection.elements(self.recursive),
                                            self.parent())
         dialog.exec_()
+
+class RemoveElementsCommand(QtGui.QUndoCommand):
+    
+    def __init__(self, level, wrappers, mode, text):
+        super().__init__()
+        self.setText(text)
+        self.level = level
+        rootParents = {}
+        elementParents = {}
+        for wrapper in wrappers:
+            parent = wrapper.parent
+            if isinstance(parent, models.RootNode):
+                if parent not in rootParents:
+                    rootParents[parent] = []
+                rootParents[parent].append(parent.contents.index(wrapper))
+            else:
+                if parent.element.id not in elementParents:
+                    elementParents[parent.element.id] = []
+                elementParents[parent.element.id].append(parent.contents.index(wrapper))
+        self.rootParents = rootParents
+        self.elementParents = elementParents
+        
+    def redo(self):
+        for root, indices in self.rootParents.items():
+            from ..models import rootedtreemodel
+            oldIds = [node.element.id for node in root.contents ]
+            newIds = oldIds[:]
+            for index in sorted(indices, reverse = True):
+                del newIds[index]
+            com = rootedtreemodel.ChangeRootCommand(root.model, oldIds, newIds)
+            modify.stack.push(com)
         
 class DeleteAction(TreeAction):
     """Action to remove selected elements."""
@@ -90,7 +121,7 @@ class DeleteAction(TreeAction):
     def initialize(self):
         selection = self.parent().nodeSelection
         if self.mode == CONTENTS:
-            self.setEnabled(all(isinstance(element.parent, models.Element) \
+            self.setEnabled(all(isinstance(element.parent, models.Wrapper) \
                                     or isinstance(element.parent, models.RootNode)
                                 for element in selection.elements()))
         elif self.mode == DB:
@@ -109,7 +140,7 @@ class DeleteAction(TreeAction):
                                         self.parent().nodeSelection.elements(),
                                         self.mode,
                                         text=self.modeText[self.mode])
-        modify.push(command)
+        modify.stack.push(command)
         if self.mode == DISK:
             modify.stack.clearBoth()
 
@@ -138,19 +169,21 @@ class MergeAction(TreeAction):
         selection = self.parent().nodeSelection
         from ..gui.dialogs import MergeDialog
         elements = selection.elements()
-        hintTitle, hintRemove = self.createMergeHint(elements)
+        hintTitle, hintRemove = self.createMergeHint([wrap.element for wrap in elements])
         mergeIndices = sorted(elem.parent.index(elem) for elem in elements)
         numSiblings = len(elements[0].parent.contents)
         belowRoot = isinstance(elements[0].parent, models.RootNode)
         dialog = MergeDialog(hintTitle, hintRemove, len(mergeIndices) < numSiblings and not belowRoot,
                              self.parent())
         if dialog.exec_() == QtGui.QDialog.Accepted:
-            modify.commands.merge(self.parent().level,
+            from ..models.rootedtreemodel import MergeCommand
+            command = MergeCommand(self.parent().level,
                          elements[0].parent,
                          mergeIndices,
                          dialog.newTitle(),
                          dialog.removeString(),
                          dialog.adjustPositions())
+            modify.stack.push(command)
 
 class FlattenAction(TreeAction):
     """Action to "flatten out" containers, i.e. remove them and replace them by their

@@ -220,8 +220,9 @@ class RootNode(Node):
     """Rootnode at the top of a RootedTreeModel."""
     
     parent = None
-    def __init__(self):
+    def __init__(self, model):
         self.contents = []
+        self.model = model
     
     def __repr__(self):
         return 'RootNode with {} children'.format(len(self.contents))    
@@ -465,8 +466,17 @@ class ContentList:
     def __getitem__(self, i):
         return self.ids[i], self.positions[i]
     
+    def __delitem__(self, i):
+        del self.ids[i]
+        del self.positions[i]
+        
+    def __setitem__(self, i, pos, id):
+        self.positions[i] = id
+        self.ids[i] = id
+        
     def insert(self, pos, id):
-        assert pos not in self.positions
+        if pos in self.positions:
+            raise ValueError("position {} for id {} already in contents ({}, {})".format(pos, id, self.positions, self.ids))
         index = bisect.bisect(self.positions, pos)
         self.positions.insert(index, pos)
         self.ids.insert(index, id)
