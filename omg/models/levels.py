@@ -107,23 +107,44 @@ class Level(QtCore.QObject):
         self.changed.emit(ElementChangedEvent(dataIds,contentIds))
   
     def addTagValue(self,tag,value,elements,emitEvent=True):
+        """Add a tag of type *tag* and value *value* to the given elements. If *emitEvent* is False, do not
+        emit an event."""
         for element in elements:
             element.tags.add(tag,value)
         if emitEvent:
             self.emitEvent([element.id for element in elements])
             
     def removeTagValue(self,tag,value,elements,emitEvent=True):
+        """Remove a tag of type *tag* and *value* value from the given elements. If *emitEvent* is False,
+        do not emit an event."""
         for element in elements:
             element.tags.remove(tag,value)
         if emitEvent:
             self.emitEvent([element.id for element in elements])
             
     def changeTagValue(self,tag,oldValue,newValue,elements,emitEvent=True):
+        """Change a tag of type *tag* in the given elements changing the value from *oldValue* to *newValue*.
+        If *emitEvent* is False, do not emit an event."""
         for element in elements:
             element.tags.replace(tag,oldValue,newValue)
         if emitEvent:
             self.emitEvent([element.id for element in elements])
-        
+    
+    def addFlag(self,flag,elements,emitEvent=True):
+        """Add *flag* to the given elements. If *emitEvent* is False, do not emit an event."""
+        for element in elements:
+            if flag not in element.flags:
+                element.flags.append(flag)
+        if emitEvent:
+            self.emitEvent([element.id for element in elements])
+            
+    def removeFlag(self,flag,elements,emitEvent=True):
+        """Remove *flag* from the given elements. If *emitEvent* is False, do not emit an event."""
+        for element in elements:
+            element.flags.remove(flag)
+        if emitEvent:
+            self.emitEvent([element.id for element in elements])
+            
     def changeId(self, old, new):
         """Change the id of some element from *old* to *new*. This should only be called from within
         appropriate UndoCommands, and only if (old in self) is True. Takes care of contents and parents, too.
@@ -317,6 +338,21 @@ class RealLevel(Level):
                 failedElements.append(elements)
                 continue
         return failedElements
+    
+    def addFlag(self,flag,elements,emitEvent=True):
+        super().addFlag(flag,elements,emitEvent=False)
+        ids = [element.id for element in elements]
+        db.write.addFlag(ids,flag)
+        if emitEvent:
+            self.emitEvent(ids)
+            
+    def removeFlag(self,flag,elements,emitEvent=True):
+        super().removeFlag(flag,elements,emitEvent=False)
+        ids = [element.id for element in elements]
+        db.write.removeFlag(ids,flag)
+        if emitEvent:
+            self.emitEvent(ids)
+            
             
 class ChangeTagFlagsCommand(QtGui.QUndoCommand):
     def __init__(self,level,newTags,text):

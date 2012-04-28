@@ -267,6 +267,7 @@ class RecordEditor(QtGui.QWidget):
             self.elementsLabel.clear()
             self.elementsLabel.setVisible(False)
         else:
+            self.elementsLabel.setVisible(True)
             if self.record.isUsual():
                 elements = self.record.getExceptions()
                 if len(elements) == 1:

@@ -53,16 +53,6 @@ def deleteElements(ids):
     updateElementsCounter(parentIds)
     updateToplevelFlags(contentsIds)
 
-def addFlags(data):
-    """Add entries to the flags table. *data* is a list of (elementid, flagid) tuples."""
-    db.multiQuery("INSERT INTO {}flags (element_id,flag_id) VALUES (?,?)".format(db.prefix), data)
-    
-    
-def removeFlags(data):
-    """Remove entries from the flags table. *data* is a list of (elementid, flagid) tuples."""
-    db.multiQuery("DELETE FROM {}flags WHERE flag_id = ? AND element_id = ?"
-                .format(db.prefix), data)
-    
 def setContents(data):
     """Set contents of one or more elements. *data* is a dict mapping ids to lists of contents. The lists
     of contents must contain elements with an id and a position. This method is not recursive."""
@@ -251,11 +241,13 @@ def setSortValue(tag, valueId, sortValue):
     db.query("UPDATE {}values_{} SET sort_value = ? WHERE tag_id = ? AND id = ?".format(db.prefix, tag.type),
              sortValue, tag.id, valueId)
 
+
 def setHidden(tagSpec, valueId, state):
     """Set the given tag value's "hidden" attribute to *state*."""
     tag = tags.get(tagSpec)
     db.query("UPDATE {}values_{} SET hide = ? WHERE tag_id = ? AND id = ?".format(db.prefix, tag.type),
              state, tag.id, valueId) 
+
 
 def addFlag(elids,flag):
     """Add the given flag to the elements with the given ids, ignoring elements that already have the
@@ -270,6 +262,17 @@ def removeFlag(elids,flag):
     db.query("DELETE FROM {}flags WHERE flag_id = {} AND element_id IN ({})"
                 .format(db.prefix,flag.id,db.csList(elids)))
     
+    
+def addFlags(data):
+    """Add entries to the flags table. *data* is a list of (elementid, flagid) tuples."""
+    db.multiQuery("INSERT INTO {}flags (element_id,flag_id) VALUES (?,?)".format(db.prefix), data)
+    
+    
+def removeFlags(data):
+    """Remove entries from the flags table. *data* is a list of (elementid, flagid) tuples."""
+    db.multiQuery("DELETE FROM {}flags WHERE flag_id = ? AND element_id = ?"
+                .format(db.prefix), data)
+    
 
 def setFlags(elid,flags):
     """Give the element with the given id exactly the flags in the list *flags*."""
@@ -278,5 +281,7 @@ def setFlags(elid,flags):
         values = ["({},{})".format(elid,flag.id) for flag in flags]
         db.query("INSERT INTO {}flags (element_id,flag_id) VALUES {}".format(db.prefix,','.join(values)))
     
+    
 def setMajor(data):
     db.multiQuery("UPDATE {}elements SET major = ? WHERE id = ?".format(db.prefix), data)
+    

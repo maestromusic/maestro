@@ -20,8 +20,8 @@ from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
 from . import dialogs
-from .. import flags, utils, config, modify
-from ..models import flageditor as flageditormodel, simplelistmodel
+from .. import flags,utils,config,modify
+from ..models import flageditor as flageditormodel,simplelistmodel
 
 
 class FlagEditor(QtGui.QWidget):
@@ -29,24 +29,24 @@ class FlagEditor(QtGui.QWidget):
     part of the TagEditor."""
     # The animation running (if any). This is used to stop the animation if the model changes.
     _animation = None
-    
+
     def __init__(self,model,vertical,parent=None):
         super().__init__(parent)
         self.vertical = vertical
-        
+
         self._flagWidgets = []
         self.model = model
         self.model.resetted.connect(self._handleReset)
         self.model.recordInserted.connect(self._handleRecordInserted)
         self.model.recordRemoved.connect(self._handleRecordRemoved)
         self.model.recordChanged.connect(self._handleRecordChanged)
-        
+
         self.setLayout(QtGui.QBoxLayout(
                                 QtGui.QBoxLayout.TopToBottom if vertical else QtGui.QBoxLayout.LeftToRight))
         self.layout().setContentsMargins(5,3,5,3)
         self.layout().addStretch(1)
         self._handleReset()
-    
+
     def setVertical(self,vertical):
         """Set whether this editor display the flags vertically."""
         if vertical != self.vertical:
@@ -54,28 +54,28 @@ class FlagEditor(QtGui.QWidget):
             self.vertical = vertical
             self.layout().setDirection(
                             QtGui.QBoxLayout.TopToBottom if vertical else QtGui.QBoxLayout.LeftToRight)
-        
+
     def _handleReset(self):
         """Reset the FlagEditor."""
         self._stopAnimation()
         for flagWidget in self._flagWidgets:
             self.layout().removeWidget(flagWidget)
             flagWidget.deleteLater()
-        
+
         self._flagWidgets = []
-        
+
         for record in self.model.records:
             flagWidget = FlagWidget(self.model,record)
             self.layout().insertWidget(len(self._flagWidgets),flagWidget)
             self._flagWidgets.append(flagWidget)
-    
+
     def _handleRecordInserted(self,pos,record):
         """Insert a FlagWidget for the new record."""
         self._stopAnimation()
         flagWidget = FlagWidget(self.model,record)
         self.layout().insertWidget(self._mapToLayout(pos),flagWidget)
         self._flagWidgets.insert(pos,flagWidget)
-    
+
     def _handleRecordRemoved(self,record):
         """Remove the FlagWidget for *record*. If flageditor_animation and there are FlagWidgets on the
         right of the removed one, start an animation to slide them to the left."""
@@ -84,7 +84,7 @@ class FlagEditor(QtGui.QWidget):
             if flagWidget.getRecord() == record:
                 self.layout().removeWidget(flagWidget)
                 self._flagWidgets.remove(flagWidget)
-               
+
                 # No need to start animation for the last flag
                 if config.options.gui.flageditor.animation and pos < len(self._flagWidgets):
                     size = flagWidget.sizeHint()
@@ -102,10 +102,10 @@ class FlagEditor(QtGui.QWidget):
                     self._animation.setEasingCurve(QtCore.QEasingCurve.InOutSine)
                     self._animation.start(QtCore.QAbstractAnimation.DeleteWhenStopped)
                     self._animation.finished.connect(self._handleAnimationFinished)
-                    
+
                 flagWidget.deleteLater()
                 return
-            
+
     def _handleRecordChanged(self,oldRecord,newRecord):
         """Update the FlagWidget whose record has changed."""
         self._stopAnimation()
@@ -113,13 +113,13 @@ class FlagEditor(QtGui.QWidget):
             if flagWidget.getRecord() == oldRecord:
                 flagWidget.setRecord(newRecord)
                 return
-    
+
     def _stopAnimation(self):
         """If there is an active animation, stop it."""
         if self._animation is not None:
             self._animation.stop()
             self._handleAnimationFinished()
-            
+
     def _handleAnimationFinished(self):
         """When the animation is finished remove the empty widget used for the animation."""
         if self._animation is not None:
@@ -127,7 +127,7 @@ class FlagEditor(QtGui.QWidget):
             self.layout().removeWidget(empty)
             empty.deleteLater()
             self._animation = None
-        
+
     def _mapToLayout(self,pos):
         """Map a position in self.flagWidgets to a position in the flageditor's boxlayout: Due to the
         animation the layout may contain an empty widget so that positions after this widget are shifted by
@@ -139,8 +139,8 @@ class FlagEditor(QtGui.QWidget):
                     return i
                 else: pos -= 1
         else: return self.layout().count() - 1 # Remember the stretch at the end
-    
-    
+
+
 class FlagWidget(QtGui.QWidget):
     """Small widget representing a Record. It will display the flag's name and icon and if the record is not
     common also the number of elements that have the flag. Furthermore it contains a button to remove the
@@ -150,35 +150,34 @@ class FlagWidget(QtGui.QWidget):
         - record: the record displayed by this FlagWidget
         - parent: the parent component
         
-    \ """ 
+    \ """
     # Used to render the removeButton
     clearPixmap = utils.getIcon('clear_16.png').pixmap(16,16)
-    
+
     # Whether the removeButton is visible
     _showRemoveButton = False
-    
+
     # Whether the removeButton reacts to mouseReleasedEvents. To avoid clicking on the remove button
     # accidentally, it is enabled a split second after it has been shown.
     _removeButtonEnabled = False
-    
-    def __init__(self,model,record,parent = None):
+
+    def __init__(self,model,record,parent=None):
         super().__init__(parent)
         self.setSizePolicy(QtGui.QSizePolicy.Fixed,QtGui.QSizePolicy.Fixed)
         self.model = model
         self.record = record
         self.setRecord(record)
-        self.model.titlesChanged.connect(self._handleTitlesChanged)
-    
+
     def getText(self):
         """Return the text displayed by this widget."""
         if self.record.isCommon():
             return self.record.flag.name
         else: return self.tr("{} (in {})").format(self.record.flag.name,len(self.record.elementsWithFlag))
-    
+
     def getRecord(self):
         """Return the record displayed by this widget."""
         return self.record
-    
+
     def setRecord(self,record):
         """Set the record displayed by this widget."""
         # Due to the string "(in 7)" the size of the widget depends on the number of records with flag.
@@ -188,18 +187,18 @@ class FlagWidget(QtGui.QWidget):
         self.record = record
         self.createToolTip()
         self.update()
-    
+
     def createToolTip(self):
         # If the record is not common to all elements, display a tooltip containing the titles of those
         # elements that have the flag. But do not use more than flageditor_maxtooltiplines lines.
         if not self.record.isCommon():
             maxLines = config.options.gui.flageditor.max_tooltip_lines
             if len(self.record.elementsWithFlag) > maxLines:
-                lines = [element.title for element in self.record.elementsWithFlag[:maxLines-1]]
-                lines.append(self.tr("(And %n other)",'',len(self.record.elementsWithFlag) - (maxLines-1)))
-            else: lines = [element.title for element in self.record.elementsWithFlag]
+                lines = [element.getTitle() for element in self.record.elementsWithFlag[:maxLines - 1]]
+                lines.append(self.tr("(And %n other)",'',len(self.record.elementsWithFlag) - (maxLines - 1)))
+            else: lines = [element.getTitle() for element in self.record.elementsWithFlag]
             self.setToolTip("\n".join(lines))
-            
+
     def _sizes(self):
         """Return a tuple of sizes. These are e.g. necessary to draw the widget or to react correctly to
         mouse events."""
@@ -210,88 +209,88 @@ class FlagWidget(QtGui.QWidget):
         smallHSpace = 4
         bigHSpace = 7
         vSpace = 3 # looks bigger because most characters are smaller than fm.height
-        width = textWidth + 2* (borderWidth + smallHSpace + iconSize + bigHSpace) 
-        height = fm.height() + 2*vSpace + 2*borderWidth
+        width = textWidth + 2 * (borderWidth + smallHSpace + iconSize + bigHSpace)
+        height = fm.height() + 2 * vSpace + 2 * borderWidth
         return fm,borderWidth,textWidth,iconSize,smallHSpace,bigHSpace,vSpace,width,height
-        
+
     def paintEvent(self,event):
         fm,borderWidth,textWidth,iconSize,smallHSpace,bigHSpace,vSpace,width,height = self._sizes()
         painter = QtGui.QPainter(self)
         painter.setPen(Qt.black)
-        gradient = QtGui.QLinearGradient(0,0,0,1) 
+        gradient = QtGui.QLinearGradient(0,0,0,1)
         gradient.setCoordinateMode(QtGui.QGradient.ObjectBoundingMode)
         gradient.setColorAt(0,QtGui.QColor(0x25,0xac,0xe4))
         gradient.setColorAt(1,QtGui.QColor(0x12,0x94,0xcb))
         painter.setBrush(gradient)
-        painter.drawRect(0,0,width-1,height-1) # Take the pen width into account
-        
+        painter.drawRect(0,0,width - 1,height - 1) # Take the pen width into account
+
         painter.setPen(Qt.white)
-        painter.drawText(borderWidth+smallHSpace+iconSize+bigHSpace,
-                         borderWidth+vSpace+fm.ascent(),
+        painter.drawText(borderWidth + smallHSpace + iconSize + bigHSpace,
+                         borderWidth + vSpace + fm.ascent(),
                          self.getText())
-        
-        
+
+
         if self.record.flag.icon is not None:
             pixmap = self.record.flag.icon.pixmap(16,16)
-            painter.drawPixmap(borderWidth+smallHSpace,(height-iconSize)//2,pixmap)
-            
+            painter.drawPixmap(borderWidth + smallHSpace,(height - iconSize) // 2,pixmap)
+
         if self._showRemoveButton:
-            painter.drawPixmap(width-borderWidth-smallHSpace-iconSize,(height-iconSize)//2,self.clearPixmap)
-         
+            painter.drawPixmap(width - borderWidth - smallHSpace - iconSize,(height - iconSize) // 2,self.clearPixmap)
+
     def sizeHint(self):
         fm,borderWidth,textWidth,iconSize,smallHSpace,bigHSpace,vSpace,width,height = self._sizes()
         return QtCore.QSize(width,height)
-    
+
     def mouseReleaseEvent(self,event):
         if self._removeButtonEnabled and event.button() == Qt.LeftButton:
             fm,borderWidth,textWidth,iconSize,smallHSpace,bigHSpace,vSpace,width,height = self._sizes()
-            rect = QtCore.QRect(width-borderWidth-smallHSpace-iconSize,(height-iconSize)//2,iconSize,iconSize)
+            rect = QtCore.QRect(width - borderWidth - smallHSpace - iconSize,(height - iconSize) // 2,iconSize,iconSize)
             if rect.contains(event.pos()):
                 self.model.removeFlag(self.record.flag)
         super().mouseReleaseEvent(event)
-        
+
     def enterEvent(self,event):
         self._showRemoveButton = True
         QtCore.QTimer.singleShot(250,self._handleTimer)
         self.update()
-    
+
     def _handleTimer(self):
         """To avoid clicking on the remove button (which is invisible by default) accidentally, enable it a
         split second after it has been shown."""
         # Do not enable the button if the user left the component while the timer was running.
         if self._showRemoveButton:
             self._removeButtonEnabled = True
-        
+
     def leaveEvent(self,event):
         self._showRemoveButton = False
         self._removeButtonEnabled = False
         self._pressed = False
         self.update()
-        
+
     def contextMenuEvent(self,contextMenuEvent,record=None):
         menu = QtGui.QMenu(self)
 
-        menu.addAction(self.model.createUndoAction(self,self.tr("Undo")))
-        menu.addAction(self.model.createRedoAction(self,self.tr("Redo")))
+        menu.addAction(self.model.stack.createUndoAction(self,self.tr("Undo")))
+        menu.addAction(self.model.stack.createRedoAction(self,self.tr("Redo")))
         menu.addSeparator()
-        
+
         if not self.record.isCommon():
             extendAction = QtGui.QAction(self.tr("Extend"),self)
             extendAction.triggered.connect(self._handleExtend)
             menu.addAction(extendAction)
-        
+
         if len(self.record.allElements) > 1:
             elementsAction = QtGui.QAction(self.tr("Edit elements with flag..."),self)
             elementsAction.triggered.connect(self._handleEditElements)
             menu.addAction(elementsAction)
-        
+
         menu.popup(contextMenuEvent.globalPos())
 
     def _handleExtend(self):
         """Extend the flag to all elements."""
         newRecord = flageditormodel.Record(self.record.flag,self.record.allElements,self.record.allElements)
         self.model.changeRecord(self.record,newRecord)
-    
+
     def _handleEditElements(self):
         """Open a dialog that allows to edit self.record.elementsWithFlag."""
         dialog = EditElementsDialog(self.record,self)
@@ -302,11 +301,6 @@ class FlagWidget(QtGui.QWidget):
                                                    selectedElements)
                 self.model.changeRecord(self.record,newRecord)
 
-    def _handleTitlesChanged(self,affected):
-        """React to titlesChanged signals: Reset the tooltip."""
-        if any(element in self.record.elementsWithFlag for element in affected):
-            self.createToolTip()
-            
 
 class AddFlagPopup(dialogs.FancyPopup):
     """Fancy popup that displays a list of flags that do not appear in one of the edited elements. If the 
@@ -319,7 +313,7 @@ class AddFlagPopup(dialogs.FancyPopup):
         self.flagList = QtGui.QListWidget()
         self.flagList.itemClicked.connect(self._handleItemClicked)
         self.layout().addWidget(self.flagList)
-        
+
         _flagTypes = sorted(flags.allFlags(),key=lambda f: f.name)
         for flag in _flagTypes:
             # Do not show flags which are already contained in all elements
@@ -329,7 +323,7 @@ class AddFlagPopup(dialogs.FancyPopup):
                 if flag.icon is not None:
                     item.setIcon(flag.icon)
                 self.flagList.addItem(item)
-                
+
         buttonLayout = QtGui.QHBoxLayout()
         self.layout().addLayout(buttonLayout)
         addFlagButton = QtGui.QPushButton(self.tr("New"))
@@ -338,7 +332,7 @@ class AddFlagPopup(dialogs.FancyPopup):
         managerButton = QtGui.QPushButton(self.tr("FlagManager"))
         managerButton.clicked.connect(self._handleManagerButton)
         buttonLayout.addWidget(managerButton)
-    
+
     def _handleAddButton(self):
         """Create a new flagtype (querying the user for the flagtype's name) and directly add it to all
         elements that are currently edited."""
@@ -346,13 +340,13 @@ class AddFlagPopup(dialogs.FancyPopup):
         flag = flagmanager.createNewFlagType(self.parent())
         self.model.addFlag(flag)
         self.close()
-        
+
     def _handleManagerButton(self):
         """Open the flagmanager."""
         from . import preferences
         preferences.show('main/flagmanager')
         self.close()
-        
+
     def _handleItemClicked(self,item):
         """Add the clicked flag to all elements that are currently edited."""
         self.model.addFlag(item.data(Qt.UserRole))
@@ -366,19 +360,19 @@ class EditElementsDialog(QtGui.QDialog):
         super().__init__(parent)
         self.setWindowTitle(self.tr("Edit elements with flag"))
         self.record = record
-        
+
         self.setLayout(QtGui.QVBoxLayout())
-        
+
         self.elementsBox = QtGui.QListView(self)
         self.layout().addWidget(self.elementsBox,1)
         self.elementsBox.setModel(simplelistmodel.SimpleListModel(self.record.allElements,
-                                                                  lambda el: el.title))
+                                                                  lambda el: el.getTitle()))
         self.elementsBox.setSelectionMode(QtGui.QAbstractItemView.MultiSelection)
         for i,element in enumerate(self.record.allElements):
             if record is None or element in record.elementsWithFlag:
                 self.elementsBox.selectionModel().select(self.elementsBox.model().index(i,0),
                                                          QtGui.QItemSelectionModel.Select)
-                
+
         buttonLayout = QtGui.QHBoxLayout()
         buttonLayout.addStretch(1)
         self.layout().addLayout(buttonLayout)
@@ -388,16 +382,15 @@ class EditElementsDialog(QtGui.QDialog):
         abortButton = QtGui.QPushButton(self.tr("Cancel"))
         abortButton.clicked.connect(self.reject)
         buttonLayout.addWidget(abortButton)
-        
+
     def _handleOkButton(self):
         """Check whether at least one element is selected and if so, exit."""
         if self.elementsBox.selectionModel().hasSelection():
             self.accept()
         else: QtGui.QMessageBox.warning(self,self.tr("No element selected"),
                                         self.tr("You must select at lest one element."))
-    
+
     def getSelectedElements(self):
         """Return the list of selected elements."""
         return [self.record.allElements[i] for i in range(len(self.record.allElements))
                                 if self.elementsBox.selectionModel().isRowSelected(i,QtCore.QModelIndex())]
-        

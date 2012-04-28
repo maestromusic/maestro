@@ -20,6 +20,7 @@ from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
 from .. import constants, tags, utils, modify
+from . import levels
 
 translate = QtCore.QCoreApplication.translate
 
@@ -65,7 +66,14 @@ class Record:
     def getExceptions(self):
         """Return a list of elements that do not have the value of this record."""
         return [element for element in self.allElements if element not in self.elementsWithValue]
-            
+    
+    def merge(self,other):
+        """Return a copy of this record which contains the union of the elementsWithValue of this record and
+        the record *other*."""
+        elements = list(self.elementsWithValue)
+        elements.extend(el for el in other.elementsWithValue if el not in elements)
+        return Record(self.tag,self.value,self.allElements,elements)
+    
     def __str__(self):
         if self.isCommon():
             return str(self.value)
@@ -75,154 +83,11 @@ class Record:
             return translate("TagEditor","{} except in {}").format(self.value,self.getExceptions()[0])
         else: return translate("TagEditor","{} in {} pieces").format(self.value,len(self.elementsWithValue))
 
-
-class TagEditorUndoCommand(QtGui.QUndoCommand):
-    """Changes in the tageditor have to be stored at two places: In the level (which may include changing
-    database and filesystem) and in the RecordModel used by the TagEditorModel. The latter can in principle
-    be done by simply reacting to the ElementChangedEvent triggered by the former. But this can lead to
-    unexpected results like records jumping around because the order has changed.
-    
-    Therefore the tageditor uses a more complicated Undo-/Redo-system using its own kind of UndoCommands --
-    the TagEditorUndoCommand. Such a command will change both the level and the records directly and emit an
-    event. A TagEditorUndoCommand stores a list of methods of the RecordModel and associated argument
-    lists. It will automatically compute the appropriate methods and arguments for the undo. On redo/undo
-    each method in the proper list is executed with the associated arguments and the level is changed
-    accordingly (without emitting an event). Finally a single event is emitted for all changes.
-
-    To compose a TagEditorUndoCommand, push it on the stack, use addMethod (one or more times) and call
-    finish (the order is important, see below).
-    
-    Two problems remain: A TagEditorUndoCommand must not directly change records after records have been
-    changed by an external source (e.g. the tageditor's set of elements has changed or it reacted to an
-    ElementChangeEvent). The records that should be changed by the TagEditorUndoCommand may simply not exist
-    anymore. To solve this problem the TagEditor will store an integer _statusNumber that is increased every
-    time such a change happens. A TagEditorUndoCommand will store the number when it is created and only
-    change records directly if the numbers match. If the numbers don't match it will only change the level
-    and the tageditor has to react to the ChangeEvent and update itself accordingly.
-    The second problem is that during composing of the UndoCommand we often need to execute the added methods
-    immediately, because we might need the result to decide which method to add next. This and the fact that
-    we need to emit a single event after all methods have been executed makes above order mandatory.
-    """
-    def __init__(self,model,text):
-        super().__init__(text)
-        self.model = model
-        self.redoMethods = []
-        self.undoMethods = []
-        self.ids = []
-        self._statusNumber = model._statusNumber
-        self._finished = False
-
-    def addMethod(self,method,*params):
-        """Add a method of the RecordModel to this command. Execute the method immediately and on every redo
-        with the given set of arguments. Additionally compute the corresponding method and arguments for undo.
-        """ 
-        assert not self._finished
-        recordModel = self.model.records
-        self.redoMethods.append((method,params))
-
-        # Compute corresponding undo-method and params
-        # Furthermore update the list of changed ids
-        if method.__name__ == 'insertRecord':
-            pos,record = params
-            undoMethod = recordModel.removeRecord
-            undoParams = (record,)
-            self._updateIds(record)
-        elif method.__name__ == 'removeRecord':
-            record = params[0] # 'record, = params' would work, too.
-            pos = recordModel[record.tag].index(record)
-            undoMethod = recordModel.insertRecord
-            undoParams = (pos,record)
-            self._updateIds(record)
-        elif method.__name__ == 'changeRecord':
-            tag,oldRecord,newRecord = params
-            undoMethod = recordModel.changeRecord
-            undoParams = (tag,newRecord,oldRecord)
-            self._updateIds(oldRecord)
-            self._updateIds(newRecord)
-        elif method.__name__ == 'moveRecord':
-            tag,oldPos,newPos = params
-            undoMethod = recordModel.moveRecord
-            undoParams = (tag,newPos,oldPos)
-        elif method.__name__ == 'insertTag':
-            pos,tag = params
-            undoMethod = recordModel.removeTag
-            undoParams = (tag,)
-        elif method.__name__ == 'removeTag':
-            tag = params[0]
-            pos = recordModel.tags().index(tag)
-            undoMethod = recordModel.insertTag
-            undoParams = (pos,tag)
-        elif method.__name__ == 'changeTag':
-            oldTag,newTag = params
-            undoMethod = recordModel.changeTag
-            undoParams = (newTag,oldTag)
-        self.undoMethods.append((undoMethod,undoParams))
-        
-        method(*params)
-        self.modifyLevel(method,params)
-
-    def _updateIds(self,record):
-        """Add the ids of all elements of *record* to the ids of this command."""
-        self.ids.extend(element.id for element in record.elementsWithValue if element.id not in self.ids)
-
-    def finish(self):
-        """Finish composing the command. This will emit a change-event."""
-        self.model.level.emitEvent(self.ids)
-        self._finished = True
-        
-    def redo(self):
-        if len(self.redoMethods):
-            for method,params in self.redoMethods:
-                if self._statusNumber == self.model._statusNumber:
-                    method(*params)
-                self.modifyLevel(method,params)
-            self.model.level.emitEvent(self.ids)
-
-    def undo(self):
-        if len(self.undoMethods):
-            for method,params in reversed(self.undoMethods):
-                if self._statusNumber == self.model._statusNumber:
-                    method(*params)
-                self.modifyLevel(method,params)
-            self.model.level.emitEvent(self.ids)
-
-    def modifyLevel(self,method,params):
-        """Modify the underlying level according to the given method (of RecordModel) and arguments."""
-        if method.__name__ == 'insertRecord':
-            pos,record = params
-            self.model.level.addTagValue(record.tag,record.value,record.elementsWithValue,emitEvent=False)
-        elif method.__name__ == 'removeRecord':
-            record = params[0] # 'record, = params' would work, too.
-            self.model.level.removeTagValue(record.tag,record.value,record.elementsWithValue,emitEvent=False)
-        elif method.__name__ == 'changeRecord':
-            tag,oldRecord,newRecord = params
-            
-            if oldRecord.tag != newRecord.tag:
-                self.model.level.removeTagValue(oldRecord.tag,oldRecord.value,
-                                                oldRecord.elementsWithValue,emitEvent=False)
-                self.model.level.addTagValue(newRecord.tag,newRecord.value,
-                                             newRecord.elementsWithValue,emitEvent=False)
-            else:
-                oldElements = set(oldRecord.elementsWithValue)
-                newElements = set(newRecord.elementsWithValue)
-                removeList = list(oldElements - newElements)
-                addList = list(newElements - oldElements)
-                if len(removeList):
-                    self.model.level.removeTagValue(oldRecord.tag,oldRecord.value,removeList,emitEvent=False)
-                if len(addList):
-                    self.model.level.addTagValue(newRecord.tag,newRecord.value,addList,emitEvent=False)
-                    
-                if oldRecord.value != newRecord.value:
-                    changeList = list(newElements.intersection(oldElements))
-                    if len(changeList):
-                        self.model.level.changeTagValue(tag,oldRecord.value,newRecord.value,
-                                                        changeList,emitEvent=False)
-    
     
 class RecordModel(QtCore.QObject):
     """A RecordModel is basically the data-structure used by the tageditor. It stores an OrderedDict mapping
     tags to lists of records (similar to the tageditor's GUI). It provides a set of basic commands to change
-    the data and will emit signals when doing so. The list of Records can be accessed via item access:
+    the data and will emit signals when doing so. The lists of Records can be accessed via item access:
     
         recordModel[tags.get('artist')]
         
@@ -340,8 +205,175 @@ class RecordModel(QtCore.QObject):
         the model."""
         self._records.changeKey(oldTag,newTag)
         self.tagChanged.emit(oldTag,newTag)
+      
+        
+class TagFlagEditorUndoCommand(QtGui.QUndoCommand):
+    """Abstract super class of the UndoCommands used by FlagEditorModel and TagEditorModel. The following
+    discussion uses tags, but the same procedure is used for flags.
+     
+    Changes in the tageditor have to be stored at two places: In the level (which may include changing
+    database and filesystem) and in the RecordModel used by the TagEditorModel. The latter can in principle
+    be done by simply reacting to the ElementChangedEvent triggered by the former. But this can lead to
+    unexpected results like records jumping around because the order has changed.
+    
+    Therefore the tageditor uses a more complicated Undo-/Redo-system using its own kind of UndoCommands --
+    the TagEditorUndoCommand. Such a command will change the level and additionally change the records by
+    himself (keeping records at the correct position).
+    
+    A TagEditorUndoCommand stores a list of methods of the RecordModel and associated argument lists for redo.
+    It will automatically compute the appropriate methods and arguments for the undo as well as a list of
+    changed ids for the event.
+    On redo/undo the following steps happen:
+    
+        - the methods are invoked with their arguments
+        - the level is changed according to the list of methods and arguments.
+        - then a single event for all changes done by the methods is emitted. This event contains the list
+          of methods and arguments.
 
+    To compose a TagEditorUndoCommand, use addMethod (one or more times) and finally push it on the stack.
+    
+    Two problems remain:
+        
+        - Which methods should be added to a command often depends on the effects of methods previously added.
+          Thus when adding a method to the command it must be executed directly. At the first redo we have to
+          take care that the methods are not executed a second time (this is done by self._firstRedo).
+        - A TagEditorUndoCommand must not change records by himslef after records have been changed by an
+          external source (e.g. the tageditor's set of elements has changed or it reacted to an
+          ElementChangeEvent by another source). The records that should be changed by the
+          TagEditorUndoCommand may simply not exist anymore. To solve this problem the TagEditor will store
+          an integer _statusNumber that is increased every time such a change happens. A TagEditorUndoCommand
+          will store the number when it is created and only change records by himself if the numbers match.
+          
+    """
+    def __init__(self,model,text):
+        super().__init__(text)
+        self._firstRedo = True
+        self.model = model
+        self._statusNumber = self.model._statusNumber
+        self.redoMethods = []
+        self.undoMethods = []
+        self.ids = []
 
+    def addMethod(self,method,*params):
+        """Add a method of the RecordModel to this command. On redo change the level according to the methods
+        and arguments added to this command. When the tageditor reacts to the ChangeEvent generated by the
+        redo, execute the methods with the corresponding arguments to update the records.
+        """ 
+        self.redoMethods.append((method,params))
+        self.undoMethods.append(self._computeUndoMethod(method,params))
+        method(*params)
+
+    def _computeUndoMethod(self,method,*params):
+        """Compute the method and arguments that will undo the change made by *method* invoked with *params*
+        and return them as a tuple.
+        
+        Furthermore update the list of ids stored in this command to include those elements that will be
+        changed by *method*.
+        """
+        raise NotImplementedError()
+
+    def redo(self):
+        if len(self.redoMethods):
+            for method,params in self.redoMethods:
+                if not self._firstRedo and self._statusNumber == self.model._statusNumber:
+                    method(*params)
+                self.modifyLevel(method,params)
+            event = levels.ElementChangedEvent(dataIds=self.ids) #TagFlagEditorChangedEvent(self,self.redoMethods)
+            self.model.level.changed.emit(event)
+        self._firstRedo = False
+
+    def undo(self):
+        if len(self.undoMethods):
+            for method,params in reversed(self.undoMethods):
+                if self._statusNumber == self.model._statusNumber:
+                    method(*params)
+                self.modifyLevel(method,params)
+            event = levels.ElementChangedEvent(dataIds=self.ids) #TagFlagEditorChangedEvent(self,self.undoMethods)
+            self.model.level.changed.emit(event)
+
+    def modifyLevel(self,method,params):
+        """Modify the level according to *method* and *params*: The change to the level must be the same
+        that is done to the records when *method* is invoked with *params*."""
+        raise NotImplementedError()
+        
+        
+class TagEditorUndoCommand(TagFlagEditorUndoCommand):
+    """UndoCommands used by the RagEditor. See TagFlagEditorUndoCommand."""
+    def _computeUndoMethod(self,method,params):
+        recordModel = self.model.records
+        if method.__name__ == 'insertRecord':
+            pos,record = params
+            undoMethod = recordModel.removeRecord
+            undoParams = (record,)
+            self._updateIds(record)
+        elif method.__name__ == 'removeRecord':
+            record = params[0] # 'record, = params' would work, too.
+            pos = recordModel[record.tag].index(record)
+            undoMethod = recordModel.insertRecord
+            undoParams = (pos,record)
+            self._updateIds(record)
+        elif method.__name__ == 'changeRecord':
+            tag,oldRecord,newRecord = params
+            undoMethod = recordModel.changeRecord
+            undoParams = (tag,newRecord,oldRecord)
+            self._updateIds(oldRecord)
+            self._updateIds(newRecord)
+        elif method.__name__ == 'moveRecord':
+            tag,oldPos,newPos = params
+            undoMethod = recordModel.moveRecord
+            undoParams = (tag,newPos,oldPos)
+        elif method.__name__ == 'insertTag':
+            pos,tag = params
+            undoMethod = recordModel.removeTag
+            undoParams = (tag,)
+        elif method.__name__ == 'removeTag':
+            tag = params[0]
+            pos = recordModel.tags().index(tag)
+            undoMethod = recordModel.insertTag
+            undoParams = (pos,tag)
+        elif method.__name__ == 'changeTag':
+            oldTag,newTag = params
+            undoMethod = recordModel.changeTag
+            undoParams = (newTag,oldTag)
+        return undoMethod,undoParams
+
+    def _updateIds(self,record):
+        """Add the ids of all elements of *record* to the ids of this command. Use this in _computeUndoMethod
+        to update the list of changed ids."""
+        self.ids.extend(element.id for element in record.elementsWithValue if element.id not in self.ids)
+        
+    def modifyLevel(self,method,params):
+        if method.__name__ == 'insertRecord':
+            pos,record = params
+            self.model.level.addTagValue(record.tag,record.value,record.elementsWithValue,emitEvent=False)
+        elif method.__name__ == 'removeRecord':
+            record = params[0] # 'record, = params' would work, too.
+            self.model.level.removeTagValue(record.tag,record.value,record.elementsWithValue,emitEvent=False)
+        elif method.__name__ == 'changeRecord':
+            tag,oldRecord,newRecord = params
+            
+            if oldRecord.tag != newRecord.tag:
+                self.model.level.removeTagValue(oldRecord.tag,oldRecord.value,
+                                                oldRecord.elementsWithValue,emitEvent=False)
+                self.model.level.addTagValue(newRecord.tag,newRecord.value,
+                                             newRecord.elementsWithValue,emitEvent=False)
+            else:
+                oldElements = set(oldRecord.elementsWithValue)
+                newElements = set(newRecord.elementsWithValue)
+                removeList = list(oldElements - newElements)
+                addList = list(newElements - oldElements)
+                if len(removeList):
+                    self.model.level.removeTagValue(oldRecord.tag,oldRecord.value,removeList,emitEvent=False)
+                if len(addList):
+                    self.model.level.addTagValue(newRecord.tag,newRecord.value,addList,emitEvent=False)
+                    
+                if oldRecord.value != newRecord.value:
+                    changeList = list(newElements.intersection(oldElements))
+                    if len(changeList):
+                        self.model.level.changeTagValue(tag,oldRecord.value,newRecord.value,
+                                                        changeList,emitEvent=False)
+                        
+                        
 class TagEditorModel(QtCore.QObject):
     """A model built for the Record-based GUI of the tageditor. It stores
     
@@ -356,14 +388,27 @@ class TagEditorModel(QtCore.QObject):
     records as well as the underlying level (but without emitting an event). When the command is finished, a
     single ElementChangedEvent is emitted.
     
-    On later redos all methods of the command are executed and an event is emitted. On undos an appropriate 
-    list of undo methods computed by the command is executed and an event is emitted. In both cases the
-    command only changes the RecordModel if the list of records stored in the model is still the same (the
-    level is changed in any case).
+    When a record-changing method is called, an TagEditorUndoCommand is created. Then a series of methods of
+    the RecordModel is added to the command and directly executed, changing the records but not yet the level.
+    It is important to change the record directly because the next method added to the command might depend
+    on the effect of the previous one. When the command is finally composed, it is pushed onto the stack and
+    the level is changed according to the stored methods. A single ElementChangedEvent is emitted.
+    
+    On later redos all methods of the command are executed changing records and level and an event is emitted.
+    On undos an appropriate list of undo methods computed by the command is executed and an event is emitted.
+    In both cases the command only changes the RecordModel if its status is still the same, i.e. the list of
+    records has not been changed by an external source (e.g. by selecting different elements).
     
     Nethertheless a TagEditorModel must react to ChangeEvents sent from the level because tags may have
     changed by an external source or by an TagEditorUndoCommand that is too old to change records directly
-    (see the discussion of _statusNumber in the docstring of TagEditorUndoCommand).
+    (see the discussion of _statusNumber in the docstring of TagFlagEditorUndoCommand).
+    
+    Model parameters are:
+    
+        - level: whether changes in this model affect the database or the editor
+        - elements: a list of elements whose flags will be displayed and edited by this model.
+        - stack: An undo stack or None, in which case the global stack will be used (only use your own stacks
+          in modal dialogs)
     """
     resetted = QtCore.pyqtSignal()
     
@@ -399,22 +444,21 @@ class TagEditorModel(QtCore.QObject):
         return self.records[tag]
 
     def getElements(self):
-        """Return a list of all elements currently edited."""
+        """Return a list of all elements currently being edited in the tageditor."""
         return self.elements
     
     def setElements(self,elements):
-        """Set the list of edited elements and reset the tageditor."""
+        """Set the list of elements currently edited and reset the tageditor."""
         self._statusNumber += 1
         self.elements = elements
-        records = self._createRecords(self.elements)
+        records = self._createRecords()
         self.records.setRecords(records.values())
         self.resetted.emit()
 
-    def _createRecords(self,elements):
-        """Create records for the given elements. Note that the attribute 'allElements' of the records
-        will always be 'self.elements' regardless of the argument *elements*."""
+    def _createRecords(self):
+        """Create records for self.elments. Return them as dict mapping (tag,value)-tuples to records."""
         records = {}
-        for element in elements:
+        for element in self.elements:
             for tag in element.tags:
                 for value in element.tags[tag]:
                     if (tag,value) in records:
@@ -434,17 +478,13 @@ class TagEditorModel(QtCore.QObject):
     def addRecord(self,record):
         """Add a record to the model. If there is already a record with same tag and value the elements
         with that value will be merged from both records."""
-        #TODO: return value?
         command = TagEditorUndoCommand(self,self.tr("Add record"))
-        self.stack.push(command)
         result = self._insertRecord(command,None,record)
-        command.finish()
-        return result
+        self.stack.push(command)
 
     def _insertRecord(self,command,pos,record):
         """Insert a record at the position *pos*. This is a helper function used by e.g. addRecord. It does
-        not start a new macro and should therefore not be used from outside this class."""
-        #TODO: return value?
+        not start a new command and should therefore not be used from outside this class."""
         if record.tag not in self.records.tags():
             # Add the missing tag
             command.addMethod(self.records.insertTag,len(self.records.tags()),record.tag)
@@ -457,20 +497,16 @@ class TagEditorModel(QtCore.QObject):
                 if record.isCommon():
                     pos = self._commonCount(record.tag)
                 else: pos = len(self.records[record.tag])
-            else: assert pos <= len(self.records[record.tag])
             command.addMethod(self.records.insertRecord,pos,record)
-            return True
         else:
             # Now things get complicated: Add the record's elements to those of (a copy of)
             # the existing record.
-            copy = existingRecord.copy(True)
-            copy.extend([el for el in record.elementsWithValue if el not in copy.elementsWithValue])
+            copy = existingRecord.merge(record)
             if copy.elementsWithValue != existingRecord.elementsWithValue:
                 command.addMethod(self.records.changeRecord,record.tag,existingRecord,copy)
                 # If this makes the record common, move it to the right place
                 if existingRecord.isCommon() != copy.isCommon():
                     self._checkCommonAndMove(command,copy)
-            return False
             
     def removeRecord(self,record):
         """Remove a record from the model."""
@@ -480,43 +516,48 @@ class TagEditorModel(QtCore.QObject):
         """Remove several records from the model."""
         if len(records) > 0:
             command = TagEditorUndoCommand(self,self.tr("Remove record(s)",'',len(records)))
-            self.stack.push(command)
             for record in records:
-                command.addMethod(self.records.removeRecord,record)
-                if len(self.records[record.tag]) == 0:
-                    # Remove the empty tag
-                    command.addMethod(self.records.removeTag,record.tag)
-            command.finish()
+                self._removeRecord(command,record)
+            self.stack.push(command)
 
+    def _removeRecord(self,command,record):
+        """Add methods to the given UndoCommand that will remove *record*."""
+        command.addMethod(self.records.removeRecord,record)
+        if len(self.records[record.tag]) == 0:
+            command.addMethod(self.records.removeTag,record.tag)
+            
     def changeRecord(self,oldRecord,newRecord):
         """Change the record *oldRecord* into *newRecord*. This method will handle all complicated stuff that
         can happen (e.g. when oldRecord.tag != newRecord.tag or when a record with the same tag and value as
         *newReword* does already exist).
         """
         command = TagEditorUndoCommand(self,self.tr("Change record"))
-        self.stack.push(command)
 
         # If the tag has changed or the new value does already exist, we simply remove the old and add the
         # new record. Otherwise we really change the record so that its position stays the same because this
         # is what the user expects.
-        if oldRecord.tag != newRecord.tag or self.records.get(newRecord.tag,newRecord.value) is not None:
+        existingRecord = self.records.get(newRecord.tag,newRecord.value)
+        if oldRecord.tag != newRecord.tag or (existingRecord is not None and existingRecord is not oldRecord):
+            # This is a complicated change and the record has no chance to stay in the same position.
+            # Thus we simply remove the old and add the new
             self._removeRecord(command,oldRecord)
-            self._insertRecord(command,len(self.records[newRecord.tag]),newRecord)
+            self._insertRecord(command,None,newRecord)
         else: 
+            # Simple: Tag is unchanged and either there is no record with newRecord.value or the value
+            # remains unchangend (thus only elementsWithValue changed)
             command.addMethod(self.records.changeRecord,oldRecord.tag,oldRecord,newRecord)
             self._checkCommonAndMove(command,newRecord)
-        command.finish()
+        self.stack.push(command)
 
     def removeTag(self,tag):
         """Remove all records with tag *tag*."""
         command = TagEditorUndoCommand(self,self.tr("Remove tag"))
-        self.stack.push(command)
         # First remove all records
         while len(self.records[tag]) > 0:
             command.addMethod(self.records.removeRecord,self.records[tag][0])
         # Remove the empty tag
         command.addMethod(self.records.removeTag,record.tag)
-        command.finish()
+        self.stack.push(command)
 
     def changeTag(self,oldTag,newTag):
         """Change tag *oldTag* into *newTag*. This will convert the values and tags of the affected records
@@ -532,7 +573,6 @@ class TagEditorModel(QtCore.QObject):
         except ValueError:
             return False # conversion not possible
         command = TagEditorUndoCommand(self,self.tr("Change tag"))
-        self.stack.push(command)
 
         if newTag not in self.records.tags():
             # First change the tag itself. This is necessary so that the tageditor can react to the
@@ -555,7 +595,7 @@ class TagEditorModel(QtCore.QObject):
             # Finally remove the old tag
             command.addMethod(self.records.removeTag,oldTag)
 
-        command.finish()
+        self.stack.push(command)
         return True
         
     def split(self,record,separator):
@@ -574,9 +614,8 @@ class TagEditorModel(QtCore.QObject):
     def splitMany(self,records,separator):
         """Split each of the given records using *separator*. Return true if all splits were successful."""
         command = TagEditorUndoCommand(self,self.tr("Split many"))
-        self.stack.push(command)
         result = any(self._split(command,record,separator) for record in records)
-        command.finish()
+        self.stack.push(command)
         return result
     
     def _split(self,command,record,separator):
@@ -607,16 +646,15 @@ class TagEditorModel(QtCore.QObject):
         """Given a list of records and an equally long lists of values, change the value of the i-th record
         to the i-th value."""
         command = TagEditorUndoCommand(self,self.tr("Edit many"))
-        self.stack.push(command)
         for record, value in zip(records,newValues):
             newRecord = record.copy()
             newRecord.value = value
             command.addMethod(self.records.changeRecord,record.tag,record,newRecord)
+        self.stack.push(command)
 
     def extendRecords(self,records):
         """Make the given records common, i.e. set 'record.elementsWithValue' to all elements."""
         command = TagEditorUndoCommand(self,self.tr("Extend records"))
-        self.stack.push(command)
 
         for record in records:
             if record.isCommon():
@@ -631,7 +669,8 @@ class TagEditorModel(QtCore.QObject):
             command.addMethod(self.records.changeRecord,record.tag,record,newRecord)
             
             if pos != newPos:
-                command.addMethod(self.records.moveRecords,records.tag,pos,newPos)
+                command.addMethod(self.records.moveRecord,record.tag,pos,newPos)
+        self.stack.push(command)
 
     def _checkCommonAndMove(self,command,record):
         """Check whether *record* is at a valid position (uncommon records come after common ones) and if
@@ -645,46 +684,6 @@ class TagEditorModel(QtCore.QObject):
         if command is None:
             self.records.moveRecord(record.tag,pos,newPos)
         else: command.addMethod(self.records.moveRecord,record.tag,pos,newPos)
-                
-    def _addElementsWithValue(self,tag,value,elements):
-        """Add *elements* to the record defined by *tag* and *value*. Create the record when necessary."""
-        if len(elements) == 0:
-            return
-        record = self.inner.getRecord(tag,value)
-        if record is None:
-            if tag not in self.inner.tags:
-                self.inner.insertTag(len(self.inner.tags),tag)
-            record = Record(tag,value,self.inner.elements,elements)
-            pos = self._commonCount(tag) if record.isCommon() else len(self.inner.tags[tag])
-            self.inner.insertRecord(pos,record)
-        else:
-            newElementsWithValue = [el for el in self.inner.elements if el in record.elementsWithValue
-                                                                         or el in elements]
-            if len(newElementsWithValue) > len(record.elementsWithValue):
-                newRecord = record.copy()
-                newRecord.elementsWithValue = newElementsWithValue
-                self.inner.changeRecord(record.tag,record,newRecord)
-                if newRecord.isCommon() and not record.isCommon():
-                    self._checkCommonAndMove(record,undoable=False)
-                    self.commonChanged.emit(record.tag)
-
-    def _removeElementsWithValue(self,tag,value,elements):
-        """Remove *elements* from the record defined by *tag* and *value*. Delete the record if it is
-        empty afterwards."""
-        if len(elements) == 0:
-            return
-        record = self.inner.getRecord(tag,value)
-        if record is not None: # otherwise there is nothing to do
-            remaining = [el for el in record.elementsWithValue if el not in elements]
-            if len(remaining) == 0:
-                self.inner.removeRecord(record)
-            elif len(remaining) < len(record.elementsWithValue):
-                newRecord = record.copy()
-                newRecord.elementsWithValue = remaining
-                self.inner.changeRecord(record.tag,record,newRecord)
-                if record.isCommon():
-                    self._checkCommonAndMove(record,undoable=False)
-                    self.commonChanged.emit(record.tag)
         
     def getPossibleSeparators(self,records):
         """Return all separators (from constants.SEPARATORS) that are present in every value of the given
@@ -706,35 +705,33 @@ class TagEditorModel(QtCore.QObject):
         return sum(record.isCommon() for record in self.records[tag])
 
     def _handleLevelChanged(self,event):
+        """React to change events fo the underlying level."""
         currentIds = [el.id for el in self.elements]
         if all(id not in currentIds for id in event.dataIds):
             return # not our problem
 
         changed = False
-        
-        # Built records for elements in dataIds
-        records = self._createRecords(self.elements)
-        print(records)
+        actualRecords = self._createRecords()
         
         for tag in self.records.tags():
-            for record in list(self.records[tag]):
-                if (tag,record.value) not in records:
-                    self.records.removeRecord(record)
-                    if len(self.records[record.tag]) == 0:
-                        self.records.removeTag(record.tag)
+            for myRecord in list(self.records[tag]):
+                if (tag,myRecord.value) not in actualRecords:
+                    self.records.removeRecord(myRecord)
+                    if len(self.records[myRecord.tag]) == 0:
+                        self.records.removeTag(myRecord.tag)
                     changed = True
                 else:
-                    newRecord = records[(tag,record.value)]
-                    if newRecord.elementsWithValue != record.elementsWithValue:
-                        self.records.changeRecord(record.tag,record,newRecord)
+                    actualRecord = actualRecords[(tag,myRecord.value)]
+                    if actualRecord.elementsWithValue != myRecord.elementsWithValue:
+                        self.records.changeRecord(myRecord.tag,myRecord,actualRecord)
                         changed = True
-                    del records[(tag,record.value)]
+                    del actualRecords[(tag,myRecord.value)]
         
         # Finally add all records that remained
-        for record in records.values():
-            if record.tag not in self.records.tags():
-                self.records.insertTag(len(self.records.tags()),record.tag)
-            self.records.insertRecord(len(self.records[record.tag]),record)
+        for actualRecord in actualRecords.values():
+            if actualRecord.tag not in self.records.tags():
+                self.records.insertTag(len(self.records.tags()),actualRecord.tag)
+            self.records.insertRecord(len(self.records[actualRecord.tag]),actualRecord)
             changed = True
         
         if changed:

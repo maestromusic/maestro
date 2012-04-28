@@ -302,7 +302,8 @@ class Browser(QtGui.QWidget):
         self.load(restoreExpanded = True)
     
     def _handleLevelChange(self,event):
-        self.load(restoreExpanded = True)
+        #self.load(restoreExpanded = True)
+        pass
 
 
 class BrowserTreeView(treeview.TreeView):

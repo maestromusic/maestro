@@ -154,10 +154,10 @@ class TagEditorWidget(QtGui.QWidget):
         self.model.tagChanged.connect(self._handleTagChanged)
         self.model.resetted.connect(self._handleReset)
 
-        #self.flagModel = flageditormodel.FlagEditorModel(level,elements,saveDirectly,self.model)
-        #self.flagModel.resetted.connect(self._checkFlagEditorVisibility)
-        #self.flagModel.recordInserted.connect(self._checkFlagEditorVisibility)
-        #self.flagModel.recordRemoved.connect(self._checkFlagEditorVisibility)
+        self.flagModel = flageditormodel.FlagEditorModel(level,elements,stack)
+        self.flagModel.resetted.connect(self._checkFlagEditorVisibility)
+        self.flagModel.recordInserted.connect(self._checkFlagEditorVisibility)
+        self.flagModel.recordRemoved.connect(self._checkFlagEditorVisibility)
 
         self.selectionManager = widgetlist.SelectionManager()
         # Do not allow the user to select ExpandLines
@@ -184,7 +184,7 @@ class TagEditorWidget(QtGui.QWidget):
         
         self.addFlagButton = QtGui.QPushButton()
         self.addFlagButton.setIcon(utils.getIcon("flag_blue.png"))
-        #self.addFlagButton.clicked.connect(self._handleAddFlagButton)
+        self.addFlagButton.clicked.connect(self._handleAddFlagButton)
         self.topLayout.addWidget(self.addFlagButton)
         
         self.label = QtGui.QLabel()
@@ -202,23 +202,23 @@ class TagEditorWidget(QtGui.QWidget):
         self.viewport.layout().addStretch()
         scrollArea.setWidget(self.viewport)
 
-        #self.flagWidget = QtGui.QWidget()
-        #self.flagWidget.setLayout(QtGui.QHBoxLayout())
-        #self.flagWidget.layout().setContentsMargins(0,0,0,0)
-        #self.layout().addWidget(self.flagWidget)
+        self.flagWidget = QtGui.QWidget()
+        self.flagWidget.setLayout(QtGui.QHBoxLayout())
+        self.flagWidget.layout().setContentsMargins(0,0,0,0)
+        self.layout().addWidget(self.flagWidget)
         
-        #self.flagLabel = QtGui.QLabel() # Text will be set in setVertical
-        #self.flagLabel.setToolTip(self.tr("Flags"))
-        #self.flagWidget.layout().addWidget(self.flagLabel)
+        self.flagLabel = QtGui.QLabel() # Text will be set in setVertical
+        self.flagLabel.setToolTip(self.tr("Flags"))
+        self.flagWidget.layout().addWidget(self.flagLabel)
         
-        #flagScrollArea = QtGui.QScrollArea()
-        #flagScrollArea.setWidgetResizable(True)
-        #flagScrollArea.setMaximumHeight(40)
+        flagScrollArea = QtGui.QScrollArea()
+        flagScrollArea.setWidgetResizable(True)
+        flagScrollArea.setMaximumHeight(40)
         # Vertical model of the flageditor is not used
-        #flagEditor = flageditor.FlagEditor(self.flagModel,False)
-        #flagScrollArea.setWidget(flagEditor)
-        #self.flagWidget.layout().addWidget(flagScrollArea,1)
-        #self._checkFlagEditorVisibility()
+        flagEditor = flageditor.FlagEditor(self.flagModel,False)
+        flagScrollArea.setWidget(flagEditor)
+        self.flagWidget.layout().addWidget(flagScrollArea,1)
+        self._checkFlagEditorVisibility()
         
         self.singleTagEditors = {}
         self.tagBoxes = {}
@@ -242,7 +242,7 @@ class TagEditorWidget(QtGui.QWidget):
             if not self.vertical: # Not when this function is called for the first time
                 self.topLayout.removeWidget(self.label)
             self.layout().insertWidget(1,self.label)
-            #self.flagLabel.setText('<img src=":omg/icons/flag_blue.png">')
+            self.flagLabel.setText('<img src=":omg/icons/flag_blue.png">')
         else:
             self.addButton.setText(self.tr("Add tag"))
             self.removeButton.setText(self.tr("Remove selected"))
@@ -257,13 +257,13 @@ class TagEditorWidget(QtGui.QWidget):
             if self.vertical: # Not when this function is called for the first time
                 self.layout().removeWidget(self.label)
             self.topLayout.insertWidget(self.topLayout.count()-1,self.label) # -1 due to the stretch
-            #self.flagLabel.setText('<img src=":omg/icons/flag_blue.png"> '+self.tr("Flags: "))
+            self.flagLabel.setText('<img src=":omg/icons/flag_blue.png"> '+self.tr("Flags: "))
             
         self.vertical = vertical
             
     def setElements(self,elements):
         self.model.setElements(elements)
-        #self.flagModel.setElements(elements)
+        self.flagModel.setElements(elements)
         
     def _insertSingleTagEditor(self,row,tag):
         self.tagEditorLayout.insertRow(row)
@@ -319,7 +319,7 @@ class TagEditorWidget(QtGui.QWidget):
             self.model.addRecord(dialog.getRecord())
 
     def _handleRemoveSelected(self):
-        records = [re.getRecord() for re in self.selectionManager.getSelectedWidgets() if re.isVisible()]
+        records = self.getSelectedRecords()
         if len(records) > 0:
             self.model.removeRecords(records)
           
@@ -406,7 +406,7 @@ class TagEditorWidget(QtGui.QWidget):
             
         # Fancy stuff
         fancyMenu = menu.addMenu(self.tr("Fancy stuff"))
-        selectedRecords = [editor.getRecord() for editor in self.selectionManager.getSelectedWidgets()]
+        selectedRecords = self._getSelectedRecords()
 
         if len(selectedRecords) > 0:
             if not all(record.isCommon() for record in selectedRecords):
@@ -469,7 +469,14 @@ class TagEditorWidget(QtGui.QWidget):
             self.model.changeRecord(record,dialog.getRecord())
 
     def _checkFlagEditorVisibility(self):
+        """Set the flag editor's visibility depending on whether flags are present."""
         self.flagWidget.setVisible(not self.flagModel.isEmpty())
+        
+    def _getSelectedRecords(self):
+        """Return all records that are selected and visible (i.e. not hidden by a collapsed ExpandLine."""
+        return [editor.getRecord() for editor in self.selectionManager.getSelectedWidgets()
+                                # Filter out ExpandLines and hidden records
+                                if isinstance(editor,singletageditor.RecordEditor) and editor.isVisible()]
 
 
 class RecordDialog(QtGui.QDialog):
