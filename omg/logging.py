@@ -100,7 +100,7 @@ def init():
     """Initialize logging according to the config variable ``config.storage.main.logging``. Of course, you
     must initialize the config module first.
     """
-    from omg import config
+    from . import config
     
     logging.config.dictConfig(config.storage.main.logging)
     

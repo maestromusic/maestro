@@ -56,7 +56,7 @@ each thread and use a ``with`` statement to ensure the connection is finally clo
 
 import os, sys, threading, functools
 
-from omg import strutils, config, logging, utils, tags as tagsModule, constants
+from .. import config, logging, utils, tags as tagsModule, constants
 from . import sql
 
 # Table type and prefix

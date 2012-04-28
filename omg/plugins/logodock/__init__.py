@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2009-2011 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2012 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -22,8 +22,8 @@ OMG's widget system."""
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from omg import constants
-from omg.gui import mainwindow
+from ... import constants, utils
+from ...gui import mainwindow
 
 
 def enable():
@@ -39,8 +39,7 @@ def disable():
 class LogoDock(QtGui.QDockWidget):
     def __init__(self,parent=None,location=None):
         super().__init__(parent)
-        pm = QtGui.QPixmap(':/omg/logo.png')
         label = QtGui.QLabel()
-        label.setPixmap(pm)
+        label.setPixmap(QtGui.QPixmap(':/omg/omg.png'))
         label.setAlignment(Qt.AlignCenter)
         self.setWidget(label)

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2009-2011 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2012 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -23,17 +23,16 @@ them. It is provided as central widget, dialog (in the extras menu) and standalo
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from omg import database as db, application, constants, config, utils, tags as tagsModule
-from omg.gui import mainwindow
+from ... import database as db, application, constants, config, utils, tags as tagsModule
+from ...gui import mainwindow
 
-# don't use relative import since this file may be executed directly and is not a package in that case.
+#TODO: ??? don't use relative import since this file may be executed directly and is not a package in that case.
 from . import resources, checks
 
 _action = None # the action that is inserted into the Extras menu
 _widget = None # the dialog widget must be stored in a variable or it will vanish immediately
 
 
-# The next few (undocumented) functions are called by the plugin system
 def enable():
     global _action
     _action = QtGui.QAction(application.mainWindow)

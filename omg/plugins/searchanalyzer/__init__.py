@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2009-2011 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2012 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -22,16 +22,15 @@ table without any fancy grouping as the browser does (it will add titles, though
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from omg import search, config, application, database as db, constants, utils
-from omg.search import searchbox
-from omg.gui import mainwindow, dialogs
+from ... import search, config, application, database as db, constants, utils
+from ...search import searchbox, criteria as criteriaModule
+from ...gui import mainwindow, dialogs
 
 
 _action = None # the action that is inserted into the Extras menu
 _widget = None # the dialog widget must be stored in a variable or it will vanish immediately
 
 
-# The next few (undocumented) functions are called by the plugin system
 def enable():
     global _action
     _action = QtGui.QAction(application.mainWindow)
@@ -88,6 +87,8 @@ class SearchAnalyzer(QtGui.QDialog):
         self.resultTable = self.engine.createResultTable("analyzer",
                 "name VARCHAR({}) NULL".format(constants.TAG_VARCHAR_LENGTH))
         
+        self.flagFilter = []
+        
         # Initialize GUI
         self.setLayout(QtGui.QVBoxLayout())
         topLayout = QtGui.QHBoxLayout()
@@ -120,16 +121,20 @@ class SearchAnalyzer(QtGui.QDialog):
             buttonLayout.addWidget(closeButton,0)
         
     def _handleSearchFinished(self,searchRequest):
+        """If the search was successful, update the result list."""
         if searchRequest is self.searchRequest and not searchRequest.isStopped():
             self.updateTable()
 
     def updateTable(self):
+        """Update the result table (in the GUI) with data from the result table (in the database)."""
         self.table.clear()
         # Add the titles. If there are more than one title, concatenate them.
         db.query("""
             UPDATE {1} AS res JOIN 
                 (SELECT el.id AS id, GROUP_CONCAT(v.value SEPARATOR ', ') AS value
-                FROM {0}elements AS el JOIN {0}tags AS t ON el.id = t.element_id JOIN {0}values_varchar AS v ON t.tag_id = v.tag_id AND t.value_id = v.id
+                FROM {0}elements AS el
+                            JOIN {0}tags AS t ON el.id = t.element_id
+                            JOIN {0}values_varchar AS v ON t.tag_id = v.tag_id AND t.value_id = v.id
                 WHERE v.tag_id = 4
                 GROUP BY el.id) AS sub
             ON res.id = sub.id
@@ -150,7 +155,11 @@ class SearchAnalyzer(QtGui.QDialog):
         self.table.setEnabled(True)
             
     def _handleCriteriaChanged(self):
-        criteria = self.searchBox.getCriteria()
+        """Reload search criteria. If there are criteria, then start search. Otherwise clear the
+        result table."""
+        criteria = list(self.searchBox.getCriteria())
+        if len(self.flagFilter) > 0:
+            criteria.insert(0,criteriaModule.FlagsCriterion(self.flagFilter))
         if len(criteria) == 0:
             self.searchRequest.stop()
             self.table.clear()
@@ -160,19 +169,28 @@ class SearchAnalyzer(QtGui.QDialog):
         else:
             self.table.setEnabled(False)
             self.searchRequest = self.engine.search("{}elements".format(db.prefix),self.resultTable,criteria)
-            
+    
+    def setFlags(self,flagTypes):
+        """Set the flag filter. Only elements that have all flags in *flagTypes* will be displayed as search
+        results."""
+        if set(flagTypes) != set(self.flagFilter):
+            self.flagFilter = list(flagTypes)
+            self._handleCriteriaChanged()
+        
     def _handleOptionButton(self):
-        dialog = OptionDialog(self)
-        pos = (self.optionButton.x(),self.optionButton.y()+self.optionButton.frameGeometry().height())
-        dialog.move(*pos)
+        """Open the option popup."""
+        dialog = OptionPopup(self,self.optionButton)
         dialog.show()
 
 
-class OptionDialog(dialogs.FancyTabbedPopup):
-    def __init__(self,parent = None):
-        dialogs.FancyTabbedPopup.__init__(self,parent)
-        self.resize(200,100)
-                
-        self.flagTab = QtGui.QWidget()
-        self.addTab(self.flagTab,"Flags")
+class OptionPopup(dialogs.FancyTabbedPopup):
+    """Small popup which currently only allows to set a list of flags. Only elements with all of these flags
+    will be displayed in the search results."""
+    def __init__(self,searchAnalyzer,parent):
+        dialogs.FancyTabbedPopup.__init__(self,parent,300,200)
+        
+        from ...gui import browserdialog
+        self.flagView = browserdialog.FlagView(searchAnalyzer.flagFilter)
+        self.flagView.selectionChanged.connect(lambda: searchAnalyzer.setFlags(self.flagView.selectedFlagTypes))
+        self.tabWidget.addTab(self.flagView,"Flags")
         

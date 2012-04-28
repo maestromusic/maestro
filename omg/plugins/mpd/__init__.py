@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2009-2011 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2012 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -19,15 +19,15 @@
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
-from omg import player, config, logging, database as db, models
-from omg.utils import relPath, absPath, ranges
-from omg.models import playlist
-from omg.player import STOP, PLAY, PAUSE
-from omg.modify.treeactions import TreeAction
+from ... import player, config, logging, database as db, models
+from ...utils import relPath, absPath, ranges
+from ...models import playlist
+from ...player import STOP, PLAY, PAUSE
+from ...modify.treeactions import TreeAction
 
 import mpd, queue, itertools, functools, threading
 
-logger = logging.getLogger("omg.plugins.mpd")
+logger = logging.getLogger(__name__)
 
 CONNECTION_TIMEOUT = 10 # time in seconds before an initial connection to MPD is given up
 POLLING_INTERVAL = 200 # milliseconds between two MPD polls

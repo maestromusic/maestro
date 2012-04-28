@@ -22,7 +22,6 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from .. import database as db, models, config, utils, logging, modify
-from ..modify import events
 from . import rootedtreemodel, treebuilder
 
 logger = logging.getLogger(__name__)

@@ -26,7 +26,7 @@ import sys, os, fcntl, getopt
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from omg import config, logging, constants
+from . import config, logging, constants
 
 # The application's main window
 mainWindow = None
@@ -122,9 +122,9 @@ def run(cmdConfig=[],exitPoint="nogui",console=True):
     search.init()
     
     # Load Plugins
-    #from . import plugins
-    #plugins.init()
-    #plugins.enablePlugins()
+    from . import plugins
+    plugins.init()
+    plugins.enablePlugins()
     
     if exitPoint == 'nogui':
         return
@@ -143,7 +143,7 @@ def run(cmdConfig=[],exitPoint="nogui",console=True):
     from . import player
     player.init()
     mainWindow = mainwindow.MainWindow()
-    #plugins.mainWindowInit()
+    plugins.mainWindowInit()
     
     # Launch application
     mainWindow.show()
@@ -155,7 +155,7 @@ def run(cmdConfig=[],exitPoint="nogui",console=True):
     search.shutdown()
     mainWindow.saveLayout()
     delegateconfiguration.save()
-    #plugins.shutdown()
+    plugins.shutdown()
     config.shutdown()
     logging.shutdown()
     sys.exit(returnValue)

@@ -16,11 +16,11 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-"""Module to manage the database tables used by omg."""
+"""Module to manage the database tables used by OMG."""
 
 import re
-from omg import config,constants,database as db
-from omg.database.sql import DBException
+from .. import constants, database as db
+from .sql import DBException
 
 
 class SQLTable:

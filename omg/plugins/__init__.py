@@ -21,9 +21,8 @@ import os, sys, collections, os.path
 from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
-import omg
-from omg import logging, config, constants
-from omg.gui import mainwindow
+from .. import logging, config, constants
+from ..gui import mainwindow
 
 translate = QtCore.QCoreApplication.translate
 logger = logging.getLogger(__name__)
