@@ -22,6 +22,7 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from .. import database as db, models, config, utils, logging, modify
+from ..models import levels
 from . import rootedtreemodel, treebuilder
 
 logger = logging.getLogger(__name__)
@@ -31,7 +32,7 @@ class Playlist(rootedtreemodel.RootedTreeModel):
     
     def __init__(self, backend):
         """Initialize with an empty playlist."""
-        rootedtreemodel.RootedTreeModel.__init__(self,models.RootNode())
+        super().__init__(root = models.RootNode(self))
         self.backend = backend
         self.clearCurrent()
         modify.dispatcher.changes.connect(self.handleChangeEvent)
@@ -75,11 +76,7 @@ class Playlist(rootedtreemodel.RootedTreeModel):
         self.beginResetModel()
         elements = []
         for path in paths:
-            id = db.idFromPath(path)
-            if id is not None:
-                elements.append(models.File.fromId(id))
-            else:
-                elements.append(models.File.fromFilesystem(path, ignoreUnknownTags = True))
+            elements.append(levels.real.get(path))
         elements = self.restructure(elements)
         self.root.setContents(elements)
         self.endResetModel()

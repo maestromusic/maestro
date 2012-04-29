@@ -78,26 +78,37 @@ class MergeCommand(QtGui.QUndoCommand):
         self.insertIndex = indices[0] # where the new container will live
         self.level = level
         self.newTitle = newTitle
+        self.tagChanges = {}
+        self.parentChanges = {} # maps child id to (position under old parent, position under new container) tuples
+        self.positionChanges = {}
+        def recordTagChanges(element):
+            if tagsModule.TITLE in element.tags:
+                tagCopy = element.tags.copy()
+                tagCopy[tagsModule.TITLE] = [ t.replace(removeString, '') for t in tagCopy[tagsModule.TITLE]]
+                self.tagChanges[id] = tagsModule.TagDifference(element.tags, tagCopy)
         if isinstance(parent, Wrapper):
             self.elementParent = True
             self.insertPosition = parent.element.contents[self.insertIndex][1]
-            self.positionChanges = {}
+            
             self.parentID = parent.element.id
-            self.parentChanges = {} # maps child id to (position under old parent, position under new container) tuples
-            self.tagChanges = {}
+            
             for index, (position, id) in enumerate(parent.element.contents.items()):
                 element = level.get(id)
                 if index in indices:
                     self.parentChanges[id] = (position, len(self.parentChanges) + 1)
-                    if tagsModule.TITLE in element.tags:
-                        tagCopy = element.tags.copy()
-                        tagCopy[tagsModule.TITLE] = [ t.replace(removeString, '') for t in tagCopy[tagsModule.TITLE]]
-                        self.tagChanges[id] = tagsModule.TagDifference(element.tags, tagCopy)
+                    recordTagChanges(element)
                 elif adjustPositions and len(self.parentChanges) > 1:
                     self.positionChanges[id] = (position, position - len(self.parentChanges) + 1)
                     
         else:
             self.elementParent = False
+            for index, wrapper in enumerate(parent.contents):
+                id = wrapper.element.id
+                element = level.get(id)
+                if index in indices:
+                    self.parentChanges[id] = (index, len(self.parentChanges) + 1)
+                    recordTagChanges(element)
+            
     
     def redo(self):
         if not hasattr(self, "containerID"):
@@ -108,23 +119,27 @@ class MergeCommand(QtGui.QUndoCommand):
         if self.elementParent:
             parent = self.level.get(self.parentID)
             
-            for id, (oldPos, newPos) in self.parentChanges.items():
-                element = self.level.get(id)
+        for id, (oldPos, newPos) in self.parentChanges.items():
+            element = self.level.get(id)
+            if self.elementParent:
                 parent.contents.remove(pos = oldPos)
                 element.parents.remove(self.parentID)
-                element.parents.append(self.containerID)
-                container.contents.insert(newPos, id)
-                elements.append(element)
-                if id in self.tagChanges:
-                    self.tagChanges[id].apply(element.tags)
+            element.parents.append(self.containerID)
+            container.contents.insert(newPos, id)
+            elements.append(element)
+            if id in self.tagChanges:
+                self.tagChanges[id].apply(element.tags)
+        
+        if self.elementParent:
             parent.contents.insert(self.insertPosition, self.containerID)
-            for id, (oldPos, newPos) in sorted(self.positionChanges.items()):
-                element = self.level.get(id)
-                parent.contents.positions[parent.contents.positions.index(oldPos)] = newPos
+        for id, (oldPos, newPos) in sorted(self.positionChanges.items()):
+            element = self.level.get(id)
+            parent.contents.positions[parent.contents.positions.index(oldPos)] = newPos
+            
         container.tags = tagsModule.findCommonTags(elements)
         container.tags[tagsModule.TITLE] = [self.newTitle]
         self.level.emitEvent(dataIds = list(self.positionChanges.keys()),
-                             contentIds = [self.containerID, self.parentID])
+                             contentIds = [self.containerID, self.parentID] if self.elementParent else [self.containerID])
                   
     def undo(self):
         if self.elementParent:
@@ -133,16 +148,17 @@ class MergeCommand(QtGui.QUndoCommand):
             for id, (oldPos, newPos) in self.positionChanges.items():
                 element = self.level.get(id)
                 parent.contents.positions[parent.contents.positions.index(newPos)] = oldPos
-            for id, (oldPos, newPos) in self.parentChanges.items():
-                element = self.level.get(id)
+        for id, (oldPos, newPos) in self.parentChanges.items():
+            element = self.level.get(id)
+            if self.elementParent:
                 parent.contents.insert(oldPos, id)
                 element.parents.append(self.parentID)
-                element.parents.remove(self.containerID)
-                if id in self.tagChanges:
-                    self.tagChanges[id].revert(element.tags)
+            element.parents.remove(self.containerID)
+            if id in self.tagChanges:
+                self.tagChanges[id].revert(element.tags)
         del self.level.elements[self.containerID]
         self.level.emitEvent(dataIds = list(self.positionChanges.keys()),
-                             contentIds = [self.parentID])
+                             contentIds = [self.parentID] if self.elementParent else [])
         
     
 class ClearTreeAction(treeactions.TreeAction):
