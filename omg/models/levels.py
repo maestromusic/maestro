@@ -41,6 +41,7 @@ class ElementGetError(RuntimeError):
 
 
 class ElementChangedEvent(ChangeEvent):
+    #TODO comment
     def __init__(self,dataIds=None,contentIds=None):
         if dataIds is None:
             self.dataIds = []
@@ -51,6 +52,7 @@ class ElementChangedEvent(ChangeEvent):
 
 
 class Level(QtCore.QObject):
+    #TODO comment
     changed = QtCore.pyqtSignal(ChangeEvent)
     """Signal that is emitted if something changes on this level. The first argument is a list of Ids of elements
     whose tags, flags, major status, ... has changed (things affecting only the element itself). The second list
@@ -90,9 +92,10 @@ class Level(QtCore.QObject):
             else: notFound.append(id)
         self.parent.loadIntoChild(notFound,self,ignoreUnknownTags)
                 
-    def loadPaths(self,paths,aDict,ignoreUnknownTags=False):
+    def loadPaths(self,paths,ignoreUnknownTags=False):
+        #TODO comment
         ids = [idFromPath(path) for path in paths]
-        self.load(ids,aDict,ignoreUnknownTags)
+        self.load(ids,ignoreUnknownTags)
         
     def __contains__(self, id):
         """Returns if the given id is loaded in this level. Note that if the id could be loaded from the
@@ -155,6 +158,7 @@ class Level(QtCore.QObject):
         self.elements[new] = elem
         for parentID in elem.parents:
             parentContents = self.elements[parentID].contents
+            #TODO: Might be harmful to create new lists. Why not change the ids in place?
             parentContents.ids = [ new if id == old else id for id in parentContents.ids ]
         if elem.isContainer():
             for childID in elem.contents.ids:
@@ -185,6 +189,7 @@ class RealLevel(Level):
                 self.loadFromFileSystem(paths,child,askOnNewTags)
             
     def loadFromDB(self,idList,level):
+        #TODO: comment
         if len(idList) == 0: # queries will fail otherwise
             return 
         idList = ','.join(str(id) for id in idList)
@@ -248,6 +253,7 @@ class RealLevel(Level):
             level.elements[id].flags.append(flags.get(flagId))
     
     def loadFromFileSystem(self,paths,level, askOnNewTags = True):
+        #TODO: comment
         for path in paths:
             rpath = utils.relPath(path)
             logger.debug("reading file {} from filesystem".format(rpath))
@@ -259,6 +265,7 @@ class RealLevel(Level):
                         real.read()
                         readOk = True
                     except tags.UnknownTagError as e:
+                        # TODO: respect askOnNEwTags parameter (or remove it)
                         # TODO: wrap this up as a separate function stored somewhere else
                         from ..gui.tagwidgets import NewTagTypeDialog
                         QtGui.QApplication.changeOverrideCursor(Qt.ArrowCursor)
@@ -353,25 +360,7 @@ class RealLevel(Level):
         if emitEvent:
             self.emitEvent(ids)
             
-            
-class ChangeTagFlagsCommand(QtGui.QUndoCommand):
-    def __init__(self,level,newTags,text):
-        super().__init__(text)
-        self.level = level
-        self.newTags = newTags
-        self.oldTags = {id: level.get(id).tags for id in newTags.keys()}
-        
-    def redo(self):
-        for id,tags in self.newTags.items():
-            level.get(id).tags = tags
-        level.changed.emit(ElementChangedEvent(newTags.keys(),False))
-        
-    def undo(self):
-        for id,tags in self.oldTags.items():
-            level.get(id).tags = tags
-        level.changed.emit(ElementChangedEvent(oldTags.keys(),False))
-        
-        
+#TODO: move into its own file
 class CommitCommand(QtGui.QUndoCommand):
     """The CommitCommand is used to "commit" the state of some elements in one level to its parent level.
     If the parent level is *real*, then also the database and, if needed, files on disk are updated
@@ -402,7 +391,7 @@ class CommitCommand(QtGui.QUndoCommand):
             self.realFileChanges = {}
             self.idMap = None
         else:
-            self.newId = self.oldId = lambda x : x
+            self.newId = self.oldId = lambda x : x  #TODO wtf?
             
         self.newElements = []
         self.flagChanges, self.tagChanges, self.contentsChanges, self.majorChanges = {}, {}, {}, {}
@@ -583,13 +572,15 @@ class CommitCommand(QtGui.QUndoCommand):
             
 
 def idFromPath(path):
+    """Return the id for the given path. For elements in the database this is a positive number. Otherwise
+    the temporary id is returned or a new one is created."""
     id = db.idFromPath(path)
     if id is not None:
         return id
     else: return tIdFromPath(path)
 
-_currentTId = 0
-_tIds = {}
+_currentTId = 0 # Will be decreased by one every time a new TID is assigned
+_tIds = {} # TODO: Is there any chance that items will be removed from here?
 _paths = {}
 
 def tIdFromPath(path):

@@ -62,8 +62,8 @@ class Node:
     def insertContents(self, index, nodes):
         """Insert *nodes* at position *index* into this node's contents. As with setContents the list won't
         be copied and the parents will be set to this node."""
-        for n in nodes:
-            n.parent = self
+        for node in nodes:
+            node.parent = self
         self.contents[index:index] = nodes
         
     def isFile(self):
@@ -166,15 +166,25 @@ class Node:
             offset = offset + node.fileCount()
         return offset
         
-    def fileAtOffset(self,offset):
-        """Get the file at the given <offset>. Note that <offset> is relative to this element, not to the
-        whole playlist (unless the element is the rootnode)."""
+    def fileAtOffset(self,offset,allowFileCount=False):
+        """Get the file at the given *offset*. Note that *offset* is relative to this element, not to the
+        whole playlist (unless the element is the rootnode).
+        
+        Usually the inequality 0 <= *offset* < self.fileCount() must be valid. If *allowFileCount* is True,
+        *offset* may equal self.fileCount(). In that case None is returned, as the offset points behind all
+        files (that position is usually only interesting for insert operations).
+        """
+        #TODO: what if offset == node.fileCount()?
         assert self.getContents() is not None
         offset = int(offset)
         if offset == 0 and self.isFile():
             return self
         else: 
             child,innerOffset = self.childAtOffset(offset)
+            if child is None: # offset == self.fileCount()
+                if allowFileCount:
+                    return None
+                else: raise IndexError("Offset {} is out of bounds (equals fileCount)".format(offset))
             if child.isFile():
                 return child
             else: return child.fileAtOffset(innerOffset)
@@ -186,10 +196,13 @@ class Node:
         with 12 songs, then getChildIndexAtOffset(17) will return (1,3), since the 18th file if the playlist
         (i.e. with offset 17), is contained in the second album (i.e with index 1) and it is the 4th song on
         that album (i.e. it has offset 3 relative to the album).
+        
+        If *offset* points to the last position inside this node (in other words offset == self.fileCount()),
+        then (None,None) is returned.
         """
         offset = int(offset)
         if offset < 0:
-            raise IndexError("Offset {0} is out of bounds".format(offset))
+            raise IndexError("Offset {} is out of bounds".format(offset))
         cOffset = 0
         for i in range(0,self.getContentsCount()):
             fileCount = self.contents[i].fileCount()
@@ -198,12 +211,15 @@ class Node:
             else: cOffset = cOffset + fileCount
         if offset == cOffset:
             return None,None
-        raise IndexError("Offset {0} is out of bounds".format(offset))
+        raise IndexError("Offset {} is out of bounds".format(offset))
     
     def childAtOffset(self,offset):
         """Return the child containing the file with the given (relative) offset, and the offset of that file
         relative to the child. This is a convenience-method for
-        getChildren()[getChildIndexAtOffset(offset)[0]]. Confer getChildIndexAtOffset.
+        getContents()[getChildIndexAtOffset(offset)[0]]. Confer getChildIndexAtOffset.
+        
+        If *offset* points to the last position inside this node (in other words offset == self.fileCount()),
+        then (None,None) is returned.
         """
         index,innerOffset = self.childIndexAtOffset(offset)
         if index is None:
@@ -230,16 +246,24 @@ class RootNode(Node):
 
 class Wrapper(Node):
     """A node that holds an element."""
-    def __init__(self,element,contents = None, position = None):
+    def __init__(self,element,contents=None,position=None,parent=None):
         self.element = element
         self.position = position
+        self.parent = parent
         if element.isContainer():
             if contents is not None:
-                self.contents = contents
+                self.setContents(contents)
             else: self.contents = []
-        else:
-            assert contents is None
+        else: assert contents is None
         
+    def copy(self,contents=None):
+        copy = Wrapper(self.element,None,self.position,self.parent)
+        if self.isContainer():
+            if contents is None:
+                copy.setContents([child.copy() for child in self.contents])
+            else: copy.setContents(contents)
+        return copy
+    
     def isFile(self):
         return self.element.isFile()
     
@@ -278,6 +302,34 @@ class Wrapper(Node):
         if len(parts) > 0:
             return '\n'.join(parts)
         else: return str(self)
+        
+    def getLength(self):
+        """Return the length of this element, i.e. the sum of the lengths of all contents."""
+        if self.isFile():
+            return self.element.length
+        else:
+            lengths = (wrapper.getLength() for wrapper in self.contents)
+            # Skip elements of length None
+            return sum(l for l in lengths if l is not None)
+    
+    def getExtension(self):
+        """Return the extension of all files in this container. Return None if they have different extension
+        or at least one of them does not have an extension."""
+        if self.isFile():
+            return self.element.getExtension()
+        else:
+            extension = None
+            for wrapper in self.contents:
+                ext = wrapper.getExtension()
+                if ext is None:
+                    return None
+                if extension is None:
+                    extension = ext
+                elif extension != ext:
+                    return None
+            return extension
+
+    # Note that no __eq__ method is defined for wrappers. Different wrapper instances really are different.
 
 
 class Element:
@@ -366,37 +418,13 @@ class Container(Element):
     def getContents(self):
         return (self.level.get(id) for id in self.contents)
     
-    def getLength(self):
-        """Return the length of this element, i.e. the sum of the lengths of all contents."""
-        lengths = (c.getLength() for c in self.getContents())
-        # Skip elements of length None
-        return sum(l for l in lengths if l is not None)
-    
-    def getExtension(self):
-        """Return the extension of all files in this container. Return None if they have different extension
-        or at least one of them does not have an extension."""
-        extension = None
-        for element in self.getContents():
-            ext = element.getExtension()
-            if ext is None:
-                return None
-            if extension is None:
-                extension = ext
-            elif extension != ext:
-                return None
-        return extension
-    
     def __repr__(self):
         return "Container[{}] with {} elements".format(self.id, len(self.contents))
 
 
 class File(Element):
-    
-    
+    #TODO: comment
     def __init__(self, level, id, path, length,*, parents=None, tags=None, flags=None):
-        """Initialize this element with the given id, which must be an integer or None (for external files).
-        Optionally you may specify a tags.Storage object holding the tags of this element and/or a file path.
-        """
         if not isinstance(id,int) or not isinstance(path,str) or not isinstance(length,int):
             raise TypeError("Invalid type (id,path,length): ({},{},{}) of types ({},{},{})"
                             .format(id,path,length,type(id),type(path),type(length)))
@@ -434,10 +462,6 @@ class File(Element):
     def major(self):
         return False
     
-    def getLength(self):
-        """Return the length of this file."""
-        return self.length
-    
     def getExtension(self):
         """Return the filename extension of this file."""
         ext = os.path.splitext(self.path)[1]
@@ -447,6 +471,7 @@ class File(Element):
         
     def __repr__(self):
         return "File[{}] {}".format(self.id, self.path)
+
 
 class ContentList:
     def __init__(self, existing = None):
@@ -473,6 +498,12 @@ class ContentList:
     def __setitem__(self, i, pos, id):
         self.positions[i] = id
         self.ids[i] = id
+    
+    def __contains__(self,id):
+        return id in self.ids
+    
+    def getPosition(self,id):
+        return self.positions[self.ids.index(id)]
         
     def insert(self, pos, id):
         if pos in self.positions:
@@ -504,4 +535,9 @@ class ContentList:
         return self.ids == other.ids and self.positions == other.positions
     
     def __ne__(self, other):
-        return not self == other
+        return self.ids != other.ids or self.positions != other.positions
+    
+    def __str__(self):
+        return '[{}]'.format(', '.join('{}: {}'.format(self.positions[i],self.ids[i])
+                                       for i in range(len(self.positions))))
+         

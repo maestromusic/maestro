@@ -16,6 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+# TODO: Move view-specific treeactions to the corresponding modules
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
@@ -29,9 +30,11 @@ translate = QtGui.QApplication.translate
 
 
 class NamedList(list):
+    #TODO: comment
     def __init__(self, name, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.name = name
+        
         
 class TreeAction(QtGui.QAction):
     """Super class for TreeActions, i.e. Actions for TreeViews."""
@@ -51,6 +54,7 @@ class TreeAction(QtGui.QAction):
     
     def doAction(self):
         raise NotImplementedError()
+
 
 class EditTagsAction(TreeAction):
     """Action to edit tags; exists both in a recursive and non-recursive variant, depending on the argument

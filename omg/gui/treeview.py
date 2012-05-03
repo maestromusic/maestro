@@ -26,6 +26,7 @@ from collections import OrderedDict
 translate = QtGui.QApplication.translate
 logger = logging.getLogger(__name__)
 
+
 class NodeSelection:
     """Objects of this class store a selection of nodes a TreeView. Different than a QItemSelectionModel,
     a NodeSelection knows about Nodes, Elements etc and provides special methods to determine properties
@@ -62,8 +63,8 @@ class NodeSelection:
             return result
         
     def elements(self, recursive = False):
-        """Returns a list of all selected element wrappers. If *recursive* is True, all children of selected wrappers
-        are also returned."""
+        """Returns a list of all selected element wrappers. If *recursive* is True, all children of selected
+        wrappers are also returned."""
         if not recursive:
             # Just remove duplicates and nodes which don't have tags
             return self._elements
@@ -105,6 +106,7 @@ class NodeSelection:
 
 class TreeActionConfiguration(QtCore.QObject):
     """Objects of this class define an action configuration for a treeview."""
+    #TODO: comment
     
     globalUndoRedo = True # specifies whether or not to add global undo/redo actions to context menu
     actionDefinitionAdded = QtCore.pyqtSignal(object)
@@ -178,6 +180,7 @@ class TreeActionConfiguration(QtCore.QObject):
                 else:
                     menu.addAction(treeActions[name])
         return menu
+        
         
 class TreeView(QtGui.QTreeView):
     """Base class for tree views that contain mainly elements. This class handles mainly the
@@ -263,7 +266,17 @@ class TreeView(QtGui.QTreeView):
         if current.isValid():
             return current.internalPointer()
         
+    def selectedRanges(self):
+        """Return the ranges of selected nodes. Each range is a 3-tuple of parent (which doesn't need to be
+        selected), first index of parent.contents that is selected and the last index that is selected.
+        """
+        selection = self.selectionModel().selection()
+        return [(self.model().data(itemRange.parent()),itemRange.top(),itemRange.bottom())
+                    for itemRange in selection]
+            
+        
     def updateGlobalSelection(self, selected, deselected):
+        #TODO rewrite
         """Change the global selection if some any elements are selected in any views. Connect the
         selectionChanged() signal of the selection model to this slot to obtain the desired effect."""
         globalSelection = []
@@ -275,3 +288,4 @@ class TreeView(QtGui.QTreeView):
         if len(globalSelection):
             from . import mainwindow
             mainwindow.setGlobalSelection(globalSelection,self)
+            

@@ -172,7 +172,7 @@ class Tag:
             * rawTitle: The title as set in the database. If a tag does not have a title set in the
               database this will be None, while 'title' will be the name.
             * iconPath: Path to the tagtype's icon or None if if doesn't have an icon.
-            * icon: A QIcon loaded from above path.
+            * icon: A QIcon loaded from above path (read-only)
             * private: Whether the flag is private, i.e. stored only in the database and not in files.
 
         Usually you should get tag instances via the :func:`get-method<omg.tags.get>`. The exception is for
@@ -189,13 +189,18 @@ class Tag:
         if title is not None and title != self.name:
             self.rawTitle = title
         else: self.rawTitle = None
-        self.setIconPath(iconPath)
+        self.iconPath = iconPath
         self.private = private
+        
+    @property
+    def iconPath(self):
+        return self._iconPath
 
-    def setIconPath(self,iconPath):
+    @iconPath.setter
+    def iconPath(self,iconPath):
         """Set the tag's iconPath and load the icon."""
         assert iconPath is None or isinstance(iconPath,str)
-        self.iconPath = iconPath
+        self._iconPath = iconPath
         if iconPath is not None:
             self.icon = QtGui.QIcon(iconPath)
         else: self.icon = None
@@ -225,15 +230,15 @@ class Tag:
     def __str__(self):
         return self.title
     
-    def getTitle(self):
+    @property
+    def title(self):
         return self.rawTitle if self.rawTitle is not None else self.name
     
-    def setTitle(self,title):
+    @title.setter
+    def title(self,title):
         if title != '' and title != self.name:
             self.rawTitle = title
         else: self.rawTitle = None
-        
-    title = property(getTitle,setTitle)
 
         
 class UnknownTagError(RuntimeError):
@@ -478,7 +483,7 @@ def changeTagType(tagType,**data):
     if 'iconPath' in data and data['iconPath'] != tagType.iconPath:
         assignments.append('icon = ?')
         params.append(data['iconPath'])
-        tagType.setIconPath(data['iconPath'])
+        tagType.iconPath = data['iconPath']
         
     if 'private' in data and bool(data['private']) != tagType.private:
         assignments.append('private = 1' if data['private'] else 'private = 0')

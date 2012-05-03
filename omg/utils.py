@@ -37,7 +37,9 @@ def mapRecursively(f,aList):
         else: result.append(f(item))
     return result
 
+
 def ranges(lst):
+    #TODO: comment
     def helper(lst, first, cur, result):
         if len(lst) == 0:
             return result + [(first,cur)]
@@ -47,6 +49,7 @@ def ranges(lst):
     if len(lst) <= 1:
         return list(map(lambda x: (x,x), lst))
     return helper(list(enumerate(lst[1:])), lst[0], lst[0], list())
+
 
 def dictOrIdentity(dct):
     """Returns a function that returns dct[x] if x in dct and x otherwise."""
@@ -62,6 +65,7 @@ def walk(node):
         for x in walk(child):
             yield x
 
+
 def groupFilePaths(paths):
     """Takes a list of file paths, splits them into dirname and basename, and groups
     them by the dirname."""
@@ -72,6 +76,7 @@ def groupFilePaths(paths):
             filesByFolder[dir] = []
         filesByFolder[dir].append(filename)
     return filesByFolder
+            
             
 def hasKnownExtension(file):
     """Return True if the given path has a known extension (i.e., appears in options.main.extension).
@@ -101,9 +106,7 @@ def absPath(file):
 
 
 def collectFiles(paths):
-    """Finds all music files below the given *paths*. The output is a dict mapping subdirectory paths to
-    lists of contained music files."""
-    
+    """Finds all music files below the given *paths*."""
     filePaths ={}
     def add(file, parent = None):
         
@@ -121,7 +124,7 @@ def collectFiles(paths):
                 for f in sorted(files):
                     add(os.path.join(parent, f), parent)
                 dirs.sort()
-    return filePaths
+    return filePaths.values()
 
 
 def getIcon(name):
@@ -199,8 +202,9 @@ class FlexiDate(object):
                 result += self.day
         return result
 
-    def toMaximalSql(self):
-         return 10000*self.year + 100*12 + 31
+    def endOfYearSql(self):
+        """Return the last day of the year of this date as an integer as used in the database."""
+        return 10000*self.year + 100*12 + 31
          
     @staticmethod
     def fromSql(value):

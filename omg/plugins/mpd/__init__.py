@@ -21,7 +21,7 @@ from PyQt4.QtCore import Qt
 
 from ... import player, config, logging, database as db, models
 from ...utils import relPath, absPath, ranges
-from ...models import playlist
+from ...models import playlist, levels
 from ...player import STOP, PLAY, PAUSE
 from ...modify.treeactions import TreeAction
 
@@ -281,7 +281,8 @@ class MPDPlayerBackend(player.PlayerBackend):
     
     def __init__(self, name):
         super().__init__(name)
-        self.playlist = playlist.Playlist(self)
+        self.playlist = playlist.PlaylistModel(self)
+        self.paths = []
         try:
             data = config.storage.mpd.profiles[self.name]
         except KeyError:
@@ -302,9 +303,10 @@ class MPDPlayerBackend(player.PlayerBackend):
         
         # initialize functions that emit signals to the MPD thread on being called
         def _emitChange(what, *args):
-            if what[0]== '_': # those methods call superclass implementation first
-                getattr(player.PlayerBackend, what)(self, *args)
+            #if what[0]== '_': # those methods call superclass implementation first
+            #    getattr(player.PlayerBackend, what)(self, *args)
             self.changeFromMain.emit(what, *args)
+            
         for what in ("setElapsed", "setState", "setCurrentSong", "_setPlaylist",
                 "_insertIntoPlaylist", "_removeFromPlaylist", "nextSong",
                 "previousSong", "setVolume"):
@@ -314,12 +316,11 @@ class MPDPlayerBackend(player.PlayerBackend):
     def _handleMPDChange(self, what, how):
         if what == 'init_done':
             self.paths, self.currentSong, self.currentSongLength, self.elapsed, self.state = how
-            self.playlist.updateFromPathList(self.paths)
+            self.playlist.initFromPaths(self.paths) 
             if self.currentSong != -1:
                 self.playlist.setCurrent(self.currentSong)
             self.connectionState = player.CONNECTED
             self.connectionStateChanged.emit(player.CONNECTED)
-            self.stack.clear()
         
         elif what == 'elapsed':
             self.elapsed = how
@@ -339,21 +340,23 @@ class MPDPlayerBackend(player.PlayerBackend):
             self.volumeChanged.emit(how)
             
         elif what == 'remove':
-            self.playlist.removeSongs(how)
-            self.stack.push(player.RemoveFromPlaylistCommand(self, how, '[ext] remove', True))
+            print("Change from MPD: remove")
+            print(how)
+            self.playlist.removeByOffset(how[0][0],len(how),fromOutside=True)
             for pos,path in reversed(how):
                 del self.paths[pos]
         
         elif what == 'insert':
-            self.playlist.insertSongs(how)
-            self.stack.push(player.InsertIntoPlaylistCommand(self, how, '[ext] insert', True))
+            print("Change from MPD: insert")
+            print(how)
+            self.playlist.insertPathsAtOffset(how[0][0],[entry[1] for entry in how],fromOutside=True)
             for pos, path in how:
-                self.paths[pos:pos] = how
+                self.paths[pos:pos] = path
             
         elif what == 'playlist':
-            self.playlist.updateFromPathList(how)
-            self.stack.push(player.ChangePlaylistCommand(self, self.paths, how, '[ext] modify', True))
-            self.paths = how
+            print("Change from MPD: playlist")
+            print(how)
+            self.playlist.resetFromPaths(how)
             
         elif what == 'disconnect':
             self.connectionStateChanged.emit(player.DISCONNECTED)
@@ -376,6 +379,15 @@ class MPDPlayerBackend(player.PlayerBackend):
         self._numFrontends -= 1
         if self._numFrontends == 0:
             self.mpdthread.doPolling.clear()
+    
+    def insertIntoPlaylist(self,pos,paths):
+        self._insertIntoPlaylist(list(enumerate(paths,start=pos)))
+    
+    def removeFromPlaylist(self,begin,end):
+        self._removeFromPlaylist([(begin,'') for i in range(end-begin)])
+        
+    def setPlaylist(self,paths):
+        self._setPlaylist(paths)
     
     @staticmethod
     def configWidget(profile = None):

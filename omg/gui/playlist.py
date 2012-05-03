@@ -45,6 +45,7 @@ class PlaylistTreeView(treeview.TreeView):
     
     def __init__(self, parent = None):
         super().__init__(parent)
+        self.backend = None
         self.setSelectionMode(self.ExtendedSelection)
         self.setDragEnabled(True)
         self.setAcceptDrops(True)
@@ -55,84 +56,71 @@ class PlaylistTreeView(treeview.TreeView):
         self.setItemDelegate(playlistdelegate.PlaylistDelegate(self))
 
     def setBackend(self, backend):
+        if self.backend is not None:
+            self.songSelected.disconnect(self.backend.setCurrentSong)
         self.backend = backend
-        if 'pl_undo' in self.treeActions:
-            self.removeAction(self.treeActions['pl_undo'])
-            self.removeAction(self.treeActions['pl_redo'])
-        self.treeActions['pl_undo'] = self.backend.stack.createUndoAction(self, self.tr('Undo(playlist)'))
-        self.treeActions['pl_redo'] = self.backend.stack.createRedoAction(self, self.tr('Redo(playlist)'))
-        model = backend.playlist
-        if self.selectionModel():
-            self.selectionModel().selectionChanged.disconnect(self.updateGlobalSelection)
-        self.setModel(model)
-        self.itemDelegate().model = model
-        self.selectionModel().selectionChanged.connect(self.updateGlobalSelection)
-        self.songSelected.connect(backend.setCurrentSong)
-        self.updateNodeSelection()
+        self.setDisabled(backend is None)
+        if backend is not None:
+            model = backend.playlist
+            if self.selectionModel():
+                self.selectionModel().selectionChanged.disconnect(self.updateGlobalSelection)
+            self.setModel(model)
+            if 'pl_undo' in self.treeActions:
+                self.removeAction(self.treeActions['pl_undo'])
+                self.removeAction(self.treeActions['pl_redo'])
+            self.treeActions['pl_undo'] = model.stack.createUndoAction(self, self.tr('Undo(playlist)'))
+            self.treeActions['pl_redo'] = model.stack.createRedoAction(self, self.tr('Redo(playlist)'))
+            self.itemDelegate().model = model
+            self.selectionModel().selectionChanged.connect(self.updateGlobalSelection)
+            self.songSelected.connect(backend.setCurrentSong)
+            self.updateNodeSelection()
         
-    
     def _handleDoubleClick(self, idx):
         if idx.isValid():
             offset = idx.internalPointer().offset()
             self.songSelected.emit(offset)
 
+    #TODO: are the next three methods all necessary?
     def dragEnterEvent(self, event):
         if event.source() is self:
-            event.setDropAction(Qt.MoveAction)
-        else:
-            event.setDropAction(Qt.CopyAction)
+            if event.keyboardModifiers() & Qt.ControlModifier:
+                event.setDropAction(Qt.CopyAction)
+            else: event.setDropAction(Qt.MoveAction)
         treeview.TreeView.dragEnterEvent(self, event)
         
     def dragMoveEvent(self, event):
         if event.source() is self:
             if event.keyboardModifiers() & Qt.ControlModifier:
                 event.setDropAction(Qt.CopyAction)
-            else:
-                event.setDropAction(Qt.MoveAction)
+            else: event.setDropAction(Qt.MoveAction)
         treeview.TreeView.dragMoveEvent(self, event)
         
     def dropEvent(self, event):
         if event.source() is self:
-            if event.keyboardModifiers() & Qt.ShiftModifier:
-                event.setDropAction(Qt.MoveAction)
-            elif event.keyboardModifiers() & Qt.ControlModifier:
+            if event.keyboardModifiers() & Qt.ControlModifier:
                 event.setDropAction(Qt.CopyAction)
-            elif event.source() is self:
-                event.setDropAction(Qt.MoveAction)
-            else:
-                event.setDropAction(Qt.CopyAction)
+            else: event.setDropAction(Qt.MoveAction)
         treeview.TreeView.dropEvent(self, event)
         
     def removeSelected(self):
-        elements = set(ix.internalPointer() for ix in self.selectedIndexes())
-        redundant = set()
-        for element in elements:
-            for parent in element.getParents():
-                if parent in elements:
-                    redundant.add(element)
-        elements -= redundant
-        removals = []
-        for element in elements:
-            for file in element.getAllFiles():
-                #TODO: super inefficient to calculate all the offsets...we need a better way
-                # to do this anyway!
-                removals.append((file.offset(), file.path))
-        removals.sort()
-        self.backend.removeFromPlaylist(removals)
+        self.model().removeMany(self.selectedRanges())
 
 
 class PlaylistWidget(QtGui.QDockWidget):
-    
     def __init__(self, parent = None, state = None, location = None):
         super().__init__(parent)
-        self.setWindowTitle(self.tr('playlist'))
+        self.setWindowTitle(self.tr('Playlist'))
         
+        self.backend = None
         self.treeview = PlaylistTreeView()
  
         widget = QtGui.QWidget()
         layout = QtGui.QVBoxLayout(widget)
-        layout.addWidget(self.treeview)       
+        layout.addWidget(self.treeview)   
+        
+        # TODO Move stuff into a popup.    
         bottomLayout = QtGui.QHBoxLayout()
+        layout.addLayout(bottomLayout)
         self.backendChooser = playerwidgets.BackendChooser(self)
         self.backendChooser.backendChanged.connect(self.setBackend)
         
@@ -144,7 +132,6 @@ class PlaylistWidget(QtGui.QDockWidget):
                                                     [self.treeview]))
         bottomLayout.addStretch()
         
-        layout.addLayout(bottomLayout)
         self.setWidget(widget)
         if not self.backendChooser.setCurrentProfile(state):
             self.setBackend(self.backendChooser.currentProfile())
@@ -153,21 +140,11 @@ class PlaylistWidget(QtGui.QDockWidget):
         return self.backendChooser.currentProfile()
     
     def setBackend(self, name):
-        if hasattr(self, 'backend'):
+        if self.backend is not None:
             self.backend.unregisterFrontend(self)
-            self.treeview.songSelected.disconnect(self.backend.setCurrentSong)
-        if name is None:
-            self.treeview.setDisabled(True)
-            return
         backend = player.instance(name)
-        if backend is None:
-            self.treeview.setDisabled(True)
-            return
         backend.registerFrontend(self)
-        
-        self.treeview.setEnabled(True)
         self.backend = backend
-        
         self.treeview.setBackend(self.backend)
         
         

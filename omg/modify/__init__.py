@@ -16,6 +16,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+#TODO: if this module remains that empty. Move everything into application
+
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
