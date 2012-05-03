@@ -283,5 +283,6 @@ def setFlags(elid,flags):
     
     
 def setMajor(data):
-    db.multiQuery("UPDATE {}elements SET major = ? WHERE id = ?".format(db.prefix), data)
+    """Changes the "major" flag of elements. *data* is a list of (id, newMajor) tuples."""
+    db.multiQuery("UPDATE {}elements SET major = ? WHERE id = ?".format(db.prefix), [(b,a) for a,b in data])
     

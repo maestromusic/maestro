@@ -20,7 +20,7 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from .. import modify, tags, models, logging
-#from ..modify import commands
+from . import commands
 from ..constants import DB, DISK, CONTENTS
 #from omg.modify.commands import InsertElementsCommand
 
@@ -288,9 +288,8 @@ class ToggleMajorAction(TreeAction):
         self.selection = selection
         
     def doAction(self):
-        for element in self.selection.elements():
-            if element.major == self.state:
-                modify.push(commands.ChangeMajorFlagCommand(self.parent().level, element))
+        modify.stack.push(commands.ChangeMajorFlagCommand(self.parent().model().level,
+                        [wrap.element.id for wrap in self.selection.elements() if wrap.element.major == self.state]))
         self.toggle()
                 
 

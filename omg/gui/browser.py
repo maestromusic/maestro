@@ -26,7 +26,7 @@ from ..search import searchbox, criteria as criteriaModule
 from . import mainwindow, treeview, browserdialog
 from .delegates import browser as browserdelegate, configuration as delegateconfiguration
 from ..models import browser as browsermodel, levels, Element, Container, Wrapper
-from ..modify.treeactions import *
+from ..modify import treeactions
 translate = QtCore.QCoreApplication.translate
 
 
@@ -319,7 +319,9 @@ class BrowserTreeView(treeview.TreeView):
     _optimizers = None
     
     actionConfig = treeview.TreeActionConfiguration()
-
+    sect = translate(__name__, "elements")
+    actionConfig.addActionDefinition(((sect, 'merge'),), treeactions.MergeAction)
+    actionConfig.addActionDefinition(((sect, 'major?'),), treeactions.ToggleMajorAction) 
     
     def __init__(self,parent,layers,sortTags,delegateConfig):
         treeview.TreeView.__init__(self,parent)

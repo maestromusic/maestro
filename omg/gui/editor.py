@@ -78,10 +78,12 @@ class EditorTreeView(treeview.TreeView):
     """This is the main widget of an editor: The tree view showing the current element tree."""
 
     actionConfig = treeview.TreeActionConfiguration()
-     
-    sect = translate(__name__, "editor")
+    sect = translate(__name__, "elements")
     actionConfig.addActionDefinition(((sect, 'remove'),), DeleteAction, mode = CONTENTS)
     actionConfig.addActionDefinition(((sect, 'merge'),), MergeAction)
+    actionConfig.addActionDefinition(((sect, 'major?'),), ToggleMajorAction) 
+    sect = translate(__name__, "editor")
+    
     actionConfig.addActionDefinition(((sect, 'clearEditor'),), rootedtreemodel.ClearTreeAction)
 
     def __init__(self, parent = None):
@@ -265,10 +267,6 @@ eData = mainwindow.WidgetData(id = "editor",
                              unique = False,
                              preferredDockArea = Qt.RightDockWidgetArea)
 mainwindow.addWidgetData(eData)
-
-def activeEditorModels():
-    """Returns a list containing the models of all open editor models."""
-    return [dock.editor.model() for dock in mainwindow.mainWindow.getWidgets('editor')]
 
 class ConfigureGuessProfilesDialog(QtGui.QDialog):
     """A dialog to configure the profiles used for "guessing" album structures. 

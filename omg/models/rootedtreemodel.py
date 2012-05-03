@@ -135,7 +135,8 @@ class MergeCommand(QtGui.QUndoCommand):
         for id, (oldPos, newPos) in sorted(self.positionChanges.items()):
             element = self.level.get(id)
             parent.contents.positions[parent.contents.positions.index(oldPos)] = newPos
-            
+        if self.level is levels.real:
+            modify.real.changeTags(self.tagChanges)
         container.tags = tagsModule.findCommonTags(elements)
         container.tags[tagsModule.TITLE] = [self.newTitle]
         self.level.emitEvent(dataIds = list(self.positionChanges.keys()),
@@ -156,6 +157,8 @@ class MergeCommand(QtGui.QUndoCommand):
             element.parents.remove(self.containerID)
             if id in self.tagChanges:
                 self.tagChanges[id].revert(element.tags)
+        if self.level is levels.real:
+            modify.real.changeTags(self.tagChanges, reverse = True)
         del self.level.elements[self.containerID]
         self.level.emitEvent(dataIds = list(self.positionChanges.keys()),
                              contentIds = [self.parentID] if self.elementParent else [])
@@ -187,13 +190,13 @@ class CommitTreeAction(treeactions.TreeAction):
         self.setText(self.tr('commit this tree'))
         
     def initialize(self):
-        self.setEnabled(self.parent().nodeSelection.hasElements())
+        self.setEnabled(len(self.parent().model().root.contents) > 0)
         
     def doAction(self):
         from . import levels
         model = self.parent().model()
-        ids = set(n.element.id for n in self.parent().nodeSelection.elements())
-        modify.stack.push(levels.CommitCommand(model.level, ids))
+        ids = set(n.element.id for n in self.parent().model().root.contents)
+        modify.stack.push(levels.CommitCommand(model.level, ids, self.tr("Commit editor")))
         
 class RootedTreeModel(QtCore.QAbstractItemModel):
     """The RootedTreeModel subclasses QAbstractItemModel to create a simple model for QTreeViews. It takes one
@@ -209,7 +212,7 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
     is expanded the first time.
     """
     
-    def __init__(self,root=None, level = None):
+    def __init__(self,level, root=None):
         """Initialize a new RootedTreeModel. Optionally you can specify the root of the model."""
         QtCore.QAbstractItemModel.__init__(self)
         self.root = root
