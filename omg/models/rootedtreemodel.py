@@ -23,6 +23,7 @@ from . import Node, Wrapper, ContentList, mimedata
 from .. import logging, config, modify, utils, tags as tagsModule
 from . import levels, Container
 from ..modify import treeactions
+from .. import database as db
 logger = logging.getLogger(__name__)
 
 class ChangeRootCommand(QtGui.QUndoCommand):
@@ -109,10 +110,14 @@ class MergeCommand(QtGui.QUndoCommand):
                     self.parentChanges[id] = (index, len(self.parentChanges) + 1)
                     recordTagChanges(element)
             
-    
     def redo(self):
         if not hasattr(self, "containerID"):
-            self.containerID = levels.createTId()
+            if self.level is levels.real:
+                self.containerID = db.write.createElements([(False, not self.elementParent, len(self.parentChanges), False)])[0]
+            else:
+                self.containerID = levels.createTId()
+        elif self.level is levels.real:
+            db.write.createElementsWithIds([(self.containerID, False, not self.elementParent, len(self.parentChanges), False)])
         container = Container(self.level, self.containerID, major = False)
         elements = []
         self.level.elements[self.containerID] = container
@@ -129,16 +134,27 @@ class MergeCommand(QtGui.QUndoCommand):
             elements.append(element)
             if id in self.tagChanges:
                 self.tagChanges[id].apply(element.tags)
-        
+        container.tags = tagsModule.findCommonTags(elements)
+        container.tags[tagsModule.TITLE] = [self.newTitle]
         if self.elementParent:
             parent.contents.insert(self.insertPosition, self.containerID)
         for id, (oldPos, newPos) in sorted(self.positionChanges.items()):
             element = self.level.get(id)
             parent.contents.positions[parent.contents.positions.index(oldPos)] = newPos
         if self.level is levels.real:
+            db.transaction()
             modify.real.changeTags(self.tagChanges)
-        container.tags = tagsModule.findCommonTags(elements)
-        container.tags[tagsModule.TITLE] = [self.newTitle]
+            modify.real.changeTags({self.containerID: tagsModule.TagDifference(None, container.tags)})
+            db.write.addContents([(self.containerID, id, newPos) for (id, (oldPos,newPos)) in self.parentChanges.items()])
+            if self.elementParent:
+                db.write.removeAllContents([self.parentID])
+                db.write.addContents([(self.parentID, pos, childID) for pos,childID in parent.contents.items()])
+            db.commit()
+            for id, diff in self.tagChanges.items():
+                elem = self.level.get(id)
+                if elem.isFile() and not diff.onlyPrivateChanges():
+                    modify.real.changeFileTags(elem.path, diff)
+        
         self.level.emitEvent(dataIds = list(self.positionChanges.keys()),
                              contentIds = [self.containerID, self.parentID] if self.elementParent else [self.containerID])
                   
@@ -158,7 +174,17 @@ class MergeCommand(QtGui.QUndoCommand):
             if id in self.tagChanges:
                 self.tagChanges[id].revert(element.tags)
         if self.level is levels.real:
+            db.transaction()
             modify.real.changeTags(self.tagChanges, reverse = True)
+            db.write.deleteElements([self.containerID])
+            if self.elementParent:
+                db.write.removeAllContents([self.parentID])
+                db.write.addContents([(self.parentID, pos, childID) for pos,childID in parent.contents.items()])
+            db.commit()
+            for id, diff in self.tagChanges.items():
+                elem = self.level.get(id)
+                if elem.isFile() and not diff.onlyPrivateChanges():
+                    modify.real.changeFileTags(elem.path, diff)
         del self.level.elements[self.containerID]
         self.level.emitEvent(dataIds = list(self.positionChanges.keys()),
                              contentIds = [self.parentID] if self.elementParent else [])

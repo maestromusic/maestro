@@ -84,7 +84,7 @@ class FileSystemBrowserDock(QtGui.QDockWidget):
     """A DockWidget wrapper for the FileSystemBrowser."""
     def __init__(self,parent=None,location=None):
         QtGui.QDockWidget.__init__(self, parent)
-        self.setWindowTitle(translate("FileSystemBrowser","File System Browser"))
+        self.setWindowTitle(translate(__name__,"Filesystem: {}").format(config.options.main.collection))
         self.setWidget(FileSystemBrowser())
         
         
