@@ -147,7 +147,7 @@ class TextCriterion(Criterion):
                 else:
                     whereClause = "v.value BETWEEN {} AND {}".format(
                             utils.FlexiDate(self.years[0]).toSql(),
-                            utils.FlexiDate(self.years[1]).toMaximalSql())
+                            utils.FlexiDate(self.years[1]).endOfYearSql())
         
             subQueries.append("""
                     SELECT DISTINCT {1}

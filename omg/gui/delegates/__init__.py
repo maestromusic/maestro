@@ -191,30 +191,30 @@ class StandardDelegate(AbstractDelegate):
         return leftTexts,rightTexts
 
     def getData(self,dataPiece,wrapper):
-        """Return the data for the given datapiece and element as a string. Return an empty string if no
+        """Return the data for the given datapiece and wrapper as a string. Return an empty string if no
         data is available."""
         if dataPiece.tag is not None:
             return self.getFormattedTagValues(dataPiece.tag,wrapper)
         else:
             if dataPiece.data == "filetype":
-                ext = element.getExtension()
+                ext = wrapper.element.getExtension()
                 # Do not display extensions in each file if they are the same for the whole container
-                if isinstance(element.parent,models.Element) and element.parent.getExtension() == ext:
+                if isinstance(wrapper.parent,models.Wrapper) and wrapper.parent.getExtension() == ext:
                     return ''
                 else: return ext
             elif dataPiece.data == "length":
-                length = element.getLength()
+                length = wrapper.getLength()
                 if length is not None:
                     return strutils.formatLength(length)
                 else: return ''
             elif dataPiece.data == "filecount":
-                if element.isFile():
+                if wrapper.isFile():
                     return '' # Do not display a '1' at every file
                 else: return translate("AbstractDelegate","%n piece(s)","",QtCore.QCoreApplication.CodecForTr,
-                                       element.fileCount())
+                                       wrapper.fileCount())
             elif dataPiece.data == "filecount+length":
-                fileCount = self.getData(configuration.DataPiece("filecount"),element)
-                length = self.getData(configuration.DataPiece("length"),element)
+                fileCount = self.getData(configuration.DataPiece("filecount"),wrapper)
+                length = self.getData(configuration.DataPiece("length"),wrapper)
                 return _join(', ',[fileCount,length])
 
     def getFormattedTagValues(self,tagType,wrapper):

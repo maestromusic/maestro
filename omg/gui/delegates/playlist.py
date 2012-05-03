@@ -36,8 +36,10 @@ class PlaylistDelegate(StandardDelegate):
                 ['t:date','t:genre','t:conductor'],
                 {"fitInTitleRowData": configuration.DataPiece("filecount+length")}
     )
+    
     def layout(self, index, availableWidth):
-        if index == self.model.currentModelIndex or index in self.model.currentParentsModelIndices:
+        wrapper = self.model.data(index)
+        if wrapper in self.model.currentlyPlayingNodes:
             self.addCenter(abstractdelegate.PlayTriangleItem(QtGui.QColor(20,200,20),9))
         super().layout(index, availableWidth)
     

@@ -26,13 +26,17 @@ from .. import config, models
 
 
 class MimeData(QtCore.QMimeData):
-    """Subclass of QMimeData specialized to transport a tree of elements. It supports two MimeTypes: The first
+    """Subclass of QMimeData specialized to transport a tree of nodes. It supports two MimeTypes: The first
     one is used internally by omg and stores the tree-structure. Its name is stored in the config variable 
     "gui->mime". The second one is "text/uri-list" and contains a list of URLs to all files in the tree. This
-    type is used by applications like Amarok and Dolphin."""
+    type is used by applications like Amarok and Dolphin.
+    
+    The tree may contain arbitrary Nodes, use getFiles to get all files (recursively) or getWrappers to get
+    the toplevel wrap
+    """
     def __init__(self,nodeList):
         QtCore.QMimeData.__init__(self)
-        self.nodeList = nodeList
+        self._nodeList = nodeList
         
     def hasFormat(self,format):
         return format in self.formats()
@@ -53,20 +57,33 @@ class MimeData(QtCore.QMimeData):
             return QtCore.QVariant(type) if type is not None else QtCore.QVariant()
 
     def getNodes(self):
-        """Return the list of elements stored in this MimeData instance."""
-        return self.nodeList
+        """Return the list of nodes stored in this MimeData instance."""
+        return self._nodeList
     
     def getFiles(self):
-        """Return all files contained in the elements stored in this MimeData instance."""
+        """Return all wrappers storing files in this MimeData instance."""
         return itertools.chain.from_iterable(node.getAllFiles() for node in self.getNodes())
+    
+    def getWrappers(self):
+        """Search the tree for the toplevel wrappers and return them. This differs from the result of
+        getNodes only if some nodes are no wrappers (but e.g. ValueNodes from the broswer).
+        In other words: Strip everything at the top of the tree that is not a Wrapper and remove the rest.
+        """
+        return self._getWrappers(self.getNodes())
+         
+    def _getWrappers(self,nodes):
+        """Like getWrappers, but use the given nodes."""
+        return itertools.chain.from_iterable(
+                        [node] if isinstance(node,models.Wrapper) else self._getWrappers(node.getContents())
+                    for node in nodes)
         
     def paths(self):
         """Return a list of absolute paths to all files contained in this MimeData-instance."""
-        return [absPath(file.path) for file in self.getFiles()]
+        return [absPath(file.element.path) for file in self.getFiles()]
         
     def urls(self):
         return [QtCore.QUrl("file://"+path) for path in self.paths()]
-
+    
     @staticmethod
     def fromIndexes(model,indexList):
         """Generate a MimeData instance from the indexes in *indexList*. *model* must be the model containing

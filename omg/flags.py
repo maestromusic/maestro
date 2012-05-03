@@ -49,19 +49,27 @@ class Flag:
     they are much easier, because they have no values, valuetypes, translations and because they are not
     stored in files.
     
-    Usually you shold get flag instances via the :func:`get-method<omg.flags.get>`. The exception is for
-    flags that are not (yet) in the database (use :func:`exists` to check this). For these flags
-    :func:`get` will fail and you have to create your own instances. If you use the common instance, it
-    will get automatically updated on FlagTypeChangeEvents.
+    Attributes of Flag: id, name, iconPath
+    Read-only attribute: icon
+    
+    Usually you shold get flag instances via flags.get. The exception is for  flags that are not (yet) in
+    the database (use :func:`exists` to check this). For these flags get will fail and you have to create
+    your own instances. If you use the common instance, it will get automatically updated on
+    FlagTypeChangeEvents.
     """
     def __init__(self,id=None,name=None,iconPath=None):
         self.id = id
         self.name = name
-        self.setIconPath(iconPath)
-    
-    def setIconPath(self,iconPath):
-        """Set the flag's iconPath and load the icon."""
         self.iconPath = iconPath
+        
+    @property
+    def iconPath(self):
+        return self._iconPath
+
+    @iconPath.setter
+    def iconPath(self,iconPath):
+        """Set the flag's iconPath and load the icon."""
+        self._iconPath = iconPath
         if iconPath is not None:
             self.icon = QtGui.QIcon(iconPath)
         else: self.icon = None
@@ -240,13 +248,14 @@ def changeFlagType(flagType,**data):
     if 'iconPath' in data and data['iconPath'] != flagType.iconPath:
         assignments.append('icon = ?')
         params.append(data['iconPath'])
-        flagType.setIconPath(data['iconPath'])
+        flagType.iconPath = data['iconPath']
     
     if len(assignments) > 0:
         params.append(flagType.id) # for the where clause
         db.query("UPDATE {}flag_names SET {} WHERE id = ?".format(db.prefix,','.join(assignments)),*params)
         modify.dispatcher.changes.emit(FlagTypeChangedEvent(CHANGED,flagType))
     db.commit()
+
 
 class FlagDifference:
     """See tags.TagDifference"""

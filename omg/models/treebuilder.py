@@ -16,8 +16,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from .. import database as db
-from . import Container
+from .. import database as db, models
+from . import Container, levels
 
 def seqLen(sequence):
     """Return the length of an item-sequence."""
@@ -36,52 +36,42 @@ class ContainerNode:
     def __init__(self,id):
         """Initialize a new ContainerNode with the given id."""
         self.id = id
-        self.items = []
+        self.wrappers = []
         self.childContainers = []
         self.itemSequences = []
         self.parentIds = None
     
     # For debugging
     def __str__(self):
-        itemString = "[{0}]".format(",".join(str(item) for item in self.items))
-        childContainerString = "[{0}]".format(",".join(str(c.id) for c in self.childContainers))
-        return "ContainerNode {0}:\n\tItems {1}\n\tChildContainers {2}\n\tItemSequences {3}\n\tParentIds {4}".format(self.id,itemString,childContainerString,self.itemSequences,self.parentIds)
+        wrapperString = "[{}]".format(",".join(str(wrapper) for wrapper in self.wrappers))
+        childContainerString = "[{}]".format(",".join(str(c.id) for c in self.childContainers))
+        return "ContainerNode {}:\n\Wrappers {}\n\tChildContainers {}\n\tItemSequences {}\n\tParentIds {}" \
+                .format(self.id,wrapperString,childContainerString,self.itemSequences,self.parentIds)
 
 
 class TreeBuilder:
-    """This class encapsulates an algorithm that - given a list of items and information
-    in what containers these items are contained - builds a tree structure covering all
-    nodes in a nice way."""
-    def __init__(self,items):
-        """Intialize the algorithm with a sequence of paths."""
-        self.items = items
+    """This class encapsulates an algorithm that given a list of elements builds a tree structure of wrappers
+    covering all elements in a nice way.
+    """
+    def __init__(self,wrappers):
+        self.wrappers = wrappers
             
     def buildParentGraph(self):
         """Find all ancestors of the items used in this TreeBuilder, gather information
         about them (e.g. itemSequences) and create a graph with this information."""
         self.containerNodes = {}
-        for i, item in enumerate(self.items):
-            self._buildContainerNodes(item)
-            self._updateItemSequences(item, i)
+        for i,wrapper in enumerate(self.wrappers):
+            self._buildContainerNodes(wrapper)
+            self._updateItemSequences(wrapper, i)
         
     def buildTree(self,sequence = None,parent = None,createOnlyChildren = True):
         """Build a tree over the given sequence (which defaults to all items)."""
         if sequence is None:
-            sequence = (0,len(self.items)-1)
+            sequence = (0,len(self.wrappers)-1)
         if parent is None:
             containerNodes = self.containerNodes.values()
         else: containerNodes = self.containerNodes[parent.id].childContainers
         return self._createTree(sequence,containerNodes,createOnlyChildren)
-    
-    def isParent(self,node):
-        return self._getId(node) in self.containerNodes
-    
-    def containsAll(self,node):
-        if node.id not in self.containerNodes:
-            return False
-        else:
-            cNode = self.containerNodes[node.id]
-            return len(cNode.itemSequences) == 1 and cNode.itemSequences[0] == (0,len(self.items)-1)
             
     def _buildContainerNodes(self,node):
         """If they do not exist already, create ContainerNodes for all ancestors of the given node.
@@ -93,17 +83,14 @@ class TreeBuilder:
         # Get list of parent-ids
         if isinstance(node,ContainerNode):
             listOfPids = node.parentIds
-        elif node.isInDB():
-            listOfPids = db.parents(node.id)
-        else:
-            return
+        else: listOfPids = node.element.parents
         
         for pid in listOfPids:
             # If no ContainerNode for this pid exists, create one
             if pid not in self.containerNodes:
                 parentContainer = ContainerNode(pid)
                 self.containerNodes[pid] = parentContainer
-                parentContainer.parentIds = [id for id in db.parents(pid) if db.isMajor(id)]
+                parentContainer.parentIds = db.parents(pid)
                 # Recursive call to create all ancestors of the new node
                 self._buildContainerNodes(parentContainer)
             else:
@@ -112,7 +99,7 @@ class TreeBuilder:
             if isinstance(node, ContainerNode):
                 parentContainer.childContainers.append(node)
             else:
-                parentContainer.items.append(node)
+                parentContainer.wrappers.append(node)
 
 
     def _updateItemSequences(self, node, itemIndex):
@@ -121,10 +108,7 @@ class TreeBuilder:
         # Get list of parent-ids
         if isinstance(node, ContainerNode):
             listOfPids = node.parentIds
-        elif node.isInDB():
-            listOfPids = db.parents(node.id)
-        else:
-            return
+        else: listOfPids = node.element.parents
         
         for pid in listOfPids:
             parentContainer = self.containerNodes[pid]
@@ -179,7 +163,8 @@ class TreeBuilder:
     
     
     def _findPos(self,itemIndex,itemSequences):
-        """Find the position of <itemIndex> in the given list of item-sequences: If <itemIndex> is 12 and <itemSequences> is [(1,3),(5,9),(10,10),(14,16)], then return 3."""
+        """Find the position of *itemIndex* in the given list of item-sequences: If *itemIndex* is 12 and 
+        *itemSequences* is [(1,3),(5,9),(10,10),(14,16)], then return 3."""
         for i,seq in enumerate(itemSequences):
             if itemIndex < seq[0]:
                 return i
@@ -188,8 +173,9 @@ class TreeBuilder:
     
     def _createTree(self,sequence,containerNodes,createOnlyChildren=True):
         """Create a tree using some of the nodes in <containerNodes> as roots and covering all
-        items from <sequence>. If <createOnlyChildren> is false, the root-nodes of the returned
-        tree are guaranteed to contain either none or at least two children."""
+        items from *sequence*. If *createOnlyChildren* is false, the root-nodes of the returned
+        tree are guaranteed to contain either none or at least two children.
+        """
         #print("This is createTree over the sequence {0}-{1}".format(*sequence))
         coveredItems = set()
         
@@ -205,33 +191,41 @@ class TreeBuilder:
                     break
                 #print("Found a maximal sequence: {0}-{1}".format(*maxSequence))
                 pos = self._findPos(maxSequence[0],rootSeqs)
-                newNode = Container.fromId(cNode.id,
-                                           contents = self._createTree(maxSequence,cNode.childContainers))
-                for elem in newNode.contents:
-                    elem.position = list(db.positions(newNode.id, elem.id))[0]
+                newNode = models.Wrapper(levels.real.get(cNode.id),
+                                         contents = self._createTree(maxSequence,cNode.childContainers))
+                for wrapper in newNode.contents:
+                    #TODO: This does not work correctly if an element appears twice with different positions
+                    # in the same container
+                    wrapper.position = newNode.element.contents.getPosition(wrapper.element.id)
                 
                 roots.insert(pos,newNode)
                 rootSeqs.insert(pos,maxSequence)
-                coveredItems = coveredItems.union(set(self.items[maxSequence[0]:maxSequence[1]+1]))
+                coveredItems = coveredItems.union(set(self.wrappers[maxSequence[0]:maxSequence[1]+1]))
                 
                 # Correct all itemSequences:
                 for node in containerNodes:
-                    node.itemSequences = [self._cutItemSequence(seq,maxSequence) for seq in node.itemSequences]
+                    node.itemSequences = [self._cutItemSequence(seq,maxSequence)
+                                                    for seq in node.itemSequences]
                     node.itemSequences = [seq for seq in node.itemSequences if seq is not None]
                 
         # Add remaining items as direct children
         for itemIndex in range(sequence[0],sequence[1]+1):
-            if self.items[itemIndex] not in coveredItems:
+            if self.wrappers[itemIndex] not in coveredItems:
                 pos = self._findPos(itemIndex,rootSeqs)
-                roots.insert(pos,self.items[itemIndex])
+                roots.insert(pos,self.wrappers[itemIndex])
                 rootSeqs.insert(pos,(itemIndex,itemIndex))
 
         return roots
 
     def _cutItemSequence(self,a,b):
-        """Cut away all parts of the sequence b from the sequence a and return the result: if b = (2,4), then a = (1,3) becomes (1,1) and a = (3,6) becomes (5,6). b must not be an inner part of a, because the result would consist of two distinct sequences (e.g. a=(1,5), b=(2,3) would result in (1,1) ∪ (4,5))."""
+        """Cut away all parts of the sequence b from the sequence a and return the result: if b = (2,4),
+        then a = (1,3) becomes (1,1) and a = (3,6) becomes (5,6). b must not be an inner part of a, because
+        the result would consist of two distinct sequences (e.g. a=(1,5), b=(2,3) would result in
+        (1,1) ∪ (4,5)).
+        """
         if a[0]< b[0] and a[1] > b[1]:
-            raise AssertionError("Sequence b is an inner part of a: {2}-{3} ⊂ {0}-{1}".format(a[0],a[1],b[0],b[1]))
+            raise AssertionError("Sequence b is an inner part of a: {2}-{3} ⊂ {0}-{1}"
+                                 .format(a[0],a[1],b[0],b[1]))
         
         if a[0] < b[0]:
             return (a[0],min(a[1],b[0]-1))

@@ -25,8 +25,8 @@ from . import levels, Container
 from ..modify import treeactions
 logger = logging.getLogger(__name__)
 
+
 class ChangeRootCommand(QtGui.QUndoCommand):
-    
     def __init__(self, model, old, new, text = "<change root>"):
         super().__init__()
         self.model = model
@@ -41,6 +41,7 @@ class ChangeRootCommand(QtGui.QUndoCommand):
     def undo(self):
         logger.debug("change root: {} --> {}".format(self.new, self.old))
         self.model.changeContents(QtCore.QModelIndex(), self.old )
+        
 
 class MergeCommand(QtGui.QUndoCommand):
     """Merge creates a new container between *parent* and the children at the given *indices*.
@@ -180,21 +181,19 @@ class CommitTreeAction(treeactions.TreeAction):
         modify.stack.push(levels.CommitCommand(model.level, ids))
         
 class RootedTreeModel(QtCore.QAbstractItemModel):
-    """The RootedTreeModel subclasses QAbstractItemModel to create a simple model for QTreeViews. It takes one
+    """The RootedTreeModel subclasses QAbstractItemModel to create a simple model for QTreeViews. It has one
     root node which is not considered part of the data of this model (and is not displayed by QTreeViews).
     Nodes in a RootedTreeModel may have every type, but must implement the following methods:
     
         - hasChildren(): return if a node has children
         - getChildrenCount(): return the number of children of the node
         - getChildren(): return the list of children of the node
-        - getParent(): return the node's parent. The root-node' getParent-method must return None.
+        - getParent(): return the node's parent. The root-node's getParent-method must return None.
         
-    The hasChildren-method allows to implement nodes that calculate the number of children not until the node
-    is expanded the first time.
+    The hasChildren-method allows to implement nodes that don't calculate the number of children until the
+    node is expanded the first time.
     """
-    
     def __init__(self,root=None, level = None):
-        """Initialize a new RootedTreeModel. Optionally you can specify the root of the model."""
         QtCore.QAbstractItemModel.__init__(self)
         self.root = root
         self.level = level
@@ -297,10 +296,11 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
         return QtCore.QAbstractItemModel.createIndex(self,row,column,internalPointer)
         
     def getIndex(self,node):
-        """Return the (Qt)-index of the given node. If <node> is the root of this model, return an invalid
+        """Return the (Qt)-index of the given node. If *node* is the root of this model, return an invalid
         QModelIndex."""
         if node == self.root:
             return QtCore.QModelIndex()
+
         parent = node.parent
         try:
             parent.index(node)

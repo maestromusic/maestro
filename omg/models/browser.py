@@ -435,24 +435,24 @@ class LoadingNode(models.Node):
     def toolTipText(self):
         None
     
-    
+#TODO: rewrite getelementsinstantly stuff to respect wrappers
 class BrowserMimeData(mimedata.MimeData):
     """This is the subclass of mimedata.MimeData that is used by the browser. The main differences are that
     the browser contains nodes that are no elements and that they may not have loaded their contents yet.   
     """  
     def __init__(self, browserNodeList):
-        mimedata.MimeData.__init__(self,None) # The element list will be computed when it is needed.
-        self.browserNodeList = browserNodeList
+        super().__init__(None) # The element list will be computed when it is needed.
+        self._browserNodeList = browserNodeList
 
     def getNodes(self):
-        if self.nodeList is not None:
-            return self.nodeList
+        if self._nodeList is not None:
+            return self._nodeList
         
-        # self.elementList may contain CriterionNodes or (unlikely) LoadingNodes.
-        self.nodeList = list(itertools.chain.from_iterable(self._getElementsInstantly(node)
-                                                              for node in self.browserNodeList))
-        self.browserNodeList = None # Save memory
-        return self.nodeList
+        # self.browserNodeList may contain CriterionNodes or (unlikely) LoadingNodes.
+        self._nodeList = list(itertools.chain.from_iterable(self._getElementsInstantly(node)
+                                                               for node in self._browserNodeList))
+        self._browserNodeList = None # Save memory
+        return self._nodeList
                                           
     def _getElementsInstantly(self,node):
         """If *node* is a CriterionNode return all (toplevel) elements contained in it. If contents have to
