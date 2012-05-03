@@ -31,7 +31,7 @@ class EditorModel(rootedtreemodel.RootedTreeModel):
     
     def __init__(self):
         """Initializes the model. A new RootNode will be set as root."""
-        super().__init__(RootNode(self), levels.editor)
+        super().__init__(levels.editor, RootNode(self))
         self.albumGroupers = []
         self.metacontainer_regex=r" ?[([]?(?:cd|disc|part|teil|disk|vol)\.? ?([iI0-9]+)[)\]]?"
         

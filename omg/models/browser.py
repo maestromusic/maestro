@@ -53,7 +53,7 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
     nodeLoaded = QtCore.pyqtSignal(Node)
     
     def __init__(self,layers,sortTags):
-        rootedtreemodel.RootedTreeModel.__init__(self,RootNode(self))
+        super().__init__(levels.real, RootNode(self))
         self.table = None
         self.layers = layers
         self.sortTags = sortTags
@@ -428,7 +428,11 @@ class LoadingNode(models.Node):
     
     def hasContents(self):
         return False
-        
+    
+    @property
+    def contents(self):
+        return list()
+    
     def __str__(self):
         return "<LoadingNode>"
         

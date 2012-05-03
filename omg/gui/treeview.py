@@ -283,8 +283,8 @@ class TreeView(QtGui.QTreeView):
         for index in self.selectionModel().selectedIndexes():
             node = self.model().data(index)
             # The browser does not load tags automatically
-            if isinstance(node, models.Element):
-                globalSelection.append(node)
+            if isinstance(node, models.Wrapper):
+                globalSelection.append(node.element)
         if len(globalSelection):
             from . import mainwindow
             mainwindow.setGlobalSelection(globalSelection,self)

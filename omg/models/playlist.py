@@ -32,7 +32,8 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
 
     def __init__(self, backend=None):
         """Initialize with an empty playlist."""
-        super().__init__(models.RootNode(self),levels.real)
+        super().__init__(levels.real)
+
         self.backend = backend
         self.current = None
          # self.current and all of its parents. The delegate draws an arrow in front of these nodes

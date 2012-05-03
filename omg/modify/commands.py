@@ -15,20 +15,20 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
-assert False
+
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from .. import logging
 from ..models import levels
-from . import ElementChangeCommand
+from ..database import write
 
 translate = QtCore.QCoreApplication.translate
 logger = logging.getLogger(__name__)
 
 """This modules contains a list of often needed ElementChangeCommand subclasses for special purposes."""
         
-class InsertElementsCommand(ElementChangeCommand):
+class InsertElementsCommand(QtGui.QUndoCommand):
     """A specialized command to insert elements into an existing container."""
     
     def __init__(self, level, parentId, row, insertedIds, text='insert elements'):
@@ -67,6 +67,25 @@ class InsertElementsCommand(ElementChangeCommand):
         if self.level is levels.real:
             pass
 
+class ChangeMajorFlagCommand(QtGui.QUndoCommand):
+    def __init__(self, level, ids):
+        super().__init__()
+        self.level = level
+        self.previous = {id: level.get(id).major for id in ids}
+    
+    def redo(self):
+        for id, prev in self.previous.items():
+            self.level.get(id).major = not prev
+        if self.level is levels.real:
+            write.setMajor([id, not prev] for id,prev in self.previous.items())
+        self.level.emitEvent(list(self.previous.keys()))
+    
+    def undo(self):
+        for id, prev in self.previous.items():
+            self.level.get(id).major = prev
+        if self.level is levels.real:
+            write.setMajor(list(self.previous.items()))
+        self.level.emitEvent(list(self.previous.keys()))
 
 
 #class TagFlagUndoCommand(UndoCommand):
@@ -204,81 +223,6 @@ class InsertElementsCommand(ElementChangeCommand):
 #                              QtGui.QMessageBox.Ok).exec_()
 #            
 #        
-#def merge(level, parent, indices, newTitle, removeString, adjustPositions):
-#    """Merge creates a new container between *parent* and the children at the given *indices*.
-#    Those child elements will be removed from *parent* and instead inserted as children of
-#    the new container at indices[0]. The new container will contain all tags that are equal in
-#    all of its new children; its TITLE tag will be set to *newTitle*.
-#    
-#    removeString defines what to remove from the titles of the elements that are moved below the
-#    new container; this will usually be similar to *newTitle* plus possibly some punctutaion.
-#    If *adjustPositions* is True, the positions of items that are *not* removed are decreased
-#    to fill the gaps arising from moved elements.
-#    Example: Consider the following setting of an album containing a Sonata: 
-#    
-#    * parent
-#    |- pos1: child0 (title = Sonata Nr. 5: Allegro)
-#    |- pos2: child1 (tilte = Sonata Nr. 5: Adagio)
-#    |- pos3: child2 (title = Sonata Nr. 5: Finale. Presto)
-#    |- pos4: child3 (title = Nocturne Op. 13/37)
-#    |- pos5: child4 (title = Prelude BWV 42)
-#    
-#    After a call to merge with *indices=(0,1,2)*, *newTitle='Sonata Nr. 5'*, *removeString='Sonata Nr. 5: '*,
-#    *adjustPositions = True* the layout would be:
-#    
-#    * parent
-#    |- * pos1: new container (title = Sonata Nr. 5)
-#       |- pos1: child0 (title = Allegro)
-#       |- pos2: child1 (title = Adagio)
-#       |- pos3: child2 (title = Finale. Presto)
-#    |- pos2: child3 (title = Nocturne Op. 13/37)
-#    |- pos3: child4 (title = Prelude BWV 42)
-#    """ 
-#    from ..models import Container, Element, RootNode
-#
-#    logger.debug("starting merge\n  on parent {}\n  indices {}".format(parent, indices))
-#    modify.beginMacro(level, translate(__name__, 'merge elements'))
-#    
-#    insertIndex = indices[0]
-#    insertPosition = parent.contents[insertIndex].iPosition()
-#    newContainerPosition = insertPosition if isinstance(parent, Element) else None
-#    newChildren = []
-#    toRemove = []    
-#    positionChanges = []
-#    
-#    for i, element in enumerate(parent.contents[insertIndex:], start = insertIndex):
-#        if i in indices:
-#            copy = parent.contents[i].copy()
-#            if tagsModule.TITLE in copy.tags:
-#                copy.tags[tagsModule.TITLE] = [ t.replace(removeString, '') for t in copy.tags[tagsModule.TITLE] ]
-#            copy.position = len(newChildren) + 1
-#            newChildren.append(copy)
-#            toRemove.append(parent.contents[i])
-#        elif adjustPositions:# or isinstance(parent, RootNode):
-#            positionChanges.append( (element.iPosition(), element.iPosition() - len(newChildren) + 1) )
-#    modify.push(RemoveElementsCommand(level, toRemove, mode = CONTENTS))
-#    if len(positionChanges) > 0:
-#        modify.push(PositionChangeCommand(level, parent.id, positionChanges))
-#    t = tagsModule.findCommonTags(newChildren, True)
-#    t[tagsModule.TITLE] = [newTitle]
-#    if level == EDITOR:
-#        newContainer = Container(id = modify.newEditorId(),
-#                                 contents = newChildren,
-#                                 tags = t,
-#                                 flags = [],
-#                                 position = newContainerPosition,
-#                                 major = False)
-#    else:
-#        createCommand = CreateContainerCommand(t, None, False)
-#        modify.push(createCommand)
-#        newContainer = Container.fromId(createCommand.id, loadData = True, position = newContainerPosition)
-#
-#    insertions = { parent.id : [(insertPosition, newContainer)] }
-#    if level == REAL:
-#        insertions[newContainer.id] = [ (elem.position, elem) for elem in newChildren ]
-#    modify.push(InsertElementsCommand(level, insertions))
-#    modify.endMacro()
-#
 #def flatten(level, elements, recursive):
 #    """Flatten out the given elements, i.e. remove them and put their children at their previous
 #    place. If *recursive* is *True*, the same will be done for all children, so that we end

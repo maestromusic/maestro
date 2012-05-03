@@ -340,21 +340,21 @@ class MPDPlayerBackend(player.PlayerBackend):
             self.volumeChanged.emit(how)
             
         elif what == 'remove':
-            print("remove")
+            print("Change from MPD: remove")
             print(how)
             self.playlist.removeByOffset(how[0][0],len(how),fromOutside=True)
             for pos,path in reversed(how):
                 del self.paths[pos]
         
         elif what == 'insert':
-            print("insert")
+            print("Change from MPD: insert")
             print(how)
             self.playlist.insertPathsAtOffset(how[0][0],[entry[1] for entry in how],fromOutside=True)
             for pos, path in how:
                 self.paths[pos:pos] = path
             
         elif what == 'playlist':
-            print("playlist")
+            print("Change from MPD: playlist")
             print(how)
             self.playlist.resetFromPaths(how)
             
@@ -381,17 +381,12 @@ class MPDPlayerBackend(player.PlayerBackend):
             self.mpdthread.doPolling.clear()
     
     def insertIntoPlaylist(self,pos,paths):
-        print("insertIntoPlaylist at {}".format(pos))
-        print(paths)
         self._insertIntoPlaylist(list(enumerate(paths,start=pos)))
     
     def removeFromPlaylist(self,begin,end):
-        print("removeFromPlaylist  {}-{}".format(begin,end))
         self._removeFromPlaylist([(begin,'') for i in range(end-begin)])
         
     def setPlaylist(self,paths):
-        print("setPlaylist")
-        print(paths)
         self._setPlaylist(paths)
     
     @staticmethod

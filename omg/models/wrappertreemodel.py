@@ -30,10 +30,7 @@ translate = QtCore.QCoreApplication.translate
 
 class WrapperTreeModel(rootedtreemodel.RootedTreeModel):
     def __init__(self,level=None,stack=None):
-        super().__init__(models.RootNode(self))
-        if level is None:
-            self.level = levels.real
-        else: self.level = level
+        super().__init__(level,models.RootNode(self))
         if stack is None:
             self.stack = modify.stack
         else: self.stack = stack
@@ -216,7 +213,7 @@ class RemoveCommand(QtGui.QUndoCommand):
     def __init__(self,model,rangeList):
         super().__init__(translate("WrapperTreeModel","Remove contents"))
         self.model = model
-        print(rangeList)
+        
         # Make dict mapping parent to list of ranges with this parent
         rangeDict = {}
         for range in rangeList:
@@ -263,7 +260,6 @@ class RemoveCommand(QtGui.QUndoCommand):
         # Finally concat the different lists to a single list of ranges removing those that have been marked
         self.ranges = list(itertools.chain.from_iterable(
                                             ranges for ranges in rangeDict.values() if ranges is not None))
-        print(self.ranges)
         
         self.insertions = [(parent,start,parent.contents[start:end+1]) for parent,start,end in self.ranges]
                     
