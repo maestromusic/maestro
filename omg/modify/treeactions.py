@@ -181,7 +181,7 @@ class MergeAction(TreeAction):
                              self.parent())
         if dialog.exec_() == QtGui.QDialog.Accepted:
             from ..models import rootedtreemodel
-            command = rootedtreemodel.MergeCommand(self.parent().level,
+            command = rootedtreemodel.MergeCommand(self.parent().model().level,
                          elements[0].parent,
                          mergeIndices,
                          dialog.newTitle(),

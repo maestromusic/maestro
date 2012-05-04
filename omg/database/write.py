@@ -97,7 +97,7 @@ def removeContents(data):
 
 def removeAllContents(data):
     """Remove *all* contents of the parents whose IDs are given by the list *data*."""
-    db.multiQuery("DELETE FROM {}contents WHERE container_id = ?".format(db.prefix), data)
+    db.multiQuery("DELETE FROM {}contents WHERE container_id = ?".format(db.prefix), [(d,) for d in data])
     
 def changePositions(parentID, changes):
     """Change the positions of children of *parentID* as given by *changes*, which is a list of (oldPos, newPos)

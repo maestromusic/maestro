@@ -29,12 +29,7 @@ logger = logging.getLogger(__name__)
 
 
 def createNewElements(level, ids, idMap = None):
-    """Create new elements. *elements* is a list of preliminary elements. If they have negative IDs, new IDs for
-    them are created automatically. Otherwise, they are inserted with the IDs as given in the element.
-    This method will insert new entries in the elements and file table. It won't save
-    any contents.
-    
-    This method will return a dict mapping old to new ids.
+    """
     """
     elements = [ level.get(id) for id in ids ]
     specs = [ (True, len(element.parents)==0, 0, False)
@@ -55,7 +50,7 @@ def createNewElements(level, ids, idMap = None):
             return filesystem.fileHash(path)
         db.write.addFiles([ (idMap[file.id], file.path, hash(file.path), file.length) for file in elements if file.isFile() ])
     return idMap
-
+    
 def changeContents(changes):
     """Change content relations of containers. *changes* is a dict mapping container ID to (oldContents, newContents)
     tuples of ContentList instances.""" 
@@ -108,7 +103,7 @@ def changeFileTags(path, tagDiff, reverse = False):
     file = realfiles.get(path)
     file.read()
     if reverse:
-        tagDiff.revert(file.tags, True)
+        tagDiff.revert(file.tags, False)
     else:
         tagDiff.apply(file.tags, False)
     file.save()
