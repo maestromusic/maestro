@@ -67,8 +67,7 @@ def walk(node):
 
 
 def groupFilePaths(paths):
-    """Takes a list of file paths, splits them into dirname and basename, and groups
-    them by the dirname."""
+    """Take a list of file paths, split them into dirname and basename, and group them by the dirname."""
     filesByFolder = {}
     for path in paths:
         dir, filename = os.path.split(path)
@@ -89,7 +88,7 @@ def hasKnownExtension(file):
 
 
 def relPath(file):
-    """Returns the relative path of a music file against the collection base path."""
+    """Return the relative path of a music file against the collection base path."""
     if os.path.isabs(file):
         return os.path.relpath(file, config.options.main.collection)
     else:
@@ -97,7 +96,7 @@ def relPath(file):
 
 
 def absPath(file):
-    """Returns the absolute path of a music file inside the collection directory, if it is not absolute
+    """Return the absolute path of a music file inside the collection directory, if it is not absolute
     already."""
     if not os.path.isabs(file):
         return os.path.join(config.options.main.collection, file)
@@ -106,10 +105,10 @@ def absPath(file):
 
 
 def collectFiles(paths):
-    """Finds all music files below the given *paths*."""
+    """Find all music files below the given *paths*. Return them as dict mapping directory to list of paths
+    within."""
     filePaths ={}
     def add(file, parent = None):
-        
         if not hasKnownExtension(file):
             return
         dir = parent or os.path.dirname(file)
@@ -124,7 +123,7 @@ def collectFiles(paths):
                 for f in sorted(files):
                     add(os.path.join(parent, f), parent)
                 dirs.sort()
-    return filePaths.values()
+    return filePaths
 
 
 def getIcon(name):

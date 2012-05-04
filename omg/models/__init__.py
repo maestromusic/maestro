@@ -44,11 +44,12 @@ class Node:
         return self.contents
     
     def getContentsCount(self,recursive=False):
-        """Return the number of children or None if it is unknown."""
+        """Return the number of contents (that is direct children) of this node. If *recursive* is True,
+        return the number of descendants."""
         if not recursive:
             return len(self.getContents())
         else:
-            # Add the child itself
+            # Add the children themselves: +1
             return sum(child.getContentsCount(True)+1 for child in self.getContents())   
 
     def setContents(self,contents):
@@ -84,11 +85,11 @@ class Node:
             yield parent
             parent = parent.parent
     
-    def getDepth(self):
-        """Return the depth of this node in the current tree structure. The root node will have level 0."""
+    def depth(self):
+        """Return the depth of this node in the current tree structure. The root node has level 0."""
         if self.parent is None:
             return 0
-        else: return 1 + self.parent.getDepth()
+        else: return 1 + self.parent.depth()
 
     def maxDepth(self):
         """Return the maximum depth of nodes below this node."""
@@ -96,23 +97,18 @@ class Node:
             return 1 + max(node.maxDepth() for node in self.getContents())
         else: return 0
 
-    def index(self,node, compareByID = False):
+    def index(self,node):
         """Return the index of *node* in this node's contents or raise a ValueError if *node* is not found.
          See also find."""
         for i,n in enumerate(self.getContents()):
-            if compareByID:
-                if n.id == node.id and n.position == node.position:
-                    return i
-                
-            else:
-                if n == node:
-                    return i
-        raise ValueError("Node.index: Node {0} is not contained in element {1}.".format(node,self))
+            if n == node:
+                return i
+        raise ValueError("Node.index: Node {} is not contained in element {}.".format(node,self))
         
-    def find(self,node, compareById):
+    def find(self,node):
         """Return the index of *node* in this node's contents or -1 if *node* is not found. See also index."""
-        for i, elem in enumerate(self.contents):
-            if elem == node or (compareById and elem.id == node.id):
+        for i,n in enumerate(self.contents):
+            if n == node:
                 return i
         return -1
     
@@ -121,9 +117,7 @@ class Node:
         node itself if *skipSelf* is not set True."""
         if not skipSelf:
             yield self
-        if self.isFile():
-            return
-        for node in self.contents:
+        for node in self.getContents():
             for subnode in node.getAllNodes():
                 yield subnode
  
@@ -139,44 +133,38 @@ class Node:
                     yield file
 
     def fileCount(self):
-        """Return the number of files contained in this element or in child-elements of it."""
+        """Return the number of files contained in this element or in descendants of it. If this node
+        is a file, return 1."""
         if self.isFile():
             return 1
-        else: return sum(element.fileCount() for element in self.getContents())
+        else: return sum(node.fileCount() for node in self.getContents())
         
     def offset(self):
-        """Get the offset of this element in the current tree structure."""
+        """Get the offset of this element in the current tree structure. For files the offset is defined as
+        the position of the file in the list of files in the whole tree (so e.g. for a playlist tree the 
+        offset is the position of the file in the flat playlist). For containers the offset is defined as
+        the offset that a file at the container's location in the tree would have (if the container contains
+        at least one file, this is the offset of the first file among its descendants)."""
         if self.parent is None:
-            return 0
+            return 0 # rootnode has offset 0
         else:
+            # start with the parent's offset and add child.fileCount() for each child before this node
             offset = self.parent.offset()
             for child in self.parent.getContents():
                 if child == self:
                     return offset
-                else: offset = offset + child.fileCount()
-            raise ValueError("Node.getOffset: Node {0} is not contained in its parent {1}."
+                else: offset += child.fileCount()
+            raise ValueError("Node.getOffset: Node {} is not contained in its parent {}."
                                 .format(self,self.parent))
     
-    def childOffset(self,childIndex):
-        """Return the offset of the child with index <childIndex> in this node."""
-        if childIndex < 0 or childIndex >= self.getContentCount():
-            raise IndexError("childIndex {} is out of bounds.".format(childIndex))
-        offset = 0
-        for node in self.getContents()[:childIndex]:
-            offset = offset + node.fileCount()
-        return offset
-        
     def fileAtOffset(self,offset,allowFileCount=False):
-        """Get the file at the given *offset*. Note that *offset* is relative to this element, not to the
-        whole playlist (unless the element is the rootnode).
+        """Return the file at the given *offset*. Note that *offset* is relative to this node, so only the
+        tree below this node will be searched.
         
         Usually the inequality 0 <= *offset* < self.fileCount() must be valid. If *allowFileCount* is True,
         *offset* may equal self.fileCount(). In that case None is returned, as the offset points behind all
         files (that position is usually only interesting for insert operations).
         """
-        #TODO: what if offset == node.fileCount()?
-        assert self.getContents() is not None
-        offset = int(offset)
         if offset == 0 and self.isFile():
             return self
         else: 
@@ -192,24 +180,23 @@ class Node:
     def childIndexAtOffset(self,offset):
         """Return a tuple: the index of the child C that contains the file F with the given offset (relative
         to this element) and the offset of F relative to C ("inner offset").
-        For example: If this element is the rootnode and the playlist contains an album with 13 songs and one
-        with 12 songs, then getChildIndexAtOffset(17) will return (1,3), since the 18th file if the playlist
-        (i.e. with offset 17), is contained in the second album (i.e with index 1) and it is the 4th song on
-        that album (i.e. it has offset 3 relative to the album).
+        For example: If this element is the rootnode of a playlist tree containing an album with 13 songs and
+        a second one with 12 songs, then getChildIndexAtOffset(17) will return (1,3), since the 18th file in
+        the playlist (i.e. with offset 17), is contained in the second child (i.e with index 1) and it is the
+        4th song in that child (i.e. it has offset 3 relative to the album).
         
         If *offset* points to the last position inside this node (in other words offset == self.fileCount()),
         then (None,None) is returned.
         """
-        offset = int(offset)
         if offset < 0:
             raise IndexError("Offset {} is out of bounds".format(offset))
         cOffset = 0
         for i in range(0,self.getContentsCount()):
             fileCount = self.contents[i].fileCount()
-            if offset < cOffset + fileCount:
-                return i,offset-cOffset
-            else: cOffset = cOffset + fileCount
-        if offset == cOffset:
+            if offset < cOffset + fileCount: # offset points to a file somewhere in self.contents[i]
+                return i,offset-cOffset 
+            else: cOffset += fileCount
+        if offset == cOffset: # offset points to the end of the list of files below self
             return None,None
         raise IndexError("Offset {} is out of bounds".format(offset))
     
@@ -227,26 +214,43 @@ class Node:
         else: return self.getContents()[index],innerOffset
         
     def printStructure(self, indent = ''):
+        """Debug method: print the tree below this node using indentation."""
         print(indent + str(self))
         for child in self.getContents():
             child.printStructure(indent + '  ')
 
 
 class RootNode(Node):
-    """Rootnode at the top of a RootedTreeModel."""
-    
-    parent = None
+    """Rootnodes are used at the top of RootedTreeModel. They are not displayed within the GUI, but recursive
+    tree operations are much simpler if there is a single root node instead of a list of (visible) roots."""
     def __init__(self, model):
         self.contents = []
         self.model = model
+        self.parent = None
     
     def __repr__(self):
-        return 'RootNode with {} children'.format(len(self.contents))    
+        return 'RootNode with {} contents'.format(len(self.contents))    
 
 
 class Wrapper(Node):
-    """A node that holds an element."""
-    def __init__(self,element,contents=None,position=None,parent=None):
+    """A node that marks an element's location in a tree. On each level there is only one instance of each
+    element and this instance has a fixed list of contents and parents and corresponding positions. To use
+    elements in trees they must be wrapped by a wrapper which has only one parent and position and its own
+    list of contents. Usually both parent and contents contain wrappers again (and usually the elements of
+    those wrappers are an actual parent/contents of the element, but this is not obligatory).
+    
+    Arguments:
+    
+        *element*: the element instance wrapped by this wrapper,
+        *contents*: the list of contents of this wrapper. Usually these are other wrappers. Note that the
+                    list won't be copied but the parents of the list entries will be adjusted.
+                    If this wrapper wraps a file, this argument must be None. For containers it may be None,
+                    in which case the wrapper will be initialized with an empty list.
+        *position*: the position of this wrapper. May be None.
+        *parent*: the parent (usually another wrapper or a rootnode)
+        
+    """
+    def __init__(self,element,*,contents=None,position=None,parent=None):
         self.element = element
         self.position = position
         self.parent = parent
@@ -254,10 +258,17 @@ class Wrapper(Node):
             if contents is not None:
                 self.setContents(contents)
             else: self.contents = []
-        else: assert contents is None
+        else:
+            if contents is not None:
+                raise ValueError("contents must be None for a File-wrapper")
+            self.contents = None
         
     def copy(self,contents=None):
-        copy = Wrapper(self.element,None,self.position,self.parent)
+        """Return a copy of this wrapper. Because a flat copy of the contents is not possible (parent
+        pointers would be wrong) all contents are copied recursively. Instead of this you can optionally
+        specify a list of contents that will be put into the copy regardless of the original's contents.
+        """
+        copy = Wrapper(self.element,contents=None,position=self.position,parent=self.parent)
         if self.isContainer():
             if contents is None:
                 copy.setContents([child.copy() for child in self.contents])
@@ -280,19 +291,26 @@ class Wrapper(Node):
         return self.contents if self.element.isContainer() else []
     
     def loadContents(self, recursive):
+        """Fill this wrapper with exactly the contents of the underlying element. If *recursive* is True,
+        load the contents of all children in the same way."""
         if self.element.isContainer():
-            self.setContents([Wrapper(self.element.level.get(id),position = pos) for pos,id in self.element.contents.items()])
+            self.setContents([Wrapper(self.element.level.get(id),position = pos)
+                                    for pos,id in self.element.contents.items()])
             if recursive:
                 for child in self.contents:
                     child.loadContents(recursive)
     
-    def getTitle(self,prependPosition=False,usePath=True,titles=None):
-        title = self.element.getTitle(usePath,titles)
+    def getTitle(self,prependPosition=False,usePath=True):
+        """Return the title of the wrapped element. If *prependPosition* is True and this wrapper has a
+        position, prepend it to the title. See also Element.getTitle.
+        """
+        title = self.element.getTitle(usePath)
         if prependPosition and self.position is not None:
             return "{} - {}".format(self.position,title)
         else: return title
         
     def toolTipText(self):
+        """Return a text to use as tooltip over this wrapper."""
         parts = []
         if self.element.tags is not None:
             parts.append('\n'.join('{}: {}'.format(tag.title,', '.join(map(str,values)))
@@ -307,10 +325,7 @@ class Wrapper(Node):
         """Return the length of this element, i.e. the sum of the lengths of all contents."""
         if self.isFile():
             return self.element.length
-        else:
-            lengths = (wrapper.getLength() for wrapper in self.contents)
-            # Skip elements of length None
-            return sum(l for l in lengths if l is not None)
+        else: return sum(wrapper.getLength() for wrapper in self.contents)
     
     def getExtension(self):
         """Return the extension of all files in this container. Return None if they have different extension
@@ -333,42 +348,37 @@ class Wrapper(Node):
 
 
 class Element:
-    """Abstract base class for elements (files or containers) in playlists, browser, etc.. Contains methods
-    to load tags and contents from the database or from files."""   
+    """Abstract base class for elements (files or containers)."""   
     def __init__(self):
-        raise RuntimeError("Cannot instantiate abstract base class Element. Use Element.fromId.")
+        raise RuntimeError("Cannot instantiate abstract base class Element.")
 
     def isInDB(self):
+        """Return whether this element is contained in the database (as opposed to e.g. external files in
+        the playlist or newly created containers in the editor).
+        """
         return self.id > 0
-        
-    def __str__(self):
-        if self.tags is not None:
-            ret =  "({}) <{}[{}]> {}".format(self.position if self.position is not None else '',
-                                             type(self).__name__,
-                                             self.id, 
-                                             self.getTitle())
-        else: ret =  "<{}[{}]>".format(type(self).__name__,self.id)
-        return '*' + ret if self.major else ret
     
-    def getTitle(self,usePath=True,titles=None):
+    def isFile(self):
+        """Return whether this element is a file."""
+        raise NotImplementedError()
+    
+    def isContainer(self):
+        """Return whether this element is a container."""
+        raise NotImplementedError()
+    
+    def getTitle(self,usePath=True):
         """Return the title of this element or some dummy title, if the element does not have a title tag.
-        Additionally the result may contain a position (if *prependPosition* is True) and/or the element's
-        id (if ''config.options.misc.show_ids'' is True). If *usePath* is True, the path will be used as
-        title for files without title tag. Finally, the optional argument *titles* may be used to overwrite
-        the titles stored in ''self.tags'' (this is in particular useful if the element does not store tags).
+        If config.options.misc.show_ids is True, the title will be prepended by the element's id.
+        If *usePath* is True, the path will be used as title for files without a title tag.
         """
         result = ''
         
         if hasattr(self,'id') and config.options.misc.show_ids:
-            result += "[{0}] ".format(self.id)
+            result += "[{}] ".format(self.id)
             
-        if titles is not None:
-            result += " - ".join(titles)
-        elif self.tags is None:
-            result += translate("Element","<No title>")
-        elif tags.TITLE in self.tags:
+        if tags.TITLE in self.tags:
             result += " - ".join(self.tags[tags.TITLE])
-        elif usePath and self.isFile() and self.path is not None:
+        elif usePath and self.isFile():
             result += self.path
         else: result += translate("Element","<No title>")
 
@@ -376,18 +386,18 @@ class Element:
     
 
 class Container(Element):
-    """Element-subclass for containers."""
-    
-    contents = None
-
+    """Element-subclass for containers. You must specify the level and id and whether this Container is
+    major. Keyword-arguments that are not specified will be set to empty lists/tag.Storage instances.
+    Note that *contents* must be a ContentList.
+    """
     def __init__(self, level, id, major,*, contents=None, parents=None, tags=None, flags=None):
-        """Initialize this container, optionally with a contents list."""
         self.level = level
         self.id = id
         self.level = level
         self.major = major
         if contents is not None:
-            assert type(contents) is ContentList
+            if type(contents) is not ContentList:
+                raise TypeError("contents must be a ContentList")
             self.contents = contents
         else: self.contents = ContentList()
         if parents is not None:
@@ -401,6 +411,10 @@ class Container(Element):
         else: self.flags = []
     
     def copy(self):
+        """Create a copy of this container. Create copies of all attributes. Because contents are stored as
+        ids and do not have parent pointers, it is not necessary to copy contents recursively (contrary to
+        Wrapper.copy).
+        """
         return Container(level = self.level,
                          id = self.id,
                          major = self.major,
@@ -416,6 +430,9 @@ class Container(Element):
         return False
     
     def getContents(self):
+        """Return a generator yielding the contents of this Container as Element instances (remember that
+        self.contents only stores the ids). Elements that have not been loaded yet on this Container's level
+        will be loaded."""
         return (self.level.get(id) for id in self.contents)
     
     def __repr__(self):
@@ -423,7 +440,9 @@ class Container(Element):
 
 
 class File(Element):
-    #TODO: comment
+    """Element-subclass for files. You must specify the level, id, path and length in seconds of the file.
+    Keyword-arguments that are not specified will be set to empty lists/tag.Storage instances.
+    """
     def __init__(self, level, id, path, length,*, parents=None, tags=None, flags=None):
         if not isinstance(id,int) or not isinstance(path,str) or not isinstance(length,int):
             raise TypeError("Invalid type (id,path,length): ({},{},{}) of types ({},{},{})"
@@ -433,6 +452,7 @@ class File(Element):
         self.level = level
         self.path = path
         self.length = length
+        
         if parents is not None:
             self.parents = parents
         else: self.parents = []
@@ -444,22 +464,18 @@ class File(Element):
         else: self.flags = []
         
     def copy(self):
-        return File( level = self.level,
-                     id = self.id,
-                     path = self.path,
-                     length = self.length,
-                     parents = self.parents[:],
-                     tags = self.tags.copy(),
-                     flags = self.flags[:])
+        return File(level = self.level,
+                    id = self.id,
+                    path = self.path,
+                    length = self.length,
+                    parents = self.parents[:],
+                    tags = self.tags.copy(),
+                    flags = self.flags[:])
     
     def isFile(self):
         return True
     
     def isContainer(self):
-        return False
-    
-    @property
-    def major(self):
         return False
     
     def getExtension(self):
@@ -470,20 +486,24 @@ class File(Element):
         else: return None
         
     def __repr__(self):
-        return "File[{}] {}".format(self.id, self.path)
+        return "<File[{}] {}>".format(self.id, self.path)
 
 
 class ContentList:
-    def __init__(self, existing = None):
-        if existing is not None:
-            self.positions = existing.positions[:]
-            self.ids = existing.ids[:]
-        else:
-            self.positions = []
-            self.ids = []
+    """List that stores a list of ids together with positions (which must be increasing and unique but not
+    necessarily the indexes of the corresponding ids. On item access the list will return tuples containing
+    the id and the position.
+    """
+    def __init__(self):
+        self.positions = []
+        self.ids = []
     
     def copy(self):
-        return ContentList(existing = self)
+        """Return a copy of this list."""
+        result = ContentList()
+        result.ids = self.ids[:]
+        result.positions = self.positions[:]
+        return result
         
     def __len__(self):
         return len(self.ids)
@@ -496,31 +516,42 @@ class ContentList:
         del self.positions[i]
         
     def __setitem__(self, i, pos, id):
-        self.positions[i] = id
+        if (i > 0 and self.positions[i-1] >= pos) or \
+            (i < len(self.positions)-1 and self.positions[i+1] <= pos):
+            raise ValueError("id/position ({},{}) cannot be inserted at index {} because positions "
+                             " must be strictly monotonically increasing."""
+                             .format(id,pos,i))
+        self.positions[i] = pos
         self.ids[i] = id
     
     def __contains__(self,id):
         return id in self.ids
     
     def getPosition(self,id):
+        """Return the position corresponding to *id*. Raise a ValueError, if *id* is not contained in this
+        list."""
         return self.positions[self.ids.index(id)]
         
     def insert(self, pos, id):
-        if pos in self.positions:
-            raise ValueError("position {} for id {} already in contents ({}, {})".format(pos, id, self.positions, self.ids))
+        """Insert an id with a position at the correct index into the list."""
         index = bisect.bisect(self.positions, pos)
+        if index > 0 and self.positions[index-1] == pos:  
+            raise ValueError("position {} for id {} already in contents ({}, {})"
+                             .format(pos, id, self.positions, self.ids))
         self.positions.insert(index, pos)
         self.ids.insert(index, id)
     
-    def remove(self, *args, pos = None, i = None):
+    def remove(self,pos=None,index=None):
+        """Remove an id and its position from the list. You must specify either the position or its index."""
         if pos is not None:
-            i = self.positions.index(pos)
-        elif i is None:
-                raise ValueError("Either of 'pos' or 'i' must be given to ContentList.remove()")
-        del self.ids[i]
-        del self.positions[i]
+            index = self.positions.index(pos)
+        elif index is None:
+            raise ValueError("Either of 'pos' or 'index' must be given to ContentList.remove()")
+        del self.ids[index]
+        del self.positions[index]
     
     def items(self):
+        """Return a generator yielding tuples (position,id) for all ids in the list."""
         return zip(self.positions, self.ids)
     
     def shift(self, delta):
@@ -529,7 +560,7 @@ class ContentList:
             return
         # ensure position doesn't drop below 1 after the shift
         assert self.positions[0] + delta  > 0
-        self.positions[:] = map(lambda x: x + delta, self.positions)
+        self.positions = [x+delta for x in self.positions]
     
     def __eq__(self, other):
         return self.ids == other.ids and self.positions == other.positions
