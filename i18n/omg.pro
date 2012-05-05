@@ -1,5 +1,5 @@
 
-SOURCES = ../bin/install.py\
+SOURCES =
       ../omg/application.py\
 	  ../omg/gui/browserdialog.py\
 	  ../omg/gui/browser.py\
@@ -14,6 +14,7 @@ SOURCES = ../bin/install.py\
 	  ../omg/gui/tagwidgets.py\
 	  ../omg/gui/mainwindow.py\
       ../omg/gui/treeview.py\
+      ../omg/install.py\
 	  ../omg/models/editor.py\
 	  ../omg/modify/__init__.py\
       ../omg/plugins/dbanalyzer/__init__.py\
