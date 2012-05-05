@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2009-2011 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2012 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -157,7 +157,7 @@ class AbstractDelegate(QtGui.QStyledItemDelegate):
         # Total width available. Note that option.rect is useless due to a performance hack in Qt.
         # (Confer QTreeView::indexRowSizeHint in Qt's sources) 
         totalWidth = self.parent().viewport().width() - 2*self.hMargin
-        totalWidth -= self.parent().indentation() * self.model.data(index).getDepth()
+        totalWidth -= self.parent().indentation() * self.model.data(index).depth()
         
         # Collect items
         self.left,self.right,self.center = [],[],[]

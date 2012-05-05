@@ -29,6 +29,13 @@ translate = QtCore.QCoreApplication.translate
 
 
 class WrapperTreeModel(rootedtreemodel.RootedTreeModel):
+    """A WrapperTreeModel is a general model for trees consisting mainly of wrappers. It provides undoable
+    methods to modify the tree structure and drag and drop support that allows the user to modify the tree
+    arbitrarily (the only rule is that contents must not be inserted into a file. They will be placed behind
+    it instead).
+    
+    Usually the main undostack is used, but you can specify a different stack using the argument *stack*.
+    """
     def __init__(self,level=None,stack=None):
         super().__init__(level,models.RootNode(self))
         if stack is None:
@@ -106,7 +113,8 @@ class WrapperTreeModel(rootedtreemodel.RootedTreeModel):
         if mimeData.hasFormat(config.options.gui.mime):
             wrappers = [wrapper.copy() for wrapper in mimeData.getWrappers()]
         else:
-            paths = [utils.relPath(path) for path in utils.collectFiles(u.path() for u in mimeData.urls())]
+            paths = [utils.relPath(path) for path in utils.collectFiles(u.path()
+                                                                    for u in mimeData.urls()).values()]
                 
             #TODO create a shortcut for the following lines (this calls db.idFromPath twice for each element)
             levels.real.loadPaths(paths) 
@@ -228,11 +236,11 @@ class RemoveCommand(QtGui.QUndoCommand):
             ranges.sort(key=lambda range: range[1])
             
             currentIndex = 0
-            current = ranges[0]
             i = 1
             while i < len(ranges):
                 # If the start point of the next range is inside the current range or directly after the 
                 # current range...
+                current = ranges[currentIndex]
                 next = ranges[i]
                 if next[1] <= current[2] + 1:
                     # ...then expand the current range to the union of both and remove the next range
@@ -241,7 +249,6 @@ class RemoveCommand(QtGui.QUndoCommand):
                     del ranges[i]
                 else:
                     # ...otherwise set current to the next range 
-                    current = next
                     currentIndex = i
                     i += 1
         

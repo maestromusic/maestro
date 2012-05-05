@@ -287,13 +287,13 @@ class ToggleMajorAction(TreeAction):
     def initialize(self):
         selection = self.parent().nodeSelection
         self.setEnabled(selection.hasElements())
-        self.setChecked(all(element.element.major for element in selection.elements()))
+        self.setChecked(all(w.isContainer() and w.element.major for w in selection.elements()))
         self.state = self.isChecked()
         self.selection = selection
         
     def doAction(self):
         modify.stack.push(commands.ChangeMajorFlagCommand(self.parent().model().level,
-                        [wrap.element.id for wrap in self.selection.elements() if wrap.element.major == self.state]))
+                        [w.element.id for w in self.selection.elements() if w.element.major == self.state]))
         self.toggle()
                 
 
