@@ -50,6 +50,15 @@ class ElementChangedEvent(ChangeEvent):
             self.contentIds = []
         else: self.contentIds = contentIds
 
+class ElementCreateDeleteEvent(ElementChangedEvent):
+    """Special event for creation and/or deletion of elements. Has
+    the additional attributes "created" and "deleted".
+    """
+    def __init__(self, created = None, deleted = None):
+        super().__init__(None, None)
+        self.created = created if created is not None else []
+        self.deleted = deleted if deleted is not None else []
+        
 
 class Level(QtCore.QObject):
     #TODO comment
@@ -434,10 +443,10 @@ class CommitCommand(QtGui.QUndoCommand):
                         # element already loaded in real level (already commited or loaded in playlist)
                         self.realFileChanges[myEl.path] = changes
                 else:
-                     fileTags = myEl.fileTags
-                     fileChanges = tags.TagDifference(fileTags, myEl.tags)
-                     if not fileChanges.onlyPrivateChanges():
-                         self.realFileChanges[myEl.path] = fileChanges
+                    fileTags = myEl.fileTags
+                    fileChanges = tags.TagDifference(fileTags, myEl.tags)
+                    if not fileChanges.onlyPrivateChanges():
+                        self.realFileChanges[myEl.path] = fileChanges
                         
                 
             changeElement = True
@@ -517,6 +526,7 @@ class CommitCommand(QtGui.QUndoCommand):
                 modify.real.changeFileTags(path, changes)
         self.level.parent.emitEvent([self.newId(id) for id in self.ids], [self.newId(id) for id in self.contents])
         self.level.emitEvent([self.newId(id) for id in self.ids], []) # no contents changed in current level!
+        self.level.parent.changed.emit(ElementCreateDeleteEvent(list(map(self.newId, self.newElements))))
         
     def undo(self):
         if self.real:
@@ -566,6 +576,7 @@ class CommitCommand(QtGui.QUndoCommand):
                 modify.real.changeFileTags(path, changes, reverse = True)
         self.level.parent.emitEvent(self.ids, self.contents)
         self.level.emitEvent(self.ids, []) # no contents changed in current level!
+        self.level.parent.changed.emit(ElementCreateDeleteEvent(None, list(map(self.newId, self.newElements))))
                 
             
 

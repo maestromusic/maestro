@@ -20,7 +20,8 @@
 
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
-from .. import logging, config, utils, database as db, realfiles, modify
+from .. import logging, config, utils, database as db, realfiles, models
+from ..models import levels
 import os.path, subprocess, hashlib, datetime, threading, queue, time
 logger = logging.getLogger(__name__)
 
@@ -33,7 +34,7 @@ def init():
         return
     syncThread = FileSystemSynchronizer()
     null = open(os.devnull)    
-    modify.dispatcher.changes.connect(syncThread.handleEvent, Qt.QueuedConnection)
+    levels.real.changed.connect(syncThread.handleEvent, Qt.QueuedConnection)
     notifier = Notifier()
     syncThread.missingFilesDetected.connect(notifier.notifyAboutMissingFiles)
     syncThread.modifiedTagsDetected.connect(notifier.changeModifiedTags)
@@ -348,50 +349,54 @@ class FileSystemSynchronizer(QtCore.QThread):
         
     @QtCore.pyqtSlot(list)
     def handleEvent(self, event):
-        if isinstance(event, modify.events.FilesAddedEvent):
-            # files added to DB -> check if folders have changed
-            paths = event.paths
-            for path in paths:
-                self.hashJobs.put(path)
-            filesByFolder = utils.groupFilePaths(paths)
-            for folder, files in filesByFolder.items():
-                dirContent = os.listdir(utils.absPath(folder))
-                folderStillUnsynced = False
-                for elem in dirContent:
-                    relElemPath = os.path.join(folder, elem)
-                    if elem in files:
-                        files.remove(elem)
-                    elif os.path.isdir(utils.absPath(relElemPath)):
-                        if relElemPath in self.knownFolders \
-                                and self.knownFolders[relElemPath] == 'unsynced':
+        if isinstance(event, levels.ElementCreateDeleteEvent):
+            if len(event.created) > 0:
+                # files added to DB -> check if folders have changed
+                paths = [levels.real.get(id).path for id in event.created
+                         if levels.real.get(id).isFile()]
+                for path in paths:
+                    self.hashJobs.put(path)
+                filesByFolder = utils.groupFilePaths(paths)
+                for folder, files in filesByFolder.items():
+                    dirContent = os.listdir(utils.absPath(folder))
+                    folderStillUnsynced = False
+                    for elem in dirContent:
+                        relElemPath = os.path.join(folder, elem)
+                        if elem in files:
+                            files.remove(elem)
+                        elif os.path.isdir(utils.absPath(relElemPath)):
+                            if relElemPath in self.knownFolders \
+                                    and self.knownFolders[relElemPath] == 'unsynced':
+                                folderStillUnsynced = True
+                                break
+                            continue
+                        elif not utils.hasKnownExtension(elem):
+                            continue
+                        elif elem not in self.dbFiles:
                             folderStillUnsynced = True
                             break
-                        continue
-                    elif not utils.hasKnownExtension(elem):
-                        continue
-                    elif elem not in self.dbFiles:
-                        folderStillUnsynced = True
-                        break
-                if not folderStillUnsynced:
-                    logger.debug('previously unsynced folder now ok: {}'.format(folder))
-                    self.updateFolderState(folder, 'ok', True)
-                
-        elif isinstance(event, modify.events.FilesRemovedEvent):
-            byFolder = utils.groupFilePaths(event.paths)
-            for folder, files in byFolder.items():
-                if event.disk:
-                    stillMusicThere = False
-                    for thing in os.listdir(utils.absPath(folder)):
-                        if os.path.isfile(utils.absPath(os.path.join(folder, thing))):
-                            if utils.hasKnownExtension(thing):
-                                stillMusicThere = True
-                                break
-                    if not stillMusicThere:
-                        self.updateFolderState(folder, 'nomusic', True)
-                        
-                else:
-                    self.updateFolderState(folder, 'unsynced', True)
-    
+                    if not folderStillUnsynced:
+                        logger.debug('previously unsynced folder now ok: {}'.format(folder))
+                        self.updateFolderState(folder, 'ok', True)
+                    
+            if len(event.deleted) > 0:
+                paths = [levels.real.get(id).path for id in event.deleted
+                         if levels.real.get(id).isFile()]
+                byFolder = utils.groupFilePaths(paths)
+                for folder, files in byFolder.items():
+                    if event.disk:
+                        stillMusicThere = False
+                        for thing in os.listdir(utils.absPath(folder)):
+                            if os.path.isfile(utils.absPath(os.path.join(folder, thing))):
+                                if utils.hasKnownExtension(thing):
+                                    stillMusicThere = True
+                                    break
+                        if not stillMusicThere:
+                            self.updateFolderState(folder, 'nomusic', True)
+                            
+                    else:
+                        self.updateFolderState(folder, 'unsynced', True)
+        
     def computeAndStoreHash(self, path):
         """Compute the hash of the file at *path* (or fetch it from self.knownNewFiles
         if available) and set it in the database."""
