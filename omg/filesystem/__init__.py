@@ -349,12 +349,10 @@ class FileSystemSynchronizer(QtCore.QThread):
         
     @QtCore.pyqtSlot(list)
     def handleEvent(self, event):
-        if isinstance(event, levels.ElementCreateDeleteEvent):
+        if isinstance(event, levels.FileCreateDeleteEvent):
             if len(event.created) > 0:
                 # files added to DB -> check if folders have changed
-                paths = [levels.real.get(id).path for id in event.created
-                         if levels.real.get(id).isFile()]
-                for path in paths:
+                for path in event.created:
                     self.hashJobs.put(path)
                 filesByFolder = utils.groupFilePaths(paths)
                 for folder, files in filesByFolder.items():
@@ -380,9 +378,7 @@ class FileSystemSynchronizer(QtCore.QThread):
                         self.updateFolderState(folder, 'ok', True)
                     
             if len(event.deleted) > 0:
-                paths = [levels.real.get(id).path for id in event.deleted
-                         if levels.real.get(id).isFile()]
-                byFolder = utils.groupFilePaths(paths)
+                byFolder = utils.groupFilePaths(event.deleted)
                 for folder, files in byFolder.items():
                     if event.disk:
                         stillMusicThere = False
@@ -405,9 +401,11 @@ class FileSystemSynchronizer(QtCore.QThread):
             del self.knownNewFiles[path]
         else:
             hash = computeHash(path)
+        db.transaction()
         db.setHash(path, hash)
         self.dbFiles.append(path)
         db.query('DELETE FROM {}newfiles WHERE path = ?'.format(db.prefix), path)
+        db.commit()
         
     def pollJobs(self):
         """Called periodically by self.timer, this method checks if "compute hash" jobs

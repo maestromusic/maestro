@@ -98,3 +98,6 @@ class SqlResult(AbstractSqlResult):
         
     def getSingleColumn(self):
         return (row[0] for row in self._rows)
+
+# hack to fix a race condition on startup due to import locks
+datetime.datetime.strptime("1900","%Y")

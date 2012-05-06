@@ -43,6 +43,7 @@ class ElementGetError(RuntimeError):
 class ElementChangedEvent(ChangeEvent):
     #TODO comment
     def __init__(self,dataIds=None,contentIds=None):
+        super().__init__()
         if dataIds is None:
             self.dataIds = []
         else: self.dataIds = dataIds
@@ -50,12 +51,12 @@ class ElementChangedEvent(ChangeEvent):
             self.contentIds = []
         else: self.contentIds = contentIds
 
-class ElementCreateDeleteEvent(ElementChangedEvent):
-    """Special event for creation and/or deletion of elements. Has
-    the additional attributes "created" and "deleted".
+class FileCreateDeleteEvent(ElementChangedEvent):
+    """Special event for creation and/or deletion of files in the database. Has
+    the attributes "created" and "deleted", which are lists of paths.
     """
     def __init__(self, created = None, deleted = None):
-        super().__init__(None, None)
+        super().__init__()
         self.created = created if created is not None else []
         self.deleted = deleted if deleted is not None else []
         
@@ -463,8 +464,8 @@ class CommitCommand(QtGui.QUndoCommand):
         return changeElement, changeContents
             
     def redo(self):
-        # create new elements in DB to obtain id map, if necessary
-        if self.real: 
+        if self.real:
+            # create new elements in DB to obtain id map, and change IDs in current level 
             db.transaction()
             if self.idMap is None:
                 # first redo -> prepare id mapping
@@ -482,8 +483,9 @@ class CommitCommand(QtGui.QUndoCommand):
                 if id in self.level.parent:
                     # happens if the element is loaded in some playlist
                     self.level.parent.changeId(id, self.newId(id))
-        # nothing else to be changed in the current (child) level. Update elements in parent
-        
+                    
+        # Add/update elements in parent level
+        newFilesPaths = []
         for id in set(self.ids + self.contents):
             elem = self.level.elements[self.newId(id)]
             nid = self.newId(id)
@@ -491,6 +493,8 @@ class CommitCommand(QtGui.QUndoCommand):
                 copy = elem.copy()
                 copy.level = self.level.parent
                 self.level.parent.elements[nid] = copy
+                if elem.isFile():
+                    newFilesPaths.append(elem.path)
             else:
                 pElem = self.parent.level.elements[nid]
                 if id in self.majorChanges:
@@ -526,7 +530,10 @@ class CommitCommand(QtGui.QUndoCommand):
                 modify.real.changeFileTags(path, changes)
         self.level.parent.emitEvent([self.newId(id) for id in self.ids], [self.newId(id) for id in self.contents])
         self.level.emitEvent([self.newId(id) for id in self.ids], []) # no contents changed in current level!
-        self.level.parent.changed.emit(ElementCreateDeleteEvent(list(map(self.newId, self.newElements))))
+        
+        if len(newFilesPaths) > 0:
+            self.level.parent.changed.emit(FileCreateDeleteEvent(newFilesPaths))
+        self.newFilesPaths = newFilesPaths # store for undo
         
     def undo(self):
         if self.real:
@@ -576,7 +583,8 @@ class CommitCommand(QtGui.QUndoCommand):
                 modify.real.changeFileTags(path, changes, reverse = True)
         self.level.parent.emitEvent(self.ids, self.contents)
         self.level.emitEvent(self.ids, []) # no contents changed in current level!
-        self.level.parent.changed.emit(ElementCreateDeleteEvent(None, list(map(self.newId, self.newElements))))
+        if len(self.newFilesPaths) > 0:
+            self.level.parent.changed.emit(FileCreateDeleteEvent(None, self.newFilesPaths))
                 
             
 
