@@ -142,7 +142,7 @@ class DeleteAction(TreeAction):
                 elementParents[parent.element.id].append((wrapper.position, wrapper.element.id))
         
         if len(rootParents) > 0:
-            self.parent().model().remove(rootParents)
+            self.parent().model().removeWrappers(rootParents)
         if len(elementParents) > 0:
             modify.stack.push(RemoveElementsCommand(self.parent().level,
                                             elementParents,
