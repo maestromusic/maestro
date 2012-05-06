@@ -53,12 +53,15 @@ class ElementChangedEvent(ChangeEvent):
 
 class FileCreateDeleteEvent(ElementChangedEvent):
     """Special event for creation and/or deletion of files in the database. Has
-    the attributes "created" and "deleted", which are lists of paths.
+    the attributes "created" and "deleted", which are lists of paths. The boolean
+    *disk* attribute indicates that a file removal has taken place on disk (not only
+    DB) which helps the filesystem module to efficiently update its folder states.
     """
-    def __init__(self, created = None, deleted = None):
+    def __init__(self, created = None, deleted = None, disk = False):
         super().__init__()
         self.created = created if created is not None else []
         self.deleted = deleted if deleted is not None else []
+        self.disk = disk
         
 
 class Level(QtCore.QObject):
@@ -176,6 +179,21 @@ class Level(QtCore.QObject):
                     self.elements[childID].parents = [ new if id == old else old
                                                       for id in self.elements[childID].parents ]
     
+    def insertChild(self, parentId, position, childId):
+        """Insert element with id *childId* at *position* under *parentId*."""
+        parent = self.get(parentId)
+        parent.contents.insert(position, childId)
+        if not parentId in self.get(childId).parents:
+            self.get(childId).parents.append(parentId)
+        
+    def removeChild(self, parentId, position):
+        """Remove element at *position* from container with id *parentId*."""
+        parent = self.get(parentId)
+        childId = parent.contents.getId(position)
+        parent.contents.remove(pos = position)
+        if childId not in parent.contents.ids:
+            self.get(childId).parents.remove(parentId)
+        
     
 class RealLevel(Level):
     def __init__(self):

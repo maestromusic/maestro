@@ -81,34 +81,24 @@ class EditTagsAction(TreeAction):
 
 class RemoveElementsCommand(QtGui.QUndoCommand):
     
-    def __init__(self, level, wrappers, mode, text):
+    def __init__(self, level, removals, mode, text):
         super().__init__()
         self.setText(text)
         self.level = level
-        rootParents = {}
-        elementParents = {}
-        for wrapper in wrappers:
-            parent = wrapper.parent
-            if isinstance(parent, models.RootNode):
-                if parent not in rootParents:
-                    rootParents[parent] = []
-                rootParents[parent].append(parent.contents.index(wrapper))
-            else:
-                if parent.element.id not in elementParents:
-                    elementParents[parent.element.id] = []
-                elementParents[parent.element.id].append(parent.contents.index(wrapper))
-        self.rootParents = rootParents
-        self.elementParents = elementParents
+        self.removals = removals
+        
         
     def redo(self):
-        for root, indices in self.rootParents.items():
-            from ..models import rootedtreemodel
-            oldIds = [node.element.id for node in root.contents ]
-            newIds = oldIds[:]
-            for index in sorted(indices, reverse = True):
-                del newIds[index]
-            com = rootedtreemodel.ChangeRootCommand(root.model, oldIds, newIds)
-            modify.stack.push(com)
+        for parentId, removals in self.removals.items():
+            for pos,id in removals:
+                self.level.removeChild(parentId, pos)
+        self.level.emitEvent(contentIds= list(self.removals.keys()))
+    
+    def undo(self):
+        for parentId, removals in self.removals.items():
+            for pos,id in removals:
+                self.level.insertChild(parentId, pos, id)
+        self.level.emitEvent(contentIds= list(self.removals.keys()))
         
 class DeleteAction(TreeAction):
     """Action to remove selected elements."""
@@ -140,11 +130,24 @@ class DeleteAction(TreeAction):
                         self.tr('Removing files from disk cannot be made undone and will clear your undo stack.\n'+
                         'Are you absolutely sure?')):
                 return False
-        command = RemoveElementsCommand(self.parent().level,
-                                        self.parent().nodeSelection.elements(),
-                                        self.mode,
-                                        text=self.modeText[self.mode])
-        modify.stack.push(command)
+        rootParents = []
+        elementParents = {}
+        for wrapper in self.parent().nodeSelection.elements():
+            parent = wrapper.parent
+            if isinstance(parent, models.RootNode):
+                rootParents.append(wrapper)
+            else:
+                if parent.element.id not in elementParents:
+                    elementParents[parent.element.id] = []
+                elementParents[parent.element.id].append((wrapper.position, wrapper.element.id))
+        
+        if len(rootParents) > 0:
+            self.parent().model().remove(rootParents)
+        if len(elementParents) > 0:
+            modify.stack.push(RemoveElementsCommand(self.parent().level,
+                                            elementParents,
+                                            self.mode,
+                                            text=self.modeText[self.mode]))
         if self.mode == DISK:
             modify.stack.clearBoth()
 

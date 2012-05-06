@@ -531,7 +531,11 @@ class ContentList:
         """Return the position corresponding to *id*. Raise a ValueError, if *id* is not contained in this
         list."""
         return self.positions[self.ids.index(id)]
-        
+    
+    def getId(self, position):
+        """Return the id at position *position*."""
+        return self.ids[self.positions.index(position)]
+    
     def insert(self, pos, id):
         """Insert an id with a position at the correct index into the list."""
         index = bisect.bisect(self.positions, pos)

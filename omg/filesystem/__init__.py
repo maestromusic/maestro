@@ -354,7 +354,7 @@ class FileSystemSynchronizer(QtCore.QThread):
                 # files added to DB -> check if folders have changed
                 for path in event.created:
                     self.hashJobs.put(path)
-                filesByFolder = utils.groupFilePaths(paths)
+                filesByFolder = utils.groupFilePaths(event.created)
                 for folder, files in filesByFolder.items():
                     dirContent = os.listdir(utils.absPath(folder))
                     folderStillUnsynced = False

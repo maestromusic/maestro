@@ -20,12 +20,12 @@ from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
 from .. import logging, modify, config
-from ..models import rootedtreemodel, RootNode, Wrapper, albumguesser, levels
+from ..models import wrappertreemodel, RootNode, Wrapper, albumguesser, levels
 from ..utils import collectFiles
 
 logger = logging.getLogger(__name__)
                     
-class EditorModel(rootedtreemodel.RootedTreeModel):
+class EditorModel(wrappertreemodel.WrapperTreeModel):
     """Model class for the editors where users can edit elements before they are commited into
     the database."""
     
@@ -34,15 +34,6 @@ class EditorModel(rootedtreemodel.RootedTreeModel):
         super().__init__(levels.editor, RootNode(self))
         self.albumGroupers = []
         self.metacontainer_regex=r" ?[([]?(?:cd|disc|part|teil|disk|vol)\.? ?([iI0-9]+)[)\]]?"
-        
-    def flags(self,index):
-        defaultFlags = super().flags(index)
-        if index.isValid():
-            return defaultFlags | Qt.ItemIsDropEnabled | Qt.ItemIsDragEnabled
-        else: return defaultFlags | Qt.ItemIsDropEnabled
-
-    def supportedDropActions(self):
-        return Qt.CopyAction | Qt.MoveAction
 
     def dropMimeData(self,mimeData,action,row,column,parentIndex):
         """This function does all the magic that happens if elements are dropped onto this editor."""
@@ -79,7 +70,7 @@ class EditorModel(rootedtreemodel.RootedTreeModel):
         if parent is self.root:
             oldContentIDs = [ node.element.id for node in self.root.contents ]
             newContentIDs = oldContentIDs[:row] + ids + oldContentIDs[row:]
-            modify.stack.push(rootedtreemodel.ChangeRootCommand(self, oldContentIDs, newContentIDs))
+            modify.stack.push(wrappertreemodel.ChangeRootCommand(self, oldContentIDs, newContentIDs))
             ret = True
         else:
             ret = False

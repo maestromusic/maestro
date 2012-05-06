@@ -319,6 +319,8 @@ class BrowserTreeView(treeview.TreeView):
     _optimizers = None
     
     actionConfig = treeview.TreeActionConfiguration()
+    sect = translate(__name__, "browser")
+    actionConfig.addActionDefinition(((sect, 'value'),), treeactions.TagValueAction)
     sect = translate(__name__, "elements")
     actionConfig.addActionDefinition(((sect, 'merge'),), treeactions.MergeAction)
     actionConfig.addActionDefinition(((sect, 'major?'),), treeactions.ToggleMajorAction) 
