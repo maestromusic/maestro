@@ -58,6 +58,7 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
         self.layers = layers
         self.sortTags = sortTags
         self._searchRequests = []
+        self.level = levels.real
         
         if searchEngine is None:
             initSearchEngine()

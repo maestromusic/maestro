@@ -20,8 +20,10 @@
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from .. import modify, tags, models, logging
+from .. import modify, tags, models, logging, database as db
+from ..database import write
 from . import commands
+from ..models import levels
 from ..constants import DB, DISK, CONTENTS
 #from omg.modify.commands import InsertElementsCommand
 
@@ -81,7 +83,7 @@ class EditTagsAction(TreeAction):
 
 class RemoveElementsCommand(QtGui.QUndoCommand):
     
-    def __init__(self, level, removals, mode, text):
+    def __init__(self, level, removals, text):
         super().__init__()
         self.setText(text)
         self.level = level
@@ -89,15 +91,27 @@ class RemoveElementsCommand(QtGui.QUndoCommand):
         
         
     def redo(self):
+        if self.level is levels.real:
+            db.transaction()
         for parentId, removals in self.removals.items():
             for pos,id in removals:
                 self.level.removeChild(parentId, pos)
+            if self.level is levels.real:
+                db.write.removeContents([ (parentId, pos) for pos,id in removals])
+        if self.level is levels.real:
+            db.commit()
         self.level.emitEvent(contentIds= list(self.removals.keys()))
     
     def undo(self):
+        if self.level is levels.real:
+            db.transaction()
         for parentId, removals in self.removals.items():
             for pos,id in removals:
                 self.level.insertChild(parentId, pos, id)
+            if self.level is levels.real:
+                db.write.addContents([ (parentId, pos, id) for pos,id in removals])
+        if self.level is levels.real:
+            db.commit()
         self.level.emitEvent(contentIds= list(self.removals.keys()))
         
 class DeleteAction(TreeAction):
@@ -124,32 +138,26 @@ class DeleteAction(TreeAction):
             self.setEnabled(self.parent().level == REAL and selection.hasFiles())
         
     def doAction(self):
-        if self.mode == DISK:
-            from ..gui.dialogs import question
-            if not question(self.tr('WARNING'),
-                        self.tr('Removing files from disk cannot be made undone and will clear your undo stack.\n'+
-                        'Are you absolutely sure?')):
-                return False
-        rootParents = []
-        elementParents = {}
-        for wrapper in self.parent().nodeSelection.elements():
-            parent = wrapper.parent
-            if isinstance(parent, models.RootNode):
-                rootParents.append(wrapper)
-            else:
-                if parent.element.id not in elementParents:
-                    elementParents[parent.element.id] = []
-                elementParents[parent.element.id].append((wrapper.position, wrapper.element.id))
-        
-        if len(rootParents) > 0:
-            self.parent().model().removeWrappers(rootParents)
-        if len(elementParents) > 0:
-            modify.stack.push(RemoveElementsCommand(self.parent().level,
-                                            elementParents,
-                                            self.mode,
-                                            text=self.modeText[self.mode]))
-        if self.mode == DISK:
-            modify.stack.clearBoth()
+        if self.mode == CONTENTS:
+            rootParents = []
+            elementParents = {}
+            for wrapper in self.parent().nodeSelection.elements():
+                parent = wrapper.parent
+                if isinstance(parent, models.RootNode):
+                    rootParents.append(wrapper)
+                else:
+                    if parent.element.id not in elementParents:
+                        elementParents[parent.element.id] = []
+                    elementParents[parent.element.id].append((wrapper.position, wrapper.element.id))
+            
+            if len(rootParents) > 0:
+                self.parent().model().removeWrappers(rootParents)
+            if len(elementParents) > 0:
+                modify.stack.push(RemoveElementsCommand(self.parent().model().level,
+                                                elementParents,
+                                                text=self.modeText[self.mode]))
+        else:
+            raise NotImplementedError()
 
 class MergeAction(TreeAction):
     """Action to merge selected elements into a new container."""

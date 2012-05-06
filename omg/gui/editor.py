@@ -79,7 +79,7 @@ class EditorTreeView(treeview.TreeView):
 
     actionConfig = treeview.TreeActionConfiguration()
     sect = translate(__name__, "elements")
-    actionConfig.addActionDefinition(((sect, 'remove'),), DeleteAction, mode = CONTENTS)
+    actionConfig.addActionDefinition(((sect, 'remove'),), DeleteAction, mode = CONTENTS, shortcut = "Del")
     actionConfig.addActionDefinition(((sect, 'merge'),), MergeAction)
     actionConfig.addActionDefinition(((sect, 'major?'),), ToggleMajorAction) 
     sect = translate(__name__, "editor")

@@ -21,7 +21,7 @@ import functools
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
-from .. import database as db, config,utils, tags, modify, flags
+from .. import database as db, config, constants, utils, tags, modify, flags
 from ..search import searchbox, criteria as criteriaModule
 from . import mainwindow, treeview, browserdialog
 from .delegates import browser as browserdelegate, configuration as delegateconfiguration
@@ -322,6 +322,7 @@ class BrowserTreeView(treeview.TreeView):
     sect = translate(__name__, "browser")
     actionConfig.addActionDefinition(((sect, 'value'),), treeactions.TagValueAction)
     sect = translate(__name__, "elements")
+    actionConfig.addActionDefinition(((sect, 'removeContents'),), treeactions.DeleteAction, mode = constants.CONTENTS, shortcut = "Del")
     actionConfig.addActionDefinition(((sect, 'merge'),), treeactions.MergeAction)
     actionConfig.addActionDefinition(((sect, 'major?'),), treeactions.ToggleMajorAction) 
     
