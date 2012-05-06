@@ -191,8 +191,8 @@ class MergeAction(TreeAction):
         dialog = MergeDialog(hintTitle, hintRemove, len(mergeIndices) < numSiblings and not belowRoot,
                              self.parent())
         if dialog.exec_() == QtGui.QDialog.Accepted:
-            from ..models import rootedtreemodel
-            command = rootedtreemodel.MergeCommand(self.parent().model().level,
+            from ..models import wrappertreemodel
+            command = wrappertreemodel.MergeCommand(self.parent().model().level,
                          elements[0].parent,
                          mergeIndices,
                          dialog.newTitle(),
@@ -209,7 +209,7 @@ class MergeAction(TreeAction):
                 for idx in sorted(mergedIndexes, reverse = True):
                     del newContents[idx]
                 newContents[command.insertIndex:command.insertIndex] = [command.containerID]
-                rootChangeCom = rootedtreemodel.ChangeRootCommand(self.parent().model(), oldContents, newContents)
+                rootChangeCom = wrappertreemodel.ChangeRootCommand(self.parent().model(), oldContents, newContents)
                 modify.stack.push(rootChangeCom)
                 modify.stack.endMacro()
 

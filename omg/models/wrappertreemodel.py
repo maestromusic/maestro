@@ -21,9 +21,9 @@ import itertools
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from .. import database as db, models, config, utils, logging, modify, models
+from .. import database as db, models, config, utils, logging, modify, models, tags as tagsModule
 from ..modify import treeactions
-from . import rootedtreemodel, treebuilder, levels, ContentList, Wrapper
+from . import rootedtreemodel, treebuilder, levels, ContentList, Wrapper, Container
 
 logger = logging.getLogger(__name__)
 translate = QtCore.QCoreApplication.translate
