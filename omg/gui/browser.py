@@ -322,6 +322,8 @@ class BrowserTreeView(treeview.TreeView):
     sect = translate(__name__, "browser")
     actionConfig.addActionDefinition(((sect, 'value'),), treeactions.TagValueAction)
     sect = translate(__name__, "elements")
+    actionConfig.addActionDefinition(((sect, 'editTags'),), treeactions.EditTagsAction, recursive = False)
+    actionConfig.addActionDefinition(((sect, 'editTagsR'),), treeactions.EditTagsAction, recursive = True)
     actionConfig.addActionDefinition(((sect, 'removeContents'),), treeactions.DeleteAction, mode = constants.CONTENTS, shortcut = "Del")
     actionConfig.addActionDefinition(((sect, 'merge'),), treeactions.MergeAction)
     actionConfig.addActionDefinition(((sect, 'major?'),), treeactions.ToggleMajorAction) 

@@ -76,8 +76,8 @@ class EditTagsAction(TreeAction):
         *recursive* is True). This is called by the edit tags actions in the contextmenu.
         """
         from ..gui import tageditor
-        dialog = tageditor.TagEditorDialog(self.parent().level,
-                                           self.parent().nodeSelection.elements(self.recursive),
+        dialog = tageditor.TagEditorDialog(self.parent().model().level,
+                                           [w.element for w in self.parent().nodeSelection.elements(self.recursive)],
                                            self.parent())
         dialog.exec_()
 
@@ -129,7 +129,7 @@ class DeleteAction(TreeAction):
     def initialize(self):
         selection = self.parent().nodeSelection
         if self.mode == CONTENTS:
-            self.setEnabled(all(isinstance(element.parent, models.Wrapper) \
+            self.setEnabled(not selection.empty() and all(isinstance(element.parent, models.Wrapper) \
                                     or isinstance(element.parent, models.RootNode)
                                 for element in selection.elements()))
         elif self.mode == DB:
@@ -333,41 +333,6 @@ class ClearPlaylistAction(TreeAction):
         
     def doAction(self):
         self.parent().backend.clearPlaylist()
-        
-class NewContainerAction(TreeAction):
-    """Action to create a new container inside an editor. Opens a tag editor dialog
-    and then inserts the container."""
-    
-    def __init__(self, parent):
-        super().__init__(parent, shortcut = "Ctrl+N")
-        self.setText(self.tr('new container'))
-        
-    def doAction(self):
-        
-        self.container = models.Container(id = modify.newEditorId(),
-                                     contents = None,
-                                     tags = tags.Storage(),
-                                     flags = [],
-                                     position = None,
-                                     major = False )
-        
-        from ..gui.tageditor import TagEditorDialog
-        dialog = TagEditorDialog(EDITOR, [self.container], self.parent())
-        modify.dispatcher.changes.connect(self.catchTagEvent) #TODO: omg...
-        if dialog.exec_() == QtGui.QDialog.Accepted:
-            root = self.parent().model().root
-            pos = len(root.contents)
-            modify.push(InsertElementsCommand(EDITOR,
-                                              {root.id: [(pos, self.container)]},
-                                              self.tr('new container')))
-        modify.dispatcher.changes.disconnect(self.catchTagEvent)
-        
-    def catchTagEvent(self, event):
-        print(event.ids())
-        print(self.container.id)
-        if list(event.ids()) == [self.container.id]:
-            event.applyTo(self.container)
-            
         
             
 class TagValueAction(TreeAction):

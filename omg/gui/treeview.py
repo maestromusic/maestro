@@ -73,7 +73,7 @@ class NodeSelection:
             elements = []
             for node in selectedNodes:
                 for child in node.getAllNodes():
-                    if isinstance(child,models.Element):
+                    if isinstance(child,models.Wrapper):
                         elements.append(child)
             return elements
         
