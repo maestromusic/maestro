@@ -53,12 +53,11 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
     nodeLoaded = QtCore.pyqtSignal(Node)
     
     def __init__(self,layers,sortTags):
-        super().__init__(RootNode(self))
+        super().__init__(levels.real, BrowserRootNode(self))
         self.table = None
         self.layers = layers
         self.sortTags = sortTags
         self._searchRequests = []
-        self.level = levels.real
         
         if searchEngine is None:
             initSearchEngine()
@@ -413,7 +412,7 @@ class HiddenValuesNode(models.Node):
         return None
         
         
-class RootNode(models.RootNode):
+class BrowserRootNode(models.RootNode):
     """Rootnode of the Browser-TreeModel."""
     def __init__(self,model):
         super().__init__(model)

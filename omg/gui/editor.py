@@ -22,7 +22,7 @@ from PyQt4.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
 # --------- OMG imports ----------------------
-from ..models import editor, levels, wrappertreemodel
+from ..models import editor, levels, rootedtreemodel
 from ..constants import CONTENTS
 from . import treeview, mainwindow
 from ..modify.treeactions import *
@@ -86,7 +86,7 @@ class EditorTreeView(treeview.TreeView):
     actionConfig.addActionDefinition(((sect, 'major?'),), ToggleMajorAction)
     sect = translate(__name__, "editor")
     
-    actionConfig.addActionDefinition(((sect, 'clearEditor'),), wrappertreemodel.ClearTreeAction)
+    actionConfig.addActionDefinition(((sect, 'clearEditor'),), rootedtreemodel.ClearTreeAction)
 
     def __init__(self, parent = None):
         super().__init__(parent)
@@ -198,7 +198,7 @@ class EditorWidget(QtGui.QDockWidget):
         hb.addStretch()
         self.toolbar = QtGui.QToolBar(self)
         self.toolbar.addAction(self.editor.treeActions['clearEditor'])
-        commitAction = wrappertreemodel.CommitTreeAction(self.editor)
+        commitAction = rootedtreemodel.CommitTreeAction(self.editor)
         self.addAction(commitAction)
         self.toolbar.addAction(commitAction)
         hb.addWidget(self.toolbar)
