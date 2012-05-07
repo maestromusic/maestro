@@ -20,18 +20,18 @@ from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
 from .. import logging, modify, config
-from ..models import rootedtreemodel, RootNode, Wrapper, albumguesser, levels
+from ..models import rootedtreemodel, wrappertreemodel, RootNode, Wrapper, albumguesser, levels
 from ..utils import collectFiles
 
 logger = logging.getLogger(__name__)
-                    
-class EditorModel(rootedtreemodel.RootedTreeModel):
+        
+class EditorModel(wrappertreemodel.WrapperTreeModel):
     """Model class for the editors where users can edit elements before they are commited into
     the database."""
     
     def __init__(self):
         """Initializes the model. A new RootNode will be set as root."""
-        super().__init__(levels.editor, RootNode(self))
+        super().__init__(levels.editor)
         self.albumGroupers = []
         self.metacontainer_regex=r" ?[([]?(?:cd|disc|part|teil|disk|vol)\.? ?([iI0-9]+)[)\]]?"
 
@@ -73,19 +73,24 @@ class EditorModel(rootedtreemodel.RootedTreeModel):
             # first case: OMG mime data -> wrappers from an editor, browser etc.
         else:
             raise RuntimeError('HÄÄÄÄÄ???')
-        
-        if len(ids) == 0:
-            ret = False
-        if parent is self.root:
-            oldContentIDs = [ node.element.id for node in self.root.contents ]
-            newContentIDs = oldContentIDs[:row] + ids + oldContentIDs[row:]
-            modify.stack.push(rootedtreemodel.ChangeRootCommand(self, oldContentIDs, newContentIDs))
-            ret = True
-        else:
-            ret = False
+        ret = len(ids) != 0        
+        self.insertElements(parent, row, ids)
         modify.stack.endMacro()
         return ret   
-        
+    
+    def insertElements(self, parent, index, ids, positions = None):
+        """Undoably insert elements with *ids* (a list) at index "index" under *parent*, which
+        is a wrapper. This convenience function either fires a ChangeRootCommand, if the parent
+        is the RootNode, or updates the level, if it's an element. In the latter case, a list
+        of positions for the new elements may be given; if not, it is automatically inferred."""
+        if parent is self.root:
+            oldContentIDs = [node.element.id for node in self.root.contents ]
+            newContentIDs = oldContentIDs[:index] + ids + oldContentIDs[index:]
+            modify.stack.push(rootedtreemodel.ChangeRootCommand(self, oldContentIDs, newContentIDs))
+        else:
+            modify.stack.push(InsertCommand(self.level, parent.element.id, index, ids, positions))
+            
+           
     def prepareURLs(self, urls, parent):
         '''This method is called if url MIME data is dropped onto this model, from an external file manager
         or a filesystembrowser widget.'''
@@ -115,4 +120,39 @@ class EditorModel(rootedtreemodel.RootedTreeModel):
         except albumguesser.GuessError as e:
             print(e)
             return []
+
+class InsertCommand(QtGui.QUndoCommand):
+    """A command to insert elements into a container in a level."""
+    def __init__(self, level, parentId, index, ids, positions = None):
+        super().__init__()
+        self.level = level
+        self.parentId = parentId
+        self.index = index
+        self.ids = ids
+        if positions is None:
+            if index == 0:
+                firstPosition = 1
+            else:
+                parent = self.level.get(parentId)
+                firstPosition = parent.contents.positions[index-1] + 1
+            positions = list(range(firstPosition, firstPosition + len(ids)))
+        self.positions = positions
         
+    def redo(self):
+        parent = self.level.get(self.parentId)
+        parent.contents.ids[self.index:self.index] = self.ids
+        parent.contents.positions[self.index:self.index] = self.positions
+        for childId in self.ids:
+            child = self.level.get(childId)
+            if self.parentId not in child.parents:
+                child.parents.append(self.parentId)
+        self.level.emitEvent(contentIds = [self.parentId])
+    
+    def undo(self):
+        parent = self.level.get(self.parentId)
+        del parent.contents.ids[self.index:self.index+len(self.ids)]
+        del parent.contents.positions[self.index:self.index+len(self.ids)]
+        for childId in self.ids:
+            if childId not in parent.contents.ids:
+                self.level.get(childId).parents.remove(self.parentId)
+        self.level.emitEvent(contentIds = [self.parentId])

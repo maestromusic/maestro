@@ -113,9 +113,18 @@ class RemoveElementsCommand(QtGui.QUndoCommand):
         if self.level is levels.real:
             db.commit()
         self.level.emitEvent(contentIds= list(self.removals.keys()))
-        
+   
 class DeleteAction(TreeAction):
-    """Action to remove selected elements."""
+    """Action to remove selected elements. Works for editor and browser.
+    
+    The deletion mode (CONTENTS, DB, or DISK) has to be passed to the constructor. The
+    behavior is as follows:
+    - CONTENTS: remove elements from their parents. If the parent is an element, the level
+                gets updated. If the parent is the RootNode, the element is removed there,
+                leaving the level untouched.
+    - DB (only in 'real' level): remove selected elements from the database
+    - DISK: remove selected files from disk. If the files are contained in the DB, they
+            are also removed from there."""
     modeText = { DB: translate( __name__, 'delete (from database)' ),
                  CONTENTS: translate( __name__, 'delete (from parent)'),
                  DISK: translate( __name__, 'delete (from disk)')}
@@ -138,20 +147,25 @@ class DeleteAction(TreeAction):
             self.setEnabled(self.parent().level == REAL and selection.hasFiles())
         
     def doAction(self):
+        model = self.parent().model()
         if self.mode == CONTENTS:
             rootParents = []
             elementParents = {}
             for wrapper in self.parent().nodeSelection.elements():
                 parent = wrapper.parent
                 if isinstance(parent, models.RootNode):
-                    rootParents.append(wrapper)
+                    rootParents.append(parent.contents.index(wrapper))
                 else:
                     if parent.element.id not in elementParents:
                         elementParents[parent.element.id] = []
                     elementParents[parent.element.id].append((wrapper.position, wrapper.element.id))
             
             if len(rootParents) > 0:
-                self.parent().model().removeWrappers(rootParents)
+                from ..models.rootedtreemodel import ChangeRootCommand
+                newContents = model.root.contents[:]
+                for idx in sorted(rootParents, reverse = True):
+                    del newContents[idx]
+                modify.stack.push(ChangeRootCommand(model, model.root.contents, newContents))
             if len(elementParents) > 0:
                 modify.stack.push(RemoveElementsCommand(self.parent().model().level,
                                                 elementParents,

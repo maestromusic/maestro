@@ -38,7 +38,7 @@ class WrapperTreeModel(rootedtreemodel.RootedTreeModel):
     Usually the main undostack is used, but you can specify a different stack using the argument *stack*.
     """
     def __init__(self,level = None, root = None, stack = None):
-        super().__init__(models.RootNode(self) if root is None else root)
+        super().__init__(level, models.RootNode(self) if root is None else root)
         if stack is None:
             self.stack = modify.stack
         else: self.stack = stack
@@ -66,9 +66,9 @@ class WrapperTreeModel(rootedtreemodel.RootedTreeModel):
         del parent.contents[start:end+1]
         self.endRemoveRows()
     
-    def insert(self,parent,position,wrappers):
-        """Insert *wrappers* at the given position into the wrapper *parent*.""" 
-        command = InsertCommand(self,parent,position,wrappers)
+    def insert(self,parent,index,wrappers):
+        """Insert *wrappers* at the given positional index into the wrapper *parent*.""" 
+        command = InsertCommand(self,parent,index,wrappers)
         self.stack.push(command)
     
     def removeWrappers(self,wrappers):
