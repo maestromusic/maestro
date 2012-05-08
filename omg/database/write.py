@@ -103,7 +103,11 @@ def changePositions(parentID, changes):
     """Change the positions of children of *parentID* as given by *changes*, which is a list of (oldPos, newPos)
     tuples."""
     db.multiQuery("UPDATE {}contents SET position=? WHERE container_id=? AND position=?"
-                  .format(db.prefix), [(newPos,parentID,oldPos) for (oldPos,newPos) in changes ])
+                  .format(db.prefix), [(newPos,parentID,oldPos)
+                        for (oldPos,newPos) in sorted(changes, key = lambda cng: cng[1], reverse = True) if newPos > oldPos])
+    db.multiQuery("UPDATE {}contents SET position=? WHERE container_id=? AND position=?"
+                  .format(db.prefix), [(newPos,parentID,oldPos)
+                        for (oldPos,newPos) in sorted(changes, key = lambda cng: cng[1]) if newPos < oldPos])
      
 def updateElementsCounter(elids = None):
     """Update the elements counter. If *elids* is a list of elements-ids, the counters of those elements will
