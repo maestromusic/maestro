@@ -54,7 +54,7 @@ def createNewElements(level, ids, idMap = None):
 def changeContents(changes):
     """Change content relations of containers. *changes* is a dict mapping container ID to (oldContents, newContents)
     tuples of ContentList instances.""" 
-    idsWithPriorContents = [ (id,) for id,changeTup in changes.items() if len(changeTup[0]) > 0 ]
+    idsWithPriorContents = [ id for id,changeTup in changes.items() if len(changeTup[0]) > 0 ]
     if len(idsWithPriorContents) > 0:
         # first remove old content relations
         db.write.removeAllContents(idsWithPriorContents)

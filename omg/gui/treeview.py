@@ -86,7 +86,7 @@ class NodeSelection:
         """Returns True iff all selected elements share the same parent. IF *requireParentElement* is True,
         that parent must also be an element, otherwise False is returned."""
         return len(self._parents) == 1 and \
-            (not requireParentElement or isinstance(next(iter(self._parents)), models.Element))
+            (not requireParentElement or isinstance(next(iter(self._parents)), models.Wrapper))
     
     def hasElements(self):
         """True iff at least one element is selected."""

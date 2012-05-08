@@ -21,6 +21,7 @@ from PyQt4.QtCore import Qt
 
 from .. import logging
 from ..models import levels
+from .. import database as db
 from ..database import write
 
 translate = QtCore.QCoreApplication.translate
@@ -87,6 +88,36 @@ class ChangeMajorFlagCommand(QtGui.QUndoCommand):
             write.setMajor(list(self.previous.items()))
         self.level.emitEvent(list(self.previous.keys()))
 
+class ChangePositionsCommand(QtGui.QUndoCommand):
+    """Change the positions of several elements below the same parent. Checks for
+    invalid changes."""
+    def __init__(self, level, parentId, oldPositions, shift):
+        super().__init__()
+        self.level = level
+        self.parentId = parentId
+        self.oldPositions = level.get(parentId).contents.positions[:]
+        self.newPositions = list(map(lambda p:p + shift if p in oldPositions else p, self.oldPositions))
+        if any(i <=0 for i in self.newPositions):
+            raise levels.ConsistencyError('Positions may not drop below one')
+        if len(set(self.oldPositions)) != len(set(self.newPositions)):
+            raise levels.ConsistencyError('Position conflict: cannot perform change')
+        if self.level is levels.real:
+            self.changes = [ (p,p+shift) for p in oldPositions ]
+        
+    def redo(self):
+        parent = self.level.get(self.parentId)
+        parent.contents.positions = self.newPositions[:]
+        if self.level is levels.real:
+            db.write.changePositions(self.parentId, self.changes)
+        self.level.emitEvent(contentIds = (self.parentId,))
+    
+    def undo(self):
+        parent = self.level.get(self.parentId)
+        parent.contents.positions = self.oldPositions[:]
+        if self.level is levels.real:
+            db.write.changePositions(self.parentId, [(b,a) for a,b in self.changes])
+        self.level.emitEvent(contentIds = (self.parentId,))
+            
 
 #class TagFlagUndoCommand(UndoCommand):
 #    """An UndoCommand that changes only tags and/or flags. The dicts *tagChanges* and *flagChanges* map

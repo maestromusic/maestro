@@ -84,6 +84,8 @@ class EditorTreeView(treeview.TreeView):
     actionConfig.addActionDefinition(((sect, 'remove'),), DeleteAction, mode = CONTENTS, shortcut = "Del")
     actionConfig.addActionDefinition(((sect, 'merge'),), MergeAction)
     actionConfig.addActionDefinition(((sect, 'major?'),), ToggleMajorAction)
+    actionConfig.addActionDefinition(((sect, 'position+'),), ChangePositionAction, mode = "+1")
+    actionConfig.addActionDefinition(((sect, 'position-'),), ChangePositionAction, mode = "-1")
     sect = translate(__name__, "editor")
     
     actionConfig.addActionDefinition(((sect, 'clearEditor'),), rootedtreemodel.ClearTreeAction)

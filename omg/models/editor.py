@@ -64,15 +64,12 @@ class EditorModel(wrappertreemodel.WrapperTreeModel):
             row = parent.getContentsCount()
 
         modify.stack.beginMacro(self.tr("drop into editor"))
-        if mimeData.hasFormat("text/uri-list"):
-            # files and/or folders are dropped from outside or from a filesystembrowser.
-            ids = self.prepareURLs(mimeData.urls(), parent)
-            
-        elif mimeData.hasFormat(config.options.gui.mime):
+        if mimeData.hasFormat(config.options.gui.mime):
             ids = [ node.element.id for node in mimeData.getNodes() if isinstance(node, Wrapper) ]
-            # first case: OMG mime data -> wrappers from an editor, browser etc.
-        else:
-            raise RuntimeError('HÄÄÄÄÄ???')
+            
+        else: #mimeData.hasFormat(config.options.gui.mime)
+            ids = self.prepareURLs(mimeData.urls(), parent)
+        
         ret = len(ids) != 0        
         self.insertElements(parent, row, ids)
         modify.stack.endMacro()

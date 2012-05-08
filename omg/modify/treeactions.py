@@ -248,39 +248,35 @@ class FlattenAction(TreeAction):
 
 class ChangePositionAction(TreeAction):
     
-    def __init__(self, parent, type = "free", *args, **kwargs):
+    def __init__(self, parent, mode = "free", *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
-        self.type = type
-        if type == "free":
+        self.mode = mode
+        if mode == "free":
             self.setText(self.tr("choose position..."))
-        elif type == "+1":
+        elif mode == "+1":
             self.setText(self.tr("increase position"))
-        elif type == "-1":
+        elif mode == "-1":
             self.setText(self.tr("decrease position"))
         else:
-            raise ValueError("{0} is not a valid ChangePositionAction type".format(type))
+            raise ValueError("{0} is not a valid ChangePositionAction mode".format(mode))
     
     def initialize(self):
         selection = self.parent().nodeSelection
-        if self.type == "free":
+        if self.mode == "free":
             self.setEnabled(False)
-        elif self.type == "+1":
-            self.setEnabled(selection.singleElement() and selection.elements()[0].position is not None)
         else:
-            self.setEnabled(selection.singleElement()
-                            and selection.elements()[0].position is not None 
-                            and selection.elements()[0].position> 1)
-    
+            self.setEnabled(selection.singleParent(True))
+        
     def doAction(self):
+        from ..gui.dialogs import warning
         selection = self.parent().nodeSelection
-        element = selection.elements()[0]
-        parentId = element.parent.id
-        if self.type == "+1":
-            modify.push(commands.PositionChangeCommand(self.parent().level,
-                                                       parentId, [(element.position, element.position+1)]))
-        elif self.type == "-1":
-            modify.push(commands.PositionChangeCommand(self.parent().level,
-                                                       parentId, [(element.position, element.position-1)]))
+        positions = [wrap.position for wrap in selection.elements()]
+        parentId = selection.elements()[0].parent.element.id
+        try:
+            modify.stack.push(commands.ChangePositionsCommand(self.parent().model().level, parentId, positions,
+                                                              1 if self.mode == "+1" else -1))
+        except levels.ConsistencyError as e:
+            warning(self.tr('error'), str(e))
 
 class MatchTagsFromFilenamesAction(TreeAction):
     """An action to trigger a dialog that matches tags from file names. Will be enabled only if at least
@@ -369,7 +365,7 @@ class TagValueAction(TreeAction):
         from ..gui.tagwidgets import TagValuePropertiesWidget
         if len(self.tagValueSpec) > 1:
             items = list(map(str, self.tagValueSpec.keys()))
-            ans, ok = QtGui.QInputDialog.getItem(self.parent(), self.tr("choose tag type"),
+            ans, ok = QtGui.QInputDialog.getItem(self.parent(), self.tr("choose tag mode"),
                                        self.tr('tag:'), items)
             if not ok:
                 return

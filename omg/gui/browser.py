@@ -326,7 +326,9 @@ class BrowserTreeView(treeview.TreeView):
     actionConfig.addActionDefinition(((sect, 'editTagsR'),), treeactions.EditTagsAction, recursive = True)
     actionConfig.addActionDefinition(((sect, 'removeContents'),), treeactions.DeleteAction, mode = constants.CONTENTS, shortcut = "Del")
     actionConfig.addActionDefinition(((sect, 'merge'),), treeactions.MergeAction)
-    actionConfig.addActionDefinition(((sect, 'major?'),), treeactions.ToggleMajorAction) 
+    actionConfig.addActionDefinition(((sect, 'major?'),), treeactions.ToggleMajorAction)
+    actionConfig.addActionDefinition(((sect, 'position+'),), treeactions.ChangePositionAction, mode = "+1")
+    actionConfig.addActionDefinition(((sect, 'position-'),), treeactions.ChangePositionAction, mode = "-1") 
     
     def __init__(self,parent,layers,sortTags,delegateConfig):
         treeview.TreeView.__init__(self,parent)

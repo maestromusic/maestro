@@ -40,6 +40,10 @@ class ElementGetError(RuntimeError):
     pass
 
 
+class ConsistencyError(RuntimeError):
+    """Error signaling a consistency violation of the element data."""
+    pass
+
 class ElementChangedEvent(ChangeEvent):
     #TODO comment
     def __init__(self,dataIds=None,contentIds=None):
@@ -514,7 +518,7 @@ class CommitCommand(QtGui.QUndoCommand):
                 if elem.isFile():
                     newFilesPaths.append(elem.path)
             else:
-                pElem = self.parent.level.elements[nid]
+                pElem = self.level.parent.elements[nid]
                 if id in self.majorChanges:
                     pElem.major = self.majorChanges[id][1]
                 if id in self.tagChanges:
