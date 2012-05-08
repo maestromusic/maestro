@@ -293,10 +293,10 @@ class TagManager(QtGui.QWidget):
         if number > 0:
             return number,False
         else:
-            from .. import editor
-            for model in editor.activeEditorModels():
-                if any(tag in node.element.tags for node in model.getRoot().getAllNodes(skipSelf=True)):
-                    return 0,False
+            from ...models import levels
+            for elem in levels.editor.elements:
+                if tag in node.element.tags:
+                    return 0, False
             return 0,True
         
     def _getColumnIndex(self,columnKey):
