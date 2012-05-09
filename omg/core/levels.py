@@ -82,6 +82,10 @@ class Level(QtCore.QObject):
         self.name = name
         self.parent = parent
         self.elements = {}
+        if config.options.misc.debug_events:
+            def _debugAll(event):
+                logger.debug("EVENT[{}]: {}".format(self.name,str(event)))
+            self.changed.connect(_debugAll)
         
     def get(self,param):
         """Return the element determined by *param* from this level. Load the element, if it is not already
