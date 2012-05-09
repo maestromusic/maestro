@@ -19,7 +19,7 @@
 from PyQt4 import QtCore
 
 from . import tageditor
-from .. import modify
+from .. import application
 from ..core import tags, flags
 
 
@@ -166,7 +166,7 @@ class FlagEditorModel(QtCore.QObject):
         self.level = level
         self.level.changed.connect(self._handleLevelChanged)
         if stack is None:
-            self.stack = modify.stack
+            self.stack = application.stack
         else: self.stack = stack
         
         self._statusNumber = 0

@@ -28,11 +28,15 @@ from PyQt4.QtCore import Qt
 
 from . import config, logging, constants
 
+
+logger = None # Will be set when logging is initialized
+        
 # The application's main window
 mainWindow = None
 
-global logger
-        
+# The application's undo stack
+stack = None
+
 # Store translators so that they are not garbage-collected
 _translators = []
 
@@ -41,6 +45,15 @@ class ChangeEvent:
     """Abstract super class for all changeevents."""
     pass
 
+
+class ChangeEventDispatcher(QtCore.QObject):
+    changes = QtCore.pyqtSignal(ChangeEvent)
+    
+    def __init__(self):
+        QtCore.QObject.__init__(self)
+
+dispatcher = None
+ 
 
 def run(cmdConfig=[],exitPoint=None,console=False):
     """This is the entry point of OMG. *cmdConfig* is a list of options given on the command line that will
@@ -65,7 +78,7 @@ def run(cmdConfig=[],exitPoint=None,console=False):
     # Lock the lockfile to prevent a second OMG-instance from starting.
     if not console:
         lock()
-    
+        
     # Check for a collection directory
     if config.options.main.collection == '':
         logger.error("No collection directory defined.")
@@ -75,6 +88,15 @@ def run(cmdConfig=[],exitPoint=None,console=False):
     
     loadTranslators(app,logger)
 
+    # Initialize dispatcher
+    global dispatcher
+    dispatcher = ChangeEventDispatcher()
+    
+    if config.options.misc.debug_events:
+        def _debugAll(event):
+            logger.debug("EVENT: " + str(event))
+        dispatcher.changes.connect(_debugAll)
+    
     # Initialize database
     from . import database
     try:
@@ -113,6 +135,9 @@ def run(cmdConfig=[],exitPoint=None,console=False):
     
     if exitPoint == 'nogui':
         return
+    
+    global stack
+    stack = QtGui.QUndoStack()
         
     from . import filesystem
     filesystem.init()

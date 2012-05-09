@@ -21,7 +21,7 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from . import commands
-from .. import modify, database as db
+from .. import application, database as db
 from ..constants import DB, DISK, CONTENTS
 from ..core import levels, tags
 from ..core.nodes import RootNode, Wrapper
@@ -163,11 +163,11 @@ class DeleteAction(TreeAction):
                 newContents = model.root.contents[:]
                 for idx in sorted(rootParents, reverse = True):
                     del newContents[idx]
-                modify.stack.push(ChangeRootCommand(model, model.root.contents, newContents))
+                application.stack.push(ChangeRootCommand(model, model.root.contents, newContents))
             if len(elementParents) > 0:
-                modify.stack.push(RemoveElementsCommand(self.parent().model().level,
-                                                elementParents,
-                                                text=self.modeText[self.mode]))
+                application.stack.push(RemoveElementsCommand(self.parent().model().level,
+                                                             elementParents,
+                                                             text=self.modeText[self.mode]))
         else:
             raise NotImplementedError()
 
@@ -211,10 +211,10 @@ class MergeAction(TreeAction):
                          dialog.removeString(),
                          dialog.adjustPositions())
             if command.elementParent:
-                modify.stack.push(command)
+                application.stack.push(command)
             else:
-                modify.stack.beginMacro(self.tr("merge elements"))
-                modify.stack.push(command)
+                application.stack.beginMacro(self.tr("merge elements"))
+                application.stack.push(command)
                 oldContents = [node.element.id for node in self.parent().model().root.contents ]
                 newContents = oldContents[:]
                 mergedIndexes = [ v[0] for v in command.parentChanges.values() ]
@@ -222,8 +222,8 @@ class MergeAction(TreeAction):
                     del newContents[idx]
                 newContents[command.insertIndex:command.insertIndex] = [command.containerID]
                 rootChangeCom = rootedtreemodel.ChangeRootCommand(self.parent().model(), oldContents, newContents)
-                modify.stack.push(rootChangeCom)
-                modify.stack.endMacro()
+                application.stack.push(rootChangeCom)
+                application.stack.endMacro()
 
 class FlattenAction(TreeAction):
     """Action to "flatten out" containers, i.e. remove them and replace them by their
@@ -239,10 +239,10 @@ class FlattenAction(TreeAction):
         from ..gui.dialogs import FlattenDialog
         dialog = FlattenDialog(parent = self.parent())
         if dialog.exec_() == QtGui.QDialog.Accepted:
-            modify.commands.flatten(self.parent().level,
-                                    self.parent().nodeSelection.elements(),
-                                    dialog.recursive()
-                                    )
+            application.commands.flatten(self.parent().level,
+                                         self.parent().nodeSelection.elements(),
+                                         dialog.recursive()
+                                         )
 
 class ChangePositionAction(TreeAction):
     
@@ -271,8 +271,9 @@ class ChangePositionAction(TreeAction):
         positions = [wrap.position for wrap in selection.elements()]
         parentId = selection.elements()[0].parent.element.id
         try:
-            modify.stack.push(commands.ChangePositionsCommand(self.parent().model().level, parentId, positions,
-                                                              1 if self.mode == "+1" else -1))
+            application.stack.push(commands.ChangePositionsCommand(self.parent().model().level,
+                                                                   parentId, positions,
+                                                                   1 if self.mode == "+1" else -1))
         except levels.ConsistencyError as e:
             warning(self.tr('error'), str(e))
 
@@ -311,7 +312,7 @@ class ToggleMajorAction(TreeAction):
         self.selection = selection
         
     def doAction(self):
-        modify.stack.push(commands.ChangeMajorFlagCommand(self.parent().model().level,
+        application.stack.push(commands.ChangeMajorFlagCommand(self.parent().model().level,
                         [w.element.id for w in self.selection.elements() if w.element.major == self.state]))
         self.toggle()
                 

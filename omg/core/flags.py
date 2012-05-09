@@ -18,7 +18,7 @@
 
 from PyQt4 import QtGui
 
-from .. import database as db, modify, logging, constants
+from .. import application, constants, database as db, logging
 from ..constants import ADDED, DELETED, CHANGED
 from ..application import ChangeEvent
 
@@ -204,7 +204,7 @@ def addFlagType(**data):
     
     _flagsById[flagType.id] = flagType
     _flagsByName[flagType.name] = flagType
-    modify.dispatcher.changes.emit(FlagTypeChangedEvent(ADDED,flagType))
+    application.dispatcher.changes.emit(FlagTypeChangedEvent(ADDED,flagType))
     return flagType
 
 
@@ -218,7 +218,7 @@ def removeFlagType(flagType):
     db.commit()
     del _flagsById[flagType.id]
     del _flagsByName[flagType.name]
-    modify.dispatcher.changes.emit(FlagTypeChangedEvent(DELETED,flagType))
+    application.dispatcher.changes.emit(FlagTypeChangedEvent(DELETED,flagType))
 
 
 def changeFlagType(flagType,**data):
@@ -254,7 +254,7 @@ def changeFlagType(flagType,**data):
     if len(assignments) > 0:
         params.append(flagType.id) # for the where clause
         db.query("UPDATE {}flag_names SET {} WHERE id = ?".format(db.prefix,','.join(assignments)),*params)
-        modify.dispatcher.changes.emit(FlagTypeChangedEvent(CHANGED,flagType))
+        application.dispatcher.changes.emit(FlagTypeChangedEvent(CHANGED,flagType))
     db.commit()
 
 
@@ -274,3 +274,4 @@ class FlagDifference:
         for flag in self.additions:
             flagsB.remove(flag)
         flagsB.extend(self.removals)
+        

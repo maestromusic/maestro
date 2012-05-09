@@ -22,7 +22,7 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from . import rootedtreemodel
-from .. import database as db, models, config, utils, modify, models
+from .. import application, database as db, models, config, utils, models
 from ..core import levels
 from ..core.nodes import RootNode, Wrapper
 
@@ -34,14 +34,9 @@ class WrapperTreeModel(rootedtreemodel.RootedTreeModel):
     methods to modify the tree structure and drag and drop support that allows the user to modify the tree
     arbitrarily (the only rule is that contents must not be inserted into a file. They will be placed behind
     it instead).
-    
-    Usually the main undostack is used, but you can specify a different stack using the argument *stack*.
     """
-    def __init__(self,level = None, root = None, stack = None):
+    def __init__(self,level = None, root = None):
         super().__init__(level, RootNode(self) if root is None else root)
-        if stack is None:
-            self.stack = modify.stack
-        else: self.stack = stack
         self.level = level
         
     def _setRootContents(self,wrappers):
@@ -69,7 +64,7 @@ class WrapperTreeModel(rootedtreemodel.RootedTreeModel):
     def insert(self,parent,index,wrappers):
         """Insert *wrappers* at the given positional index into the wrapper *parent*.""" 
         command = InsertCommand(self,parent,index,wrappers)
-        self.stack.push(command)
+        application.stack.push(command)
     
     def removeWrappers(self,wrappers):
         """Remove the given wrappers from the model. When possible its usually faster to use the range-based
@@ -100,7 +95,7 @@ class WrapperTreeModel(rootedtreemodel.RootedTreeModel):
         RemoveCommand).
         """
         command = RemoveCommand(self,ranges)
-        self.stack.push(command)
+        application.stack.push(command)
         
     def supportedDropActions(self):
         return Qt.CopyAction | Qt.MoveAction
@@ -171,14 +166,14 @@ class WrapperTreeModel(rootedtreemodel.RootedTreeModel):
         elif position < 0 or position > len(parent.contents):
             raise ValueError("Position {} is out of bounds".format(position))
         
-        self.stack.beginMacro(self.tr("Split node"))
+        application.stack.beginMacro(self.tr("Split node"))
         # Insert a copy of parent directly after parent
         copy = parent.copy(contents=[])
         self.insert(parent.parent,parent.parent.index(parent)+1,[copy])
         movingWrappers = parent.contents[position:]
         self.remove(parent,position,len(parent.contents)-1)
         self.insert(copy,0,movingWrappers)
-        self.stack.endMacro()
+        application.stack.endMacro()
                         
 
                     

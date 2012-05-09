@@ -96,7 +96,8 @@ defaults = OrderedDict((
 ("misc", {
     "show_ids": (bool,False,"Whether OMG should display element IDs"),
     "consoleLogLevel": (str,"",
-                        "Log-messages of this loglevel and higher are additionally printed to stderr. Leave it empty to use the configuration specified in the logging configuration (storage.options.main.logging).")
+                        "Log-messages of this loglevel and higher are additionally printed to stderr. Leave it empty to use the configuration specified in the logging configuration (storage.options.main.logging)."),
+    "debug_events": (bool,False,"Whether to print a debug message for each change event.")
 }),
 ))
 

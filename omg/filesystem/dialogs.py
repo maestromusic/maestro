@@ -21,13 +21,14 @@ import itertools
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
-from .. import database as db, modify, constants, utils
+from .. import application, constants, database as db, utils
 from ..core.elements import File, Container
 from ..core.nodes import RootNode
 from ..modify import commands
 from ..models.rootedtreemodel import RootedTreeModel
 from ..gui import mainwindow, treeview
 from ..gui.delegates.editor import EditorDelegate
+
 
 class MissingFilesDialog(QtGui.QDialog):
     """A dialog that notifies the user about missing files.
@@ -95,8 +96,8 @@ class MissingFilesDialog(QtGui.QDialog):
     def deleteElements(self):
         files = self.fileview.nodeSelection.elements()
         containers = self.containerview.nodeSelection.elements()
-        modify.push(commands.RemoveElementsCommand(constants.REAL, files + containers, constants.DB,
-                                       self.tr('remove deleted files from DB')))
+        application.push(commands.RemoveElementsCommand(constants.REAL, files + containers, constants.DB,
+                                                        self.tr('remove deleted files from DB')))
         self.accept()
         
     def startFileSelection(self, index):

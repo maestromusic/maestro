@@ -380,10 +380,10 @@ class TagEditorWidget(QtGui.QWidget):
         if not all(singleTagEditor.isValid() for singleTagEditor in self.singleTagEditors.values()):
             QtGui.QMessageBox.warning(self,self.tr("Invalid value"),self.tr("At least one value is invalid."))
         else:
-            modify.push(modify.commands.TagFlagUndoCommand(self.level,
-                                                           self.model.getChanges(),
-                                                           self.flagModel.getChanges(),
-                                                           elements = self.model.getElements()))
+            application.push(modify.commands.TagFlagUndoCommand(self.level,
+                                                                self.model.getChanges(),
+                                                                self.flagModel.getChanges(),
+                                                                elements = self.model.getElements()))
             self.saved.emit()
                 
     def contextMenuEvent(self,contextMenuEvent,record=None):

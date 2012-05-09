@@ -20,7 +20,7 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from . import mimedata
-from .. import logging, config, utils
+from .. import application, logging, config, utils
 from .. import database as db, modify
 from ..core import levels, tags as tagsModule
 from ..core.elements import Container, ContentList
@@ -400,7 +400,7 @@ class ClearTreeAction(treeactions.TreeAction):
     
     def doAction(self):
         model = self.parent().model()
-        modify.stack.push(ChangeRootCommand(model,
+        application.stack.push(ChangeRootCommand(model,
                                       [node.element.id for node in model.root.contents],
                                       [],
                                       self.tr('clear view')))
@@ -419,7 +419,7 @@ class CommitTreeAction(treeactions.TreeAction):
         from . import levels
         model = self.parent().model()
         ids = set(n.element.id for n in self.parent().model().root.contents)
-        modify.stack.push(levels.CommitCommand(model.level, ids, self.tr("Commit editor")))
+        application.stack.push(levels.CommitCommand(model.level, ids, self.tr("Commit editor")))
 
             
 

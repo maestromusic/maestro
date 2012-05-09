@@ -21,7 +21,7 @@ import functools
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from ... import utils, modify, constants
+from ... import application, constants, utils
 from ...core import tags
 from ..delegates import configuration
 from .. import dialogs
@@ -410,7 +410,7 @@ class TagEditor(QtGui.QComboBox):
         super().__init__()
         self._updateBox(value)
         self.currentIndexChanged.connect(self.valueChanged)
-        modify.dispatcher.changes.connect(self._handleTagTypeChanged)
+        application.dispatcher.changes.connect(self._handleTagTypeChanged)
             
     def _updateBox(self,defaultTag):
         """Fill/update the list of tags."""
@@ -451,7 +451,7 @@ class DataPieceEditor(QtGui.QComboBox):
         super().__init__()
         self._updateBox(value)
         self.currentIndexChanged.connect(self.valueChanged)
-        modify.dispatcher.changes.connect(self._handleTagTypeChanged)
+        application.dispatcher.changes.connect(self._handleTagTypeChanged)
             
     def _updateBox(self,default):
         """Fill/update the list of datapieces."""

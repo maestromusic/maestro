@@ -18,8 +18,8 @@
 
 from PyQt4 import QtCore
 
-from .. import database as db
-from ..core import tags
+from ... import database as db
+from ...core import tags
 
 translate = QtCore.QCoreApplication.translate
 

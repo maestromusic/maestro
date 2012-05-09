@@ -40,7 +40,7 @@ from functools import reduce
 
 from PyQt4 import QtGui
 
-from .. import config, constants, logging, utils
+from .. import application, config, constants, logging, utils
 from ..constants import ADDED, DELETED, CHANGED
 from ..application import ChangeEvent
 
@@ -413,8 +413,7 @@ def addTagType(**data):
     _tagsByName[tagType.name] = tagType
     _tagsById[tagType.id] = tagType
     tagList.append(tagType)
-    from . import modify
-    modify.dispatcher.changes.emit(TagTypeChangedEvent(ADDED,tagType))
+    application.dispatcher.changes.emit(TagTypeChangedEvent(ADDED,tagType))
     return tagType
         
 
@@ -433,9 +432,7 @@ def removeTagType(tagType):
     del _tagsByName[tagType.name]
     del _tagsById[tagType.id]
     tagList.remove(tagType)
-            
-    from . import modify
-    modify.dispatcher.changes.emit(TagTypeChangedEvent(DELETED,tagType))
+    application.dispatcher.changes.emit(TagTypeChangedEvent(DELETED,tagType))
 
 
 def changeTagType(tagType,**data):
@@ -494,8 +491,7 @@ def changeTagType(tagType,**data):
         db.query("UPDATE {}tagids SET {} WHERE id = ?"
                     .format(db.prefix,','.join(assignments)),*params)
         db.commit()
-        from . import modify
-        modify.dispatcher.changes.emit(TagTypeChangedEvent(CHANGED,tagType))
+        application.dispatcher.changes.emit(TagTypeChangedEvent(CHANGED,tagType))
 
 
 def loadTagTypesFromDB():

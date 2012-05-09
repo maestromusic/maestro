@@ -19,7 +19,7 @@
 from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
-from .. import utils, database as db, modify, constants
+from .. import application, utils, database as db, constants
 from ..core import tags
 
 
@@ -38,7 +38,7 @@ class TagLabel(QtGui.QLabel):
         QtGui.QLabel.__init__(self,parent)
         self.iconOnly = iconOnly
         self.setTag(tag)
-        modify.dispatcher.changes.connect(self._handleDispatcher)
+        application.dispatcher.changes.connect(self._handleDispatcher)
 
     def text(self):
         if self.tag is not None:
@@ -191,7 +191,7 @@ class TagTypeBox(QtGui.QStackedWidget):
         
         self.addWidget(self.box)
         
-        modify.dispatcher.changes.connect(self._handleTagTypeChanged)
+        application.dispatcher.changes.connect(self._handleTagTypeChanged)
     
     def _addTagToBox(self,tag):
         """Add a tag to the box. Display icon and title if available."""
@@ -561,12 +561,12 @@ class NewTagTypeDialog(QtGui.QDialog):
                                       self.tr("The title must not be empty."))
             return
         if self._newTag is None:
-            modify.stack.push(tags.TagTypeUndoCommand(constants.ADDED,
-                                                name=self.tagname,
-                                                type=self.combo.getType(),
-                                                title=self.titleLineEdit.text(),
-                                                iconPath=None,
-                                                private=self.privateBox.isChecked()))
+            application.stack.push(tags.TagTypeUndoCommand(constants.ADDED,
+                                                           name=self.tagname,
+                                                           type=self.combo.getType(),
+                                                           title=self.titleLineEdit.text(),
+                                                           iconPath=None,
+                                                           private=self.privateBox.isChecked()))
             self._newTag = tags.get(self.tagname)
         self.accept()
         
@@ -692,17 +692,19 @@ class TagValuePropertiesWidget(QtGui.QWidget):
         if self.changeValueCheckbox.isChecked() and self.valueEdit.text() != self.orig_value:
             #TODO: make sure that the new value is not an empty string  
             command = commands.RenameTagValueCommand(self.tag, self.orig_value, self.valueEdit.text())
-            modify.stack.push(command)
+            application.stack.push(command)
         if self.sortValueCheckbox.isChecked():
             if self.sortEdit.text() != self.orig_sortValue:
-                command = commands.SortValueUndoCommand(self.tag, self.valueId, self.orig_sortValue, self.sortEdit.text())
-                modify.stack.push(command)
+                command = commands.SortValueUndoCommand(self.tag, self.valueId, self.orig_sortValue,
+                                                        self.sortEdit.text())
+                application.stack.push(command)
         elif self.orig_sortValue is not None:
             command = commands.SortValueUndoCommand(self.tag, self.valueId, self.orig_sortValue, None)
-            modify.stack.push(command)
+            application.stack.push(command)
         if self.hiddenCheckbox.isChecked() != self.orig_hidden:
-            command = commands.ValueHiddenUndoCommand(self. tag, self.valueId, self.hiddenCheckbox.isChecked())
-            modify.stack.push(command)
+            command = commands.ValueHiddenUndoCommand(self. tag, self.valueId,
+                                                      self.hiddenCheckbox.isChecked())
+            application.stack.push(command)
     
     @staticmethod
     def showDialog(tag, valueId):

@@ -19,7 +19,7 @@
 from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
-from .. import constants, utils, modify
+from .. import application, constants, utils
 from ..core import levels, tags
 
 translate = QtCore.QCoreApplication.translate
@@ -432,7 +432,7 @@ class TagEditorModel(QtCore.QObject):
         self.setElements(elements)
         
         if stack is None:
-            self.stack = modify.stack
+            self.stack = application.stack
         else: self.stack = stack
 
     def getTags(self):

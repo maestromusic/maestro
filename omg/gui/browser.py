@@ -21,7 +21,7 @@ import functools
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
-from .. import database as db, config, constants, utils, modify
+from .. import application, config, constants, database as db, config, utils
 from ..core import tags, flags, levels
 from ..core.elements import Element, Container
 from ..core.nodes import Wrapper
@@ -185,7 +185,7 @@ class Browser(QtGui.QWidget):
                 # Load a reasonable default
                 self.sortTags = {tags.get('artist'): [tags.get('date')]}
             
-        modify.dispatcher.changes.connect(self._handleDispatcher)
+        application.dispatcher.changes.connect(self._handleDispatcher)
         levels.real.changed.connect(self._handleLevelChange)
         
         # Convert tag names to tags, leaving the nested list structure unchanged.

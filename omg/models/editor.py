@@ -19,7 +19,7 @@
 from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
-from .. import modify, config
+from .. import application, config
 from ..core import levels
 from ..core.nodes import RootNode, Wrapper
 from ..models import rootedtreemodel, wrappertreemodel, albumguesser
@@ -64,7 +64,7 @@ class EditorModel(wrappertreemodel.WrapperTreeModel):
         if row == -1:
             row = parent.getContentsCount()
 
-        modify.stack.beginMacro(self.tr("drop into editor"))
+        application.stack.beginMacro(self.tr("drop into editor"))
         if mimeData.hasFormat(config.options.gui.mime):
             ids = [ node.element.id for node in mimeData.getNodes() if isinstance(node, Wrapper) ]
             
@@ -73,7 +73,7 @@ class EditorModel(wrappertreemodel.WrapperTreeModel):
         
         ret = len(ids) != 0        
         self.insertElements(parent, row, ids)
-        modify.stack.endMacro()
+        application.stack.endMacro()
         return ret   
     
     def insertElements(self, parent, index, ids, positions = None):
@@ -84,9 +84,9 @@ class EditorModel(wrappertreemodel.WrapperTreeModel):
         if parent is self.root:
             oldContentIDs = [node.element.id for node in self.root.contents ]
             newContentIDs = oldContentIDs[:index] + ids + oldContentIDs[index:]
-            modify.stack.push(rootedtreemodel.ChangeRootCommand(self, oldContentIDs, newContentIDs))
+            application.stack.push(rootedtreemodel.ChangeRootCommand(self, oldContentIDs, newContentIDs))
         else:
-            modify.stack.push(InsertCommand(self.level, parent.element.id, index, ids, positions))
+            application.stack.push(InsertCommand(self.level, parent.element.id, index, ids, positions))
             
            
     def prepareURLs(self, urls, parent):

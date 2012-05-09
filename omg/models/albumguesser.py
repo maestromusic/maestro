@@ -20,7 +20,7 @@ import os, re, itertools
 
 from PyQt4 import QtCore, QtGui
 
-from .. import logging
+from .. import application, logging
 from ..core import tags, levels
 from ..core.elements import Container
 from ..utils import relPath
@@ -41,7 +41,7 @@ def guessAlbums(level, filesByFolder, parent, albumGroupers, metacontainer_regex
         # no grouping -> concatenate filesByFolder
         return [f.id for f in itertools.chain(*filesByFolder.values())]
     else:
-        modify.stack.beginMacro('album guessing')
+        application.stack.beginMacro('album guessing')
         if "DIRECTORY" in albumGroupers:
             albums = []
             singles = []
@@ -71,7 +71,7 @@ def guessAlbums(level, filesByFolder, parent, albumGroupers, metacontainer_regex
                 from ..gui.dialogs import warning
                 warning(translate(__name__, "Error guessing meta-containers"), str(e))
                 complete = albums + singles    
-        modify.stack.endMacro()
+        application.stack.endMacro()
         return complete
 
 class AlbumGuessCommand(QtGui.QUndoCommand):
@@ -144,7 +144,7 @@ def guessAlbumsInDirectory(level, files, albumGroupers):
             albumTags = tags.findCommonTags(elements)
             albumTags[tags.TITLE] = [key] if dirMode else elements[0].tags[albumTag]
             command = AlbumGuessCommand(level, albumTags, children)
-            modify.stack.push(command)
+            application.stack.push(command)
             returnedAlbumIDs.append(command.containerID)
             logger.debug("guessed album with id {}".format(command.containerID))
         else:
@@ -186,6 +186,6 @@ def guessMetaContainers(level, albumIDs, albumGroupers, meta_regex):
         metaTags[tags.TITLE] = [key[1]]
         metaTags[albumTag] = [key[1]]
         command = AlbumGuessCommand(level, metaTags, {pos:album.id for pos,album in contents.items()}, meta = True)
-        modify.stack.push(command)
+        application.stack.push(command)
         returnedTopIDs.append(command.containerID)
     return returnedTopIDs

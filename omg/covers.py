@@ -21,7 +21,7 @@ import os
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from . import config
+from . import application, config
 
 
 COVER_DIR = os.path.join(config.CONFDIR,'cover')
@@ -102,8 +102,7 @@ def setCover(id,cover):
     previous cover. This method will push a CoverUndoCommand on the stack so the change can be undone."""
     if not isinstance(cover,QtGui.QPixmap) or not isinstance(id,int):
         raise TypeError("cover must be a QPixmap, id an int")
-    from . import modify
-    modify.push(modify.commands.CoverUndoCommand(id,cover))
+    application.push(application.commands.CoverUndoCommand(id,cover))
     
         
 def saveCover(id,cover):
@@ -129,7 +128,6 @@ def saveCover(id,cover):
             if path[0:6] == "cache_" and os.path.isfile(os.path.join(COVER_DIR,path,str(id))):
                 os.remove(os.path.join(COVER_DIR,path,str(id)))
         
-        from . import modify
-        modify.dispatcher.changes.emit(modify.events.CoverChangeEvent(id))
+        application.dispatcher.changes.emit(application.events.CoverChangeEvent(id))
         
     return success

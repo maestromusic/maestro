@@ -40,8 +40,6 @@ class PlaylistTreeView(treeview.TreeView):
     sect = translate(__name__, "playlist")
     actionConfig.addActionDefinition(((sect, 'removeFromPL'),), RemoveFromPlaylistAction)
     actionConfig.addActionDefinition(((sect, 'clearPL'),), ClearPlaylistAction)
-    actionConfig.addActionDefinition(((sect, 'pl_undo'),), None) # special action
-    actionConfig.addActionDefinition(((sect, 'pl_redo'),), None)
 
     songSelected = QtCore.pyqtSignal(int)
     
@@ -67,11 +65,6 @@ class PlaylistTreeView(treeview.TreeView):
             if self.selectionModel():
                 self.selectionModel().selectionChanged.disconnect(self.updateGlobalSelection)
             self.setModel(model)
-            if 'pl_undo' in self.treeActions:
-                self.removeAction(self.treeActions['pl_undo'])
-                self.removeAction(self.treeActions['pl_redo'])
-            self.treeActions['pl_undo'] = model.stack.createUndoAction(self, self.tr('Undo(playlist)'))
-            self.treeActions['pl_redo'] = model.stack.createRedoAction(self, self.tr('Redo(playlist)'))
             self.itemDelegate().model = model
             self.selectionModel().selectionChanged.connect(self.updateGlobalSelection)
             self.songSelected.connect(backend.setCurrentSong)

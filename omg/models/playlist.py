@@ -18,11 +18,8 @@
 
 import itertools
 
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import Qt
-
 from . import wrappertreemodel, treebuilder
-from .. import config, utils
+from .. import application, config, utils
 from ..core import levels
 from ..core.nodes import RootNode, Wrapper
 
@@ -39,7 +36,6 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
          # self.current and all of its parents. The delegate draws an arrow in front of these nodes
         self.currentlyPlayingNodes = []
         levels.real.changed.connect(self._handleLevelChanged)
-        self.stack = QtGui.QUndoStack()
     
     def clearCurrent(self):
         """Unsets the current song and clears the currentlyPlayingNodes list."""
@@ -93,15 +89,15 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
     def resetFromPaths(self,paths,fromOutside=False):
         """Reset the playlist to contain the given files. This method is undoable."""
         wrappers = self._buildWrappersFromPaths(paths)
-        self.stack.push(PlaylistChangeCommand(self,self.root.contents,wrappers,fromOutside))
+        application.stack.push(PlaylistChangeCommand(self,self.root.contents,wrappers,fromOutside))
 
     def clear(self,fromOutside=False):
         """Clear the playlist."""
-        self.stack.push(ChangePlaylistCommand(self,self.root.contents,[]))
+        application.stack.push(ChangePlaylistCommand(self,self.root.contents,[]))
         
     def insert(self,parent,position,wrappers,fromOutside=False):
         assert not parent.isFile()
-        self.stack.beginMacro(self.tr("Insert elements"))
+        application.stack.beginMacro(self.tr("Insert elements"))
         while parent is not self.root:
             #TODO handle special case that all nodes are descendants of parent but some are no children
             if any(w.element.id not in parent.element.contents for w in wrappers):
@@ -111,9 +107,9 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
             else: break
         
         command = PlaylistInsertCommand(self,parent,position,wrappers,fromOutside)
-        self.stack.push(command)
+        application.stack.push(command)
         
-        self.stack.endMacro()
+        application.stack.endMacro()
         
     def insertPathsAtOffset(self,offset,paths,fromOutside=False):
         """Insert the given paths at the given offset."""
@@ -126,7 +122,7 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         else:
             parent = file.parent
             index = parent.index(file)
-        self.stack.push(PlaylistInsertCommand(self,parent,index,wrappers,fromOutside))
+        application.stack.push(PlaylistInsertCommand(self,parent,index,wrappers,fromOutside))
     
     def removeByOffset(self,offset,count,fromOutside=False):
         """Remove *count* files beginning at *offset* from the playlist."""
@@ -137,11 +133,11 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
             parent = file.parent
             index = parent.index(file)
             ranges.append((parent,index,index))
-        self.stack.push(PlaylistRemoveCommand(self,ranges,fromOutside))
+        application.stack.push(PlaylistRemoveCommand(self,ranges,fromOutside))
         
     def removeMany(self,ranges,fromOutside=False):
         command = PlaylistRemoveCommand(self,ranges,fromOutside)
-        self.stack.push(command)
+        application.stack.push(command)
         #TODO glue
                
     def _handleLevelChanged(self,event):

@@ -21,7 +21,7 @@ import functools, os
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from ... import database as db, constants, utils, modify
+from ... import application, constants, database as db, utils
 from ...core import flags
 from .. import misc
 from ..misc import iconbuttonbar
@@ -61,10 +61,10 @@ class FlagManager(QtGui.QWidget):
         buttonBarLayout.addWidget(addButton)
         
         self.undoButton = QtGui.QPushButton(self.tr("Undo"))
-        self.undoButton.clicked.connect(modify.stack.undo)
+        self.undoButton.clicked.connect(application.stack.undo)
         buttonBarLayout.addWidget(self.undoButton)
         self.redoButton = QtGui.QPushButton(self.tr("Redo"))
-        self.redoButton.clicked.connect(modify.stack.redo)
+        self.redoButton.clicked.connect(application.stack.redo)
         buttonBarLayout.addWidget(self.redoButton)
         
         buttonBarLayout.addStretch(1)
@@ -77,8 +77,8 @@ class FlagManager(QtGui.QWidget):
         
         self._loadFlags()
         self._checkUndoRedoButtons()
-        modify.stack.indexChanged.connect(self._checkUndoRedoButtons)
-        modify.dispatcher.changes.connect(self._handleDispatcher)
+        application.stack.indexChanged.connect(self._checkUndoRedoButtons)
+        application.dispatcher.changes.connect(self._handleDispatcher)
         
     def _handleDispatcher(self,event):
         """React to FlagTypeChangedEvents from the dispatcher."""
@@ -152,7 +152,7 @@ class FlagManager(QtGui.QWidget):
             if number > 0:
                 # TODO
                 raise NotImplementedError()
-            modify.stack.push(flags.FlagTypeUndoCommand(constants.DELETED,flagType))
+            application.stack.push(flags.FlagTypeUndoCommand(constants.DELETED,flagType))
 
     def _handleItemChanged(self,item):
         """When the name of a flag has been changed, ask the user if he really wants this and if so perform
@@ -187,15 +187,15 @@ class FlagManager(QtGui.QWidget):
                         != QtGui.QMessageBox.Yes):
                 item.setText(oldName)
                 return
-        modify.stack.push(flags.FlagTypeUndoCommand(constants.CHANGED,flagType,name=newName))
+        application.stack.push(flags.FlagTypeUndoCommand(constants.CHANGED,flagType,name=newName))
     
     def _checkUndoRedoButtons(self):
         """Enable or disable the undo and redo buttons depending on stack state."""
-        self.undoButton.setEnabled(modify.stack.canUndo()
-                            and isinstance(modify.stack.command(modify.stack.index()-1),
+        self.undoButton.setEnabled(application.stack.canUndo()
+                            and isinstance(application.stack.command(application.stack.index()-1),
                                            flags.FlagTypeUndoCommand))
-        self.redoButton.setEnabled(modify.stack.canRedo()
-                            and isinstance(modify.stack.command(modify.stack.index()),
+        self.redoButton.setEnabled(application.stack.canRedo()
+                            and isinstance(application.stack.command(application.stack.index()),
                                            flags.FlagTypeUndoCommand))
         
     def _handleCellDoubleClicked(self,row,column):
@@ -234,7 +234,7 @@ class FlagManager(QtGui.QWidget):
             
     def _setIcon(self,flagType,iconPath):
         """Set the icon(-path) of *flagType* to *iconPath* and update the GUI.""" 
-        modify.stack.push(flags.FlagTypeUndoCommand(constants.CHANGED,flagType,iconPath=iconPath))
+        application.stack.push(flags.FlagTypeUndoCommand(constants.CHANGED,flagType,iconPath=iconPath))
         # Update the widget
         row = self._flagTypes.index(flagType)
         index = self.tableWidget.model().index(row,0)                     
@@ -285,6 +285,6 @@ def createNewFlagType(parent = None):
                                   translate("FlagManager","This is no a valid flagname."))
         return None
     else:
-        modify.stack.push(flags.FlagTypeUndoCommand(constants.ADDED,name=name))
+        application.stack.push(flags.FlagTypeUndoCommand(constants.ADDED,name=name))
         return True
     

@@ -48,7 +48,7 @@ import functools
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from .. import config, constants, logging, modify
+from .. import application, config, constants, logging, modify
 
 # This will contain the single instance of MainWindow once it is initialized
 mainWindow = None
@@ -190,8 +190,8 @@ class MainWindow(QtGui.QMainWindow):
         loaded."""
         self.menus = {}
         self.menus['edit'] = self.menuBar().addMenu(self.tr("&Edit"))
-        undoAction = modify.stack.createUndoAction(self, prefix='')
-        redoAction = modify.stack.createRedoAction(self, prefix='')
+        undoAction = application.stack.createUndoAction(self, prefix='')
+        redoAction = application.stack.createRedoAction(self, prefix='')
         undoAction.setShortcut(self.tr('Ctrl+Z'))
         redoAction.setShortcut(self.tr('Ctrl+Y'))
         self.menus['edit'].addAction(undoAction)
