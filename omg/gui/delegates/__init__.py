@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2009-2011 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2012 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -21,9 +21,11 @@ import math
 from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
-from ... import models, tags, strutils, database as db, utils
 from . import configuration
 from .abstractdelegate import *
+from ... import models, strutils, database as db, utils
+from ...core import tags
+from ...core.nodes import RootNode, Wrapper
 from ...models import browser as browsermodel
 
 translate = QtCore.QCoreApplication.translate
@@ -199,7 +201,7 @@ class StandardDelegate(AbstractDelegate):
             if dataPiece.data == "filetype":
                 ext = wrapper.element.getExtension()
                 # Do not display extensions in each file if they are the same for the whole container
-                if isinstance(wrapper.parent,models.Wrapper) and wrapper.parent.getExtension() == ext:
+                if isinstance(wrapper.parent,Wrapper) and wrapper.parent.getExtension() == ext:
                     return ''
                 else: return ext
             elif dataPiece.data == "length":
@@ -237,11 +239,11 @@ class StandardDelegate(AbstractDelegate):
         parent = wrapper
         while len(values) > 0:
             parent = parent.parent
-            if isinstance(parent,models.Wrapper):
+            if isinstance(parent,Wrapper):
                 if tagType in parent.element.tags:
                     parentValues = parent.element.tags[tagType]
                 else: parentValues = []
-            elif isinstance(parent,models.RootNode):
+            elif isinstance(parent,RootNode):
                 break
             elif isinstance(parent,browsermodel.ValueNode):
                 parentValues = parent.values
@@ -264,7 +266,7 @@ class StandardDelegate(AbstractDelegate):
             flags = list(wrapper.element.flags) # copy!
             parent = wrapper.parent
             while parent is not None:
-                if isinstance(parent,models.Wrapper):
+                if isinstance(parent,Wrapper):
                     for flag in parent.element.flags:
                         if flag in flags:
                             flags.remove(flag)

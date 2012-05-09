@@ -21,10 +21,10 @@ import itertools
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from .. import database as db, models, config, utils, logging, modify, models
-from . import wrappertreemodel, treebuilder, levels
-
-logger = logging.getLogger(__name__)
+from . import wrappertreemodel, treebuilder
+from .. import config, utils
+from ..core import levels
+from ..core.nodes import RootNode, Wrapper
 
             
 class PlaylistModel(wrappertreemodel.WrapperTreeModel):
@@ -62,7 +62,7 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         self.current = self.root.fileAtOffset(offset)
         self.currentlyPlayingNodes = [self.current]
         parent = self.current.parent
-        while not isinstance(parent, models.RootNode):
+        while not isinstance(parent, RootNode):
             self.currentlyPlayingNodes.append(parent)
             parent = parent.parent
         
@@ -81,7 +81,7 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         """Build wrappers for the given paths and if possible add containers. In other words: convert a flat
         playlist to a tree playlist."""
         levels.real.loadPaths(paths)
-        wrappers = [models.Wrapper(levels.real.get(path)) for path in paths]
+        wrappers = [Wrapper(levels.real.get(path)) for path in paths]
         treeBuilder = treebuilder.TreeBuilder(wrappers)
         treeBuilder.buildParentGraph()
         return treeBuilder.buildTree(createOnlyChildren=False)
@@ -118,7 +118,7 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
     def insertPathsAtOffset(self,offset,paths,fromOutside=False):
         """Insert the given paths at the given offset."""
         levels.real.loadPaths(paths)
-        wrappers = [models.Wrapper(levels.real.get(path)) for path in paths]
+        wrappers = [Wrapper(levels.real.get(path)) for path in paths]
         file = self.root.fileAtOffset(offset,allowFileCount=True)
         if file is None:
             parent = self.root

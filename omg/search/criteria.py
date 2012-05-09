@@ -18,7 +18,8 @@
 
 import re
 
-from omg import database as db, tags, utils, config
+from .. import database as db, utils, config
+from ..core import tags
 
 # Initialized in search.init
 SEARCH_TAGS = set()

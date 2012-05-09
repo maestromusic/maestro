@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2009-2011 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2012 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -21,10 +21,12 @@ from PyQt4.QtCore import Qt
 
 from . import treeview, mainwindow, playerwidgets
 from .delegates import playlist as playlistdelegate, configuration as delegateconfig
-from .. import logging, player, utils
+from .. import player
 from ..modify.treeactions import *
+
+
 translate = QtCore.QCoreApplication.translate
-logger = logging.getLogger("gui.playlist")
+
 
 class PlaylistTreeView(treeview.TreeView):
     """This is the main widget of a playlist: The tree view showing the current element tree."""

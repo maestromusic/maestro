@@ -21,11 +21,11 @@ import itertools
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from .. import database as db, models, config, utils, logging, modify, models, tags as tagsModule
-from ..modify import treeactions
-from . import rootedtreemodel, treebuilder, levels, ContentList, Wrapper, Container
+from . import rootedtreemodel
+from .. import database as db, models, config, utils, modify, models
+from ..core import levels
+from ..core.nodes import RootNode, Wrapper
 
-logger = logging.getLogger(__name__)
 translate = QtCore.QCoreApplication.translate
 
 
@@ -38,7 +38,7 @@ class WrapperTreeModel(rootedtreemodel.RootedTreeModel):
     Usually the main undostack is used, but you can specify a different stack using the argument *stack*.
     """
     def __init__(self,level = None, root = None, stack = None):
-        super().__init__(level, models.RootNode(self) if root is None else root)
+        super().__init__(level, RootNode(self) if root is None else root)
         if stack is None:
             self.stack = modify.stack
         else: self.stack = stack
@@ -120,7 +120,7 @@ class WrapperTreeModel(rootedtreemodel.RootedTreeModel):
                 
             #TODO create a shortcut for the following lines (this calls db.idFromPath twice for each element)
             levels.real.loadPaths(paths) 
-            wrappers = [models.Wrapper(levels.real.get(path)) for path in paths]
+            wrappers = [Wrapper(levels.real.get(path)) for path in paths]
         
         # Compute drop position
         if parentIndex.isValid():

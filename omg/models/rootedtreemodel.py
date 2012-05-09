@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2009-2011 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2012 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -19,11 +19,17 @@
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from . import mimedata, levels, Node, RootNode, ContentList, Wrapper, Element, Container
+from . import mimedata
 from .. import logging, config, utils
-from .. import database as db, modify, tags as tagsModule
+from .. import database as db, modify
+from ..core import levels, tags as tagsModule
+from ..core.elements import Container, ContentList
+from ..core.nodes import Node, RootNode, Wrapper
 from ..modify import treeactions
+
+
 logger = logging.getLogger(__name__)
+
 
 class RootedTreeModel(QtCore.QAbstractItemModel):
     """The RootedTreeModel subclasses QAbstractItemModel to create a simple model for QTreeViews. It has one

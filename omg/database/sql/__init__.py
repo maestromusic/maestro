@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2009-2011 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2012 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -24,6 +24,9 @@ code.
 Currently the following drivers are supported:
 
 * `qtsql`: uses the QtSql-Module of PyQt4 (http://doc.trolltech.com/latest/qtsql.html)
+* `myconnpy`: uses MySQL Connector/Python (https://launchpad.net/myconnpy)
+* `pymysql`: uses PyMySQL (https://github.com/petehunt/PyMySQL/)
+* `sqlite`: uses the built-in sqlite3 module
 
 The following example shows basic usage of the module::
 
@@ -45,9 +48,8 @@ The following example shows basic usage of the module::
 The main class of the module is :class:`AbstractSQL <omg.database.sql.AbstractSQL>` which is subclassed by
 every driver.
 """
-import datetime
 
-from PyQt4 import QtCore
+import datetime
 
 
 # When a driver is loaded _modules[driverIdentifier] will contain the driver's module.

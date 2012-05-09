@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2009-2011 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2012 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,8 +16,10 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from .. import database as db, models
-from . import Container, levels
+from .. import database as db
+from ..core import levels
+from ..core.nodes import Wrapper
+ 
 
 def seqLen(sequence):
     """Return the length of an item-sequence."""
@@ -191,7 +193,7 @@ class TreeBuilder:
                     break
                 #print("Found a maximal sequence: {0}-{1}".format(*maxSequence))
                 pos = self._findPos(maxSequence[0],rootSeqs)
-                newNode = models.Wrapper(levels.real.get(cNode.id),
+                newNode = Wrapper(levels.real.get(cNode.id),
                                          contents = self._createTree(maxSequence,cNode.childContainers))
                 for wrapper in newNode.contents:
                     #TODO: This does not work correctly if an element appears twice with different positions

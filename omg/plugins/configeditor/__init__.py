@@ -21,7 +21,7 @@ import functools
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from ... import application, config
+from ... import config
 from ...gui import preferences
 
 translate = functools.partial(QtGui.QApplication.translate, 'ConfigEditor')

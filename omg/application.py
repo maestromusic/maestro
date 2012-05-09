@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2009-2011 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2012 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -104,7 +104,7 @@ def run(cmdConfig=[],exitPoint="nogui",console=True):
         return
         
     # Initialize tags
-    from . import tags,flags
+    from .core import tags,flags
     try:
         tags.init()
     except RuntimeError:
@@ -116,7 +116,7 @@ def run(cmdConfig=[],exitPoint="nogui",console=True):
         return
         
     # Load and initialize remaining modules
-    from .models import levels
+    from .core import levels
     levels.init()
     from . import resources, search
     search.init()

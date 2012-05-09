@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2009-2011 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2012 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -21,7 +21,8 @@ import copy
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from ... import utils, tags, config, logging
+from ... import utils, config, logging
+from ...core import tags
 
 translate = QtCore.QCoreApplication.translate
 logger = logging.getLogger(__name__)

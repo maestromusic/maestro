@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2009-2011 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2012 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -20,14 +20,12 @@
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from .. import modify, tags, models, logging, database as db
-from ..database import write
 from . import commands
-from ..models import levels
+from .. import modify, database as db
 from ..constants import DB, DISK, CONTENTS
-#from omg.modify.commands import InsertElementsCommand
+from ..core import levels, tags
+from ..core.nodes import RootNode, Wrapper
 
-logger = logging.getLogger(__name__)
 translate = QtGui.QApplication.translate
 
 
@@ -138,8 +136,8 @@ class DeleteAction(TreeAction):
     def initialize(self):
         selection = self.parent().nodeSelection
         if self.mode == CONTENTS:
-            self.setEnabled(not selection.empty() and all(isinstance(element.parent, models.Wrapper) \
-                                    or isinstance(element.parent, models.RootNode)
+            self.setEnabled(not selection.empty() and all(isinstance(element.parent, Wrapper) \
+                                    or isinstance(element.parent, RootNode)
                                 for element in selection.elements()))
         elif self.mode == DB:
             self.setEnabled(self.parent().level == REAL and selection.hasElements())
@@ -153,7 +151,7 @@ class DeleteAction(TreeAction):
             elementParents = {}
             for wrapper in self.parent().nodeSelection.elements():
                 parent = wrapper.parent
-                if isinstance(parent, models.RootNode):
+                if isinstance(parent, RootNode):
                     rootParents.append(parent.contents.index(wrapper))
                 else:
                     if parent.element.id not in elementParents:
@@ -201,7 +199,7 @@ class MergeAction(TreeAction):
         hintTitle, hintRemove = self.createMergeHint([wrap.element for wrap in elements])
         mergeIndices = sorted(elem.parent.index(elem) for elem in elements)
         numSiblings = len(elements[0].parent.contents)
-        belowRoot = isinstance(elements[0].parent, models.RootNode)
+        belowRoot = isinstance(elements[0].parent, RootNode)
         dialog = MergeDialog(hintTitle, hintRemove, len(mergeIndices) < numSiblings and not belowRoot,
                              self.parent())
         if dialog.exec_() == QtGui.QDialog.Accepted:

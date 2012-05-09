@@ -16,18 +16,20 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+import os.path
+
 from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
-import itertools, os.path
-
-from .. import tags, strutils, utils, config, logging, modify, constants
-from ..models import tageditor as tageditormodel, simplelistmodel, File, flageditor as flageditormodel, levels
-from ..gui import singletageditor, dialogs, tagwidgets, mainwindow, editor, flageditor
+from .. import strutils, utils, config, logging, modify
+from ..core import tags, levels
+from ..core.elements import File
+from ..models import tageditor as tageditormodel, simplelistmodel, flageditor as flageditormodel
+from ..gui import singletageditor, tagwidgets, mainwindow, editor, flageditor
 from ..gui.misc import widgetlist, dynamicgridlayout
 
-translate = QtCore.QCoreApplication.translate
 
+translate = QtCore.QCoreApplication.translate
 logger = logging.getLogger(__name__)
 
 

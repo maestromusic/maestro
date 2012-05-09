@@ -19,8 +19,8 @@
 from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
-from .. import constants, tags, utils, modify
-from . import levels
+from .. import constants, utils, modify
+from ..core import levels, tags
 
 translate = QtCore.QCoreApplication.translate
 

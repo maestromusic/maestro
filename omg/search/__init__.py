@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2009-2011 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2012 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -19,10 +19,10 @@
 import threading
 
 from PyQt4 import QtCore
-from PyQt4.QtCore import Qt
 
-from .. import database as db, tags, config
 from . import criteria as criteriaModule
+from .. import database as db, config
+from ..core import tags
 
 # Name of the temporary search table
 # The table is created in the search thread and temporary, so that it does not conflict with other threads.

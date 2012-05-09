@@ -17,7 +17,9 @@
 #
 
 import itertools
-from .. import database as db, tags
+
+from .. import database as db
+from ..core import tags
 
 
 def createElements(data):

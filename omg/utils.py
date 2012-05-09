@@ -17,9 +17,11 @@
 #
 
 import datetime, os, functools
-from omg import config, constants
-from PyQt4 import QtGui, QtCore
 from collections import OrderedDict
+
+from PyQt4 import QtGui
+
+from . import config
 
 
 def mapRecursively(f,aList):

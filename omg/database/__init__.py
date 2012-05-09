@@ -54,10 +54,11 @@ each thread and use a ``with`` statement to ensure the connection is finally clo
 
 \ """
 
-import os, sys, threading, functools
+import os, threading, functools
 
-from .. import config, logging, utils, tags as tagsModule, constants
 from . import sql
+from .. import config, logging, utils, constants
+from ..core import tags as tagsModule
 
 # Table type and prefix
 type = None
@@ -502,7 +503,7 @@ def elementsWithTagValue(tagSpec, valueSpec):
 # flags table
 #=======================================================================
 def flags(elid):
-    from .. import flags
+    from ..core import flags
     return [flags.get(id) for id in query(
                     "SELECT flag_id FROM {}flags WHERE element_id = ?".format(prefix),elid)
               .getSingleColumn()]

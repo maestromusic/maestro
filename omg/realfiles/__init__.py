@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2009-2011 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2012 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -18,10 +18,12 @@
 
 import subprocess, pickle, re, os
 
-from .. import tags, logging
+from .. import config, logging
+from ..core import tags
 from ..utils import absPath
-from ..config import options
+
 logger = logging.getLogger(__name__)
+
 
 def get(path, ignoreUnknownTags = False):
     """Create a RealFile-instance for the given path, which may be a relative or absolute path."""
@@ -113,7 +115,7 @@ try:
                 key = key.lower()
                 if key in ["tracknumber", "discnumber"]:
                     self.ignoredTags[key] = values
-                elif key in options.tags.always_delete:
+                elif key in config.options.tags.always_delete:
                     toDelete.append(key)
                 else:
                     try:

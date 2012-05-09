@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2009-2011 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2012 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -18,6 +18,7 @@
 
 from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
+
 
 class IconLineEdit(QtGui.QLineEdit):
     """This is simply a line edit that displays an icon inside the lineedit at the right end. In fact the

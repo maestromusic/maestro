@@ -30,10 +30,9 @@ type and description). To distinguish dicts which are nested sections from dicts
 names must be prepended with 'SECTION:' (this is not part of the section name).
 """
 
-import os, logging, sys
-
-from PyQt4 import QtCore
+import os
 from collections import OrderedDict
+
 
 # No use to translate strings here, as this is executed before any translators have been loaded.
 defaults = OrderedDict((

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2009-2011 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2012 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -19,13 +19,13 @@
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from .. import logging
-from ..models import levels
 from .. import database as db
+from ..core import levels
 from ..database import write
 
+
 translate = QtCore.QCoreApplication.translate
-logger = logging.getLogger(__name__)
+
 
 """This modules contains a list of often needed ElementChangeCommand subclasses for special purposes."""
         

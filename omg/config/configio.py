@@ -17,7 +17,8 @@
 #
  
 import re, collections, json, os
-from omg import logging
+
+from .. import logging
 
 logger = logging.getLogger(__name__)
 

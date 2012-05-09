@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2009-2011 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2012 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -18,9 +18,11 @@
 
 """This module just contains several useful string functions."""
 
-import re, itertools
-from omg import config, constants
+import re
 from difflib import SequenceMatcher
+
+from . import constants
+
 
 def longestSubstring(a, b):
     """Return the longest common substring of *a* and *b*."""

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2009-2011 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2012 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -17,9 +17,14 @@
 #
 
 """This module contains a dialog that matches tags from paths of files by a format string with placeholders."""
+
 import re
+
 from PyQt4 import QtCore, QtGui
-from .. import tags, modify, config
+
+from .. import modify, config
+from ..core import tags
+
 
 class ExtendedTableWidgetItem(QtGui.QTableWidgetItem):
     """A QTableWidgetItem with an additional internal object pointer."""

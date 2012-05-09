@@ -19,8 +19,9 @@
 """Module to manage the database tables used by OMG."""
 
 import re
-from .. import constants, database as db
+
 from .sql import DBException
+from .. import constants, database as db
 
 
 class SQLTable:

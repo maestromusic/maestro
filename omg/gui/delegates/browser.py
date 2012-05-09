@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2009-2011 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2012 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,10 +16,10 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import Qt
+from PyQt4 import QtCore
 
-from ... import tags, config, models
+from ...core import tags
+from ...core.nodes import Wrapper
 from . import StandardDelegate, configuration, TextItem, ITALIC_STYLE
 from ...models import browser as browsermodel
 
@@ -56,5 +56,5 @@ class BrowserDelegate(StandardDelegate):
             self.addCenter(TextItem(self.tr("Hidden"),ITALIC_STYLE))
         elif isinstance(node,browsermodel.LoadingNode):
             self.addCenter(TextItem(self.tr("Loading..."),ITALIC_STYLE))
-        elif isinstance(node,models.Wrapper):
+        elif isinstance(node,Wrapper):
             super().layout(index,availableWidth)

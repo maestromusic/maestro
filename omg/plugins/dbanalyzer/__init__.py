@@ -23,11 +23,10 @@ them. It is provided as central widget, dialog (in the extras menu) and standalo
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from ... import database as db, application, constants, config, utils, tags as tagsModule
+from . import resources, checks
+from ... import database as db, application, constants, config
 from ...gui import mainwindow
 
-#TODO: ??? don't use relative import since this file may be executed directly and is not a package in that case.
-from . import resources, checks
 
 _action = None # the action that is inserted into the Extras menu
 _widget = None # the dialog widget must be stored in a variable or it will vanish immediately

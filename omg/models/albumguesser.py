@@ -16,16 +16,19 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-
-from . import Container, levels
-from .. import tags, modify
-from ..utils import relPath
-from .. import logging
-logger = logging.getLogger(__name__)
 import os, re, itertools
 
 from PyQt4 import QtCore, QtGui
+
+from .. import logging
+from ..core import tags, levels
+from ..core.elements import Container
+from ..utils import relPath
+
+
+logger = logging.getLogger(__name__)
 translate = QtCore.QCoreApplication.translate
+
 
 class GuessError(ValueError):
     pass

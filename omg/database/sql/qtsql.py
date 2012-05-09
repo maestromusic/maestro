@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2009-2011 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2012 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -17,13 +17,12 @@
 #
 
 """Database driver using QtSql. Have a look at database.sql.AbstractSQL for docstrings."""
+
 import datetime
 
 from PyQt4 import QtSql, QtCore
 from . import DBException, EmptyResultException, AbstractSql, AbstractSqlResult
-from ... import utils, logging
-
-logger = logging.getLogger(__name__)
+from ... import utils
 
 
 class Sql(AbstractSql):

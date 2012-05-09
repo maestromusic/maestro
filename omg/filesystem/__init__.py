@@ -18,11 +18,14 @@
 
 """The sync module is responsible for the synchronization of the database with the file system."""
 
+import os.path, subprocess, hashlib, datetime, threading, queue, time
+
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
-from .. import logging, config, utils, database as db, realfiles, models
-from ..models import levels
-import os.path, subprocess, hashlib, datetime, threading, queue, time
+
+from .. import logging, config, utils, database as db, realfiles
+from ..core import levels
+
 logger = logging.getLogger(__name__)
 
 syncThread = None
@@ -107,7 +110,7 @@ class Notifier(QtCore.QObject):
     
     @QtCore.pyqtSlot(object)
     def changeModifiedTags(self, changes):
-        from .. import tags
+        from ..core import tags
         for id, (dbTags, fileTags) in changes.items():
             
             for tag, values in dbTags.items(): # preserve private tags

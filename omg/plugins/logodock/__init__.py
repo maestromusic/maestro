@@ -22,7 +22,6 @@ OMG's widget system."""
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from ... import constants, utils
 from ...gui import mainwindow
 
 

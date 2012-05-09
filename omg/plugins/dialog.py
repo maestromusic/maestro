@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2009-2011 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2012 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -19,27 +19,28 @@
 """This module provides a dialog to display all plugins with the info from the PLUGININFO file and allow
 the user to enable or disable them."""
 
-import os, sys
-
-from PyQt4 import QtCore,QtGui
+from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from omg import logging, config, constants
 from . import PLUGININFO_OPTIONS, plugins
+
 
 translate = QtCore.QCoreApplication.translate
 
-logger = logging.getLogger("omg.plugins")
 
 COLUMN_HEADERS = [translate("PluginDialog","Enabled"),
-                  translate("PluginDialog","Name"),translate("PluginDialog","Author"),
-                  translate("PluginDialog","Version"),translate("PluginDialog","Description"),
-                  translate("PluginDialog","Minimum OMG version"), translate("PluginDialog", "Maximum OMG version")
+                  translate("PluginDialog","Name"),
+                  translate("PluginDialog","Author"),
+                  translate("PluginDialog","Version"),
+                  translate("PluginDialog","Description"),
+                  translate("PluginDialog","Minimum OMG version"),
+                  translate("PluginDialog", "Maximum OMG version")
                   ]
 
 
 class PluginDialog(QtGui.QWidget):
-    """Dialog to display all plugins with the info from the PLUGININFO file and allow the user to enable or disable them."""
+    """Dialog to display all plugins with the info from the PLUGININFO file and allow the user to enable
+    or disable them."""
     def __init__(self,dialog,parent=None):
         super().__init__(parent)
         self.setLayout(QtGui.QVBoxLayout())

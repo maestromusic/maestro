@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2009-2011 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2012 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -21,8 +21,11 @@ import itertools
 from PyQt4 import QtCore
 from PyQt4.QtCore import Qt
 
-from .. import config, models, search, database as db, tags, logging, utils
-from . import rootedtreemodel, mimedata, Node, Element, levels
+from . import rootedtreemodel, mimedata
+from .. import config, search, database as db, logging, utils
+from ..core import tags, levels
+from ..core.elements import Element
+from ..core.nodes import Node, RootNode, Wrapper
 
 logger = logging.getLogger(__name__)
 
@@ -234,7 +237,7 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
         
         if contentsNone:
             self.beginInsertRows(self.getIndex(node),0,len(ids)-1)
-        node.setContents([models.Wrapper(levels.real.get(id)) for id in ids])
+        node.setContents([Wrapper(levels.real.get(id)) for id in ids])
         for child in node.getContents():
             child.loadContents(recursive=True)
         
@@ -262,12 +265,12 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
     def applyEvent(self, ids, contents):
         """Apply an event to all elements."""
         for node in self.getAllNodes():
-            if isinstance(node, models.Wrapper) and node.element.id in ids:
+            if isinstance(node, Wrapper) and node.element.id in ids:
                 index = self.getIndex(node)
                 self.dataChanged.emit(index,index)
 
 
-class CriterionNode(models.Node):
+class CriterionNode(Node):
     """CriterionNode is the base class for nodes used to group elements according to a criterion (confer 
     search.criteria) in a BrowserModel. The level below this node will contain all elements of this level
     that match the criterion."""
@@ -399,7 +402,7 @@ class VariousNode(CriterionNode):
         return None
 
 
-class HiddenValuesNode(models.Node):
+class HiddenValuesNode(Node):
     """A node that contains hidden value nodes."""
     def __init__(self,parent,valueNodes):
         self.parent = parent
@@ -412,14 +415,14 @@ class HiddenValuesNode(models.Node):
         return None
         
         
-class BrowserRootNode(models.RootNode):
+class BrowserRootNode(RootNode):
     """Rootnode of the Browser-TreeModel."""
     def __init__(self,model):
         super().__init__(model)
         self.layerIndex = -1
         
 
-class LoadingNode(models.Node):
+class LoadingNode(Node):
     """This is a placeholder for those moments when we must wait for a search to terminate before we can
     display the real contents. The delegate will draw the string "Loading...".
     """
@@ -462,7 +465,7 @@ class BrowserMimeData(mimedata.MimeData):
         """If *node* is a CriterionNode return all (toplevel) elements contained in it. If contents have to
         be loaded, wait for the search to finish. If *node* is an element return ''[node]''.
         """
-        if isinstance(node, models.Wrapper):
+        if isinstance(node, Wrapper):
             return [node]
         if isinstance(node,CriterionNode):
             node.loadContents(wait=True) # This does not load element data

@@ -16,12 +16,15 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+import os
+
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
-import os
+
 from . import mainwindow
-from ..utils import relPath, absPath, getIcon
 from .. import filesystem, config
+from ..utils import relPath, absPath, getIcon
+
 
 """This module contains a dock widget that displays the music in directory view, i.e. without
 considering the container structure in the database. It is meant to help building up the database.

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2009-2011 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2012 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -21,8 +21,9 @@ import itertools
 from PyQt4 import QtCore
 from PyQt4.QtCore import Qt
 
+from .. import config
+from ..core.nodes import Wrapper
 from ..utils import absPath
-from .. import config, models
 
 
 class MimeData(QtCore.QMimeData):
@@ -74,7 +75,7 @@ class MimeData(QtCore.QMimeData):
     def _getWrappers(self,nodes):
         """Like getWrappers, but use the given nodes."""
         return itertools.chain.from_iterable(
-                        [node] if isinstance(node,models.Wrapper) else self._getWrappers(node.getContents())
+                        [node] if isinstance(node,Wrapper) else self._getWrappers(node.getContents())
                     for node in nodes)
         
     def paths(self):

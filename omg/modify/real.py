@@ -20,10 +20,10 @@
 This module will really modify database and filesystem (using database.write and realfiles). It does not
 do any Undo-/Redo-stuff.
 """
- 
-from .. import database as db, tags as tagsModule, realfiles, logging, utils
-from ..database import write
+
 import os
+ 
+from .. import database as db, realfiles, logging, utils
 
 logger = logging.getLogger(__name__)
 

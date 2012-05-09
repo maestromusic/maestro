@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2009-2011 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2012 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,15 +16,18 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+import itertools
+
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
-from .. import models, database as db, modify, constants, utils
+from .. import database as db, modify, constants, utils
+from ..core.elements import File, Container
+from ..core.nodes import RootNode
 from ..modify import commands
-from ..models.rootedtreemodel import RootedTreeModel, RootNode
+from ..models.rootedtreemodel import RootedTreeModel
 from ..gui import mainwindow, treeview
 from ..gui.delegates.editor import EditorDelegate
-import itertools
 
 class MissingFilesDialog(QtGui.QDialog):
     """A dialog that notifies the user about missing files.

@@ -19,7 +19,8 @@
 from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
-from .. import tags, utils, database as db, modify, constants
+from .. import utils, database as db, modify, constants
+from ..core import tags
 
 
 class TagLabel(QtGui.QLabel):

@@ -21,12 +21,17 @@ import functools
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
-from .. import database as db, config, constants, utils, tags, modify, flags
+from .. import database as db, config, constants, utils, modify
+from ..core import tags, flags, levels
+from ..core.elements import Element, Container
+from ..core.nodes import Wrapper
 from ..search import searchbox, criteria as criteriaModule
 from . import mainwindow, treeview, browserdialog
 from .delegates import browser as browserdelegate, configuration as delegateconfiguration
-from ..models import browser as browsermodel, levels, Element, Container, Wrapper
+from ..models import browser as browsermodel
 from ..modify import treeactions
+
+
 translate = QtCore.QCoreApplication.translate
 
 

@@ -60,8 +60,9 @@ options. Use :func:`loadPlugins` and :func:`removePlugins` to add or remove plug
 """
 
 import os, sys, pickle, collections, copy
-from omg import constants, logging
+
 from . import configio
+from .. import constants, logging
 
 CONFDIR = None
 

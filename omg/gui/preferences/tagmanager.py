@@ -16,12 +16,13 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import functools, os
+import functools
 
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from ... import tags, utils, database as db, constants, modify
+from ... import utils, database as db, constants, modify
+from ...core import tags
 from .. import tagwidgets, dialogs, misc
 from ..misc import iconbuttonbar
 

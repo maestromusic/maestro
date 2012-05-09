@@ -16,18 +16,18 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from PyQt4 import QtGui, QtCore
+import mpd, functools, threading
+
+from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from ... import player, config, logging, database as db, models
-from ...utils import relPath, absPath, ranges
-from ...models import playlist, levels
+from ... import player, config, logging
+from ...models import playlist
 from ...player import STOP, PLAY, PAUSE
-from ...modify.treeactions import TreeAction
 
-import mpd, queue, itertools, functools, threading
 
 logger = logging.getLogger(__name__)
+
 
 CONNECTION_TIMEOUT = 10 # time in seconds before an initial connection to MPD is given up
 POLLING_INTERVAL = 200 # milliseconds between two MPD polls

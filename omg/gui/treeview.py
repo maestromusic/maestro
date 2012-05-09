@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2009-2011 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2012 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,15 +16,14 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+from collections import OrderedDict
+
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from .. import models, logging
+from ..core.elements import Container
+from ..core.nodes import Wrapper
 from ..modify import treeactions
-from collections import OrderedDict
-
-translate = QtGui.QApplication.translate
-logger = logging.getLogger(__name__)
 
 
 class NodeSelection:
@@ -41,7 +40,7 @@ class NodeSelection:
         all attributes."""
         indexes = model.selectedIndexes()
         self._nodes = [ model.model().data(index) for index in indexes ]
-        self._elements = [ node for node in self._nodes if isinstance(node, models.Wrapper) ]
+        self._elements = [ node for node in self._nodes if isinstance(node, Wrapper) ]
         self._parents = set(elem.parent for elem in self._elements)
         self._model = model
     
@@ -73,7 +72,7 @@ class NodeSelection:
             elements = []
             for node in selectedNodes:
                 for child in node.getAllNodes():
-                    if isinstance(child,models.Wrapper):
+                    if isinstance(child, Wrapper):
                         elements.append(child)
             return elements
         
@@ -86,7 +85,7 @@ class NodeSelection:
         """Returns True iff all selected elements share the same parent. IF *requireParentElement* is True,
         that parent must also be an element, otherwise False is returned."""
         return len(self._parents) == 1 and \
-            (not requireParentElement or isinstance(next(iter(self._parents)), models.Wrapper))
+            (not requireParentElement or isinstance(next(iter(self._parents)), Wrapper))
     
     def hasElements(self):
         """True iff at least one element is selected."""
@@ -95,7 +94,7 @@ class NodeSelection:
     def hasContainers(self):
         """True iff at least one container is selected."""
         for element in self._elements:
-            if isinstance(element, models.Container):
+            if isinstance(element, Container):
                 return True
         return False
 
@@ -283,7 +282,7 @@ class TreeView(QtGui.QTreeView):
         for index in self.selectionModel().selectedIndexes():
             node = self.model().data(index)
             # The browser does not load tags automatically
-            if isinstance(node, models.Wrapper):
+            if isinstance(node, Wrapper):
                 globalSelection.append(node.element)
         if len(globalSelection):
             from . import mainwindow

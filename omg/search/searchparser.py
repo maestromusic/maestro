@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2009-2011 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2012 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -18,8 +18,9 @@
 
 """Methods to parse queries of the form "Symphony composer:Haydn  title:'Le Matin'"."""
 
-from omg import strutils, tags
 from .criteria import TextCriterion
+from .. import strutils
+from ..core import tags
         
 # Abbreviations for tags which may be used in queries
 TAG_ABBREVIATIONS = {"t": "title",

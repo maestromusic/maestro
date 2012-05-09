@@ -32,7 +32,7 @@ Currently the order of pages is:
     or
     Special tags settings (if tagids is not empty, but either 'title' or 'album' are missing)
 """
-import collections, sys, os
+import collections, os
 
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
@@ -40,7 +40,7 @@ from PyQt4.QtCore import Qt
 # This script tries to include as few modules as possible
 from omg import config, logging, database as db
 from omg.application import loadTranslators
-from omg.tags import isValidTagname
+from omg.core.tags import isValidTagname
 from omg.gui.misc import iconchooser
 
 logger = logging.getLogger("Install tool")

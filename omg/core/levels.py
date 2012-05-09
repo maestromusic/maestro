@@ -18,10 +18,12 @@
 
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
-from .. import database as db, tags, flags, realfiles, utils, config, logging, modify
+
+from . import tags, flags
+from .elements import File, Container, ContentList
+from .. import database as db, realfiles, utils, config, logging, modify
 from ..modify import real
 from ..database import write as dbwrite
-from . import File, Container, ContentList
 from ..application import ChangeEvent
 
 real = None

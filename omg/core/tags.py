@@ -40,10 +40,9 @@ from functools import reduce
 
 from PyQt4 import QtGui
 
-from . import config, constants, logging
-from .constants import ADDED, DELETED, CHANGED
-from .utils import FlexiDate
-from .application import ChangeEvent
+from .. import config, constants, logging, utils
+from ..constants import ADDED, DELETED, CHANGED
+from ..application import ChangeEvent
 
 translate = QtGui.QApplication.translate
 logger = logging.getLogger(__name__)
@@ -94,11 +93,11 @@ class ValueType:
         elif self.name == 'text':
             return isinstance(value,str) and len(value) > 0
         elif self.name == 'date':
-            if isinstance(value,FlexiDate):
+            if isinstance(value,utils.FlexiDate):
                 return True
             else:
                 try: 
-                    FlexiDate.strptime(value)
+                    utils.FlexiDate.strptime(value)
                     return True
                 except TypeError:
                     return False
@@ -115,7 +114,7 @@ class ValueType:
         if self == TYPE_DATE and newType != TYPE_DATE:
             convertedValue = value.strftime()
         elif self != TYPE_DATE and newType == TYPE_DATE:
-            convertedValue = FlexiDate.strptime(value)
+            convertedValue = utils.FlexiDate.strptime(value)
         else: convertedValue = value # nothing to convert
         if newType.isValid(convertedValue):
             return convertedValue
@@ -125,9 +124,9 @@ class ValueType:
     def sqlFormat(self,value):
         """Convert *value* into a string that can be inserted into database queries."""
         if self.name == 'date':
-            if isinstance(value,FlexiDate):
+            if isinstance(value,utils.FlexiDate):
                 return value.sqlFormat()
-            else: return FlexiDate.strptime(value).sqlFormat()
+            else: return utils.FlexiDate.strptime(value).sqlFormat()
         else: return value
 
     @staticmethod
@@ -144,7 +143,7 @@ class ValueType:
         :class:`omg.utils.FlexiDate`\ s if this is the date-type.
         """
         if self == TYPE_DATE:
-            return FlexiDate.strptime(string)
+            return utils.FlexiDate.strptime(string)
         else: return string
     
     def __repr__(self):
