@@ -42,27 +42,12 @@ class ChangeEvent:
     pass
 
 
-def run(cmdConfig=[],exitPoint="nogui",console=True):
-    """This method serves two purposes: It is the entry point for OMG and it is used to initialize OMG's
-    framework on the console and without GUI for debugging. Using this method on the console works like this:
-
-        >>> from omg import application, tags
-        >>> application.run()
-        >>> tags.tagList
-        ["title", "artist", "album", ...]
-        
-    Then using this method on the console, use the parameter *exitPoint* to determine how much of the
-    framework should be initialized. Note that the default parameters are chosen to save work on the console
-    and are not the values necessary to get the usual graphical application.
+def run(cmdConfig=[],exitPoint=None,console=False):
+    """This is the entry point of OMG. *cmdConfig* is a list of options given on the command line that will
+    overwrite the corresponding option from the file or the default. Each list item has to be a string like
+    ``main.collection=/var/music``.
     
-        * cmdConfig: is a list of options given on the command line that will overwrite the corresponding
-          option from the file or the default. Each list item has to be a string like
-          ``main.collection=/var/music``.
-        * exitPoint: Determines when to stop the startup process. Set this to None to run OMG's usual GUI.
-          Other allowed values are 'database','tags' and 'nogui'. The run script will stop after the database
-          connection has been established, after the tags module has been initialized or just before the GUI 
-          would be created, respectively.
-        * console: Set this to True on the console to turn off the lockfile and the (graphical) installer.
+    The other commands should not be used. Use the init-method instead.
     """
     handleCommandLineOptions(cmdConfig)
     
@@ -236,15 +221,30 @@ def loadTranslators(app,logger):
                                 .format(translatorFile,translatorDir))
 
 
+def init(exitPoint='nogui',console=True):
+    """Initialize OMG's framework (database, tags etc.) but do not run a GUI. Use this for tests on the
+    terminal:
+
+        >>> from omg import application
+        >>> application.init()
+        >>> from omg.core import tags
+        >>> tags.tagList
+        ["title", "artist", "album", ...]
+    
+    Using the optional argument *exitPoint* you may also initialize only part of the framework. Allowed
+    values are 'database','tags' and 'nogui'. The run script will stop after the database connection has been
+    established, after the tags module has been initialized or just before the GUI would be created,
+    respectively.
+    
+    If *console* is True, the lockfile and the (graphical) installer are turned off.
+    """
+    run(exitPoint,console)
+
+
 def runInstaller():
     """Run the graphical installer."""
     os.execl(sys.executable, os.path.basename(sys.executable), "-m", "omg.install")
     
     
-def runGUI():
-    """Run the graphical user interface of OMG."""
-    run(exitPoint=None,console=False)
-    
-    
 if __name__ == "__main__":
-    runGUI()
+    run()
