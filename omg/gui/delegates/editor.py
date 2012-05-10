@@ -32,6 +32,6 @@ class EditorDelegate(StandardDelegate):
                 StandardDelegate.options,
                 ['t:album','t:composer','t:artist','t:performer'],
                 ['t:date','t:genre','t:conductor'],
-                {"showPaths": True, 'showMajor': True, 'appendRemainingTags': True}
+                {"showPaths": True, 'showMajor': True, 'appendRemainingTags': True, 'showAllAncestors': True}
     )
     

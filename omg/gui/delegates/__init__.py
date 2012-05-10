@@ -37,6 +37,8 @@ class StandardDelegate(AbstractDelegate):
     for these options."""
     options = configuration.copyOptions(AbstractDelegate.options)
     options.extend(utils.OrderedDict.fromItems([(data[0],configuration.DelegateOption(*data)) for data in [
+        ("showMajorAncestors",translate("Delegates","Display major parent containers which are not in the tree."),"bool",False),
+        ("showAllAncestors",translate("Delegates","Display all parent containers which are not in the tree."),"bool",False),
         ("showMajor",translate("Delegates","Display major flag"),"bool",False),
         ("showPositions",translate("Delegates","Display position numbers"),"bool",True),
         ("showPaths",translate("Delegates","Display paths"),"bool",False),
@@ -53,12 +55,29 @@ class StandardDelegate(AbstractDelegate):
     def layout(self,index,availableWidth):
         wrapper = self.model.data(index)
         element = wrapper.element
+        level = element.level
        
         # These can only be computed when we know whether fitting the fitInTitleRowData did work
         leftTexts,rightTexts = None,None
         
         flagIcons = self.prepareFlags(wrapper)[0]
-        
+                
+        # Ancestors
+        if self.config.options['showAllAncestors'].value or self.config.options['showMajorAncestors'].value:
+            ancestorsInTree = [w.element.id for w in wrapper.getParents() if isinstance(w,Wrapper)]
+            ancestors = []
+            ancestorIds = []
+            self.appendAncestors(element, ancestors, ancestorIds, ancestorsInTree,
+                                 onlyMajor=not self.config.options['showAllAncestors'].value)
+            
+            for ancestor in reversed(ancestors):
+                if element.id in ancestor.contents: # direct parent
+                    pos = ancestor.contents.getPosition(element.id)
+                    text = translate("Delegates","#{} in {}").format(pos,ancestor.getTitle())
+                else: text = translate("Delegates","In {}").format(ancestor.getTitle())
+                self.addCenter(TextItem(text,ITALIC_STYLE))
+                self.newRow()
+            
         # Cover
         #if element.hasCover():
         #    coverSize = self.config.options['coverSize'].value
@@ -66,6 +85,9 @@ class StandardDelegate(AbstractDelegate):
          #   availableWidth -= coverSize + self.hSpace
         
         # Title and Major
+        preTitleItem = self.getPreTitleItem(wrapper)
+        if preTitleItem is not None:
+            self.addCenter(preTitleItem)
         titleItem = TextItem(wrapper.getTitle(prependPosition=self.config.options['showPositions'].value,
                                            usePath=False),
                              BOLD_STYLE if element.isContainer() else STD_STYLE,
@@ -166,6 +188,25 @@ class StandardDelegate(AbstractDelegate):
                 element.path = db.path(element.id)
             self.addCenter(TextItem(element.path,ITALIC_STYLE))
             self.newRow()
+        
+    def appendAncestors(self,element,ancestors,ancestorIds,filter,onlyMajor):
+        """Recursively add all ancestors of *element* to the list *ancestors* and their ids to the list
+        *ancestorIds*. Do not add elements if their id is already contained in *ancestorIds* or if their
+        id is in the list *filter*. If *onlyMajor* is True, add only major containers.
+        """
+        for id in element.parents:
+            if id in ancestorIds or id in filter: 
+                # Do not search for ancestors recursively because we did so already.
+                # (this is clear if id in ancestorIds, otherwise we did so when painting the corresponding
+                # wrapper in the current tree structure)
+                continue
+            ancestor = element.level.get(id)
+            if not onlyMajor or ancestor.major:
+                ancestorIds.append(id)
+                ancestors.append(ancestor)
+            # Search for ancestors recursively even if the current ancestor is not major. It might have
+            # a major parent.
+            self.appendAncestors(ancestor,ancestors,ancestorIds,filter,onlyMajor)
     
     def prepareColumns(self,wrapper,exclude=[]):
         """Collect the texts displayed in both columns based on the configured datapieces. Exclude datapieces
@@ -275,7 +316,13 @@ class StandardDelegate(AbstractDelegate):
             flags = wrapper.element.flags
         return [flag.icon for flag in flags if flag.icon is not None],\
                [flag.name for flag in flags if flag.icon is None]
-        
+               
+    def getPreTitleItem(self,wrapper):
+        """Return a DelegateItem that should be placed in front of the title (which is not always in the
+        first line. This is used by PlaylistDelegate to add a small triangle in front of the currently
+        playing element."""
+        return None
+    
             
 def _join(sep,strings):
     """Join *strings* using *sep* but removing empty strings."""

@@ -33,12 +33,13 @@ class PlaylistDelegate(StandardDelegate):
                 StandardDelegate.options,
                 ['t:composer','t:artist','t:performer'],
                 ['t:date','t:genre','t:conductor'],
-                {"fitInTitleRowData": configuration.DataPiece("filecount+length")}
+                {"fitInTitleRowData": configuration.DataPiece("filecount+length"),
+                 "showMajorAncestors": True
+                 }
     )
     
-    def layout(self, index, availableWidth):
-        wrapper = self.model.data(index)
+    def getPreTitleItem(self,wrapper):
         if wrapper in self.model.currentlyPlayingNodes:
-            self.addCenter(abstractdelegate.PlayTriangleItem(QtGui.QColor(20,200,20),9))
-        super().layout(index, availableWidth)
+            return abstractdelegate.PlayTriangleItem(QtGui.QColor(20,200,20),9)
+        return None
     
