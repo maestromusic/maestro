@@ -22,10 +22,12 @@ the user to enable or disable them."""
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from . import PLUGININFO_OPTIONS, plugins
-
+from . import plugins
 
 translate = QtCore.QCoreApplication.translate
+
+
+PLUGININFO_OPTIONS = ("NAME","AUTHOR","VERSION","DESCRIPTION","MINOMGVERSION","MAXOMGVERSION")
 
 
 COLUMN_HEADERS = [translate("PluginDialog","Enabled"),
@@ -63,12 +65,15 @@ class PluginDialog(QtGui.QWidget):
         
         for i,plugin in enumerate(plugins.values()):
             item = QtGui.QTableWidgetItem()
-            item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsUserCheckable if plugin.version_ok else Qt.NoItemFlags)
+            item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsUserCheckable if plugin.versionOk else Qt.NoItemFlags)
             item.setCheckState(Qt.Checked if plugin.enabled else Qt.Unchecked)
             self.table.setItem(i,0,item)
             for j,key in enumerate(PLUGININFO_OPTIONS):
-                item = QtGui.QTableWidgetItem(plugin.data[key])
-                item.setFlags(Qt.ItemIsEnabled if plugin.version_ok else Qt.NoItemFlags)
+                if hasattr(plugin.package,key):
+                    text = getattr(plugin.package,key)
+                else: text = ''
+                item = QtGui.QTableWidgetItem(text)
+                item.setFlags(Qt.ItemIsEnabled if plugin.versionOk else Qt.NoItemFlags)
                 self.table.setItem(i,j+1,item)
         self.table.resizeColumnsToContents()
 
