@@ -17,7 +17,7 @@
 #
 
 """
-This module controls the startup and finishing process of OMG. The run method may also be used to initialize
+This module controls the startup and finishing process of OMG. The init method may be used to initialize
 OMG's framework without starting a GUI.
 """
 
@@ -56,11 +56,19 @@ dispatcher = None
  
 
 def run(cmdConfig=[],exitPoint=None,console=False):
-    """This is the entry point of OMG. *cmdConfig* is a list of options given on the command line that will
+    """This is the entry point of OMG. With the default arguments OMG will start the GUI. Use init if you
+    only want to initialize the framework without starting the GUI.
+    
+    *cmdConfig* is a list of options given on the command line that will
     overwrite the corresponding option from the file or the default. Each list item has to be a string like
     ``main.collection=/var/music``.
     
-    The other commands should not be used. Use the init-method instead.
+    Using the optional argument *exitPoint* you may also initialize only part of the framework. Allowed
+    values are 'database','tags' and 'nogui'. The run script will stop after the database connection has been
+    established, after the tags module has been initialized or just before the GUI would be created,
+    respectively.
+    
+    If *console* is True, the lockfile and the (graphical) installer are turned off.
     """
     handleCommandLineOptions(cmdConfig)
     
@@ -246,7 +254,7 @@ def loadTranslators(app,logger):
                                 .format(translatorFile,translatorDir))
 
 
-def init(exitPoint='nogui',console=True):
+def init(cmdConfig=[],exitPoint='nogui',console=True):
     """Initialize OMG's framework (database, tags etc.) but do not run a GUI. Use this for tests on the
     terminal:
 
@@ -256,14 +264,9 @@ def init(exitPoint='nogui',console=True):
         >>> tags.tagList
         ["title", "artist", "album", ...]
     
-    Using the optional argument *exitPoint* you may also initialize only part of the framework. Allowed
-    values are 'database','tags' and 'nogui'. The run script will stop after the database connection has been
-    established, after the tags module has been initialized or just before the GUI would be created,
-    respectively.
-    
-    If *console* is True, the lockfile and the (graphical) installer are turned off.
+    Actually this method is the same as run, but with different default arguments.
     """
-    run(exitPoint,console)
+    run(cmdConfig,exitPoint,console)
 
 
 def runInstaller():
