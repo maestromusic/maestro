@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-from omg.core import tags
+from omg.core import tags, levels
 from omg import logging
 
 logger = logging.getLogger(__name__)
@@ -29,17 +29,60 @@ def enable():
     pass
     
 
+
+ 
 import pyparsing
-from pyparsing import Literal, Word, alphas, alphanums
+from pyparsing import Forward, Literal, OneOrMore, Optional, Word, alphas, alphanums, nums, printables
 
 lbrace = Literal("<").suppress()
 rbrace = Literal(">").suppress()
 
+number = Word(nums)
+levelDef = number + Literal(".").suppress()
+
 tagName = Word(alphas + "_", alphanums + "_:()/\\")
-print('wtf')
-#print(tagName.parseString("<zomg"))
+
+tagMacro = lbrace + Optional(levelDef("levelDef")) + tagName("tag") + rbrace
+
+expression = Forward()
+
+ifExpr = Literal("?").suppress() + expression
+
+condition = (lbrace + tagName("tag") + ifExpr("if") + rbrace)("condition")
+staticText = pyparsing.CharsNotIn("<>")#Word("".join(p for p in printables if p not in "<>"))
+expression << OneOrMore(tagMacro | staticText | condition)
+def tagMacroAction(s, loc, toks):
+    macro = toks["tag"]
+    if "levelDef" in toks:
+        level = int(toks["levelDef"][0])
+        if level > len(currentParents):
+            return [""]
+        pos,parent = currentParents[-level]
+        elemTag = parent.tags
+    else:
+        elemTag = currentElem.tags
+    if tags.exists(macro.lower()):
+        tag = tags.get(macro.lower())
+        if tag in elemTag:
+            return [",".join(elemTag[tag])]
+tagMacro.setParseAction(tagMacroAction)
+
+def conditionAction(s, loc, toks):
+    print('if {} then eval {}'.format(toks["tag"], toks["if"]))
+condition.setParseAction(conditionAction)
+def traverse(element, *parents):
+    global currentElem, currentParents
+    currentElem = element
+    currentParents = parents
+    if element.isFile():
+        print(expression.parseString("<title>/<composer?<composer>>"))
+    else:
+        for pos, childId in element.contents.items():
+            child = levels.real.get(childId)
+            traverse(child, (pos, element), *parents)
+traverse(levels.real.get(23))
 logger.info("renamer enabled")
-        
+
 
 def disable():
     pass
