@@ -84,7 +84,7 @@ class Plugin(object):
         
     def shutdown(self):
         """Shut down the plugin if needed."""
-        if hasattr(self.module, 'shutdown'):
+        if self.loaded and hasattr(self.module, 'shutdown'):
             self.module.shutdown()
             
     def mainWindowInit(self):
