@@ -24,6 +24,8 @@ translate = QtCore.QCoreApplication.translate
 from . import tags as tagsModule
 from .. import config
 
+from PyQt4 import QtGui
+translate = QtGui.QApplication.translate
 
 class Element:
     """Abstract base class for elements (files or containers)."""   

@@ -84,7 +84,7 @@ class Plugin(object):
         
     def shutdown(self):
         """Shut down the plugin if needed."""
-        if hasattr(self.module, 'shutdown'):
+        if self.loaded and hasattr(self.module, 'shutdown'):
             self.module.shutdown()
             
     def mainWindowInit(self):
@@ -112,6 +112,7 @@ def init():
         except ImportError:
             if plugindir != '__pycache__':
                 # Print an error and continue
+                logger.error('Could not load plugin {}'.format(plugindir))
                 import traceback
                 traceback.print_exc()
 
