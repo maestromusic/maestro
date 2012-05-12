@@ -112,6 +112,7 @@ def init():
         except ImportError:
             if plugindir != '__pycache__':
                 # Print an error and continue
+                logger.error('Could not load plugin {}'.format(plugindir))
                 import traceback
                 traceback.print_exc()
 
