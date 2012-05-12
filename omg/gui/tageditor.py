@@ -321,7 +321,7 @@ class TagEditorWidget(QtGui.QWidget):
             self.model.addRecord(dialog.getRecord())
 
     def _handleRemoveSelected(self):
-        records = self.getSelectedRecords()
+        records = self._getSelectedRecords()
         if len(records) > 0:
             self.model.removeRecords(records)
           
