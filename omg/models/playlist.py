@@ -172,10 +172,6 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
             
             wrappers = treebuilder.buildTree(levels.real,files,preWrapper,postWrapper)
                 
-        
-            
-                
-        
         #TODO: handle move actions
 #         if action == Qt.MoveAction:
 #            offsetShift = 0
@@ -193,10 +189,28 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
 #           self.backend.stack.endMacro()
 #       return True
     
-    
+        application.stack.beginMacro(self.tr("Drop elements"))
         self.insert(parent,position,wrappers)
-        #TODO: glue
+        self.glue(parent,position+len(wrappers))
+        self.glue(parent,position)
+        application.stack.endMacro()
         return True
+            
+    def glue(self,parent,position):
+        if position == 0 or position == parent.getContentsCount():
+            return # nothing to glue here
+        first = parent.contents[position-1]
+        second = parent.contents[position]
+        if first.element.id == second.element.id:
+            priorLength = first.getContentsCount()
+            wrappers = second.contents
+            # Of course the second line would also remove the wrappers. But on undo the parent pointers of
+            # the wrappers wouldn't be corrected
+            self.remove(second,0,len(wrappers)-1)
+            self.remove(parent,position,position)
+            self.insert(first,priorLength,wrappers)
+            # Glue recursively
+            self.glue(first,priorLength)
         
         
         
