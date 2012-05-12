@@ -253,15 +253,19 @@ class Wrapper(Node):
                 raise ValueError("contents must be None for a File-wrapper")
             self.contents = None
         
-    def copy(self,contents=None):
+    def copy(self,contents=None,level=None):
         """Return a copy of this wrapper. Because a flat copy of the contents is not possible (parent
         pointers would be wrong) all contents are copied recursively. Instead of this you can optionally
         specify a list of contents that will be put into the copy regardless of the original's contents.
+        
+        If *level* is not None, the copy will use elements from the given level instead of the original
+        elements (this is for example necessary when dropping elements from level to another).
         """
-        copy = Wrapper(self.element,contents=None,position=self.position,parent=self.parent)
+        element = self.element if level is None else level.get(element.id)
+        copy = Wrapper(element,contents=None,position=self.position,parent=self.parent)
         if self.isContainer():
             if contents is None:
-                copy.setContents([child.copy() for child in self.contents])
+                copy.setContents([child.copy(level=level) for child in self.contents])
             else: copy.setContents(contents)
         return copy
     
@@ -333,5 +337,8 @@ class Wrapper(Node):
                 elif extension != ext:
                     return None
             return extension
+    
+    def __repr__(self):
+        return "<W: {}>".format(self.getTitle()) 
 
     # Note that no __eq__ method is defined for wrappers. Different wrapper instances really are different.

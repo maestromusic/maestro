@@ -18,6 +18,9 @@
 
 import copy, os.path, bisect
 
+from PyQt4 import QtCore
+translate = QtCore.QCoreApplication.translate
+
 from . import tags as tagsModule
 from .. import config
 

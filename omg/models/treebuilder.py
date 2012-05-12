@@ -21,219 +21,217 @@ from ..core import levels
 from ..core.nodes import Wrapper
  
 
-def seqLen(sequence):
-    """Return the length of an item-sequence."""
-    return sequence[1] - sequence[0] + 1
-
-class ContainerNode:
-    """The TreeBuilder-algorithm creates a ContainerNode for each ancestor of the items.
-    During the algorithm these nodes store the following information:
-    id: The container-ID of this ancestor
-    items: The items which are (directly) contained in this container
-    childContainers: The ContainerNodes for the containers which are directly contained in this container
-    itemSequences: List of item sequences of this container
-    parentIds: A list of IDs of this container's parents
+class Sequence:
+    """A sequence of adjacent files. Basically this is simply a closed integral interval [*start*,*end*].
+    The length of a sequence is the number of files in it.
     """
+    def __init__(self,start,end):
+        assert start <= end
+        self.start = start
+        self.end = end
+        
+    def __len__(self):
+        return self.end - self.start + 1
     
-    def __init__(self,id):
-        """Initialize a new ContainerNode with the given id."""
-        self.id = id
-        self.wrappers = []
-        self.childContainers = []
-        self.itemSequences = []
-        self.parentIds = None
+    def bounded(self,other):
+        """Return the subsequence of this sequence that is contained in the sequence *other*. If that
+        subsequence is empty, return None. Example: Sequence(2,7).bounded(Sequence(0,5)) = Sequence(2,5).
+        """
+        start = max(other.start,self.start)
+        end = min(other.end,self.end)
+        if start <= end:
+            return Sequence(start,end)
+        else: return None
+        
+    def __repr__(self):
+        return "[{},{}]".format(self.start,self.end)
     
-    # For debugging
-    def __str__(self):
-        wrapperString = "[{}]".format(",".join(str(wrapper) for wrapper in self.wrappers))
-        childContainerString = "[{}]".format(",".join(str(c.id) for c in self.childContainers))
-        return "ContainerNode {}:\n\Wrappers {}\n\tChildContainers {}\n\tItemSequences {}\n\tParentIds {}" \
-                .format(self.id,wrapperString,childContainerString,self.itemSequences,self.parentIds)
 
-
-class TreeBuilder:
-    """This class encapsulates an algorithm that given a list of elements builds a tree structure of wrappers
-    covering all elements in a nice way.
+class SequenceDict(dict):
+    """A dict mapping element ids to sequences of files that are descendants of the element.
+    
+    On creation the dict will create lists for each file in *files* and for all of their ancestors (in the
+    given level). Each list will be populated with the sequences of descendants of that element, i.e. ranges
+    of adjacent files in *files* that are descendants of the element.
+    
+    For example: If *files* contains 5 files of which the first three are in the container with id 1
+    and the last two are in the container with id 2 and both containers are in a third container with id 3,
+    then the dict would contain the mappings {1: [Sequence(0,2)], 2: [Sequence(3,4)], 3: [Sequence(0,4)]}
+    and also a mapping for each file: The i-th file's id is mapped to [Sequence(i,i)].
+    
+    For *preWrapper* and *postWrapper* see buildTree. All wrapper ancestors of these wrappers will be also
+    added to the dict (with sequences in the negative numbers for *preWrapper* parents and sequences with
+    start >= len(files) for *postWrapper* parents. These wrappers are not used to build the tree but their
+    sequences leads to parents of *preWrapper* and *postWrapper* being favored.
+    
+    Furthermore this dict has an attribute toplevelIds storing a list of all toplevel ancestors of *files*
+    (including the ids of files which do not have any ancestor).
     """
-    def __init__(self,wrappers):
-        self.wrappers = wrappers
-            
-    def buildParentGraph(self):
-        """Find all ancestors of the items used in this TreeBuilder, gather information
-        about them (e.g. itemSequences) and create a graph with this information."""
-        self.containerNodes = {}
-        for i,wrapper in enumerate(self.wrappers):
-            self._buildContainerNodes(wrapper)
-            self._updateItemSequences(wrapper, i)
+    def __init__(self,level,files,preWrapper,postWrapper):
+        super().__init__()
+        self.level = level
+        self.toplevelIds = []
         
-    def buildTree(self,sequence = None,parent = None,createOnlyChildren = True):
-        """Build a tree over the given sequence (which defaults to all items)."""
-        if sequence is None:
-            sequence = (0,len(self.wrappers)-1)
-        if parent is None:
-            containerNodes = self.containerNodes.values()
-        else: containerNodes = self.containerNodes[parent.id].childContainers
-        return self._createTree(sequence,containerNodes,createOnlyChildren)
-            
-    def _buildContainerNodes(self,node):
-        """If they do not exist already, create ContainerNodes for all ancestors of the given node.
-        For all parent containers of the given node a ContainerNode is created if it doesn't
-        already exists and the given node is added to the children list of the ContainerNode.
-        Whenever a new node is created, this method is recursively called on the new node,
-        to create all ancestors of that node."""
-        
-        # Get list of parent-ids
-        if isinstance(node,ContainerNode):
-            listOfPids = node.parentIds
-        else: listOfPids = node.element.parents
-        
-        for pid in listOfPids:
-            # If no ContainerNode for this pid exists, create one
-            if pid not in self.containerNodes:
-                parentContainer = ContainerNode(pid)
-                self.containerNodes[pid] = parentContainer
-                parentContainer.parentIds = db.parents(pid)
-                # Recursive call to create all ancestors of the new node
-                self._buildContainerNodes(parentContainer)
-            else:
-                parentContainer = self.containerNodes[pid]
-            # Append the node to the children of the parent container
-            if isinstance(node, ContainerNode):
-                parentContainer.childContainers.append(node)
-            else:
-                parentContainer.wrappers.append(node)
-
-
-    def _updateItemSequences(self, node, itemIndex):
-        """Update the item sequences of *node* and all its ancestors to
-        contain the item with index <itemIndex>."""
-        # Get list of parent-ids
-        if isinstance(node, ContainerNode):
-            listOfPids = node.parentIds
-        else: listOfPids = node.element.parents
-        
-        for pid in listOfPids:
-            parentContainer = self.containerNodes[pid]
-            
-            if len(parentContainer.itemSequences) == 0:
-                # Create a new ItemSequence containing just one item
-                parentContainer.itemSequences.append((itemIndex,itemIndex))
-            else:
-                # If the last itemSequence contains the previous item, extend it to contain the
-                # current item, too. Otherwise create a new ItemSequence containing at first only
-                # the current item.
-                lastStart, lastEnd = parentContainer.itemSequences[-1]
-                if lastEnd == itemIndex - 1:
-                    # Increase the end of the sequence by 1
-                    parentContainer.itemSequences[-1] = (lastStart,itemIndex)
-                elif lastEnd < itemIndex - 1:
-                    parentContainer.itemSequences.append((itemIndex,itemIndex))
-                #else: In this case lastItemSequence[1] == itemIndex and this means the sequence
-                #has already been increased
-
-            # Finally update the itemSequences of all parents of parentContainer
-            self._updateItemSequences(parentContainer,itemIndex)
-
-
-    def _findMaximalSequence(self,containerNodes, boundingSeq):
-        """Find an item-sequence of maximal bounded length.
-        
-        This method finds among all item-sequences of the given ContainerNodes one that
-        has maximal length within the interval given by <boundingSeq> (<containerNodes> is
-        a list of ContainerNodes). It returns a tuple consisting of the maximal sequence
-        (bounded by <boundingSeq>) and the node containing that sequence.
-        
-        Example: If the nodes a and b contain item-sequences (1,7) and (5,10), respectively,
-        and <boundingSeq> is (5,8), the result will be ((5,8),b): (1,7) bounded to the
-        sequence (5,8) is (5,7) while (5,10) becomes (5,8) and is thus the sequence of
-        maximal bounded length.
-        
-        If no sequence of positive bounded length is found, this method will return None.
-        """
-        maxSeq = nodeWithMaxSeq = None
-        
-        for node in containerNodes:
-            for sequence in node.itemSequences:
-                # Bound the sequence by boundingSeq
-                boundedSeq = (max(sequence[0],boundingSeq[0]),min(sequence[1],boundingSeq[1]))
-                if boundedSeq[1] >= boundedSeq[0]: # Sequence is not empty
-                    if maxSeq is None or seqLen(boundedSeq) > seqLen(maxSeq):
-                        maxSeq = boundedSeq
-                        nodeWithMaxSeq = node
-                        
-        return maxSeq,nodeWithMaxSeq
-    
-    
-    def _findPos(self,itemIndex,itemSequences):
-        """Find the position of *itemIndex* in the given list of item-sequences: If *itemIndex* is 12 and 
-        *itemSequences* is [(1,3),(5,9),(10,10),(14,16)], then return 3."""
-        for i,seq in enumerate(itemSequences):
-            if itemIndex < seq[0]:
-                return i
-        return len(itemSequences) # Behind the last item
-    
-    
-    def _createTree(self,sequence,containerNodes,createOnlyChildren=True):
-        """Create a tree using some of the nodes in <containerNodes> as roots and covering all
-        items from *sequence*. If *createOnlyChildren* is false, the root-nodes of the returned
-        tree are guaranteed to contain either none or at least two children.
-        """
-        #print("This is createTree over the sequence {0}-{1}".format(*sequence))
-        coveredItems = set()
-        
-        roots = []
-        rootSeqs = []
-        
-        if len(containerNodes) > 0:
-            while len(coveredItems) < seqLen(sequence):
-                maxSequence, cNode = self._findMaximalSequence(containerNodes,sequence)
-                if maxSequence is None: # No sequence found: remaining items are direct children
-                    break
-                if (not createOnlyChildren) and seqLen(maxSequence) == 1:
-                    break
-                #print("Found a maximal sequence: {0}-{1}".format(*maxSequence))
-                pos = self._findPos(maxSequence[0],rootSeqs)
-                newNode = Wrapper(levels.real.get(cNode.id),
-                                         contents = self._createTree(maxSequence,cNode.childContainers))
-                for wrapper in newNode.contents:
-                    #TODO: This does not work correctly if an element appears twice with different positions
-                    # in the same container
-                    wrapper.position = newNode.element.contents.getPosition(wrapper.element.id)
+        # First add the parents and sequences of preWrapper, then the parents/sequences of the files in their
+        # order and finally the parents/sequences of postWrapper. The order is important so that merging
+        # of sequences works (whenever a new sequence is added it is only compared to last sequence of the
+        # corresponding element).  
+        if preWrapper is not None:
+            last = preWrapper
+            for parent in preWrapper.getParents():
+                if isinstance(parent,Wrapper):
+                    self.add(parent.element.id,-parent.fileCount(),-1)
+                    last = parent
+                else: break
+            self.toplevelIds.append(last.element.id)
                 
-                roots.insert(pos,newNode)
-                rootSeqs.insert(pos,maxSequence)
-                coveredItems = coveredItems.union(set(self.wrappers[maxSequence[0]:maxSequence[1]+1]))
-                
-                # Correct all itemSequences:
-                for node in containerNodes:
-                    node.itemSequences = [self._cutItemSequence(seq,maxSequence)
-                                                    for seq in node.itemSequences]
-                    node.itemSequences = [seq for seq in node.itemSequences if seq is not None]
-                
-        # Add remaining items as direct children
-        for itemIndex in range(sequence[0],sequence[1]+1):
-            if self.wrappers[itemIndex] not in coveredItems:
-                pos = self._findPos(itemIndex,rootSeqs)
-                roots.insert(pos,self.wrappers[itemIndex])
-                rootSeqs.insert(pos,(itemIndex,itemIndex))
-
-        return roots
-
-    def _cutItemSequence(self,a,b):
-        """Cut away all parts of the sequence b from the sequence a and return the result: if b = (2,4),
-        then a = (1,3) becomes (1,1) and a = (3,6) becomes (5,6). b must not be an inner part of a, because
-        the result would consist of two distinct sequences (e.g. a=(1,5), b=(2,3) would result in
-        (1,1) ∪ (4,5)).
+        for i,file in enumerate(files):
+            self._addFileToElement(file.id,i)
+            
+        if postWrapper is not None:
+            last = postWrapper
+            for parent in postWrapper.getParents():
+                if isinstance(parent,Wrapper):
+                    self.add(parent.element.id,len(files)+1,len(files)+parent.fileCount())
+                    last = parent
+                else: break
+            self.toplevelIds.append(last.element.id)
+            
+        #print(self)
+        #print(self.toplevelIds)
+            
+    def add(self,id,start,end=None):
+        """Add a sequence [*start*,*end*] to the list of sequences of the element given by *id*. If the
+        sequence comes directly after the last sequence of this element, extend that last sequence instead
+        of adding a new one.
+        """ 
+        if end is None:
+            end = start
+        if id not in self:
+            self[id] = [Sequence(start,end)]
+        else:
+            lastSeq = self[id][-1]
+            if lastSeq.end >= start - 1:
+                lastSeq.end = max(lastSeq.end,end)
+            else: self[id].append(Sequence(start,end))
+            
+    def _addFileToElement(self,elementId,fileIndex):
+        """Add a Sequence [*fileIndex*,*fileIndex*] to the element with id *elementId* and recursively to
+        all of its ancestors. Try to merge the sequences like in self.add.
+        
+        Also update the attribute toplevelIds.
         """
-        if a[0]< b[0] and a[1] > b[1]:
-            raise AssertionError("Sequence b is an inner part of a: {2}-{3} ⊂ {0}-{1}"
-                                 .format(a[0],a[1],b[0],b[1]))
+        self.add(elementId,fileIndex)
+        element = self.level.get(elementId)
+        if len(element.parents) == 0:
+            if element.id not in self.toplevelIds:
+                self.toplevelIds.append(element.id)
+        else:
+            for id in self.level.get(elementId).parents:
+                self._addFileToElement(id,fileIndex)
+                
+    def longest(self,ids,boundingSequence=None):
+        """Search for a longest sequence in this dict. Only search in the lists of the elements given by
+        the ids *ids* and if *boudingSequence* is not None, compare sequences not by their real length but by
+        the length of the sequences bounded to *boundingSequence*.
         
-        if a[0] < b[0]:
-            return (a[0],min(a[1],b[0]-1))
-        elif a[1] > b[1]:
-            return (max(a[0],b[1]+1),a[1])
-        else: # a is completely contained in b
-            return None
+        Return a tuple consisting of a longest sequence (bounded to *boundingSequence*) and the element
+        (not the id) there that sequence was found.
+        """
+        longest = None
+        element = None
+        for id in ids:
+            if id not in self:
+                continue
+            for seq in self[id]:
+                if boundingSequence is not None:
+                    seq = seq.bounded(boundingSequence)
+                if seq is not None and (longest is None or len(seq) > len(longest)):
+                    longest = seq
+                    element = self.level.get(id)
+        return longest, element
+     
+    def remove(self,sequence):
+        """Remove the given sequence from all sequences in this dict, i.e. remove sequences that are
+        completely contained in *sequence* and shrink sequences that overlap with *sequence*.
+        """
+        for id in list(self.keys()):
+            newSeqs = []
+            for seq in self[id]:
+                if seq.end < sequence.start or seq.start > sequence.end:
+                    # No overlap: Simply keep the sequence
+                    newSeqs.append(seq)
+                else:
+                    # Note that the next two if's may both be True. In this case we split seq into two
+                    # new sequences (this happens if sequence ⊂ seq).
+                    if seq.start < sequence.start:
+                        newSeqs.append(Sequence(seq.start,sequence.start - 1))
+                    if seq.end > sequence.end:
+                        newSeqs.append(Sequence(sequence.end+1,seq.end))
+            if len(newSeqs):
+                self[id] = newSeqs
+            else: del self[id]
+             
         
+def buildTree(level,files,preWrapper=None,postWrapper=None):
+    """Build a tree over the given list of files (instances of File) and return its root wrappers as list.
+    If possible add containers to the tree to generate a nice tree structure. This method is for example
+    used by the playlist to generate a nice tree playlist from a simple list of files.
+    
+    *level* is the level that determines the possible tree structure.
+    
+    *preWrapper* and *postWrapper* specify the file-wrapper before and after the new tree if the tree is e.g.
+    to be inserted into a playlist. When building the container structure, ancestors of these wrappers in the
+    existing tree structure are favored. Existing Wrappers will not be changed, though. It is the task of
+    the caller to merge wrappers returned by this method and existing Wrappers.
+    """
+    seqs = SequenceDict(level,files,preWrapper,postWrapper)
+    return _buildTree(files,seqs,None,seqs.toplevelIds,allowSingleChild = False)
+
+    
+def _buildTree(files,seqs,boundingSeq,toplevelIds,allowSingleChild):
+    """Build a tree over the part of *files* specified by *boundingSeq* (over all files if *boundingSeq* is
+    None. *seqs* is the SequenceDict, *toplevelIds* are the elements that may be used at the highest level.
+    If *allowSingleChildren* is False, the highest level will not contain wrappers with only one child
+    (note that we must allow single children on lower levels).
+    """
+    #print("This is _buildTree for {} . TLIds: {}".format(boundingSeq,toplevelIds))
+    
+    # Root nodes are not necessarily added in correct order. Insert them indexed by the start point of their
+    # sequence and at the end sort them by the start point.
+    roots = {}
+    
+    while True:
+        # Choose the longest sequence (bounded to boundingSeq and only from elements within toplevelIds)
+        # The second restriction increases performance and avoids that we accidentally choose a child when
+        # its parent has the same sequence (this happens only for single children).
+        longestSeq,element = seqs.longest(toplevelIds,boundingSeq)
+        #print("Longest sequence: {}".format(str(longestSeq)))
+        if longestSeq is None:
+            # All files in *boundingSeq* are covered
+            break
+        
+        # Skip sequences that are completely out of range (this may happen due to preWrapper/postWrapper)
+        if longestSeq.end < 0 or longestSeq.start >= len(files):
+            seqs.remove(longestSeq)
+            continue
+        
+        # Create a wrapper for the tree
+        wrapper = Wrapper(element)
+        if wrapper.isContainer():
+            # For containers recursively create the tree below. Bound the tree creation to longestSeq.
+            # Choose only roots which are contents of element.
+            childContents = _buildTree(files,seqs,longestSeq,element.contents.ids,allowSingleChild=True)
+            
+            # Avoid creating a single child by replacing wrapper by its only child
+            if len(childContents) == 1 and not allowSingleChild:
+                wrapper = childContents[0]
+            else: wrapper.setContents(childContents)
+        
+        # Add the wrapper to roots and remove the sequence from all sequences
+        roots[longestSeq.start] = wrapper
+        seqs.remove(longestSeq)
+    
+    # Sort root nodes by start point
+    return [roots[key] for key in sorted(roots.keys())]
    
