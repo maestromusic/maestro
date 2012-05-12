@@ -65,7 +65,7 @@ type = None
 prefix = None
 
 # Logger for database warnings
-logger = logging.getLogger("omg.database")
+logger = logging.getLogger(__name__)
 
 # Each thread must have its own connection object. This maps thread identifiers to the connection object
 connections = {}

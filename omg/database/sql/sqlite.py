@@ -18,6 +18,9 @@
 
 import sqlite3, datetime
 from . import DBException, AbstractSql, AbstractSqlResult, EmptyResultException
+from ... import utils
+
+sqlite3.register_adapter(utils.FlexiDate,lambda f: f.toSql())
 
 
 class Sql(AbstractSql):
@@ -34,13 +37,13 @@ class Sql(AbstractSql):
             
     def query(self,queryString,*args):
         try:
-            return SqlResult(self._db.execute(queryString,args))
+            return SqlResult(self._db.execute(queryString,args),False)
         except Exception as e:
             raise DBException(str(e),query=queryString,args=args)
     
     def multiQuery(self,queryString,argSets):
         try:
-            return SqlResult(self._db.executemany(queryString,argSets))
+            return SqlResult(self._db.executemany(queryString,argSets),True)
         except Exception as e:
             raise DBException(str(e),query=queryString,args=argSets)
         
@@ -58,8 +61,9 @@ class Sql(AbstractSql):
 
 
 class SqlResult(AbstractSqlResult):
-    def __init__(self,cursor):
+    def __init__(self,cursor,multi):
         self._cursor = cursor
+        self._multi = multi
         if cursor.rowcount == -1: # chances are that this is a SELECT query
             self._rows = cursor.fetchall()
             self._index = -1
@@ -82,14 +86,14 @@ class SqlResult(AbstractSqlResult):
         return self._cursor._executed.decode('utf-8')
         
     def affectedRows(self):
+        if self._multi:
+            raise DBException("You must not use 'affectedRows' after a multiquery.")
         return self._cursor.rowcount
     
     def insertId(self):
-        if self._cursor.lastrowid is None:
-            # lastrowid is None after multiqueries
-            return self._cursor.execute("SELECT last_insert_rowid()").fetchone()[0]
-        else:
-            return self._cursor.lastrowid
+        if self._multi:
+            raise DBException("You must not use 'insertId' after a multiquery.")
+        return self._cursor.lastrowid
     
     def getSingle(self):
         if len(self._rows) == 0:

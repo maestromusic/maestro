@@ -134,7 +134,7 @@ class Option:
             * “name”: Its name,
             * “default”: the default value,
             * “value”: the current value from the file or defaults. When this value differs from default, it
-              will be written to the file it shutdown.
+              will be written to the file at shutdown.
             
     \ """
     def __init__(self,name,default,description=""):
