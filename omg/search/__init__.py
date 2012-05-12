@@ -118,7 +118,7 @@ class SearchRequest:
                 self.engine._thread.searchEvent.set()
             
     def __str__(self):
-        return "<SearchRequest: {}->{} for [{}] | ({},{},{},{})".format(self.fromTable,
+        return "<SearchRequest: {}->{} for [{}] | ({},{})".format(self.fromTable,
                  self.resultTable,",".join(str(c) for c in self.criteria),self.data,self.lockTable)
         
 
