@@ -394,7 +394,7 @@ def addTagType(**data):
           
     After creation a TagTypeChangedEvent is emitted.
     """
-    from . import database as db
+    from .. import database as db
     if 'tagType' in data:
         tagType = data['tagType']
         data = (tagType.id,tagType.name,tagType.type.name,tagType.title,tagType.iconPath,tagType.private)

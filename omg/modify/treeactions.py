@@ -160,7 +160,7 @@ class DeleteAction(TreeAction):
             
             if len(rootParents) > 0:
                 from ..models.rootedtreemodel import ChangeRootCommand
-                newContents = model.root.contents[:]
+                newContents = [node.element.id for node in model.root.contents]
                 for idx in sorted(rootParents, reverse = True):
                     del newContents[idx]
                 application.stack.push(ChangeRootCommand(model, model.root.contents, newContents))
