@@ -64,9 +64,9 @@ def run(cmdConfig=[],exitPoint=None,console=False):
     ``main.collection=/var/music``.
     
     Using the optional argument *exitPoint* you may also initialize only part of the framework. Allowed
-    values are 'database','tags' and 'nogui'. The run script will stop after the database connection has been
-    established, after the tags module has been initialized or just before the GUI would be created,
-    respectively.
+    values are 'database','tags', 'noplugins' and 'nogui'. The run script will stop after the database
+    connection has been established, after the tags module has been initialized, before the plugins would be
+    loaded or just before the GUI would be created, respectively.
     
     If *console* is True, the lockfile and the (graphical) installer are turned off.
     """
@@ -135,6 +135,9 @@ def run(cmdConfig=[],exitPoint=None,console=False):
     levels.init()
     from . import resources, search
     search.init()
+    
+    if exitPoint == 'noplugins':
+        return
     
     # Load Plugins
     from . import plugins
@@ -254,7 +257,7 @@ def loadTranslators(app,logger):
                                 .format(translatorFile,translatorDir))
 
 
-def init(cmdConfig=[],exitPoint='nogui',console=True):
+def init(cmdConfig=[],exitPoint='noplugins',console=True):
     """Initialize OMG's framework (database, tags etc.) but do not run a GUI. Use this for tests on the
     terminal:
 
