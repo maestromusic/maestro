@@ -385,7 +385,7 @@ class MainSection(Section):
         """Remove the plugin configuration of one or more plugins. *sectionNames* contains the names of the
         sections used by the plugins that should be removed."""
         for name in sectionNames:
-            if storage:
+            if self.storage:
                 assert name.startswith('SECTION:')
                 name = name[len('SECTION:'):]
             if name not in self.members:
