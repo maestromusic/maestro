@@ -41,111 +41,112 @@ def enable():
     from omg.gui import editor, browser
     editor.EditorTreeView.actionConfig.addActionDefinition((("plugins", 'renamer'),), RenameFilesAction)
     browser.BrowserTreeView.actionConfig.addActionDefinition((("plugins", 'renamer'),), RenameFilesAction)
+class GrammarRenamer(profiles.Profile):
+        
+    name = "GrammarRenamer"
+    def levelDefAction(self, s, loc, toks):
+        level = int(toks[0])
+        return [level]
+       
+    def tagDefinitionAction(self, s, loc, toks):
+        macro = toks["tag"]
+        ret = toks.copy()
+        ret["exists"] = False
+        ret["value"] = None
+        if "levelDef" in toks:
+            #print('levelDef: {}'.format(toks["levelDef"]["level"]))
+            level = toks["levelDef"][0]
+            if level > len(self.currentParents):
+                return ret
+            pos,parent = self.currentParents[-level]
+            if macro == "#":
+                ret["value"] =  self.positionFormat.format(pos)
+            else:
+                elemTag = parent.tags
+        else:
+            elemTag = self.currentElem.tags
+            if macro == "#":
+                if len(self.currentParents) > 0:
+                    ret["value"] = self.positionFormat.format(self.currentParents[0][0])
+        if macro != "#":
+            if tags.exists(macro.lower()):
+                tag = tags.get(macro.lower())
+                if tag in elemTag:
+                    ret["value"] = ",".join(map(str, elemTag[tag])).replace("/", "-")
+        ret["exists"] = (ret["value"] != None)
+        if ret["value"] is None:
+            ret["value"] = ""
+        return ret
     
+    def conditionAction(self, s, loc, toks):
+        tag = toks.tagDef
+        if "if" in toks or "else" in toks:
+            if tag.exists:
+                return toks["if"] if "if" in toks else []
+            else:
+                return toks["else"] if "else" in toks else []
+        else: return tag.value
+    
+    def __init__(self, name, formatString = ""):
+        super().__init__(name)
+        
+        # grammar definition
+        self.positionFormat = "{:0>" + str(config.options.renamer.positionDigits) + "}"
+        self.formatString = formatString
+        pyparsing.ParserElement.setDefaultWhitespaceChars("\t\n")
+        lbrace = Literal("<").suppress()
+        rbrace = Literal(">").suppress()
+        
+        number = Word(nums)
+        
+        levelDef = number + Literal(".").suppress()
+        levelDef.setParseAction(self.levelDefAction)
+        
+        tagName = Word(alphas + "_", alphanums + "_:()/\\")
+        
+        tagDefinition = Optional(levelDef("levelDef")) + (tagName ^ "#")("tag") 
+        tagDefinition.setParseAction(self.tagDefinitionAction)
+        
+        expression = Forward()
+        
+        ifExpr = Literal("?").suppress() + expression
+        elseExpr = Literal("!").suppress() + expression
+        condition = lbrace + tagDefinition("tagDef") \
+                + ((Optional(ifExpr("if")) + Optional(elseExpr("else"))) ^ (Optional(elseExpr("else")) + Optional(ifExpr("else"))))\
+                + rbrace # i am sure this is possible in a nicer way ...
+        condition.setParseAction(self.conditionAction)
+        
+        staticText = pyparsing.CharsNotIn("<>!?")#Word("".join(p for p in printables if p not in "<>"))
+        expression << OneOrMore(staticText | condition)
+        self.expression = expression
+    
+    def computeNewPath(self):
+        """Computes the new path for the element defined by *self.currentElem* and *self.currentParents*."""
+        extension = self.currentElem.path.rsplit(".", 1)[1]
+        return "".join(self.expression.parseString(self.formatString)) + "." + extension
+        
+    def traverse(self, element, *parents):
+        self.currentElem = element
+        self.currentParents = parents
+        if element.isFile():
+            self.result[element.id] = self.computeNewPath()
+        else:
+            for pos, childId in element.contents.items():
+                self.traverse(levels.real.get(childId), (pos, element), *parents)
+        
+    def renameContainer(self, id):
+        self.result = dict()
+        self.traverse(levels.real.get(id))
+        return self.result
 
 def init():
-    class GrammarRenamer(profiles.Profile):
-        
-        name = "GrammarRenamer"
-        def levelDefAction(self, s, loc, toks):
-            level = int(toks[0])
-            return [level]
-           
-        def tagDefinitionAction(self, s, loc, toks):
-            macro = toks["tag"]
-            ret = toks.copy()
-            ret["exists"] = False
-            ret["value"] = None
-            if "levelDef" in toks:
-                #print('levelDef: {}'.format(toks["levelDef"]["level"]))
-                level = toks["levelDef"][0]
-                if level > len(self.currentParents):
-                    return ret
-                pos,parent = self.currentParents[-level]
-                if macro == "#":
-                    ret["value"] =  self.positionFormat.format(pos)
-                else:
-                    elemTag = parent.tags
-            else:
-                elemTag = self.currentElem.tags
-                if macro == "#":
-                    if len(self.currentParents) > 0:
-                        ret["value"] = self.positionFormat.format(self.currentParents[0][0])
-            if macro != "#":
-                if tags.exists(macro.lower()):
-                    tag = tags.get(macro.lower())
-                    if tag in elemTag:
-                        ret["value"] = ",".join(map(str, elemTag[tag])).replace("/", "-")
-            ret["exists"] = (ret["value"] != None)
-            if ret["value"] is None:
-                ret["value"] = ""
-            return ret
-        
-        def conditionAction(self, s, loc, toks):
-            tag = toks.tagDef
-            if "if" in toks or "else" in toks:
-                if tag.exists:
-                    return toks["if"] if "if" in toks else []
-                else:
-                    return toks["else"] if "else" in toks else []
-            else: return tag.value
-        
-        def __init__(self, name, formatString):
-            super().__init__(name)
-            
-            # grammar definition
-            self.positionFormat = "{:0>" + str(config.options.renamer.positionDigits) + "}"
-            self.formatString = formatString
-            pyparsing.ParserElement.setDefaultWhitespaceChars("\t\n")
-            lbrace = Literal("<").suppress()
-            rbrace = Literal(">").suppress()
-            
-            number = Word(nums)
-            
-            levelDef = number + Literal(".").suppress()
-            levelDef.setParseAction(self.levelDefAction)
-            
-            tagName = Word(alphas + "_", alphanums + "_:()/\\")
-            
-            tagDefinition = Optional(levelDef("levelDef")) + (tagName ^ "#")("tag") 
-            tagDefinition.setParseAction(self.tagDefinitionAction)
-            
-            expression = Forward()
-            
-            ifExpr = Literal("?").suppress() + expression
-            elseExpr = Literal("!").suppress() + expression
-            condition = lbrace + tagDefinition("tagDef") \
-                    + ((Optional(ifExpr("if")) + Optional(elseExpr("else"))) ^ (Optional(elseExpr("else")) + Optional(ifExpr("else"))))\
-                    + rbrace # i am sure this is possible in a nicer way ...
-            condition.setParseAction(self.conditionAction)
-            
-            staticText = pyparsing.CharsNotIn("<>!?")#Word("".join(p for p in printables if p not in "<>"))
-            expression << OneOrMore(staticText | condition)
-            self.expression = expression
-        
-        def traverse(self, element, *parents):
-            self.currentElem = element
-            self.currentParents = parents
-            if element.isFile():
-                extension = element.path.rsplit(".", 1)[1]
-                return [(element.id, "".join(self.expression.parseString(self.formatString)) + "." + extension)]
-            else:
-                ret = []
-                for pos, childId in element.contents.items():
-                    ret.extend(self.traverse(levels.real.get(childId), (pos, element), *parents))
-                return ret
-            
-        def renameContainer(self, id):
-            return self.traverse(levels.real.get(id))
-    format="""
-<composer?Klassik/<composer>/<album> (<artist>)/<#> - <title>
-!Modern/<artist>/<date?<date> - ><album>/<#> - <title>>"""
-    ren = GrammarRenamer("test", format) 
-    print(ren.renameContainer(12))
+    
+
     global profileConfig
     profileConfig = profiles.ProfileConfiguration("renamer", config.options.renamer, [GrammarRenamer])
     global initialized
     initialized = True
+    logger.debug("initialized renamer plugin")
 
 
 def disable():

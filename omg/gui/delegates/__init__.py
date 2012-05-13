@@ -183,6 +183,9 @@ class StandardDelegate(AbstractDelegate):
             self.addCenter(MultiTextItem(leftTexts,rightTexts))
         
         # Path
+        self.layoutPath(element)
+    
+    def layoutPath(self, element):
         if self.config.options['showPaths'].value and element.isFile():
             if element.path is None:
                 element.path = db.path(element.id)
