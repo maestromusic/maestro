@@ -68,17 +68,12 @@ class RenameDialog(QtGui.QDialog):
         self.setWindowTitle(self.tr("Rename {} containers").format(len(ids)))
         mainLayout = QtGui.QVBoxLayout()
         
-        topLayout = QtGui.QHBoxLayout()
-        topLayout.addWidget(QtGui.QLabel(self.tr("Renaming profile:")), 0)
-        self.profileBox = profiles.ProfileComboBox(plugin.profileConfig)
-        topLayout.addWidget(self.profileBox, 1)
-        mainLayout.addLayout(topLayout, 1)
+        configDisplay = plugin.profileConfig.configurationDisplay()
+        mainLayout.addWidget(configDisplay,1)
+        configDisplay.temporaryModified.connect(self._handleFormatChange)
         
-        self.currentFormatEdit = QtGui.QTextEdit()
-        mainLayout.addWidget(self.currentFormatEdit, 1)
-        
-        self.currentFormatEdit.textChanged.connect(self._handleFormatChange)
-        self.profileBox.profileChosen.connect(self._handleProfileChange)
+        self.statusLabel = QtGui.QLabel("zomg")
+        mainLayout.addWidget(self.statusLabel, 1)
         
         self.tree = treeview.TreeView()
         self.model = editor.EditorModel(level)
@@ -97,21 +92,21 @@ class RenameDialog(QtGui.QDialog):
         self.setLayout(mainLayout)
         self.resize(800,500)
     
-    def _handleProfileChange(self, name):
+    def setProfile(self, name):
         currentPlug = plugin.profileConfig.plugins[name]
         self.currentFormatEdit.setText(currentPlug.formatString)
     
-    def _handleFormatChange(self):
-        import pyparsing
+    def _handleFormatChange(self, renamer):
+        """handle changes to the format text edit box"""
         try:
-            renamer = plugin.GrammarRenamer("temp", self.currentFormatEdit.toPlainText())
             totalResult = dict()
             for id in self.ids:
                 result = renamer.renameContainer(id)
                 totalResult.update(result)
             self.delegate.result = totalResult
-        except pyparsing.ParseException:
-            pass
+            self.statusLabel.setText(self.tr("Format ok"))
+        except plugin.FormatSyntaxError:
+            self.statusLabel.setText(self.tr("Syntax error in format string"))
         self.model.modelReset.emit()
         self.tree.expandAll()
         

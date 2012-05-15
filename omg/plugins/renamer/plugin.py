@@ -15,9 +15,11 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from PyQt4 import QtCore, QtGui
 
 from omg.core import tags, levels
 from omg import logging, config, profiles
+from calendar import format
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +28,7 @@ from pyparsing import Forward, Literal, OneOrMore, Optional, Word, alphas, alpha
     
 def defaultStorage():
     return {"SECTION:renamer":
-            {'profiles': ("default", "<artist>") } }
+            {'profiles': [("default", "GrammarRenamer", "<artist>")] } }
 
 def defaultConfig():
     return {"renamer": {
@@ -41,9 +43,12 @@ def enable():
     from omg.gui import editor, browser
     editor.EditorTreeView.actionConfig.addActionDefinition((("plugins", 'renamer'),), RenameFilesAction)
     browser.BrowserTreeView.actionConfig.addActionDefinition((("plugins", 'renamer'),), RenameFilesAction)
+
+class FormatSyntaxError(SyntaxError):
+    pass
 class GrammarRenamer(profiles.Profile):
         
-    name = "GrammarRenamer"
+    className = "GrammarRenamer"
     def levelDefAction(self, s, loc, toks):
         level = int(toks[0])
         return [level]
@@ -87,7 +92,7 @@ class GrammarRenamer(profiles.Profile):
                 return toks["else"] if "else" in toks else []
         else: return tag.value
     
-    def __init__(self, name, formatString = ""):
+    def __init__(self, name, formatString = "<artist>/I AM A DEFAULT FORMAT STRING/<1.title>/<#> - <title>"):
         super().__init__(name)
         
         # grammar definition
@@ -117,13 +122,16 @@ class GrammarRenamer(profiles.Profile):
         condition.setParseAction(self.conditionAction)
         
         staticText = pyparsing.CharsNotIn("<>!?")#Word("".join(p for p in printables if p not in "<>"))
-        expression << OneOrMore(staticText | condition)
+        expression << OneOrMore(condition ^ staticText)
         self.expression = expression
     
     def computeNewPath(self):
         """Computes the new path for the element defined by *self.currentElem* and *self.currentParents*."""
         extension = self.currentElem.path.rsplit(".", 1)[1]
-        return "".join(self.expression.parseString(self.formatString)) + "." + extension
+        try:
+            return "".join(self.expression.parseString(self.formatString)) + "." + extension
+        except pyparsing.ParseException as e:
+            raise FormatSyntaxError(str(e))
         
     def traverse(self, element, *parents):
         self.currentElem = element
@@ -139,11 +147,33 @@ class GrammarRenamer(profiles.Profile):
         self.traverse(levels.real.get(id))
         return self.result
 
+    
+    @classmethod    
+    def configurationWidget(cls, profile = None, parent = None):
+        widget = GrammarConfigurationWidget(parent)
+        if profile is not None:
+            widget.edit.setText(profileConfig.profiles[profile].formatString)
+        return widget
+
+class GrammarConfigurationWidget(profiles.ConfigurationWidget):
+        def __init__(self, parent = None):
+            super().__init__(parent)
+            self.edit = QtGui.QTextEdit()
+            layout = QtGui.QVBoxLayout()
+            layout.addWidget(self.edit)
+            self.setLayout(layout)
+            self.edit.textChanged.connect(self.handleTextChange)
+        
+        def handleTextChange(self):
+            renamer = GrammarRenamer("temporary", self.edit.toPlainText())
+            self.temporaryModified.emit(renamer)
+
 def init():
     
 
     global profileConfig
-    profileConfig = profiles.ProfileConfiguration("renamer", config.options.renamer, [GrammarRenamer])
+    profileConfig = profiles.ProfileConfiguration("renamer", config.storage.renamer, [GrammarRenamer])
+    profileConfig.loadConfig()
     global initialized
     initialized = True
     logger.debug("initialized renamer plugin")
