@@ -57,7 +57,7 @@ class Sql(AbstractSql):
 
         # Execute
         if query.exec_():
-            return SqlResult(query)
+            return SqlResult(query,False)
         else:
             if self._db.lastError() is not None:
                 raise DBException("Query failed: {}".format(self._db.lastError().text()),queryString,args)
@@ -81,7 +81,7 @@ class Sql(AbstractSql):
 
         # Execute
         if query.execBatch():
-            return SqlResult(query)
+            return SqlResult(query,True)
         else:
             if self._db.lastError() is not None:
                 raise DBException("Query failed: {}".format(self._db.lastError().text()),queryString,argSets)
@@ -111,11 +111,12 @@ class Sql(AbstractSql):
 
 
 class SqlResult(AbstractSqlResult):
-    def __init__(self,query):
+    def __init__(self,query,multi):
         self._result = query # No need to use QSqlResult objects
         # Store these values as the methods will return -1 after the query has become inactive
-        self._affectedRows = self._result.numRowsAffected() 
-        self._insertId = self._result.lastInsertId()
+        if not multi:
+            self._affectedRows = self._result.numRowsAffected() 
+            self._insertId = self._result.lastInsertId()
         
     def __iter__(self):
         return SqlResultIterator(self._result)

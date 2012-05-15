@@ -17,8 +17,8 @@
 #
 
 import pymysql
-from . import AbstractSql, AbstractSqlResult, EmptyResultException
-
+from . import AbstractSql, AbstractSqlResult, DBException, EmptyResultException
+from ... import utils
 
 class Sql(AbstractSql):
     def connect(self,username,password,database,host="localhost",port=3306,**kwargs):
@@ -31,16 +31,23 @@ class Sql(AbstractSql):
     def query(self,queryString,*args):
         if args:
             queryString = queryString.replace('?','%s')
-        cursor = self._db.cursor()
-        cursor.execute(queryString,args)
-        return SqlResult(cursor)
+            args = [a.toSql() if isinstance(a,utils.FlexiDate) else a for a in args]
+        try:
+            cursor = self._db.cursor()
+            cursor.execute(queryString,args)
+        except pymysql.err.Error as e:
+            raise DBException(str(e),queryString,args)
+        return SqlResult(cursor,False)
     
     def multiQuery(self,queryString,argSets):
-        if argSets:
-            queryString = queryString.replace('?','%s')
-        cursor = self._db.cursor()
-        cursor.executemany(queryString,argSets)
-        return SqlResult(cursor)
+        queryString = queryString.replace('?','%s')
+        argSets = [[a.toSql() if isinstance(a,utils.FlexiDate) else a for a in argSet] for argSet in argSets]
+        try:
+            cursor = self._db.cursor()
+            cursor.executemany(queryString,argSets)
+        except pymysql.err.Error as e:
+            raise DBException(str(e),queryString,argSets)
+        return SqlResult(cursor,True)
         
     def transaction(self):
         self.query('START TRANSACTION')
@@ -53,8 +60,9 @@ class Sql(AbstractSql):
 
 
 class SqlResult(AbstractSqlResult):
-    def __init__(self,cursor):
+    def __init__(self,cursor,multi):
         self._cursor = cursor
+        self._multi = multi
     
     def __iter__(self):
         return self._cursor.__iter__()
@@ -72,9 +80,13 @@ class SqlResult(AbstractSqlResult):
         return self._cursor._executed
         
     def affectedRows(self):
+        if self._multi:
+            raise DBException("You must not use 'affectedRows' after a multiquery.")
         return self._cursor.rowcount
     
     def insertId(self):
+        if self._multi:
+            raise DBException("You must not use 'insertId' after a multiquery.")
         return self._cursor.lastrowid
     
     def getSingle(self):

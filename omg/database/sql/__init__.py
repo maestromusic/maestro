@@ -112,7 +112,7 @@ class AbstractSql:
         """Connect to a database using the given information."""
             
     def query(self,queryString,*args):
-        """Perform a query in the database.
+        """Perform a query in the database. Raise a DBException if the query fails.
         
         Execute the query *queryString* and return an :class:``AbstractSqlResult`` which yields the result's
         rows in tuples. *queryString* may contain ``'?'`` as placeholders which are replaced by the
@@ -131,7 +131,8 @@ class AbstractSql:
         """
         
     def multiQuery(self,queryString,args):
-        """Perform a query several times with changing parameter sets.
+        """Perform a query several times with changing parameter sets.  Raise a DBException if the query
+        fails.
 
         Equivalent to::
         
@@ -200,11 +201,14 @@ class AbstractSqlResult:
         actual values used when executing."""
         
     def affectedRows(self):
-        """Return the number of rows affected by the query producing this :class:`AbstracSqlResult`."""
+        """Return the number of rows affected by the query producing this :class:`AbstracSqlResult`.
+        This method must not be used for result sets produced by multiqueries (different drivers would return
+        different values)."""
     
     def insertId(self):
         """Return the last value which was used in an ``AUTO_INCREMENT``-column when this AbstractSqlResult
-        was created."""
+        was created. This method must not be used for result sets produced by multiqueries (different drivers
+        would return different values)."""
     
     def getSingle(self):
         """Return the first value from the first row of the result set. Use this as a shorthand method if

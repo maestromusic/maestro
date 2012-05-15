@@ -77,10 +77,8 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         """Build wrappers for the given paths and if possible add containers. In other words: convert a flat
         playlist to a tree playlist."""
         levels.real.loadPaths(paths)
-        wrappers = [Wrapper(levels.real.get(path)) for path in paths]
-        treeBuilder = treebuilder.TreeBuilder(wrappers)
-        treeBuilder.buildParentGraph()
-        return treeBuilder.buildTree(createOnlyChildren=False)
+        files = [levels.real.get(path) for path in paths]
+        return treebuilder.buildTree(levels.real,files)
     
     def initFromPaths(self,paths):
         """Initialize the playlist to contain the given files. This method is not undoable."""
@@ -143,6 +141,76 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
     def _handleLevelChanged(self,event):
         #TODO
         pass
+    
+    def dropMimeData(self,mimeData,action,row,column,parentIndex):
+        # Compute drop position
+        if parentIndex.isValid():
+            parent = parentIndex.internalPointer()
+        else: parent = self.root
+        if row == -1 or row == parent.getContentsCount():
+            if parent.isFile(): # Drop onto a file
+                position = parent.parent.index(parent) + 1
+                parent = parent.parent
+            else: position = parent.getContentsCount()
+        else: position = row
+        
+        if mimeData.hasFormat(config.options.gui.mime):
+            wrappers = [wrapper.copy() for wrapper in mimeData.getWrappers()]
+        else:
+            paths = [utils.relPath(path) for path in itertools.chain.from_iterable(
+                                    utils.collectFiles(u.path() for u in mimeData.urls()).values())]
+                
+            #TODO create a shortcut for the following lines (this calls db.idFromPath twice for each element)
+            levels.real.loadPaths(paths) 
+            files = [levels.real.get(path) for path in paths]
+            
+            offset = parent.offset() + sum(w.fileCount() for w in parent.contents[:position])
+            if offset == 0 and position == 0:
+                preWrapper = None
+            else: preWrapper = self.root.fileAtOffset(offset)
+            postWrapper = self.root.fileAtOffset(offset+1,allowFileCount=True)
+            
+            wrappers = treebuilder.buildTree(levels.real,files,preWrapper,postWrapper)
+                
+        #TODO: handle move actions
+#         if action == Qt.MoveAction:
+#            offsetShift = 0
+#            removePairs = []
+#            for file in fileElems:
+#                fileOffset = file.offset()
+#                removePairs.append((fileOffset, file.path))
+#                if fileOffset < offset:
+#                    offsetShift += 1
+#            offset -= offsetShift
+#            self.backend.stack.beginMacro(self.tr("move songs"))
+#            self.backend.removeFromPlaylist(removePairs)
+#       self.backend.insertIntoPlaylist(list(enumerate(paths, start = offset)))
+#      if action == Qt.MoveAction:
+#           self.backend.stack.endMacro()
+#       return True
+    
+        application.stack.beginMacro(self.tr("Drop elements"))
+        self.insert(parent,position,wrappers)
+        self.glue(parent,position+len(wrappers))
+        self.glue(parent,position)
+        application.stack.endMacro()
+        return True
+            
+    def glue(self,parent,position):
+        if position == 0 or position == parent.getContentsCount():
+            return # nothing to glue here
+        first = parent.contents[position-1]
+        second = parent.contents[position]
+        if first.element.id == second.element.id:
+            priorLength = first.getContentsCount()
+            wrappers = second.contents
+            # Of course the second line would also remove the wrappers. But on undo the parent pointers of
+            # the wrappers wouldn't be corrected
+            self.remove(second,0,len(wrappers)-1)
+            self.remove(parent,position,position)
+            self.insert(first,priorLength,wrappers)
+            # Glue recursively
+            self.glue(first,priorLength)
         
         
         

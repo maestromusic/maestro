@@ -1,53 +1,84 @@
-#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# Copyright 2009 Martin Altmayer
+# OMG Music Manager  -  http://omg.mathematik.uni-kl.de
+# Copyright (C) 2009-2012 Martin Altmayer, Michael Helmling
 #
-# This program is free software; you can redistribute it and/or modify
-# it under the terms of the GNU General Public License version 3 as
-# published by the Free Software Foundation
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
 """Unittests for the sql-package."""
 
-import sys, unittest
-from omg import config, database as db
-from omg.utils import FlexiDate
+import sys, unittest, os.path
+sys.path.insert(0,os.path.normpath(os.path.join(os.getcwd(),os.path.dirname(__file__),'../')))
+
+from omg import application, config, database as db, utils
+from omg import constants
 
 data = (
     ("Tobias Ä",24,1.8,True,None),
     ("Julia Ö",22,1.7,False,None),
     ("Karin Ü",21,1.8,True,None),
-    ("Frédéric François Chopin",39,1.6,False,FlexiDate(1849,10,17))
+    ("Frédéric François Chopin",39,1.6,False,utils.FlexiDate(1849,10,17))
 )
 
 testTable = "sqltest"
 
 class SqlTestCase(unittest.TestCase):
-    def __init__(self,driver):
-        unittest.TestCase.__init__(self)
-        self.driver = driver
+    def __init__(self,type,driver=None):
+        super().__init__()
+        self.type, self.driver = type, driver
         
     def setUp(self):
-        print("Checking driver '{}'...".format(self.driver))
-        db.testConnect(self.driver)
+        if self.type == 'sqlite':
+            config.options.database.type = 'sqlite'
+            config.options.database.sqlite_path = ':memory:'#os.path.join(os.getcwd(),os.path.dirname(__file__),
+                                                             #  'test.sqlite')
+            print("Checking SQLite...")
+        else:
+            config.options.database.mysql_drivers = [self.driver]
+            print("Checking MySQL with driver '{}'...".format(self.driver))
+        db.connect()
 
     def tearDown(self):
         db.close()
 
     def runTest(self):
         # Create the table
-        db.query("""
-            CREATE TEMPORARY TABLE {}{} (
-            id INT UNSIGNED NOT NULL AUTO_INCREMENT,
-            name VARCHAR(30) NOT NULL,
-            age INT NOT NULL,
-            size DOUBLE NOT NULL,
-            male BOOLEAN NOT NULL,
-            death INT NULL DEFAULT NULL,
-            PRIMARY KEY(id)
-            ) ENGINE InnoDB, CHARACTER SET 'utf8';
-            """.format(db.prefix,testTable)
-        )
+        if self.type == 'mysql':
+            db.query("""
+                CREATE TEMPORARY TABLE {}{} (
+                id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+                name VARCHAR(30) NOT NULL,
+                age INT NOT NULL,
+                size DOUBLE NOT NULL,
+                male BOOLEAN NOT NULL,
+                death INT NULL DEFAULT NULL,
+                PRIMARY KEY(id)
+                ) ENGINE InnoDB, CHARACTER SET 'utf8';
+                """.format(db.prefix,testTable)
+            )
+        else:
+             db.query("""
+                CREATE TABLE {}{} (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name VARCHAR(30) NOT NULL,
+                age INT NOT NULL,
+                size DOUBLE NOT NULL,
+                male BOOLEAN NOT NULL,
+                death INT NULL DEFAULT NULL
+                )
+                """.format(db.prefix,testTable)
+            )
         
         # Fill it with data
         result = db.query("INSERT INTO {}{} (name,age,size,male,death) VALUES (?,?,?,?,?)"
@@ -56,8 +87,8 @@ class SqlTestCase(unittest.TestCase):
 
         result = db.multiQuery("INSERT INTO {}{} (name,age,size,male,death) VALUES (?,?,?,?,?)"
                                 .format(db.prefix,testTable),data[1:])
-        self.assertEqual(result.affectedRows(),1) # The result contains only information about the last query
-        self.assertEqual(result.insertId(),4)
+        # Neither affectedRows nor insertId are equal for different drivers after a multiQuery
+        self.assertEqual(db.query("SELECT COUNT(*) FROM {}{}".format(db.prefix,testTable)).getSingle(),4)
 
         # And retrieve it again
         result = db.query("SELECT id,name,age,size,male,death FROM {}{} ORDER BY id".format(db.prefix,testTable))
@@ -65,8 +96,9 @@ class SqlTestCase(unittest.TestCase):
         for i,row in enumerate(result):
             self.assertEqual(i+1,row[0]) # id
             for j in range(5):
-                self.assertEqual(data[i][j],row[j+1]if j+1<5 else FlexiDate.fromSql(row[j+1]))
+                self.assertEqual(data[i][j],row[j+1] if j+1<5 else utils.FlexiDate.fromSql(row[j+1]))
 
+        # Check getSingle* methods
         result = db.query("SELECT id FROM {}{} WHERE age = ?".format(db.prefix,testTable),24)
         self.assertEqual(result.getSingle(),1)
 
@@ -94,11 +126,12 @@ class SqlTestCase(unittest.TestCase):
 
         db.transaction()
         for i in range(1,4):
-            db.query("UPDATE {}{} SET death = ?".format(db.prefix,testTable),FlexiDate(2000))
+            db.query("UPDATE {}{} SET death = ?".format(db.prefix,testTable),utils.FlexiDate(2000))
         db.rollback()
 
         result = db.query("SELECT death FROM {}{}".format(db.prefix,testTable))
-        self.assertListEqual(list(FlexiDate.fromSql(value) for value in result.getSingleColumn()),3*[None])
+        self.assertListEqual(list(utils.FlexiDate.fromSql(value) for value in result.getSingleColumn()),
+                             3*[None])
 
         # Check exceptions
         self.assertRaises(db.sql.DBException,lambda: db.query("STUPID QUERY"))
@@ -109,10 +142,14 @@ class SqlTestCase(unittest.TestCase):
         
 
 if __name__ == "__main__":
-    config.init()
+    # Force temporary values for these config variables (that is, changes to these variables will not be
+    # written to the file).
+    application.init(cmdConfig=['database.type=mysql','database.mysql_drivers=','database.sqlite_path='],
+                     exitPoint='config')
 
     suite = unittest.TestSuite()
-    for driver in ("qtsql",):
-        suite.addTest(SqlTestCase(driver))
+    for driver in ["qtsql","pymysql","myconnpy"]:
+        suite.addTest(SqlTestCase("mysql",driver))
+    suite.addTest(SqlTestCase("sqlite"))
         
     unittest.TextTestRunner(verbosity=2).run(suite)

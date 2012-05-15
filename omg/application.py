@@ -64,9 +64,13 @@ def run(cmdConfig=[],exitPoint=None,console=False):
     ``main.collection=/var/music``.
     
     Using the optional argument *exitPoint* you may also initialize only part of the framework. Allowed
-    values are 'database','tags' and 'nogui'. The run script will stop after the database connection has been
-    established, after the tags module has been initialized or just before the GUI would be created,
-    respectively.
+    values are (in this order):
+    
+        - 'config':    Initialize only config
+        - 'database':  Stop after database connection has been established
+        - 'tags':      Stop after tags module has been initialized (this needs a db connection.
+        - 'noplugins': Stop before plugins would be loaded
+        - 'nogui':     Stop right before the GUI would be created (plugins are enabled at this point)
     
     If *console* is True, the lockfile and the (graphical) installer are turned off.
     """
@@ -82,10 +86,12 @@ def run(cmdConfig=[],exitPoint=None,console=False):
     global logger
     logger = logging.getLogger("omg")
     logger.debug("START")
-    
     # Lock the lockfile to prevent a second OMG-instance from starting.
     if not console:
         lock()
+    
+    if exitPoint == 'config':
+        return
         
     # Check for a collection directory
     if config.options.main.collection == '':
@@ -104,7 +110,7 @@ def run(cmdConfig=[],exitPoint=None,console=False):
         def _debugAll(event):
             logger.debug("EVENT: " + str(event))
         dispatcher.changes.connect(_debugAll)
-    
+        
     # Initialize database
     from . import database
     try:
@@ -135,6 +141,9 @@ def run(cmdConfig=[],exitPoint=None,console=False):
     levels.init()
     from . import resources, search
     search.init()
+    
+    if exitPoint == 'noplugins':
+        return
     
     # Load Plugins
     from . import plugins
@@ -254,7 +263,7 @@ def loadTranslators(app,logger):
                                 .format(translatorFile,translatorDir))
 
 
-def init(cmdConfig=[],exitPoint='nogui',console=True):
+def init(cmdConfig=[],exitPoint='noplugins',console=True):
     """Initialize OMG's framework (database, tags etc.) but do not run a GUI. Use this for tests on the
     terminal:
 

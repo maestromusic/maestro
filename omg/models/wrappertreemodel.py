@@ -110,8 +110,8 @@ class WrapperTreeModel(rootedtreemodel.RootedTreeModel):
         if mimeData.hasFormat(config.options.gui.mime):
             wrappers = [wrapper.copy() for wrapper in mimeData.getWrappers()]
         else:
-            paths = [utils.relPath(path) for path in utils.collectFiles(u.path()
-                                                                    for u in mimeData.urls()).values()]
+            paths = [utils.relPath(path) for path in itertools.chain.from_iterable(
+                                    utils.collectFiles(u.path() for u in mimeData.urls()).values())]
                 
             #TODO create a shortcut for the following lines (this calls db.idFromPath twice for each element)
             levels.real.loadPaths(paths) 

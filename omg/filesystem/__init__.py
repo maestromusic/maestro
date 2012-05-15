@@ -153,7 +153,7 @@ class FileSystemSynchronizer(QtCore.QThread):
         database. Otherwise, *self.modifiedTags[id]* will be set to a tuple (dbTags, fileTags)."""
         
         dbTags = db.tags(id)
-        rfile = realfiles.get(path)
+        rfile = realfiles.get(path,ignoreUnknownTags=True)
         rfile.read()
         if dbTags.withoutPrivateTags() != rfile.tags:
             logger.debug('Detected modification on file "{}": tags differ'.format(path))
