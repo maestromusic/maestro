@@ -181,8 +181,7 @@ class Level(QtCore.QObject):
         self.elements[new] = elem
         for parentID in elem.parents:
             parentContents = self.elements[parentID].contents
-            #TODO: Might be harmful to create new lists. Why not change the ids in place?
-            parentContents.ids = [ new if id == old else id for id in parentContents.ids ]
+            parentContents.ids[:] = [ new if id == old else id for id in parentContents.ids ]
         if elem.isContainer():
             for childID in elem.contents.ids:
                 if childID in self.elements:

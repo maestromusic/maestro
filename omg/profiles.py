@@ -238,7 +238,6 @@ class ProfileConfigurationDisplay(QtGui.QWidget):
         self.setProfile(list(self.profileConf.profiles.keys())[-1])
         
     def setProfile(self, name):
-        print('set')
         self.nameEdit.setText(name)
         self.profileChooser.setCurrentProfile(name)
         self.setClass(self.profileConf.profiles[name].className, name)
