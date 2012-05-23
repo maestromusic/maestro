@@ -65,8 +65,16 @@ class ProfileConfiguration(QtCore.QObject):
         self.profiles[name] = self.classes[className](name)
         self.profileAdded.emit(name)
     
+    def removeProfile(self, name):
+        del self.profiles[name]
+        self.profileRemoved.emit(name)
+        
     def configurationDisplay(self, currentProfile = None, parent = None):
         return ProfileConfigurationDisplay(self, currentProfile, parent)
+    
+    def __getitem__(self, str):
+        """For convenience, you can access the ProfileConfiguration directly to obtain a profile by its name."""
+        return self.profiles[str]
              
 class Profile:
     
@@ -118,8 +126,9 @@ class ClassComboBox(QtGui.QComboBox):
 class ProfileComboBox(QtGui.QComboBox):
     """This class provides a combo box that lets the user choose a profile."""
     
-    profileChosen = QtCore.pyqtSignal(str)
     
+    profileChosen = QtCore.pyqtSignal(str)
+
     def __init__(self, profileConf, default = None, includeConfigure = True, parent = None):
         super().__init__(parent)
         for name in profileConf.profiles:
@@ -146,9 +155,19 @@ class ProfileComboBox(QtGui.QComboBox):
         """Returns the currently selected profile, or *None* if none is selected.
         
         The latter happens especially in the case that no profile is configured."""
+        name = self.currentProfileName()
+        if name is None:
+            return None
+        else:
+            return self.profileConf[name]
+    
+    def currentProfileName(self):
+        """Returns the name of the currently selected profile, or *None* if none is selected.
+        
+        The latter happens especially in the case that no profile is configured."""
         if self.includeConfigure and self.currentIndex() == self.count()-1:
             return None
-        return self.profileConf[self.currentText()]
+        return self.currentText()
     
     def setCurrentProfile(self, name, emit = True):
         for i in range(self.profileCount()):
@@ -162,6 +181,9 @@ class ProfileComboBox(QtGui.QComboBox):
         return False
                    
     def handleIndexChange(self, i):
+        if i == -1:
+            self.profileChosen.emit('')
+            return
         if i != self.profileCount():
             if not self.supressEvent:
                 self.profileChosen.emit(self.itemText(i))
@@ -192,6 +214,7 @@ class ProfileComboBox(QtGui.QComboBox):
 class ProfileConfigurationDisplay(QtGui.QWidget):
     
     temporaryModified = QtCore.pyqtSignal(object)
+    profileChanged = QtCore.pyqtSignal(str)
     
     def __init__(self, profileConf, currentProfile = None, parent = None):
         super().__init__(parent)
@@ -219,7 +242,10 @@ class ProfileConfigurationDisplay(QtGui.QWidget):
             self.enableClassChooser()
         
         self.newButton.clicked.connect(self.handleNewProfile)
-        self.profileChooser.profileChosen.connect(self.setProfile)    
+        self.removeButton.clicked.connect(self.handleRemoveProfile)
+        self.saveButton.clicked.connect(self.handleSaveProfile)
+        self.profileChooser.profileChosen.connect(self.setProfile)
+            
         mainLayout = QtGui.QVBoxLayout()
         mainLayout.addLayout(topLayout)
         mainLayout.addLayout(self.secondLayout)
@@ -236,11 +262,22 @@ class ProfileConfigurationDisplay(QtGui.QWidget):
     def handleNewProfile(self):
         self.profileConf.newProfile()
         self.setProfile(list(self.profileConf.profiles.keys())[-1])
+    
+    def handleRemoveProfile(self):
+        self.profileConf.removeProfile(self.profileChooser.currentProfileName())
+    
+    def handleSaveProfile(self):
+        #TODO
         
     def setProfile(self, name):
-        self.nameEdit.setText(name)
-        self.profileChooser.setCurrentProfile(name)
-        self.setClass(self.profileConf.profiles[name].className, name)
+        if name == '':
+            self.nameEdit.setText(self.tr("new Profile"))
+            self.setClass(next(iter(self.profileConf.classes)))
+        else:
+            self.nameEdit.setText(name)
+            self.profileChooser.setCurrentProfile(name)
+            self.setClass(self.profileConf.profiles[name].className, name)
+        self.profileChanged.emit(name)
     
     def setClass(self, className, profileName = None):
         self.classChooser.setCurrentClass(className, emit = False)
