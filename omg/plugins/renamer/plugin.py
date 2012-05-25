@@ -99,6 +99,7 @@ class GrammarRenamer(profiles.Profile):
         self.positionFormat = "{:0>" + str(config.options.renamer.positionDigits) + "}"
         self.formatString = formatString
         pyparsing.ParserElement.setDefaultWhitespaceChars("\t\n")
+        #pyparsing.ParserElement.enablePackrat() does not work (buggy)
         lbrace = Literal("<").suppress()
         rbrace = Literal(">").suppress()
         
@@ -147,7 +148,8 @@ class GrammarRenamer(profiles.Profile):
         self.traverse(levels.real.get(id))
         return self.result
 
-    
+    def config(self):
+        return (self.formatString,)
     @classmethod    
     def configurationWidget(cls, profile = None, parent = None):
         widget = GrammarConfigurationWidget(parent)
@@ -167,6 +169,9 @@ class GrammarConfigurationWidget(profiles.ConfigurationWidget):
         def handleTextChange(self):
             renamer = GrammarRenamer("temporary", self.edit.toPlainText())
             self.temporaryModified.emit(renamer)
+            
+        def currentConfig(self):
+            return (self.edit.toPlainText(),)
 
 def init():
     

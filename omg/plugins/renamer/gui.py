@@ -70,10 +70,11 @@ class RenameDialog(QtGui.QDialog):
         
         configDisplay = plugin.profileConfig.configurationDisplay()
         mainLayout.addWidget(configDisplay,1)
-        configDisplay.temporaryModified.connect(self._handleFormatChange)
-        
-        self.statusLabel = QtGui.QLabel("zomg")
+        configDisplay.temporaryModified.connect(self._handleTempChange)
+        configDisplay.profileChanged.connect(self._handleProfileChange)
+        self.statusLabel = QtGui.QLabel()
         mainLayout.addWidget(self.statusLabel, 1)
+        self.statusLabel.setVisible(False)
         
         self.tree = treeview.TreeView()
         self.model = editor.EditorModel(level)
@@ -83,6 +84,8 @@ class RenameDialog(QtGui.QDialog):
         self.model.insertElements(self.model.root, 0, ids)
         self.tree.expandAll()
         
+        if configDisplay.currentProfileName() != '':
+            self._handleProfileChange(configDisplay.currentProfileName())
         mainLayout.addWidget(self.tree, 100)
         bb = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Cancel | QtGui.QDialogButtonBox.Ok)
         bb.accepted.connect(self.accept)
@@ -92,11 +95,11 @@ class RenameDialog(QtGui.QDialog):
         self.setLayout(mainLayout)
         self.resize(800,500)
     
-    def setProfile(self, name):
-        currentPlug = plugin.profileConfig.plugins[name]
-        self.currentFormatEdit.setText(currentPlug.formatString)
-    
-    def _handleFormatChange(self, renamer):
+    def _handleProfileChange(self, name):
+        profile = plugin.profileConfig[name]
+        self._handleTempChange(profile)
+        
+    def _handleTempChange(self, renamer):
         """handle changes to the format text edit box"""
         try:
             totalResult = dict()
@@ -104,9 +107,10 @@ class RenameDialog(QtGui.QDialog):
                 result = renamer.renameContainer(id)
                 totalResult.update(result)
             self.delegate.result = totalResult
-            self.statusLabel.setText(self.tr("Format ok"))
+            self.statusLabel.hide()
         except plugin.FormatSyntaxError:
             self.statusLabel.setText(self.tr("Syntax error in format string"))
+            self.statusLabel.show()
         self.model.modelReset.emit()
         self.tree.expandAll()
         

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2009-2012 Martin Altmayer, Michael Helmling
+# Copyright (C) 2012 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -52,9 +52,16 @@ class ProfileConfiguration(QtCore.QObject):
         for name, clsName, *config in self.configSection.profiles:
             if clsName in self.classes:
                 self.profiles[name] = self.classes[clsName](name, *config)
+                
             else:
                 logger.warning("could not load {} profile {}: class {} not found".format(self.name, name, clsName))
     
+    def saveConfig(self):
+        configContents = []
+        for name, profile in self.profiles.items():
+            configContents.append( (name, profile.className) + tuple(profile.config())  )
+        self.configSection.profiles = configContents
+            
     def newProfile(self, name = None, className = None):
         if name is None:
             name = self.tr("newProfile")
@@ -63,18 +70,33 @@ class ProfileConfiguration(QtCore.QObject):
         if className is None:
             className = next(iter(self.classes))
         self.profiles[name] = self.classes[className](name)
+        self.saveConfig()
         self.profileAdded.emit(name)
     
     def removeProfile(self, name):
         del self.profiles[name]
+        self.saveConfig()
         self.profileRemoved.emit(name)
-        
+    
+    def renameProfile(self, oldName, newName):
+        self.profiles = collections.OrderedDict((newName if n==oldName else n, p) for n, p in self.profiles.items() )
+        self.saveConfig()
+        self.profileRenamed.emit(oldName, newName)
+    
+    def modifyProfile(self, name, className, config):
+        self.profiles[name] = self.classes[className](name, *config)
+        self.saveConfig()
+        self.profileModified.emit(name)
+    
     def configurationDisplay(self, currentProfile = None, parent = None):
         return ProfileConfigurationDisplay(self, currentProfile, parent)
     
-    def __getitem__(self, str):
+    def __contains__(self, name):
+        return self.profiles.__contains__(name)
+        
+    def __getitem__(self, name):
         """For convenience, you can access the ProfileConfiguration directly to obtain a profile by its name."""
-        return self.profiles[str]
+        return self.profiles[name]
              
 class Profile:
     
@@ -91,6 +113,13 @@ class Profile:
 class ConfigurationWidget(QtGui.QWidget):
     
     temporaryModified = QtCore.pyqtSignal(object)
+    
+    def currentConfig(self):
+        """Returns the current configuration represented by the state of the widget.
+        
+        Subclasses must implement this method; it should return a tuple of data suitable
+        to pass to the Profile's constructor"""
+        raise NotImplementedError()
     
 class ClassComboBox(QtGui.QComboBox):
     """This class provides a combo box for choosing a profile implementation class."""
@@ -208,7 +237,6 @@ class ProfileComboBox(QtGui.QComboBox):
         for i in range(self.profileCount()):
             if self.itemText(i) == name:
                 self.removeItem(i)
-                #TODO: handle removal of current profile: change current profile
                 break
             
 class ProfileConfigurationDisplay(QtGui.QWidget):
@@ -254,9 +282,8 @@ class ProfileConfigurationDisplay(QtGui.QWidget):
         self.mainLayout = mainLayout
         if currentProfile is None:
             currentProfile = next(iter(self.profileConf.profiles))
-        print(currentProfile)
-        print(list(self.profileConf.profiles.keys()))
         
+        self.currentProfileName = self.profileChooser.currentProfileName
         self.setProfile(currentProfile)
     
     def handleNewProfile(self):
@@ -267,27 +294,51 @@ class ProfileConfigurationDisplay(QtGui.QWidget):
         self.profileConf.removeProfile(self.profileChooser.currentProfileName())
     
     def handleSaveProfile(self):
-        #TODO
-        
+        if self.nameEdit.text() == '':
+            from .gui import dialogs
+            dialogs.warning(self.tr('Invalid Profile Name'), self.tr("The profile must have a non-empty name"))
+        else:
+            currentProfile = self.profileChooser.currentProfileName()
+            newName = str(self.nameEdit.text())
+            if newName != currentProfile:
+                if newName in self.profileConf:
+                    ans = dialogs.question(self.tr('Overwrite profile?'),
+                                     self.tr('A profile named "{}" already exists. Do you want to overwrite it?'))
+                    if ans:
+                        self.profileConf.removeProfile(newName)
+                    else:
+                        return
+                self.profileConf.renameProfile(currentProfile, newName)
+            self.profileConf.modifyProfile(newName, self.classChooser.currentText(), self.configWidget.currentConfig())
+            
     def setProfile(self, name):
         if name == '':
-            self.nameEdit.setText(self.tr("new Profile"))
-            self.setClass(next(iter(self.profileConf.classes)))
+            self.nameEdit.setEnabled(False)
+            self.setClass('')
         else:
             self.nameEdit.setText(name)
+            self.nameEdit.setEnabled(True)
             self.profileChooser.setCurrentProfile(name)
             self.setClass(self.profileConf.profiles[name].className, name)
         self.profileChanged.emit(name)
     
     def setClass(self, className, profileName = None):
-        self.classChooser.setCurrentClass(className, emit = False)
+        if className == '':
+            self.classChooser.setEnabled(False)
+            self._removeConfigWidget()
+        else:
+            self.classChooser.setCurrentClass(className, emit = False)
+            self._removeConfigWidget()
+            self.configWidget = self.profileConf.classes[className].configurationWidget(profileName)
+            self.configWidget.temporaryModified.connect(self.temporaryModified)
+            self.mainLayout.insertWidget(2, self.configWidget)
+    
+    def _removeConfigWidget(self):
         if self.configWidget is not None:
             self.mainLayout.removeWidget(self.configWidget)
             self.configWidget.temporaryModified.disconnect(self.temporaryModified)
             self.configWidget.setVisible(False)
-        self.configWidget = self.profileConf.classes[className].configurationWidget(profileName)
-        self.configWidget.temporaryModified.connect(self.temporaryModified)
-        self.mainLayout.insertWidget(2, self.configWidget)
+        self.configWidget = None
         
     def enableClassChooser(self):
         self.secondLayout.insertWidget(2, QtGui.QLabel(self.tr("Type:")))
