@@ -171,7 +171,7 @@ class File(Element):
 
 class ContentList:
     """List that stores a list of ids together with positions (which must be increasing and unique but not
-    necessarily the indexes of the corresponding ids. On item access the list will return tuples containing
+    necessarily the indexes of the corresponding ids). On item access the list will return tuples containing
     the id and the position.
     """
     def __init__(self):
@@ -184,6 +184,13 @@ class ContentList:
         result.ids = self.ids[:]
         result.positions = self.positions[:]
         return result
+    
+    def append(self,id):
+        """Append an id to the list choosing a position which is 1 bigger than the last position."""
+        self.ids.append(id)
+        if len(self.positions) == 0:
+            self.positions.append(1)
+        else: self.positions.append(self.positions[-1]+1)
         
     def __len__(self):
         return len(self.ids)

@@ -383,3 +383,10 @@ class PointAtInfinity:
 
     def __str__(self):
         return "{}{}".format('+' if self.plus else '-', '∞')
+
+
+def rfind(aList,item):
+    for i,x in enumerate(reversed(aList)):
+        if x == item:
+            return len(aList)-1-i
+    else: return -1

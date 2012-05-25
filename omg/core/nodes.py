@@ -202,6 +202,16 @@ class Node:
         if index is None:
             return None,None
         else: return self.getContents()[index],innerOffset
+    
+    def firstLeaf(self,allowSelf=False):
+        if self.hasContents():
+            return self.getContents()[0].firstLeaf(allowSelf=True)
+        else: return self if allowSelf else None
+        
+    def lastLeaf(self,allowSelf=False):
+        if self.hasContents():
+            return self.getContents()[-1].lastLeaf(allowSelf=True)
+        else: return self if allowSelf else None
         
     def printStructure(self, indent = ''):
         """Debug method: print the tree below this node using indentation."""

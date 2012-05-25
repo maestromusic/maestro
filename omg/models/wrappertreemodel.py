@@ -61,9 +61,9 @@ class WrapperTreeModel(rootedtreemodel.RootedTreeModel):
         del parent.contents[start:end+1]
         self.endRemoveRows()
     
-    def insert(self,parent,index,wrappers):
-        """Insert *wrappers* at the given positional index into the wrapper *parent*.""" 
-        command = InsertCommand(self,parent,index,wrappers)
+    def insert(self,parent,position,wrappers):
+        """Insert *wrappers* at the given position into the wrapper *parent*.""" 
+        command = InsertCommand(self,parent,position,wrappers)
         application.stack.push(command)
     
     def removeWrappers(self,wrappers):
@@ -160,7 +160,7 @@ class WrapperTreeModel(rootedtreemodel.RootedTreeModel):
         
         If *position* is 0 or equal to the number of contents of *parent*, do nothing.
         """
-        assert parent != self.root
+        assert parent is not self.root
         if position == 0 or position == len(parent.contents):
             return # nothing to split here
         elif position < 0 or position > len(parent.contents):
