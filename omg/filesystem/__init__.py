@@ -378,7 +378,9 @@ class FileSystemSynchronizer(QtCore.QThread):
                             break
                     if not folderStillUnsynced:
                         logger.debug('previously unsynced folder now ok: {}'.format(folder))
+                        db.transaction()
                         self.updateFolderState(folder, 'ok', True)
+                        db.commit()
                     
             if len(event.deleted) > 0:
                 byFolder = utils.groupFilePaths(event.deleted)

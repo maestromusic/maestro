@@ -30,9 +30,9 @@ class EditorModel(wrappertreemodel.WrapperTreeModel):
     """Model class for the editors where users can edit elements before they are commited into
     the database."""
     
-    def __init__(self):
+    def __init__(self, level = levels.editor):
         """Initializes the model. A new RootNode will be set as root."""
-        super().__init__(levels.editor)
+        super().__init__(level)
         self.albumGroupers = []
         self.metacontainer_regex=r" ?[([]?(?:cd|disc|part|teil|disk|vol)\.? ?([iI0-9]+)[)\]]?"
 

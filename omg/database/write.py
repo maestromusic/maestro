@@ -25,8 +25,10 @@ from ..core import tags
 def createElements(data):
     """Creates elements in the database and returns their IDs. *data* is a list of
     (file, toplevel, elementcount, major) tuples specifying the new elements."""
-    last = db.multiQuery("INSERT INTO {}elements (file,toplevel, elements, major) VALUES (?,?,?,?)"
-                  .format(db.prefix), data).insertId()
+    queryString = "INSERT INTO {}elements (file,toplevel, elements, major) VALUES (?,?,?,?)".format(db.prefix)
+    if len(data) > 1:
+        db.multiQuery(queryString, data[:-1])
+    last = db.query(queryString, *data[-1]).insertId()
     first = last - len(data) + 1
     return list(range(first, last+1))
 
@@ -159,8 +161,10 @@ def makeValueIDs(data):
             valuesToAdd[tag.type].add((tag.id, db._encodeValue(tag.type, value)))
     for tagType, values in valuesToAdd.items():
         values = list(values)
-        lastId = db.multiQuery("INSERT INTO {}values_{} (tag_id, value) VALUES (?,?)"
-                      .format(db.prefix, tagType), values).insertId()
+        queryString = "INSERT INTO {}values_{} (tag_id, value) VALUES (?,?)".format(db.prefix, tagType)
+        if len(values) > 1:
+            db.multiQuery(queryString, values[:-1])
+        lastId = db.query(queryString, *(values[-1])).insertId()
         if tagType in db._cachedValues:
             # update cache
             firstId = lastId - len(values) + 1

@@ -38,10 +38,12 @@ class DelegateStyle:
     three attributes *relFontSize*, *bold* and *italic*. *relFontSize* is a factor which is multiplied with
     the delegate option ''fontSize''.
     """
-    def __init__(self,relFontSize,bold,italic):
+    def __init__(self,relFontSize,bold,italic,color = QtGui.qApp.palette().color(QtGui.QPalette.WindowText)):
         self.bold = bold
         self.italic = italic
         self.relFontSize = relFontSize
+        self.color = color
+            
 
 
 # Some standard styles used in the delegates
@@ -349,6 +351,8 @@ class TextItem(DelegateItem):
         else: flags |= Qt.AlignLeft
         # Enable elided text
         #text = delegate.painter.fontMetrics().elidedText(self.text,Qt.ElideRight,rect.width())
+        if self.style is not None:
+            delegate.painter.setPen(self.style.color)
         bRect = delegate.painter.drawText(rect,flags,self.text)
         return bRect.width(),max(bRect.height(),self.minHeight)
     
