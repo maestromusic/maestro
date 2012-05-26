@@ -386,7 +386,9 @@ class PointAtInfinity:
 
 
 def rfind(aList,item):
+    """Return the index of the last occurrence of *item* in *aList*. Return -1 if *item* is not found."""
     for i,x in enumerate(reversed(aList)):
         if x == item:
             return len(aList)-1-i
     else: return -1
+    

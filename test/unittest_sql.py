@@ -22,7 +22,6 @@ import sys, unittest, os.path
 sys.path.insert(0,os.path.normpath(os.path.join(os.getcwd(),os.path.dirname(__file__),'../')))
 
 from omg import application, config, database as db, utils
-from omg import constants
 
 data = (
     ("Tobias Ä",24,1.8,True,None),

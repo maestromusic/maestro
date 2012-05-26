@@ -33,10 +33,15 @@ class MimeData(QtCore.QMimeData):
     type is used by applications like Amarok and Dolphin.
     
     The tree may contain arbitrary Nodes, use getFiles to get all files (recursively) or getWrappers to get
-    the toplevel wrap
+    the toplevel wrappers.
+    
+    Use the attribute 'level' to check whether the wrappers in the MimeData are on the level used by the
+    widget/model where they are dropped. If not, they might contain elements that do not exist on the second
+    level as well as an invalid tree structure.
     """
-    def __init__(self,nodeList):
+    def __init__(self,level,nodeList):
         QtCore.QMimeData.__init__(self)
+        self.level = level
         self._nodeList = nodeList
         
     def hasFormat(self,format):
@@ -93,4 +98,4 @@ class MimeData(QtCore.QMimeData):
         nodes = [model.data(index,role=Qt.EditRole) for index in indexList]
         # Filter away nodes if a parent is also contained in the indexList. 
         nodes = [n for n in nodes if not any(parent in nodes for parent in n.getParents())]
-        return MimeData(nodes)
+        return MimeData(model.level,nodes)

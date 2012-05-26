@@ -203,26 +203,17 @@ def buildTree(level,wrappers,parent=None,preWrapper=None,postWrapper=None):
     while not isinstance(parent,RootNode):
         if parent.element.id in seqs and seqs.contains(parent.element.id,Sequence(0,len(wrappers)-1)):
             toplevelIds = parent.element.contents.ids
-            allowSingleChild = True
             break
         parent = parent.parent
-    else:
-        toplevelIds = seqs.toplevelIds
-        allowSingleChild = False
+    else: toplevelIds = seqs.toplevelIds
         
-    # TODO: Remove  allowSingleChild parameter
-    allowSingleChild = True
-    return _buildTree(wrappers,seqs,None,toplevelIds,allowSingleChild)
+    return _buildTree(wrappers,seqs,None,toplevelIds)
 
     
-def _buildTree(wrappers,seqs,boundingSeq,toplevelIds,allowSingleChild):
+def _buildTree(wrappers,seqs,boundingSeq,toplevelIds):
     """Build a tree over the part of *files* specified by *boundingSeq* (over all files if *boundingSeq* is
     None. *seqs* is the SequenceDict, *toplevelIds* are the elements that may be used at the highest level.
-    If *allowSingleChildren* is False, the highest level will not contain wrappers with only one child
-    (note that we must allow single children on lower levels).
     """
-    print("This is _buildTree for {}. TLIds: {}".format(boundingSeq,toplevelIds))
-    
     # Root nodes are not necessarily added in correct order. Insert them indexed by the start point of their
     # sequence and at the end sort them by the start point.
     roots = {}
@@ -249,14 +240,8 @@ def _buildTree(wrappers,seqs,boundingSeq,toplevelIds,allowSingleChild):
             if wrapper.isContainer():
                 # For containers recursively create the tree below. Bound the tree creation to longestSeq.
                 # Choose only roots which are contents of element.
-                childContents = _buildTree(wrappers,seqs,longestSeq,element.contents.ids,
-                                           allowSingleChild=True)
+                childContents = _buildTree(wrappers,seqs,longestSeq,element.contents.ids)
                 wrapper.setContents(childContents)
-                
-                # Avoid creating a single child by replacing wrapper by its only child
-                if not allowSingleChild:
-                    while wrapper.getContentsCount() == 1:
-                        wrapper = wrapper.contents[0]
         
         # Add the wrapper to roots and remove the sequence from all sequences
         roots[longestSeq.start] = wrapper

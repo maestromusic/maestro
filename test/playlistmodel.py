@@ -16,113 +16,18 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-"""Unittests for the sql-package."""
+"""Unittests for the PlaylistModel."""
 
 import sys, unittest, os.path
 sys.path.insert(0,os.path.normpath(os.path.join(os.getcwd(),os.path.dirname(__file__),'../')))
 
 from omg import application, config, database as db, utils
-from omg.core import levels, tags
-from omg.core.elements import File, Container, Element
-from omg.core.nodes import Wrapper
-
 from omg.models import playlist
+from testlevel import *
 
 
-class TestLevel(levels.Level):
-    def __init__(self,name="TEST"):
-        super().__init__(name,None) # no parent => no db access
-        self.currentId = 0
-        self.nameToElement = {}
-        
-    def addContainer(self,name):
-        assert name not in self.nameToElement
-        self.currentId -= 1
-        container = Container(self,self.currentId,False)
-        container.tags.add(tags.TITLE,name)
-        self.elements[self.currentId] = container
-        self.nameToElement[name] = container
-        return container
-    
-    def addFile(self,name):
-        assert name not in self.nameToElement
-        self.currentId -= 1
-        file = File(self,self.currentId,'test/'+name,100)
-        file.tags.add(tags.TITLE,name)
-        self.elements[self.currentId] = file
-        self.nameToElement[name] = file
-        return file
-        
-    def addChild(self,parent,child):
-        if not isinstance(parent,Element):
-            if isinstance(parent,str):
-                parent = self.nameToElement[parent]
-            else: parent = self.elements[parent]
-        if not isinstance(child,Element):
-            if isinstance(child,str):
-                child = self.nameToElement[child]
-            else: child = self.elements[child]
-        if parent.id not in child.parents:
-            child.parents.append(parent.id)
-        parent.contents.append(child.id)
-        
-    def addAlbum(self,name,fileCount=5):
-        container = self.addContainer(name)
-        for i in range(1,fileCount+1):
-            file = self.addFile(name+str(i))
-            self.addChild(container,file)
-        return container
-    
-    def createWrappers(self,s):
-        roots = []
-        currentWrapper = None
-        currentList = roots
-        for token in getTokens(s):
-            #print("Token: {}".format(token))
-            if token == ',':
-                continue
-            if token == '[':
-                currentWrapper = currentList[-1]
-                currentList = currentWrapper.contents
-            elif token == ']':
-                currentWrapper = currentWrapper.parent
-                if currentWrapper is None:
-                    currentList = roots
-                else: currentList = currentWrapper.contents
-            else:
-                wrapper = Wrapper(self.nameToElement[token])
-                currentList.append(wrapper)
-                if currentWrapper is not None:
-                    assert currentWrapper.element.id in wrapper.element.parents
-                    wrapper.parent = currentWrapper
-        return roots
-    
-
-def getTokens(s):
-    last = 0
-    i = 0
-    while i < len(s):
-        if s[i] in (',','[',']'):
-            if last != i:
-                yield s[last:i]
-            last = i+1
-            yield s[i]
-        i += 1
-    if last != i:
-        yield s[last:i]
-    
-        
-def getWrapperString(node):
-    parts = []
-    for child in node.contents:
-        if child.isFile() or child.getContentsCount() == 0:
-            parts.append(child.element.tags[tags.TITLE][0])
-        else:
-            parts.append(child.element.tags[tags.TITLE][0]+'['+getWrapperString(child)+']')
-    return ','.join(parts)
-    
-    
 class PseudoBackend:
+    """Pseudo backend that simply manages a flat list of files.""" 
     def __init__(self):
         self.playlist = []
         
@@ -133,15 +38,46 @@ class PseudoBackend:
         self.playlist[pos:pos] = paths
     
     def removeFromPlaylist(self,begin,end):
-        del self.playlist[begin:end+1]
+        del self.playlist[begin:end]
     
-    
-class InsertTestCase(unittest.TestCase):
+
+class PlaylistTestCase(unittest.TestCase):
+    """Base test case for playlist test cases."""
     def __init__(self,level,playlist):
         super().__init__()
         self.level = level
         self.playlist = playlist
-    
+        self.checks = []
+        self.lastStackIndex = 0
+        
+    def check(self,wrapperString,redo=True):
+        """Check whether the current tree structure as well as the flat playlist is in agreement with
+        *wrapperString* (a string in the format for TestLevel.getWrappers).
+        
+        If *redo* is True, record the test so that it can be performed again when checkUndo is called.
+        """
+        # Check tree structure
+        self.assertEqual(wrapperString,getWrapperString(self.playlist.root))
+        
+        # Check flat playlist
+        self.assertEqual(self.playlist.backend.playlist,
+                         [f.element.path for f in self.playlist.root.getAllFiles()])
+        
+        if redo:
+            self.checks.append((wrapperString,application.stack.index()))
+        
+    def checkUndo(self):
+        """Undo all changes to the playlist and do the checks again at the right moments."""
+        for wrapperString,index in reversed(self.checks):
+            application.stack.setIndex(index)
+            self.check(wrapperString,redo=False)
+        
+        application.stack.setIndex(0)
+        self.check('',redo=False) # all steps undone
+        
+        
+class InsertTestCase(PlaylistTestCase):
+    """Test case for the insert algorithm, including treebuilder, split and glue."""
     def runTest(self):
         level = self.level
         playlist = self.playlist
@@ -187,26 +123,24 @@ class InsertTestCase(unittest.TestCase):
         
         # Split checks
         #=========================
-        A = level.createWrappers('A[A1,A2]')[0]
-        playlist.insert(playlist.root,0,[A])
-        print("===================================f")
+        
+        wrappers,A = level.createWrappers('A[A1,A2]','A')
+        playlist.insert(playlist.root,0,wrappers)
         playlist.insert(A,1,level.createWrappers('B'))
         self.check('A[A1],B,A[A2]')
         playlist.clear()
         
         # Split over several levels
-        toplevel = level.createWrappers('T[X[A[A1,A2]]]')[0]
-        playlist.insert(playlist.root,0,[toplevel])
+        wrappers,toplevel,A = level.createWrappers('T[X[A[A1,A2]]]','T','A')
+        playlist.insert(playlist.root,0,wrappers)
         self.check('T[X[A[A1,A2]]]')
-        A = toplevel.contents[0].contents[0]
         playlist.insert(A,1,level.createWrappers('E1'))
         self.check('T[X[A[A1]]],E1,T[X[A[A2]]]')
         playlist.clear()
         
         # Split some levels and create an appropriate parent 
-        toplevel = level.createWrappers('T[X[A[A1,A2]]]')[0]
-        playlist.insert(playlist.root,0,[toplevel])
-        A = toplevel.contents[0].contents[0]
+        wrappers,toplevel,A = level.createWrappers('T[X[A[A1,A2]]]','T','A')
+        playlist.insert(playlist.root,0,wrappers)
         playlist.insert(A,1,level.createWrappers('D1'))
         self.check('T[X[A[A1]],Y[D[D1]],X[A[A2]]]')
         playlist.clear()
@@ -223,7 +157,14 @@ class InsertTestCase(unittest.TestCase):
         playlist.insert(playlist.root,1,level.createWrappers('B1,B2'))
         self.check('A[A2,A3,A4,A5],B[B1,B2]')
         playlist.clear()
-                
+        
+        # Check glueing with a container that is not below the insertion parent
+        wrappers,A = level.createWrappers('A[A1],E[E2]','A')
+        playlist.insert(playlist.root,0,wrappers)
+        playlist.insert(A,1,level.createWrappers('A2,E1'))
+        self.check('A[A1,A2],E[E1,E2]')
+        playlist.clear()
+        
         # Glue over several levels
         playlist.insert(playlist.root,0,level.createWrappers('T[X[A[A1,A2]]]'))
         playlist.insert(playlist.root,1,level.createWrappers('A3,A4'))
@@ -231,32 +172,94 @@ class InsertTestCase(unittest.TestCase):
         playlist.clear()      
         
         # Complicated glue (both ends, several levels)
-        toplevel = level.createWrappers('T[X[A[A1]],Y[D[D2]]]')[0]
-        playlist.insert(playlist.root,0,[toplevel])
+        wrappers,toplevel = level.createWrappers('T[X[A[A1]],Y[D[D2]]]','T')
+        playlist.insert(playlist.root,0,wrappers)
         playlist.insert(toplevel,1,level.createWrappers('B1,C1,D1'))
         self.check('T[X[A[A1],B[B1],C[C1]],Y[D[D1,D2]]]')
         playlist.clear()
         
         # Glue and split together
-        toplevel = level.createWrappers('T[X[A[A1],B[B1]]')[0]
-        X = toplevel.contents[0]
-        playlist.insert(playlist.root,0,[toplevel])
+        wrappers,X = level.createWrappers('T[X[A[A1],B[B1]]','X')
+        playlist.insert(playlist.root,0,wrappers)
         playlist.insert(X,1,level.createWrappers('A2,E1,B2'))
         self.check('T[X[A[A1,A2]]],E1,T[X[B[B2,B1]]]')
         playlist.clear()
         
-    def check(self,wrapperString):
-        # Check tree structure
-        self.assertEqual(wrapperString,getWrapperString(self.playlist.root))
+        self.checkUndo()
         
-        # Check flat playlist
-        self.assertEqual(self.playlist.backend.playlist,
-                         [f.element.path for f in self.playlist.root.getAllFiles()])
         
-
-
-
-
+class RemoveTestCase(PlaylistTestCase):
+    def setUp(self):
+        self.playlist.clear()
+        application.stack.clear()
+        
+    def runTest(self):
+        level = self.level
+        playlist = self.playlist
+        
+        # Simple remove
+        playlist.insert(playlist.root,0,level.createWrappers('A1,E2,A3'))
+        playlist.remove(playlist.root,1,1)
+        self.check('A1,A3')
+        playlist.clear()
+        
+        # From a parent
+        wrappers,A = level.createWrappers('A[A1,A2,A3]','A')
+        playlist.insert(playlist.root,0,wrappers)
+        playlist.remove(A,1,1)
+        self.check('A[A1,A3]')
+        playlist.clear()
+        
+        # Recursive
+        playlist.insert(playlist.root,0,level.createWrappers('A[A1,A2],E1'))
+        playlist.remove(playlist.root,0,0)
+        self.check('E1')
+        playlist.clear()
+        
+        # Remove several ranges below the same parent
+        wrappers,A = level.createWrappers('A[A1,A2,A3,A4,A5,A1,A2,A3]','A')
+        playlist.insert(playlist.root,0,wrappers)
+        playlist.removeMany([(A,1,3),(A,5,6)])
+        self.check('A[A1,A5,A3]')
+        playlist.clear()
+        
+        # Remove empty parent
+        wrappers,A = level.createWrappers('A[A1,A2],E1','A')
+        playlist.insert(playlist.root,0,wrappers)
+        playlist.remove(A,0,1)
+        self.check('E1')
+        playlist.clear()
+        
+        # Remove several empty parents (making another parent empty)
+        wrappers,A,B = level.createWrappers('T[X[A[A1,A2],B[B1,B2]],Y[D[D1]]','A','B')
+        playlist.insert(playlist.root,0,wrappers)
+        playlist.removeMany([(A,0,1),(B,0,1)])
+        self.check('T[Y[D[D1]]]')
+        playlist.clear()
+        
+        # Glue
+        playlist.insert(playlist.root,0,level.createWrappers('A[A1,A2],E1,A[A3,A4]'))
+        playlist.remove(playlist.root,1,1)
+        self.check('A[A1,A2,A3,A4]')
+        playlist.clear()
+        
+        # Glue several levels
+        wrappers,X = level.createWrappers('X[A[A1,A2],B[B1],A[A3,A4]]','X')
+        playlist.insert(playlist.root,0,wrappers)
+        playlist.remove(X,1,1)
+        self.check('X[A[A1,A2,A3,A4]]')
+        playlist.clear()
+        
+        # Glue several levels after removing empty parents (this changes the glue position)
+        wrappers,B,C = level.createWrappers('X[A[A1,A2],B[B1],C[C1],A[A3,A4]]','B','C')
+        playlist.insert(playlist.root,0,wrappers)
+        playlist.removeMany([(B,0,0),(C,0,0)])
+        self.check('X[A[A1,A2,A3,A4]]')
+        playlist.clear()
+        
+        self.checkUndo()
+        
+        
 if __name__ == "__main__":
     application.init(exitPoint='noplugins')
 
@@ -284,13 +287,12 @@ if __name__ == "__main__":
     level.addChild('Pl','D4')
     level.addChild('Pl','D5')
     
-    print({id: element.tags[tags.TITLE][0] for id,element in level.elements.items()})
+    #print({id: element.tags[tags.TITLE][0] for id,element in level.elements.items()})
     
     playlist = playlist.PlaylistModel(backend=PseudoBackend(),level=level)
     
     suite = unittest.TestSuite()
     suite.addTest(InsertTestCase(level,playlist))
+    suite.addTest(RemoveTestCase(level,playlist))
     unittest.TextTestRunner(verbosity=2).run(suite)
-    
-    
     
