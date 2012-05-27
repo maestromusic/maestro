@@ -186,12 +186,15 @@ def buildTree(level,wrappers,parent=None,preWrapper=None,postWrapper=None):
     
     *level* is the level that determines the possible tree structure.
     
+    If a wrapper is given as *parent*, the treebuilder will try to generate a treestructure that can be
+    inserted into this wrapper. If this is not possible because not all *wrappers* are descendants of
+    *parent* it will retry with the parent of *parent* and so on.
+    
+    will generate a treestructure that can be inserted into parent 
     *preWrapper* and *postWrapper* specify the file-wrapper before and after the new tree if the tree is e.g.
     to be inserted into a playlist. When building the container structure, ancestors of these wrappers in the
     existing tree structure are favored. Existing Wrappers will not be changed, though. It is the task of
     the caller to merge wrappers returned by this method and existing wrappers.
-    
-    TODO: comment parent
     """
     #print("PARENT/PRE/POST: {} {} {}".format(parent,preWrapper,postWrapper))
     if len(wrappers) == 0:
@@ -200,12 +203,13 @@ def buildTree(level,wrappers,parent=None,preWrapper=None,postWrapper=None):
 
     # If a parent is given and it contains all elements that should be inserted, then accept only the
     # contents of this parent as toplevel nodes
-    while not isinstance(parent,RootNode):
-        if parent.element.id in seqs and seqs.contains(parent.element.id,Sequence(0,len(wrappers)-1)):
-            toplevelIds = parent.element.contents.ids
-            break
-        parent = parent.parent
-    else: toplevelIds = seqs.toplevelIds
+    toplevelIds = seqs.toplevelIds
+    if parent is not None:
+        while not isinstance(parent,RootNode):
+            if parent.element.id in seqs and seqs.contains(parent.element.id,Sequence(0,len(wrappers)-1)):
+                toplevelIds = parent.element.contents.ids
+                break
+            parent = parent.parent
         
     return _buildTree(wrappers,seqs,None,toplevelIds)
 

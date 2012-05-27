@@ -257,6 +257,13 @@ class RemoveTestCase(PlaylistTestCase):
         self.check('X[A[A1,A2,A3,A4]]')
         playlist.clear()
         
+        # Several glues below the same parent (indexes might get wrong)
+        wrappers,B1,B3 = level.createWrappers('X[A[A1],B[B1],A[A2],B[B2],A[A3],B[B3],A[A4]]','B1','B3')
+        playlist.insert(playlist.root,0,wrappers)
+        playlist.removeMany([(B1.parent,0,0),(B3.parent,0,0)])
+        self.check('X[A[A1,A2],B[B2],A[A3,A4]]')
+        playlist.clear()
+        
         self.checkUndo()
         
         

@@ -77,7 +77,7 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         """Build wrappers for the given paths and if possible add containers. In other words: convert a flat
         playlist to a tree playlist."""
         levels.real.loadPaths(paths)
-        files = [self.level.get(path) for path in paths]
+        files = [Wrapper(self.level.get(path)) for path in paths]
         return treebuilder.buildTree(self.level,files)
     
     def initFromPaths(self,paths):
@@ -253,7 +253,8 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         command = PlaylistRemoveCommand(self,ranges,fromOutside)
         application.stack.push(command)
         
-        for parent,gap in command.getGaps():
+        # Process gaps in reversed order to keep indexes below the same parent intact
+        for parent,gap in reversed(command.getGaps()):
             self.glue(parent,gap)
         
         application.stack.endMacro()
