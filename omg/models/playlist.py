@@ -18,7 +18,7 @@
 
 import itertools
 
-from . import wrappertreemodel, treebuilder
+from . import wrappertreemodel, treebuilder, rootedtreemodel
 from .. import application, config, utils
 from ..core import levels
 from ..core.nodes import RootNode, Wrapper
@@ -48,6 +48,7 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
     def setCurrent(self, offset):
         """Set the currently playing song to the song with the given offset. If offset is negative, no song
         is currenlty playing."""
+        print("setCurrent {}".format(offset))
         if offset < 0:       
             self.clearCurrent() 
             return
@@ -64,7 +65,7 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         
         # Emit events for nodes whose state changed
         for node in oldPlayingNodes:
-            if node not in self.currentlyPlayingNodes:
+            if node not in self.currentlyPlayingNodes and self.contains(node):
                 index = self.getIndex(node)
                 self.dataChanged.emit(index,index)
                 

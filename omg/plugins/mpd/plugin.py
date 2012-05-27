@@ -115,8 +115,11 @@ class MPDThread(QtCore.QThread):
             for position, path in reversed(how):
                 self.client.delete(position)
                 del self.mpd_playlist[position]
-            self.playlistVersion += len(how) 
-        
+            self.playlistVersion += len(how)
+            # If the current song has been removed MPD plays the next song automatically. Because the
+            # song number does not change this is not sent to OMG. So we force emitting the current song.
+            self._updateAttributes(emitCurrentSong=True)
+            
         else:
             logger.error('Unknown command: {}'.format(what, how))
     
@@ -178,7 +181,7 @@ class MPDThread(QtCore.QThread):
                 self.mpd_playlist.append(file)
         self.changeFromMPD.emit('playlist', self.mpd_playlist[:])
         
-    def _updateAttributes(self, emit = True):
+    def _updateAttributes(self, emit = True, emitCurrentSong=False):
         """Get current status from MPD, update attributes of this object and emit
         messages if something has changed."""
          
@@ -201,7 +204,7 @@ class MPDThread(QtCore.QThread):
             currentSong = int(self.mpd_status["song"])
         else:
             currentSong = -1
-        if currentSong != self.currentSong:
+        if currentSong != self.currentSong or emitCurrentSong:
             self.currentSong = currentSong
             if currentSong != -1:
                 self.mpd_current = self.client.currentsong()
@@ -275,8 +278,8 @@ class MPDThread(QtCore.QThread):
         if self.connected:
             self.client.update()
             
+            
 class MPDPlayerBackend(player.PlayerBackend):
-    
     changeFromMain = QtCore.pyqtSignal(str, object)
     
     def __init__(self, name):
