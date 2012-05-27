@@ -25,7 +25,10 @@ translate = QtCore.QCoreApplication.translate
 
 
 class Check:
-    """Abstract base class for checks. A check tests the database for one consistency criterion and returns the number of errors or even detail information (e.g. the ids of the affected rows). Both the number and the data will be cached. Finally a check can even (try to) fix the problems."""
+    """Abstract base class for checks. A check tests the database for one consistency criterion and returns
+    the number of errors or even detail information (e.g. the ids of the affected rows). Both the number and
+    the data will be cached. Finally a check can even (try to) fix the problems.
+    """
     def __init__(self):
         self.number = None
         self.data = None
@@ -39,13 +42,17 @@ class Check:
         return self.__class__.__doc__
 
     def getNumber(self,refresh = False):
-        """Return the number of errors in the database and cache it. Return the cached value unless *refresh* is true."""
+        """Return the number of errors in the database and cache it. Return the cached value unless
+        *refresh* is true."""
         if refresh or self.number is None:
             self.number = self.check(data=False)
         return self.number
 
     def getData(self,refresh = False):
-        """Return detail data to errors in the database and cache it. Return the cached data unless *refresh* is true. The result is a list of tuples where each tuple contains information to a single error. The meaning of the tuple entries is returned by :meth:`getColumnHeaders`."""
+        """Return detail data to errors in the database and cache it. Return the cached data unless
+        *refresh* is true. The result is a list of tuples where each tuple contains information to a single
+        error. The meaning of the tuple entries is returned by :meth:`getColumnHeaders`.
+        """
         if refresh or self.data is None:
             self.data = self.check(data=True)
         return self.data
@@ -55,7 +62,7 @@ class Check:
         return self._columnHeaders
     
     def fix(self):
-        """Fix the problem and delete cached data. After this method :meth:`getNumber` should return ''0''."""
+        """Fix the problem and delete cached data. After this method :meth:`getNumber` should return 0."""
         if self.getNumber() > 0:
             self._fix()
         self.number = None
@@ -91,7 +98,8 @@ class ElementCounterCheck(Check):
 
 
 class ToplevelFlagCheck(Check):
-    """Check for broken toplevel flags in the elements table. The toplevel flag should be true if and only if the element does not appear as a child in the contents table."""
+    """Check for broken toplevel flags in the elements table. The toplevel flag should be true if and only
+    if the element does not appear as a child in the contents table."""
     _columnHeaders = (translate("DBAnalyzerChecks","ID"),translate("DBAnalyzerChecks","Name"),
                      translate("DBAnalyzerChecks","In DB"),translate("DBAnalyzerChecks","Real"))
                      
@@ -115,7 +123,8 @@ class ToplevelFlagCheck(Check):
             
 
 class FileFlagCheck(Check):
-    """Check for broken file flags in the element table. The file flag should be true if and only if the element is contained in the file table."""
+    """Check for broken file flags in the element table. The file flag should be true if and only if the
+    element is contained in the file table."""
     _columnHeaders = (translate("DBAnalyzerChecks","ID"),translate("DBAnalyzerChecks","Name"),
                      translate("DBAnalyzerChecks","In DB"),translate("DBAnalyzerChecks","Real"))
                      
@@ -142,9 +151,15 @@ class FileFlagCheck(Check):
 
 
 class EmptyContainerCheck(Check):
-    """Check for empty containers in the elements table. This check uses the file table and not elements.elements. Fixing this check will set the file flag to true if the element is contained in the files table. Otherwise it will be deleted. Warning: Actually empty containers do not make the database corrupt. Especially during editing containers may be empty on purpose."""
-    _columnHeaders = (translate("DBAnalyzerChecks","ID"),translate("DBAnalyzerChecks","Name"),
-                      translate("DBAnalyzerChecks","Element Counter"),translate("DBAnalyzerChecks","File (in file table)"))
+    """Check for empty containers in the elements table. This check uses the file table and not
+    elements.elements. Fixing this check will set the file flag to true if the element is contained in the
+    files table. Otherwise it will be deleted. Warning: Actually empty containers do not make the database
+    corrupt. Especially during editing containers may be empty on purpose.
+    """
+    _columnHeaders = (translate("DBAnalyzerChecks","ID"),
+                      translate("DBAnalyzerChecks","Name"),
+                      translate("DBAnalyzerChecks","Element Counter"),
+                      translate("DBAnalyzerChecks","File (in file table)"))
                      
     _name = translate("DBAnalyzerChecks","Empty containers")
     
@@ -184,7 +199,8 @@ class SuperfluousTagValuesCheck(Check):
     _name = translate("DBAnalyzerChecks","Superfluous tag values")
 
     def _query(self,type,data,delete):
-        """Build a query selecting superfluous tags values of value type *type* (or only their number if *data* is false)."""
+        """Build a query selecting superfluous tags values of value type *type* (or only their number if
+        *data* is false)."""
         if not delete:
             if not data:
                 beginning = "SELECT COUNT(*)"
@@ -202,7 +218,8 @@ class SuperfluousTagValuesCheck(Check):
         else:
             result = []
             for type in tags.TYPES:
-                result.extend((type.name,row[0],row[1],row[2]) for row in db.query(self._query(type.name,True,False)))
+                result.extend((type.name,row[0],row[1],row[2])
+                              for row in db.query(self._query(type.name,True,False)))
             return result
 
     def _fix(self):
@@ -211,14 +228,16 @@ class SuperfluousTagValuesCheck(Check):
 
 
 class ValueIdsCheck(Check):
-    """Check for entries in the tag table that reference a tag id which does not exist in the corresponding tag table."""
+    """Check for entries in the tag table that reference a tag id which does not exist in the corresponding
+    tag table."""
     _columnHeaders = (translate("DBAnalyzerChecks","ID"),translate("DBAnalyzerChecks","Name"),
                       translate("DBAnalyzerChecks","Tag ID"),translate("DBAnalyzerChecks","Value ID"))
                       
     _name = translate("DBAnalyzerChecks","Value IDs")
 
     def _query(self,type,data,delete):
-        """Build a query selecting invalid tag references in the tag-table of type *type* (or only their number if *data* is true)."""
+        """Build a query selecting invalid tag references in the tag-table of type *type* (or only their
+        number if *data* is true)."""
         if not delete:
             if not data:
                 beginning = "SELECT COUNT(*)"
@@ -246,26 +265,33 @@ class ValueIdsCheck(Check):
 
 
 class WithoutTagsCheck(Check):
-    """Check for elements without tags. Fixing this means removing those elements from the database!"""
+    """Check for elements without tags. WARNING: Fixing this means removing those elements from the
+    database!"""
     _columnHeaders = (translate("DBAnalyzerChecks","ID"),translate("DBAnalyzerChecks","Path"),
                       translate("DBAnalyzerChecks","Elements"))
                       
     _name = translate("DBAnalyzerChecks","Without Tags")
     
-    def check(self,data):
-        select = 'el.id,f.path,el.elements' if data else "COUNT(*)"
-        query = """
-            SELECT {0}
+    def _query(self,command):
+        return """
+            {0}
             FROM {1}elements AS el LEFT JOIN {1}tags AS t ON el.id = t.element_id
                                    LEFT JOIN {1}files AS f ON el.id = f.element_id
             WHERE t.tag_id IS NULL
-            """.format(select,db.prefix)
+            """.format(command,db.prefix)
+            
+    def check(self,data):
         if not data:
+            query = self._query('SELECT COUNT(*)')
             return db.query(query).getSingle()
-        else: return [row for row in db.query(query)]
+        else:
+            query = self._query('SELECT el.id,f.path,el.elements')
+            return [row for row in db.query(query)]
         
-    def fix(self): pass
-
+    def fix(self):
+        # el is an alias for elements defined in the query's FROM-part (see above)
+        db.query(self._query('DELETE el'.format(db.prefix)))
+        
 
 class DoubledFilesCheck(Check):
     """Check for files that appear twice in the database. This check currently cannot be fixed automatically.

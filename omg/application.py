@@ -142,6 +142,11 @@ def run(cmdConfig=[],exitPoint=None,console=False):
     from . import resources, search
     search.init()
     
+    # Initialize stack (because most models need the stack we create it before the noplugins-exitpoint, so
+    # that it is available for console scripts/unittests)    
+    global stack
+    stack = QtGui.QUndoStack()
+    
     if exitPoint == 'noplugins':
         return
     
@@ -152,9 +157,6 @@ def run(cmdConfig=[],exitPoint=None,console=False):
     
     if exitPoint == 'nogui':
         return
-    
-    global stack
-    stack = QtGui.QUndoStack()
         
     from . import filesystem
     filesystem.init()

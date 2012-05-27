@@ -448,7 +448,7 @@ class BrowserMimeData(mimedata.MimeData):
     the browser contains nodes that are no elements and that they may not have loaded their contents yet.   
     """  
     def __init__(self, browserNodeList):
-        super().__init__(None) # The element list will be computed when it is needed.
+        super().__init__(levels.real,None) # The element list will be computed when it is needed.
         self._browserNodeList = browserNodeList
 
     def getNodes(self):

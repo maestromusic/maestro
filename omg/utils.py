@@ -262,7 +262,7 @@ class FlexiDate(object):
             self.year != other.year or self.month != other.month or self.day != other.day
 
     def __hash__(self):
-        return id(self)
+        return hash((self.year,self.month,self.day))
     
     
 class OrderedDict(dict):
@@ -383,3 +383,12 @@ class PointAtInfinity:
 
     def __str__(self):
         return "{}{}".format('+' if self.plus else '-', '∞')
+
+
+def rfind(aList,item):
+    """Return the index of the last occurrence of *item* in *aList*. Return -1 if *item* is not found."""
+    for i,x in enumerate(reversed(aList)):
+        if x == item:
+            return len(aList)-1-i
+    else: return -1
+    

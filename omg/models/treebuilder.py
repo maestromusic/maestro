@@ -18,7 +18,7 @@
 
 from .. import database as db
 from ..core import levels
-from ..core.nodes import Wrapper
+from ..core.nodes import RootNode, Wrapper
  
 
 class Sequence:
@@ -95,10 +95,11 @@ class SequenceDict(dict):
                     self.add(parent.element.id,len(files)+1,len(files)+parent.fileCount())
                     last = parent
                 else: break
-            self.toplevelIds.append(last.element.id)
+            if last.element.id not in self.toplevelIds:
+                self.toplevelIds.append(last.element.id)
             
-        #print(self)
-        #print(self.toplevelIds)
+        #print("SEQ: {}".format({self.level.get(id).getTitle(): seq for id,seq in self.items()}))
+        #print("TIDs: {}".format(self.toplevelIds))
             
     def add(self,id,start,end=None):
         """Add a sequence [*start*,*end*] to the list of sequences of the element given by *id*. If the
@@ -171,32 +172,52 @@ class SequenceDict(dict):
             if len(newSeqs):
                 self[id] = newSeqs
             else: del self[id]
+            
+    def contains(self,id,sequence):
+        """Return whether the sequences of the element with id *id* contain a sequence that contains
+        *sequence*."""
+        return any(s.start <= sequence.start and s.end >= sequence.end for s in self[id])
              
         
-def buildTree(level,files,preWrapper=None,postWrapper=None):
-    """Build a tree over the given list of files (instances of File) and return its root wrappers as list.
+def buildTree(level,wrappers,parent=None,preWrapper=None,postWrapper=None):
+    """Build a tree over the given list of wrapper return its root wrappers as list.
     If possible add containers to the tree to generate a nice tree structure. This method is for example
     used by the playlist to generate a nice tree playlist from a simple list of files.
     
     *level* is the level that determines the possible tree structure.
     
+    If a wrapper is given as *parent*, the treebuilder will try to generate a treestructure that can be
+    inserted into this wrapper. If this is not possible because not all *wrappers* are descendants of
+    *parent* it will retry with the parent of *parent* and so on.
+    
+    will generate a treestructure that can be inserted into parent 
     *preWrapper* and *postWrapper* specify the file-wrapper before and after the new tree if the tree is e.g.
     to be inserted into a playlist. When building the container structure, ancestors of these wrappers in the
     existing tree structure are favored. Existing Wrappers will not be changed, though. It is the task of
-    the caller to merge wrappers returned by this method and existing Wrappers.
+    the caller to merge wrappers returned by this method and existing wrappers.
     """
-    seqs = SequenceDict(level,files,preWrapper,postWrapper)
-    return _buildTree(files,seqs,None,seqs.toplevelIds,allowSingleChild = False)
+    #print("PARENT/PRE/POST: {} {} {}".format(parent,preWrapper,postWrapper))
+    if len(wrappers) == 0:
+        return []
+    seqs = SequenceDict(level,[w.element for w in wrappers],preWrapper,postWrapper)
+
+    # If a parent is given and it contains all elements that should be inserted, then accept only the
+    # contents of this parent as toplevel nodes
+    toplevelIds = seqs.toplevelIds
+    if parent is not None:
+        while not isinstance(parent,RootNode):
+            if parent.element.id in seqs and seqs.contains(parent.element.id,Sequence(0,len(wrappers)-1)):
+                toplevelIds = parent.element.contents.ids
+                break
+            parent = parent.parent
+        
+    return _buildTree(wrappers,seqs,None,toplevelIds)
 
     
-def _buildTree(files,seqs,boundingSeq,toplevelIds,allowSingleChild):
+def _buildTree(wrappers,seqs,boundingSeq,toplevelIds):
     """Build a tree over the part of *files* specified by *boundingSeq* (over all files if *boundingSeq* is
     None. *seqs* is the SequenceDict, *toplevelIds* are the elements that may be used at the highest level.
-    If *allowSingleChildren* is False, the highest level will not contain wrappers with only one child
-    (note that we must allow single children on lower levels).
     """
-    #print("This is _buildTree for {} . TLIds: {}".format(boundingSeq,toplevelIds))
-    
     # Root nodes are not necessarily added in correct order. Insert them indexed by the start point of their
     # sequence and at the end sort them by the start point.
     roots = {}
@@ -206,27 +227,25 @@ def _buildTree(files,seqs,boundingSeq,toplevelIds,allowSingleChild):
         # The second restriction increases performance and avoids that we accidentally choose a child when
         # its parent has the same sequence (this happens only for single children).
         longestSeq,element = seqs.longest(toplevelIds,boundingSeq)
-        #print("Longest sequence: {}".format(str(longestSeq)))
         if longestSeq is None:
-            # All files in *boundingSeq* are covered
+            # All wrappers in *boundingSeq* are covered
             break
         
         # Skip sequences that are completely out of range (this may happen due to preWrapper/postWrapper)
-        if longestSeq.end < 0 or longestSeq.start >= len(files):
+        if longestSeq.end < 0 or longestSeq.start >= len(wrappers):
             seqs.remove(longestSeq)
             continue
         
-        # Create a wrapper for the tree
-        wrapper = Wrapper(element)
-        if wrapper.isContainer():
-            # For containers recursively create the tree below. Bound the tree creation to longestSeq.
-            # Choose only roots which are contents of element.
-            childContents = _buildTree(files,seqs,longestSeq,element.contents.ids,allowSingleChild=True)
-            
-            # Avoid creating a single child by replacing wrapper by its only child
-            if len(childContents) == 1 and not allowSingleChild:
-                wrapper = childContents[0]
-            else: wrapper.setContents(childContents)
+        # Create a wrapper for the tree...or use the one that was submitted
+        if len(longestSeq) == 1 and element == wrappers[longestSeq.start].element:
+            wrapper = wrappers[longestSeq.start]
+        else:
+            wrapper = Wrapper(element)
+            if wrapper.isContainer():
+                # For containers recursively create the tree below. Bound the tree creation to longestSeq.
+                # Choose only roots which are contents of element.
+                childContents = _buildTree(wrappers,seqs,longestSeq,element.contents.ids)
+                wrapper.setContents(childContents)
         
         # Add the wrapper to roots and remove the sequence from all sequences
         roots[longestSeq.start] = wrapper

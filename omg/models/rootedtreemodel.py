@@ -143,7 +143,7 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
         if not isinstance(internalPointer,Node):
             raise TypeError("Internal pointers in a RootedTreeModel must be subclasses of Node, but got {}"
                                .format(type(internalPointer)))
-        return QtCore.QAbstractItemModel.createIndex(self,row,column,internalPointer)
+        return super().createIndex(row,column,internalPointer)
         
     def getIndex(self,node):
         """Return the (Qt)-index of the given node. If *node* is the root of this model, return an invalid
@@ -153,12 +153,12 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
 
         parent = node.parent
         try:
-            parent.index(node)
+            pos = parent.index(node)
         except ValueError:
             raise RuntimeError("Cannot create an index for node {} because ".format(node)
                                + "it is not contained in its alleged parent {}.".format(parent))
             
-        return self.createIndex(parent.index(node),0,node)     
+        return self.createIndex(pos,0,node)     
 
     def getAllNodes(self, skipSelf = False):
         """Generator which will return all nodes contained in the tree in depth-first-manner."""
@@ -175,6 +175,12 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
                 if child.hasContents():
                     queue.append(child)
                 yield child
+                
+    def contains(self,node):
+        """Return whether *node* is contained in this model."""
+        if node == self.root:
+            return True
+        else: return node in node.parent.contents and self.contains(node.parent)
 
     def changeContents(self, index, new):
         parent = self.data(index, Qt.EditRole)
