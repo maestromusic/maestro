@@ -262,7 +262,7 @@ class FlexiDate(object):
             self.year != other.year or self.month != other.month or self.day != other.day
 
     def __hash__(self):
-        return id(self)
+        return hash((self.year,self.month,self.day))
     
     
 class OrderedDict(dict):
