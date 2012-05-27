@@ -352,8 +352,8 @@ class FileSystemSynchronizer(QtCore.QThread):
         
     @QtCore.pyqtSlot(list)
     def handleEvent(self, event):
-        db.transaction()
         if isinstance(event, levels.FileCreateDeleteEvent):
+            db.transaction()
             if len(event.created) > 0:
                 # files added to DB -> check if folders have changed
                 for path in event.created:
@@ -396,12 +396,13 @@ class FileSystemSynchronizer(QtCore.QThread):
                             
                     else:
                         self.updateFolderState(folder, 'unsynced', True)
-        db.commit()
+            db.commit()
         
     def computeAndStoreHash(self, path):
         """Compute the hash of the file at *path* (or fetch it from self.knownNewFiles
         if available) and set it in the database."""
         db.transaction()
+        logger.debug("computing hash of {}".format(path))
         if path in self.knownNewFiles:
             hash = self.knownNewFiles[path][0]
             del self.knownNewFiles[path]
@@ -427,7 +428,8 @@ class FileSystemSynchronizer(QtCore.QThread):
             self.lastScan = time.time()
            
     def run(self):
-        db.connect(isolation_level = "DEFERRED")
+        logger.debug('Filesystem connecting with thread {}'.format(QtCore.QThread.currentThreadId()))
+        db.connect(isolation_level = None)
         # initially fill self.knownFolders so that the FilesystemBrowser displays folder icons
         for folder, state in db.query('SELECT path,state FROM {}folders'.format(db.prefix)):
             self.knownFolders[folder] = state

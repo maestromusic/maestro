@@ -114,6 +114,7 @@ def run(cmdConfig=[],exitPoint=None,console=False):
     # Initialize database
     from . import database
     try:
+        logger.debug('Application connecting with thread {}'.format(QtCore.QThread.currentThreadId()))
         database.connect()
     except database.sql.DBException as e:
         logger.error("I cannot connect to the database. Did you provide the correct information in the config"

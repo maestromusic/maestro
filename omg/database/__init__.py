@@ -185,7 +185,6 @@ def multiQuery(queryString,args):
 def transaction():
     try:
         transactionLock.acquire()
-        print('got TRANS lock')
         connections[threading.current_thread().ident].transaction()
     except KeyError:
         raise RuntimeError("Cannot access database before a connection for this thread has been opened.")
@@ -194,7 +193,6 @@ def commit():
     try:
         connections[threading.current_thread().ident].commit()
         transactionLock.release()
-        print('released TRANS lock')
     except KeyError:
         raise RuntimeError("Cannot access database before a connection for this thread has been opened.")
 

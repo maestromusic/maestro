@@ -21,8 +21,10 @@ import threading
 from PyQt4 import QtCore
 
 from . import criteria as criteriaModule
-from .. import database as db, config
+from .. import database as db, config, logging
 from ..core import tags
+
+logger = logging.getLogger(__name__)
 
 # Name of the temporary search table
 # The table is created in the search thread and temporary, so that it does not conflict with other threads.
@@ -310,6 +312,7 @@ class SearchThread(threading.Thread):
                     
         """        
         # -*- coding: utf-8 -*-
+        logger.debug('Search connecting with thread {}'.format(QtCore.QThread.currentThreadId()))
         with db.connect():
             if db.type == 'mysql':
                 createQuery = """
@@ -550,5 +553,8 @@ def truncate(tableName):
     if db.type == 'mysql':
         # truncate may be much faster than delete
         db.query('TRUNCATE {}'.format(tableName))
-    else: db.query('DELETE FROM {}'.format(tableName))
+    else:
+        db.transaction()
+        db.query('DELETE FROM {}'.format(tableName))
+        db.commit()
     
