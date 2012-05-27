@@ -216,6 +216,13 @@ class RemoveTestCase(PlaylistTestCase):
         self.check('E1')
         playlist.clear()
         
+        # Remove parent and node below
+        wrappers,A = level.createWrappers('A[A1,A2],E1','A')
+        playlist.insert(playlist.root,0,wrappers)
+        playlist.removeMany([(playlist.root,0,0),(A,0,0)])
+        self.check('E1')
+        playlist.clear()
+        
         # Remove several ranges below the same parent
         wrappers,A = level.createWrappers('A[A1,A2,A3,A4,A5,A1,A2,A3]','A')
         playlist.insert(playlist.root,0,wrappers)

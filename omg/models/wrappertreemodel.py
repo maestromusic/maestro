@@ -247,6 +247,8 @@ class RemoveCommand(QtGui.QUndoCommand):
                          or any(range[1] <= index <= range[2] for range in rangeDict[ancestor])):
                         rangeDict[parent] = None # mark the parent to be removed
                         break
+        # Remove ranges that have been marked
+        rangeDict = {parent:ranges for parent,ranges in rangeDict.items() if ranges is not None}
         
         # Check whether parents will be empty after removal. Remove those parents. This can make the
         # grandparent empty so do this recursively.
@@ -255,8 +257,7 @@ class RemoveCommand(QtGui.QUndoCommand):
                 self._removeParentIfEmpty(rangeDict,parent)
             
         # Finally concat the different lists to a single list of ranges removing those that have been marked
-        self.ranges = list(itertools.chain.from_iterable(
-                                            ranges for ranges in rangeDict.values() if ranges is not None))
+        self.ranges = list(itertools.chain.from_iterable(ranges for ranges in rangeDict.values()))
         
         self.insertions = [(parent,start,parent.contents[start:end+1]) for parent,start,end in self.ranges]
     
