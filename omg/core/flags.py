@@ -95,7 +95,7 @@ def get(identifier):
         return _flagsById[identifier]
     elif isinstance(identifier,str):
         return _flagsByName[identifier]
-    elif isinstance(identifier,FlagType):
+    elif isinstance(identifier,Flag):
         return identifier
     else: raise ValueError("identifier must be either int or string or FlagType.")
 

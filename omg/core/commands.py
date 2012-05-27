@@ -40,31 +40,25 @@ class CommitCommand(QtGui.QUndoCommand):
         self.level = level
         
         allIds = set(ids)
-        # add children's IDs to ensure consistent commit
-        def addChildren(ids):
-            if len(ids) == 0:
-                return set()
-            newIds = set()
-            for id in ids:
-                elem = self.level.get(id)
-                if elem.isContainer():
-                    newIds.update(childId for childId in elem.contents.ids if childId in self.level and childId not in allIds)
-            allIds.update(newIds)
-            addChildren(newIds)                    
-        addChildren(allIds)
+        # add IDs of all children to ensure a consistent commit
+        additionalIds = set()
+        for id in allIds:
+            additionalIds.update(level.children(id))
+        allIds.update(additionalIds)
         
         self.real = level.parent is levels.real # a handy shortcut
         if self.real:
             self.newInDatabase = [ id for id in allIds if id < 0 ]
             self.realFileChanges = {}
-            self.idMap = None
+            self.idMap = None # maps tempId -> realId
         else:
-            self.newId = self.oldId = lambda x : x  #TODO wtf?
+            # if non-real parent, newId is the identity function
+            self.newId = self.oldId = lambda x : x
             
-        self.newElements = []
+        self.newElements = [] # elements which are not in parent level before the commit
         self.flagChanges, self.tagChanges, self.contentsChanges, self.majorChanges = {}, {}, {}, {}
         self.pathChanges = {}
-        self.ids, self.contents = [], []
+        self.ids, self.contents = [], [] # for the events
         for id in allIds:
             element, contents =  self.recordChanges(id)
             if element:
@@ -107,7 +101,7 @@ class CommitCommand(QtGui.QUndoCommand):
                         # element already loaded in real level (already commited or loaded in playlist)
                         self.realFileChanges[myEl.path] = changes
                 else:
-                    fileTags = myEl.fileTags
+                    fileTags = myEl.fileTags # set by Element drop into editor; avoids costly disk access
                     fileChanges = tags.TagDifference(fileTags, myEl.tags)
                     if not fileChanges.onlyPrivateChanges():
                         self.realFileChanges[myEl.path] = fileChanges
@@ -125,7 +119,6 @@ class CommitCommand(QtGui.QUndoCommand):
                 self.majorChanges[id] = (oldMajor, myEl.major)
                 changeElement = True
         elif oldPath != myEl.path:
-            # check for changed paths
             self.pathChanges[id] = (oldPath, myEl.path)
             changeElement = True 
         return changeElement, changeContents
@@ -144,18 +137,17 @@ class CommitCommand(QtGui.QUndoCommand):
                     newContents.ids[:] = map(self.newId, newContents.ids)
             else:
                 modify.real.createNewElements(self.level, self.newInDatabase, self.idMap)
-            # change IDs for new elements
+            # change IDs of new elements in both current and parent level
             for id in self.newInDatabase:
                 self.level.changeId(id, self.newId(id))
                 if id in self.level.parent:
-                    # happens if the element is loaded in some playlist
                     self.level.parent.changeId(id, self.newId(id))
                     
         # Add/update elements in parent level
         newFilesPaths = []
         for id in set(self.ids + self.contents):
-            elem = self.level.elements[self.newId(id)]
             nid = self.newId(id)
+            elem = self.level.elements[nid]
             if id in self.newElements:
                 copy = elem.copy()
                 copy.level = self.level.parent
@@ -200,8 +192,9 @@ class CommitCommand(QtGui.QUndoCommand):
                 logger.debug("changing file tags: {0}-->{1}".format(path, changes))
                 modify.real.changeFileTags(path, changes)
 
+        # an event for both levels
         self.level.parent.emitEvent([self.newId(id) for id in self.ids], [self.newId(id) for id in self.contents])
-        self.level.emitEvent([self.newId(id) for id in self.ids], []) # no contents changed in current level!
+        self.level.emitEvent([self.newId(id) for id in self.ids], [])
         
         if len(newFilesPaths) > 0:
             self.level.parent.changed.emit(levels.FileCreateDeleteEvent(newFilesPaths))
@@ -289,7 +282,7 @@ class InsertElementsCommand(QtGui.QUndoCommand):
         for id in self.insertedIds:
             self.level.get(id).parents.append(parentId)
         if self.level is levels.real:
-            pass
+            raise NotImplementedError()
         
     def undoChanges(self):
         parentId = self.ids[0]
@@ -298,7 +291,7 @@ class InsertElementsCommand(QtGui.QUndoCommand):
         for id in self.insertedIds:
             self.level.get(id).parents.remove(parentId)
         if self.level is levels.real:
-            pass
+            raise NotImplementedError()
 
 class ChangeMajorFlagCommand(QtGui.QUndoCommand):
     def __init__(self, level, ids):
@@ -351,8 +344,7 @@ class ChangePositionsCommand(QtGui.QUndoCommand):
         self.level.emitEvent(contentIds = (self.parentId,))
 
 class RenameFilesCommand(QtGui.QUndoCommand):
-    """A command to rename (and/or move) files on the filesystem.
-    """
+    """A command to rename (and/or move) files on the filesystem."""
     
     def __init__(self, level, map):
         """Creates the command for *level* with the id-to-newPath-map *map*."""
@@ -368,18 +360,7 @@ class RenameFilesCommand(QtGui.QUndoCommand):
             self.changes[id] = (element.path, newPath)
             
     def redo(self):
-        if self.level is levels.real:
-            levels.real.renameFiles(self.changes)
-        else:
-            for id, (_, newPath) in self.changes.items():
-                self.level.get(id).path = newPath
-            self.level.emitEvent(list(self.changes.keys()))
-            
+        self.level.renameFiles(self.changes)
+                    
     def undo(self):
-        if self.level is levels.real:
-            levels.real.renameFiles({id:(newPath, oldPath) for id, (oldPath, newPath) in self.changes.items()})
-        else:
-            for id, (oldPath, _) in self.changes.items():
-                self.level.get(id).path = oldPath
-            self.level.emitEvent(list(self.changes.keys()))
-        
+        self.level.renameFiles({id:(newPath, oldPath) for id, (oldPath, newPath) in self.changes.items()})

@@ -16,9 +16,6 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import copy
-
-
 class Node:
     """(Abstract) base class for elements in a RootedTreeModel...that is almost everything in playlists,
     browser etc.. Node implements the methods required by RootedTreeModel as well as many tree-structure 
@@ -271,7 +268,7 @@ class Wrapper(Node):
         If *level* is not None, the copy will use elements from the given level instead of the original
         elements (this is for example necessary when dropping elements from level to another).
         """
-        element = self.element if level is None else level.get(element.id)
+        element = self.element if level is None else level.get(self.element.id)
         copy = Wrapper(element,contents=None,position=self.position,parent=self.parent)
         if self.isContainer():
             if contents is None:

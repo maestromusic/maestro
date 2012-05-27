@@ -397,6 +397,18 @@ class FileSystemSynchronizer(QtCore.QThread):
                     else:
                         self.updateFolderState(folder, 'unsynced', True)
             db.commit()
+        elif isinstance(event, levels.FileRenameEvent):
+            db.transaction()
+            for old, new in event.renamings:
+                if old in self.knownNewFiles:
+                    self.knewnNewFiles[new] = self.knownNewFiles[old]
+                    del self.knownNewFiles[old]
+                    db.query("UPDATE {}newfiles SET path=? WHERE path=?".format(db.prefix), new, old)
+                elif old in self.dbFiles:
+                    self.dbFiles.remove(old)
+                    self.dbFiles.append(new)
+            db.commit()
+                    
         
     def computeAndStoreHash(self, path):
         """Compute the hash of the file at *path* (or fetch it from self.knownNewFiles

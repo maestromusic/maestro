@@ -20,9 +20,8 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from . import tags, flags
-from .elements import File, Container, ContentList
-from .. import database as db, realfiles, utils, config, logging, modify
-from ..modify import real
+from .elements import File, Container
+from .. import database as db, realfiles, utils, config, logging
 from ..database import write as dbwrite
 from ..application import ChangeEvent
 
@@ -68,7 +67,12 @@ class FileCreateDeleteEvent(ElementChangedEvent):
         self.created = created if created is not None else []
         self.deleted = deleted if deleted is not None else []
         self.disk = disk
-        
+
+class FileRenameEvent(ChangeEvent):
+    """Event indicating that files have been renamed on disk."""
+    def __init__(self, renamings):
+        super().__init__()
+        self.renamings = renamings
 
 class Level(QtCore.QObject):
     #TODO comment
@@ -202,7 +206,22 @@ class Level(QtCore.QObject):
         parent.contents.remove(pos = position)
         if childId not in parent.contents.ids:
             self.get(childId).parents.remove(parentId)
+    
+    def renameFiles(self, map, emitEvent = True):
+        """Rename files based on *map*, which is a dict from ids to new paths.
         
+        On a normal level, this just changes the path attributes and emits an event."""
+        for id, (_, newPath) in map.items():
+            self.get(id).path = newPath
+        if emitEvent:
+            self.emitEvent(list(map.keys()))
+    
+    def children(self, id):
+        """Returns a list of (recursively) all children of the element with *id*."""
+        if self.get(id).isFile():
+            return set((id,))
+        else:
+            return set.union(set((id,)), *[self.children(cid) for cid in self.get(id).contents.ids])
     
 class RealLevel(Level):
     def __init__(self):
@@ -384,14 +403,15 @@ class RealLevel(Level):
         return failedElements
     
     def renameFiles(self, map, emitEvent = True):
-        """Rename files based on *map*, which is a dict from ids to new paths."""
+        """on the real level, files are renamed on disk and in DB."""
+        super().renameFiles(map, emitEvent)
         import os
         for id, (oldPath, newPath) in map.items():
             os.renames(utils.absPath(oldPath), utils.absPath(newPath))
-            self.get(id).path = newPath
         db.write.changeFilePaths([ (id, newPath) for id, (_, newPath) in map.items()])
         if emitEvent:
-            self.emitEvent(list(map.keys()))
+            self.changed.emit(FileRenameEvent(list(map.items())))
+            
     def addFlag(self,flag,elements,emitEvent=True):
         super().addFlag(flag,elements,emitEvent=False)
         ids = [element.id for element in elements]
