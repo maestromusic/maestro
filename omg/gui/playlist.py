@@ -21,12 +21,10 @@ from PyQt4.QtCore import Qt
 
 from . import treeview, mainwindow, playerwidgets
 from .delegates import playlist as playlistdelegate, configuration as delegateconfig
+from .treeactions import *
 from .. import player
-from ..modify.treeactions import *
-
 
 translate = QtCore.QCoreApplication.translate
-
 
 class PlaylistTreeView(treeview.TreeView):
     """This is the main widget of a playlist: The tree view showing the current element tree."""

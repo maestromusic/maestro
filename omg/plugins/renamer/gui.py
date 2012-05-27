@@ -17,12 +17,14 @@
 
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
-from omg.modify import treeactions
-from omg import profiles
-from omg.gui import treeview, delegates
+
+from omg import application
+from omg.gui import treeview, treeactions, delegates
 from omg.gui.delegates import configuration, abstractdelegate
 from omg.models import editor
+from omg.core.commands import RenameFilesCommand
 from . import plugin
+
 translate = QtCore.QCoreApplication.translate
 class RenameFilesAction(treeactions.TreeAction):
     """Action to rename files in a container according to the tags and the container structure."""
@@ -35,9 +37,12 @@ class RenameFilesAction(treeactions.TreeAction):
         self.setEnabled(self.parent().nodeSelection.hasElements())
     
     def doAction(self):
-        dialog = RenameDialog(self.parent(), self.parent().model().level,
+        dialog = RenameDialog(self.parent(), self.level(),
                               [wrap.element.id for wrap in self.parent().nodeSelection.elements()])
         dialog.exec_()
+        if dialog.result() == dialog.Accepted:
+            application.stack.push(RenameFilesCommand(self.level(), dialog.results))
+            
 
 class PathDelegate(delegates.StandardDelegate):
     """Delegate for the editor."""
@@ -63,8 +68,10 @@ class PathDelegate(delegates.StandardDelegate):
 class RenameDialog(QtGui.QDialog):
     def __init__(self, parent, level, ids):
         super().__init__(parent)
+        
         self.setModal(True)
         self.ids = ids
+        self.level = level
         self.setWindowTitle(self.tr("Rename {} containers").format(len(ids)))
         mainLayout = QtGui.QVBoxLayout()
         
@@ -104,9 +111,9 @@ class RenameDialog(QtGui.QDialog):
         try:
             totalResult = dict()
             for id in self.ids:
-                result = renamer.renameContainer(id)
+                result = renamer.renameContainer(self.level, id)
                 totalResult.update(result)
-            self.delegate.result = totalResult
+            self.results = self.delegate.result = totalResult
             self.statusLabel.hide()
         except plugin.FormatSyntaxError:
             self.statusLabel.setText(self.tr("Syntax error in format string"))

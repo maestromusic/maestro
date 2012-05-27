@@ -44,6 +44,19 @@ def enable():
     editor.EditorTreeView.actionConfig.addActionDefinition((("plugins", 'renamer'),), RenameFilesAction)
     browser.BrowserTreeView.actionConfig.addActionDefinition((("plugins", 'renamer'),), RenameFilesAction)
 
+def disable():
+    editor.EditorTreeView.actionConfig.removeActionDefinition((("plugins", 'renamer'),))
+
+
+profileConfig = None
+def init():
+    global profileConfig
+    profileConfig = profiles.ProfileConfiguration("renamer", config.storage.renamer, [GrammarRenamer])
+    profileConfig.loadConfig()
+    global initialized
+    initialized = True
+    logger.debug("initialized renamer plugin")
+
 class FormatSyntaxError(SyntaxError):
     pass
 class GrammarRenamer(profiles.Profile):
@@ -141,11 +154,12 @@ class GrammarRenamer(profiles.Profile):
             self.result[element.id] = self.computeNewPath()
         else:
             for pos, childId in element.contents.items():
-                self.traverse(levels.real.get(childId), (pos, element), *parents)
+                self.traverse(self.level.get(childId), (pos, element), *parents)
         
-    def renameContainer(self, id):
+    def renameContainer(self, level, id):
         self.result = dict()
-        self.traverse(levels.real.get(id))
+        self.level = level
+        self.traverse(level.get(id))
         return self.result
 
     def config(self):
@@ -173,16 +187,3 @@ class GrammarConfigurationWidget(profiles.ConfigurationWidget):
         def currentConfig(self):
             return (self.edit.toPlainText(),)
 
-def init():
-    
-
-    global profileConfig
-    profileConfig = profiles.ProfileConfiguration("renamer", config.storage.renamer, [GrammarRenamer])
-    profileConfig.loadConfig()
-    global initialized
-    initialized = True
-    logger.debug("initialized renamer plugin")
-
-
-def disable():
-    editor.EditorTreeView.actionConfig.removeActionDefinition((("plugins", 'renamer'),))

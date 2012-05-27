@@ -23,7 +23,7 @@ from PyQt4.QtCore import Qt
 
 from ..core.elements import Container
 from ..core.nodes import Wrapper
-from ..modify import treeactions
+from . import treeactions
 
 
 class NodeSelection:

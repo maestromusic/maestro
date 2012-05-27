@@ -30,7 +30,7 @@ from .. import config
 from ..core import levels, tags
 from ..constants import CONTENTS
 from ..models import editor, rootedtreemodel
-from ..modify.treeactions import *
+from .treeactions import *
 from .delegates import editor as editordelegate, configuration as delegateconfig
 
 
@@ -88,7 +88,7 @@ class EditorTreeView(treeview.TreeView):
     actionConfig.addActionDefinition(((sect, 'position-'),), ChangePositionAction, mode = "-1")
     sect = translate(__name__, "editor")
     
-    actionConfig.addActionDefinition(((sect, 'clearEditor'),), rootedtreemodel.ClearTreeAction)
+    actionConfig.addActionDefinition(((sect, 'clearEditor'),), ClearTreeAction)
 
     def __init__(self, parent = None):
         super().__init__(parent)
@@ -200,7 +200,7 @@ class EditorWidget(QtGui.QDockWidget):
         hb.addStretch()
         self.toolbar = QtGui.QToolBar(self)
         self.toolbar.addAction(self.editor.treeActions['clearEditor'])
-        commitAction = rootedtreemodel.CommitTreeAction(self.editor)
+        commitAction = CommitTreeAction(self.editor)
         self.addAction(commitAction)
         self.toolbar.addAction(commitAction)
         hb.addWidget(self.toolbar)

@@ -63,6 +63,7 @@ from ..core import tags as tagsModule
 # Table type and prefix
 type = None
 prefix = None
+transactionLock = threading.Lock()
 
 # Logger for database warnings
 logger = logging.getLogger(__name__)
@@ -84,7 +85,7 @@ class ConnectionContextManager:
         return False # If the suite was stopped by an exception, don't stop that exception
 
 
-def connect():
+def connect(**kwargs):
     """Connect to the database server with information from the config file. The drivers specified in
     ``config.options.database.mysql_drivers`` are tried in the given order. This method must be called 
     exactly once for each thread that wishes to access the database. If successful, it returns a
@@ -106,17 +107,17 @@ def connect():
         path = config.options.database.sqlite_path.strip()
         if path.startswith('config:'):
             path = os.path.join(config.CONFDIR,path[len('config:'):])
-        return _connect(['sqlite'],[path])
+        return _connect(['sqlite'],[path], **kwargs)
     else: 
         authValues = [config.options.database["mysql_"+key] for key in sql.AUTH_OPTIONS]
         return _connect(config.options.database.mysql_drivers,authValues)
 
 
-def _connect(drivers,authValues):
+def _connect(drivers,authValues, **kwargs):
     """Connect to the database using the given parameters which are submitted to the connect method of the
     driver. Throw a DBException if connection fails."""
     connection = sql.newConnection(drivers)
-    connection.connect(*authValues)
+    connection.connect(*authValues, **kwargs)
     connections[threading.current_thread().ident] = connection
     return ConnectionContextManager()
     
@@ -183,6 +184,8 @@ def multiQuery(queryString,args):
 
 def transaction():
     try:
+        transactionLock.acquire()
+        print('got TRANS lock')
         connections[threading.current_thread().ident].transaction()
     except KeyError:
         raise RuntimeError("Cannot access database before a connection for this thread has been opened.")
@@ -190,6 +193,8 @@ def transaction():
 def commit():
     try:
         connections[threading.current_thread().ident].commit()
+        transactionLock.release()
+        print('released TRANS lock')
     except KeyError:
         raise RuntimeError("Cannot access database before a connection for this thread has been opened.")
 

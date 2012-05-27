@@ -144,9 +144,9 @@ def updateToplevelFlags(elids = None):
         {1}
         """.format(db.prefix,whereClause))
 
-def changeFilePath(elid, path):
-    """Change the path of a file."""
-    db.query("UPDATE {}files SET path = ? WHERE element_id = ?".format(db.prefix), path, elid)
+def changeFilePaths(data):
+    """Change the paths of files by the (id, path) list *data*."""
+    db.multiQuery("UPDATE {}files SET path = ? WHERE element_id = ?".format(db.prefix), data)
 
 def makeValueIDs(data):
     """Ensures that tag values are present in values_* tables. *data* must
