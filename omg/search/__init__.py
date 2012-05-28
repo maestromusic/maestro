@@ -553,8 +553,5 @@ def truncate(tableName):
     if db.type == 'mysql':
         # truncate may be much faster than delete
         db.query('TRUNCATE {}'.format(tableName))
-    else:
-        db.transaction()
-        db.query('DELETE FROM {}'.format(tableName))
-        db.commit()
+    else: db.query('DELETE FROM {}'.format(tableName))
     

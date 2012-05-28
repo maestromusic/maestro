@@ -18,9 +18,11 @@
 
 import sqlite3, datetime
 from . import DBException, AbstractSql, AbstractSqlResult, EmptyResultException
-from ... import utils
+from ... import utils, logging
 
 sqlite3.register_adapter(utils.FlexiDate,lambda f: f.toSql())
+
+logger = logging.getLogger(__name__)
 
 
 class Sql(AbstractSql):
@@ -36,16 +38,28 @@ class Sql(AbstractSql):
         self._db.close()
             
     def query(self,queryString,*args):
-        try:
-            return SqlResult(self._db.execute(queryString,args),False)
-        except Exception as e:
-            raise DBException(str(e),query=queryString,args=args)
+        while True:
+            try:
+                return SqlResult(self._db.execute(queryString,args),False)
+            except Exception as e:
+                if isinstance(e,sqlite3.OperationalError) and str(e) == 'database is locked':
+                    logger.warning("Database is locked (I will retry). Query: {}".format(queryString))
+                    import time
+                    time.sleep(0.1)
+                    continue
+                raise DBException(str(e),query=queryString,args=args)
     
     def multiQuery(self,queryString,argSets):
-        try:
-            return SqlResult(self._db.executemany(queryString,argSets),True)
-        except Exception as e:
-            raise DBException(str(e),query=queryString,args=argSets)
+        while True:
+            try:
+                return SqlResult(self._db.executemany(queryString,argSets),True)
+            except Exception as e:
+                if isinstance(e,sqlite3.OperationalError) and str(e) == 'database is locked':
+                    logger.warning("Database is locked (I will retry). Multiquery: {}".format(queryString))
+                    import time
+                    time.sleep(0.1)
+                    continue
+                raise DBException(str(e),query=queryString,args=argSets)
         
     def transaction(self):
         self.query('BEGIN TRANSACTION')
