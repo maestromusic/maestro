@@ -22,7 +22,8 @@ from PyQt4 import QtCore, QtGui
 
 from . import levels, tags, flags
 from .elements import ContentList
-from .. import database as db, logging, utils, modify
+from .. import database as db, logging, utils
+from ..modify import real as modifyReal
 from ..database import write
 
 import os.path
@@ -129,14 +130,14 @@ class CommitCommand(QtGui.QUndoCommand):
             db.transaction()
             if self.idMap is None:
                 # first redo -> prepare id mapping
-                self.idMap = modify.real.createNewElements(self.level, self.newInDatabase)
+                self.idMap = modifyReal.createNewElements(self.level, self.newInDatabase)
                 self.newId = utils.dictOrIdentity(self.idMap)
                 self.oldId = utils.dictOrIdentity({b:a for a,b in self.idMap.items() })
                 # update contentsChanges to use the new ids
                 for _, newContents in self.contentsChanges.values():
                     newContents.ids[:] = map(self.newId, newContents.ids)
             else:
-                modify.real.createNewElements(self.level, self.newInDatabase, self.idMap)
+                modifyReal.createNewElements(self.level, self.newInDatabase, self.idMap)
             # change IDs of new elements in both current and parent level
             for id in self.newInDatabase:
                 self.level.changeId(id, self.newId(id))
@@ -172,7 +173,7 @@ class CommitCommand(QtGui.QUndoCommand):
             if len(self.majorChanges) > 0:
                 db.write.setMajor((self.newId(id), newMajor) for id,(_,newMajor) in self.majorChanges.items())
             if len(self.contentsChanges) > 0:
-                modify.real.changeContents({self.newId(id):changes for id, changes in self.contentsChanges.items()})
+                modifyReal.changeContents({self.newId(id):changes for id, changes in self.contentsChanges.items()})
             if len(self.tagChanges) > 0:
                 # although the difference from our level to the parent might affect only a subset of the tags,
                 # for elements new to the database the complete tags must be written (happens if a non-db file is
@@ -182,15 +183,15 @@ class CommitCommand(QtGui.QUndoCommand):
                         return tags.TagDifference(None, self.level.get(self.newId(id)).tags)
                     else:
                         return self.tagChanges[id]
-                modify.real.changeTags({self.newId(id):dbDiff(id) for id in self.tagChanges.keys()})
+                modifyReal.changeTags({self.newId(id):dbDiff(id) for id in self.tagChanges.keys()})
             if len(self.flagChanges) > 0:
-                modify.real.changeFlags({self.newId(id):diff for id,diff in self.flagChanges.items()})            
+                modifyReal.changeFlags({self.newId(id):diff for id,diff in self.flagChanges.items()})            
             db.commit()
             if len(self.pathChanges) > 0:
                 levels.real.renameFiles({self.newId(id):diff for id,diff in self.pathChanges.items()})
             for path,changes in self.realFileChanges.items():
                 logger.debug("changing file tags: {0}-->{1}".format(path, changes))
-                modify.real.changeFileTags(path, changes)
+                modifyReal.changeFileTags(path, changes)
 
         # an event for both levels
         self.level.parent.emitEvent([self.newId(id) for id in self.ids], [self.newId(id) for id in self.contents])
@@ -204,7 +205,7 @@ class CommitCommand(QtGui.QUndoCommand):
         if self.real:
             for path, changes in self.realFileChanges.items():
                 logger.debug("reverting file tags: {0}<--{1}".format(path, changes))
-                modify.real.changeFileTags(path, changes, reverse = True)
+                modifyReal.changeFileTags(path, changes, reverse = True)
             if len(self.pathChanges) > 0:
                 levels.real.renameFiles({self.newId(id):(b,a) for id,(a,b) in self.pathChanges.items()})
             db.transaction()
@@ -217,15 +218,15 @@ class CommitCommand(QtGui.QUndoCommand):
             contentsChangesExisting = {self.newId(id):(b,a) for id, (a,b) in self.contentsChanges.items()
                                         if id not in self.newInDatabase}
             if len(contentsChangesExisting) > 0:
-                modify.real.changeContents(contentsChangesExisting)
+                modifyReal.changeContents(contentsChangesExisting)
             tagChangesExisting = {self.newId(id):diff for id,diff in self.tagChanges.items()
                                     if id not in self.newInDatabase}
             if len(tagChangesExisting) > 0:
-                modify.real.changeTags(tagChangesExisting, reverse = True)
+                modifyReal.changeTags(tagChangesExisting, reverse = True)
             flagChangesExisting = {self.newId(id):diff for id,diff in self.tagChanges.items()
                                     if id not in self.newInDatabase}
             if len(flagChangesExisting) > 0:
-                modify.real.changeFlags(flagChangesExisting, reverse = True)
+                modifyReal.changeFlags(flagChangesExisting, reverse = True)
         
         for id in set(self.ids + self.contents):
             if id in self.newElements:

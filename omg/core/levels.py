@@ -312,7 +312,6 @@ class RealLevel(Level):
         #TODO: comment
         for path in paths:
             rpath = utils.relPath(path)
-            logger.debug("reading file {} from filesystem".format(rpath))
             try:
                 readOk = False
                 while not readOk:
@@ -333,7 +332,7 @@ class RealLevel(Level):
                             pass
                         elif ret == dialog.Delete or ret == dialog.DeleteAlways:
                             if ret == dialog.DeleteAlways:
-                                config.options.tags.always_delete = config.options.tags.always_delete + [e.tagname]
+                                config.options.tags.always_delete.append(e.tagname)
                             logger.info('REMOVE TAG {0} from {1}'.format(e.tagname, rpath))
                             re = realfiles.get(path)
                             re.remove(e.tagname)

@@ -184,7 +184,9 @@ def multiQuery(queryString,args):
 
 def transaction():
     try:
-        transactionLock.acquire()
+        #TODO
+        if config.options.database.type == 'sqlite':
+            transactionLock.acquire()
         connections[threading.current_thread().ident].transaction()
     except KeyError:
         raise RuntimeError("Cannot access database before a connection for this thread has been opened.")
@@ -192,7 +194,10 @@ def transaction():
 def commit():
     try:
         connections[threading.current_thread().ident].commit()
-        transactionLock.release()
+        #TODO
+        # This leads to an error when creating new tags after an unknown tag has been found in files
+        if config.options.database.type == 'sqlite':
+            transactionLock.release()
     except KeyError:
         raise RuntimeError("Cannot access database before a connection for this thread has been opened.")
 
