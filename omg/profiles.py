@@ -49,9 +49,10 @@ class ProfileConfiguration(QtCore.QObject):
         self.profiles = collections.OrderedDict()
         
     def loadConfig(self):
-        for name, clsName, *config in self.configSection.profiles:
+        for name, clsName, *config in self.configSection["profiles"]:
             if clsName in self.classes:
                 self.profiles[name] = self.classes[clsName](name, *config)
+                print('initalized profile {} with *config={}'.format(name, config))
                 
             else:
                 logger.warning("could not load {} profile {}: class {} not found".format(self.name, name, clsName))
@@ -60,7 +61,8 @@ class ProfileConfiguration(QtCore.QObject):
         configContents = []
         for name, profile in self.profiles.items():
             configContents.append( (name, profile.className) + tuple(profile.config())  )
-        self.configSection.profiles = configContents
+        self.configSection["profiles"] = configContents
+        print(self.configSection["profiles"])
             
     def newProfile(self, name = None, className = None):
         if name is None:
@@ -97,11 +99,17 @@ class ProfileConfiguration(QtCore.QObject):
     def __getitem__(self, name):
         """For convenience, you can access the ProfileConfiguration directly to obtain a profile by its name."""
         return self.profiles[name]
+    
+    def openConfigDialog(self, currentProfile = None):
+        dialog = ProfileConfigurationDialog(self, currentProfile)
+        dialog.exec_()
+        
              
-class Profile:
+class Profile(QtCore.QObject):
     
     className = "undefined"
     def __init__(self, name):
+        super().__init__()
         self.name = name
     
     @classmethod    
@@ -155,7 +163,6 @@ class ClassComboBox(QtGui.QComboBox):
 class ProfileComboBox(QtGui.QComboBox):
     """This class provides a combo box that lets the user choose a profile."""
     
-    
     profileChosen = QtCore.pyqtSignal(str)
 
     def __init__(self, profileConf, default = None, includeConfigure = True, parent = None):
@@ -165,14 +172,19 @@ class ProfileComboBox(QtGui.QComboBox):
         self.includeConfigure = includeConfigure
         if includeConfigure:
             self.addItem(self.tr("configure..."))
-        profileConf.profileAdded.connect(lambda name: self.insertItem(self.profileCount(), name))
+            self.view().activated.connect(lambda idx: print(idx.row()))
+        profileConf.profileAdded.connect(self.handleProfileAdded)
         self.currentIndexChanged[int].connect(self.handleIndexChange)
+        self.activated[int].connect(self.handleActivation)
         profileConf.profileRenamed.connect(self.handleProfileRenamed)
-        
         profileConf.profileRemoved.connect(self.handleProfileRemoved)
+        
+        self.lastProfile = None
         self.profileConf = profileConf
         if default:
             self.setCurrentProfile(default, False)
+        if self.profileCount() > 0:
+            self.storedProfile = self.currentProfileName()
             
     def profileCount(self):
         if self.includeConfigure:
@@ -199,13 +211,10 @@ class ProfileComboBox(QtGui.QComboBox):
         return self.currentText()
     
     def setCurrentProfile(self, name, emit = True):
+        self.storedProfile = name
         for i in range(self.profileCount()):
             if self.itemText(i) == name:
-                if not emit:
-                    self.supressEvent = True
                 self.setCurrentIndex(i)
-                self.supressEvent = False
-                
                 return True
         return False
                    
@@ -214,22 +223,31 @@ class ProfileComboBox(QtGui.QComboBox):
             self.profileChosen.emit('')
             return
         if i != self.profileCount():
-            if not self.supressEvent:
-                self.profileChosen.emit(self.itemText(i))
-        else:            
-            self.profileConf.openConfigDialog(self, self.itemText(self.storedIndex))
-            self.setCurrentIndex(self.storedIndex)
+            self.profileChosen.emit(self.itemText(i))
+            self.storedProfile = self.itemText(i)
+
+    def handleActivation(self, i):
+        if self.includeConfigure and i == self.profileCount():
+            self.profileConf.openConfigDialog(self.storedProfile)
+            self.setCurrentProfile(self.storedProfile, False)
             
     def mousePressEvent(self, event):
         if self.includeConfigure and self.count() == 1 and event.button() == Qt.LeftButton:
-            self.profileConf.openConfigDialog(self, None)
+            self.profileConf.openConfigDialog(None)
             event.accept()
         else:
             return super().mousePressEvent(event)
-     
+    
+    def handleProfileAdded(self, name):
+        self.insertItem(self.profileCount(), name)
+        if self.profileCount() == 1 and self.includeConfigure:
+            self.setCurrentProfile(name)
+    
     def handleProfileRenamed(self, old, new):
+        if self.storedProfile == old:
+            self.storedProfile = new
         for i in range(self.profileCount()):
-            if self.itemText(i) == old:                
+            if self.itemText(i) == old:               
                 self.setItemText(i, new)
                 break
     
@@ -249,7 +267,7 @@ class ProfileConfigurationDisplay(QtGui.QWidget):
         self.profileConf = profileConf
         topLayout = QtGui.QHBoxLayout()
         topLayout.addWidget(QtGui.QLabel("Profile:"), 0)
-        self.profileChooser = ProfileComboBox(profileConf, currentProfile, includeConfigure = False, parent = self)
+        self.profileChooser = ProfileComboBox(profileConf, currentProfile, includeConfigure = False)
         self.newButton = QtGui.QPushButton(self.tr("New"))
         self.removeButton = QtGui.QPushButton(self.tr("Remove"))
         topLayout.addWidget(self.profileChooser,10)
@@ -280,8 +298,6 @@ class ProfileConfigurationDisplay(QtGui.QWidget):
         self.configWidget  = None
         self.setLayout(mainLayout)
         self.mainLayout = mainLayout
-        if currentProfile is None:
-            currentProfile = next(iter(self.profileConf.profiles))
         
         self.currentProfileName = self.profileChooser.currentProfileName
         self.setProfile(currentProfile)
@@ -300,19 +316,25 @@ class ProfileConfigurationDisplay(QtGui.QWidget):
         else:
             currentProfile = self.profileChooser.currentProfileName()
             newName = str(self.nameEdit.text())
-            if newName != currentProfile:
-                if newName in self.profileConf:
-                    ans = dialogs.question(self.tr('Overwrite profile?'),
-                                     self.tr('A profile named "{}" already exists. Do you want to overwrite it?'))
-                    if ans:
-                        self.profileConf.removeProfile(newName)
-                    else:
-                        return
-                self.profileConf.renameProfile(currentProfile, newName)
-            self.profileConf.modifyProfile(newName, self.classChooser.currentText(), self.configWidget.currentConfig())
+            if currentProfile != '':
+                if newName != currentProfile:
+                    if newName in self.profileConf:
+                        ans = dialogs.question(self.tr('Overwrite profile?'),
+                                         self.tr('A profile named "{}" already exists. Do you want to overwrite it?'))
+                        if ans:
+                            self.profileConf.removeProfile(newName)
+                        else:
+                            return
+                    self.profileConf.renameProfile(currentProfile, newName)
+                self.profileConf.modifyProfile(newName, self.classChooser.currentText(), self.configWidget.currentConfig())
+            else:
+                self.profileConf.newProfile(newName, self.classChooser.currentText(), self.configWidget.currentConfig())
+            
             
     def setProfile(self, name):
         if name == '':
+            name = None
+        if name is None:
             self.nameEdit.setEnabled(False)
             self.setClass('')
         else:
@@ -332,15 +354,32 @@ class ProfileConfigurationDisplay(QtGui.QWidget):
             self.configWidget = self.profileConf.classes[className].configurationWidget(profileName)
             self.configWidget.temporaryModified.connect(self.temporaryModified)
             self.mainLayout.insertWidget(2, self.configWidget)
+            self.configWidget.setSizePolicy(QtGui.QSizePolicy.Minimum, QtGui.QSizePolicy.Minimum)
     
     def _removeConfigWidget(self):
         if self.configWidget is not None:
-            self.mainLayout.removeWidget(self.configWidget)
             self.configWidget.temporaryModified.disconnect(self.temporaryModified)
-            self.configWidget.setVisible(False)
+            self.mainLayout.removeWidget(self.configWidget)
+            self.configWidget.hide()
         self.configWidget = None
         
     def enableClassChooser(self):
         self.secondLayout.insertWidget(2, QtGui.QLabel(self.tr("Type:")))
         self.secondLayout.insertWidget(3, self.classChooser)
+
+class ProfileConfigurationDialog(QtGui.QDialog):
+
+    def __init__(self, profileConf, currentProfile = None, parent = None):
+        super().__init__(parent)
+        self.setModal(True)
+        self.setWindowTitle(self.tr("Profile Configuration: {}").format(profileConf.name))
+        self.profileConf = profileConf
+        layout = QtGui.QVBoxLayout()
+        self.confDisplay = ProfileConfigurationDisplay(profileConf, currentProfile)
+        layout.addWidget(self.confDisplay)
+        self.buttonBox = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Close)
+        self.buttonBox.rejected.connect(self.accept)
+        layout.addWidget(self.buttonBox)
+        self.setLayout(layout)
+
         

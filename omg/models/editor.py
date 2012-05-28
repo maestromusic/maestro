@@ -33,8 +33,6 @@ class EditorModel(wrappertreemodel.WrapperTreeModel):
     def __init__(self, level = levels.editor):
         """Initializes the model. A new RootNode will be set as root."""
         super().__init__(level)
-        self.albumGroupers = []
-        self.metacontainer_regex=r" ?[([]?(?:cd|disc|part|teil|disk|vol)\.? ?([iI0-9]+)[)\]]?"
 
     def supportedDropActions(self):
         return Qt.CopyAction | Qt.MoveAction
@@ -110,12 +108,12 @@ class EditorModel(wrappertreemodel.WrapperTreeModel):
                     filesByFolder[folder].append(self.level.get(file))
             progress.close()
             # call album guesser
-            return albumguesser.guessAlbums(self.level, filesByFolder, parent, self.albumGroupers, self.metacontainer_regex)
+            if self.guessProfile is not None:
+                profile = albumguesser.profileConfig[self.guessProfile]
+                profile.guessAlbums(self.level, filesByFolder)
+                return profile.albums + profile.singles
 
         except levels.ElementGetError as e:
-            print(e)
-            return []
-        except albumguesser.GuessError as e:
             print(e)
             return []
 

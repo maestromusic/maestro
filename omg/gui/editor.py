@@ -16,64 +16,19 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-# --------- Python standard lib imports ------
-import itertools
-
-# --------- Qt imports -----------------------
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
-# --------- OMG imports ----------------------
+import itertools
+
 from . import treeview, mainwindow
-from .. import config
-from ..core import levels, tags
-from ..constants import CONTENTS
-from ..models import editor, rootedtreemodel
+from .. import profiles
+from ..models import editor, albumguesser
 from .treeactions import *
 from .delegates import editor as editordelegate, configuration as delegateconfig
 
-
-_profiles = None
-
-def profiles():
-    """Use this method to access a dictionary of album guessing profiles. Returns a dict mapping profile name
-    to a list of album guessers, which are either tag objects or the magic string "DIRECTORY"."""
-    def parseAlbumGrouper(name):
-        if name == "album": # this is the default
-            return tags.ALBUM
-        elif name[0] == "t":
-            return tags.get(name[1:])
-        elif name == "DIRECTORY":
-            return name
-        else:
-            raise ValueError("Could not parse album grouper element: {}".format(name))
-    global _profiles
-    if _profiles is None:
-        pr = config.storage.editor.guess_profiles
-        _profiles = {}
-        for name, lst in pr.items():
-            _profiles[name] = list(map(parseAlbumGrouper, lst))
-    return _profiles
-
-def storeProfiles():
-    """Save the current album guessing profiles into the storage."""
-    storage_profiles = {}
-    for name, lst in profiles().items():
-        storage_profiles[name] = []
-        for item in lst:
-            if item == "DIRECTORY":
-                storage_profiles[name].append(item)
-            else:
-                storage_profiles[name].append('t' + item.name)
-    config.storage.editor.guess_profiles = storage_profiles
         
-class ProfileChangeNotifier(QtCore.QObject):
-    """This singleton class is used to populate changes in the guessing profiles through multiple editors."""
-    profilesChanged = QtCore.pyqtSignal()     
-profileNotifier = ProfileChangeNotifier()
-profileNotifier.profilesChanged.connect(storeProfiles)
-    
 class EditorTreeView(treeview.TreeView):
     """This is the main widget of an editor: The tree view showing the current element tree."""
 
@@ -161,10 +116,10 @@ class EditorWidget(QtGui.QDockWidget):
         self.setWidget(widget)
         vb = QtGui.QVBoxLayout(widget)
         try:
-            expand,profile  = state
+            expand,guessProfile = state
         except:
             expand = True
-            profile = "dontguess"
+            guessProfile = None
         self.editor = EditorTreeView()
         self.editor.setAutoExpand(expand)
         vb.addWidget(self.editor)
@@ -176,22 +131,19 @@ class EditorWidget(QtGui.QDockWidget):
         self.autoExpandCheckbox.stateChanged.connect(self.editor.setAutoExpand)
         self.autoExpandCheckbox.setToolTip(self.tr('auto expand dropped containers'))
         hb.addWidget(self.autoExpandCheckbox)
-                
-        self.guessProfileCombo = QtGui.QComboBox()
-        self.guessProfileCombo.addItem(self.tr("no guessing"))
-        self.guessProfileCombo.addItems(list(profiles().keys()))
-        self.guessProfileCombo.addItem(self.tr("configure..."))
+        
+        self.guessCheck = QtGui.QCheckBox()
+        self.guessProfileCombo = profiles.ProfileComboBox(albumguesser.profileConfig, guessProfile)
+        self.guessCheck.toggled.connect(self.guessProfileCombo.setEnabled)
+        self.guessCheck.toggled.connect(self._handleProfileCheck)
+        self.guessCheck.setChecked(guessProfile is not None)
+        self.guessProfileCombo.setDisabled(guessProfile is None)
+        if guessProfile is not None:
+            self.guessProfileCombo.setCurrentProfile(guessProfile)
         self.guessProfileCombo.setToolTip(self.tr("select album guessing profile"))
-        self.guessProfileCombo.currentIndexChanged[int].connect(self._handleProfileCombo)
-        self.guessIndex = 0
-        if profile == "dontguess":
-            self.guessProfileCombo.setCurrentIndex(0)
-        elif profile in profiles():
-            for i in range(1, self.guessProfileCombo.count()-1):
-                if self.guessProfileCombo.itemText(i) == profile:
-                    self.guessProfileCombo.setCurrentIndex(i)
-                    self.guessIndex = i
-                    break
+        self.guessProfileCombo.profileChosen.connect(self._handleProfileCombo)
+        
+        hb.addWidget(self.guessCheck)
         hb.addWidget(self.guessProfileCombo)
         
         hb.addWidget(QtGui.QLabel(self.tr("Item Display:")))
@@ -204,63 +156,25 @@ class EditorWidget(QtGui.QDockWidget):
         self.addAction(commitAction)
         self.toolbar.addAction(commitAction)
         hb.addWidget(self.toolbar)
-        profileNotifier.profilesChanged.connect(self._handleProfilesChanged)
 
-    def _handleProfilesChanged(self):
-        """This slot is called when the list of guess profiles changes. We have to update the 
-        profile-combobox and check whether the currently selected profile is still available."""
-        newProfiles = list(profiles().keys())
-        myProfiles = []
-        self.guessProfileCombo.currentIndexChanged[int].disconnect(self._handleProfileCombo)
-        for i in range(1, self.guessProfileCombo.count()-1):
-            myProfiles.append(self.guessProfileCombo.itemText(i))
-        currentProfile = self.guessProfileCombo.currentText()
-        if self.guessProfileCombo.currentIndex() == 0:
-            currentProfile = 0
-        for i, profile in reversed(list(enumerate(myProfiles, start=1))):
-            if profile not in newProfiles:
-                self.guessProfileCombo.removeItem(i)
-        for p in newProfiles:
-            if p not in myProfiles:
-                self.guessProfileCombo.insertItem(self.guessProfileCombo.count()-1, p)
-        self.guessProfileCombo.currentIndexChanged[int].connect(self._handleProfileCombo)
-        if currentProfile != 0:
-            if currentProfile in newProfiles:
-                for i in range(1, self.guessProfileCombo.count()-1):
-                    if self.guessProfileCombo.itemText(i) == currentProfile:
-                        self.guessProfileCombo.setCurrentIndex(i)
-                        break
-            else:
-                self.guessProfileCombo.setCurrentIndex(0)
-            
-    def _handleProfileCombo(self, index):
-        """Handles changes of the current index of the guess profile combobox. If the last item is chosen,
-        a profile configuration dialog is opened."""
-        if index == self.guessIndex:
-            return
-        if index == 0:
-            self.editor.model().albumGroupers = []
-            self.guessIndex = 0
-        elif index == self.guessProfileCombo.count() - 1:
-            if self.guessIndex != 0:
-                profile = self.guessProfileCombo.itemText(self.guessIndex)
-            else:
-                profile = ''
-            dialog = ConfigureGuessProfilesDialog(self, profile)
-            self.guessProfileCombo.setCurrentIndex(self.guessIndex)
-            dialog.exec_()
-            profileNotifier.profilesChanged.emit()
-            
+    def _handleProfileCheck(self, state):
+        """Handle toggling of the guess checkbox."""
+        if state:
+            self.editor.model().guessProfile = self.guessProfileCombo.currentProfileName()
         else:
-            self.editor.model().albumGroupers = profiles()[self.guessProfileCombo.itemText(index)]
-            self.guessIndex = index
+            self.editor.model().guessProfile = None
+    
+    def _handleProfileCombo(self, name):
+        """Handles changes of the current name of the guess profile combobox."""
+        self.editor.model().guessProfile = name
     
     def saveState(self):
-        if self.guessProfileCombo.currentIndex() == 0:
-            profile = "dontguess"
+        if self.guessCheck.isChecked():
+            profile = self.guessProfileCombo.currentProfileName()
         else:
-            profile = self.guessProfileCombo.currentText()
+            profile = None
         return (self.autoExpandCheckbox.isChecked(),profile)
+
 # register this widget in the main application
 eData = mainwindow.WidgetData(id = "editor",
                              name = translate("Editor","editor"),
@@ -271,174 +185,3 @@ eData = mainwindow.WidgetData(id = "editor",
                              unique = False,
                              preferredDockArea = Qt.RightDockWidgetArea)
 mainwindow.addWidgetData(eData)
-
-class ConfigureGuessProfilesDialog(QtGui.QDialog):
-    """A dialog to configure the profiles used for "guessing" album structures. 
-    
-    Each profile is determined by its name, and contains a list of tags by which albums are grouped. One
-    tag is the "main" grouper tag; this one is used to determine the TITLE-tag of the new album as well as
-    for automatic meta-container guessing. Additionally, each profile sets the "directory mode" flag. If 
-    that is enabled, only albums within the same directory on the filesystem will be grouped together."""
-    def __init__(self, parent, profile = ''):
-        super().__init__(parent)
-        self.setModal(True)
-        self.setWindowTitle(self.tr("Configure Album Guessing Profiles"))
-        mainLayout = QtGui.QVBoxLayout(self)
-        descriptionLabel = QtGui.QLabel(self.tr(
-"""Configuration of the "album guessing" profiles. These profiles determine how the editor tries to \
-guess the album structure of files which are dropped into the editor.
-
-Album guessing is done by means of a list of tags; all files whose tags coincide for this list will then be \
-considered an album. The "main" grouper tag determines the TITLE tag of the new album. If "directory mode" \
-is on, files will only be grouped together if they are in the same directory."""))
-        descriptionLabel.setWordWrap(True)
-        mainLayout.addWidget(descriptionLabel)
-        self.profileChooser = QtGui.QComboBox(self)
-        prfs = list(profiles().keys())
-        self.profileChooser.addItems(prfs)
-        self.profileChooser.setCurrentIndex(prfs.index(profile) if profile != '' else 0)
-        self.profileChooser.setSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Preferred)
-        self.profileChooser.currentIndexChanged[str].connect(self.setCurrentProfile)
-        self.newProfileButton = QtGui.QPushButton(self.tr("new"))
-        self.newProfileButton.clicked.connect(self.newProfile)
-        self.deleteProfileButton = QtGui.QPushButton(self.tr("remove"))
-        self.deleteProfileButton.clicked.connect(self.removeProfile)
-        chooserLayout = QtGui.QHBoxLayout()
-        chooserLayout.addWidget(self.profileChooser)
-        #chooserLayout.addStretch()
-        chooserLayout.addWidget(self.newProfileButton)
-        chooserLayout.addWidget(self.deleteProfileButton)
-        
-        mainLayout.addLayout(chooserLayout)
-        
-        currentNameLayout = QtGui.QHBoxLayout()
-        currentNameLayout.addWidget(QtGui.QLabel(self.tr("profile name:")))
-        self.nameEdit = QtGui.QLineEdit()
-        self.nameEdit.textEdited.connect(self.renameCurrent)
-        self.nameEdit.setFocus()
-        currentNameLayout.addWidget(self.nameEdit)
-        mainLayout.addLayout(currentNameLayout)
-        
-        configLayout = QtGui.QHBoxLayout()
-        self.preview = QtGui.QListWidget()
-        configSideLayout = QtGui.QVBoxLayout()
-        self.addTagButton = QtGui.QPushButton(self.tr("add tag..."))
-        self.tagMenu = QtGui.QMenu()
-        self.tagActions = []
-        actionGroup = QtGui.QActionGroup(self)
-        for tag in tags.tagList:
-            tagAction = QtGui.QAction(self)
-            tagAction.setText(str(tag))
-            tagAction.setData(tag)
-            actionGroup.addAction(tagAction)
-            self.tagMenu.addAction(tagAction)
-            self.tagActions.append(tagAction)
-        self.addTagButton.setMenu(self.tagMenu)
-        actionGroup.triggered.connect(self.addTag)
-        self.removeTagButton = QtGui.QPushButton(self.tr("remove tag"))
-        self.removeTagButton.clicked.connect(self.removeTag)
-        self.directoryModeButton = QtGui.QPushButton(self.tr("directory mode"))
-        self.directoryModeButton.setCheckable(True)
-        self.directoryModeButton.setToolTip(
-"""If this is checked, only files within the same directory will be considered for automatic album
-guessing. This is useful in most cases, unless you have albums that are split across several folders.""")
-        self.directoryModeButton.clicked[bool].connect(self.setDirectoryMode)
-        configSideLayout.addWidget(self.addTagButton)
-        configSideLayout.addWidget(self.removeTagButton)
-        configSideLayout.addWidget(self.directoryModeButton)
-        self.setMainGrouperButton = QtGui.QPushButton(self.tr("set to main"))
-        self.setMainGrouperButton.clicked.connect(self.setMain)
-        configSideLayout.addWidget(self.setMainGrouperButton)
-        configSideLayout.addStretch()
-        configLayout.addWidget(self.preview)
-        configLayout.addLayout(configSideLayout)
-        mainLayout.addLayout(configLayout)
-        
-        controlBox = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Close)
-        #dialogControlLayout = QtGui.QHBoxLayout()
-        #closeButton = QtGui.QPushButton(self.tr("close"))
-        controlBox.rejected.connect(self.accept)
-        mainLayout.addWidget(controlBox)
-        if profile == '' and len(profiles()) > 0:
-            profile = list(profiles().keys())[0]
-        self.setCurrentProfile(profile)
-        
-    def removeProfile(self):
-        i = self.profileChooser.currentIndex()
-        name = self.profileChooser.currentText()
-        del profiles()[name]
-        self.profileChooser.removeItem(i)
-        
-    def newProfile(self):
-        name= self.tr("newProfile")
-        if name in profiles():
-            for i in itertools.count():
-                if name + str(i) not in profiles():
-                    name = name + str(i)
-                    break
-        profiles()[name] = ["DIRECTORY"]
-        self.setCurrentProfile(name)
-        self.profileChooser.addItem(name)
-        self.profileChooser.setCurrentIndex(self.profileChooser.count()-1)
-        
-    def setCurrentProfile(self, name):
-        self.profile = name
-        self.nameEdit.setText(name)
-        self.nameEdit.setEnabled(name != '')
-        self.preview.setEnabled(name != '')
-        self.preview.clear()
-        if name != '':
-            profile = profiles()[name]
-            self.directoryModeButton.setChecked("DIRECTORY" in profile)
-            for thing in profile:
-                if thing != "DIRECTORY":
-                    self.preview.addItem(str(thing))
-            if self.preview.count() > 0:
-                mainItem = self.preview.item(0)
-                f = mainItem.font()
-                f.setBold(True)
-                mainItem.setFont(f)
-                self.preview.setCurrentRow(0)
-            for action in self.tagActions:
-                action.setDisabled(action.data() in profile)
-    
-    def renameCurrent(self, newName):
-        profile = profiles()[self.profile]
-        profiles()[newName] = profile
-        del profiles()[self.profile]
-        self.profile = newName
-        self.profileChooser.setItemText(self.profileChooser.currentIndex(), newName)
-    
-    def addTag(self, action):
-        self.preview.addItem(action.text())
-        profiles()[self.profile].append(action.data())
-        action.setDisabled(True)
-        if self.preview.count() == 1:
-            self.preview.setCurrentRow(0)
-            self.setMain()
-        
-    def removeTag(self):
-        tagName = self.preview.currentItem().text()
-        tag = tags.get(tagName)
-        for action in self.tagActions:
-            if action.data() == tag:
-                action.setEnabled(True)
-        self.preview.takeItem(self.preview.currentRow())
-        profiles()[self.profile].remove(tag)
-    
-    def setMain(self):
-        item = self.preview.currentItem()
-        tag = tags.get(item.text())
-        profiles()[self.profile].remove(tag)
-        profiles()[self.profile].insert(0, tag)
-        for i in range(self.preview.count()):
-            item = self.preview.item(i)
-            font = item.font()
-            font.setBold(i == self.preview.currentRow())
-            item.setFont(font)
-            
-    def setDirectoryMode(self, mode):
-        if mode:
-            profiles()[self.profile].append("DIRECTORY")
-        else:
-            profiles()[self.profile].remove("DIRECTORY")
