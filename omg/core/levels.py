@@ -68,7 +68,7 @@ class FileCreateDeleteEvent(ElementChangedEvent):
         self.deleted = deleted if deleted is not None else []
         self.disk = disk
 
-class FileRenameEvent(ChangeEvent):
+class FileRenameEvent(ElementChangedEvent):
     """Event indicating that files have been renamed on disk."""
     def __init__(self, renamings):
         super().__init__()
@@ -217,11 +217,18 @@ class Level(QtCore.QObject):
             self.emitEvent(list(map.keys()))
     
     def children(self, id):
-        """Returns a list of (recursively) all children of the element with *id*."""
+        """Returns a set of (recursively) all children of the element with *id*."""
         if self.get(id).isFile():
             return set((id,))
         else:
             return set.union(set((id,)), *[self.children(cid) for cid in self.get(id).contents.ids])
+    
+    def subLevel(self, ids, name):
+        """Return a new level containing copies of the elements with given *ids*, named *name*."""
+        level = Level(name, self)
+        for id in ids:
+            level.load(self.children(id))
+        return level
     
 class RealLevel(Level):
     def __init__(self):
@@ -235,6 +242,7 @@ class RealLevel(Level):
         for id in ids:
             if id in self.elements:
                 child.elements[id] = self.elements[id].copy()
+                child.elements[id].level = child
             else: notFound.append(id)
         if len(notFound) > 0:
             positiveIds = [id for id in notFound if id > 0]

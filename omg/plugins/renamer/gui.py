@@ -20,9 +20,9 @@ from PyQt4.QtCore import Qt
 
 from omg import application
 from omg.gui import treeview, treeactions, delegates
-from omg.gui.delegates import configuration, abstractdelegate
+from omg.gui.delegates import configuration
 from omg.models import editor
-from omg.core.commands import RenameFilesCommand
+from omg.core.commands import CommitCommand
 from . import plugin
 
 translate = QtCore.QCoreApplication.translate
@@ -41,7 +41,7 @@ class RenameFilesAction(treeactions.TreeAction):
                               [wrap.element.id for wrap in self.parent().nodeSelection.elements()])
         dialog.exec_()
         if dialog.result() == dialog.Accepted:
-            application.stack.push(RenameFilesCommand(self.level(), dialog.results))
+            application.stack.push(CommitCommand(dialog.sublevel, dialog.ids, self.tr("rename")))
             
 
 class PathDelegate(delegates.StandardDelegate):
@@ -54,16 +54,14 @@ class PathDelegate(delegates.StandardDelegate):
                 [],
                 {"showPaths": True, 'showMajor': False, 'appendRemainingTags': False, 'showAllAncestors': False}
     )
+    
     def addPath(self, element):
         if element.isFile() and element.id in self.result:
             self.addCenter(delegates.TextItem(element.path,delegates.ITALIC_STYLE))
             self.newRow()
-            self.addCenter(delegates.TextItem(self.result[element.id], self.newPathStyle))
-    
-    def __init__(self, view):
-        super().__init__(view)
-        self.newPathStyle = abstractdelegate.DelegateStyle(1, False, True, Qt.red)
-        self.result = {}
+            newPathStyle = abstractdelegate.DelegateStyle(1, False, True, Qt.red)
+            self.addCenter(delegates.TextItem(self.result[element.id], newPathStyle))
+            
     
 class RenameDialog(QtGui.QDialog):
     def __init__(self, parent, level, ids):
@@ -83,12 +81,12 @@ class RenameDialog(QtGui.QDialog):
         mainLayout.addWidget(self.statusLabel, 1)
         self.statusLabel.setVisible(False)
         
+        self.sublevel = level.subLevel(ids, "rename")
+        self.model = editor.EditorModel(self.sublevel, ids)
         self.tree = treeview.TreeView()
-        self.model = editor.EditorModel(level)
         self.tree.setModel(self.model)
         self.delegate = PathDelegate(self.tree)
         self.tree.setItemDelegate(self.delegate)
-        self.model.insertElements(self.model.root, 0, ids)
         self.tree.expandAll()
         
         if configDisplay.currentProfileName() != '':
@@ -113,7 +111,9 @@ class RenameDialog(QtGui.QDialog):
             for id in self.ids:
                 result = renamer.renameContainer(self.level, id)
                 totalResult.update(result)
-            self.results = self.delegate.result = totalResult
+            for id, elem in self.sublevel.elements.items():
+                if id in totalResult:
+                    elem.path = totalResult[id]
             self.statusLabel.hide()
         except plugin.FormatSyntaxError:
             self.statusLabel.setText(self.tr("Syntax error in format string"))

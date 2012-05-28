@@ -323,6 +323,7 @@ class MergeCommand(QtGui.QUndoCommand):
         container = Container(self.level, self.containerID, major = False)
         elements = []
         self.level.elements[self.containerID] = container
+        logger.debug("merge: inserted new container with ID {} into level {}".format(self.containerID, self.level))
         if self.elementParent:
             parent = self.level.get(self.parentID)
             

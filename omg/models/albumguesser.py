@@ -127,6 +127,7 @@ class StandardGuesser(profiles.Profile):
                 if key not in byKey:
                     byKey[key] = []
                 byKey[key].append(element)
+        self.albums.extend(list(existingParents))
         for key, elements in byKey.items():
             if pureDirMode or (self.albumTag in elements[0].tags):
                 elementsWithoutPos = { e for e in elements if e.tags.position is None }
@@ -179,8 +180,9 @@ class StandardGuesser(profiles.Profile):
             command = AlbumGuessCommand(self.level, metaTags, {pos:album.id for pos,album in contents.items()}, meta = True)
             application.stack.push(command)
             self.albums.append(command.containerID)
-            for c in contents:
-                self.albums.remove(c.id)
+            for c in contents.values():
+                if c.id in self.albums:
+                    self.albums.remove(c.id)
 
     @classmethod    
     def configurationWidget(cls, profile = None, parent = None):

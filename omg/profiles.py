@@ -14,7 +14,9 @@
 # 
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
+
+
+# This module provides a system to manage configuration profiles in OMG. 
 
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
@@ -106,13 +108,18 @@ class ProfileConfiguration(QtCore.QObject):
         
              
 class Profile(QtCore.QObject):
-    
+    """Base class for a profile implementation. """
     className = "undefined"
     def __init__(self, name):
         super().__init__()
         self.name = name
     
-    @classmethod    
+    def config(self):
+        """Return the configuration of the current profile, which, passed to the constructor,
+        yield an equivalent profile."""
+        raise NotImplementedError()
+    
+    @classmethod   
     def configurationWidget(cls, profile = None):
         """Return a widget for configuring profiles of this class. If *profile* is not None, it
         is the name of the initial profile."""
@@ -258,7 +265,9 @@ class ProfileComboBox(QtGui.QComboBox):
                 break
             
 class ProfileConfigurationDisplay(QtGui.QWidget):
-    
+    """A widget containing all the necessary bits to configure a profile. This is used
+    in the ProfileConfigurationDialog, but may also be used in custom dialogs which allow
+    to edit and use a profile in one step."""
     temporaryModified = QtCore.pyqtSignal(object)
     profileChanged = QtCore.pyqtSignal(str)
     
@@ -300,7 +309,7 @@ class ProfileConfigurationDisplay(QtGui.QWidget):
         self.mainLayout = mainLayout
         
         self.currentProfileName = self.profileChooser.currentProfileName
-        self.setProfile(currentProfile)
+        self.setProfile(self.profileChooser.currentProfileName())
     
     def handleNewProfile(self):
         self.profileConf.newProfile()

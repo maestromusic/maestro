@@ -30,9 +30,13 @@ class EditorModel(wrappertreemodel.WrapperTreeModel):
     """Model class for the editors where users can edit elements before they are commited into
     the database."""
     
-    def __init__(self, level = levels.editor):
-        """Initializes the model. A new RootNode will be set as root."""
+    def __init__(self, level = levels.editor, ids = None):
+        """Initializes the model. A new RootNode will be set as root.
+        
+        If *ids* is given, these elements will be initially loaded under the root node"""
         super().__init__(level)
+        if ids:
+            self.changeContents(QtCore.QModelIndex(), ids)
 
     def supportedDropActions(self):
         return Qt.CopyAction | Qt.MoveAction
@@ -48,9 +52,7 @@ class EditorModel(wrappertreemodel.WrapperTreeModel):
         
         if action == Qt.IgnoreAction:
             return True
-
         if action == Qt.TargetMoveAction:
-            print('wtf target')
             raise ValueError()
         
         parent = self.data(parentIndex, Qt.EditRole)
@@ -74,6 +76,9 @@ class EditorModel(wrappertreemodel.WrapperTreeModel):
         application.stack.endMacro()
         return ret   
     
+    def removeRows(self, row, count, parent):
+        print('remove rows!')
+        
     def insertElements(self, parent, index, ids, positions = None):
         """Undoably insert elements with *ids* (a list) at index "index" under *parent*, which
         is a wrapper. This convenience function either fires a ChangeRootCommand, if the parent

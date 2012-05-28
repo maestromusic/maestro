@@ -554,4 +554,3 @@ def truncate(tableName):
         # truncate may be much faster than delete
         db.query('TRUNCATE {}'.format(tableName))
     else: db.query('DELETE FROM {}'.format(tableName))
-    
