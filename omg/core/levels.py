@@ -68,7 +68,7 @@ class FileCreateDeleteEvent(ElementChangedEvent):
         self.deleted = deleted if deleted is not None else []
         self.disk = disk
 
-class FileRenameEvent(ChangeEvent):
+class FileRenameEvent(ElementChangedEvent):
     """Event indicating that files have been renamed on disk."""
     def __init__(self, renamings):
         super().__init__()

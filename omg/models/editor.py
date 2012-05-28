@@ -48,7 +48,6 @@ class EditorModel(wrappertreemodel.WrapperTreeModel):
         
         if action == Qt.IgnoreAction:
             return True
-
         if action == Qt.TargetMoveAction:
             raise ValueError()
         
