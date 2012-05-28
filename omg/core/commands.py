@@ -343,25 +343,3 @@ class ChangePositionsCommand(QtGui.QUndoCommand):
         if self.level is levels.real:
             db.write.changePositions(self.parentId, [(b,a) for a,b in self.changes])
         self.level.emitEvent(contentIds = (self.parentId,))
-
-class RenameFilesCommand(QtGui.QUndoCommand):
-    """A command to rename (and/or move) files on the filesystem."""
-    
-    def __init__(self, level, map):
-        """Creates the command for *level* with the id-to-newPath-map *map*."""
-        super().__init__()
-        self.level = level
-        self.changes = {}
-        for id, newPath in map.items():
-            element = level.get(id)
-            if element.path == newPath:
-                continue
-            if os.path.exists(utils.absPath(newPath)):
-                raise OSError("Can't rename '{}' to '{}': Target name exists!".format(element.path, newPath))
-            self.changes[id] = (element.path, newPath)
-            
-    def redo(self):
-        self.level.renameFiles(self.changes)
-                    
-    def undo(self):
-        self.level.renameFiles({id:(newPath, oldPath) for id, (oldPath, newPath) in self.changes.items()})

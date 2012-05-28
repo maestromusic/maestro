@@ -257,7 +257,6 @@ class CommitTreeAction(TreeAction):
         self.setEnabled(len(self.parent().model().root.contents) > 0)
         
     def doAction(self):
-        from ..core import levels
         model = self.parent().model()
         ids = set(n.element.id for n in self.parent().model().root.contents)
         application.stack.push(commands.CommitCommand(model.level, ids, self.tr("Commit editor")))

@@ -309,7 +309,7 @@ class ProfileConfigurationDisplay(QtGui.QWidget):
         self.mainLayout = mainLayout
         
         self.currentProfileName = self.profileChooser.currentProfileName
-        self.setProfile(currentProfile)
+        self.setProfile(self.profileChooser.currentProfileName())
     
     def handleNewProfile(self):
         self.profileConf.newProfile()

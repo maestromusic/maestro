@@ -123,7 +123,7 @@ class GrammarRenamer(profiles.Profile):
         
         tagName = Word(alphas + "_", alphanums + "_:()/\\")
         
-        tagDefinition = Optional(levelDef("levelDef")) + (tagName ^ "#")("tag") 
+        tagDefinition = Optional(levelDef("levelDef")) + (tagName | "#")("tag") 
         tagDefinition.setParseAction(self.tagDefinitionAction)
         
         expression = Forward()
@@ -131,12 +131,12 @@ class GrammarRenamer(profiles.Profile):
         ifExpr = Literal("?").suppress() + expression
         elseExpr = Literal("!").suppress() + expression
         condition = lbrace + tagDefinition("tagDef") \
-                + ((Optional(ifExpr("if")) + Optional(elseExpr("else"))) ^ (Optional(elseExpr("else")) + Optional(ifExpr("else"))))\
+                + ((Optional(ifExpr("if")) + Optional(elseExpr("else"))) | (Optional(elseExpr("else")) + Optional(ifExpr("else"))))\
                 + rbrace # i am sure this is possible in a nicer way ...
         condition.setParseAction(self.conditionAction)
         
         staticText = pyparsing.CharsNotIn("<>!?")#Word("".join(p for p in printables if p not in "<>"))
-        expression << OneOrMore(condition ^ staticText)
+        expression << OneOrMore(condition | staticText)
         self.expression = expression
     
     def computeNewPath(self):
