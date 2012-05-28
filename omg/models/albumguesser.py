@@ -180,8 +180,9 @@ class StandardGuesser(profiles.Profile):
             command = AlbumGuessCommand(self.level, metaTags, {pos:album.id for pos,album in contents.items()}, meta = True)
             application.stack.push(command)
             self.albums.append(command.containerID)
-            for c in contents:
-                self.albums.remove(c.id)
+            for c in contents.values():
+                if c.id in self.albums:
+                    self.albums.remove(c.id)
 
     @classmethod    
     def configurationWidget(cls, profile = None, parent = None):

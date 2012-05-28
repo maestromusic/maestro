@@ -199,7 +199,6 @@ def addFlagType(**data):
         flagType.id = db.query(
             "INSERT INTO {}flag_names (name,icon) VALUES (?,?)"
               .format(db.prefix),*data).insertId()
-    db.commit()
     logger.info("Added new flag '{}'".format(flagType.name))
     
     _flagsById[flagType.id] = flagType
@@ -215,7 +214,6 @@ def removeFlagType(flagType):
     
     logger.info("Removing flag '{}'.".format(flagType))
     db.query("DELETE FROM {}flag_names WHERE id = ?".format(db.prefix),flagType.id)
-    db.commit()
     del _flagsById[flagType.id]
     del _flagsByName[flagType.name]
     application.dispatcher.changes.emit(FlagTypeChangedEvent(DELETED,flagType))
@@ -255,7 +253,6 @@ def changeFlagType(flagType,**data):
         params.append(flagType.id) # for the where clause
         db.query("UPDATE {}flag_names SET {} WHERE id = ?".format(db.prefix,','.join(assignments)),*params)
         application.dispatcher.changes.emit(FlagTypeChangedEvent(CHANGED,flagType))
-    db.commit()
 
 
 class FlagDifference:
