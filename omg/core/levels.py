@@ -235,6 +235,7 @@ class RealLevel(Level):
         for id in ids:
             if id in self.elements:
                 child.elements[id] = self.elements[id].copy()
+                child.elements[id].level = child
             else: notFound.append(id)
         if len(notFound) > 0:
             positiveIds = [id for id in notFound if id > 0]

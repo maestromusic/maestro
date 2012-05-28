@@ -160,9 +160,9 @@ class CommitCommand(QtGui.QUndoCommand):
                 if id in self.majorChanges:
                     pElem.major = self.majorChanges[id][1]
                 if id in self.tagChanges:
-                    self.tagChanges[id].apply(pElem)
+                    self.tagChanges[id].apply(pElem.tags)
                 if id in self.flagChanges:
-                    self.flagChanges[id].apply(pElem)
+                    self.flagChanges[id].apply(pElem.flags)
                 if id in self.contentsChanges:
                     pElem.contents = self.contentsChanges[id][1].copy()
                 if id in self.pathChanges:
@@ -236,9 +236,9 @@ class CommitCommand(QtGui.QUndoCommand):
                 if id in self.majorChanges:
                     pElem.major = self.majorChanges[id][0]
                 if id in self.tagChanges:
-                    self.tagChanges[id].revert(pElem)
+                    self.tagChanges[id].revert(pElem.tags)
                 if id in self.flagChanges:
-                    self.flagChanges[id].revert(pElem)
+                    self.flagChanges[id].revert(pElem.flags)
                 if id in self.contentsChanges:
                     pElem.contents = self.contentsChanges[id][0].copy()
                 if id in self.pathChanges:

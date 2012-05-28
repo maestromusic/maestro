@@ -50,7 +50,6 @@ class EditorModel(wrappertreemodel.WrapperTreeModel):
             return True
 
         if action == Qt.TargetMoveAction:
-            print('wtf target')
             raise ValueError()
         
         parent = self.data(parentIndex, Qt.EditRole)
@@ -74,6 +73,9 @@ class EditorModel(wrappertreemodel.WrapperTreeModel):
         application.stack.endMacro()
         return ret   
     
+    def removeRows(self, row, count, parent):
+        print('remove rows!')
+        
     def insertElements(self, parent, index, ids, positions = None):
         """Undoably insert elements with *ids* (a list) at index "index" under *parent*, which
         is a wrapper. This convenience function either fires a ChangeRootCommand, if the parent

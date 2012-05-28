@@ -127,6 +127,7 @@ class StandardGuesser(profiles.Profile):
                 if key not in byKey:
                     byKey[key] = []
                 byKey[key].append(element)
+        self.albums.extend(list(existingParents))
         for key, elements in byKey.items():
             if pureDirMode or (self.albumTag in elements[0].tags):
                 elementsWithoutPos = { e for e in elements if e.tags.position is None }

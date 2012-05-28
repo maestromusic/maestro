@@ -140,6 +140,7 @@ class EditorWidget(QtGui.QDockWidget):
         self.guessProfileCombo.setDisabled(guessProfile is None)
         if guessProfile is not None:
             self.guessProfileCombo.setCurrentProfile(guessProfile)
+        self.editor.model().guessProfile = guessProfile
         self.guessProfileCombo.setToolTip(self.tr("select album guessing profile"))
         self.guessProfileCombo.profileChosen.connect(self._handleProfileCombo)
         
