@@ -26,6 +26,7 @@ from .. import player
 
 translate = QtCore.QCoreApplication.translate
 
+
 class PlaylistTreeView(treeview.TreeView):
     """This is the main widget of a playlist: The tree view showing the current element tree."""
     level = None

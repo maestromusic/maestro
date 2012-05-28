@@ -82,13 +82,18 @@ class InsertTestCase(PlaylistTestCase):
         level = self.level
         playlist = self.playlist
         
-        # Insert some wrappers with no useful container structure
-        playlist.insert(playlist.root,0,level.createWrappers('D1,E1,D1'))
-        self.check('D1,E1,D1')
+        # Insert a single wrapper. Do not add a parent
+        playlist.insert(playlist.root,0,level.createWrappers('A1'))
+        self.check('A1')
         
         # Check clear
         playlist.clear()
         self.check('')
+        
+        # Insert some wrappers with no useful container structure
+        playlist.insert(playlist.root,0,level.createWrappers('D1,E1,D1'))
+        self.check('D1,E1,D1')
+        playlist.clear()
 
         # Insert a container
         playlist.insert(playlist.root,0,level.createWrappers('A[A1,A2,A3]'))

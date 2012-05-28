@@ -183,6 +183,11 @@ class StandardDelegate(AbstractDelegate):
             self.addCenter(MultiTextItem(leftTexts,rightTexts))
         
         # Path
+        self.addPath(element)
+        
+    def addPath(self,element):
+        """Add the path of *element* to the DelegateItems. Subclasses may overwrite this method to use e.g.
+        two items for an old and a new path.""" 
         if self.config.options['showPaths'].value and element.isFile():
             self.newRow()
             self.addCenter(TextItem(element.path,ITALIC_STYLE))

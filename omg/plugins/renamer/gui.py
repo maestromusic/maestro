@@ -54,7 +54,7 @@ class PathDelegate(delegates.StandardDelegate):
                 [],
                 {"showPaths": True, 'showMajor': False, 'appendRemainingTags': False, 'showAllAncestors': False}
     )
-    def layoutPath(self, element):
+    def addPath(self, element):
         if element.isFile() and element.id in self.result:
             self.addCenter(delegates.TextItem(element.path,delegates.ITALIC_STYLE))
             self.newRow()

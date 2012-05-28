@@ -40,10 +40,7 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
     def clearCurrent(self):
         """Unsets the current song and clears the currentlyPlayingNodes list."""
         self.current = None
-        for node in self.currentlyPlayingNodes:
-            index = self.getIndex(node)
-            self.dataChanged.emit(index,index)
-        self.currentlyPlayingNodes = []
+        self._updateCurrentlyPlayingNodes()
     
     def setCurrent(self, offset):
         """Set the currently playing song to the song with the given offset. If offset is negative, no song
@@ -57,11 +54,18 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         
         # Update data in the model
         self.current = self.root.fileAtOffset(offset)
-        self.currentlyPlayingNodes = [self.current]
-        parent = self.current.parent
-        while not isinstance(parent, RootNode):
-            self.currentlyPlayingNodes.append(parent)
-            parent = parent.parent
+        self._updateCurrentlyPlayingNodes()
+        
+    def _updateCurrentlyPlayingNodes(self):
+        oldPlayingNodes = self.currentlyPlayingNodes
+        if self.current is None:
+            self.currentlyPlayingNodes = []
+        else:
+            self.currentlyPlayingNodes = [self.current]
+            parent = self.current.parent
+            while not isinstance(parent, RootNode):
+                self.currentlyPlayingNodes.append(parent)
+                parent = parent.parent
         
         # Emit events for nodes whose state changed
         for node in oldPlayingNodes:
@@ -79,7 +83,11 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         playlist to a tree playlist."""
         levels.real.loadPaths(paths)
         files = [Wrapper(self.level.get(path)) for path in paths]
-        return treebuilder.buildTree(self.level,files)
+        wrappers = treebuilder.buildTree(self.level,files)
+        for i in range(len(wrappers)):
+            while wrappers[i].getContentsCount() == 1:
+                wrappers[i] = wrappers[i].contents[0]
+        return wrappers
     
     def initFromPaths(self,paths):
         """Initialize the playlist to contain the given files. This method is not undoable."""
@@ -180,7 +188,7 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         # Build a tree
         preWrapper, postWrapper = self._getPrePostWrappers(parent,position)
         wrappers = treebuilder.buildTree(self.level,origWrappers,parent,preWrapper,postWrapper)
-        #print("WRAPPERS: {}".format(wrappers))
+        print("WRAPPERS: {}".format(wrappers))
         
         # Check whether we have to split the parent because some wrappers do not fit into parent
         # It might be necessary to split several parents
@@ -213,13 +221,13 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
                 while wrappers[i].getContentsCount() == 1 and wrappers[i] not in origWrappers:
                     wrappers[i] = wrappers[i].contents[0]
                     
-        #print("FINAL WRAPPERS: {}".format(wrappers))
+        print("FINAL WRAPPERS: {}".format(wrappers))
         
         # Insert
         command = PlaylistInsertCommand(self,parent,position,wrappers,fromOutside)
         application.stack.push(command)
         
-        # Glue add the edges
+        # Glue at the edges
         self.glue(parent,position+len(wrappers))
         self.glue(parent,position)
         
@@ -364,6 +372,7 @@ class PlaylistRemoveCommand(wrappertreemodel.RemoveCommand):
                 endOffset = parent.contents[end].offset() + parent.contents[end].fileCount()
                 self.model.backend.removeFromPlaylist(startOffset,endOffset)
             self.model._remove(parent,start,end)
+        self.model._updateCurrentlyPlayingNodes()
         self._dontUpdatePlayer = False
             
     def undo(self):
