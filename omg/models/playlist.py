@@ -18,7 +18,7 @@
 
 import itertools
 
-from . import wrappertreemodel, treebuilder, rootedtreemodel
+from . import wrappertreemodel, treebuilder
 from .. import application, config, utils
 from ..core import levels
 from ..core.nodes import RootNode, Wrapper

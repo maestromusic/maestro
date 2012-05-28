@@ -309,7 +309,6 @@ class SearchThread(threading.Thread):
                 - process the first criterion
                     
         """        
-        # -*- coding: utf-8 -*-
         with db.connect():
             if db.type == 'mysql':
                 createQuery = """
