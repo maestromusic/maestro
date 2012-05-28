@@ -253,11 +253,11 @@ class FlagManager(QtGui.QWidget):
         if number > 0:
             return number,False
         else:
-            from .. import editor
-            for model in editor.activeEditorModels():
-                if any(flagType in node.flags for node in model.getRoot().getAllNodes(skipSelf=True)):
-                    return 0,False
-            return 0,True
+            from ...core import levels
+            for elem in levels.editor.elements:
+                if flag in node.element.flags:
+                    return 0, False
+            return 0, True
         
     def _getColumnIndex(self,columnKey):
         """Return the index of the column with the given key (i.e. the first part of the corresponding tuple

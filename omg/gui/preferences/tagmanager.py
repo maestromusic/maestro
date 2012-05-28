@@ -21,7 +21,7 @@ import functools
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from ... import application, constants, database as db
+from ... import application, constants, database as db, utils
 from ...core import tags
 from .. import tagwidgets, dialogs, misc
 from ..misc import iconbuttonbar
@@ -294,7 +294,7 @@ class TagManager(QtGui.QWidget):
         if number > 0:
             return number,False
         else:
-            from ...models import levels
+            from ...core import levels
             for elem in levels.editor.elements:
                 if tag in node.element.tags:
                     return 0, False
