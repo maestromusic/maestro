@@ -688,21 +688,21 @@ class TagValuePropertiesWidget(QtGui.QWidget):
         self.hiddenCheckbox.setChecked(self.orig_hidden)
         
     def commit(self):
-        from ..modify import commands 
+        from ..core import tagcommands
         if self.changeValueCheckbox.isChecked() and self.valueEdit.text() != self.orig_value:
             #TODO: make sure that the new value is not an empty string  
             command = commands.RenameTagValueCommand(self.tag, self.orig_value, self.valueEdit.text())
             application.stack.push(command)
         if self.sortValueCheckbox.isChecked():
             if self.sortEdit.text() != self.orig_sortValue:
-                command = commands.SortValueUndoCommand(self.tag, self.valueId, self.orig_sortValue,
+                command = tagcommands.ChangeSortValueCommand(self.tag, self.valueId, self.orig_sortValue,
                                                         self.sortEdit.text())
                 application.stack.push(command)
         elif self.orig_sortValue is not None:
-            command = commands.SortValueUndoCommand(self.tag, self.valueId, self.orig_sortValue, None)
+            command = tagcommands.ChangeSortValueCommand(self.tag, self.valueId, self.orig_sortValue, None)
             application.stack.push(command)
         if self.hiddenCheckbox.isChecked() != self.orig_hidden:
-            command = commands.ValueHiddenUndoCommand(self. tag, self.valueId,
+            command = tagcommands.HiddenAttributeCommand(self. tag, self.valueId,
                                                       self.hiddenCheckbox.isChecked())
             application.stack.push(command)
     
