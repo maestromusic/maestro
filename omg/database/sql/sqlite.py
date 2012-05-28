@@ -24,11 +24,11 @@ sqlite3.register_adapter(utils.FlexiDate,lambda f: f.toSql())
 
 
 class Sql(AbstractSql):
-    def connect(self,path,**kwargs):
+    def connect(self,path, isolation_level = None):
         # There doesn't seem to be a real documentation of the isolation_level parameter. 
         # But I like the conclusion of this discussion:
         # http://mail.python.org/pipermail/python-list/2010-March/1239395.html
-        self._db = sqlite3.connect(path,isolation_level = None)
+        self._db = sqlite3.connect(path, isolation_level = isolation_level)
         # Foreign keys must be enabled in each connection
         self._db.execute("PRAGMA foreign_keys = ON")
 

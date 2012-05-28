@@ -20,9 +20,8 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from . import tags, flags
-from .elements import File, Container, ContentList
-from .. import database as db, realfiles, utils, config, logging, modify
-from ..modify import real
+from .elements import File, Container
+from .. import database as db, realfiles, utils, config, logging
 from ..database import write as dbwrite
 from ..application import ChangeEvent
 
@@ -68,7 +67,12 @@ class FileCreateDeleteEvent(ElementChangedEvent):
         self.created = created if created is not None else []
         self.deleted = deleted if deleted is not None else []
         self.disk = disk
-        
+
+class FileRenameEvent(ChangeEvent):
+    """Event indicating that files have been renamed on disk."""
+    def __init__(self, renamings):
+        super().__init__()
+        self.renamings = renamings
 
 class Level(QtCore.QObject):
     #TODO comment
@@ -202,7 +206,22 @@ class Level(QtCore.QObject):
         parent.contents.remove(pos = position)
         if childId not in parent.contents.ids:
             self.get(childId).parents.remove(parentId)
+    
+    def renameFiles(self, map, emitEvent = True):
+        """Rename files based on *map*, which is a dict from ids to new paths.
         
+        On a normal level, this just changes the path attributes and emits an event."""
+        for id, (_, newPath) in map.items():
+            self.get(id).path = newPath
+        if emitEvent:
+            self.emitEvent(list(map.keys()))
+    
+    def children(self, id):
+        """Returns a list of (recursively) all children of the element with *id*."""
+        if self.get(id).isFile():
+            return set((id,))
+        else:
+            return set.union(set((id,)), *[self.children(cid) for cid in self.get(id).contents.ids])
     
 class RealLevel(Level):
     def __init__(self):
@@ -383,6 +402,16 @@ class RealLevel(Level):
                 continue
         return failedElements
     
+    def renameFiles(self, map, emitEvent = True):
+        """on the real level, files are renamed on disk and in DB."""
+        super().renameFiles(map, emitEvent)
+        import os
+        for id, (oldPath, newPath) in map.items():
+            os.renames(utils.absPath(oldPath), utils.absPath(newPath))
+        db.write.changeFilePaths([ (id, newPath) for id, (_, newPath) in map.items()])
+        if emitEvent:
+            self.changed.emit(FileRenameEvent(list(map.items())))
+            
     def addFlag(self,flag,elements,emitEvent=True):
         super().addFlag(flag,elements,emitEvent=False)
         ids = [element.id for element in elements]
@@ -397,225 +426,6 @@ class RealLevel(Level):
         if emitEvent:
             self.emitEvent(ids)
             
-#TODO: move into its own file
-class CommitCommand(QtGui.QUndoCommand):
-    """The CommitCommand is used to "commit" the state of some elements in one level to its parent level.
-    If the parent level is *real*, then also the database and, if needed, files on disk are updated
-    accordingly."""
-    
-    def __init__(self, level, ids, text = None):
-        """Sets up a commit command for the given *ids* in *level*."""
-        super().__init__(text)
-        self.level = level
-        
-        allIds = set(ids)
-        # add children's IDs to ensure consistent commit
-        def addChildren(ids):
-            if len(ids) == 0:
-                return set()
-            newIds = set()
-            for id in ids:
-                elem = self.level.get(id)
-                if elem.isContainer():
-                    newIds.update(childId for childId in elem.contents.ids if childId in self.level and childId not in allIds)
-            allIds.update(newIds)
-            addChildren(newIds)                    
-        addChildren(allIds)
-        
-        self.real = level.parent is real # a handy shortcut
-        if self.real:
-            self.newInDatabase = [ id for id in allIds if id < 0 ]
-            self.realFileChanges = {}
-            self.idMap = None
-        else:
-            self.newId = self.oldId = lambda x : x  #TODO wtf?
-            
-        self.newElements = []
-        self.flagChanges, self.tagChanges, self.contentsChanges, self.majorChanges = {}, {}, {}, {}
-        self.ids, self.contents = [], []
-        for id in allIds:
-            element, contents =  self.recordChanges(id)
-            if element:
-                self.ids.append(id)
-            if contents:
-                self.contents.append(id)
-    
-    def recordChanges(self, id):
-        """Store changes of a single element, return two booleans (changeElement, changeContents)
-        reflecting whether the elements itself and/or its contents have changed."""
-        myEl = self.level.get(id)
-        changeElement, changeContents = False, False
-        if id in self.level.parent:
-            oldEl = self.level.parent.get(id)
-            oldTags = oldEl.tags
-            oldFlags = oldEl.flags
-            if oldEl.isContainer():
-                oldMajor = oldEl.major
-                oldContents = oldEl.contents
-        else:
-            changeElement = True
-            self.newElements.append(id)
-            oldTags = None
-            oldFlags = []
-            if myEl.isContainer():
-                oldMajor = None
-                oldContents = ContentList()  
-        
-        if oldTags != myEl.tags:
-            changes = tags.TagDifference(oldTags, myEl.tags)
-            self.tagChanges[id] = changes
-            if self.real and myEl.isFile():
-                # check for file tag changes
-                if id not in self.newElements:
-                    if not changes.onlyPrivateChanges():
-                        # element already loaded in real level (already commited or loaded in playlist)
-                        self.realFileChanges[myEl.path] = changes
-                else:
-                    fileTags = myEl.fileTags
-                    fileChanges = tags.TagDifference(fileTags, myEl.tags)
-                    if not fileChanges.onlyPrivateChanges():
-                        self.realFileChanges[myEl.path] = fileChanges
-                        
-                
-            changeElement = True
-        if oldFlags != myEl.flags:
-            self.flagChanges[id] = flags.FlagDifference(oldFlags, myEl.flags)
-            changeElement = True
-        if myEl.isContainer():
-            if oldContents != myEl.contents:
-                changeContents = True
-                self.contentsChanges[id] = (oldContents.copy(), myEl.contents.copy())
-            if oldMajor != myEl.major:
-                self.majorChanges[id] = (oldMajor, myEl.major)
-                changeElement = True
-        return changeElement, changeContents
-            
-    def redo(self):
-        if self.real:
-            # create new elements in DB to obtain id map, and change IDs in current level 
-            db.transaction()
-            if self.idMap is None:
-                # first redo -> prepare id mapping
-                self.idMap = modify.real.createNewElements(self.level, self.newInDatabase)
-                self.newId = utils.dictOrIdentity(self.idMap)
-                self.oldId = utils.dictOrIdentity({b:a for a,b in self.idMap.items() })
-                # update contentsChanges to use the new ids
-                for _, newContents in self.contentsChanges.values():
-                    newContents.ids[:] = map(self.newId, newContents.ids)
-            else:
-                modify.real.createNewElements(self.level, self.newInDatabase, self.idMap)
-            # change IDs for new elements
-            for id in self.newInDatabase:
-                self.level.changeId(id, self.newId(id))
-                if id in self.level.parent:
-                    # happens if the element is loaded in some playlist
-                    self.level.parent.changeId(id, self.newId(id))
-                    
-        # Add/update elements in parent level
-        newFilesPaths = []
-        for id in set(self.ids + self.contents):
-            elem = self.level.elements[self.newId(id)]
-            nid = self.newId(id)
-            if id in self.newElements:
-                copy = elem.copy()
-                copy.level = self.level.parent
-                self.level.parent.elements[nid] = copy
-                if elem.isFile():
-                    newFilesPaths.append(elem.path)
-            else:
-                pElem = self.level.parent.elements[nid]
-                if id in self.majorChanges:
-                    pElem.major = self.majorChanges[id][1]
-                if id in self.tagChanges:
-                    self.tagChanges[id].apply(pElem)
-                if id in self.flagChanges:
-                    self.flagChanges[id].apply(pElem)
-                if id in self.contentsChanges:
-                    pElem.contents = self.contentsChanges[id][1].copy()
-                        
-        # apply changes in DB, if parent level is real
-        if self.real:
-            if len(self.majorChanges) > 0:
-                db.write.setMajor((self.newId(id), newMajor) for id,(_,newMajor) in self.majorChanges.items())
-            if len(self.contentsChanges) > 0:
-                modify.real.changeContents({self.newId(id):changes for id, changes in self.contentsChanges.items()})
-            if len(self.tagChanges) > 0:
-                # although the difference from our level to the parent might affect only a subset of the tags,
-                # for elements new to the database the complete tags must be written (happens if a non-db file is
-                # loaded in real)
-                def dbDiff(id):
-                    if id in self.newInDatabase:
-                        return tags.TagDifference(None, self.level.get(self.newId(id)).tags)
-                    else:
-                        return self.tagChanges[id]
-                modify.real.changeTags({self.newId(id):dbDiff(id) for id in self.tagChanges.keys()})
-            if len(self.flagChanges) > 0:
-                modify.real.changeFlags({self.newId(id):diff for id,diff in self.flagChanges.items()})
-            db.commit()
-            for path,changes in self.realFileChanges.items():
-                logger.debug("changing file tags: {0}-->{1}".format(path, changes))
-                modify.real.changeFileTags(path, changes)
-        self.level.parent.emitEvent([self.newId(id) for id in self.ids], [self.newId(id) for id in self.contents])
-        self.level.emitEvent([self.newId(id) for id in self.ids], []) # no contents changed in current level!
-        
-        if len(newFilesPaths) > 0:
-            self.level.parent.changed.emit(FileCreateDeleteEvent(newFilesPaths))
-        self.newFilesPaths = newFilesPaths # store for undo
-        
-    def undo(self):
-        if self.real:
-            db.transaction()
-            if len(self.newInDatabase) > 0:
-                db.write.deleteElements(list(self.idMap.values()))
-            majorChangesExisting = [(self.newId(id),oldMajor) for id,(oldMajor,_) in self.majorChanges.items()
-                                        if id not in self.newInDatabase]
-            if len(majorChangesExisting) > 0:
-                db.write.setMajor(majorChangesExisting)
-            contentsChangesExisting = {self.newId(id):(b,a) for id, (a,b) in self.contentsChanges.items()
-                                        if id not in self.newInDatabase}
-            if len(contentsChangesExisting) > 0:
-                modify.real.changeContents(contentsChangesExisting)
-            tagChangesExisting = {self.newId(id):diff for id,diff in self.tagChanges.items()
-                                    if id not in self.newInDatabase}
-            if len(tagChangesExisting) > 0:
-                modify.real.changeTags(tagChangesExisting, reverse = True)
-            flagChangesExisting = {self.newId(id):diff for id,diff in self.tagChanges.items()
-                                    if id not in self.newInDatabase}
-            if len(flagChangesExisting) > 0:
-                modify.real.changeFlags(flagChangesExisting, reverse = True)
-            db.commit()
-        
-        for id in set(self.ids + self.contents):
-            if id in self.newElements:
-                del self.level.parent.elements[self.newId(id)]
-            else:
-                pElem = self.level.parent.elements[self.newId(id)]
-                if id in self.majorChanges:
-                    pElem.major = self.majorChanges[id][0]
-                if id in self.tagChanges:
-                    self.tagChanges[id].revert(pElem)
-                if id in self.flagChanges:
-                    self.flagChanges[id].revert(pElem)
-                if id in self.contentsChanges:
-                    pElem.contents = self.contentsChanges[id][0].copy()
-        
-        if self.real:
-            for id in self.newInDatabase:
-                self.level.changeId(self.newId(id), id)
-                if self.newId(id) in self.level.parent:
-                    self.level.parent.changeId(self.newId(id), id)
-            db.commit()
-            for path, changes in self.realFileChanges.items():
-                logger.debug("reverting file tags: {0}<--{1}".format(path, changes))
-                modify.real.changeFileTags(path, changes, reverse = True)
-        self.level.parent.emitEvent(self.ids, self.contents)
-        self.level.emitEvent(self.ids, []) # no contents changed in current level!
-        if len(self.newFilesPaths) > 0:
-            self.level.parent.changed.emit(FileCreateDeleteEvent(None, self.newFilesPaths))
-                
-            
-
-            
 
 def idFromPath(path):
     """Return the id for the given path. For elements in the database this is a positive number. Otherwise
@@ -624,6 +434,12 @@ def idFromPath(path):
     if id is not None:
         return id
     else: return tIdFromPath(path)
+
+def pathFromId(id):
+    if id < 0:
+        return pathFromTId(id)
+    else:
+        return db.path(id)
 
 _currentTId = 0 # Will be decreased by one every time a new TID is assigned
 _tIds = {} # TODO: Is there any chance that items will be removed from here?

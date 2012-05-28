@@ -39,20 +39,6 @@ def mapRecursively(f,aList):
         else: result.append(f(item))
     return result
 
-
-def ranges(lst):
-    #TODO: comment
-    def helper(lst, first, cur, result):
-        if len(lst) == 0:
-            return result + [(first,cur)]
-        if lst[0][1] == cur + 1:
-            return helper(lst[1:], first, cur+1, result)
-        return helper(lst[1:], lst[0][1], lst[0][1], result + [(first,cur)])
-    if len(lst) <= 1:
-        return list(map(lambda x: (x,x), lst))
-    return helper(list(enumerate(lst[1:])), lst[0], lst[0], list())
-
-
 def dictOrIdentity(dct):
     """Returns a function that returns dct[x] if x in dct and x otherwise."""
     return lambda x : dct[x] if x in dct else x

@@ -29,8 +29,13 @@ logger = logging.getLogger(__name__)
 
 
 def createNewElements(level, ids, idMap = None):
+    """Creates database entries for the elements with *ids* in *level*, returning a
+    dictionary mapping the temporary ids to the new (positive) ones. This map may be 
+    given in advance via the *idMap* argument, if the database IDs are not to be chosen
+    automatically.
     """
-    """
+    if len(ids) == 0:
+        return {}
     elements = [ level.get(id) for id in ids ]
     specs = [ (True, len(element.parents)==0, 0, False)
                  if element.isFile()

@@ -29,7 +29,7 @@ from ..search import searchbox, criteria as criteriaModule
 from . import mainwindow, treeview, browserdialog
 from .delegates import browser as browserdelegate, configuration as delegateconfiguration
 from ..models import browser as browsermodel
-from ..modify import treeactions
+from . import treeactions
 
 
 translate = QtCore.QCoreApplication.translate

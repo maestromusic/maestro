@@ -16,15 +16,14 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-# TODO: Move view-specific treeactions to the corresponding modules
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from . import commands
-from .. import application, database as db
+from .. import application, database as db, utils
 from ..constants import DB, DISK, CONTENTS
-from ..core import levels, tags
+from ..core import levels, tags, commands
 from ..core.nodes import RootNode, Wrapper
+from ..models import rootedtreemodel
 
 translate = QtGui.QApplication.translate
 
@@ -54,6 +53,10 @@ class TreeAction(QtGui.QAction):
     
     def doAction(self):
         raise NotImplementedError()
+    
+    def level(self):
+        """A shorthand function to determine the level of the treeview's model."""
+        return self.parent().model().level
 
 
 class EditTagsAction(TreeAction):
@@ -140,9 +143,9 @@ class DeleteAction(TreeAction):
                                     or isinstance(element.parent, RootNode)
                                 for element in selection.elements()))
         elif self.mode == DB:
-            self.setEnabled(self.parent().level == REAL and selection.hasElements())
+            self.setEnabled(self.parent().level is levels.real and selection.hasElements())
         elif self.mode == DISK:
-            self.setEnabled(self.parent().level == REAL and selection.hasFiles())
+            self.setEnabled(self.parent().level is levels.real and selection.hasFiles())
         
     def doAction(self):
         model = self.parent().model()
@@ -225,6 +228,40 @@ class MergeAction(TreeAction):
                 application.stack.push(rootChangeCom)
                 application.stack.endMacro()
 
+class ClearTreeAction(TreeAction):
+    """This action clears a tree model using a simple ChangeRootCommand."""
+    
+    def __init__(self, parent):
+        super().__init__(parent, shortcut = "Shift+Del")
+        self.setIcon(utils.getIcon("clear_playlist.png"))
+        self.setText(self.tr('clear'))
+    
+    def initialize(self):
+        self.setEnabled(self.parent().model().root.getContentsCount() > 0)
+    
+    def doAction(self):
+        model = self.parent().model()
+        application.stack.push(rootedtreemodel.ChangeRootCommand(model,
+                                      [node.element.id for node in model.root.contents],
+                                      [],
+                                      self.tr('clear view')))
+
+class CommitTreeAction(TreeAction):
+    
+    def __init__(self, parent):
+        super().__init__(parent, shortcut = "Shift+Enter")
+        self.setIcon(QtGui.qApp.style().standardIcon(QtGui.QStyle.SP_DialogSaveButton))
+        self.setText(self.tr('commit this tree'))
+        
+    def initialize(self):
+        self.setEnabled(len(self.parent().model().root.contents) > 0)
+        
+    def doAction(self):
+        from ..core import levels
+        model = self.parent().model()
+        ids = set(n.element.id for n in self.parent().model().root.contents)
+        application.stack.push(commands.CommitCommand(model.level, ids, self.tr("Commit editor")))
+        
 class FlattenAction(TreeAction):
     """Action to "flatten out" containers, i.e. remove them and replace them by their
     children."""
@@ -239,7 +276,7 @@ class FlattenAction(TreeAction):
         from ..gui.dialogs import FlattenDialog
         dialog = FlattenDialog(parent = self.parent())
         if dialog.exec_() == QtGui.QDialog.Accepted:
-            application.commands.flatten(self.parent().level,
+            flatten(self.parent().level,
                                          self.parent().nodeSelection.elements(),
                                          dialog.recursive()
                                          )

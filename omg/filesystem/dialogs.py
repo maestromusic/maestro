@@ -22,10 +22,9 @@ from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
 from .. import application, constants, database as db, utils
-from ..core.elements import File, Container
-from ..core.nodes import RootNode
-from ..modify import commands
-from ..models.rootedtreemodel import RootedTreeModel
+from ..core import commands, levels, elements
+from .. import models
+from ..models.rootedtreemodel import RootedTreeModel, RootNode
 from ..gui import mainwindow, treeview
 from ..gui.delegates.editor import EditorDelegate
 
@@ -50,15 +49,13 @@ class MissingFilesDialog(QtGui.QDialog):
                              "provide a new path for the others."))
         label.setWordWrap(True)
         layout.addWidget(label)
-        self.filemodel = RootedTreeModel(RootNode())
+        self.filemodel = RootedTreeModel(levels.real)
         
-        elements = [ models.File.fromId(id) for id in sorted(ids)]
+        elements = [ levels.real.get(id) for id in sorted(ids)]
         self.candidateContainers = []
-        for pid in set(itertools.chain(*(db.parents(id) for id in ids))):
-            contentIDs = db.contents(pid, False)
-            if all(cid in ids for cid in contentIDs):
-                container = models.Container.fromId(pid)
-                container.check_ids = contentIDs
+        for pid in set(itertools.chain(*(element.parents for element in elements))):
+            container = levels.real.get(pid)
+            if all (cid in ids for cid in container.contents.ids):
                 self.candidateContainers.append(container)
         self.filemodel.root.setContents(elements)
         
@@ -73,7 +70,7 @@ class MissingFilesDialog(QtGui.QDialog):
                                      "Please select which of them are also to be deleted."))
         label.setWordWrap(True)
         layout.addWidget(label)
-        self.containermodel = RootedTreeModel(RootNode())
+        self.containermodel = RootedTreeModel(levels.real)
         self.containerview = treeview.TreeView()
         self.containerview.setModel(self.containermodel)
         self.containerview.setItemDelegate(EditorDelegate(self.fileview, EditorDelegate.defaultConfiguration))

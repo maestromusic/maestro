@@ -26,7 +26,7 @@ from PyQt4.QtCore import Qt
 
 from ... import covers, config
 from ...core import tags
-from ...modify import treeactions
+from ...gui import treeactions
 
 translate = QtGui.QApplication.translate
 

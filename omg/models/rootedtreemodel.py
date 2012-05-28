@@ -25,7 +25,6 @@ from .. import database as db, modify
 from ..core import levels, tags as tagsModule
 from ..core.elements import Container, ContentList
 from ..core.nodes import Node, RootNode, Wrapper
-from ..modify import treeactions
 
 
 logger = logging.getLogger(__name__)
@@ -390,44 +389,7 @@ class MergeCommand(QtGui.QUndoCommand):
                     modify.real.changeFileTags(elem.path, diff)
         del self.level.elements[self.containerID]
         self.level.emitEvent(dataIds = list(self.positionChanges.keys()),
-                             contentIds = [self.parentID] if self.elementParent else [])
-        
-    
-class ClearTreeAction(treeactions.TreeAction):
-    """This action clears a tree model using a simple ChangeRootCommand."""
-    
-    def __init__(self, parent):
-        super().__init__(parent, shortcut = "Shift+Del")
-        self.setIcon(utils.getIcon("clear_playlist.png"))
-        self.setText(self.tr('clear'))
-    
-    def initialize(self):
-        self.setEnabled(self.parent().model().root.getContentsCount() > 0)
-    
-    def doAction(self):
-        model = self.parent().model()
-        application.stack.push(ChangeRootCommand(model,
-                                      [node.element.id for node in model.root.contents],
-                                      [],
-                                      self.tr('clear view')))
-
-class CommitTreeAction(treeactions.TreeAction):
-    
-    def __init__(self, parent):
-        super().__init__(parent, shortcut = "Shift+Enter")
-        self.setIcon(QtGui.qApp.style().standardIcon(QtGui.QStyle.SP_DialogSaveButton))
-        self.setText(self.tr('commit this tree'))
-        
-    def initialize(self):
-        self.setEnabled(len(self.parent().model().root.contents) > 0)
-        
-    def doAction(self):
-        from ..core import levels
-        model = self.parent().model()
-        ids = set(n.element.id for n in self.parent().model().root.contents)
-        application.stack.push(levels.CommitCommand(model.level, ids, self.tr("Commit editor")))
-
-            
+                             contentIds = [self.parentID] if self.elementParent else [])            
 
 class ChangeRootCommand(QtGui.QUndoCommand):
     def __init__(self, model, old, new, text = "<change root>"):

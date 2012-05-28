@@ -36,7 +36,7 @@ def init():
     if config.options.filesystem.disable:
         return
     syncThread = FileSystemSynchronizer()
-    null = open(os.devnull)    
+    null = open(os.devnull)
     levels.real.changed.connect(syncThread.handleEvent, Qt.QueuedConnection)
     notifier = Notifier()
     syncThread.missingFilesDetected.connect(notifier.notifyAboutMissingFiles)
@@ -344,15 +344,16 @@ class FileSystemSynchronizer(QtCore.QThread):
             missingIDs = self.lostFiles[:]
             if len(self.missingFiles) > 0:
                 missingIDs.extend(list(zip(*self.missingFiles.values()))[1])
-            self.dialogFinished.clear()
-            self.missingFilesDetected.emit(missingIDs)
-            self.dialogFinished.wait()
+            #self.dialogFinished.clear()
+            #self.missingFilesDetected.emit(missingIDs)
+            #self.dialogFinished.wait()
             
         logger.debug('rescanned collection')    
         
     @QtCore.pyqtSlot(list)
     def handleEvent(self, event):
         if isinstance(event, levels.FileCreateDeleteEvent):
+            db.transaction()
             if len(event.created) > 0:
                 # files added to DB -> check if folders have changed
                 for path in event.created:
@@ -378,9 +379,7 @@ class FileSystemSynchronizer(QtCore.QThread):
                             break
                     if not folderStillUnsynced:
                         logger.debug('previously unsynced folder now ok: {}'.format(folder))
-                        db.transaction()
                         self.updateFolderState(folder, 'ok', True)
-                        db.commit()
                     
             if len(event.deleted) > 0:
                 byFolder = utils.groupFilePaths(event.deleted)
@@ -397,16 +396,30 @@ class FileSystemSynchronizer(QtCore.QThread):
                             
                     else:
                         self.updateFolderState(folder, 'unsynced', True)
+            db.commit()
+        elif isinstance(event, levels.FileRenameEvent):
+            db.transaction()
+            for old, new in event.renamings:
+                if old in self.knownNewFiles:
+                    self.knewnNewFiles[new] = self.knownNewFiles[old]
+                    del self.knownNewFiles[old]
+                    db.query("UPDATE {}newfiles SET path=? WHERE path=?".format(db.prefix), new, old)
+                elif old in self.dbFiles:
+                    self.dbFiles.remove(old)
+                    self.dbFiles.append(new)
+            db.commit()
+                    
         
     def computeAndStoreHash(self, path):
         """Compute the hash of the file at *path* (or fetch it from self.knownNewFiles
         if available) and set it in the database."""
+        db.transaction()
+        logger.debug("computing hash of {}".format(path))
         if path in self.knownNewFiles:
             hash = self.knownNewFiles[path][0]
             del self.knownNewFiles[path]
         else:
             hash = computeHash(path)
-        db.transaction()
         db.setHash(path, hash)
         self.dbFiles.append(path)
         db.query('DELETE FROM {}newfiles WHERE path = ?'.format(db.prefix), path)
@@ -427,7 +440,8 @@ class FileSystemSynchronizer(QtCore.QThread):
             self.lastScan = time.time()
            
     def run(self):
-        db.connect()
+        logger.debug('Filesystem connecting with thread {}'.format(QtCore.QThread.currentThreadId()))
+        db.connect(isolation_level = None)
         # initially fill self.knownFolders so that the FilesystemBrowser displays folder icons
         for folder, state in db.query('SELECT path,state FROM {}folders'.format(db.prefix)):
             self.knownFolders[folder] = state

@@ -426,7 +426,7 @@ def removeTagType(tagType):
     if tagType == TITLE or tagType == ALBUM:
         raise ValueError("Cannot remove title or album tag.")
     
-    from . import database as db
+    from .. import database as db
     db.query("DELETE FROM {}tagids WHERE id=?".format(db.prefix),tagType.id)
     db.commit()
     del _tagsByName[tagType.name]
@@ -487,10 +487,9 @@ def changeTagType(tagType,**data):
     
     if len(assignments) > 0:
         params.append(tagType.id) # for the where clause
-        from . import database as db
+        from .. import database as db
         db.query("UPDATE {}tagids SET {} WHERE id = ?"
                     .format(db.prefix,','.join(assignments)),*params)
-        db.commit()
         application.dispatcher.changes.emit(TagTypeChangedEvent(CHANGED,tagType))
 
 
