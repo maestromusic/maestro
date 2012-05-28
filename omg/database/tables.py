@@ -155,9 +155,9 @@ CREATE TABLE {0}files (
 "CREATE INDEX files_hash_idx ON {}files (hash)".format(db.prefix),
 "CREATE INDEX files_length_idx ON {}files (length)".format(db.prefix),
 """
-CREATE TRIGGER files_timestamp_trg AFTER UPDATE ON {}files
+CREATE TRIGGER files_timestamp_trg AFTER UPDATE ON {0}files
 BEGIN
-UPDATE files SET verified = CURRENT_TIMESTAMP WHERE element_id = new.element_id;
+UPDATE {0}files SET verified = CURRENT_TIMESTAMP WHERE element_id = new.element_id;
 END
 """.format(db.prefix)
 )
@@ -366,9 +366,9 @@ CREATE TABLE {}newfiles (
 "CREATE INDEX newfiles_path_idx ON {}newfiles (path)".format(db.prefix),
 "CREATE INDEX newfiles_hash_idx ON {}newfiles (hash)".format(db.prefix),
 """
-CREATE TRIGGER newfiles_timestamp_trg AFTER UPDATE ON {}newfiles
+CREATE TRIGGER newfiles_timestamp_trg AFTER UPDATE ON {0}newfiles
 BEGIN
-UPDATE newfiles SET verified = CURRENT_TIMESTAMP WHERE path = new.path;
+UPDATE {0}newfiles SET verified = CURRENT_TIMESTAMP WHERE path = new.path;
 END
 """.format(db.prefix)
 )
