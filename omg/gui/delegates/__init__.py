@@ -183,14 +183,9 @@ class StandardDelegate(AbstractDelegate):
             self.addCenter(MultiTextItem(leftTexts,rightTexts))
         
         # Path
-        self.layoutPath(element)
-    
-    def layoutPath(self, element):
         if self.config.options['showPaths'].value and element.isFile():
-            if element.path is None:
-                element.path = db.path(element.id)
-            self.addCenter(TextItem(element.path,ITALIC_STYLE))
             self.newRow()
+            self.addCenter(TextItem(element.path,ITALIC_STYLE))
         
     def appendAncestors(self,element,ancestors,ancestorIds,filter,onlyMajor):
         """Recursively add all ancestors of *element* to the list *ancestors* and their ids to the list
