@@ -20,7 +20,7 @@ from PyQt4.QtCore import Qt
 
 from omg import application
 from omg.gui import treeview, treeactions, delegates
-from omg.gui.delegates import configuration
+from omg.gui.delegates import configuration, abstractdelegate
 from omg.models import editor
 from omg.core.commands import CommitCommand
 from . import plugin
@@ -55,12 +55,16 @@ class PathDelegate(delegates.StandardDelegate):
                 {"showPaths": True, 'showMajor': False, 'appendRemainingTags': False, 'showAllAncestors': False}
     )
     
+    def __init__(self, view): 
+        super().__init__(view) 
+        self.newPathStyle = abstractdelegate.DelegateStyle(1, False, True, Qt.red) 
+        self.result = {} 
+        
     def addPath(self, element):
         if element.isFile() and element.id in self.result:
             self.addCenter(delegates.TextItem(element.path,delegates.ITALIC_STYLE))
             self.newRow()
-            newPathStyle = abstractdelegate.DelegateStyle(1, False, True, Qt.red)
-            self.addCenter(delegates.TextItem(self.result[element.id], newPathStyle))
+            self.addCenter(delegates.TextItem(self.result[element.id], self.newPathStyle))
             
     
 class RenameDialog(QtGui.QDialog):
