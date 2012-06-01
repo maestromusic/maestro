@@ -71,6 +71,8 @@ def run(cmdConfig=[],exitPoint=None,console=False):
         - 'tags':      Stop after tags module has been initialized (this needs a db connection.
         - 'noplugins': Stop before plugins would be loaded
         - 'nogui':     Stop right before the GUI would be created (plugins are enabled at this point)
+        
+    If *exitPoint* is not None, this method returns the created QApplication-instance.
     
     If *console* is True, the lockfile and the (graphical) installer are turned off.
     """
@@ -91,7 +93,7 @@ def run(cmdConfig=[],exitPoint=None,console=False):
         lock()
     
     if exitPoint == 'config':
-        return
+        return app
         
     # Check for a collection directory
     if config.options.main.collection == '':
@@ -123,7 +125,7 @@ def run(cmdConfig=[],exitPoint=None,console=False):
             runInstaller()
         else: sys.exit(1)
     if exitPoint == 'database':
-        return
+        return app
         
     # Initialize tags
     from .core import tags,flags
@@ -135,7 +137,7 @@ def run(cmdConfig=[],exitPoint=None,console=False):
         else: sys.exit(1)
     flags.init()
     if exitPoint == 'tags':
-        return
+        return app
         
     # Load and initialize remaining modules
     from .core import levels
@@ -149,7 +151,7 @@ def run(cmdConfig=[],exitPoint=None,console=False):
     stack = QtGui.QUndoStack()
     
     if exitPoint == 'noplugins':
-        return
+        return app
     
     # Load Plugins
     from . import plugins
@@ -157,7 +159,7 @@ def run(cmdConfig=[],exitPoint=None,console=False):
     plugins.enablePlugins()
     
     if exitPoint == 'nogui':
-        return
+        return app
         
     from . import filesystem
     filesystem.init()
@@ -276,9 +278,10 @@ def init(cmdConfig=[],exitPoint='noplugins',console=True):
         >>> tags.tagList
         ["title", "artist", "album", ...]
     
+    If *exitPoint* is not None, return the created QApplication-instance.
     Actually this method is the same as run, but with different default arguments.
     """
-    run(cmdConfig,exitPoint,console)
+    return run(cmdConfig,exitPoint,console)
 
 
 def runInstaller():
