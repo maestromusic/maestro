@@ -22,7 +22,7 @@ from PyQt4.QtCore import Qt
 from . import treeview, mainwindow, playerwidgets
 from .delegates import playlist as playlistdelegate, configuration as delegateconfig
 from .treeactions import *
-from .. import player
+from .. import player, profiles
 
 translate = QtCore.QCoreApplication.translate
 
@@ -118,8 +118,8 @@ class PlaylistWidget(QtGui.QDockWidget):
         # TODO Move stuff into a popup.    
         bottomLayout = QtGui.QHBoxLayout()
         layout.addLayout(bottomLayout)
-        self.backendChooser = playerwidgets.BackendChooser(self)
-        self.backendChooser.backendChanged.connect(self.setBackend)
+        self.backendChooser = profiles.ProfileComboBox(player.profileConf, default = state)
+        self.backendChooser.profileChosen.connect(self.setBackend)
         
         bottomLayout.addWidget(self.backendChooser)
         
@@ -130,17 +130,20 @@ class PlaylistWidget(QtGui.QDockWidget):
         bottomLayout.addStretch()
         
         self.setWidget(widget)
-        if not self.backendChooser.setCurrentProfile(state):
-            self.setBackend(self.backendChooser.currentProfile())
+        
+        self.setBackend(self.backendChooser.currentProfileName())
     
     def saveState(self):
-        return self.backendChooser.currentProfile()
+        return self.backendChooser.currentProfileName()
     
     def setBackend(self, name):
         if self.backend is not None:
             self.backend.unregisterFrontend(self)
-        backend = player.instance(name)
-        backend.registerFrontend(self)
+        if name is not None:
+            backend = player.profileConf[name]
+            backend.registerFrontend(self)
+        else:
+            backend = None
         self.backend = backend
         self.treeview.setBackend(self.backend)
         

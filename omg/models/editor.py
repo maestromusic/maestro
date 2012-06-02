@@ -19,11 +19,10 @@
 from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
-from .. import application, config
+from .. import application, config, utils
 from ..core import levels
-from ..core.nodes import RootNode, Wrapper
+from ..core.nodes import Wrapper
 from ..models import rootedtreemodel, wrappertreemodel, albumguesser
-from ..utils import collectFiles
         
         
 class EditorModel(wrappertreemodel.WrapperTreeModel):
@@ -37,6 +36,8 @@ class EditorModel(wrappertreemodel.WrapperTreeModel):
         super().__init__(level)
         if ids:
             self.changeContents(QtCore.QModelIndex(), ids)
+        if level is not None:
+            level.changed.connect(self._handleLevelChanged)
 
     def supportedDropActions(self):
         return Qt.CopyAction | Qt.MoveAction
@@ -95,7 +96,7 @@ class EditorModel(wrappertreemodel.WrapperTreeModel):
     def prepareURLs(self, urls, parent):
         '''This method is called if url MIME data is dropped onto this model, from an external file manager
         or a filesystembrowser widget.'''
-        files = collectFiles(sorted(url.path() for url in urls))
+        files = utils.collectFiles(sorted(url.path() for url in urls))
         numFiles = sum(len(v) for v in files.values())
         progress = QtGui.QProgressDialog()
         progress.setLabelText(self.tr("Importing {0} files...").format(numFiles))
@@ -121,6 +122,18 @@ class EditorModel(wrappertreemodel.WrapperTreeModel):
         except levels.ElementGetError as e:
             print(e)
             return []
+        
+            
+    def _handleLevelChanged(self, event):
+        dataIds = event.dataIds
+        contentIds = event.contentIds
+        for node, contents in utils.walk(self.root):
+            if isinstance(node, Wrapper):
+                if node.element.id in dataIds:
+                    self.dataChanged.emit(self.getIndex(node), self.getIndex(node))
+                if node.element.id in contentIds:
+                    self.changeContents(self.getIndex(node), self.level.get(node.element.id).contents)
+                    contents[:] = [wrapper for wrapper in contents if wrapper in node.contents ]
 
 class InsertCommand(QtGui.QUndoCommand):
     """A command to insert elements into a container in a level."""

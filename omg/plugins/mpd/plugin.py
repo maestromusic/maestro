@@ -21,7 +21,7 @@ import mpd, functools, threading
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from ... import player, config, logging
+from ... import player, config, logging, profiles
 from ...models import playlist
 from ...player import STOP, PLAY, PAUSE
 
@@ -43,14 +43,14 @@ class MPDThread(QtCore.QThread):
     are handled by the *_handleMainChange* slot."""
     changeFromMPD = QtCore.pyqtSignal(str, object)
     
-    def __init__(self, backend, connectionData):
+    def __init__(self, backend, host, port, password):
         super().__init__(None)
         self.timer = QtCore.QTimer(self)
         self.moveToThread(self)
         self.timer.moveToThread(self)
         self.timer.timeout.connect(self.poll)
         self.backend = backend
-        self.connectionData = connectionData
+        self.host, self.port, self.password = host, port, password
         self.playlistVersion = self.state   = \
             self.currentSong = self.elapsed = \
             self.currentSongLength = self.volume = None
@@ -244,8 +244,8 @@ class MPDThread(QtCore.QThread):
     def connect(self):
         import socket
         try:
-            self.client.connect(host = self.connectionData['host'],
-                        port = self.connectionData['port'],
+            self.client.connect(host = self.host,
+                        port = self.port,
                         timeout = CONNECTION_TIMEOUT)
             self._updateAttributes(emit = False)
             self.changeFromMPD.emit('init_done',
@@ -288,18 +288,15 @@ class MPDThread(QtCore.QThread):
             
             
 class MPDPlayerBackend(player.PlayerBackend):
+    
+    className = "MPD"
     changeFromMain = QtCore.pyqtSignal(str, object)
     
-    def __init__(self, name):
+    def __init__(self, name, host = 'localhost', port = '6600', password = None):
         super().__init__(name)
         self.playlist = playlist.PlaylistModel(self)
         self.paths = []
-        try:
-            data = config.storage.mpd.profiles[self.name]
-        except KeyError:
-            logger.warning("no MPD config found for profile {} - using default".format(self.name))
-            data = default_data
-        self.mpdthread = MPDThread(self, data)
+        self.mpdthread = MPDThread(self, host, port, password)
         self.mpdthread.changeFromMPD.connect(self._handleMPDChange, Qt.QueuedConnection)
         self.changeFromMain.connect(self.mpdthread._handleMainChange)
         self.mpdthread.start()
@@ -322,6 +319,9 @@ class MPDPlayerBackend(player.PlayerBackend):
                 "_insertIntoPlaylist", "_removeFromPlaylist", "nextSong",
                 "previousSong", "setVolume", "_move"):
             setattr(self, what, functools.partial(_emitChange, what))
+    
+    def config(self):
+        return self.mpdthread.host, self.mpdthread.port, self.mpdthread.password
     
     @QtCore.pyqtSlot(str, object)
     def _handleMPDChange(self, what, how):
@@ -398,18 +398,19 @@ class MPDPlayerBackend(player.PlayerBackend):
         
     def move(self,fromOffset,toOffset):
         self._move((fromOffset,toOffset))
-            
-    @staticmethod
-    def configWidget(profile = None):
+    
+    @classmethod
+    def configurationWidget(cls, profile = None):
         """Return a config widget, initialized with the data of the given *profile*."""
-        return MPDConfigWidget(None, profile)
+        return MPDConfigWidget(profile)
         
     def __str__(self):
         return "MPDPlayerBackend({})".format(self.name)
 
-class MPDConfigWidget(QtGui.QWidget):
-    def __init__(self, parent = None, profile = None):
-        super().__init__(parent)
+class MPDConfigWidget(profiles.ConfigurationWidget):
+    
+    def __init__(self, profile = None):
+        super().__init__()
         layout = QtGui.QGridLayout(self)
         layout.addWidget(QtGui.QLabel(self.tr("Host:"), self), 0, 0, Qt.AlignRight)
         self.hostEdit = QtGui.QLineEdit(self)
@@ -427,52 +428,22 @@ class MPDConfigWidget(QtGui.QWidget):
         self.setProfile(profile)
     
     def setProfile(self, profile):
-        if profile is not None and profile in config.storage.mpd.profiles:
-            data = config.storage.mpd.profiles[profile]
+        if profile is None:
+            host, port, password = 'localhost', 6600, ''
         else:
-            data = default_data
-        self.hostEdit.setText(data['host'])
-        self.portEdit.setText(str(data['port']))
-        self.passwordEdit.setText(data['password'])
+            host, port, password = player.profileConf[profile].config()
+        self.hostEdit.setText(host)
+        self.portEdit.setText(str(port))
+        self.passwordEdit.setText(password)
     
-    def storeProfile(self, profile):
+    def currentConfig(self):
         host = self.hostEdit.text()
-        port = self.portEdit.text()
+        port = int(self.portEdit.text())
         password = self.passwordEdit.text()
-        profiles = config.storage.mpd.profiles
-        profiles[profile] = {'host': host, 'port': port, 'password': password}
-        config.storage.mpd.profiles = profiles
+        return (host, port, password)
         
-        
-def defaultStorage():
-    return {"SECTION:mpd":
-            {'profiles': {} } }
-
-def _handleNewProfile(name):
-    if player.configuredBackends[name] == 'mpd':
-        logger.debug("adding MPD backend {}".format(name))
-        profiles = config.storage.mpd.profiles.copy()
-        profiles[name] = default_data.copy()
-        config.storage.mpd.profiles = profiles
-    else:
-        logger.debug("MPD backend ignoring profile add: {}, backend {}".format(name, player.configuredBackends[name]))
-def _handleRenameProfile(old, new):
-    logger.debug("rename profile request {} {}".format(old, new))
-    if player.configuredBackends[new] == 'mpd':
-        assert old in config.storage.mpd.profiles
-        config.storage.mpd.profiles = {
-            (new if name==old else name): conf for name,conf in config.storage.mpd.profiles.items()}
-def _handleRemoveProfile(name):
-    if name in config.storage.mpd.profiles:
-        profiles = config.storage.mpd.profiles 
-        del profiles[name]
-        config.storage.mpd.profiles = profiles
-
 def enable():
-    player.backendClasses['mpd'] = MPDPlayerBackend
-    player.notifier.profileAdded.connect(_handleNewProfile)
-    player.notifier.profileRenamed.connect(_handleRenameProfile)
-    player.notifier.profileRemoved.connect(_handleRemoveProfile)
+    player.profileConf.addClass(MPDPlayerBackend)
 
 def disable():
-    del player.backendClasses['mpd']
+    player.profileConf.removeClass(MPDPlayerBackend)

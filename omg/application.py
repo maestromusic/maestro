@@ -172,8 +172,6 @@ def run(cmdConfig=[],exitPoint=None,console=False):
     
     delegateconfiguration.load()
     
-    from . import player
-    player.init()
     mainWindow = mainwindow.MainWindow()
     plugins.mainWindowInit()
     
