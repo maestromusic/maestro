@@ -87,8 +87,7 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
     def _buildWrappersFromPaths(self,paths):
         """Build wrappers for the given paths and if possible add containers. In other words: convert a flat
         playlist to a tree playlist."""
-        levels.real.loadPaths(paths)
-        files = [Wrapper(self.level.get(path)) for path in paths]
+        files = [Wrapper(element) for element in self.level.getFromPaths(paths)]
         wrappers = treebuilder.buildTree(self.level,files)
         for i in range(len(wrappers)):
             while wrappers[i].getContentsCount() == 1:
@@ -143,10 +142,7 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         else:
             paths = [utils.relPath(path) for path in itertools.chain.from_iterable(
                                     utils.collectFiles(u.path() for u in mimeData.urls()).values())]
-                
-            #TODO create a shortcut for the following lines (this calls db.idFromPath twice for each element)
-            self.level.loadPaths(paths) 
-            wrappers = [self.level.get(path) for path in paths]
+            wrappers = [Wrapper(element) for element in self.level.getFromPaths(paths)]
                
         self.insert(parent,position,wrappers)
         application.stack.endMacro()
@@ -233,8 +229,7 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         
     def insertPathsAtOffset(self,offset,paths,updateBackend=True):
         """Insert the given paths at the given offset."""
-        self.level.loadPaths(paths)
-        wrappers = [Wrapper(self.level.get(path)) for path in paths]
+        wrappers = [Wrapper(element) for element in self.level.getFromPaths(paths)]
         file = self.root.fileAtOffset(offset,allowFileCount=True)
         if file is None:
             parent = self.root

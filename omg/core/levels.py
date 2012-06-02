@@ -102,7 +102,7 @@ class Level(QtCore.QObject):
             self.parent.loadIntoChild([param],self)
         return self.elements[param]
     
-    def load(self,ids,ignoreUnknownTags=False):
+    def getFromIds(self,ids,ignoreUnknownTags=False):
         """Load all elements given by the list of ids *ids* into this level (do nothing for elements which
         are already loaded."""
         notFound = []
@@ -110,6 +110,12 @@ class Level(QtCore.QObject):
             if id not in self.elements:
                 notFound.append(id)
         self.parent.loadIntoChild(notFound,self,ignoreUnknownTags)
+        return [self.elements[id] for id in ids]
+                
+    def getFromPaths(self,paths,ignoreUnknownTags=False):
+        """Load elements for the given paths and return them."""
+        ids = [idFromPath(path) for path in paths]
+        return self.getFromIds(ids,ignoreUnknownTags)
         
     def loadIntoChild(self,ids,child,ignoreUnknownTags=False):
         """Load all elements given by the list of ids *ids* into the level *child*. Do not check whether
@@ -120,10 +126,6 @@ class Level(QtCore.QObject):
                 child.elements[id] = self.elements[id].copy(child)
             else: notFound.append(id)
         self.parent.loadIntoChild(notFound,self,ignoreUnknownTags)
-                
-    def loadPaths(self,paths,ignoreUnknownTags=False):
-        ids = [idFromPath(path) for path in paths]
-        self.load(ids,ignoreUnknownTags)
         
     def __contains__(self, id):
         """Returns if the given id is loaded in this level. Note that if the id could be loaded from the

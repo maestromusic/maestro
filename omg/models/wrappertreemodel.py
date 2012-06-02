@@ -115,10 +115,7 @@ class WrapperTreeModel(rootedtreemodel.RootedTreeModel):
         else:
             paths = [utils.relPath(path) for path in itertools.chain.from_iterable(
                                     utils.collectFiles(u.path() for u in mimeData.urls()).values())]
-                
-            #TODO create a shortcut for the following lines (this calls db.idFromPath twice for each element)
-            levels.real.loadPaths(paths) 
-            wrappers = [Wrapper(levels.real.get(path)) for path in paths]
+            wrappers = [Wrapper(element) for element in levels.real.getFromPaths(paths)]
         
         # Compute drop position
         if parentIndex.isValid():
