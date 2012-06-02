@@ -109,6 +109,11 @@ class ProfileConfiguration(QtCore.QObject):
         self.saveConfig()
         self.profileModified.emit(name)
     
+    def profileChooser(self, *args, **kwargs):
+        """Creates a profile combo box for this configuration. All other arguments
+        of the ProfileComboBox constructor may be passed."""
+        return ProfileComboBox(self, *args, **kwargs)
+    
     def configurationDisplay(self, currentProfile = None, parent = None):
         return ProfileConfigurationDisplay(self, currentProfile, parent)
     

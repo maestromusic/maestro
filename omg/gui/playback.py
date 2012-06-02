@@ -22,10 +22,9 @@ from PyQt4.QtCore import Qt
 from . import mainwindow, playerwidgets
 from .. import player, utils, logging
 
-
 translate = QtCore.QCoreApplication.translate
-logger = logging.getLogger("omg.playback")
 
+logger = logging.getLogger(__name__)
 
 def formatTime(seconds):
     seconds = int(seconds)
@@ -40,9 +39,9 @@ class PlaybackWidget(QtGui.QDockWidget):
         self.setWindowTitle(self.tr('playback controls'))
         widget = QtGui.QWidget()
         self.setWidget(widget)
-        
+        self.backend = None
         topLayout = QtGui.QHBoxLayout()
-        self.backendChooser = playerwidgets.BackendChooser(self)
+        self.backendChooser = player.profileConf.profileChooser(default = state)
         topLayout.addWidget(self.backendChooser)
         
         policy = QtGui.QSizePolicy()
@@ -85,10 +84,9 @@ class PlaybackWidget(QtGui.QDockWidget):
         mainLayout = QtGui.QVBoxLayout(widget)
         mainLayout.addLayout(topLayout)
         mainLayout.addLayout(bottomLayout)
-        self.backendChooser.backendChanged.connect(self.setBackend)
+        self.backendChooser.profileChosen.connect(self.setBackend)
         self.seekSlider.sliderMoved.connect(self.updateSeekLabel)
-        if not self.backendChooser.setCurrentProfile(state):
-            self.setBackend(self.backendChooser.currentProfile())
+        self.setBackend(self.backendChooser.currentProfileName())
     
     def updateSeekLabel(self, value):
         self.seekLabel.setText("{}-{}".format(formatTime(value), formatTime(self.seekSlider.maximum())))
@@ -133,7 +131,7 @@ class PlaybackWidget(QtGui.QDockWidget):
             
     def setBackend(self, name):
         logger.debug("setBackend {}".format(name))
-        if hasattr(self, 'backend'):
+        if self.backend is not None:
             self.backend.elapsedChanged.disconnect(self.updateSlider)
             self.backend.volumeChanged.disconnect(self.volumeLabel.setVolume)
             self.volumeLabel.volumeRequested.disconnect(self.backend.setVolume)
@@ -147,13 +145,9 @@ class PlaybackWidget(QtGui.QDockWidget):
             self.backend.unregisterFrontend(self)
         if name is None:
             self.titleLabel.setText(self.tr('no backend selected'))
+            self.backend = None
             return
-        backend = player.instance(name)
-        if backend is None:
-            self.titleLabel.setText(self.tr('could not set playback profile {} because its '
-                                            'backend class is not available. Did you forget ' 
-                                            'to enable a plugin?').format(name))
-            return
+        backend = player.profileConf[name]
         self.backend = backend 
         self.backend.elapsedChanged.connect(self.updateSlider)
         self.backend.stateChanged.connect(self.updateState)
