@@ -409,7 +409,7 @@ class MainSection(Section):
 
     def _pprintSection(self,section,nesting):
         """Helper for pprint: PPrint a section."""
-        print(("    "*(nesting-1))+('['*nesting)+section._name+(']'*nesting))
+        print(("    "*(nesting-1))+('['*nesting)+section.name+(']'*nesting))
         for member in section.members.values():
             if isinstance(member,Section):
                 print()

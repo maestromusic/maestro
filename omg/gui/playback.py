@@ -168,7 +168,7 @@ class PlaybackWidget(QtGui.QDockWidget):
         
     
     def saveState(self):
-        return self.backendChooser.currentProfile()
+        return self.backendChooser.currentProfileName()
     
 data = mainwindow.WidgetData(id = "playback",
                              name = translate("Playback","playback"),
