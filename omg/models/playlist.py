@@ -50,7 +50,6 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
     def setCurrent(self, offset):
         """Set the currently playing song to the song with the given offset. If offset is negative, no song
         is currenlty playing."""
-        print("setCurrent {}".format(offset))
         if offset < 0:       
             self.clearCurrent() 
         else:
@@ -270,16 +269,15 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         # - we might remove wrappers making a parent node empty,
         # - after any removal adjacent wrappers may be glued
         # While we could easily calculate a new position taking the first effect into account, this is
-        # difficult for the other ones. Therefore we mark the insert position with a special node.
-        # By the way this avoids that nodes after the insert position are glued with nodes before the
-        # insert position.
+        # difficult for the other ones. Therefore we mark the insert position with a special wrapper.
         # We use the super()-methods when we don't want fancy stuff like glueing
-        # We use _dontGlueAway to avoid the following problem: Assume the playlist contains the containers
+        # We use _dontGlueAway to avoid the following problems: Assume the playlist contains the containers
         # A, B, A. If we now move B into one of the A-containers, both A-containers are glued. This might
-        # delete our insert parent!
-        marker = Marker()
+        # delete our insert parent! Similarly nodes behind the before position might be glued with nodes
+        # behind it.
+        marker = Wrapper(wrappers[0].element)
         super().insert(parent,position,[marker])
-        self._dontGlueAway = parent
+        self._dontGlueAway = [parent,marker]
         self.removeWrappers(wrappers,updateBackend=False)
         position = parent.index(marker)
         super().removeMany([(parent,position,position)])
@@ -351,8 +349,8 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         Glue also might glue several layers and works below arbitrary parent nodes (not only the root-node
         as in the example above.
         
-        It is unspecified which wrapper will be removed when two wrappers are glued. The variable
-        _dontGlueAway may be used to save a single node from being removed in a glue.
+        It is unspecified which wrapper will be removed when two wrappers are glued. The list
+        self._dontGlueAway may be used to save some nodes from being removed in a glue.
         """
         #print("This is glue for parent {} at {}".format(parent,position))
         if position == 0 or position == parent.getContentsCount():
@@ -364,14 +362,14 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         
         while len(postParentIds) and len(preParentIds):
             pos = utils.rfind(postParentIds,preParentIds[-1])
-            if pos >= 0 and preParents[-1] != self._dontGlueAway:
+            if pos >= 0 and (self._dontGlueAway is None or preParents[-1] not in self._dontGlueAway):
                 self.merge(preParents[-1],postParents[pos],firstIntoSecond=True)
                 del preParentIds[-1]
                 del preParents[-1]
                 del postParentIds[pos:]
                 continue
             pos = utils.rfind(preParentIds,postParentIds[-1])
-            if pos >= 0 and postParents[-1] != self._dontGlueAway:
+            if pos >= 0 and (self._dontGlueAway is None or postParents[-1] not in self._dontGlueAway):
                 self.merge(preParents[pos],postParents[-1],firstIntoSecond=False)
                 del preParentIds[pos:]
                 del postParentIds[-1]
@@ -513,10 +511,3 @@ class ConditionalCommand(QtGui.QUndoCommand):
     def undo(self):
         if not self.onRedo:
             self.method()
-            
-
-class Marker(Node):
-    """Special node that is used to mark the position where nodes should be inserted during a move. When
-    removing the nodes that move this position might change in complicated ways due to glueing and removing
-    empty parents."""
-    contents = []

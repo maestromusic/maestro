@@ -105,11 +105,8 @@ class MPDThread(QtCore.QThread):
         
         elif what == "_move":
             fromOffset,toOffset = how
-            # Moving to adjacent offsets doesn't change anything
-            if toOffset not in (fromOffset,fromOffset+1):
+            if fromOffset != toOffset:
                 file = self.mpd_playlist.pop(fromOffset)
-                if fromOffset < toOffset:
-                    toOffset -= 1
                 self.mpd_playlist.insert(toOffset,file)
                 self.client.move(fromOffset,toOffset)
                 self.playlistVersion += 1
