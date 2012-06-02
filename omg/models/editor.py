@@ -104,17 +104,22 @@ class EditorModel(wrappertreemodel.WrapperTreeModel):
         progress.setMinimumDuration(200)
         progress.setWindowModality(Qt.WindowModal)
         filesByFolder = {}
-        
+        ids = []
         try:
             # load files into editor level
             for folder, filesInOneFolder in files.items():
                 filesByFolder[folder] = []
                 for file in filesInOneFolder:
                     progress.setValue(progress.value() + 1)
-                    filesByFolder[folder].append(self.level.get(file))
+                    element = self.level.get(file)
+                    filesByFolder[folder].append(element)
+                    ids.append(element.id)
+                    
             progress.close()
             # call album guesser
-            if self.guessProfile is not None:
+            if self.guessProfile is None:
+                return ids
+            else:
                 profile = albumguesser.profileConfig[self.guessProfile]
                 profile.guessAlbums(self.level, filesByFolder)
                 return profile.albums + profile.singles
