@@ -21,7 +21,7 @@ import collections
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from . import config, logging
+from . import config, logging, profiles
 
 logger = logging.getLogger(__name__)
 
@@ -29,84 +29,13 @@ STOP, PLAY, PAUSE = range(3)
 DISCONNECTED, CONNECTING, CONNECTED = range(3)
 
 
-configuredBackends = collections.OrderedDict() # map profile name -> backend name
-backendClasses = collections.OrderedDict() # map mackend name -> backend class (subclass of PlayerBackend)
-
 _runningBackends = {}
 
-
-def init():
-    """Initialize the module. Reads profiles in the storage. Call this once at application startup."""
-    global configuredBackends
-    for name, backend in config.storage.player.configured_players:
-        configuredBackends[name] = backend
-    updateConfig()
-    
-    
-def updateConfig():
-    """Update information about configured player backends in the storage.""" 
-    config.storage.player.configured_players = list(configuredBackends.items()) #hack: trick config.storage! #TODO: what trick?
+profileConf = profiles.ProfileConfiguration("playback", config.storage.player, [])
 
 
-def instance(name):
-    """Returns the instance of the player backend according to the given profile name.
-    If the instance does not yet exist, it is created."""
-    if name not in _runningBackends:
-        if configuredBackends[name] not in backendClasses:
-            logger.warning('Could not load playback profile {} because backend {} is not available. '
-                           'Did you forget to load the plugin?'.format(
-                  name, configuredBackends[name]))
-            return None
-        _runningBackends[name] = backendClasses[configuredBackends[name]](name)
-    return _runningBackends[name]
-
-
-class ProfileNotifier(QtCore.QObject):
-    """A notifier class which emits signals when profiles are renamed, added, or removed."""
-    profileRenamed = QtCore.pyqtSignal(str, str) # old name, new name
-    profileAdded = QtCore.pyqtSignal(str, str) # profile name, backend name
-    profileRemoved = QtCore.pyqtSignal(str)
-    
-    def __init__(self):
-        super().__init__()
-        
-        
-notifier = ProfileNotifier()
-
-# debug output
-notifier.profileRenamed.connect(lambda a, b: logger.debug("renamed profile {} to {}".format(a,b)))
-notifier.profileAdded.connect(lambda a, b: logger.debug("added profile {} class {}".format(a,b)))
-notifier.profileRemoved.connect(lambda a: logger.debug("removed profiel {}".format(a)))
-
-
-def addProfile(name, backend):
-    """Add a profile name *name* for backend *backend*. Creates the profile in configuredBackends,
-    updates the storage, and lets the ProfileNotifier emit an appropriate signal."""
-    configuredBackends[name] = backend
-    updateConfig()
-    notifier.profileAdded.emit(name, backend)
-
-
-def renameProfile(old, new):
-    """Rename profile *old* to *new*. Updates configuredBackends and the storage
-    and lets the ProfileNotifier emit an appropriate signal."""
-    global configuredBackends
-    configuredBackends = collections.OrderedDict(
-        ((new if name==old else name), backend) for name,backend in configuredBackends.items())
-    updateConfig()
-    notifier.profileRenamed.emit(old, new)
-
-
-def removeProfile(name):
-    """Remove the profile named *name*. Updates configuredBackends,
-    updates the storage, and lets the ProfileNotifier emit an appropriate signal."""
-    del configuredBackends[name]
-    updateConfig()
-    notifier.profileRemoved.emit(name)
-
-
-class PlayerBackend(QtCore.QObject):
-    """This is an abstract class for modules that implement connection to a backend
+class PlayerBackend(profiles.Profile):
+    """This is the base class for modules that implement connection to a backend
     providing audio playback and playlist management.
     
     In addition to the setter functions below, the attributes state, volume, currentSong,
@@ -120,17 +49,14 @@ class PlayerBackend(QtCore.QObject):
     Use QMetaObject.ivokeMethod() if you need to directly call a slot method."""
     #TODO: is the stuff above still valid? Seems to me that even MPDBackend runs in the main thread and uses a different thread internally
     
-    stateChanged = QtCore.pyqtSignal(int)
-    """Emits on of player.{PLAY, STOP,PAUSE} if the backend's state has changed."""
+    stateChanged = QtCore.pyqtSignal(int) #Emits on of {PLAY, STOP,PAUSE} if the backend's state has changed
     volumeChanged = QtCore.pyqtSignal(int)
     currentSongChanged = QtCore.pyqtSignal(int)
     elapsedChanged = QtCore.pyqtSignal(float, float)
     connectionStateChanged = QtCore.pyqtSignal(int)
     
     def __init__(self, name):
-        super().__init__()
-        notifier.profileRenamed.connect(self._handleProfileRename)
-        self.name = name
+        super().__init__(name)
         self.state = STOP
         self.connectionState = DISCONNECTED
         self.volume = 0
@@ -138,15 +64,6 @@ class PlayerBackend(QtCore.QObject):
         self.elapsed = 0
         self.currentSongLength = 0
         self.playlist = None
-    
-    def _handleProfileRename(self, old, new):
-        if self.name == old:
-            self.name = new
-            
-    @staticmethod
-    def configWidget(profile = None):
-        """Return a config widget, initialized with the data of the given *profile*."""
-        raise NotImplementedError()
     
     def setState(self, state):
         """Set the state of the player to one of STOP, PLAY, PAUSE."""
@@ -200,4 +117,3 @@ class PlayerBackend(QtCore.QObject):
         This may be used to stop time-consuming backend operations as soon as nobody is using
         it anymore."""
         pass
-    

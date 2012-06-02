@@ -66,6 +66,23 @@ class ProfileConfiguration(QtCore.QObject):
         self.configSection["profiles"] = configContents
         print(self.configSection["profiles"])
             
+    def addClass(self, cls):
+        if cls.className not in self.classes:
+            self.classes[cls.className] = cls
+            # load profiles for this class
+            for name, className, *config in self.configSection["profiles"]:
+                if className == cls.className:
+                    self.profiles[name] = self.classes[className](name, *config)
+                    print('initalized profile {} with *config={}'.format(name, config))
+            self.classAdded.emit(cls.className)
+    
+    def removeClass(self, cls):
+        if cls.className in self.classes:
+            toRemove = [ name for name,profile in self.profiles.items() if profile.className == cls.className ]
+            for name in toRemove:
+                self.removeProfile(name)
+            self.classRemove.emit(cls.className)
+    
     def newProfile(self, name = None, className = None):
         if name is None:
             name = self.tr("newProfile")

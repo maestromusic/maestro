@@ -25,6 +25,8 @@ from .. import database as db, realfiles, utils, config, logging
 from ..database import write as dbwrite
 from ..application import ChangeEvent
 
+import os.path
+
 real = None
 editor = None
 
@@ -120,7 +122,6 @@ class Level(QtCore.QObject):
         self.parent.loadIntoChild(notFound,self,ignoreUnknownTags)
                 
     def loadPaths(self,paths,ignoreUnknownTags=False):
-        #TODO comment
         ids = [idFromPath(path) for path in paths]
         self.load(ids,ignoreUnknownTags)
         
@@ -349,8 +350,13 @@ class RealLevel(Level):
                 fileTags = real.tags
                 length = real.length
                 fileTags.position = real.position
-            except OSError:
-                raise ElementGetError('could not open file: "{}"'.format(rpath))
+            except OSError as e:
+                if not os.path.exists(path):
+                    fileTags = tags.Storage()
+                    length = 0
+                    fileTags[tags.TITLE] = ["[NOT FOUND] {}".format(os.path.basename(rpath))]
+                else:
+                    raise ElementGetError('could not open file "{}":\n{}'.format(rpath, e))
             
             id = db.idFromPath(rpath)
             if id is None:

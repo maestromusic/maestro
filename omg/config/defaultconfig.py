@@ -153,6 +153,6 @@ storage = OrderedDict((
     'views': [[['composer','artist','performer']],[['genre'],['composer','artist','performer']]],
 }),
 ("SECTION:player", {
-    'configured_players': [],
+    'profiles': [],
 }),
 ))

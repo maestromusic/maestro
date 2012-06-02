@@ -47,8 +47,6 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
         super().__init__()
         self.root = RootNode(self) if root is None else root
         self.level = level
-        if level is not None:
-            level.changed.connect(self._handleLevelChanged)
     
     def getRoot(self):
         """Return the root node of this model."""
@@ -230,20 +228,7 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
         for wrapper in wrappers:
             wrapper.loadContents(recursive = True)
         self.data(index, Qt.EditRole).insertContents(position, wrappers) 
-        self.endInsertRows()
-        
-    def _handleLevelChanged(self, event):
-        dataIds = event.dataIds
-        contentIds = event.contentIds
-        for node, contents in utils.walk(self.root):
-            if isinstance(node, Wrapper):
-                if node.element.id in dataIds:
-                    self.dataChanged.emit(self.getIndex(node), self.getIndex(node))
-                if node.element.id in contentIds:
-                    self.changeContents(self.getIndex(node), self.level.get(node.element.id).contents)
-                    contents[:] = [wrapper for wrapper in contents if wrapper in node.contents ]
-
-            
+        self.endInsertRows()            
 
 class MergeCommand(QtGui.QUndoCommand):
     """Merge creates a new container between *parent* and the children at the given *indices*.
