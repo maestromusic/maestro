@@ -290,12 +290,11 @@ guessing. This is useful in most cases, unless you have albums that are split ac
                 tags.insert(0, item.data(Qt.UserRole))
             else:
                 tags.append(item.data(Qt.UserRole))
-        if self.regexCheck.isEnabled():
+        if self.regexCheck.isChecked():
             regex = self.regexEdit.text()
         else:
             regex = None
         return tags, self.directoryModeButton.isChecked(), regex
-            
     
     def addTag(self, action):
         newItem = QtGui.QListWidgetItem(action.text())
