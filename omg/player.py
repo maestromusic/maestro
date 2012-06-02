@@ -99,12 +99,20 @@ class PlayerBackend(profiles.Profile):
         pass
     
     def setPlaylist(self,paths):
+        """Clear the playlist and set it to the given paths."""
         pass
     
     def insertIntoPlaylist(self,pos,paths):
+        """Insert the given paths at *pos* into the playlist."""
         pass
     
     def removeFromPlaylist(self,begin,end):
+        """Remove the songs with offsets >= *begin* and < *end* from the playlist."""
+        pass
+    
+    def move(self,fromOffset,toOffset):
+        """Move a song within the playlist. If the current song is moved the player should keep playing at
+        the same position."""
         pass
      
     def registerFrontend(self, obj):

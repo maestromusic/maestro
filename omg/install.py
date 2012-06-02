@@ -673,12 +673,16 @@ class IconLabel(QtGui.QLabel):
         if result:
             self.setPath(result[1])
 
-
-if __name__ == '__main__':
+def run():
+    """Run the install tool."""
     global app
     app = QtGui.QApplication([])
     from omg import resources
     widget = InstallToolWindow()
     widget.show()
     app.exec_()
+    
+if __name__ == "__main__":
+    run()
+    
     

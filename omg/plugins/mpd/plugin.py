@@ -71,8 +71,8 @@ class MPDThread(QtCore.QThread):
     def _handleMainChange(self, what, how):
         """This slot is called by the main OMG program when the user requires a change.
         *what* is the name of one of the command methods of PlayerBackend, *how*
-        are the corresponding arguments."""
-        if what == "_setPlaylist":
+        is the corresponding argument."""
+        if what == "setPlaylist":
             self.client.clear()
             for path in how:
                 self.client.add(path)
@@ -102,6 +102,14 @@ class MPDThread(QtCore.QThread):
             
         elif what == "previousSong":
             self.client.previous()
+        
+        elif what == "_move":
+            fromOffset,toOffset = how
+            if fromOffset != toOffset:
+                file = self.mpd_playlist.pop(fromOffset)
+                self.mpd_playlist.insert(toOffset,file)
+                self.client.move(fromOffset,toOffset)
+                self.playlistVersion += 1
             
         elif what == "_insertIntoPlaylist":
             for position,path in how:
@@ -302,14 +310,14 @@ class MPDPlayerBackend(player.PlayerBackend):
         self.updateDBAction.triggered.connect(self.mpdthread.updateDB)
         
         # initialize functions that emit signals to the MPD thread on being called
-        def _emitChange(what, *args):
+        def _emitChange(what, arg):
             #if what[0]== '_': # those methods call superclass implementation first
             #    getattr(player.PlayerBackend, what)(self, *args)
-            self.changeFromMain.emit(what, *args)
+            self.changeFromMain.emit(what, arg)
             
-        for what in ("setElapsed", "setState", "setCurrentSong", "_setPlaylist",
+        for what in ("setElapsed", "setState", "setCurrentSong", "setPlaylist",
                 "_insertIntoPlaylist", "_removeFromPlaylist", "nextSong",
-                "previousSong", "setVolume"):
+                "previousSong", "setVolume", "_move"):
             setattr(self, what, functools.partial(_emitChange, what))
     
     def config(self):
@@ -345,14 +353,14 @@ class MPDPlayerBackend(player.PlayerBackend):
         elif what == 'remove':
             print("Change from MPD: remove")
             print(how)
-            self.playlist.removeByOffset(how[0][0],len(how),fromOutside=True)
+            self.playlist.removeByOffset(how[0][0],len(how),updateBackend=False)
             for pos,path in reversed(how):
                 del self.paths[pos]
         
         elif what == 'insert':
             print("Change from MPD: insert")
             print(how)
-            self.playlist.insertPathsAtOffset(how[0][0],[entry[1] for entry in how],fromOutside=True)
+            self.playlist.insertPathsAtOffset(how[0][0],[entry[1] for entry in how],updateBackend=False)
             for pos, path in how:
                 self.paths[pos:pos] = path
             
@@ -371,7 +379,6 @@ class MPDPlayerBackend(player.PlayerBackend):
     def addTreeActions(self, view):
         view.addAction(self.separator)
         view.addAction(self.updateDBAction)
-        
     
     def registerFrontend(self, obj):
         self._numFrontends += 1
@@ -389,8 +396,8 @@ class MPDPlayerBackend(player.PlayerBackend):
     def removeFromPlaylist(self,begin,end):
         self._removeFromPlaylist([(begin,'') for i in range(end-begin)])
         
-    def setPlaylist(self,paths):
-        self._setPlaylist(paths)
+    def move(self,fromOffset,toOffset):
+        self._move((fromOffset,toOffset))
     
     @classmethod
     def configurationWidget(cls, profile = None):

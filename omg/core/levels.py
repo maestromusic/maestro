@@ -212,6 +212,7 @@ class Level(QtCore.QObject):
         """Rename files based on *map*, which is a dict from ids to new paths.
         
         On a normal level, this just changes the path attributes and emits an event."""
+        #TODO: this contradicts the docstring
         for id, (_, newPath) in map.items():
             self.get(id).path = newPath
         if emitEvent:
@@ -230,7 +231,8 @@ class Level(QtCore.QObject):
         for id in ids:
             level.load(self.children(id))
         return level
-    
+
+
 class RealLevel(Level):
     def __init__(self):
         super().__init__('REAL',None)

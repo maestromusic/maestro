@@ -23,9 +23,9 @@ them. It is provided as central widget, dialog (in the extras menu) and standalo
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
+from omg import database as db, application, constants, config
+from omg.gui import mainwindow
 from . import resources, checks
-from ... import database as db, application, constants, config
-from ...gui import mainwindow
 
 
 _action = None # the action that is inserted into the Extras menu
@@ -301,16 +301,21 @@ class DBAnalyzerDialog(QtGui.QDialog):
         QtGui.QDialog.close(self)
 
 
-if __name__ == "__main__":
-    # The DBAnalyzer may be run as separate application
+def run():
+    """Run the DBAnalyzer as separate application."""
     app = application.init()
     config.storageObject.loadPlugins(defaultStorage())
-         
+        
     _openDialog()
     returnValue = app.exec_()
     
-    config.storageObject.write()
     from omg import logging
+    config.shutdown()
     logging.shutdown()
     import sys
     sys.exit(returnValue)
+    
+    
+if __name__ == "__main__":
+    run()
+    

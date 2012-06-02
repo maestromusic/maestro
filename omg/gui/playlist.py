@@ -74,27 +74,30 @@ class PlaylistTreeView(treeview.TreeView):
             offset = idx.internalPointer().offset()
             self.songSelected.emit(offset)
 
-    #TODO: are the next three methods all necessary?
-    def dragEnterEvent(self, event):
-        if event.source() is self:
-            if event.keyboardModifiers() & Qt.ControlModifier:
-                event.setDropAction(Qt.CopyAction)
-            else: event.setDropAction(Qt.MoveAction)
-        treeview.TreeView.dragEnterEvent(self, event)
+#    #TODO: are the next three methods all necessary?
+#    def dragEnterEvent(self, event):
+#        if event.source() is self:
+#            if event.keyboardModifiers() & Qt.ControlModifier:
+#                event.setDropAction(Qt.CopyAction)
+#            else: event.setDropAction(Qt.MoveAction)
+#        treeview.TreeView.dragEnterEvent(self, event)
+#        
+#    def dragMoveEvent(self, event):
+#        if event.source() is self:
+#            if event.keyboardModifiers() & Qt.ControlModifier:
+#                event.setDropAction(Qt.CopyAction)
+#            else: event.setDropAction(Qt.MoveAction)
+#        treeview.TreeView.dragMoveEvent(self, event)
+#        
         
-    def dragMoveEvent(self, event):
-        if event.source() is self:
-            if event.keyboardModifiers() & Qt.ControlModifier:
-                event.setDropAction(Qt.CopyAction)
-            else: event.setDropAction(Qt.MoveAction)
-        treeview.TreeView.dragMoveEvent(self, event)
-        
-    def dropEvent(self, event):
-        if event.source() is self:
-            if event.keyboardModifiers() & Qt.ControlModifier:
-                event.setDropAction(Qt.CopyAction)
-            else: event.setDropAction(Qt.MoveAction)
-        treeview.TreeView.dropEvent(self, event)
+    def dropEvent(self,event):
+        #if event.source() is self:
+        #    if event.keyboardModifiers() & Qt.ControlModifier:
+        #        event.setDropAction(Qt.CopyAction)
+         #   else: event.setDropAction(Qt.MoveAction)
+        self.model()._internalMove = event.source() == self and event.dropAction() == Qt.MoveAction
+        super().dropEvent(event)
+        self.model()._internalMove = None
         
     def removeSelected(self):
         self.model().removeMany(self.selectedRanges())

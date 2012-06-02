@@ -39,7 +39,9 @@ setup(name='omg',
       include_package_data = True,
       py_modules=['mpd', 'distribute_setup'],
       entry_points = {
-          'gui_scripts' : ['omg = omg.application:run'], 
+          'gui_scripts' : ['omg = omg.application:run',
+                           'install = omg.install:run',
+                           'dbanalyzer = omg.plugins.dbanalyzer.plugin:run'], 
           }
     )
 
