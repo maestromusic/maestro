@@ -64,9 +64,14 @@ class Node:
         isFile as e.g. rootnodes are neither."""
         return False
     
-    def getParents(self):
+    def getParents(self,includeSelf=False):
         """Returns a generator yielding all parents of this node in the current tree structure, from the
-        direct parent to the root-node."""
+        direct parent to the root-node.
+        
+        If *includeSelf* is True, the node itself is yielded before its ancestors.
+        """
+        if includeSelf:
+            yield self
         parent = self.parent
         while parent is not None:
             yield parent
@@ -108,15 +113,18 @@ class Node:
             for subnode in node.getAllNodes():
                 yield subnode
  
-    def getAllFiles(self):
+    def getAllFiles(self,reverse=False):
         """Generator which will return all files contained in this node or in children of it
-        (possibly including the node itself)."""
+        (possibly including the node itself).
+        
+        If *reverse* is True, files will be returned in reversed order.
+        """
         assert self.getContents() is not None
         if self.isFile():
             yield self
         else:
-            for element in self.getContents():
-                for file in element.getAllFiles():
+            for element in self.getContents() if not reverse else reversed(self.getContents()):
+                for file in element.getAllFiles(reverse):
                     yield file
 
     def fileCount(self):

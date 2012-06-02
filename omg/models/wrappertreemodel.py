@@ -66,9 +66,12 @@ class WrapperTreeModel(rootedtreemodel.RootedTreeModel):
         command = InsertCommand(self,parent,position,wrappers)
         application.stack.push(command)
     
-    def removeWrappers(self,wrappers):
+    def removeWrappers(self,wrappers,*args,**kwargs):
         """Remove the given wrappers from the model. When possible its usually faster to use the range-based
-        methods remove or removeMany."""
+        methods remove or removeMany.
+        
+        Any further arguments will be passed on to removeMany.
+        """
         # TODO: Maybe detect adjacent wrappers here and create a single range for them. This is not really
         # necessary as RemoveCommand will merge adjacent ranges. 
         ranges = []
@@ -76,7 +79,7 @@ class WrapperTreeModel(rootedtreemodel.RootedTreeModel):
             parent = wrapper.parent
             index = parent.index(wrapper)
             ranges.append((parent,index,index))
-        self.removeMany(ranges)
+        self.removeMany(ranges,*args,**kwargs)
     
     def remove(self,parent,first,last):
         """Remove contents from the wrapper *parent*. *start* and *end* are the first and last index that
@@ -127,31 +130,8 @@ class WrapperTreeModel(rootedtreemodel.RootedTreeModel):
                 parent = parent.parent
             else: position = parent.getContentsCount()
         else: position = row
-        
-        #TODO: handle move actions
-#         if action == Qt.MoveAction:
-#            offsetShift = 0
-#            removePairs = []
-#            for file in fileElems:
-#                fileOffset = file.offset()
-#                removePairs.append((fileOffset, file.path))
-#                if fileOffset < offset:
-#                    offsetShift += 1
-#            offset -= offsetShift
-#            self.backend.stack.beginMacro(self.tr("move songs"))
-#            self.backend.removeFromPlaylist(removePairs)
-#       self.backend.insertIntoPlaylist(list(enumerate(paths, start = offset)))
-#      if action == Qt.MoveAction:
-#           self.backend.stack.endMacro()
-#       return True
-    
     
         self.insert(parent,position,wrappers)
-        return True
-    
-    # Necessary for Qt so that Drag&Drow moves work 
-    def removeRows(self,row,count,parent):
-        self.remove(self.data(parent),row,row+count-1)
         return True
     
     def split(self,parent,position):
@@ -351,3 +331,4 @@ class ChangeCommand(QtGui.QUndoCommand):
         
     def undo(self):
         self.model._setRootContents(self.before)
+        

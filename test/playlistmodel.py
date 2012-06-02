@@ -40,6 +40,11 @@ class PseudoBackend:
     def removeFromPlaylist(self,begin,end):
         del self.playlist[begin:end]
     
+    def move(self,fromOffset,toOffset):
+        if fromOffset != toOffset:
+            file = self.playlist.pop(fromOffset)
+            self.playlist.insert(toOffset,file)
+
 
 class PlaylistTestCase(unittest.TestCase):
     """Base test case for playlist test cases."""
@@ -278,7 +283,90 @@ class RemoveTestCase(PlaylistTestCase):
         
         self.checkUndo()
         
+
+class MoveTestCase(PlaylistTestCase):
+    def setUp(self):
+        self.playlist.clear()
+        application.stack.clear()
         
+    def runTest(self):
+        level = self.level
+        playlist = self.playlist
+        
+        # Simply swap some elements
+        wrappers,A = level.createWrappers('A[A1,A2,A3]','A')
+        playlist.insert(playlist.root,0,wrappers)
+        playlist.move([A.contents[1]],A,3)
+        self.check('A[A1,A3,A2]')
+        playlist.clear()
+        
+        # Other direction
+        wrappers,A = level.createWrappers('A[A1,A2,A3]','A')
+        playlist.insert(playlist.root,0,wrappers)
+        playlist.move([A.contents[2]],A,1)
+        self.check('A[A1,A3,A2]')
+        playlist.clear()
+        
+        # Move several elements
+        wrappers,A = level.createWrappers('A[A1,A2,A3,A4,A5]','A')
+        playlist.insert(playlist.root,0,wrappers)
+        playlist.move([A.contents[0],A.contents[2],A.contents[3]],A,5)
+        self.check('A[A2,A5,A1,A3,A4]')
+        playlist.clear()
+        
+        # Move recursively
+        wrappers,X,A = level.createWrappers('X[A[A1,A2,A3],B[B1,B2],C[C1]]','X','A')
+        playlist.insert(playlist.root,0,wrappers)
+        playlist.move([A],X,2)
+        self.check('X[B[B1,B2],A[A1,A2,A3],C[C1]]')
+        playlist.clear()
+        
+        # Move in between
+        wrappers,A = level.createWrappers('A[A1,A2,A3,A4,A5]','A')
+        playlist.insert(playlist.root,0,wrappers)
+        playlist.move([A.contents[0],A.contents[3],A.contents[4]],A,3)
+        self.check('A[A2,A3,A1,A4,A5]')
+        playlist.clear()
+        
+        # Move into child (must not work)
+        wrappers,X,B,Y = level.createWrappers('X[A[A1,A2,A3],B[B1,B2]],Y[D[D1]]','X','B','Y')
+        playlist.insert(playlist.root,0,wrappers)
+        oldStackPos = application.stack.index()
+        self.assertFalse(playlist.move([X,Y],B,0))
+        self.assertEqual(oldStackPos,application.stack.index())
+        playlist.clear()
+        
+        # Move with glue, split and remove empty parents
+        wrappers,A,A5,B1,B2 = level.createWrappers('X[A[A1,A2,A3,A4,A5],B[B1,B2]]','A','A5','B1','B2')
+        playlist.insert(playlist.root,0,wrappers)
+        playlist.move([A5,B1,B2],A,2)
+        self.check('X[A[A1,A2,A5],B[B1,B2],A[A3,A4]]')
+        playlist.clear()
+        
+        # Remove wrappers in a way that decreases the insert position by glueing and removing empty parents
+        wrappers,E1,E2,E3 = level.createWrappers('A[A1,A2],E1,A[A3,A4],E[E2,E3],A[A5]','E1','E2','E3')
+        playlist.insert(playlist.root,0,wrappers)
+        playlist.move([E1,E2,E3],playlist.root,5) # Real insert position will be 1!
+        self.check('A[A1,A2,A3,A4,A5],E[E1,E2,E3]')
+        playlist.clear()
+        
+        # Horrible move: After removing the nodes, the move target might be glued away
+        wrappers,X,B1 = level.createWrappers('X[A[A1,A2],B[B1],A[A3,A4,A5]]','X','B1')
+        playlist.insert(playlist.root,0,wrappers)
+        playlist.move([B1],X.contents[2],3)
+        self.check('X[A[A1,A2,A3,A4,A5],B[B1]]')
+        playlist.clear()
+        
+        # Horrible move in the other direction
+        wrappers,X,B1 = level.createWrappers('X[A[A1,A2],B[B1],A[A3,A4,A5]]','X','B1')
+        playlist.insert(playlist.root,0,wrappers)
+        playlist.move([B1],X.contents[0],0)
+        self.check('X[B[B1],A[A1,A2,A3,A4,A5]]')
+        playlist.clear()
+        
+        self.checkUndo()
+    
+    
 if __name__ == "__main__":
     application.init(exitPoint='noplugins')
 
@@ -313,5 +401,6 @@ if __name__ == "__main__":
     suite = unittest.TestSuite()
     suite.addTest(InsertTestCase(level,playlist))
     suite.addTest(RemoveTestCase(level,playlist))
+    suite.addTest(MoveTestCase(level,playlist))
     unittest.TextTestRunner(verbosity=2).run(suite)
     

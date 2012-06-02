@@ -91,11 +91,21 @@ class MimeData(QtCore.QMimeData):
         return [QtCore.QUrl("file://"+path) for path in self.paths()]
     
     @staticmethod
-    def fromIndexes(model,indexList):
+    def fromIndexes(model,indexList,sortNodes = True):
         """Generate a MimeData instance from the indexes in *indexList*. *model* must be the model containing
         these indexes. This method will remove an index when an ancestor is contained in *indexList*, too.
         """
         nodes = [model.data(index,role=Qt.EditRole) for index in indexList]
         # Filter away nodes if a parent is also contained in the indexList. 
         nodes = [n for n in nodes if not any(parent in nodes for parent in n.getParents())]
+        
+        # Sort nodes
+        def indexGenerator(node):
+            """Return the index of *node* in its parent, the index of the parent in the grandparent and
+            so on."""
+            while node != model.getRoot():
+                yield node.parent.index(node)
+                node = node.parent
+        nodes.sort(key=lambda n: tuple(indexGenerator(n)))
+        
         return MimeData(model.level,nodes)
