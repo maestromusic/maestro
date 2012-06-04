@@ -112,7 +112,10 @@ class PlayerBackend(profiles.Profile):
     
     def move(self,fromOffset,toOffset):
         """Move a song within the playlist. If the current song is moved the player should keep playing at
-        the same position."""
+        the same position.
+        *fromOffset* is the old position in the playlist, *toOffset* is the new one, after the move. That
+        means that for forward moves, *toOffset* is one less than the insertion position.
+        """
         pass
      
     def registerFrontend(self, obj):

@@ -211,10 +211,15 @@ class ContentList:
     def __contains__(self,id):
         return id in self.ids
     
-    def getPosition(self,id):
+    def getPosition(self,id,start=None):
         """Return the position corresponding to *id*. Raise a ValueError, if *id* is not contained in this
-        list."""
-        return self.positions[self.ids.index(id)]
+        list. If *start* is given consider only contents with *position* strictly greater than *start*.
+        """
+        if start is None:
+            return self.positions[self.ids.index(id)]
+        else:
+            index = bisect.bisect(self.positions, start)
+            return self.positions[self.ids[index:].index(id)+index]
     
     def getId(self, position):
         """Return the id at position *position*."""

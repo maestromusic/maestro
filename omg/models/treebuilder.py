@@ -16,6 +16,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+import collections
+
 from .. import database as db
 from ..core import levels
 from ..core.nodes import RootNode, Wrapper
@@ -211,7 +213,10 @@ def buildTree(level,wrappers,parent=None,preWrapper=None,postWrapper=None):
                 break
             parent = parent.parent
         
-    return _buildTree(wrappers,seqs,None,toplevelIds)
+    tree = _buildTree(wrappers,seqs,None,toplevelIds)
+    if parent is not None and not isinstance(parent,RootNode):
+        findPositions(parent,tree)
+    return tree
 
     
 def _buildTree(wrappers,seqs,boundingSeq,toplevelIds):
@@ -246,6 +251,7 @@ def _buildTree(wrappers,seqs,boundingSeq,toplevelIds):
                 # Choose only roots which are contents of element.
                 childContents = _buildTree(wrappers,seqs,longestSeq,element.contents.ids)
                 wrapper.setContents(childContents)
+                findPositions(wrapper,wrapper.contents)
         
         # Add the wrapper to roots and remove the sequence from all sequences
         roots[longestSeq.start] = wrapper
@@ -253,4 +259,27 @@ def _buildTree(wrappers,seqs,boundingSeq,toplevelIds):
     
     # Sort root nodes by start point
     return [roots[key] for key in sorted(roots.keys())]
-   
+
+    
+def findPositions(parent,wrappers):
+    """Set position numbers for all *wrappers* assuming that *parent* is the corresponding container.
+    Do not change positions of wrappers that already have a position.
+    """
+    # We use a heuristic approach to handle the case that a container contains some element repeatedly:
+    # Give the first occurrence the smallest position, the second occurrence the second smallest position
+    # and so on.
+    counter = collections.defaultdict(int) # Count occurrences (see defaultdict example in the Python docs) 
+    for wrapper in wrappers:
+        counter[wrapper.element.id] += 1
+        if wrapper.position is not None:
+            continue
+        wrapper.position = None
+        for i in range(counter[wrapper.element.id]):
+            try:
+                wrapper.position = parent.element.contents.getPosition(wrapper.element.id,
+                                                                       start=wrapper.position)
+            except ValueError:
+                # The element appears more often in wrappers than in parent.element.contents
+                # Use the last number
+                break 
+            

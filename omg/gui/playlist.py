@@ -56,6 +56,7 @@ class PlaylistTreeView(treeview.TreeView):
 
     def setBackend(self, backend):
         if self.backend is not None:
+            self.model().modelReset.disconnect(self.expandAll)
             self.songSelected.disconnect(self.backend.setCurrentSong)
         self.backend = backend
         self.setDisabled(backend is None)
@@ -68,33 +69,14 @@ class PlaylistTreeView(treeview.TreeView):
             self.selectionModel().selectionChanged.connect(self.updateGlobalSelection)
             self.songSelected.connect(backend.setCurrentSong)
             self.updateNodeSelection()
+            self.model().modelReset.connect(self.expandAll)
         
     def _handleDoubleClick(self, idx):
         if idx.isValid():
             offset = idx.internalPointer().offset()
             self.songSelected.emit(offset)
-
-#    #TODO: are the next three methods all necessary?
-#    def dragEnterEvent(self, event):
-#        if event.source() is self:
-#            if event.keyboardModifiers() & Qt.ControlModifier:
-#                event.setDropAction(Qt.CopyAction)
-#            else: event.setDropAction(Qt.MoveAction)
-#        treeview.TreeView.dragEnterEvent(self, event)
-#        
-#    def dragMoveEvent(self, event):
-#        if event.source() is self:
-#            if event.keyboardModifiers() & Qt.ControlModifier:
-#                event.setDropAction(Qt.CopyAction)
-#            else: event.setDropAction(Qt.MoveAction)
-#        treeview.TreeView.dragMoveEvent(self, event)
-#        
         
     def dropEvent(self,event):
-        #if event.source() is self:
-        #    if event.keyboardModifiers() & Qt.ControlModifier:
-        #        event.setDropAction(Qt.CopyAction)
-         #   else: event.setDropAction(Qt.MoveAction)
         self.model()._internalMove = event.source() == self and event.dropAction() == Qt.MoveAction
         super().dropEvent(event)
         self.model()._internalMove = None
