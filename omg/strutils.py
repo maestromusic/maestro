@@ -98,7 +98,7 @@ def numberFromPrefix(string):
         (4,"IV. ")
 
     This method is used to find numbers in song titles. To avoid false positives, it only detects numbers if
-    they are followed by whitespace or a period and finds only roman numbers build from I,V and X.
+    they are followed by whitespace or a period or a colon and finds only roman numbers build from I,V and X.
     """
     if len(string) == 0:
         return (None,"")
@@ -122,7 +122,7 @@ def numberFromPrefix(string):
         
     # Ok I found a prefix
     indexWhereNumberEnds = i
-    if string[i] == '.':
+    if string[i] in '.:':
         i += 1
     while (string[i].isspace()):
         i += 1
