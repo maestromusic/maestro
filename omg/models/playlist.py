@@ -100,7 +100,6 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         
     def resetFromPaths(self,paths,updateBackend=True):
         """Reset the playlist to contain the given files. This method is undoable."""
-        assert False
         wrappers = self._buildWrappersFromPaths(paths)
         application.stack.push(PlaylistChangeCommand(self,wrappers,updateBackend))
 
