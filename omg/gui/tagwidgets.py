@@ -160,7 +160,10 @@ class TagTypeBox(QtGui.QStackedWidget):
     def __init__(self,defaultTag = None,parent = None,editable=True,useCoverLabel=False):
         QtGui.QStackedWidget.__init__(self,parent)
         self.setSizePolicy(QtGui.QSizePolicy(QtGui.QSizePolicy.Minimum,QtGui.QSizePolicy.Fixed))
-        self._tag = defaultTag
+        
+        if defaultTag is None:
+            self._tag = tags.tagList[0]
+        else: self._tag = defaultTag
         
         if useCoverLabel:
             self.label = TagLabel(defaultTag)
@@ -176,14 +179,7 @@ class TagTypeBox(QtGui.QStackedWidget):
         else: self.box = QtGui.QComboBox()
         self.box.setInsertPolicy(QtGui.QComboBox.NoInsert)
 
-        for tag in tags.tagList:
-            # If defaultTag is None, select the first tag
-            if self._tag is None:
-                self._tag = tag
-                self.box.setCurrentIndex(0)
-            self._addTagToBox(tag)
-            if tag == defaultTag:
-                self.box.setCurrentIndex(self.box.count()-1)
+        self._createItems()
 
         if editable:
             self.box.editingFinished.connect(self._handleEditingFinished)
@@ -191,8 +187,16 @@ class TagTypeBox(QtGui.QStackedWidget):
         
         self.addWidget(self.box)
         
-        application.dispatcher.changes.connect(self._handleTagTypeChanged)
+        application.dispatcher.changes.connect(self._handleDispatcher)
     
+    def _createItems(self):
+        """Clear the combobox and refill it with items."""
+        self.box.clear()
+        for tag in tags.tagList:
+            self._addTagToBox(tag)
+            if tag == self._tag:
+                self.box.setCurrentIndex(self.box.count()-1)
+                
     def _addTagToBox(self,tag):
         """Add a tag to the box. Display icon and title if available."""
         if tag.icon is not None:
@@ -288,29 +292,30 @@ class TagTypeBox(QtGui.QStackedWidget):
             self.showLabel()
         else: QtGui.QStackedWidget.keyPressEvent(self,keyEvent)
     
-    def _handleTagTypeChanged(self,event):
-        """React upon tagTypeChanged-signals from the dispatcher."""
-        if not isinstance(event,tags.TagTypeChangedEvent):
-            return
-        if event.action == constants.ADDED:
-            # Do not add twice
-            for i in range(self.box.count()):
-                if self.box.itemData(i) == event.tagType:
-                    return
-            else: self._addTagToBox(event.tagType)
-        elif event.action == constants.DELETED:
-            for i in range(self.box.count()):
-                if self.box.itemData(i) == event.tagType:
-                    self.box.removeItem(i)
-                    return
-        elif event.action == constants.CHANGED:
-            for i in range(self.box.count()):
-                if self.box.itemData(i) == event.tagType:
-                    self.box.setItemText(i,event.tagType.title)
-                    if event.tagType.icon is not None:
-                        self.box.setItemIcon(i,event.tagType.icon)
-                    # Do not change the tag because there is only one instance
-                    return
+    def _handleDispatcher(self,event):
+        """React upon TagTypeChangedEvents and TagTypeOrderChangeEvents from the dispatcher."""
+        if isinstance(event,tags.TagTypeChangedEvent):
+            if event.action == constants.ADDED:
+                # Do not add twice
+                for i in range(self.box.count()):
+                    if self.box.itemData(i) == event.tagType:
+                        return
+                else: self._addTagToBox(event.tagType)
+            elif event.action == constants.DELETED:
+                for i in range(self.box.count()):
+                    if self.box.itemData(i) == event.tagType:
+                        self.box.removeItem(i)
+                        return
+            elif event.action == constants.CHANGED:
+                for i in range(self.box.count()):
+                    if self.box.itemData(i) == event.tagType:
+                        self.box.setItemText(i,event.tagType.title)
+                        if event.tagType.icon is not None:
+                            self.box.setItemIcon(i,event.tagType.icon)
+                        # Do not change the tag because there is only one instance
+                        return
+        elif isinstance(event,tags.TagTypeOrderChangeEvent):
+            self._createItems()
 
 
 class TagValueEditor(QtGui.QWidget):

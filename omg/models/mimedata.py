@@ -40,7 +40,7 @@ class MimeData(QtCore.QMimeData):
     level as well as an invalid tree structure.
     """
     def __init__(self,level,nodeList):
-        QtCore.QMimeData.__init__(self)
+        super().__init__()
         self.level = level
         self._nodeList = nodeList
         

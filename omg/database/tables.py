@@ -173,6 +173,7 @@ CREATE TABLE {0}tagids (
     title    VARCHAR(63)                   DEFAULT NULL,
     icon     VARCHAR(255)                  DEFAULT NULL,
     private  BOOLEAN                       NOT NULL,
+    sort     SMALLINT UNSIGNED             NOT NULL,
     PRIMARY KEY(id),
     UNIQUE INDEX(tagname)
 ) ENGINE InnoDB, CHARACTER SET 'utf8'
@@ -184,7 +185,8 @@ CREATE TABLE {}tagids (
     tagtype  VARCHAR(7)                    NOT NULL DEFAULT 'varchar',
     title    VARCHAR(63)                   DEFAULT NULL,
     icon     VARCHAR(255)                  DEFAULT NULL,
-    private  BOOLEAN                       NOT NULL DEFAULT 0
+    private  BOOLEAN                       NOT NULL DEFAULT 0,
+    sort     INTEGER                       NOT NULL
 )
 """.format(db.prefix))
 

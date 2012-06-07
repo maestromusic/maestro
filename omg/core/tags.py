@@ -346,6 +346,8 @@ class TagTypeUndoCommand(QtGui.QUndoCommand):
             self.tagType = None
         elif self.action == DELETED:
             self.tagType = tagType
+            # Store the sort value
+            self.position = tagList.index(tagType)
         else:
             self.tagType = tagType
             self.oldData = {'name': tagType.name,'type': tagType.type,'title': tagType.title,
@@ -371,7 +373,7 @@ class TagTypeUndoCommand(QtGui.QUndoCommand):
         elif self.action == DELETED:
             # Ensure that the same object is recreated, because it might be used in many elements
             # within the undohistory.
-            addTagType(tagType=self.tagType)
+            addTagType(tagType=self.tagType,position=self.position)
         else: changeTagType(self.tagType,**self.oldData)
 
 
@@ -392,26 +394,43 @@ def addTagType(**data):
         - a subset of the arguments of Tag.__init__. In this case this data is used to create a new tag.
           The subset must not contain 'id' and must contain at least 'name' and 'type'.
           
+    In both cases an additional parameter *position* is allowed to specify the position in tags.tagList where
+    the new tagtype is created. If *position* not given, the tag will be put after all existing tags.
+    
     After creation a TagTypeChangedEvent is emitted.
     """
     from .. import database as db
+    if 'position' in data:
+        position = data['position']
+        sortValues = list(db.query("SELECT sort FROM {}tagids ORDER BY sort".format(db.prefix))
+                          .getSingleColumn())
+        if position == 0:
+            sort = 1
+        else: sort = sortValues[position-1]+1
+        # If the designated sort value is blocked, increase all sort values
+        if sort in sortValues:
+            db.query("UPDATE {}tagids SET sort=sort+1 WHERE sort >= ?".format(db.prefix),sort)
+    else:
+        sort = db.query("SELECT MAX(sort)+1 FROM {}tagids".format(db.prefix)).getSingle()
+        position = len(tagList) 
+    
     if 'tagType' in data:
         tagType = data['tagType']
-        data = (tagType.id,tagType.name,tagType.type.name,tagType.title,tagType.iconPath,tagType.private)
+        data = (tagType.id,tagType.name,tagType.type.name,tagType.title,tagType.iconPath,tagType.private,sort)
         db.query(
-            "INSERT INTO {}tagids (id,tagname,tagtype,title,icon,private) VALUES (?,?,?,?,?,?)"
+            "INSERT INTO {}tagids (id,tagname,tagtype,title,icon,private,sort) VALUES (?,?,?,?,?,?,?)"
               .format(db.prefix),*data)
     else:
         # The difference to the if-part is that we have to get the id from the database
         tagType = Tag(**data)
-        data = (tagType.name,tagType.type.name,tagType.title,tagType.iconPath,tagType.private)
+        data = (tagType.name,tagType.type.name,tagType.title,tagType.iconPath,tagType.private,sort)
         tagType.id = db.query(
-            "INSERT INTO {}tagids (tagname,tagtype,title,icon,private) VALUES (?,?,?,?,?)"
+            "INSERT INTO {}tagids (tagname,tagtype,title,icon,private,sort) VALUES (?,?,?,?,?,?)"
               .format(db.prefix),*data).insertId()
     logger.info("Added new tag '{}' of type '{}'.".format(tagType.name,tagType.type.name))
     _tagsByName[tagType.name] = tagType
     _tagsById[tagType.id] = tagType
-    tagList.append(tagType)
+    tagList.insert(position,tagType)
     application.dispatcher.changes.emit(TagTypeChangedEvent(ADDED,tagType))
     return tagType
         
@@ -491,16 +510,68 @@ def changeTagType(tagType,**data):
         application.dispatcher.changes.emit(TagTypeChangedEvent(CHANGED,tagType))
 
 
+class TagTypeOrderUndoCommand(QtGui.QUndoCommand):
+    """Command that changes the order of the tagtypes. *newList* specifies the new order and will be used
+    as replacement for tags.tagList. *newList* must contain the same tagtypes as tags.tagList.
+    
+    Note that TagTypeOrderUndoCommand does not guarantee that the sort numbers in the database will be
+    restored exactly when the command is undone. They will be set to values such that the order of
+    tags.tagList is restored.
+    """ 
+    def __init__(self,newList):
+        super().__init__(translate("TagTypeOrderUndoCommand","Change tagtype order"))
+        self.oldList = tagList
+        self.newList = newList
+    
+    def redo(self):
+        moveTagTypes(self.newList)
+    
+    def undo(self):
+        moveTagTypes(self.oldList)
+        
+    @staticmethod
+    def move(tagType,newPos):
+        """Create a TagTypeOrderUndoCommand that will move *tagType* such that it has position *newPos*."""
+        newList = list(tagList)
+        newList.remove(tagType)
+        newList.insert(newPos,tagType)
+        return TagTypeOrderUndoCommand(newList)
+        
+
+class TagTypeOrderChangeEvent(ChangeEvent):
+    """This event is emitted when the order of tagtypes has changed. The order is always stored in
+    tags.tagList."""
+    pass
+
+    
+def moveTagTypes(newList):
+    """Change the order of the tagtypes. *newList* specifies the new order and will be used as replacement
+    for tags.tagList. *newList* must contain the same tagtypes as tags.tagList.
+    
+    A TagTypeOrderChangeEvent is emitted after the order has been changed.
+    """ 
+    global tagList
+    if len(tagList) != len(newList):
+        raise ValueError("*newList* must contain the same tags as tags.tagList")
+    # Write sort numbers for all tags. Do not rely upon gapless indexes in the database (removing tagtypes
+    # does not change indexes).
+    db.multiQuery("UPDATE {}tagids SET sort = ? WHERE id = ?".format(db.prefix),
+                  enumerate([t.id for t in newList],start=1))
+    tagList = newList
+    application.dispatcher.changes.emit(TagTypeOrderChangeEvent())
+    
+    
 def loadTagTypesFromDB():
     """Initialize _tagsById, _tagsByName and tagList from the database. Raise a runtime error when the 
     tags cannot be fetched from the database (e.g. because the tagids table is missing)."""
     global _tagsByName, _tagsById, tagList
     _tagsById = {}
     _tagsByName = {}
+    tagList = []
     
     try:
-        result = db.query("SELECT id,tagname,tagtype,title,icon,private FROM {}tagids"
-                                  .format(db.prefix))
+        result = db.query("SELECT id,tagname,tagtype,title,icon,private FROM {}tagids ORDER BY sort"
+                           .format(db.prefix))
     except db.sql.DBException:
         logger.error("Could not fetch tags from tagids table.")
         raise RuntimeError()
@@ -516,11 +587,7 @@ def loadTagTypesFromDB():
         newTag = Tag(id,tagName,valueType,title,iconPath,private)
         _tagsById[newTag.id] = newTag
         _tagsByName[newTag.name] = newTag
-        
-    # tagList contains the tags in the order specified by config.options.tags.tag_order...
-    tagList = [ _tagsByName[name] for name in config.options.tags.tag_order if name in _tagsByName ]
-    # ...and then all remaining tags in arbitrary order
-    tagList.extend(set(_tagsByName.values()) - set(tagList))
+        tagList.append(newTag)
     
     
 def init():

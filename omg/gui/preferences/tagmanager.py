@@ -26,6 +26,8 @@ from ...core import tags
 from .. import tagwidgets, dialogs, misc
 from ..misc import iconbuttonbar
 
+CUSTOM_MIME = 'application/x-omgtagtype'
+
     
 class TagManager(QtGui.QWidget):
     """The TagManager allows to add, edit and remove tagtypes (like artist, composer,...). To make things
@@ -34,10 +36,14 @@ class TagManager(QtGui.QWidget):
         super().__init__(parent)
         self.setLayout(QtGui.QVBoxLayout())
         
-        self.layout().addWidget(QtGui.QLabel(
-                    self.tr("Note that you cannot change or remove tags that already appear in elements.")))
+        descriptionLabel = QtGui.QLabel(
+                    self.tr("Note that you cannot change or remove tags that already appear in elements. "
+                            "Use drag&drop to change the order in which tags are usually displayed."))
+        descriptionLabel.setWordWrap(True)
+        self.layout().addWidget(descriptionLabel)
         
         self.columns = [
+                ("sort",   self.tr("Order")),
                 ("icon",   self.tr("Icon")),
                 ("name",   self.tr("Name")),
                 ("type",   self.tr("Type")),
@@ -47,13 +53,8 @@ class TagManager(QtGui.QWidget):
                 ("actions",self.tr("Actions"))
                 ]
         
-        self.tableWidget = QtGui.QTableWidget()
-        self.tableWidget.setColumnCount(len(self.columns))
-        self.tableWidget.verticalHeader().hide()
-        self.tableWidget.setSortingEnabled(True)
-        self.tableWidget.horizontalHeader().setResizeMode(QtGui.QHeaderView.ResizeToContents)
+        self.tableWidget = TagManagerTableWidget(len(self.columns))
         self.tableWidget.cellDoubleClicked.connect(self._handleCellDoubleClicked)
-        self.tableWidget.setContextMenuPolicy(Qt.CustomContextMenu)
         self.tableWidget.customContextMenuRequested.connect(self._handleCustomContextMenuRequested)
         self.layout().addWidget(self.tableWidget)
         
@@ -87,7 +88,7 @@ class TagManager(QtGui.QWidget):
     
     def _handleDispatcher(self,event):
         """React to TagTypeChangedEvents from the dispatcher."""
-        if isinstance(event,tags.TagTypeChangedEvent):
+        if isinstance(event,(tags.TagTypeChangedEvent,tags.TagTypeOrderChangeEvent)):
             self._loadTags()
             
     def _loadTags(self):
@@ -99,8 +100,16 @@ class TagManager(QtGui.QWidget):
         CheckedSortItem = misc.createSortingTableWidgetClass('PrivateItemClass','checked')
         NumericSortItem = misc.createSortingTableWidgetClass('NumericalSortClass','leadingInt')
         
+        stdFlags = Qt.ItemIsEnabled | Qt.ItemIsSelectable | Qt.ItemIsDragEnabled
+        
         for row,tag in enumerate(tags.tagList):
             number,allowChanges = self._appearsInElements(tag)
+            
+            column = self._getColumnIndex("sort")
+            item = NumericSortItem("{}    ".format(row+1))
+            item.setTextAlignment(Qt.AlignVCenter | Qt.AlignRight)
+            item.setFlags(stdFlags)
+            self.tableWidget.setItem(row,column,item)
             
             column = self._getColumnIndex("icon")
             label = QtGui.QLabel()       
@@ -114,8 +123,8 @@ class TagManager(QtGui.QWidget):
             column = self._getColumnIndex("name")
             item = QtGui.QTableWidgetItem(tag.name)
             if allowChanges:
-                item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsEditable)
-            else: item.setFlags(Qt.ItemIsEnabled)
+                item.setFlags(stdFlags | Qt.ItemIsEditable)
+            else: item.setFlags(stdFlags)
             self.tableWidget.setItem(row,column,item)
             
             column = self._getColumnIndex("type")
@@ -127,18 +136,17 @@ class TagManager(QtGui.QWidget):
                 self.tableWidget.setIndexWidget(index,combo)
             else:
                 item = QtGui.QTableWidgetItem(tag.type.name)
-                item.setFlags(Qt.ItemIsEnabled)
+                item.setFlags(stdFlags)
                 self.tableWidget.setItem(row,column,item)
             
             column = self._getColumnIndex("title")
             item = QtGui.QTableWidgetItem(tag.rawTitle if tag.rawTitle is not None else '')
+            item.setFlags(stdFlags | Qt.ItemIsEditable)
             self.tableWidget.setItem(row,column,item)
             
             column = self._getColumnIndex("private")
             item = CheckedSortItem()
-            if allowChanges:
-                item.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
-            else: item.setFlags(Qt.ItemIsUserCheckable)
+            item.setFlags(stdFlags | Qt.ItemIsUserCheckable)
             item.setCheckState(Qt.Checked if tag.private else Qt.Unchecked)
             self.tableWidget.setItem(row,column,item)
             
@@ -148,7 +156,7 @@ class TagManager(QtGui.QWidget):
             else: text = number
             item = NumericSortItem("{}    ".format(text))
             item.setTextAlignment(Qt.AlignVCenter | Qt.AlignRight)
-            item.setFlags(Qt.ItemIsEnabled)
+            item.setFlags(stdFlags)
             self.tableWidget.setItem(row,column,item)
             
             column = self._getColumnIndex("actions")
@@ -164,7 +172,7 @@ class TagManager(QtGui.QWidget):
                 
         for i in range(len(tags.tagList)):
             self.tableWidget.setRowHeight(i,36)
-    
+        
     def _handleAddButton(self):
         """Open a NewTagTypeDialog and create a new tag."""
         tag = tagwidgets.NewTagTypeDialog.createTagType(tagname='',tagnameEditable=True,privateEditable=True)
@@ -212,9 +220,9 @@ class TagManager(QtGui.QWidget):
             if newPrivate == tag.private:
                 return
             if not allowChanges:
-                dialogs.warning(self.tr("Cannot change tag"),
-                                self.tr("Cannot change a tag that appears in elements."))
-                item.setText(oldName)
+                # Reset. Unfortunately it is not possible to deactivate the Checkboxes without disabling
+                # the item (which would cause problems with Drag&Drop).
+                item.setCheckState(Qt.Checked if tag.private else Qt.Unchecked)
                 return
             application.stack.push(tags.TagTypeUndoCommand(constants.CHANGED,tagType=tag,private=newPrivate))
 
@@ -222,10 +230,10 @@ class TagManager(QtGui.QWidget):
         """Enable or disable the undo and redo buttons depending on stack state."""
         self.undoButton.setEnabled(application.stack.canUndo()
                             and isinstance(application.stack.command(application.stack.index()-1),
-                                           tags.TagTypeUndoCommand))
+                                           (tags.TagTypeUndoCommand,tags.TagTypeOrderUndoCommand)))
         self.redoButton.setEnabled(application.stack.canRedo()
                             and isinstance(application.stack.command(application.stack.index()),
-                                           tags.TagTypeUndoCommand))
+                                           (tags.TagTypeUndoCommand,tags.TagTypeOrderUndoCommand)))
         
     def _handleValueTypeChanged(self,tag,type):
         """Handle changes to the comboboxes containing valuetypes."""
@@ -308,3 +316,58 @@ class TagManager(QtGui.QWidget):
                 return i
         raise ValueError("Invalid key {}".format(columnKey))
 
+
+class TagManagerTableWidget(QtGui.QTableWidget):
+    def __init__(self,columnCount):
+        super().__init__()
+        
+        self.setColumnCount(columnCount)
+        self.verticalHeader().hide()
+        self.setSortingEnabled(True)
+        self.horizontalHeader().setResizeMode(QtGui.QHeaderView.ResizeToContents)
+        self.setDragEnabled(True)
+        # I first tried to use InternalMove but Qt doesn't call dropMimeData then and there doesn't seem
+        # to be another way to intercept drops (ok probably it is possible using some weird event filters).
+        self.setDragDropMode(QtGui.QAbstractItemView.DragDrop)
+        self.setSelectionBehavior(QtGui.QAbstractItemView.SelectRows)
+        self.setSelectionMode(QtGui.QAbstractItemView.SingleSelection)
+        self.setContextMenuPolicy(Qt.CustomContextMenu)
+    
+    def mimeTypes(self):
+        return [CUSTOM_MIME]
+    
+    def mimeData(self,items):
+        tagType = tags.tagList[items[0].row()]
+        return TagTypeMimeData(tagType)
+    
+    def dropMimeData(self,row,column,mimeData,action):
+        if isinstance(mimeData,TagTypeMimeData) and mimeData.tagType in tags.tagList:
+            oldPos = tags.tagList.index(mimeData.tagType)
+            if row in (oldPos,oldPos+1):
+                return True # Nothing to move
+            newPos = row if row < oldPos else row-1
+            application.stack.push(tags.TagTypeOrderUndoCommand.move(mimeData.tagType,newPos))
+            return True
+        return False    
+        
+    
+    
+class TagTypeMimeData(QtCore.QMimeData):
+    def __init__(self,tagType):
+        super().__init__()
+        self.tagType = tagType
+        
+    def hasFormat(self,format):
+        return format in self.formats()
+    
+    def formats(self):
+        return ['text/plain',CUSTOM_MIME]
+        
+    def retrieveData(self,mimeType,type=None):
+        if mimeType == 'text/plain':
+            return self.tagType.title
+        elif mimeType == CUSTOM_MIME:
+            return self.tagType
+        else:
+            # return a null variant of the given type (confer the documentation of retrieveData)
+            return QtCore.QVariant(type) if type is not None else QtCore.QVariant()
