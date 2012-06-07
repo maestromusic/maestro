@@ -23,7 +23,7 @@ from .. import application, database as db, utils
 from ..constants import DB, DISK, CONTENTS
 from ..core import levels, tags, commands
 from ..core.nodes import RootNode, Wrapper
-from ..models import rootedtreemodel
+from ..models import leveltreemodel
 
 translate = QtGui.QApplication.translate
 
@@ -81,39 +81,6 @@ class EditTagsAction(TreeAction):
                                            [w.element for w in self.parent().nodeSelection.elements(self.recursive)],
                                            self.parent())
         dialog.exec_()
-
-class RemoveElementsCommand(QtGui.QUndoCommand):
-    
-    def __init__(self, level, removals, text):
-        super().__init__()
-        self.setText(text)
-        self.level = level
-        self.removals = removals
-        
-        
-    def redo(self):
-        if self.level is levels.real:
-            db.transaction()
-        for parentId, removals in self.removals.items():
-            for pos,id in removals:
-                self.level.removeChild(parentId, pos)
-            if self.level is levels.real:
-                db.write.removeContents([ (parentId, pos) for pos,id in removals])
-        if self.level is levels.real:
-            db.commit()
-        self.level.emitEvent(contentIds= list(self.removals.keys()))
-    
-    def undo(self):
-        if self.level is levels.real:
-            db.transaction()
-        for parentId, removals in self.removals.items():
-            for pos,id in removals:
-                self.level.insertChild(parentId, pos, id)
-            if self.level is levels.real:
-                db.write.addContents([ (parentId, pos, id) for pos,id in removals])
-        if self.level is levels.real:
-            db.commit()
-        self.level.emitEvent(contentIds= list(self.removals.keys()))
    
 class DeleteAction(TreeAction):
     """Action to remove selected elements. Works for editor and browser.
@@ -159,18 +126,18 @@ class DeleteAction(TreeAction):
                 else:
                     if parent.element.id not in elementParents:
                         elementParents[parent.element.id] = []
-                    elementParents[parent.element.id].append((wrapper.position, wrapper.element.id))
+                    elementParents[parent.element.id].append(wrapper.position)
             
             if len(rootParents) > 0:
-                from ..models.rootedtreemodel import ChangeRootCommand
                 newContents = [node.element.id for node in model.root.contents]
                 for idx in sorted(rootParents, reverse = True):
                     del newContents[idx]
-                application.stack.push(ChangeRootCommand(model, model.root.contents, newContents))
+                application.stack.push(leveltreemodel.ChangeRootCommand(model, model.root.contents, newContents))
             if len(elementParents) > 0:
-                application.stack.push(RemoveElementsCommand(self.parent().model().level,
-                                                             elementParents,
-                                                             text=self.modeText[self.mode]))
+                application.stack.beginMacro(self.modeText[self.mode])
+                for parentId, removals in elementParents.items():
+                    application.stack.push(commands.RemoveElementsCommand(self.level(), parentId, removals))
+                application.stack.endMacro()
         else:
             raise NotImplementedError()
 
@@ -207,7 +174,7 @@ class MergeAction(TreeAction):
                              self.parent())
         if dialog.exec_() == QtGui.QDialog.Accepted:
             from ..models import rootedtreemodel
-            command = rootedtreemodel.MergeCommand(self.parent().model().level,
+            command = leveltreemodel.MergeCommand(self.parent().model().level,
                          elements[0].parent,
                          mergeIndices,
                          dialog.newTitle(),
@@ -224,7 +191,7 @@ class MergeAction(TreeAction):
                 for idx in sorted(mergedIndexes, reverse = True):
                     del newContents[idx]
                 newContents[command.insertIndex:command.insertIndex] = [command.containerID]
-                rootChangeCom = rootedtreemodel.ChangeRootCommand(self.parent().model(), oldContents, newContents)
+                rootChangeCom = leveltreemodel.ChangeRootCommand(self.parent().model(), oldContents, newContents)
                 application.stack.push(rootChangeCom)
                 application.stack.endMacro()
 
@@ -241,7 +208,7 @@ class ClearTreeAction(TreeAction):
     
     def doAction(self):
         model = self.parent().model()
-        application.stack.push(rootedtreemodel.ChangeRootCommand(model,
+        application.stack.push(leveltreemodel.ChangeRootCommand(model,
                                       [node.element.id for node in model.root.contents],
                                       [],
                                       self.tr('clear view')))

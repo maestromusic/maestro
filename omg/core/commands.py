@@ -263,36 +263,57 @@ class InsertElementsCommand(QtGui.QUndoCommand):
         at row index *row*. *insertedIds* is the IDs list of the elements to be inserted.
         Positions are inferred from the context, and positions of subsequent elements
         will be adjusted if necessary."""
-        super().__init__(level = level, ids = [parentId], contents = True, text = text)
+        super().__init__()
         self.row = row
-        newContents = level.get(parentId).contents.copy()
-        firstPosition = 1 if row == 0 else newContents[row-1][0] 
-        newContents.ids[row:row] = insertedIds
-        self.insertedIds = insertedIds
-        newContents.positions[row:row] = range(firstPosition, firstPosition + len(insertedIds))
-        # adjust subsequent positions
-        for i in range(row+len(insertedIds), len(newContents.positions)):
-            if newContents.positions[i] <= newContents.positions[i-1]:
-                newContents.positions[i] = newContents.positions[i-1] + 1
-        self.newContents = newContents
+        self.level = level
+        self.parentId = parentId
+        contents = level.get(parentId).contents
+        firstPosition = 1 if row == 0 else contents.positions[row-1]+1
+        import itertools
+        self.insertions = list(zip(itertools.count(start=firstPosition), insertedIds))
+        if len(contents) > row and self.insertions[-1][0] >= contents.positions[row]:
+            # need to shift positions
+            self.shift = self.insertions[-1][0] - contents.positions[row] + 1
+        else:
+            self.shift = 0
         
-    def redoChanges(self):
-        parentId = self.ids[0]
-        self.oldContents = self.level.get(parentId).contents
-        self.level.get(parentId).contents = self.newContents
-        for id in self.insertedIds:
-            self.level.get(id).parents.append(parentId)
-        if self.level is levels.real:
-            raise NotImplementedError()
+    def redo(self):
+        parent = self.level.get(self.parentId)
+        if self.shift != 0:
+            if self.level is levels.real:
+                db.write.changePositions(self.parentId, [(pos, pos+self.shift) for pos in parent.contents.positions[self.row:] ])
+            parent.contents.positions[self.row:] = map(lambda x: x + self.shift, parent.contents.positions[self.row:])
+        self.level.insertChildren(self.parentId, self.insertions)
+        self.level.emitEvent(contentIds = (self.parentId, ))
         
-    def undoChanges(self):
-        parentId = self.ids[0]
-        self.newContents = self.level.get(parentId).contents
-        self.level.get(parentId).contents = self.oldContents
-        for id in self.insertedIds:
-            self.level.get(id).parents.remove(parentId)
-        if self.level is levels.real:
-            raise NotImplementedError()
+    def undo(self):
+        parent = self.level.get(self.parentId)
+        self.level.removeChildren(self.parentId, list(zip(*self.insertions))[0])
+        if self.shift != 0:
+            if self.level is levels.real:
+                db.write.changePositions(self.parentId, [(pos,pos-self.shift) for pos in parent.contents.positions[self.row:]])
+            parent.contents.positions[self.row:] = map(lambda x: x - self.shift, parent.contents.positions[self.row:])
+        self.level.emitEvent(contentIds = (self.parentId, ))
+
+class RemoveElementsCommand(QtGui.QUndoCommand):
+    """Remove some elements from a single parent."""
+    def __init__(self, level, parentId, positions, text = None):
+        super().__init__()
+        if text:
+            self.setText(text)
+        self.level = level
+        self.parentId = parentId
+        self.positions = positions
+        parent = level.get(parentId)
+        self.childIds = [parent.contents.getId(position) for position in positions]
+        
+    def redo(self):
+        self.level.removeChildren(self.parentId, self.positions)
+        self.level.emitEvent(contentIds= (self.parentId,) )
+    
+    def undo(self):
+        self.level.insertChildren(self.parentId, list(zip(self.positions, self.childIds)))
+        self.level.emitEvent(contentIds= (self.parentId,) )
 
 class ChangeMajorFlagCommand(QtGui.QUndoCommand):
     def __init__(self, level, ids):

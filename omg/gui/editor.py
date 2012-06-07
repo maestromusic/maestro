@@ -20,11 +20,10 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
-import itertools
 
 from . import treeview, mainwindow
 from .. import profiles
-from ..models import editor, albumguesser
+from ..models import leveltreemodel, albumguesser
 from .treeactions import *
 from .delegates import editor as editordelegate, configuration as delegateconfig
 
@@ -53,7 +52,7 @@ class EditorTreeView(treeview.TreeView):
         self.setAcceptDrops(True)
         self.setDefaultDropAction(Qt.MoveAction)
         self.setDropIndicatorShown(True)
-        self.setModel(editor.EditorModel())
+        self.setModel(leveltreemodel.LevelTreeModel(levels.editor))
         self.setItemDelegate(editordelegate.EditorDelegate(self))
         self.viewport().setMouseTracking(True)
         

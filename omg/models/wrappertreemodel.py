@@ -35,8 +35,8 @@ class WrapperTreeModel(rootedtreemodel.RootedTreeModel):
     arbitrarily (the only rule is that contents must not be inserted into a file. They will be placed behind
     it instead).
     """
-    def __init__(self,level = None, root = None):
-        super().__init__(level, RootNode(self) if root is None else root)
+    def __init__(self, level = None, root = None):
+        super().__init__(root)
         self.level = level
         
     def _setRootContents(self,wrappers):

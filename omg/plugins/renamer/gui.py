@@ -21,7 +21,7 @@ from PyQt4.QtCore import Qt
 from omg import application
 from omg.gui import treeview, treeactions, delegates
 from omg.gui.delegates import configuration, abstractdelegate
-from omg.models import editor
+from omg.models import leveltreemodel
 from omg.core.commands import CommitCommand
 from . import plugin
 
@@ -86,7 +86,7 @@ class RenameDialog(QtGui.QDialog):
         self.statusLabel.setVisible(False)
         
         self.sublevel = level.subLevel(ids, "rename")
-        self.model = editor.EditorModel(self.sublevel, ids)
+        self.model = leveltreemodel.LevelTreeModel(self.sublevel, ids)
         self.tree = treeview.TreeView()
         self.tree.setModel(self.model)
         self.delegate = PathDelegate(self.tree)

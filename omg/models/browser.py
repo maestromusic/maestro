@@ -56,8 +56,9 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
     nodeLoaded = QtCore.pyqtSignal(Node)
     
     def __init__(self,layers,sortTags):
-        super().__init__(levels.real, BrowserRootNode(self))
+        super().__init__(BrowserRootNode(self))
         self.table = None
+        self.level = levels.real
         self.layers = layers
         self.sortTags = sortTags
         self._searchRequests = []
