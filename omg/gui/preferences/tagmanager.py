@@ -21,7 +21,7 @@ import functools
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from ... import application, constants, database as db, utils
+from ... import application, config, constants, database as db, utils
 from ...core import tags
 from .. import tagwidgets, dialogs, misc
 from ..misc import iconbuttonbar
@@ -142,7 +142,7 @@ class TagManagerTableWidget(QtGui.QTableWidget):
         stdFlags = Qt.ItemIsEnabled | Qt.ItemIsSelectable | Qt.ItemIsDragEnabled
         
         for row,tag in enumerate(tags.tagList):
-            number,allowChanges = self._appearsInElements(tag)
+            allowChanges,number,appearsInEditor = self._checkTag(tag)
             
             column = self._getColumnIndex("sort")
             item = NumericSortItem("{}    ".format(row+1))
@@ -189,7 +189,7 @@ class TagManagerTableWidget(QtGui.QTableWidget):
             self.setItem(row,column,item)
             
             column = self._getColumnIndex("number")
-            if not allowChanges and number == 0:
+            if number == 0 and appearsInEditor:
                 text = self.tr("0, appears in editor")
             else: text = number
             item = NumericSortItem("{}    ".format(text))
@@ -198,13 +198,13 @@ class TagManagerTableWidget(QtGui.QTableWidget):
             self.setItem(row,column,item)
             
             column = self._getColumnIndex("actions")
+            buttons = iconbuttonbar.IconButtonBar()
             if allowChanges:
-                buttons = iconbuttonbar.IconButtonBar()
                 buttons.addIcon(utils.getIcon('delete.png'),
                                      functools.partial(self._handleRemoveButton,tag),
                                      self.tr("Delete tag"))
-                buttons.addIcon(utils.getIcon('goto.png'),toolTip=self.tr("Show in browser"))
-                self.setCellWidget(row,column,buttons)
+            buttons.addIcon(utils.getIcon('goto.png'),toolTip=self.tr("Show in browser"))
+            self.setCellWidget(row,column,buttons)
                 
         for i in range(len(tags.tagList)):
             self.setRowHeight(i,36)
@@ -219,7 +219,7 @@ class TagManagerTableWidget(QtGui.QTableWidget):
     
     def _handleRemoveButton(self,tag):
         """Ask the user if he really wants this and if so, remove the tag."""
-        number,allowChanges = self._appearsInElements(tag)
+        allowChanges = self._checkTag(tag)[0]
         if not allowChanges:
             dialogs.warning(self.tr("Cannot remove tag"),
                             self.tr("Cannot remove a tag that appears in elements."))
@@ -234,7 +234,7 @@ class TagManagerTableWidget(QtGui.QTableWidget):
             newName = item.text()
             if oldName == newName:
                 return
-            number,allowChanges = self._appearsInElements(tag)
+            allowChanges = self._checkTag(tag)[0]
             # Perform different tests via a for-loop
             for check,message in (
                     (not allowChanges,self.tr("Cannot change a tag that appears in elements.")),
@@ -255,7 +255,7 @@ class TagManagerTableWidget(QtGui.QTableWidget):
             
         elif item.column() == self._getColumnIndex('private'): 
             tag = self._getTag(item.row())
-            number,allowChanges = self._appearsInElements(tag)
+            allowChanges = self._checkTag(tag)[0]
             newPrivate = item.checkState() == Qt.Checked
             if newPrivate == tag.private:
                 return
@@ -268,7 +268,7 @@ class TagManagerTableWidget(QtGui.QTableWidget):
         
     def _handleValueTypeChanged(self,tag,type):
         """Handle changes to the comboboxes containing valuetypes."""
-        number,allowChanges = self._appearsInElements(tag)
+        allowChanges = self._checkTag(tag)[0]
         if not allowChanges:
             dialogs.warning(self.tr("Cannot change tag"),
                             self.tr("Cannot change a tag that appears in elements."))
@@ -350,21 +350,28 @@ class TagManagerTableWidget(QtGui.QTableWidget):
             return True
         return False   
     
-    def _appearsInElements(self,tag):
-        """Return the number of db-elements that contain a tag of the given type in the database. As second 
-        result return whether the user should be allowed to change the tag, i.e. whether the tag does not
-        appear in any element in the database nor in the editor.
+    def _checkTag(self,tag):
+        """Check whether the given tag can be edited. Return a 3-tuple of
+        
+            - Whether the tag can be edited
+            - The number of (real-level) elements the tag appears in
+            - Whether the tag appears in editor-level elements.
+            
+        The tag can be edited if it appears neither on the real-level nor on the editor-level. Title and
+        album tag can never be changed.
         """
         number = db.query("SELECT COUNT(DISTINCT element_id) FROM {}tags WHERE tag_id = ?"
                                .format(db.prefix),tag.id).getSingle()
         if number > 0:
-            return number,False
+            return False,number,False
+        elif tag.name in (config.options.tags.title_tag,config.options.tags.album_tag):
+            return False,0,False
         else:
             from ...core import levels
             for elem in levels.editor.elements:
                 if tag in node.element.tags:
-                    return 0, False
-            return 0,True
+                    return False,0,True
+            return True,0,False
         
     def _getColumnIndex(self,columnKey):
         """Return the index of the column with the given key (i.e. the first part of the corresponding tuple
