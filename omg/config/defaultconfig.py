@@ -67,9 +67,7 @@ defaults = OrderedDict((
     "port": (int,6600,"MPD's port"),
 }),
 
-("tags", {
-    "tag_order": (list,["title","artist","album","composer","date","genre","peformer","conductor"],
-                  "Order in which tags will be displayed. Must contain title and album! Tags which don't appear in this list will be displayed in arbitrary order after the tags in the list."),
+("tags", {    
     "title_tag": (str,"title","Key of the title-tag."),
     "album_tag": (str,"album","Key of the album-tag."),
     "search_tags":(list,["album","performer","conductor","title","lyricist","composer","date","artist"],

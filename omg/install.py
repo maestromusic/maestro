@@ -442,7 +442,6 @@ class TagWidget(SettingsWidget):
         self.tableWidget.setColumnCount(len(self.columns))
         self.tableWidget.setHorizontalHeaderLabels([column[1] for column in self.columns])
         self.tableWidget.verticalHeader().hide()
-        self.tableWidget.setSortingEnabled(True)
         self.tableWidget.horizontalHeader().setResizeMode(QtGui.QHeaderView.ResizeToContents)
         self.layout().addWidget(self.tableWidget)
         
@@ -460,8 +459,8 @@ class TagWidget(SettingsWidget):
                 ('composer','varchar',self.tr("Composer")),
                 ('artist','varchar',self.tr("Artist")),
                 ('performer','varchar',self.tr("Performer")),
-                ('genre','varchar',self.tr("Genre")),
                 ('conductor','varchar',self.tr("Conductor")),
+                ('genre','varchar',self.tr("Genre")),
                 ('date','date',self.tr("Date")),
                 ('comment','text',self.tr("Comment")),
         ]
@@ -552,11 +551,11 @@ class TagWidget(SettingsWidget):
             
             column = self._getColumnIndex('private')
             private = self.tableWidget.item(row,column).checkState() == Qt.Checked
-            tags[name] = (name,valueType,title,icon,1 if private else 0)
+            tags[name] = (name,valueType,title,icon,1 if private else 0,row+1)
         
         # Write tags to database
         assert db.query("SELECT COUNT(*) FROM {}tagids".format(db.prefix)).getSingle() == 0
-        db.multiQuery("INSERT INTO {}tagids (tagname,tagtype,title,icon,private) VALUES (?,?,?,?,?)"
+        db.multiQuery("INSERT INTO {}tagids (tagname,tagtype,title,icon,private,sort) VALUES (?,?,?,?,?,?)"
                       .format(db.prefix),tags.values())
         
         # The first two tags are used as title and album. popitem returns a (key,value) tuple.
