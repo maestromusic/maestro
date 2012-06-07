@@ -98,8 +98,11 @@ def writeConfig(path,config):
     """
     outputLines = [] # these lines, joined by \n, will form the final file
     try:
-        with open(path,'r') as file:
-            inputLines = [line.rstrip() for line in file.readlines()]
+        if not os.path.exists(path):
+            inputLines = []
+        else:
+            with open(path,'r') as file:
+                inputLines = [line.rstrip() for line in file.readlines()]
     except:
         raise ConfigError("Cannot read config file")
     
@@ -250,7 +253,7 @@ def writeStorage(path,storage):
     """Write the given storage section to a file at the given path."""
     rawDict = storage._toRawDict()
     try:
-        with open(path,'w') as file:
+        with open(path,'w+') as file:
             json.dump(rawDict,file,ensure_ascii=False,indent=4)
     except Exception as e:
         raise ConfigError(str(e))
