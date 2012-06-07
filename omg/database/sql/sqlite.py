@@ -26,6 +26,8 @@ logger = logging.getLogger(__name__)
 
 
 class Sql(AbstractSql):
+    _inTransaction = False
+    
     def connect(self,path, isolation_level = None):
         # There doesn't seem to be a real documentation of the isolation_level parameter. 
         # But I like the conclusion of this discussion:
@@ -52,7 +54,12 @@ class Sql(AbstractSql):
     def multiQuery(self,queryString,argSets):
         while True:
             try:
-                return SqlResult(self._db.executemany(queryString,argSets),True)
+                if not self._inTransaction:
+                    self.query('BEGIN TRANSACTION')
+                result = SqlResult(self._db.executemany(queryString,argSets),True)
+                if not self._inTransaction:
+                    self._db.commit()
+                return result
             except Exception as e:
                 if isinstance(e,sqlite3.OperationalError) and str(e) == 'database is locked':
                     logger.warning("Database is locked (I will retry). Multiquery: {}".format(queryString))
@@ -63,9 +70,11 @@ class Sql(AbstractSql):
         
     def transaction(self):
         self.query('BEGIN TRANSACTION')
+        self._inTransaction = True
         
     def commit(self):
         self._db.commit()
+        self._inTransaction = False
         
     def rollback(self):
         self._db.rollback()
