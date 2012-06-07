@@ -278,6 +278,8 @@ class ProfileComboBox(QtGui.QComboBox):
         for i in range(self.profileCount()):
             if self.itemText(i) == old:               
                 self.setItemText(i, new)
+                if i == self.currentIndex():
+                    self.profileChosen.emit(new)
                 break
     
     def handleProfileRemoved(self, name):

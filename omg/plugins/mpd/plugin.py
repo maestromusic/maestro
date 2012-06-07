@@ -32,7 +32,6 @@ logger = logging.getLogger(__name__)
 CONNECTION_TIMEOUT = 10 # time in seconds before an initial connection to MPD is given up
 POLLING_INTERVAL = 200 # milliseconds between two MPD polls
 MPD_STATES = { 'play': PLAY, 'stop': STOP, 'pause': PAUSE}
-default_data = {'host' : 'localhost', 'port': '6600', 'password': ''}
 
 class MPDThread(QtCore.QThread):
     """Helper class for the MPD player backend. An MPDThread communicates with
