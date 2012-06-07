@@ -186,7 +186,7 @@ CREATE TABLE {}tagids (
     title    VARCHAR(63)                   DEFAULT NULL,
     icon     VARCHAR(255)                  DEFAULT NULL,
     private  BOOLEAN                       NOT NULL DEFAULT 0,
-    sort     INTEGER                       NOT NULL
+    sort     INTEGER                       NOT NULL DEFAULT -1
 )
 """.format(db.prefix))
 
