@@ -287,12 +287,3 @@ class TreeView(QtGui.QTreeView):
         if len(globalSelection):
             from . import mainwindow
             mainwindow.setGlobalSelection(globalSelection,self)
-            
-    def dragMoveEvent(self, event):
-        if event.keyboardModifiers() & Qt.ShiftModifier:
-            event.setDropAction(Qt.MoveAction)
-        elif event.keyboardModifiers() & Qt.ControlModifier:
-            event.setDropAction(Qt.CopyAction)
-        else:
-            event.setDropAction(event.proposedAction())
-        QtGui.QTreeView.dragMoveEvent(self, event)
