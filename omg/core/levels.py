@@ -242,7 +242,7 @@ class Level(QtCore.QObject):
         """Return a new level containing copies of the elements with given *ids*, named *name*."""
         level = Level(name, self)
         for id in ids:
-            level.load(self.children(id))
+            level.getFromIds(self.children(id))
         return level
 
 
