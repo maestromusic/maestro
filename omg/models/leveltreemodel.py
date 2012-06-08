@@ -53,7 +53,13 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
         else: return defaultFlags | Qt.ItemIsDropEnabled
         
     def dropMimeData(self,mimeData,action,row,column,parentIndex):
-        """This function does all the magic that happens if elements are dropped onto this editor."""
+        """Drop stuff into a leveltreemodel. Handles OMG mime and text/uri-list.
+        
+        If URLs are dropped, they are loaded into the level. If there is an album
+        guesser specified, it is run on the URLs before they are inserted.
+        
+        Elements dropped on the top layer are just inserted under the RootNode. Otherwise,
+        the level is modified accordingly."""
         
         if action == Qt.IgnoreAction:
             return True
@@ -67,21 +73,29 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
         # if something is dropped on no item, append it to the end of the parent
         if row == -1:
             row = parent.getContentsCount()
-
+        if parent is not self.root:
+            if row == 0:
+                insertPosition = 1
+            else:
+                insertPosition = parent.contents[row-1].position + 1
+        else:
+            insertPosition = None
         application.stack.beginMacro(self.tr("drop"))
         if mimeData.hasFormat(config.options.gui.mime):
             ids = [ node.element.id for node in mimeData.getNodes() if isinstance(node, Wrapper) ]
             if action == Qt.MoveAction:
-                removals = utils.listDict(( (None if isinstance(node.parent, RootNode) else node.parent.element.id,
-                                             node.position)
-                                            for node in mimeData.getNodes() if isinstance(node, Wrapper)))
+                removals = utils.listDict(( (node.parent, node.parent.contents.index(node))
+                                                if isinstance(node.parent, RootNode)
+                                                else (node.parent.element.id,node.position) )
+                                            for node in mimeData.getNodes() if isinstance(node, Wrapper))
                 for rparent, positions in removals.items():
-                    if rparent is None:
-                        continue
-                    removeCommand = commands.RemoveElementsCommand(self.level, rparent, positions)
-                    application.stack.push(removeCommand)
-                if None in removals:
-                    pass #TODO
+                    if isinstance(rparent, int):
+                        commands.removeElements(self.level, rparent, positions, self.tr("remove elements"))
+                        if parent is not self.root and parent.element.id == rparent:
+                            row -= len([pos for pos in positions if pos < insertPosition])
+                for rparent, rows in removals.items():
+                    if not isinstance(rparent, int):
+                        rparent.model.removeElements(rparent, rows)
                 
         else: # text/uri-list
             ids = self.prepareURLs(mimeData.urls(), parent)
@@ -92,23 +106,32 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
         return ret   
     
     def removeRows(self, row, count, parent):
+        """Qt should not handle removals."""
         return True
         
-    def insertElements(self, parent, index, ids):
-        """Undoably insert elements with *ids* (a list) at index "index" under *parent*, which
+    def insertElements(self, parent, row, ids):
+        """Undoably insert elements with *ids* (a list) under *parent*, which
         is a wrapper. This convenience function either fires a ChangeRootCommand, if the parent
         is the RootNode, or updates the level, if it's an element. In the latter case, a list
         of positions for the new elements may be given; if not, it is automatically inferred."""
         if parent is self.root:
             oldContentIDs = [node.element.id for node in self.root.contents ]
-            newContentIDs = oldContentIDs[:index] + ids + oldContentIDs[index:]
+            newContentIDs = oldContentIDs[:row] + ids + oldContentIDs[row:]
             application.stack.push(ChangeRootCommand(self, oldContentIDs, newContentIDs))
         else:
-            application.stack.push(commands.InsertElementsCommand(self.level, parent.element.id, index, ids))
+            commands.insertElements(self.level, parent.element.id, row, ids)
     
-    def removeElements(self, parent):
-        pass
-           
+    def removeElements(self, parent, rows):
+        """Undoably remove elements in *rows* under *parent* (a wrapper)."""
+        if parent is self.root:
+            oldContentIDs = [node.element.id for node in self.root.contents ]
+            newContentIDs = [oldContentIDs[i] for i in range(len(oldContentIDs)) if i not in rows]
+            application.stack.push(ChangeRootCommand(self, oldContentIDs, newContentIDs))
+        else:
+            commands.removeElements(self.level, parent.element.id,
+                                    [parent.contents[i].position for i in rows],
+                                    self.tr("Remove elements"))
+        
     def prepareURLs(self, urls, parent):
         '''This method is called if url MIME data is dropped onto this model, from an external file manager
         or a filesystembrowser widget.'''
