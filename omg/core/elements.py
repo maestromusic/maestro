@@ -61,6 +61,13 @@ class Element:
 
         return result
     
+    def inParentLevel(self):
+        if self.level.parent is None:
+            return None
+        elif self.id not in self.level.parent:
+            return None
+        else:
+            return self.level.parent.get(self.id)
 
 class Container(Element):
     """Element-subclass for containers. You must specify the level and id and whether this Container is

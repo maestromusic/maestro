@@ -72,7 +72,6 @@ class GrammarRenamer(profiles.Profile):
         ret["exists"] = False
         ret["value"] = None
         if "levelDef" in toks:
-            #print('levelDef: {}'.format(toks["levelDef"]["level"]))
             level = toks["levelDef"][0]
             if level > len(self.currentParents):
                 return ret
@@ -90,7 +89,7 @@ class GrammarRenamer(profiles.Profile):
             if tags.exists(macro.lower()):
                 tag = tags.get(macro.lower())
                 if tag in elemTag:
-                    ret["value"] = ",".join(map(str, elemTag[tag])).replace("/", "-")
+                    ret["value"] = ",".join(map(str, elemTag[tag])).translate(self.translation)
         ret["exists"] = (ret["value"] != None)
         if ret["value"] is None:
             ret["value"] = ""
@@ -105,12 +104,18 @@ class GrammarRenamer(profiles.Profile):
                 return toks["else"] if "else" in toks else []
         else: return tag.value
     
-    def __init__(self, name, formatString = "<artist>/I AM A DEFAULT FORMAT STRING/<1.title>/<#> - <title>"):
+    def __init__(self, name, formatString = "<artist>/I AM A DEFAULT FORMAT STRING/<1.title>/<#> - <title>",
+                 replaceChars = "\\:/", replaceBy = '_.;', removeChars="?*"):
         super().__init__(name)
         
         # grammar definition
         self.positionFormat = "{:0>" + str(config.options.renamer.positionDigits) + "}"
         self.formatString = formatString
+        if len(replaceChars) != len(replaceBy):
+            raise ValueError("replaceChars and replaceBy must equal in length")
+        self.replaceChars, self.replaceBy, self.removeChars = replaceChars, replaceBy, removeChars
+        self.translation = str.maketrans(replaceChars, replaceBy, removeChars)
+            
         pyparsing.ParserElement.setDefaultWhitespaceChars("\t\n")
         #pyparsing.ParserElement.enablePackrat() does not work (buggy)
         lbrace = Literal("<").suppress()
@@ -143,7 +148,7 @@ class GrammarRenamer(profiles.Profile):
         """Computes the new path for the element defined by *self.currentElem* and *self.currentParents*."""
         extension = self.currentElem.path.rsplit(".", 1)[1]
         try:
-            return "".join(self.expression.parseString(self.formatString)) + "." + extension
+            return  "".join(self.expression.parseString(self.formatString)) + "." + extension
         except pyparsing.ParseException as e:
             raise FormatSyntaxError(str(e))
         
@@ -163,27 +168,45 @@ class GrammarRenamer(profiles.Profile):
         return self.result
 
     def config(self):
-        return (self.formatString,)
+        return (self.formatString,self.replaceChars, self.replaceBy, self.removeChars)
+    
     @classmethod    
     def configurationWidget(cls, profile = None, parent = None):
-        widget = GrammarConfigurationWidget(parent)
-        if profile is not None:
-            widget.edit.setText(profileConfig.profiles[profile].formatString)
+        widget = GrammarConfigurationWidget(profileConfig[profile], parent)
         return widget
 
 class GrammarConfigurationWidget(profiles.ConfigurationWidget):
-        def __init__(self, parent = None):
+        def __init__(self, profile = None, parent = None):
             super().__init__(parent)
             self.edit = QtGui.QTextEdit()
+            self.replaceCharsEdit = QtGui.QLineEdit()
+            self.replaceByEdit = QtGui.QLineEdit()
+            self.removeCharsEdit = QtGui.QLineEdit()
+            hlay = QtGui.QHBoxLayout()
+            hlay.addWidget(QtGui.QLabel(self.tr("Replace:")))
+            hlay.addWidget(self.replaceCharsEdit)
+            hlay.addWidget(QtGui.QLabel(self.tr("By:")))
+            hlay.addWidget(self.replaceByEdit)
+            hlay.addWidget(QtGui.QLabel("And remove:"))
+            hlay.addWidget(self.removeCharsEdit)
             layout = QtGui.QVBoxLayout()
             layout.addWidget(self.edit)
+            layout.addLayout(hlay)
             self.setLayout(layout)
-            self.edit.textChanged.connect(self.handleTextChange)
+            if profile:
+                self.edit.setText(profile.formatString)
+                self.replaceCharsEdit.setText(profile.replaceChars)
+                self.replaceByEdit.setText(profile.replaceBy)
+                self.removeCharsEdit.setText(profile.removeChars)
+            self.edit.textChanged.connect(self.handleChange)
+            for edit in self.replaceCharsEdit, self.replaceByEdit, self.removeCharsEdit:
+                edit.textEdited.connect(self.handleChange)
         
-        def handleTextChange(self):
-            renamer = GrammarRenamer("temporary", self.edit.toPlainText())
+        def handleChange(self):
+            renamer = GrammarRenamer("temporary", *self.currentConfig())
             self.temporaryModified.emit(renamer)
             
         def currentConfig(self):
-            return (self.edit.toPlainText(),)
+            return (self.edit.toPlainText(), self.replaceCharsEdit.text(),
+                    self.replaceByEdit.text(), self.removeCharsEdit.text())
 
