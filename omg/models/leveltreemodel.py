@@ -276,10 +276,8 @@ class MergeCommand(QtGui.QUndoCommand):
                 self.tagChanges[id] = tags.TagDifference(element.tags, tagCopy)
         if isinstance(parent, Wrapper):
             self.elementParent = True
-            self.insertPosition = parent.element.contents[self.insertIndex][1]
-            
+            self.insertPosition = parent.element.contents.positions[self.insertIndex]
             self.parentID = parent.element.id
-            
             for index, (position, id) in enumerate(parent.element.contents.items()):
                 element = level.get(id)
                 if index in indices:
@@ -333,7 +331,7 @@ class MergeCommand(QtGui.QUndoCommand):
             db.transaction()
             modify.real.changeTags(self.tagChanges)
             modify.real.changeTags({self.containerID: tags.TagDifference(None, container.tags)})
-            db.write.addContents([(self.containerID, id, newPos) for (id, (oldPos,newPos)) in self.parentChanges.items()])
+            db.write.addContents([(self.containerID, newPos, id) for (id, (oldPos,newPos)) in self.parentChanges.items()])
             if self.elementParent:
                 db.write.removeAllContents([self.parentID])
                 db.write.addContents([(self.parentID, pos, childID) for pos,childID in parent.contents.items()])
