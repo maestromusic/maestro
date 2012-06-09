@@ -257,8 +257,8 @@ class TreeView(QtGui.QTreeView):
         
     def selectionChanged(self, selected, deselected):
         super().selectionChanged(selected, deselected)
-        self.updateGlobalSelection(selected, deselected)
         self.updateNodeSelection()
+        self.updateGlobalSelection(selected, deselected)
     
     def currentNode(self):
         current = self.currentIndex()
@@ -273,17 +273,9 @@ class TreeView(QtGui.QTreeView):
         return [(self.model().data(itemRange.parent()),itemRange.top(),itemRange.bottom())
                     for itemRange in selection]
             
-        
     def updateGlobalSelection(self, selected, deselected):
-        #TODO rewrite
-        """Change the global selection if some any elements are selected in any views. Connect the
-        selectionChanged() signal of the selection model to this slot to obtain the desired effect."""
-        globalSelection = []
-        for index in self.selectionModel().selectedIndexes():
-            node = self.model().data(index)
-            # The browser does not load tags automatically
-            if isinstance(node, Wrapper):
-                globalSelection.append(node.element)
+        """Change the global selection if some elements are selected in this view."""
+        globalSelection = [n for n in self.nodeSelection.nodes() if isinstance(n,Wrapper)]
         if len(globalSelection):
             from . import mainwindow
-            mainwindow.setGlobalSelection(globalSelection,self)
+            mainwindow.setGlobalSelection(globalSelection[0].element.level,globalSelection)
