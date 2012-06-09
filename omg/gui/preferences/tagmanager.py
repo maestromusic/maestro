@@ -370,8 +370,8 @@ class TagManagerTableWidget(QtGui.QTableWidget):
             from ...core import levels
             for element in levels.editor.elements:
                 if tag in element.tags:
-                    return 0, False
-            return 0,True
+                    return False,0,True
+            return True,0,False
         
     def _getColumnIndex(self,columnKey):
         """Return the index of the column with the given key (i.e. the first part of the corresponding tuple
