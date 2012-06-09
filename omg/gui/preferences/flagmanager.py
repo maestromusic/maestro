@@ -286,5 +286,5 @@ def createNewFlagType(parent = None):
         return None
     else:
         application.stack.push(flags.FlagTypeUndoCommand(constants.ADDED,name=name))
-        return True
+        return flags.get(name)
     

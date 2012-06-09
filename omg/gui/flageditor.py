@@ -339,7 +339,8 @@ class AddFlagPopup(dialogs.FancyPopup):
         elements that are currently edited."""
         from .preferences import flagmanager
         flag = flagmanager.createNewFlagType(self.parent())
-        self.model.addFlag(flag)
+        if flag is not None:
+            self.model.addFlag(flag)
         self.close()
 
     def _handleManagerButton(self):
