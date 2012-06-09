@@ -16,11 +16,15 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+import functools
+
 from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
 from .. import application, utils, database as db, constants
 from ..core import tags
+
+translate = QtCore.QCoreApplication.translate
 
 
 class TagLabel(QtGui.QLabel):
@@ -294,29 +298,41 @@ class TagTypeBox(QtGui.QStackedWidget):
     
     def _handleDispatcher(self,event):
         """React upon TagTypeChangedEvents and TagTypeOrderChangeEvents from the dispatcher."""
-        if isinstance(event,tags.TagTypeChangedEvent):
-            if event.action == constants.ADDED:
-                # Do not add twice
-                for i in range(self.box.count()):
-                    if self.box.itemData(i) == event.tagType:
-                        return
-                else: self._addTagToBox(event.tagType)
-            elif event.action == constants.DELETED:
-                for i in range(self.box.count()):
-                    if self.box.itemData(i) == event.tagType:
-                        self.box.removeItem(i)
-                        return
-            elif event.action == constants.CHANGED:
-                for i in range(self.box.count()):
-                    if self.box.itemData(i) == event.tagType:
-                        self.box.setItemText(i,event.tagType.title)
-                        if event.tagType.icon is not None:
-                            self.box.setItemIcon(i,event.tagType.icon)
-                        # Do not change the tag because there is only one instance
-                        return
-        elif isinstance(event,tags.TagTypeOrderChangeEvent):
+        if isinstance(event,(tags.TagTypeChangedEvent,tags.TagTypeOrderChangeEvent)):
             self._createItems()
 
+
+class TagTypeButton(QtGui.QPushButton):
+    """Button with a menu to choose a tagtype from. When a tagtype has been chosen the signal tagChosen is
+    emitted with that tagtype."""
+    tagChosen = QtCore.pyqtSignal(tags.Tag)
+    
+    def __init__(self,text=None):
+        if text is None:
+            text = translate("TagTypeButton","Add tag")
+        super().__init__(text)
+        self.setIcon(utils.getIcon("add.png"))
+        
+        self.setMenu(QtGui.QMenu())
+        self._fillMenu()
+        application.dispatcher.changes.connect(self._handleDispatcher)
+        
+    def _fillMenu(self):
+        """Fill the menu with an action for each tagtype."""
+        menu = self.menu()
+        menu.clear()
+        for tagType in tags.tagList:
+            if tagType.icon is not None:
+                action = menu.addAction(tagType.icon,tagType.title)
+                action.setIconVisibleInMenu(True)
+            else: action = menu.addAction(tagType.title)
+            action.triggered.connect(functools.partial(self.tagChosen.emit,tagType))
+        
+    def _handleDispatcher(self,event):
+        """React upon TagTypeChangedEvents and TagTypeOrderChangeEvents from the dispatcher."""
+        if isinstance(event,(tags.TagTypeChangedEvent,tags.TagTypeOrderChangeEvent)):
+            self._fillMenu()
+        
 
 class TagValueEditor(QtGui.QWidget):
     """A flexible editor to edit tag values. Depending on the tag type which may change during runtime a
@@ -401,7 +417,7 @@ class TagValueEditor(QtGui.QWidget):
         else: return self.editor
 
     def _createEditor(self,tag):
-        """Return an editor widget suitable to edit values of the given tag."""
+        """Set the editor to a widget suitable to edit values of the given tag."""
         editor = self._editorClass(tag)() # Create a new instance of that class
         if self.hideEditor:
             from .misc import hiddeneditor
@@ -411,6 +427,7 @@ class TagValueEditor(QtGui.QWidget):
         else:
             self.editor = editor
             self.editor.editingFinished.connect(self._handleValueChanged)
+        self.setFocusProxy(self.editor)
 
     def _editorClass(self,tag=None):
         """Return a class of widgets suitable to edit values of the given tag (e.g. QLineEdit)."""

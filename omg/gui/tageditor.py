@@ -175,9 +175,11 @@ class TagEditorWidget(QtGui.QWidget):
         self.topLayout.addWidget(label)
         
         # Texts will be set in _changeLayout
-        self.addButton = QtGui.QPushButton()
-        self.addButton.setIcon(utils.getIcon("add.png"))
-        self.addButton.clicked.connect(lambda: self._handleAddRecord(None))
+        self.addButton = tagwidgets.TagTypeButton()
+        self.addButton.tagChosen.connect(self._handleAddRecord)
+        #self.addButton = QtGui.QPushButton()
+        #self.addButton.setIcon(utils.getIcon("add.png"))
+        #self.addButton.clicked.connect(lambda: self._handleAddRecord(None))
         self.topLayout.addWidget(self.addButton)
         self.removeButton = QtGui.QPushButton()
         self.removeButton.setIcon(utils.getIcon("remove.png"))
@@ -532,6 +534,10 @@ class RecordDialog(QtGui.QDialog):
         layout.addWidget(self.elementsBox)
 
         layout.addWidget(buttonBox)
+        
+        if defaultTag is None:
+            self.typeEditor.setFocus(Qt.PopupFocusReason)
+        else: self.valueEditor.setFocus(Qt.PopupFocusReason)
     
     def _handleOkButton(self):
         """Check whether at least one element is selected and the current value is valid and if so, exit."""
