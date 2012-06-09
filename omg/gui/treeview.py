@@ -279,4 +279,3 @@ class TreeView(QtGui.QTreeView):
         if len(globalSelection):
             from . import mainwindow
             mainwindow.setGlobalSelection(globalSelection[0].element.level,globalSelection)
-            

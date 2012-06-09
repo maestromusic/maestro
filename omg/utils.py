@@ -43,6 +43,15 @@ def dictOrIdentity(dct):
     """Returns a function that returns dct[x] if x in dct and x otherwise."""
     return lambda x : dct[x] if x in dct else x
 
+def listDict(input):
+    """Expects *input* to be an iterable of tuples. Returns a dict mapping each object that
+    appears as a first item of a tuple to a list of those appearing as second."""
+    ret = {}
+    for a,b in input:
+        if a not in ret:
+            ret[a] = []
+        ret[a].append(b)
+    return ret
 
 def walk(node):
     """A tree iterator for elements, inspired by os.walk: Returns a tuple (node, contents)

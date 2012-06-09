@@ -26,8 +26,6 @@ from .. import database as db, logging, utils
 from ..modify import real as modifyReal
 from ..database import write
 
-import os.path
-
 logger = logging.getLogger(__name__)
 
 class CommitCommand(QtGui.QUndoCommand):
@@ -259,41 +257,102 @@ class InsertElementsCommand(QtGui.QUndoCommand):
     """A specialized command to insert elements into an existing container."""
     
     def __init__(self, level, parentId, row, insertedIds, text='insert elements'):
-        """Create the command for given *level* inserting elements into *parentId*
-        at row index *row*. *insertedIds* is the IDs list of the elements to be inserted.
-        Positions are inferred from the context, and positions of subsequent elements
-        will be adjusted if necessary."""
-        super().__init__(level = level, ids = [parentId], contents = True, text = text)
+        """Create the command for inserting elements into *parentId* at row index *row*.
+        
+        *insertedIds* is the IDs list of the elements to be inserted. This will lead
+        to unpredictable problems if the needed position range is not free; use insertElements
+        instead."""
+        super().__init__()
         self.row = row
-        newContents = level.get(parentId).contents.copy()
-        firstPosition = 1 if row == 0 else newContents[row-1][0] 
-        newContents.ids[row:row] = insertedIds
-        self.insertedIds = insertedIds
-        newContents.positions[row:row] = range(firstPosition, firstPosition + len(insertedIds))
-        # adjust subsequent positions
-        for i in range(row+len(insertedIds), len(newContents.positions)):
-            if newContents.positions[i] <= newContents.positions[i-1]:
-                newContents.positions[i] = newContents.positions[i-1] + 1
-        self.newContents = newContents
+        self.level = level
+        self.parentId = parentId
+        contents = level.get(parentId).contents
+        firstPosition = 1 if row == 0 else contents.positions[row-1]+1
+        import itertools
+        self.insertions = list(zip(itertools.count(start=firstPosition), insertedIds))
         
-    def redoChanges(self):
-        parentId = self.ids[0]
-        self.oldContents = self.level.get(parentId).contents
-        self.level.get(parentId).contents = self.newContents
-        for id in self.insertedIds:
-            self.level.get(id).parents.append(parentId)
-        if self.level is levels.real:
-            raise NotImplementedError()
+    def redo(self):
+        self.level.insertChildren(self.parentId, self.insertions)
+        self.level.emitEvent(contentIds = (self.parentId, ))
         
-    def undoChanges(self):
-        parentId = self.ids[0]
-        self.newContents = self.level.get(parentId).contents
-        self.level.get(parentId).contents = self.oldContents
-        for id in self.insertedIds:
-            self.level.get(id).parents.remove(parentId)
-        if self.level is levels.real:
-            raise NotImplementedError()
+    def undo(self):
+        self.level.removeChildren(self.parentId, list(zip(*self.insertions))[0])
+        self.level.emitEvent(contentIds = (self.parentId, ))
 
+def insertElements(level, parentId, row, insertedIds, text = None):
+    """Safely insert elements into a parent container.
+    
+    This method changes positions of subsequent elements, if necessary."""
+    from ..application import stack
+    stack.beginMacro(text)
+    parent = level.get(parentId)
+    if len(parent.contents) > row:
+        firstPos = 1 if row == 0 else parent.contents.positions[row-1]+1
+        lastPosition = firstPos + len(insertedIds) - 1
+        shift = lastPosition - parent.contents.positions[row] + 1
+        if shift > 0:
+            posCommand = ChangePositionsCommand(level, parentId,
+                                                parent.contents.positions[row:],
+                                                shift)
+            stack.push(posCommand)
+    insertCommand = InsertElementsCommand(level, parentId, row, insertedIds)
+    stack.push(insertCommand)
+    stack.endMacro()
+    
+class RemoveElementsCommand(QtGui.QUndoCommand):
+    """Remove some elements from a single parent."""
+    def __init__(self, level, parentId, positions, text = None):
+        super().__init__()
+        if text:
+            self.setText(text)
+        self.level = level
+        self.parentId = parentId
+        self.positions = positions
+        parent = level.get(parentId)
+        self.childIds = [parent.contents.getId(position) for position in positions]
+        
+    def redo(self):
+        self.level.removeChildren(self.parentId, self.positions)
+        self.level.emitEvent(contentIds= (self.parentId,) )
+    
+    def undo(self):
+        self.level.insertChildren(self.parentId, list(zip(self.positions, self.childIds)))
+        self.level.emitEvent(contentIds= (self.parentId,) )
+
+def removeElements(level, parentId, positions, text = None):
+    """Remove elements from a parent and intelligently adjust subsequent positions.
+    
+    If there is an element following the last one deleted, and that element's position
+    is the previous one's plus 1, then positions of subsequent elements are reduced
+    to fit."""
+    from .. import application
+    import itertools
+    parent = level.get(parentId)
+    positions = sorted(positions)
+    lastRemovePosition = positions[-1]
+    lastRemoveIndex = parent.contents.positions.index(lastRemovePosition)
+    for i,p1,p2 in zip(
+        itertools.count(start=1),
+        reversed(positions),
+        reversed(parent.contents.positions[lastRemoveIndex-len(positions):lastRemoveIndex+1])):
+        if p1 == p2:
+            shift = -i
+        else:
+            break
+            
+                 
+    if len(parent.contents) > lastRemoveIndex+1 and parent.contents.positions[lastRemoveIndex+1] == positions[-1] + 1:
+        shiftPositions = parent.contents.positions[lastRemoveIndex+1:]
+    else:
+        shiftPositions = None
+    removeCommand = RemoveElementsCommand(level, parentId, positions, text)
+    application.stack.beginMacro(text)
+    application.stack.push(removeCommand)
+    if shiftPositions:
+        posCommand = ChangePositionsCommand(level, parentId, shiftPositions, shift)
+        application.stack.push(posCommand)
+    application.stack.endMacro()
+    
 class ChangeMajorFlagCommand(QtGui.QUndoCommand):
     def __init__(self, level, ids):
         super().__init__()

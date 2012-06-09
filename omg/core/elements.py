@@ -193,6 +193,7 @@ class ContentList:
         return len(self.ids)
     
     def __getitem__(self, i):
+        raise RuntimeError("don't use this function, it is ambiguous and thus dangerous")
         return self.ids[i], self.positions[i]
     
     def __delitem__(self, i):

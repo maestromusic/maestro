@@ -197,19 +197,30 @@ class Level(QtCore.QObject):
     
     def insertChild(self, parentId, position, childId):
         """Insert element with id *childId* at *position* under *parentId*."""
+        self.insertChildren(parentId, ( (position, childId), ))
+    
+    def insertChildren(self, parentId, insertions):
+        """Insert elements under *parentId*, which are given by an iterable of (position, id)
+        tuples."""
         parent = self.get(parentId)
-        parent.contents.insert(position, childId)
-        if not parentId in self.get(childId).parents:
-            self.get(childId).parents.append(parentId)
+        for pos, id in insertions:
+            parent.contents.insert(pos, id)
+            if not parentId in self.get(id).parents:
+                self.get(id).parents.append(parentId)
         
     def removeChild(self, parentId, position):
         """Remove element at *position* from container with id *parentId*."""
-        parent = self.get(parentId)
-        childId = parent.contents.getId(position)
-        parent.contents.remove(pos = position)
-        if childId not in parent.contents.ids:
-            self.get(childId).parents.remove(parentId)
+        self.removeChildren(parentId, (position,) )
     
+    def removeChildren(self, parentId, positions):
+        parent = self.get(parentId)
+        childIds = [parent.contents.getId(position) for position in positions]
+        for pos in positions:
+            parent.contents.remove(pos = pos)
+        for id in childIds:
+            if id not in parent.contents.ids:
+                self.get(id).parents.remove(parentId)
+                
     def renameFiles(self, map, emitEvent = True):
         """Rename files based on *map*, which is a dict from ids to new paths.
         
@@ -231,7 +242,7 @@ class Level(QtCore.QObject):
         """Return a new level containing copies of the elements with given *ids*, named *name*."""
         level = Level(name, self)
         for id in ids:
-            level.load(self.children(id))
+            level.getFromIds(self.children(id))
         return level
 
 
@@ -374,6 +385,14 @@ class RealLevel(Level):
             elem = File(level,id = id,path=rpath,length=length,tags=fileTags,flags=flags)
             elem.fileTags = fileTags.copy()
             level.elements[id] = elem
+    
+    def insertChildren(self, parentId, insertions):
+        db.write.addContents([(parentId, pos, id) for pos,id in insertions])
+        super().removeChildren(parentId, insertions)
+        
+    def removeChildren(self, parentId, positions):
+        db.write.removeContents([(parentId, pos) for pos in positions])
+        super().removeChildren(parentId, positions)
     
     def addTagValue(self,tag,value,elements,emitEvent=True):
         super().addTagValue(tag,value,elements,emitEvent=False)
