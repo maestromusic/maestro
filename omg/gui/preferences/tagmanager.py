@@ -361,8 +361,8 @@ class TagManagerTableWidget(QtGui.QTableWidget):
             return number,False
         else:
             from ...core import levels
-            for elem in levels.editor.elements:
-                if tag in node.element.tags:
+            for element in levels.editor.elements:
+                if tag in element.tags:
                     return 0, False
             return 0,True
         
