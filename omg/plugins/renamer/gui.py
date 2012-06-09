@@ -52,19 +52,31 @@ class PathDelegate(delegates.StandardDelegate):
                 delegates.StandardDelegate.options,
                 [],
                 [],
-                {"showPaths": True, 'showMajor': False, 'appendRemainingTags': False, 'showAllAncestors': False}
+                {"showPaths": True, 'showMajor': False, 
+                 'appendRemainingTags': False, 'showAllAncestors': False,
+                 'showFlagIcons' : False}
     )
     
     def __init__(self, view): 
         super().__init__(view) 
-        self.newPathStyle = abstractdelegate.DelegateStyle(1, False, True, Qt.red) 
+        self.newPathStyleNew = abstractdelegate.DelegateStyle(1, False, True, Qt.darkGreen)
+        self.newPathStyleOld = abstractdelegate.DelegateStyle(1, False, True, Qt.red)
+        self.unchangedStyle = abstractdelegate.DelegateStyle(1, False, True, Qt.gray) 
         self.result = {} 
         
     def addPath(self, element):
-        if element.isFile() and element.id in self.result:
-            self.addCenter(delegates.TextItem(element.path,delegates.ITALIC_STYLE))
-            self.newRow()
-            self.addCenter(delegates.TextItem(self.result[element.id], self.newPathStyle))
+        if element.isFile():
+            oldPath = element.inParentLevel().path
+            newPath= element.path
+            if oldPath != newPath:
+                    self.addCenter(delegates.TextItem(self.tr("From: {}").format(oldPath),
+                                                      self.newPathStyleOld))
+                    self.newRow()
+                    self.addCenter(delegates.TextItem(self.tr("To: {}").format(newPath),
+                                                  self.newPathStyleNew))
+            else:
+                self.addCenter(delegates.TextItem(self.tr("Unchanged: {}").format(element.path),
+                                                  self.unchangedStyle))
             
     
 class RenameDialog(QtGui.QDialog):
@@ -82,8 +94,15 @@ class RenameDialog(QtGui.QDialog):
         configDisplay.temporaryModified.connect(self._handleTempChange)
         configDisplay.profileChanged.connect(self._handleProfileChange)
         self.statusLabel = QtGui.QLabel()
-        mainLayout.addWidget(self.statusLabel, 1)
         self.statusLabel.setVisible(False)
+        f = self.statusLabel.font()
+        f.setBold(True)
+        pal = self.statusLabel.palette()
+        pal.setColor(self.statusLabel.backgroundRole(), Qt.red)
+        self.statusLabel.setFont(f)
+        self.statusLabel.setAutoFillBackground(True)
+        self.statusLabel.setPalette(pal)
+
         
         self.sublevel = level.subLevel(ids, "rename")
         self.model = leveltreemodel.LevelTreeModel(self.sublevel, ids)
@@ -93,16 +112,18 @@ class RenameDialog(QtGui.QDialog):
         self.tree.setItemDelegate(self.delegate)
         self.tree.expandAll()
         
+        self.bb = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Cancel | QtGui.QDialogButtonBox.Ok)
+        self.bb.accepted.connect(self.accept)
+        self.bb.rejected.connect(self.reject)
+        
         if configDisplay.currentProfileName() != '':
             self._handleProfileChange(configDisplay.currentProfileName())
         mainLayout.addWidget(self.tree, 100)
-        bb = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Cancel | QtGui.QDialogButtonBox.Ok)
-        bb.accepted.connect(self.accept)
-        bb.rejected.connect(self.reject)
+        mainLayout.addWidget(self.statusLabel,1)
+        mainLayout.addWidget(self.bb)
         
-        mainLayout.addWidget(bb)
         self.setLayout(mainLayout)
-        self.resize(800,500)
+        self.resize(800,700)
     
     def _handleProfileChange(self, name):
         profile = plugin.profileConfig[name]
@@ -118,10 +139,17 @@ class RenameDialog(QtGui.QDialog):
             for id, elem in self.sublevel.elements.items():
                 if id in totalResult:
                     elem.path = totalResult[id]
-            self.statusLabel.hide()
+            if len(set(totalResult.values())) != len(totalResult): # duplicate paths!
+                self.bb.button(QtGui.QDialogButtonBox.Ok).setEnabled(False)
+                self.statusLabel.setText(self.tr("New paths are not unique! Please fix"))
+                self.statusLabel.show()
+            else:
+                self.statusLabel.hide()
+                self.bb.button(QtGui.QDialogButtonBox.Ok).setEnabled(True)
         except plugin.FormatSyntaxError:
             self.statusLabel.setText(self.tr("Syntax error in format string"))
             self.statusLabel.show()
+            self.bb.button(QtGui.QDialogButtonBox.Ok).setEnabled(False)
         self.model.modelReset.emit()
         self.tree.expandAll()
         

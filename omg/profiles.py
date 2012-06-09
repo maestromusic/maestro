@@ -53,9 +53,7 @@ class ProfileConfiguration(QtCore.QObject):
     def loadConfig(self):
         for name, clsName, *config in self.configSection["profiles"]:
             if clsName in self.classes:
-                self.profiles[name] = self.classes[clsName](name, *config)
-                print('initalized profile {} with *config={}'.format(name, config))
-                
+                self.profiles[name] = self.classes[clsName](name, *config)                
             else:
                 logger.warning("could not load {} profile {}: class {} not found".format(self.name, name, clsName))
     
@@ -64,7 +62,6 @@ class ProfileConfiguration(QtCore.QObject):
         for name, profile in self.profiles.items():
             configContents.append( (name, profile.className) + tuple(profile.config())  )
         self.configSection["profiles"] = configContents
-        print(self.configSection["profiles"])
             
     def addClass(self, cls):
         if cls.className not in self.classes:
@@ -73,7 +70,6 @@ class ProfileConfiguration(QtCore.QObject):
             for name, className, *config in self.configSection["profiles"]:
                 if className == cls.className:
                     self.profiles[name] = self.classes[className](name, *config)
-                    print('initalized profile {} with *config={}'.format(name, config))
             self.classAdded.emit(cls.className)
     
     def removeClass(self, cls):
@@ -201,7 +197,6 @@ class ProfileComboBox(QtGui.QComboBox):
         self.includeConfigure = includeConfigure
         if includeConfigure:
             self.addItem(self.tr("configure..."))
-            self.view().activated.connect(lambda idx: print(idx.row()))
         profileConf.profileAdded.connect(self.handleProfileAdded)
         self.currentIndexChanged[int].connect(self.handleIndexChange)
         self.activated[int].connect(self.handleActivation)

@@ -231,12 +231,13 @@ class VolumeLabel(QtGui.QLabel):
     def setVolume(self, volume):
         """Display the appropriate icon for the given volume."""
         if volume != self.volume:
+            self.setVisible(volume != -1)
             self.setPixmap(self.volumeIcon(volume))
             if volume == 0:
                 self.lastVolume = self.volume
             self.volume = volume
             self.setToolTip(self.tr('{}%').format(volume))
-    
+        
     @staticmethod
     def volumeIcon(volume):
         """Maps the given volume to the appropriate icon."""
