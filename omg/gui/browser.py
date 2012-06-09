@@ -55,7 +55,7 @@ class BrowserDock(QtGui.QDockWidget):
             if isinstance(node,Wrapper):
                 globalSelection.append(node.element)
         if len(globalSelection):
-            mainwindow.setGlobalSelection(globalSelection,self.widget())
+            mainwindow.setGlobalSelection(levels.real,globalSelection)
             
 
 mainwindow.addWidgetData(mainwindow.WidgetData(

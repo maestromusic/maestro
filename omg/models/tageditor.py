@@ -405,18 +405,16 @@ class TagEditorModel(QtCore.QObject):
     
     Model parameters are:
     
-        - level: whether changes in this model affect the database or the editor
+        - level: the level that contains the elements
         - elements: a list of elements whose flags will be displayed and edited by this model.
         - stack: An undo stack or None, in which case the global stack will be used (only use your own stacks
           in modal dialogs)
     """
     resetted = QtCore.pyqtSignal()
     
-    def __init__(self,level,elements,stack=None):
+    def __init__(self,level=None,elements=None,stack=None):
         QtCore.QObject.__init__(self)
-        
-        self.level = level
-        self.level.changed.connect(self._handleLevelChanged)
+            
         self._statusNumber = 0
         
         self.records = RecordModel()
@@ -428,8 +426,11 @@ class TagEditorModel(QtCore.QObject):
         self.recordChanged = self.records.recordChanged
         self.recordMoved = self.records.recordMoved
         self.commonChanged = self.records.commonChanged
-            
-        self.setElements(elements)
+        
+        self.level = None # will be set in self.setElements
+        if elements is None:
+            elements = []
+        self.setElements(level,elements)
         
         if stack is None:
             self.stack = application.stack
@@ -447,9 +448,15 @@ class TagEditorModel(QtCore.QObject):
         """Return a list of all elements currently being edited in the tageditor."""
         return self.elements
     
-    def setElements(self,elements):
+    def setElements(self,level,elements):
         """Set the list of elements currently edited and reset the tageditor."""
         self._statusNumber += 1
+        if self.level != level:
+            if self.level is not None:
+                self.level.changed.connect(self._handleLevelChanged)
+            if level is not None:
+                level.changed.connect(self._handleLevelChanged)
+        self.level = level
         self.elements = elements
         records = self._createRecords()
         self.records.setRecords(records.values())

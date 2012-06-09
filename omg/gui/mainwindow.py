@@ -49,6 +49,7 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from .. import application, config, constants, logging, modify
+from ..core import levels
 
 # This will contain the single instance of MainWindow once it is initialized
 mainWindow = None
@@ -59,8 +60,8 @@ logger = logging.getLogger("omg.gui.mainwindow")
 _widgetData = []
 
 # Global selection
+_globalSelectionLevel = None
 _globalSelection = None
-_globalSelectionSource = None
 
 
 def addWidgetData(data):
@@ -83,15 +84,18 @@ def removeWidgetData(id):
 
 
 def getGlobalSelection():
-    return _globalSelection,_globalSelectionSource
+    """Return the level in which the global selection is contained and the wrappers that form the current
+    global selection."""
+    return _globalSelectionLevel,_globalSelection
 
 
-def setGlobalSelection(elements,source):
-    global _globalSelection
-    _globalSelection = elements
-    _globalSelectionSource = source
+def setGlobalSelection(level,wrappers):
+    """Set the global selection."""
+    global _globalSelectionLevel, _globalSelection
+    _globalSelectionLevel = level
+    _globalSelection = wrappers
     if mainWindow is not None:
-        mainWindow.globalSelectionChanged.emit(elements,source)
+        mainWindow.globalSelectionChanged.emit(level,wrappers)
         
     
 class WidgetData:
@@ -166,7 +170,7 @@ class MainWindow(QtGui.QMainWindow):
     # hidden docks.
     _dockWidgets = None
     
-    globalSelectionChanged = QtCore.pyqtSignal(list,QtCore.QObject)
+    globalSelectionChanged = QtCore.pyqtSignal(levels.Level,list)
     
     def __init__(self,parent=None):
         super().__init__(parent)

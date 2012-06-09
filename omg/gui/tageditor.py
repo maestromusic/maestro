@@ -43,35 +43,30 @@ class TagEditorDock(QtGui.QDockWidget):
         else: vertical = False # Should not happen
         self.dockLocationChanged.connect(self._handleLocationChanged)
         self.topLevelChanged.connect(self._handleLocationChanged)
-        
-        self.tabWidget = QtGui.QTabWidget()
-        self.tabWidget.setTabPosition(QtGui.QTabWidget.North if vertical else QtGui.QTabWidget.West)
-        self.setWidget(self.tabWidget)
-        
-        self.realEditorWidget = TagEditorWidget(levels.real,vertical=vertical)
-        self.editorEditorWidget = TagEditorWidget(levels.editor,vertical=vertical)
-        self.tabWidget.addTab(self.realEditorWidget,self.tr("Real"))
-        self.tabWidget.addTab(self.editorEditorWidget,self.tr("Editor"))
-        
+            
         self.setAcceptDrops(True)
         
+        self.editorWidget = TagEditorWidget(vertical=vertical)
+        self.setWidget(self.editorWidget)
         mainwindow.mainWindow.globalSelectionChanged.connect(self._handleSelectionChanged)
         
     def _handleLocationChanged(self,area):
+        """Handle changes in the dock's position."""
         vertical = self.isFloating() or area in [Qt.LeftDockWidgetArea,Qt.RightDockWidgetArea]
-        self.tabWidget.setTabPosition(QtGui.QTabWidget.North if vertical else QtGui.QTabWidget.West)
-        self.realEditorWidget.setVertical(vertical)
-        self.editorEditorWidget.setVertical(vertical) 
+        self.editorWidget.setVertical(vertical)
     
-    def _handleSelectionChanged(self,elements,source):
-        """React to changes to the global selection: Load the selected elements in the correct
-        TagEditorWidget."""
-        if isinstance(source,editor.EditorTreeView):
-            self.editorEditorWidget.setElements(elements)
-            self.tabWidget.setCurrentWidget(self.editorEditorWidget)
-        else:
-            self.realEditorWidget.setElements(elements)
-            self.tabWidget.setCurrentWidget(self.realEditorWidget)
+    def _handleSelectionChanged(self,level,wrappers):
+        """React to changes to the global selection: Load the elements of the selected wrappers
+        into the TagEditorWidget."""
+        if len(wrappers) == 0:
+            return
+        elements = []
+        ids = set()
+        for wrapper in wrappers:
+            if wrapper.element.id not in ids:
+                ids.add(wrapper.element.id)
+                elements.append(wrapper.element)
+        self.editorWidget.setElements(level,elements)
         
     def dragEnterEvent(self,event):
         if event.mimeData().hasFormat(config.options.gui.mime) or event.mimeData().hasUrls():
@@ -79,21 +74,27 @@ class TagEditorDock(QtGui.QDockWidget):
 
     def dropEvent(self,event):
         mimeData = event.mimeData()
-        if isinstance(event.source(),editor.EditorTreeView):
-            editorWidget = self.editorEditorWidget
-        else: editorWidget = self.realEditorWidget
         
         if mimeData.hasFormat(config.options.gui.mime):
-            editorWidget.setElements(mimeData.getElements())
-            event.acceptProposedAction()
+            allElements = (w.element for w in mimeData.getWrappers())
+            level = mimeData.level
         elif mimeData.hasUrls():
-            elements = [File.fromFilesystem(url.toLocalFile()) for url in event.mimeData().urls()
-                           if url.isValid() and url.scheme() == 'file' and os.path.exists(url.toLocalFile())]
-            editorWidget.setElements(elements)
-            event.acceptProposedAction()
+            allElements = levels.real.getFromPaths(url for url in event.mimeData().urls()
+                           if url.isValid() and url.scheme() == 'file' and os.path.exists(url.toLocalFile()))
+            level = levels.real
         else:
             logger.warning("Invalid drop event (supports only {})".format(", ".join(mimeData.formats())))
-        self.tabWidget.setCurrentWidget(editorWidget)
+            return
+        
+        elements = []
+        ids = set()
+        for element in allElements:
+            if element.id not in ids:
+                ids.add(element.id)
+                elements.append(element)
+        
+        self.editorWidget.setElements(level,elements)
+        event.acceptProposedAction()
         
         
 mainwindow.addWidgetData(mainwindow.WidgetData(
@@ -108,13 +109,14 @@ mainwindow.addWidgetData(mainwindow.WidgetData(
     
     
 class TagEditorDialog(QtGui.QDialog):
+    #TODO rewrite so that it uses its own level
     def __init__(self,level,elements,parent=None):
         QtGui.QDialog.__init__(self,parent)
         self.setLayout(QtGui.QVBoxLayout())
         self.tagedit = TagEditorWidget(level,elements)
         self.layout().addWidget(self.tagedit)
         self.setWindowTitle(self.tr("Edit tags"))
-        self.resize(600,450) #TODO: cleverer
+        self.resize(600,450) #TODO: make this cleverer
         
         style = QtGui.QApplication.style()
         
@@ -143,20 +145,17 @@ class TagEditorWidget(QtGui.QWidget):
     # confer _handleTagChanged and _handleTagChangedByUser.
     _ignoreHandleTagChangedByUser = False
     
-    def __init__(self,level,elements=None,vertical=False,stack=None):
+    def __init__(self,level=None,elements=None,vertical=False,stack=None):
         QtGui.QWidget.__init__(self)
-        self.level = level
         self.vertical = None # will be set in setVertical below
-        if elements is None:
-            elements = []
         
-        self.model = tageditormodel.TagEditorModel(level,elements,stack)
+        self.model = tageditormodel.TagEditorModel(stack=stack)
         self.model.tagInserted.connect(self._handleTagInserted)
         self.model.tagRemoved.connect(self._handleTagRemoved)
         self.model.tagChanged.connect(self._handleTagChanged)
         self.model.resetted.connect(self._handleReset)
 
-        self.flagModel = flageditormodel.FlagEditorModel(level,elements,stack)
+        self.flagModel = flageditormodel.FlagEditorModel(stack=stack)
         self.flagModel.resetted.connect(self._checkFlagEditorVisibility)
         self.flagModel.recordInserted.connect(self._checkFlagEditorVisibility)
         self.flagModel.recordRemoved.connect(self._checkFlagEditorVisibility)
@@ -170,16 +169,12 @@ class TagEditorWidget(QtGui.QWidget):
         self.topLayout = QtGui.QHBoxLayout()
         self.layout().addLayout(self.topLayout)
 
-        label = QtGui.QLabel()
-        label.setPixmap(utils.getPixmap('real.png' if level == levels.real else 'editor.png'))
-        self.topLayout.addWidget(label)
+        self.levelLabel = QtGui.QLabel()
+        self.topLayout.addWidget(self.levelLabel)
         
         # Texts will be set in _changeLayout
         self.addButton = tagwidgets.TagTypeButton()
         self.addButton.tagChosen.connect(self._handleAddRecord)
-        #self.addButton = QtGui.QPushButton()
-        #self.addButton.setIcon(utils.getIcon("add.png"))
-        #self.addButton.clicked.connect(lambda: self._handleAddRecord(None))
         self.topLayout.addWidget(self.addButton)
         self.removeButton = QtGui.QPushButton()
         self.removeButton.setIcon(utils.getIcon("remove.png"))
@@ -218,17 +213,19 @@ class TagEditorWidget(QtGui.QWidget):
         flagScrollArea = QtGui.QScrollArea()
         flagScrollArea.setWidgetResizable(True)
         flagScrollArea.setMaximumHeight(40)
-        # Vertical model of the flageditor is not used
+        # Vertical mode of the flageditor is not used
         flagEditor = flageditor.FlagEditor(self.flagModel,False)
         flagScrollArea.setWidget(flagEditor)
         self.flagWidget.layout().addWidget(flagScrollArea,1)
-        self._checkFlagEditorVisibility()
         
         self.singleTagEditors = {}
         self.tagBoxes = {}
         
         self.setVertical(vertical)
-        self._handleReset()
+        
+        if elements is None:
+            elements = []
+        self.setElements(level,elements)
     
     def setVertical(self,vertical):
         """Set whether this tageditor should be displayed in vertical model."""
@@ -265,9 +262,13 @@ class TagEditorWidget(QtGui.QWidget):
             
         self.vertical = vertical
             
-    def setElements(self,elements):
-        self.model.setElements(elements)
-        self.flagModel.setElements(elements)
+    def setElements(self,level,elements):
+        """Set the elements that are edited in the tageditor. *level* is the level that contains the
+        elements."""
+        self.levelLabel.setPixmap(utils.getPixmap('real.png' if level == levels.real or level is None
+                                                   else 'editor.png'))
+        self.model.setElements(level,elements)
+        self.flagModel.setElements(level,elements)
         
     def _insertSingleTagEditor(self,row,tag):
         self.tagEditorLayout.insertRow(row)

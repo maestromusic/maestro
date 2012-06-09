@@ -153,21 +153,15 @@ class FlagEditorModel(QtCore.QObject):
     
     Model parameters are:
     
-        - level: whether changes in this model affect the database or the editor
+        - level: the level that contains the elements
         - elements: a list of elements whose flags will be displayed and edited by this model.
         - stack: An undo stack or None, in which case the global stack will be used (only use your own stacks
           in modal dialogs)
     """
     resetted = QtCore.pyqtSignal()
     
-    def __init__(self,level,elements,stack=None):
+    def __init__(self,level=None,elements=None,stack=None):
         super().__init__()
-        
-        self.level = level
-        self.level.changed.connect(self._handleLevelChanged)
-        if stack is None:
-            self.stack = application.stack
-        else: self.stack = stack
         
         self._statusNumber = 0
         
@@ -176,11 +170,24 @@ class FlagEditorModel(QtCore.QObject):
         self.recordRemoved = self.records.recordRemoved
         self.recordChanged = self.records.recordChanged
         
-        self.setElements(elements)
+        self.level = None # will be set in self.setElements
+        if elements is None:
+            elements = []
+        self.setElements(level,elements)
+
+        if stack is None:
+            self.stack = application.stack
+        else: self.stack = stack
         
-    def setElements(self,elements):
+    def setElements(self,level,elements):
         """Reset the model to display and edit the tags of *elements*."""
         self._statusNumber += 1
+        if self.level != level:
+            if self.level is not None:
+                self.level.changed.connect(self._handleLevelChanged)
+            if level is not None:
+                level.changed.connect(self._handleLevelChanged)
+        self.level = level
         self.elements = elements
         self.records.setRecords(self._createRecords().values())
         self.resetted.emit()
