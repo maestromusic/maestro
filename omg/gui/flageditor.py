@@ -56,8 +56,15 @@ class FlagEditor(QtGui.QWidget):
         self.flagScrollArea.setViewportMargins(0,0,0,0)
         self.flagList = FlagListWidget(model,vertical)
         self.flagScrollArea.setWidget(self.flagList)
+        self.flagList.installEventFilter(self)
         self.layout().addWidget(self.flagScrollArea,1)
     
+    def eventFilter(self,object,event):
+        if event.type() == QtCore.QEvent.MouseMove:
+            # This makes the scrollarea scroll horizontally when the mouse approaches the border
+            self.flagScrollArea.ensureVisible(event.pos().x(),event.pos().y(),25,0)
+        return False
+            
     def setVertical(self,vertical):
         self.flagList.setVertical(vertical)
                  
@@ -72,6 +79,7 @@ class FlagListWidget(QtGui.QWidget):
     
     def __init__(self,model,vertical):
         super().__init__()
+        self.setMouseTracking(True)
         self.vertical = vertical
         
         self._flagWidgets = []
@@ -131,7 +139,8 @@ class FlagListWidget(QtGui.QWidget):
                 self._flagWidgets.remove(flagWidget)
 
                 # No need to start animation for the last flag
-                if config.options.gui.flageditor.animation and pos < len(self._flagWidgets):
+                if config.options.gui.flageditor.animation and pos < len(self._flagWidgets)\
+                    and self.isVisible():
                     size = flagWidget.sizeHint()
                     empty = QtGui.QWidget()
                     if self.vertical:
@@ -183,7 +192,7 @@ class FlagListWidget(QtGui.QWidget):
                 if pos == 0:
                     return i
                 else: pos -= 1
-        else: return self.layout().count() - 1 # Remember the stretch at the end
+        else: return self.layout().count()
         
         
 class FlagWidget(QtGui.QWidget):
@@ -208,6 +217,7 @@ class FlagWidget(QtGui.QWidget):
 
     def __init__(self,model,record,parent=None):
         super().__init__(parent)
+        self.setMouseTracking(True)
         self.setSizePolicy(QtGui.QSizePolicy.Fixed,QtGui.QSizePolicy.Fixed)
         self.model = model
         self.record = record
@@ -234,6 +244,7 @@ class FlagWidget(QtGui.QWidget):
         self.update()
 
     def createToolTip(self):
+        """Build and set the tooltip of this FlagWidget."""
         # If the record is not common to all elements, display a tooltip containing the titles of those
         # elements that have the flag. But do not use more than flageditor_maxtooltiplines lines.
         if not self.record.isCommon():
@@ -292,7 +303,8 @@ class FlagWidget(QtGui.QWidget):
             rect = QtCore.QRect(width - borderWidth - smallHSpace - iconSize,(height - iconSize) // 2,iconSize,iconSize)
             if rect.contains(event.pos()):
                 self.model.removeFlag(self.record.flag)
-        super().mouseReleaseEvent(event)
+            event.accept()
+        else: event.ignore() # send to parent
 
     def enterEvent(self,event):
         self._showRemoveButton = True
