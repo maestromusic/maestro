@@ -18,7 +18,7 @@
 
 from PyQt4 import QtCore
 
-from ... import database as db
+from ... import config, database as db
 from ...core import tags
 
 translate = QtCore.QCoreApplication.translate
@@ -199,18 +199,26 @@ class SuperfluousTagValuesCheck(Check):
     _name = translate("DBAnalyzerChecks","Superfluous tag values")
 
     def _query(self,type,data,delete):
-        """Build a query selecting superfluous tags values of value type *type* (or only their number if
-        *data* is false)."""
+        """Build a query selecting superfluous tag values of value-type *type* (or only their number if
+        *data* is false). If *delete* is True, return a query """
+        tableName = "{}values_{}".format(db.prefix,type)
+        # This is complicated because we need different queries for MySQL and SQLite.
+        # Neither query works in both.
+        mainPart = """ FROM {1} LEFT JOIN {0}tags ON {1}.tag_id = {0}tags.tag_id
+                                                 AND {1}.id = {0}tags.value_id
+                    WHERE element_id IS NULL
+                    """.format(db.prefix,tableName)
         if not delete:
             if not data:
-                beginning = "SELECT COUNT(*)"
-            else: beginning = "SELECT {0}values_{1}.tag_id,id,value".format(db.prefix,type)
-        else: beginning = "DELETE {0}values_{1}".format(db.prefix,type)
-        return beginning + """
-            FROM {0}values_{1} LEFT JOIN {0}tags ON {0}values_{1}.tag_id = {0}tags.tag_id
-                                                AND {0}values_{1}.id = {0}tags.value_id
-            WHERE element_id IS NULL
-            """.format(db.prefix,type)
+                return "SELECT COUNT(*)" + mainPart
+            else: return "SELECT {}.tag_id,id,value {}".format(tableName,mainPart)
+        else:
+            if config.options.database.type == 'mysql':
+                # Cannot use DELETE together with JOIN in SQLite
+                return "DELETE {} {}".format(tableName,mainPart)
+            else:
+                # Cannot delete from a table used in a subquery in MySQL
+                return "DELETE FROM {0} WHERE id IN (SELECT {0}.id {1})".format(tableName,mainPart)
             
     def check(self,data):
         if not data:
