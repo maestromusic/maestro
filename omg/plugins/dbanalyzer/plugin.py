@@ -26,6 +26,7 @@ from PyQt4.QtCore import Qt
 from omg import database as db, application, constants, config
 from omg.gui import mainwindow
 from . import resources, checks
+import datetime
 
 
 _action = None # the action that is inserted into the Extras menu
@@ -267,6 +268,9 @@ class DBAnalyzerDialog(QtGui.QDialog):
             (self.tr("Files"),db.query(
                     "SELECT COUNT(*) FROM {}files"
                         .format(db.prefix)).getSingle()),
+            (self.tr("Total Length"),str(datetime.timedelta(seconds = db.query(
+                    "SELECT SUM(length) FROM {}files"
+                        .format(db.prefix)).getSingle()))),
             (self.tr("Containers"),db.query(
                     "SELECT COUNT(*) FROM {}elements WHERE file = 0"
                         .format(db.prefix)).getSingle()),
