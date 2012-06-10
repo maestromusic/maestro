@@ -74,6 +74,7 @@ class GrammarRenamer(profiles.Profile):
         if "levelDef" in toks:
             level = toks["levelDef"][0]
             if level > len(self.currentParents):
+                ret["value"] = ""
                 return ret
             pos,parent = self.currentParents[-level]
             if macro == "#":
@@ -99,10 +100,11 @@ class GrammarRenamer(profiles.Profile):
         tag = toks.tagDef
         if "if" in toks or "else" in toks:
             if tag.exists:
-                return toks["if"] if "if" in toks else []
+                ret = toks["if"] if "if" in toks else []
             else:
-                return toks["else"] if "else" in toks else []
-        else: return tag.value
+                ret = toks["else"] if "else" in toks else []
+        else: ret = tag.value
+        return ret
     
     def __init__(self, name, formatString = "<artist>/I AM A DEFAULT FORMAT STRING/<1.title>/<#> - <title>",
                  replaceChars = "\\:/", replaceBy = '_.;', removeChars="?*"):
@@ -148,7 +150,7 @@ class GrammarRenamer(profiles.Profile):
         """Computes the new path for the element defined by *self.currentElem* and *self.currentParents*."""
         extension = self.currentElem.path.rsplit(".", 1)[1]
         try:
-            return  "".join(self.expression.parseString(self.formatString)) + "." + extension
+            return  "".join(map(str, self.expression.parseString(self.formatString))) + "." + extension
         except pyparsing.ParseException as e:
             raise FormatSyntaxError(str(e))
         

@@ -218,15 +218,15 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
         del self.data(index, Qt.EditRole).contents[first:last+1]
         self.endRemoveRows()
         
-    def _insertContents(self, index, position, ids, positions = None):
-        self.beginInsertRows(index, position, position + len(ids) - 1)
+    def _insertContents(self, index, row, ids, positions = None):
+        self.beginInsertRows(index, row, row + len(ids) - 1)
         wrappers = [Wrapper(self.level.get(id)) for id in ids]
         if positions:
             for pos, wrap in zip(positions, wrappers):
                 wrap.position = pos
         for wrapper in wrappers:
             wrapper.loadContents(recursive = True)
-        self.data(index, Qt.EditRole).insertContents(position, wrappers) 
+        self.data(index, Qt.EditRole).insertContents(row, wrappers) 
         self.endInsertRows()            
 
 
@@ -309,6 +309,7 @@ class MergeCommand(QtGui.QUndoCommand):
         logger.debug("merge: inserted new container with ID {} into level {}".format(self.containerID, self.level))
         if self.elementParent:
             parent = self.level.get(self.parentID)
+            container.parents = [parent.id]
             
         for id, (oldPos, newPos) in self.parentChanges.items():
             element = self.level.get(id)
