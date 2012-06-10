@@ -556,6 +556,7 @@ class NewTagTypeDialog(QtGui.QDialog):
         
         self.okButton = QtGui.QPushButton(self.tr("Ok"))
         self.okButton.clicked.connect(self._handleOk)
+        self.okButton.setDefault(True)
         buttonLayout.addWidget(self.okButton)
     
     def _handleDeleteClicked(self):
