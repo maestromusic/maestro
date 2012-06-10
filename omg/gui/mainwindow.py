@@ -183,6 +183,7 @@ class MainWindow(QtGui.QMainWindow):
         global mainWindow
         mainWindow = self
         self.restoreLayout()
+        self.setStatusBar(None)
         self.updateViewMenu()
         
         #TODO: Replace this hack by something clever.

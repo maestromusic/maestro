@@ -25,7 +25,7 @@ from .. import strutils, utils, config, logging, modify
 from ..core import tags, levels
 from ..core.elements import File
 from ..models import tageditor as tageditormodel, simplelistmodel, flageditor as flageditormodel
-from ..gui import singletageditor, tagwidgets, mainwindow, editor, flageditor
+from ..gui import singletageditor, tagwidgets, mainwindow, editor, flageditor, dialogs
 from ..gui.misc import widgetlist, dynamicgridlayout
 
 
@@ -112,6 +112,7 @@ class TagEditorDialog(QtGui.QDialog):
     #TODO rewrite so that it uses its own level
     def __init__(self,level,elements,parent=None):
         QtGui.QDialog.__init__(self,parent)
+        return #disable
         self.setLayout(QtGui.QVBoxLayout())
         self.tagedit = TagEditorWidget(level,elements)
         self.layout().addWidget(self.tagedit)
@@ -156,9 +157,9 @@ class TagEditorWidget(QtGui.QWidget):
         self.model.resetted.connect(self._handleReset)
 
         self.flagModel = flageditormodel.FlagEditorModel(stack=stack)
-        self.flagModel.resetted.connect(self._checkFlagEditorVisibility)
-        self.flagModel.recordInserted.connect(self._checkFlagEditorVisibility)
-        self.flagModel.recordRemoved.connect(self._checkFlagEditorVisibility)
+        #self.flagModel.resetted.connect(self._checkFlagEditorVisibility)
+        #self.flagModel.recordInserted.connect(self._checkFlagEditorVisibility)
+        #self.flagModel.recordRemoved.connect(self._checkFlagEditorVisibility)
 
         self.selectionManager = widgetlist.SelectionManager()
         # Do not allow the user to select ExpandLines
@@ -166,13 +167,20 @@ class TagEditorWidget(QtGui.QWidget):
             lambda wList,widget: not isinstance(widget,singletageditor.ExpandLine)
         
         self.setLayout(QtGui.QVBoxLayout())
+        self.layout().setSpacing(0)
+        self.layout().setContentsMargins(0,0,0,0)
         self.topLayout = QtGui.QHBoxLayout()
+        # Spacings and margins are inherited. Reset the horizontal values for topLayout
+        style = QtGui.QApplication.style()
+        self.topLayout.setSpacing(style.pixelMetric(style.PM_LayoutHorizontalSpacing))
+        self.topLayout.setContentsMargins(style.pixelMetric(style.PM_LayoutLeftMargin),0,
+                                          style.pixelMetric(style.PM_LayoutRightMargin),0)
         self.layout().addLayout(self.topLayout)
 
         self.levelLabel = QtGui.QLabel()
         self.topLayout.addWidget(self.levelLabel)
         
-        # Texts will be set in _changeLayout
+        # Texts will be set in _changeLayout because they are only displayed in horizontal mode
         self.addButton = tagwidgets.TagTypeButton()
         self.addButton.tagChosen.connect(self._handleAddRecord)
         self.topLayout.addWidget(self.addButton)
@@ -181,13 +189,15 @@ class TagEditorWidget(QtGui.QWidget):
         self.removeButton.clicked.connect(self._handleRemoveSelected)
         self.topLayout.addWidget(self.removeButton)
         
-        self.addFlagButton = QtGui.QPushButton()
-        self.addFlagButton.setIcon(utils.getIcon("flag_blue.png"))
-        self.addFlagButton.clicked.connect(self._handleAddFlagButton)
-        self.topLayout.addWidget(self.addFlagButton)
+        self.horizontalFlagEditor = flageditor.FlagEditor(self.flagModel,False)
+        self.topLayout.addWidget(self.horizontalFlagEditor,1)
+        # This stretch will be activated in vertical mode to fill the place of the horizontal flageditor
+        self.topLayout.addStretch(0)
         
-        self.label = QtGui.QLabel()
-        self.topLayout.addStretch()
+        self.optionButton = QtGui.QPushButton()
+        self.optionButton.setIcon(utils.getIcon('options.png'))
+        self.optionButton.clicked.connect(self._handleOptionButton)
+        self.topLayout.addWidget(self.optionButton)
         
         scrollArea = QtGui.QScrollArea()
         scrollArea.setWidgetResizable(True)
@@ -195,8 +205,10 @@ class TagEditorWidget(QtGui.QWidget):
             
         self.viewport = QtGui.QWidget()
         self.viewport.setLayout(QtGui.QVBoxLayout())
+        self.viewport.layout().setContentsMargins(2,2,2,2)
         self.tagEditorLayout = dynamicgridlayout.DynamicGridLayout()
         self.tagEditorLayout.setColumnStretch(1,1) # Stretch the column holding the values
+        self.tagEditorLayout.setSpacing(1)
         self.viewport.layout().addLayout(self.tagEditorLayout)
         self.viewport.layout().addStretch()
         scrollArea.setWidget(self.viewport)
@@ -206,22 +218,14 @@ class TagEditorWidget(QtGui.QWidget):
         self.flagWidget.layout().setContentsMargins(0,0,0,0)
         self.layout().addWidget(self.flagWidget)
         
-        self.flagLabel = QtGui.QLabel() # Text will be set in setVertical
-        self.flagLabel.setToolTip(self.tr("Flags"))
-        self.flagWidget.layout().addWidget(self.flagLabel)
-        
-        flagScrollArea = QtGui.QScrollArea()
-        flagScrollArea.setWidgetResizable(True)
-        flagScrollArea.setMaximumHeight(40)
-        # Vertical mode of the flageditor is not used
-        flagEditor = flageditor.FlagEditor(self.flagModel,False)
-        flagScrollArea.setWidget(flagEditor)
-        self.flagWidget.layout().addWidget(flagScrollArea,1)
+        self.verticalFlagEditor = flageditor.FlagEditor(self.flagModel,False)   
+        self.layout().addWidget(self.verticalFlagEditor)
         
         self.singleTagEditors = {}
         self.tagBoxes = {}
         
         self.setVertical(vertical)
+        
         
         if elements is None:
             elements = []
@@ -235,30 +239,16 @@ class TagEditorWidget(QtGui.QWidget):
             box.setIconOnly(vertical)
             
         if vertical:
-            for button in ['addButton','removeButton','addFlagButton']:
+            for button in ['addButton','removeButton']:
                 getattr(self,button).setText('')
-            for button in ['resetButton','cancelButton','saveButton']:
-                if hasattr(self,button):
-                    getattr(self,button).setText('')
-            if not self.vertical: # Not when this function is called for the first time
-                self.topLayout.removeWidget(self.label)
-            self.layout().insertWidget(1,self.label)
-            self.flagLabel.setText('<img src=":omg/icons/flag_blue.png">')
         else:
             self.addButton.setText(self.tr("Add tag"))
             self.removeButton.setText(self.tr("Remove selected"))
-            self.addFlagButton.setText(self.tr("Add flag"))
-            
-            if hasattr(self,'resetButton'):
-                self.resetButton.setText(self.tr("Reset"))
-            if hasattr(self,'cancelButton'):
-                self.cancelButton.setText(self.tr("Cancel"))
-            if hasattr(self,'saveButton'):
-                self.saveButton.setText(self.tr("Save"))
-            if self.vertical: # Not when this function is called for the first time
-                self.layout().removeWidget(self.label)
-            self.topLayout.insertWidget(self.topLayout.count()-1,self.label) # -1 due to the stretch
-            self.flagLabel.setText('<img src=":omg/icons/flag_blue.png"> '+self.tr("Flags: "))
+        
+        self.horizontalFlagEditor.setVisible(not vertical)
+        # The place left by the horizontalFlagEditor is filled by the stretch we put there
+        self.topLayout.setStretch(self.topLayout.count()-2,int(vertical))
+        self.verticalFlagEditor.setVisible(vertical)
             
         self.vertical = vertical
             
@@ -310,13 +300,13 @@ class TagEditorWidget(QtGui.QWidget):
             self._removeSingleTagEditor(tag)
         for tag in self.model.getTags():
             self._insertSingleTagEditor(len(self.singleTagEditors),tag)
-        count = len(self.model.getElements())
-        self.label.setText(self.tr("Edit tags of %n element(s).",'',count))
+        
         # Enable / disable buttons
-        for i in range(1,self.topLayout.count()): # Skip the iconLabel
-            widget = self.topLayout.itemAt(i).widget()
-            if widget is not None:
-                widget.setEnabled(count > 0)
+        count = len(self.model.getElements())
+        self.addButton.setEnabled(count > 0)
+        self.removeButton.setEnabled(count > 0)
+        self.horizontalFlagEditor.setEnabled(count > 0)
+        self.verticalFlagEditor.setEnabled(count > 0)
         
     def _handleAddRecord(self,tag=None):
         dialog = RecordDialog(self,self.model.getElements(),defaultTag=tag)
@@ -327,11 +317,6 @@ class TagEditorWidget(QtGui.QWidget):
         records = self._getSelectedRecords()
         if len(records) > 0:
             self.model.removeRecords(records)
-          
-    def _handleAddFlagButton(self):
-        if not flageditor.AddFlagPopup.isActive(self.addFlagButton):
-            popup = flageditor.AddFlagPopup(self.flagModel,self.addFlagButton)
-            popup.show()
             
     # Note that the following _handle-functions only add new SingleTagEditors or remove SingleTagEditors
     # which have become empty. Unless they are newly created or removed, the editors are updated in their
@@ -376,6 +361,7 @@ class TagEditorWidget(QtGui.QWidget):
             tagBox.tagChanged.connect(self._handleTagChangedByUser)
         
     def _handleSave(self):
+        #TODO
         """Handle the save button (only if ''saveDirectly'' is True)."""
         if self.model.saveDirectly:
             raise RuntimeError("You must not call save in a TagEditor that saves directly.") 
@@ -473,15 +459,20 @@ class TagEditorWidget(QtGui.QWidget):
         if dialog.exec_() == QtGui.QDialog.Accepted:
             self.model.changeRecord(record,dialog.getRecord())
 
-    def _checkFlagEditorVisibility(self):
-        """Set the flag editor's visibility depending on whether flags are present."""
-        self.flagWidget.setVisible(not self.flagModel.isEmpty())
+    #def _checkFlagEditorVisibility(self):
+    #    """Set the flag editor's visibility depending on whether flags are present."""
+    #    self.flagWidget.setVisible(not self.flagModel.isEmpty())
         
     def _getSelectedRecords(self):
         """Return all records that are selected and visible (i.e. not hidden by a collapsed ExpandLine."""
         return [editor.getRecord() for editor in self.selectionManager.getSelectedWidgets()
                                 # Filter out ExpandLines and hidden records
                                 if isinstance(editor,singletageditor.RecordEditor) and editor.isVisible()]
+        
+    def _handleOptionButton(self):
+        """Open the option dialog."""
+        dialog = OptionDialog(self.optionButton)
+        dialog.show()
 
 
 class RecordDialog(QtGui.QDialog):
@@ -583,3 +574,7 @@ class SmallTagTypeBox(tagwidgets.TagTypeBox):
         """Set whether the label should use its iconOnly-mode. Confer TagLabel.setIconOnly."""
         self.label.setIconOnly(iconOnly)
         
+        
+class OptionDialog(dialogs.FancyPopup):
+    def __init__(self,parent):
+        super().__init__(parent)

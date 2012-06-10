@@ -30,8 +30,14 @@ class HiddenEditor(QtGui.QStackedWidget):
     valueChanged = QtCore.pyqtSignal()
     label = None
     editor = None
-    popup = None # Contains the context-menu, while the editor displays one. This is necessary to prevent hiding the editor, when it looses focus to its context-menu.
-    fixed = False # If True, the currently active widget (editor and label) will remain active until fixed is set to false again. You may still use showEditor or showLabel to switch programmatically, though.
+    
+     # Contains the context-menu, while the editor displays one. This is necessary to prevent hiding the
+     # editor, when it looses focus to its context-menu.
+    popup = None
+    
+    # If True, the currently active widget (editor and label) will remain active until fixed is set to false
+    # again. You may still use showEditor or showLabel to switch programmatically, though.
+    fixed = False 
     
     def __init__(self,label=None,editor=None,parent=None,shrink=False):
         """Create a new HiddenEditor. You may specify a label, an editor and a parent. By default a QLabel
@@ -55,6 +61,7 @@ class HiddenEditor(QtGui.QStackedWidget):
         if self.label is not None:
             self.removeWidget(self.label)
         self.label = label if label is not None else QtGui.QLabel()
+        self.label.setIndent(2)
         # Keep at least the height of an QLineEdit. TODO: Improve this hack. 
         if self.shrink:
             self.label.setMinimumHeight(26)

@@ -59,9 +59,6 @@ class FancyPopup(QtGui.QFrame):
     # A set of parents whose popup is open (static). Confer isActive
     _activeParents = set()
     
-    # While fixPopup is True, the popup will not close when the mouse leaves.
-    fixPopup = False
-    
     def __init__(self,parent,width=300,height=170):
         super().__init__(parent)
         self.setWindowFlags(self.windowFlags() | Qt.Popup)
@@ -140,14 +137,11 @@ class FancyPopup(QtGui.QFrame):
 class FancyTabbedPopup(FancyPopup):
     """Fancy popup that contains a fancy TabWidget."""
     
-    # The popup will close itself if the user leaves its parent (the button that opened the popup)
-    # unless the popup is entered within a short timespan.
-    _entered = False
-    
     def __init__(self,parent,width=370,height=170):
         super().__init__(parent,width,height)
         # Create components
         self.setLayout(QtGui.QVBoxLayout())
+        self.layout().setContentsMargins(0,0,0,0)
         self.tabWidget = QtGui.QTabWidget(self)
         self.tabWidget.setDocumentMode(True)
         self.layout().addWidget(self.tabWidget)

@@ -312,7 +312,8 @@ class TagTypeButton(QtGui.QPushButton):
             text = translate("TagTypeButton","Add tag")
         super().__init__(text)
         self.setIcon(utils.getIcon("add.png"))
-        
+        # Unfortunately there is a large margin on the left
+        #https://bugreports.qt-project.org/browse/QTBUG-3624
         self.setMenu(QtGui.QMenu())
         self._fillMenu()
         application.dispatcher.changes.connect(self._handleDispatcher)

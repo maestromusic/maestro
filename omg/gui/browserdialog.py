@@ -74,7 +74,6 @@ class BrowserDialog(dialogs.FancyTabbedPopup):
         configurationCombo = delegateconfig.ConfigurationCombo(
                                                     browserdelegate.BrowserDelegate.configurationType,
                                                     self.browser.views)
-        configurationCombo.view().installEventFilter(self)
         lineLayout.addWidget(configurationCombo)
         
         instantSearchBox = QtGui.QCheckBox(self.tr("Instant search"))
@@ -106,16 +105,6 @@ class BrowserDialog(dialogs.FancyTabbedPopup):
         if len(self.flagView.selectedFlagTypes) > 0:
             self.browser.setCriterionFilter([criteriaModule.FlagsCriterion(self.flagView.selectedFlagTypes)])
         else: self.browser.setCriterionFilter([])
-
-    def eventFilter(self,obj,event):
-        # obj is configurationCombo's view. Usually the BrowserDialog closes when the mouse leaves. Thus
-        # we have to prevent the dialog from closing while the view is shown (view is a popup, so the mouse
-        # leaves BrowserDialog).
-        if event.type() == QtCore.QEvent.Show:
-            self.fixPopup = True
-        if event.type() == QtCore.QEvent.Hide:
-            self.fixPopup = False
-        return False # do not filter
           
             
 class FlagView(QtGui.QTableWidget):

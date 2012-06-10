@@ -26,28 +26,72 @@ from ..models import flageditor as flageditormodel,simplelistmodel
 
 
 class FlagEditor(QtGui.QWidget):
+    #TODO comment
     """A FlagEditor displays the records contained in a FlagEditorModel using FlagWidgets. It is used as
     part of the TagEditor."""
-    # The animation running (if any). This is used to stop the animation if the model changes.
-    _animation = None
 
     def __init__(self,model,vertical,parent=None):
         super().__init__(parent)
-        self.vertical = vertical
+        self.setSizePolicy(QtGui.QSizePolicy.Expanding,QtGui.QSizePolicy.Fixed)
+        
+        self.setLayout(QtGui.QHBoxLayout())
+        self.layout().setSpacing(0)
+        self.layout().setContentsMargins(0,0,0,0)
+        
+        label = QtGui.QLabel() # Text will be set in setVertical
+        label.setToolTip(self.tr("Flags"))
+        label.setText('<img src=":omg/icons/flag_blue.png"> '+self.tr("Flags: "))
+        self.layout().addWidget(label)
+        
+        self.addButton = QtGui.QPushButton()
+        self.addButton.setIcon(utils.getIcon("add.png"))
+        self.addButton.clicked.connect(self._handleAddButton)
+        self.layout().addWidget(self.addButton)
+        
+        self.flagScrollArea = QtGui.QScrollArea()
+        self.flagScrollArea.setWidgetResizable(True)
+        self.flagScrollArea.setMaximumHeight(30)
+        self.flagScrollArea.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.flagScrollArea.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.flagScrollArea.setViewportMargins(0,0,0,0)
+        self.flagList = FlagListWidget(model,vertical)
+        self.flagScrollArea.setWidget(self.flagList)
+        self.layout().addWidget(self.flagScrollArea,1)
+    
+    def setVertical(self,vertical):
+        self.flagList.setVertical(vertical)
+                 
+    def _handleAddButton(self):
+        popup = AddFlagPopup(self.flagList.model,self.addButton)
+        popup.show()
 
+
+class FlagListWidget(QtGui.QWidget):
+    # The animation currently running (if any). This is used to stop the animation if the model changes.
+    _animation = None
+    
+    def __init__(self,model,vertical):
+        super().__init__()
+        self.vertical = vertical
+        
         self._flagWidgets = []
         self.model = model
         self.model.resetted.connect(self._handleReset)
         self.model.recordInserted.connect(self._handleRecordInserted)
         self.model.recordRemoved.connect(self._handleRecordRemoved)
         self.model.recordChanged.connect(self._handleRecordChanged)
-
-        self.setLayout(QtGui.QBoxLayout(
-                                QtGui.QBoxLayout.TopToBottom if vertical else QtGui.QBoxLayout.LeftToRight))
-        self.layout().setContentsMargins(5,3,5,3)
-        self.layout().addStretch(1)
+        
+        self.setLayout(QtGui.QBoxLayout(QtGui.QBoxLayout.TopToBottom if vertical
+                                        else QtGui.QBoxLayout.LeftToRight))
+        self.layout().setAlignment(Qt.AlignLeft)
+        style = QtGui.QApplication.style()
+        # Use horizontal spacing instead of left margin so that the distance to the add button equals
+        # the distance between two FlagWidgets.
+        self.layout().setContentsMargins(style.pixelMetric(style.PM_LayoutHorizontalSpacing),0,
+                                         style.pixelMetric(style.PM_LayoutRightMargin),0)
+        
         self._handleReset()
-
+        
     def setVertical(self,vertical):
         """Set whether this editor display the flags vertically."""
         if vertical != self.vertical:
@@ -140,8 +184,8 @@ class FlagEditor(QtGui.QWidget):
                     return i
                 else: pos -= 1
         else: return self.layout().count() - 1 # Remember the stretch at the end
-
-
+        
+        
 class FlagWidget(QtGui.QWidget):
     """Small widget representing a Record. It will display the flag's name and icon and if the record is not
     common also the number of elements that have the flag. Furthermore it contains a button to remove the
@@ -209,7 +253,7 @@ class FlagWidget(QtGui.QWidget):
         iconSize = 16
         smallHSpace = 4
         bigHSpace = 7
-        vSpace = 3 # looks bigger because most characters are smaller than fm.height
+        vSpace = 1 # looks bigger because most characters are smaller than fm.height
         width = textWidth + 2 * (borderWidth + smallHSpace + iconSize + bigHSpace)
         height = fm.height() + 2 * vSpace + 2 * borderWidth
         return fm,borderWidth,textWidth,iconSize,smallHSpace,bigHSpace,vSpace,width,height
