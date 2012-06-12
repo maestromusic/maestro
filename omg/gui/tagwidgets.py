@@ -329,6 +329,16 @@ class TagTypeButton(QtGui.QPushButton):
             else: action = menu.addAction(tagType.title)
             action.triggered.connect(functools.partial(self.tagChosen.emit,tagType))
         
+        menu.addSeparator()
+        action = menu.addAction(self.tr("New tagtype..."))
+        action.triggered.connect(self._handleNewTagTypeAction)
+        
+    def _handleNewTagTypeAction(self):
+        """Handle the last action in the menu: Ask the user to create a new tagtype."""
+        tagType = NewTagTypeDialog.createTagType()
+        if tagType is not None:
+            self.tagChosen.emit(tagType)
+        
     def _handleDispatcher(self,event):
         """React upon TagTypeChangedEvents and TagTypeOrderChangeEvents from the dispatcher."""
         if isinstance(event,(tags.TagTypeChangedEvent,tags.TagTypeOrderChangeEvent)):

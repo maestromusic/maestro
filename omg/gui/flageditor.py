@@ -26,10 +26,8 @@ from ..models import flageditor as flageditormodel,simplelistmodel
 
 
 class FlagEditor(QtGui.QWidget):
-    #TODO comment
-    """A FlagEditor displays the records contained in a FlagEditorModel using FlagWidgets. It is used as
-    part of the TagEditor."""
-
+    """A FlagEditor contains a label, a button to add new flags and a FlagListWidget that displays the
+    model's records using FlagWidgets. It is used as part of the tageditor."""
     def __init__(self,model,vertical,parent=None):
         super().__init__(parent)
         self.setSizePolicy(QtGui.QSizePolicy.Expanding,QtGui.QSizePolicy.Fixed)
@@ -66,14 +64,19 @@ class FlagEditor(QtGui.QWidget):
         return False
             
     def setVertical(self,vertical):
+        """Set whether the list of FlagWidgets should be vertical or horizontical."""
         self.flagList.setVertical(vertical)
                  
     def _handleAddButton(self):
+        """Ask the user to add a flag."""
         popup = AddFlagPopup(self.flagList.model,self.addButton)
         popup.show()
 
 
 class FlagListWidget(QtGui.QWidget):
+    """Displays a list of FlagWidgets representing the records in the FlagEditorModel *model*. *vertical*
+    specifies the direction of the list. When a record is removed, the other records slide to fill the gap.
+    """
     # The animation currently running (if any). This is used to stop the animation if the model changes.
     _animation = None
     

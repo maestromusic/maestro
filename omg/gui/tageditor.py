@@ -189,7 +189,7 @@ class TagEditorWidget(QtGui.QWidget):
         self.removeButton.clicked.connect(self._handleRemoveSelected)
         self.topLayout.addWidget(self.removeButton)
         
-        self.horizontalFlagEditor = flageditor.FlagEditor(self.flagModel,False)
+        self.horizontalFlagEditor = flageditor.FlagEditor(self.flagModel,vertical=False)
         self.topLayout.addWidget(self.horizontalFlagEditor,1)
         # This stretch will be activated in vertical mode to fill the place of the horizontal flageditor
         self.topLayout.addStretch(0)
@@ -218,7 +218,8 @@ class TagEditorWidget(QtGui.QWidget):
         self.flagWidget.layout().setContentsMargins(0,0,0,0)
         self.layout().addWidget(self.flagWidget)
         
-        self.verticalFlagEditor = flageditor.FlagEditor(self.flagModel,False)   
+        # Vertical mode of the flageditor is not used
+        self.verticalFlagEditor = flageditor.FlagEditor(self.flagModel,vertical=False)   
         self.layout().addWidget(self.verticalFlagEditor)
         
         self.singleTagEditors = {}
