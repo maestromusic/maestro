@@ -123,7 +123,8 @@ class Level(QtCore.QObject):
         notFound = []
         for id in ids:
             if id in self.elements:
-                child.elements[id] = self.elements[id].copy(child)
+                child.elements[id] = self.elements[id].copy()
+                child.elements[id].level = child
             else: notFound.append(id)
         self.parent.loadIntoChild(notFound,self,ignoreUnknownTags)
         
