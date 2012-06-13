@@ -271,7 +271,8 @@ class TagEditorWidget(QtGui.QWidget):
         
         # Create the Tag-Editor
         self.singleTagEditors[tag] = singletageditor.SingleTagEditor(self,tag,self.model)
-        self.singleTagEditors[tag].widgetList.setSelectionManager(self.selectionManager)
+        self.singleTagEditors[tag].commonList.setSelectionManager(self.selectionManager)
+        self.singleTagEditors[tag].uncommonList.setSelectionManager(self.selectionManager)
         self.tagEditorLayout.addWidget(self.singleTagEditors[tag],row,1)
 
     def _removeSingleTagEditor(self,tag):
@@ -292,7 +293,8 @@ class TagEditorWidget(QtGui.QWidget):
         self.tagBoxes[tag].deleteLater()
         del self.tagBoxes[tag]
         tagEditor = self.singleTagEditors[tag]
-        tagEditor.widgetList.setSelectionManager(None)
+        tagEditor.commonList.setSelectionManager(None)
+        tagEditor.uncommonList.setSelectionManager(None)
         tagEditor.setParent(None)
         del self.singleTagEditors[tag]
 
@@ -384,7 +386,8 @@ class TagEditorWidget(QtGui.QWidget):
         menu.addSeparator()
         
         addRecordAction = QtGui.QAction(self.tr("Add tag..."),self)
-        addRecordAction.triggered.connect(lambda: self._handleAddRecord(record.tag))
+        tag = record.tag if record is not None else None
+        addRecordAction.triggered.connect(lambda: self._handleAddRecord(tag))
         menu.addAction(addRecordAction)
         
         removeSelectedAction = QtGui.QAction(self.tr("Remove selected"),self)

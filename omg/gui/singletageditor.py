@@ -30,9 +30,9 @@ EXPAND_LIMIT = 2
 
 class SingleTagEditor(QtGui.QWidget):
     """A SingleTagEditor is the part of an editor used to edit the values of a single tag. It consists of a 
-    misc.widgetlist.WidgetList that displays foreach record one RecordEditor wrapped in an
-    misc.hiddeneditor.HiddenEditor. Additionally it may contain a ExpandLine that allows to expand/hide the
-    records which are not common (i.e. those whose value is not contained in all currently edited elements).
+    two misc.widgetlist.WidgetList-instances that display the common records and the uncommon ones,
+    respectively. They are separated by a ExpandLine that can be used to expand/hide the second list.
+    For each record the corresponding list contains a RecordEditor.
     
     Constructor parameters:
     
@@ -49,153 +49,122 @@ class SingleTagEditor(QtGui.QWidget):
         self.tagEditor = tagEditor
         self.tag = tag
         self.model = model
+        self.expanded = False
         model.recordInserted.connect(self._handleRecordInserted)
         model.recordRemoved.connect(self._handleRecordRemoved)
-        model.recordMoved.connect(self._handleRecordMoved)
-        model.commonChanged.connect(self._handleCommonChanged)
+        model.recordChanged.connect(self._handleRecordChanged)
         
-        self.setLayout(QtGui.QHBoxLayout())
+        self.setLayout(QtGui.QVBoxLayout())
         self.layout().setSpacing(0)
-        self.layout().setMargin(0)
+        self.layout().setContentsMargins(0,0,0,0)
         palette = QtGui.QPalette()
         palette.setColor(QtGui.QPalette.Window,QtGui.QColor(255,255,255))
         self.setPalette(palette)
         self.setAutoFillBackground(True)
 
-        self.widgetList = widgetlist.WidgetList(QtGui.QBoxLayout.TopToBottom)
-        self.layout().addWidget(self.widgetList,1)
-
-        self.expandLine = None
-        self.expanded = None
+        self.commonList = widgetlist.WidgetList(QtGui.QBoxLayout.TopToBottom)
+        self.layout().addWidget(self.commonList,1)
+        
+        self.expandLine = ExpandLine()
+        self.expandLine.triggered.connect(self.setExpanded)
+        self.layout().addWidget(self.expandLine)
+        
+        self.uncommonList = widgetlist.WidgetList(QtGui.QBoxLayout.TopToBottom)
+        self.layout().addWidget(self.uncommonList,1)
         
         pos = 0
         for record in model.getRecords(tag):
             self._insertRecord(pos,record)
             pos = pos + 1
-            
-        if self._isExLineNecessary():
-            self.setExpanded(False) # Collapse for the start
+    
+        self._updateUncommonDisplay()
 
     def setTag(self,tag):
-        """Set the tag this SingleTagEditor feels responsible for. This does not change the appearance of the editor or the value in the editor but simply the set of recordAdded-, recordRemoved,...-signals this SingleTagEditor will react to."""
+        """Set the tag this SingleTagEditor feels responsible for. This does not change the appearance of
+        the editor or the value in the editor but simply the set of recordAdded-, recordRemoved,...-signals
+        this SingleTagEditor will react to.
+        """
         self.tag = tag
 
     def isValid(self):
         """Return whether all values in the RecordEditors are valid (as values of self.tag)."""
         return all(widget.isValid() for widget in self.widgetList if isinstance(widget,RecordEditor))
 
+    def _computePosition(self,common,pos):
+        """Translate the position *pos* from a position in the model's list of records to a position in
+        either the list of common records or the list of uncommon records, depending on *common*.""" 
+        return pos - sum(record.isCommon() != common for record in self.model.getRecords(self.tag)[:pos])
+        
     def _insertRecord(self,pos,record):
-        """Helper method that inserts *record* at position *pos*."""
+        """Helper method: Insert *record* at position *pos*."""
         recordEditor = RecordEditor(self.model,record)
-        if self.expandLine is not None:
-            # Calculate the correct position, taking the ExpandLine into account
-            if pos > self.widgetList.index(self.expandLine):
-                pos = pos + 1
-            elif pos == self.widgetList.index(self.expandLine):
-                # The record should be inserted exactly at the position of the ExpandLine
-                # Should we insert it before or after that line?
-                if not record.isCommon():
-                    pos = pos + 1
-        self.widgetList.insertWidget(pos,recordEditor)
-        self._checkExpandLine()
+        pos = self._computePosition(record.isCommon(),pos)
+        (self.commonList if record.isCommon() else self.uncommonList).insertWidget(pos,recordEditor)
+        self._updateUncommonDisplay()
     
+    def _removeRecord(self,record):
+        """Helper method: Remove *record*."""
+        widgetList = (self.commonList if record.isCommon() else self.uncommonList)
+        for widget in widgetList:
+            if widget.getRecord() == record:
+                widgetList.removeWidget(widget)
+                self._updateUncommonDisplay()
+                return
+        else: raise ValueError("Record '{}' was not found.".format(record))
+        
     def _handleRecordInserted(self,pos,record):
+        """React to recordInserted-signals from the model."""
         if record.tag == self.tag:
             self._insertRecord(pos,record)
             
     def _handleRecordRemoved(self,record):
+        """React to recordRemoved-signals from the model."""
         if record.tag == self.tag:
-            for widget in self.widgetList:
-                if isinstance(widget,RecordEditor) and widget.getRecord() == record:
-                    self.widgetList.removeWidget(widget)
-                    self._checkExpandLine()
-                    return
-            raise ValueError("Record '{}' was not found.".format(record))
+            self._removeRecord(record)
 
-    def _correctPosition(self,pos):
-        if self.expandLine is None:
-            return pos
-        elif pos >= self.widgetList.index(self.expandLine):
-            return pos + 1
-                
-    def _handleRecordMoved(self,tag,oldPos,newPos):
-        if tag == self.tag and oldPos != newPos:
-            oldPos = self._correctPosition(oldPos)
-            newPos = self._correctPosition(newPos)
-            self.widgetList.moveWidget(self.widgetList[oldPos],newPos)
+    def _handleRecordChanged(self,tag,oldRecord,newRecord):
+        """React to recordChanged-signals from the model."""
+        if tag == self.tag and oldRecord.isCommon() != newRecord.isCommon():
+            # Change the list in which the record is displayed
+            self._removeRecord(oldRecord)
+            self._insertRecord(self.model.getRecords(self.tag).index(newRecord),newRecord)
 
-    def _handleCommonChanged(self,tag):
-        if tag == self.tag:
-            self._checkExpandLine()
-            
-    def _isExLineNecessary(self):
-        """Return whether a ExpandLine is necessary given the records in this RecordEditorList."""
-        return self._uncommonCount() > self.EXPAND_LINE_LIMIT
-
-    def _checkExpandLine(self):
-        if self.expandLine is None:
-            if self._isExLineNecessary():
-                self.expandLine = ExpandLine(self._uncommonCount())
-                self.expandLine.expandButton.triggered.connect(self.setExpanded)
-                self.widgetList.insertWidget(self._commonCount(),self.expandLine)
-        else:
-            if not self._isExLineNecessary():
-                self.widgetList.removeWidget(self.expandLine)
-                self.expandLine.setParent(None)
-                self.expandLine = None
-                self.setExpanded(True)
-            else:
-                # We have an ExpandLine and we need it...fine. But maybe the text or position must be updated
-                exPos = self.widgetList.index(self.expandLine)
-                if exPos != self._commonCount():
-                    self.widgetList.moveWidget(self.expandLine,self._commonCount())
-                self.expandLine.setNumber(self._uncommonCount())
+    def _updateUncommonDisplay(self):
+        """Update the expand line and list of uncommon records. Check whether they should be visible."""
+        self.commonList.setVisible(len(self.commonList) > 0)
+        uncommonCount = len(self.uncommonList)
+        expandLineNecessary = uncommonCount > self.EXPAND_LINE_LIMIT
+        self.expandLine.setVisible(expandLineNecessary)
+        self.uncommonList.setVisible(uncommonCount > 0 and (self.expanded or not expandLineNecessary))
+        self.uncommonList.setContentsMargins(20 if expandLineNecessary else 0,0,0,0)
+        self.expandLine.setText("<i>"+self.tr("{} different").format(uncommonCount)+"</i>")
                 
     def setExpanded(self,expanded):
         """Set whether the uncommon records in this list should be visible (expanded) or not (collapsed)."""
         if expanded == self.expanded:
             return
-        if not expanded: # Will collapse now
-            for widget in self.widgetList:
-                if isinstance(widget,RecordEditor) and not widget.record.isCommon():
-                    widget.hide()
-            self.expanded = False
-            if self.expandLine is not None: # should be always true
-                self.expandLine.expandButton.setExpanded(False)
-        else: # Will expand now
-            for widget in self.widgetList:
-                if not widget.isVisible():
-                    widget.show()
-            self.expanded = True
-            if self.expandLine is not None: # should be always true
-                self.expandLine.expandButton.setExpanded(True)
+        self.expanded = expanded
+        self._updateUncommonDisplay()
                 
-    def _commonCount(self):
-        """Return the number of common records in this SingleTagEditor."""
-        return sum(isinstance(widget,RecordEditor) and widget.getRecord().isCommon()
-                   for widget in self.widgetList)
-        
-    def _uncommonCount(self):
-        """Return the number of uncommon records in this SingleTagEditor."""
-        return sum(isinstance(widget,RecordEditor) and not widget.getRecord().isCommon()
-                   for widget in self.widgetList)
-
     def contextMenuEvent(self,contextMenuEvent):
-        record = None
         # Figure out on what record editor the event did happen
-        pos = self.widgetList.mapTo(self,contextMenuEvent.pos())
-        for widget in self.widgetList:
-            if widget.geometry().contains(pos):
-                if isinstance(widget,RecordEditor):
-                    record = widget.getRecord()
-                break;
-        self.tagEditor.contextMenuEvent(contextMenuEvent,record)
+        for widgetList in (self.commonList,self.uncommonList):
+            if not widgetList.isVisible():
+                continue
+            pos = widgetList.mapTo(self,contextMenuEvent.pos())
+            for widget in widgetList:
+                if widget.geometry().contains(pos):
+                    self.tagEditor.contextMenuEvent(contextMenuEvent,widget.getRecord())
+                    return;
+        else: self.tagEditor.contextMenuEvent(contextMenuEvent,None)
 
 
 class RecordEditor(QtGui.QWidget):
-    """A RecordEditor is used to edit a single record. It consist of a HiddenEditor to edit the value, a
-     label which is empty for common records and contains something like "in 4/8 pieces" for other records
-     and a listview showing the titles of the elements in record.elementsWithValue."""
+    """A RecordEditor is used to edit a single record. It consist of a TagValueEditor to edit the value, an
+     ExpandLine which is invisible for common records and contains something like "in 4/8 elements" for other
+     records and a listview showing the titles of the elements in record.elementsWithValue. The listview can
+     be expanded/hidden using the ExpandLine.
+     """
     def __init__(self,model,record,parent=None):
         QtGui.QWidget.__init__(self,parent)
         self.model = model
@@ -205,28 +174,66 @@ class RecordEditor(QtGui.QWidget):
         self.expanded = None # Will be initialized at the end of setRecord
         self.listView = None # Might be created in setRecord
         
-        # Create layouts
         self.setLayout(QtGui.QVBoxLayout())
         self.layout().setSpacing(0)
-        self.layout().setMargin(0)
-        firstLineLayout = QtGui.QHBoxLayout()
-        self.secondLineLayout = QtGui.QHBoxLayout()
-        self.secondLineLayout.addSpacing(20)
-        self.layout().addLayout(firstLineLayout)
-        self.layout().addLayout(self.secondLineLayout)
+        self.layout().setContentsMargins(0,0,0,0)
         
         # Create the editor
         self.valueEditor = tagwidgets.TagValueEditor(record.tag,hideEditor=True)
         self.valueEditor.valueChanged.connect(self._handleValueChanged)
-        firstLineLayout.addWidget(self.valueEditor)
+        self.layout().addWidget(self.valueEditor)
         
-        self.elementsLabel = QtGui.QLabel()
-        firstLineLayout.addWidget(self.elementsLabel)
-        self.expandButton = ExpandButton()
-        self.expandButton.triggered.connect(self.setExpanded)
-        firstLineLayout.addWidget(self.expandButton)
-
+        self.expandLine = ExpandLine()
+        self.layout().addWidget(self.expandLine)
+        font = self.font()
+        font.setPointSize(font.pointSize()-2)
+        self.expandLine.setFont(font)
+        
+        # Using an extra layout for the list view seems to be the only method to indent it by 20px
+        listViewLayout = QtGui.QHBoxLayout()
+        listViewLayout.setContentsMargins(20,0,0,0)
+        self.listView = listview.ListView()
+        self.listView.setModel(simplelistmodel.SimpleListModel([],lambda el: el.getTitle()))
+        self.listView.setFont(font)
+        listViewLayout.addWidget(self.listView)
+        self.layout().addLayout(listViewLayout)
+        
         self.setRecord(record)
+        self.expandLine.triggered.connect(self.listView.setVisible)
+        self._updateElementDisplay()
+    
+    def _updateElementDisplay(self):
+        """Update the expandline and the listview and check whether they should be visible."""
+        record = self.record
+        if record.isCommon():
+            self.expandLine.setVisible(False)
+            self.listView.setVisible(False)
+        else:
+            elements = record.elementsWithValue if not record.isUsual() else record.getExceptions()
+            if len(elements) == 1:
+                if record.tag == tags.TITLE:
+                    # No need to display the title in the expandline when it is the record's value itself
+                    self.expandLine.setVisible(False)
+                    self.listView.setVisible(False)
+                else:
+                    self.expandLine.setVisible(True)
+                    text = self.tr("in {}") if not record.isUsual() else self.tr("except in {}")
+                    self.expandLine.setText(text.format(elements[0].getTitle()))
+                    self.expandLine.setExpanderVisible(False)
+                    self.listView.setVisible(False)
+            else:
+                self.expandLine.setVisible(True)
+                text = self.tr("in {}/{} elements") if not record.isUsual() \
+                                                    else self.tr("except in {}/{} elements")
+                self.expandLine.setText(text.format(len(elements),len(record.allElements)))
+                if record.tag == tags.TITLE:
+                    self.expandLine.setExpanderVisible(False)
+                    self.listView.setVisible(False)
+                else:
+                    self.expandLine.setExpanderVisible(True)
+                    self.listView.model().setItems(elements)
+                    self.expandLine.setExpanded(len(elements) <= EXPAND_LIMIT)
+                    self.listView.setVisible(len(elements) <= EXPAND_LIMIT)
     
     def getRecord(self):
         """Return the record that can be edited in this RecordEditor."""
@@ -236,65 +243,11 @@ class RecordEditor(QtGui.QWidget):
         """Set the record that can be edited in this RecordEditor."""
         self.record = record
         if record.tag != self.valueEditor.getTag():
-            # Do not change the value when changing the tag since it may be invalid for the new tag
+            # Do not change the value when changing the tag since the old value may be invalid for the
+            # new tag. Wait until we set the new value in the next line.
             self.valueEditor.setTag(record.tag,setValue=False)
         self.valueEditor.setValue(record.value)
-        self._updateElementsLabel()
-        if record.isCommon():
-            self.expandButton.setVisible(False)
-            if self.listView is not None:
-                self.secondLineLayout.removeWidget(self.listView)
-                self.listView = None
-        else:
-            elements = record.getExceptions() if record.isUsual() else record.elementsWithValue
-            if len(elements) == 1:
-                self.expandButton.setVisible(False)
-                if self.listView is not None:
-                    self.secondLineLayout.removeWidget(self.listView)
-                    self.listView = None
-            else:
-                self.expandButton.setVisible(True)
-                if self.listView is None:
-                    self.listView = listview.ListView()
-                    self.secondLineLayout.addWidget(self.listView)
-                self.listView.setModel(simplelistmodel.SimpleListModel(elements,lambda el: el.getTitle()))
-                self.setExpanded(len(elements) <= EXPAND_LIMIT)
-
-    def _updateElementsLabel(self):
-        """Set the correct text in the label, e.g. "in 4/8 pieces"."""
-        if self.record.isCommon():
-            self.elementsLabel.clear()
-            self.elementsLabel.setVisible(False)
-        else:
-            self.elementsLabel.setVisible(True)
-            if self.record.isUsual():
-                elements = self.record.getExceptions()
-                if len(elements) == 1:
-                    self.elementsLabel.setText(self.tr("except in {}").format(elements[0].getTitle()))
-                else: self.elementsLabel.setText(
-                           self.tr("except in {}/%n pieces","",len(self.record.allElements))
-                                    .format(len(elements)))
-            else:
-                elements = self.record.elementsWithValue
-                if len(elements) == 1 and self.record.tag != tags.TITLE:
-                    # displaying the title is not necessary if the tag is TITLE
-                    self.elementsLabel.setText(self.tr("in {}").format(elements[0].getTitle()))
-                else: self.elementsLabel.setText(
-                            self.tr("in {}/%n pieces","",len(self.record.allElements)).format(len(elements)))
-        
-    def isExpanded(self):
-        """Return whether this RecordEditor is expanded, i.e. the list of elements with the record's value
-        is visible."""
-        return self.expanded
-        
-    def setExpanded(self,expanded):
-        """Set whether this RecordEditor is expanded, i.e. the list of elements with the record's value
-        is visible."""
-        if expanded != self.expanded:
-            self.expanded = expanded
-            self.expandButton.setExpanded(expanded)
-            if self.listView is not None: # should be always true
-                self.listView.setVisible(expanded)
+        self._updateElementDisplay()
 
     def isValid(self):
         """Return whether this RecordEditor contains a value that is valid for the record's tag."""
@@ -315,50 +268,50 @@ class RecordEditor(QtGui.QWidget):
             self.setRecord(newRecord)
 
 
-class ExpandLine(QtGui.QWidget):
+class ExpandLine(QtGui.QLabel):
     """An ExpandLine is used by SingleTagEditors which contain a lot of uncommon records. It is inserted into
     the list of RecordEditors and allows the user to collapse the uncommon records and expand them again."""
-    def __init__(self,number,parent=None):
-        QtGui.QWidget.__init__(self,parent)
-        self.setLayout(QtGui.QHBoxLayout())
-        self.label = QtGui.QLabel()
-        self.expandButton = ExpandButton()
-        self.layout().addWidget(self.label)
-        self.layout().addWidget(self.expandButton)
-        self.layout().addStretch()
-        self.setNumber(number)
-        
-    def setNumber(self,number):
-        """Set the number of non-common records which is displayed in this ExpandLine."""
-        self.label.setText("<i>"+self.tr("{} different").format(number)+"</i>")
-
-
-class ExpandButton(QtGui.QPushButton):
-    """Special button that displays an arrow pointing up (expanded-state) or down (not expanded). After it
-    has been clicked by the user it will change its state and emit the triggered-signal with the new state.
-    """
-    expandIcon = utils.getIcon("expand.png")
-    collapseIcon = utils.getIcon("collapse.png")
-
+    
     # Emitted when the button is clicked. The parameter will be True if the button is in expanded-state
     # _after_ changing its state due to the click.
     triggered = QtCore.pyqtSignal(bool)
     
-    def __init__(self,expanded = False,parent=None):
-        """Initialize this button with the given parent. If expanded is True, the button will be in
-        expanded-state, i.e. show the collapse-icon."""
-        QtGui.QPushButton.__init__(self,self.collapseIcon if expanded else self.expandIcon,'',parent)
-        self.setFlat(True)
-        self.expanded = expanded
-        self.clicked.connect(self._handleClicked)
-
-    def _handleClicked(self,checked = False):
-        """Handle a click on the button."""
-        self.setExpanded(not self.expanded)
-        self.triggered.emit(self.expanded)
-
+    def __init__(self,text=''):
+        super().__init__(text)
+        self.setIndent(20)
+        self._expanded = False
+        self._expanderVisible = True
+    
     def setExpanded(self,expanded):
-        """Set the expanded-state of the button to <expanded>."""
-        if expanded != self.expanded:
-            self.expanded = expanded
-            self.setIcon(self.collapseIcon if expanded else self.expandIcon)
+        """Set whether this line is expanded. When the expand-state is changed by this method, emit the
+        triggered-signal."""  
+        if expanded != self._expanded:
+            self._expanded = expanded
+            self.update()
+            self.triggered.emit(expanded)
+            
+    def setExpanderVisible(self,expanderVisible):
+        """Set whether the expand-icon is visible (and reacts to mouse clicks)."""
+        if expanderVisible != self._expanderVisible:
+            self._expanderVisible = expanderVisible
+            self.update()
+          
+    def paintEvent(self,event):
+        super().paintEvent(event)
+        painter = QtGui.QStylePainter(self)
+        if self._expanderVisible:
+            option = QtGui.QStyleOption()
+            option.initFrom(self)
+            option.rect = QtCore.QRect(0,0,self.indent(),self.height())
+            # State_Children is necessary to draw an arrow at all, State_Open draws the expanded arro
+            option.state |= QtGui.QStyle.State_Children
+            if self._expanded:
+                option.state |= QtGui.QStyle.State_Open
+            painter.drawPrimitive(QtGui.QStyle.PE_IndicatorBranch,option)
+        event.accept()
+    
+    def mousePressEvent(self,event):
+        if self._expanderVisible and event.pos().y() < self.indent():
+            self.setExpanded(not self._expanded)
+            event.accept()
+        else: event.ignore() # let parent widget handle it (otherwise it is not possible to select records)
