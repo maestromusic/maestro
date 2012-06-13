@@ -18,10 +18,14 @@
 
 """This module just contains several useful string functions."""
 
-import re
+from PyQt4 import QtCore
+
+import datetime, re
 from difflib import SequenceMatcher
 
 from . import constants
+
+translate = QtCore.QCoreApplication.translate
 
 
 def longestSubstring(a, b):
@@ -57,8 +61,8 @@ def nextWhiteSpace(string,pos=0):
 
 
 def formatLength(lengthInSeconds):
-    """Convert a number of seconds into a string like ``01:34``, ``00:05`` or ``1:20:00``. Hours are only
-    displayed when *lengthInSeconds* is at least 3600. Minutes and seconds are displayed with leading zeros.
+    """Convert a number of seconds into a string like "01:34", "00:05", "1:20:00" or "2 days 14:25:30".
+    Display days and hours are only when necessary. Display minutes and seconds with leading zeros.
     """
     if not isinstance(lengthInSeconds,int):
         lengthInSeconds = int(lengthInSeconds)
@@ -69,7 +73,11 @@ def formatLength(lengthInSeconds):
         return "{0:02d}:{1:02d}".format(minutes,seconds)
     else:
         hours = int(lengthInSeconds / 3600)
-        return "{0:d}:{1:02d}:{2:02d}".format(hours,minutes,seconds)
+        timeString = "{0:d}:{1:02d}:{2:02d}".format(hours % 24,minutes,seconds)
+        if hours < 24:
+            return timeString
+        else: return translate("formatLength","%n days",'',QtCore.QCoreApplication.CodecForTr,
+                               int(hours/24)) + ' ' + timeString
 
 
 def commonPrefix(strings):

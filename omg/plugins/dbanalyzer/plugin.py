@@ -23,10 +23,9 @@ them. It is provided as central widget, dialog (in the extras menu) and standalo
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from omg import database as db, application, constants, config
+from omg import database as db, application, constants, config, strutils
 from omg.gui import mainwindow
 from . import resources, checks
-import datetime
 
 
 _action = None # the action that is inserted into the Extras menu
@@ -261,6 +260,11 @@ class DBAnalyzerDialog(QtGui.QDialog):
         
     def getStatistics(self):
         """Gather and return the data for the statistics table."""
+        length = db.query("SELECT SUM(length) FROM {}files".format(db.prefix)).getSingle()
+        # SQL's SUM returns NULL if files is empty
+        if db.isNull(length):
+            length = 0
+            
         return [
             (self.tr("Elements"),db.query(
                     "SELECT COUNT(*) FROM {}elements"
@@ -268,9 +272,7 @@ class DBAnalyzerDialog(QtGui.QDialog):
             (self.tr("Files"),db.query(
                     "SELECT COUNT(*) FROM {}files"
                         .format(db.prefix)).getSingle()),
-            (self.tr("Total Length"),str(datetime.timedelta(seconds = db.query(
-                    "SELECT SUM(length) FROM {}files"
-                        .format(db.prefix)).getSingle()))),
+            (self.tr("Total Length"),strutils.formatLength(length)),#str(datetime.timedelta(seconds=length))),
             (self.tr("Containers"),db.query(
                     "SELECT COUNT(*) FROM {}elements WHERE file = 0"
                         .format(db.prefix)).getSingle()),
