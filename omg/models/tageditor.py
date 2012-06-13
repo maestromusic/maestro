@@ -107,10 +107,6 @@ class RecordModel(QtCore.QObject):
     recordInserted = QtCore.pyqtSignal(int,Record)
     recordRemoved = QtCore.pyqtSignal(Record)
     recordChanged = QtCore.pyqtSignal(tags.Tag,Record,Record)
-    recordMoved = QtCore.pyqtSignal(tags.Tag,int,int)
-    
-    # This signal is emitted, when the number of common records of a tag has changed
-    commonChanged = QtCore.pyqtSignal(tags.Tag)
 
     def __getitem__(self,key):
         return self._records[key]
@@ -157,16 +153,12 @@ class RecordModel(QtCore.QObject):
         exist before you call this method, so you may need to call addTag first."""
         self._records[record.tag].insert(pos,record)
         self.recordInserted.emit(pos,record)
-        if record.isCommon():
-            self.commonChanged.emit(record.tag)
 
     def removeRecord(self,record):
         """Remove a record from the model."""
         pos = self._records[record.tag].index(record)
         del self._records[record.tag][pos]
         self.recordRemoved.emit(record)
-        if record.isCommon():
-            self.commonChanged.emit(record.tag)
             
     def changeRecord(self,tag,oldRecord,newRecord):
         """Replace the record *oldRecord* by *newRecord*. The replacement will take place in the list of
@@ -174,18 +166,6 @@ class RecordModel(QtCore.QObject):
         pos = self._records[tag].index(oldRecord)
         self._records[tag][pos] = newRecord
         self.recordChanged.emit(tag,oldRecord,newRecord)
-        if oldRecord.isCommon() != newRecord.isCommon():
-            self.commonChanged.emit(tag)
-
-    def moveRecord(self,tag,oldPos,newPos):
-        """Within the list of records of tag *tag* move a record from position *oldPos* to position
-        *newPos*."""
-        if oldPos != newPos:
-            self._records[tag].insert(newPos,self._records[tag][oldPos])
-            if oldPos < newPos:
-                del self._records[tag][oldPos]
-            else: del self._records[tag][oldPos + 1]
-            self.recordMoved.emit(tag,oldPos,newPos)
             
     def insertTag(self,pos,tag):
         """Insert the given tag at position *pos* into the OrderedDict. The list of records will be empty."""
@@ -318,10 +298,6 @@ class TagEditorUndoCommand(TagFlagEditorUndoCommand):
             undoParams = (tag,newRecord,oldRecord)
             self._updateIds(oldRecord)
             self._updateIds(newRecord)
-        elif method.__name__ == 'moveRecord':
-            tag,oldPos,newPos = params
-            undoMethod = recordModel.moveRecord
-            undoParams = (tag,newPos,oldPos)
         elif method.__name__ == 'insertTag':
             pos,tag = params
             undoMethod = recordModel.removeTag
@@ -424,8 +400,6 @@ class TagEditorModel(QtCore.QObject):
         self.recordInserted = self.records.recordInserted
         self.recordRemoved = self.records.recordRemoved
         self.recordChanged = self.records.recordChanged
-        self.recordMoved = self.records.recordMoved
-        self.commonChanged = self.records.commonChanged
         
         self.level = None # will be set in self.setElements
         if elements is None:
@@ -500,20 +474,13 @@ class TagEditorModel(QtCore.QObject):
         existingRecord = self.records.get(record.tag,record.value)
         if existingRecord is None:
             # Simply add the record
-            if pos is None:
-                if record.isCommon():
-                    pos = self._commonCount(record.tag)
-                else: pos = len(self.records[record.tag])
-            command.addMethod(self.records.insertRecord,pos,record)
+            command.addMethod(self.records.insertRecord,len(self.records[record.tag]),record)
         else:
             # Now things get complicated: Add the record's elements to those of (a copy of)
             # the existing record.
             copy = existingRecord.merge(record)
             if copy.elementsWithValue != existingRecord.elementsWithValue:
                 command.addMethod(self.records.changeRecord,record.tag,existingRecord,copy)
-                # If this makes the record common, move it to the right place
-                if existingRecord.isCommon() != copy.isCommon():
-                    self._checkCommonAndMove(command,copy)
             
     def removeRecord(self,record):
         """Remove a record from the model."""
@@ -553,7 +520,6 @@ class TagEditorModel(QtCore.QObject):
             # Simple: Tag is unchanged and either there is no record with newRecord.value or the value
             # remains unchangend (thus only elementsWithValue changed)
             command.addMethod(self.records.changeRecord,oldRecord.tag,oldRecord,newRecord)
-            self._checkCommonAndMove(command,newRecord)
         self.stack.push(command)
 
     def removeTag(self,tag):
@@ -666,31 +632,11 @@ class TagEditorModel(QtCore.QObject):
         for record in records:
             if record.isCommon():
                 continue
-            
-            # Maybe we have to change the record's position, since it is common afterwards
-            pos = self.records[record.tag].index(record)
-            newPos = self._commonCount(record.tag)
-            
             newRecord = record.copy()
             newRecord.elementsWithValue = self.elements[:] # copy the list!
             command.addMethod(self.records.changeRecord,record.tag,record,newRecord)
-            
-            if pos != newPos:
-                command.addMethod(self.records.moveRecord,record.tag,pos,newPos)
+    
         self.stack.push(command)
-
-    def _checkCommonAndMove(self,command,record):
-        """Check whether *record* is at a valid position (uncommon records come after common ones) and if
-        not, move it to a valid position. If *command* is not None, add a method to it that will do the move.
-        """
-        pos = self.records[record.tag].index(record)
-        border = self._commonCount(record.tag)
-        if (record.isCommon() and pos < border) or (not record.isCommon() and pos >= border):
-            return # nothing to do
-        newPos = border - 1 if record.isCommon() else border
-        if command is None:
-            self.records.moveRecord(record.tag,pos,newPos)
-        else: command.addMethod(self.records.moveRecord,record.tag,pos,newPos)
         
     def getPossibleSeparators(self,records):
         """Return all separators (from constants.SEPARATORS) that are present in every value of the given
@@ -706,11 +652,6 @@ class TagEditorModel(QtCore.QObject):
             result = list(filter(lambda s: s in record.value,result))
         return result
         
-    def _commonCount(self,tag):
-        """Return the number of records of the given tag that are common (i.e. all elements have the
-        record's value)."""
-        return sum(record.isCommon() for record in self.records[tag])
-
     def _handleLevelChanged(self,event):
         """React to change events fo the underlying level."""
         currentIds = [el.id for el in self.elements]
