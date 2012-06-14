@@ -24,7 +24,7 @@ from .. import application, logging, config, utils
 from .. import database as db, modify
 from ..core import levels, tags as tagsModule
 from ..core.elements import Container, ContentList
-from ..core.nodes import Node, RootNode, Wrapper
+from ..core.nodes import Node, RootNode
 
 
 logger = logging.getLogger(__name__)
@@ -33,14 +33,14 @@ logger = logging.getLogger(__name__)
 class RootedTreeModel(QtCore.QAbstractItemModel):
     """The RootedTreeModel subclasses QAbstractItemModel to create a simple model for QTreeViews. It has one
     root node which is not considered part of the data of this model (and is not displayed by QTreeViews).
-    Nodes in a RootedTreeModel may have every type, but must implement the following methods:
+    Nodes in a RootedTreeModel may have every type, but must implement the following attributes and methods:
     
-        - hasChildren(): return if a node has children
-        - getChildrenCount(): return the number of children of the node
-        - getChildren(): return the list of children of the node
-        - getParent(): return the node's parent. The root-node's getParent-method must return None.
+        - parent: the node's parent. The root node must have parent None
+        - hasContents(): return if a node has children
+        - getContentsCount(): return the number of children of the node
+        - getContents(): return the list of children of the node
         
-    The hasChildren-method allows to implement nodes that don't calculate the number of children until the
+    The hasContents-method allows to implement nodes that don't calculate the number of children until the
     node is expanded the first time.
     """
     def __init__(self, root = None):
