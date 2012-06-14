@@ -16,6 +16,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+import collections
+
 from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
@@ -118,26 +120,21 @@ class RecordModel(QtCore.QObject):
         del self._records[key]
 
     def keys(self):
+        # Note that we use a utils.OrderedDict and therefore keys will return a list and no view
         return self._records.keys()
+    
+    # Simply a more descriptive name
+    tags = keys
 
     def values(self):
         return self._records.values()
 
     def items(self):
         return self._records.items()
-
-    def tags(self):
-        """Return the list of tags contained in this model. Basically an alias for keys but this method
-        really returns a list and not a key-view. Additionally its name is more descriptive."""
-        return list(self._records.keys())
         
     def setRecords(self,records):
         """Set the records of this RecordModel."""
-        self._records = utils.OrderedDict()
-        for record in records:
-            if record.tag not in self._records:
-                self._records[record.tag] = [record]
-            else: self._records[record.tag].append(record)
+        self._records = records
     
     def get(self,tag,value):
         """Return the record with the given tag and value from the model if such a record exists or None
@@ -432,21 +429,29 @@ class TagEditorModel(QtCore.QObject):
                 level.changed.connect(self._handleLevelChanged)
         self.level = level
         self.elements = elements
-        records = self._createRecords()
-        self.records.setRecords(records.values())
+        self.records.setRecords(self._createRecords())
         self.resetted.emit()
 
     def _createRecords(self):
-        """Create records for self.elments. Return them as dict mapping (tag,value)-tuples to records."""
+        """Create records for self.elments. Return them as an ordered dict mapping tag-instances to
+        list of records."""
         records = {}
         for element in self.elements:
             for tag in element.tags:
+                if tag not in records:
+                    records[tag] = collections.OrderedDict()
                 for value in element.tags[tag]:
-                    if (tag,value) in records:
-                        records[(tag,value)].elementsWithValue.append(element)
-                    else: records[(tag,value)] = Record(tag,value,self.elements,[element])
-        return records
-
+                    if value not in records[tag]:
+                         records[tag][value] = Record(tag,value,self.elements,[element])
+                    else: records[tag][value].elementsWithValue.append(element)
+    
+        # Use lists instead of ordered dicts in the result
+        result = utils.OrderedDict()
+        for tag in tags.tagList:
+            if tag in records:
+                result[tag] = list(records[tag].values())
+        return result
+    
     def getTagsOfElement(self,element):
         """Return the tags of the given element as stored in the records."""
         result = tags.Storage()
@@ -662,25 +667,23 @@ class TagEditorModel(QtCore.QObject):
         actualRecords = self._createRecords()
         
         for tag in self.records.tags():
-            for myRecord in list(self.records[tag]):
-                if (tag,myRecord.value) not in actualRecords:
-                    self.records.removeRecord(myRecord)
-                    if len(self.records[myRecord.tag]) == 0:
-                        self.records.removeTag(myRecord.tag)
-                    changed = True
-                else:
-                    actualRecord = actualRecords[(tag,myRecord.value)]
-                    if actualRecord.elementsWithValue != myRecord.elementsWithValue:
-                        self.records.changeRecord(myRecord.tag,myRecord,actualRecord)
-                        changed = True
-                    del actualRecords[(tag,myRecord.value)]
+            if tag not in actualRecords:
+                for record in self.records[tag]:
+                    self.records.removeRecord(record)
+                self.records.removeTag(tag)
+                changed = True
         
-        # Finally add all records that remained
-        for actualRecord in actualRecords.values():
-            if actualRecord.tag not in self.records.tags():
-                self.records.insertTag(len(self.records.tags()),actualRecord.tag)
-            self.records.insertRecord(len(self.records[actualRecord.tag]),actualRecord)
-            changed = True
+        for tag in actualRecords:
+            if tag not in self.records.tags():
+                self.records.insertTag(len(self.records.tags()),tag)
+                changed = True
+            for i,record in enumerate(actualRecords[tag]):
+                if i >= len(self.records[tag]):
+                    self.records.insertRecord(i,record)
+                    changed = True
+                elif self.records[tag][i] != record:
+                    self.records.changeRecord(tag,self.records[tag][i],record)
+                    changed = True
         
         if changed:
             # After a single change to the records that is not stored in TagEditorUndoCommands, we must not
