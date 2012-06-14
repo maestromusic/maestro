@@ -823,3 +823,25 @@ def findCommonTags(elements):
     for tag in sameTags:
         tags[tag] = commonTagValues[tag]
     return tags
+
+
+class TagDict(dict):
+    """Subclass of utils.OrderedDict that accepts only tags as keys and will be sorted by their order."""
+    def __setitem__(self,key,value):
+        if not isinstance(key,Tag):
+            raise ValueError("TagDict accepts only tags as keys. I got {}".format(key))
+        super().__setitem__(key,value)
+        
+    def items(self):
+        return utils.OrderedDictItems(self,self.keys())
+
+    def keys(self):
+        return [tag for tag in tagList if tag in self]
+    
+    def values(self):
+        return utils.OrderedDictValues(self,self.keys())
+    
+    def __iter__(self):
+        return self.keys()
+    
+        

@@ -326,7 +326,13 @@ class OrderedDict(dict):
         self.insert(self.index(posKey),key,value)
 
     def items(self):
-        return OrderedDictItems(self)
+        return OrderedDictItems(self,self._keyList)
+    
+    def keys(self):
+        return self._keyList
+    
+    def values(self):
+        return OrderedDictValues(self,self._keyList)
 
     def copy(self):
         result = OrderedDict()
@@ -344,23 +350,50 @@ class OrderedDict(dict):
     
 
 class OrderedDictItems:
-    """OrderedDict.items returns an instance of this class to ensure that the items are returned in the
-    correct order."""
-    def __init__(self,oDict):
-        self.oDict = oDict
+    """This class provides a view as provided by the builtin method dict.items. The difference is that the
+    in which (key,value)-pairs are returned is determined by the list of keys *keyList*.
+    
+    Warning: If the keys of the underlying dict change, the list *keyList* must be changed accordingly.
+    """
+    def __init__(self,aDict,keyList):
+        self.aDict = aDict
+        self.keyList = keyList
     
     def __len__(self):
-        return len(self.oDict)
+        return len(self.aDict)
     
-    def __contains__(self,item):
-        return item in self.oDict
+    def __contains__(self,kvTuple):
+        k,v = kvTuple
+        return k in self.aDict and self.aDict[k] == v
     
     def __iter__(self):
         """Return an iterator which will iterate over the keys in the correct order."""
-        for key in self.oDict._keyList:
-            yield key,self.oDict[key]
+        for key in self.keyList:
+            yield key,self.aDict[key]
 
+
+class OrderedDictValues:
+    """This class provides a view as provided by the builtin method dict.values. The difference is that the
+    in which values are returned is determined by the list of keys *keyList*.
     
+    Warning: If the keys of the underlying dict change, the list *keyList* must be changed accordingly.
+    """
+    def __init__(self,aDict,keyList):
+        self.aDict = aDict
+        self.keyList = keyList
+    
+    def __len__(self):
+        return len(self.aDict)
+    
+    def __contains__(self,value):
+        return dict.contains(self.aDict,value)
+    
+    def __iter__(self):
+        """Return an iterator which will iterate over the keys in the correct order."""
+        for key in self.keyList:
+            yield self.aDict[key]
+            
+            
 @functools.total_ordering
 class PointAtInfinity:
     """Depending on the parameter *plus* this object is either bigger or smaller than any other object
