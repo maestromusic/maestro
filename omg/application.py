@@ -92,6 +92,8 @@ def run(cmdConfig=[],exitPoint=None,console=False):
     if not console:
         lock()
     
+    setLocale()
+                     
     if exitPoint == 'config':
         return app
         
@@ -228,6 +230,17 @@ def lock():
         sys.exit(-1)
 
 
+def setLocale():
+    """Set the locale based on config.options.i18n.locale."""
+    import locale
+    try:
+        # This locale stuff is famous for all sorts of funny errors on different platforms
+        locale.setlocale(locale.LC_ALL,(config.options.i18n.locale,'UTF-8'))
+    except locale.Error:
+        # Setting the default locale should always work. But might be different than the config option.
+        locale.setlocale(locale.LC_ALL,'')
+    
+    
 def loadTranslators(app,logger):
     """Load a translator for Qt's strings and one for OMG's strings."""
     from . import translations
