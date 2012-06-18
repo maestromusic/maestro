@@ -70,7 +70,7 @@ class EditTagsAction(TreeAction):
         self.recursive = recursive
     
     def initialize(self):
-        self.setEnabled(self.parent().nodeSelection.hasElements())
+        self.setEnabled(self.parent().nodeSelection.hasWrappers())
     
     def doAction(self):
         """Open a dialog to edit the tags of the currently selected elements (and the children, if
@@ -106,11 +106,11 @@ class DeleteAction(TreeAction):
     def initialize(self):
         selection = self.parent().nodeSelection
         if self.mode == CONTENTS:
-            self.setEnabled(not selection.empty() and all(isinstance(element.parent, Wrapper) \
-                                    or isinstance(element.parent, RootNode)
-                                for element in selection.elements()))
+            self.setEnabled(not selection.empty() and all(isinstance(w.parent, Wrapper) \
+                                    or isinstance(w.parent, RootNode)
+                                for w in selection.wrappers()))
         elif self.mode == DB:
-            self.setEnabled(self.parent().level is levels.real and selection.hasElements())
+            self.setEnabled(self.parent().level is levels.real and selection.hasWrappers())
         elif self.mode == DISK:
             self.setEnabled(self.parent().level is levels.real and selection.hasFiles())
         
@@ -119,7 +119,7 @@ class DeleteAction(TreeAction):
         if self.mode == CONTENTS:
             rootParents = []
             elementParents = {}
-            for wrapper in self.parent().nodeSelection.elements():
+            for wrapper in self.parent().nodeSelection.wrappers():
                 parent = wrapper.parent
                 if isinstance(parent, RootNode):
                     rootParents.append(parent.contents.index(wrapper))
@@ -165,7 +165,7 @@ class MergeAction(TreeAction):
     def doAction(self):
         selection = self.parent().nodeSelection
         from ..gui.dialogs import MergeDialog
-        elements = selection.elements()
+        elements = selection.wrappers()
         hintTitle, hintRemove = self.createMergeHint([wrap.element for wrap in elements])
         mergeIndices = sorted(elem.parent.index(elem) for elem in elements)
         numSiblings = len(elements[0].parent.contents)
@@ -243,7 +243,7 @@ class FlattenAction(TreeAction):
         dialog = FlattenDialog(parent = self.parent())
         if dialog.exec_() == QtGui.QDialog.Accepted:
             flatten(self.parent().level,
-                                         self.parent().nodeSelection.elements(),
+                                         self.parent().nodeSelection.wrappers(),
                                          dialog.recursive()
                                          )
 
@@ -271,8 +271,8 @@ class ChangePositionAction(TreeAction):
     def doAction(self):
         from ..gui.dialogs import warning
         selection = self.parent().nodeSelection
-        positions = [wrap.position for wrap in selection.elements()]
-        parentId = selection.elements()[0].parent.element.id
+        positions = [wrap.position for wrap in selection.wrappers()]
+        parentId = selection.wrappers()[0].parent.element.id
         try:
             application.stack.push(commands.ChangePositionsCommand(self.parent().model().level,
                                                                    parentId, positions,
@@ -295,7 +295,7 @@ class MatchTagsFromFilenamesAction(TreeAction):
         """Open a TagMatchDialog for the selected elements."""
         from ..gui import tagmatchdialog
         dialog = tagmatchdialog.TagMatchDialog(self.parent().level,
-                                               self.parent().nodeSelection.elements(),
+                                               self.parent().nodeSelection.wrappers(),
                                                self.parent())
         dialog.exec_()
 
@@ -309,14 +309,14 @@ class ToggleMajorAction(TreeAction):
         
     def initialize(self):
         selection = self.parent().nodeSelection
-        self.setEnabled(selection.hasElements())
-        self.setChecked(all(w.isContainer() and w.element.major for w in selection.elements()))
+        self.setEnabled(selection.hasWrappers())
+        self.setChecked(all(w.isContainer() and w.element.major for w in selection.wrappers()))
         self.state = self.isChecked()
         self.selection = selection
         
     def doAction(self):
         application.stack.push(commands.ChangeMajorFlagCommand(self.parent().model().level,
-                        [w.element.id for w in self.selection.elements() if w.element.major == self.state]))
+                        [w.element.id for w in self.selection.wrappers() if w.element.major == self.state]))
         self.toggle()
                 
 

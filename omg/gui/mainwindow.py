@@ -50,6 +50,7 @@ from PyQt4.QtCore import Qt
 
 from .. import application, config, constants, logging, modify
 from ..core import levels
+from . import selection
 
 # This will contain the single instance of MainWindow once it is initialized
 mainWindow = None
@@ -81,21 +82,6 @@ def removeWidgetData(id):
     else: _widgetData.remove(data)
     if mainWindow is not None:
         mainWindow._widgetDataRemoved(data)
-
-
-def getGlobalSelection():
-    """Return the level in which the global selection is contained and the wrappers that form the current
-    global selection."""
-    return _globalSelectionLevel,_globalSelection
-
-
-def setGlobalSelection(level,wrappers):
-    """Set the global selection."""
-    global _globalSelectionLevel, _globalSelection
-    _globalSelectionLevel = level
-    _globalSelection = wrappers
-    if mainWindow is not None:
-        mainWindow.globalSelectionChanged.emit(level,wrappers)
         
     
 class WidgetData:
@@ -170,13 +156,18 @@ class MainWindow(QtGui.QMainWindow):
     # hidden docks.
     _dockWidgets = None
     
-    globalSelectionChanged = QtCore.pyqtSignal(levels.Level,list)
+    # Use gui.selection.changed instead
+    _globalSelectionChanged = QtCore.pyqtSignal(selection.NodeSelection)
     
     def __init__(self,parent=None):
         super().__init__(parent)
         self.setDockNestingEnabled(True)
         self.setWindowTitle(self.tr('OMG version {}').format(constants.VERSION))
         self.setWindowIcon(QtGui.QIcon(":omg/omg.png"))
+        
+        from . import selection
+        selection.changed = self._globalSelectionChanged
+        
         self.setCentralWidget(SmallTabWidget())
         self.initMenus()
         self.statusBar()

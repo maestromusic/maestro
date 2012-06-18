@@ -41,21 +41,10 @@ class BrowserDock(QtGui.QDockWidget):
         QtGui.QDockWidget.__init__(self,parent)
         self.setWindowTitle(self.tr("Browser"))
         browser = Browser(self,state)
-        browser.selectionChanged.connect(self._handleSelectionChanged)
         self.setWidget(browser)
         
     def saveState(self):
         return self.widget().saveState()
-    
-    def _handleSelectionChanged(self,selectionModel,selected,deselected):
-        """Change the global selection if some any elements are selected in any views."""
-        globalSelection = []
-        for index in selectionModel.selectedIndexes():
-            node = selectionModel.model().data(index)
-            if isinstance(node,Wrapper):
-                globalSelection.append(node)
-        if len(globalSelection):
-            mainwindow.setGlobalSelection(levels.real,globalSelection)
             
 
 mainwindow.addWidgetData(mainwindow.WidgetData(
@@ -336,7 +325,7 @@ class BrowserTreeView(treeview.TreeView):
     actionConfig.addActionDefinition(((sect, 'position-'),), treeactions.ChangePositionAction, mode = "-1") 
     
     def __init__(self,parent,layers,sortTags,delegateConfig):
-        treeview.TreeView.__init__(self,parent)
+        super().__init__(levels.real,parent)
         self.setModel(browsermodel.BrowserModel(layers,sortTags))
         self.header().sectionResized.connect(self.model().layoutChanged)
         self.setItemDelegate(browserdelegate.BrowserDelegate(self,delegateConfig))

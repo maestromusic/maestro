@@ -34,11 +34,11 @@ class RenameFilesAction(treeactions.TreeAction):
         self.setText(self.tr('rename files'))
     
     def initialize(self):
-        self.setEnabled(self.parent().nodeSelection.hasElements())
+        self.setEnabled(self.parent().nodeSelection.hasWrappers())
     
     def doAction(self):
         dialog = RenameDialog(self.parent(), self.level(),
-                              [wrap.element.id for wrap in self.parent().nodeSelection.elements()])
+                              [wrap.element.id for wrap in self.parent().nodeSelection.wrappers()])
         dialog.exec_()
         if dialog.result() == dialog.Accepted:
             application.stack.push(CommitCommand(dialog.sublevel, dialog.ids, self.tr("rename")))
@@ -106,7 +106,7 @@ class RenameDialog(QtGui.QDialog):
         
         self.sublevel = level.subLevel(ids, "rename")
         self.model = leveltreemodel.LevelTreeModel(self.sublevel, ids)
-        self.tree = treeview.TreeView()
+        self.tree = treeview.TreeView(self.sublevel,affectGlobalSelection=False)
         self.tree.setModel(self.model)
         self.delegate = PathDelegate(self.tree)
         self.tree.setItemDelegate(self.delegate)

@@ -43,7 +43,7 @@ class PlaylistTreeView(treeview.TreeView):
     songSelected = QtCore.pyqtSignal(int)
     
     def __init__(self, parent = None):
-        super().__init__(parent)
+        super().__init__(levels.real,parent)
         self.backend = None
         self.setSelectionMode(self.ExtendedSelection)
         self.setDragEnabled(True)
@@ -62,11 +62,11 @@ class PlaylistTreeView(treeview.TreeView):
         self.setDisabled(backend is None)
         if backend is not None:
             model = backend.playlist
-            if self.selectionModel():
-                self.selectionModel().selectionChanged.disconnect(self.updateGlobalSelection)
+            #if self.selectionModel():
+             #   self.selectionModel().selectionChanged.disconnect(self.updateGlobalSelection)
             self.setModel(model)
             self.itemDelegate().model = model
-            self.selectionModel().selectionChanged.connect(self.updateGlobalSelection)
+            #self.selectionModel().selectionChanged.connect(self.updateGlobalSelection)
             self.songSelected.connect(backend.setCurrentSong)
             self.updateNodeSelection()
             self.model().modelReset.connect(self.expandAll)

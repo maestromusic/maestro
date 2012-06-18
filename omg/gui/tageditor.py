@@ -46,27 +46,32 @@ class TagEditorDock(QtGui.QDockWidget):
             
         self.setAcceptDrops(True)
         
-        self.editorWidget = TagEditorWidget(vertical=vertical)
+        self.editorWidget = TagEditorWidget(vertical=vertical,dock=self)
         self.setWidget(self.editorWidget)
-        mainwindow.mainWindow.globalSelectionChanged.connect(self._handleSelectionChanged)
+        
+        self.loadRecursively = True
+        if state is not None:
+            if 'loadRecursively' in state:
+                self.loadRecursively = bool(state['loadRecursively'])
+        
+        from . import selection
+        selection.changed.connect(self._handleSelectionChanged)
+        
+    def saveState(self):
+        return {'loadRecursively': self.loadRecursively}
         
     def _handleLocationChanged(self,area):
         """Handle changes in the dock's position."""
         vertical = self.isFloating() or area in [Qt.LeftDockWidgetArea,Qt.RightDockWidgetArea]
         self.editorWidget.setVertical(vertical)
     
-    def _handleSelectionChanged(self,level,wrappers):
+    def _handleSelectionChanged(self,nodeSelection):
         """React to changes to the global selection: Load the elements of the selected wrappers
         into the TagEditorWidget."""
-        if len(wrappers) == 0:
+        if not nodeSelection.hasWrappers():
             return
-        elements = []
-        ids = set()
-        for wrapper in wrappers:
-            if wrapper.element.id not in ids:
-                ids.add(wrapper.element.id)
-                elements.append(wrapper.element)
-        self.editorWidget.setElements(level,elements)
+        elements = list(nodeSelection.elements(recursive=self.loadRecursively))
+        self.editorWidget.setElements(nodeSelection.level,elements)
         
     def dragEnterEvent(self,event):
         if event.mimeData().hasFormat(config.options.gui.mime) or event.mimeData().hasUrls():
@@ -146,9 +151,10 @@ class TagEditorWidget(QtGui.QWidget):
     # confer _handleTagChanged and _handleTagChangedByUser.
     _ignoreHandleTagChangedByUser = False
     
-    def __init__(self,level=None,elements=None,vertical=False,stack=None):
+    def __init__(self,level=None,elements=None,vertical=False,stack=None,dock=None):
         QtGui.QWidget.__init__(self)
         self.vertical = None # will be set in setVertical below
+        self.dock = dock
         
         self.model = tageditormodel.TagEditorModel(stack=stack)
         self.model.tagInserted.connect(self._handleTagInserted)
@@ -475,7 +481,7 @@ class TagEditorWidget(QtGui.QWidget):
         
     def _handleOptionButton(self):
         """Open the option dialog."""
-        dialog = OptionDialog(self.optionButton)
+        dialog = OptionDialog(self.optionButton,self)
         dialog.show()
 
 
@@ -580,5 +586,22 @@ class SmallTagTypeBox(tagwidgets.TagTypeBox):
         
         
 class OptionDialog(dialogs.FancyPopup):
-    def __init__(self,parent):
+    """Option dialog for a TagEditorWidget."""
+    def __init__(self,parent,tagEditor):
         super().__init__(parent)
+        self.tagEditor = tagEditor
+        layout = QtGui.QVBoxLayout(self)
+        
+        # loadRecursively is an attribute of the tageditor's dock widget. Do not show the option if the
+        # tageditor is displayed as dialog (without dock)
+        if tagEditor.dock is not None:
+            loadRecursivelyBox = QtGui.QCheckBox(self.tr("Load elements recursively"))
+            loadRecursivelyBox.setChecked(tagEditor.dock.loadRecursively)
+            loadRecursivelyBox.stateChanged.connect(self._handleLoadRecursivelyBox)
+            layout.addWidget(loadRecursivelyBox)
+        
+        layout.addStretch(1)
+        
+    def _handleLoadRecursivelyBox(self,state):
+        self.tagEditor.dock.loadRecursively = state == Qt.Checked
+        

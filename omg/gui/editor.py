@@ -45,8 +45,7 @@ class EditorTreeView(treeview.TreeView):
     actionConfig.addActionDefinition(((sect, 'clearEditor'),), ClearTreeAction)
 
     def __init__(self, parent = None):
-        super().__init__(parent)
-        self.level = levels.editor
+        super().__init__(levels.editor,parent)
         self.setSelectionMode(self.ExtendedSelection)
         self.setDragEnabled(True)
         self.setAcceptDrops(True)

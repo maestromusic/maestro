@@ -23,30 +23,23 @@ from PyQt4.QtCore import Qt
 
 from ..core.elements import Container
 from ..core.nodes import Wrapper
-from . import treeactions
+from . import selection, treeactions
 
 
-class NodeSelection:
+class NodeSelection(selection.NodeSelection):
     """Objects of this class store a selection of nodes a TreeView. Different than a QItemSelectionModel,
     a NodeSelection knows about Nodes, Elements etc and provides special methods to determine properties
     of the selection. Actions can use this information to decide whether they are enabled or not.
-    
-    Besides the methods defined below, the following attributes are available:
-    - nodes: A list of all selected nodes (both elements and other nodes)
-    - parents: A list of parents of selected elements (parents may or may not be elements themselves)
+
+    *model* is a QItemSelectionModel.
     """
-    def __init__(self, model):
+    def __init__(self, level, model):
         """Initialize with the given *model* (instance of QItemSelectionModel). Computes and stores
         all attributes."""
-        indexes = model.selectedIndexes()
-        self._nodes = [ model.model().data(index) for index in indexes ]
-        self._elements = [ node for node in self._nodes if isinstance(node, Wrapper) ]
-        self._parents = set(elem.parent for elem in self._elements)
+        # Get the QAbstractItemModel from a QItemSelectionModel
+        super().__init__(level,[model.model().data(index) for index in model.selectedIndexes()])
         self._model = model
-    
-    def empty(self):
-        return len(self._nodes) == 0
-    
+        
     def nodes(self,onlyToplevel=False):
         """Return all nodes that are currently selected. If *onlyToplevel* is True, nodes will be excluded
         if an ancestor is also selected.
@@ -54,53 +47,9 @@ class NodeSelection:
         if not onlyToplevel:
             return self._nodes
         else:
-            result = []
-            for node in self._nodes:
-                if not any(self._model.isSelected(self._model.model().getIndex(parent))
-                               for parent in node.getParents()):
-                    result.append(node)
-            return result
-        
-    def elements(self, recursive = False):
-        """Returns a list of all selected element wrappers. If *recursive* is True, all children of selected
-        wrappers are also returned."""
-        if not recursive:
-            # Just remove duplicates and nodes which don't have tags
-            return self._elements
-        else:
-            selectedNodes = self.nodes(onlyToplevel=True)
-            elements = []
-            for node in selectedNodes:
-                for child in node.getAllNodes():
-                    if isinstance(child, Wrapper):
-                        elements.append(child)
-            return elements
-        
-    def singleElement(self):
-        """Returns True iff one single element is selected. This does not exclude that other non-element
-        nodes are selected too."""
-        return len(self._elements) == 1
-    
-    def singleParent(self, requireParentElement = False):
-        """Returns True iff all selected elements share the same parent. IF *requireParentElement* is True,
-        that parent must also be an element, otherwise False is returned."""
-        return len(self._parents) == 1 and \
-            (not requireParentElement or isinstance(next(iter(self._parents)), Wrapper))
-    
-    def hasElements(self):
-        """True iff at least one element is selected."""
-        return len(self._elements) > 0
-    
-    def hasContainers(self):
-        """True iff at least one container is selected."""
-        for element in self._elements:
-            if isinstance(element, Container):
-                return True
-        return False
-
-    def hasFiles(self):
-        """True iff at least one file is selected."""
-        return any(el.isFile() for el in self._elements)
+            return [n for n in self._nodes
+                            if not any(self._model.isSelected(self._model.model().getIndex(parent))
+                                            for parent in n.getParents())]
         
 
 class TreeActionConfiguration(QtCore.QObject):
@@ -182,15 +131,21 @@ class TreeActionConfiguration(QtCore.QObject):
         
         
 class TreeView(QtGui.QTreeView):
-    """Base class for tree views that contain mainly elements. This class handles mainly the
+    """Base class for tree views that contain mostly wrappers. This class handles mainly the
     ContextMenuProvider system, that allows plugins to insert entries into the context menus of playlist and
     browser.
+    
+    *level* is the level that contains all elements in the tree (never mix wrappers from different levels!)
+    *affectGlobalSelection* determines whether the treeview will change the global selection whenever nodes
+    in the it are selected. This should be set to False for treeviews in dialogs.
     """
     
     actionConfig = TreeActionConfiguration()
     
-    def __init__(self,parent = None):
-        QtGui.QTreeView.__init__(self, parent)
+    def __init__(self,level,parent=None,affectGlobalSelection=True):
+        super().__init__(parent)
+        self.level = level
+        self.affectGlobalSelection = affectGlobalSelection
         
         self.setHeaderHidden(True)
         self.setExpandsOnDoubleClick(False)
@@ -230,7 +185,7 @@ class TreeView(QtGui.QTreeView):
         self.updateNodeSelection()
         
     def updateNodeSelection(self):
-        self.nodeSelection = NodeSelection(self.selectionModel())
+        self.nodeSelection = NodeSelection(self.level,self.selectionModel())
         for action in self.treeActions.values():
             if isinstance(action, treeactions.TreeAction):
                 action.initialize()
@@ -258,7 +213,8 @@ class TreeView(QtGui.QTreeView):
     def selectionChanged(self, selected, deselected):
         super().selectionChanged(selected, deselected)
         self.updateNodeSelection()
-        self.updateGlobalSelection(selected, deselected)
+        if self.affectGlobalSelection and not self.nodeSelection.empty():
+            selection.setGlobalSelection(self.nodeSelection)  
     
     def currentNode(self):
         current = self.currentIndex()
@@ -272,10 +228,3 @@ class TreeView(QtGui.QTreeView):
         selection = self.selectionModel().selection()
         return [(self.model().data(itemRange.parent()),itemRange.top(),itemRange.bottom())
                     for itemRange in selection]
-            
-    def updateGlobalSelection(self, selected, deselected):
-        """Change the global selection if some elements are selected in this view."""
-        globalSelection = [n for n in self.nodeSelection.nodes() if isinstance(n,Wrapper)]
-        if len(globalSelection):
-            from . import mainwindow
-            mainwindow.setGlobalSelection(globalSelection[0].element.level,globalSelection)
