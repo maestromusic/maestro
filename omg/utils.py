@@ -16,12 +16,12 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import datetime, os, functools
+import datetime, os, functools, re, locale
 from collections import OrderedDict
 
 from PyQt4 import QtGui
 
-from . import config
+from . import config, strutils
 
 
 def mapRecursively(f,aList):
@@ -166,27 +166,57 @@ class FlexiDate(object):
             datetime.date(self.year,self.month,self.day) # Check date
     
     @staticmethod
+    def _initFormat():
+        """Initialize the class attributes FlexiDate._dateFormat and FlexiDate._dateOrder. These attributes
+        depend on the locale and are used by strptime and strftime."""
+        if not hasattr(FlexiDate,'_dateFormat'):
+            format = locale.nl_langinfo(locale.D_FMT)
+            match = re.match('%[dmY]([.\-/])%[dmY]([.\-/])%[dmY]',format)
+            if match is not None:
+                sep1 = match.group(1)
+                sep2 = match.group(2)
+            else: sep1,sep2 = '//'
+            if format.index('%d') < format.index('%m'):
+                FlexiDate._dateFormat = ('{Y:04d}',
+                                         '{m:02d}'+sep2+'{Y:04d}',
+                                         '{d:02d}'+sep1+'{m:02d}'+sep2+'{Y:04d}')
+                FlexiDate._dateOrder = (('year',),('month','year'),('day','month','year'))
+            else:
+                FlexiDate._dateFormat = ('{Y:04d}',
+                                         '{m:02d}'+sep2+'{Y:04d}',
+                                         '{m:02d}'+sep1+'{d:02d}'+sep2+'{Y:04d}')
+                FlexiDate._dateOrder = (('year',),('month','year'),('month','day','year'))
+        
+    @staticmethod
     def strptime(string):
-        """Parse FlexiDates from strings in one of the formats ``'YYYY-mm-dd'`` or ``'YYYY-mm'`` or ``'YYYY'``.
+        """Parse FlexiDates from strings in a format depending on the locale.
         Raise a :exc:`ValueError` if that fails."""
         if not isinstance(string,str):
             raise TypeError("Argument must be a string.")
-        try:
-            return FlexiDate(*map(int,string.split("-")))
-        except TypeError as e:
-            # A TypeError is raised if the number of arguments doesn't fit. In our case that's more a kind of ValueError.
-            raise ValueError(e.message)
+        
+        string = strutils.replace(string,{'/':'-','.':'-'}) # Recognize all kinds of separators
+        numbers = [int(n) for n in string.split('-')]
+        if len(numbers) > 3:
+            raise ValueError('Invalid date format: "{}"'.format(string))
+        FlexiDate._initFormat()
+        dateOrder = FlexiDate._dateOrder[len(numbers)-1]
+        return FlexiDate(**{key: numbers[i] for i,key in enumerate(dateOrder)})
     
-    def strftime(self, format = ("{Y:04d}-{m:02d}-{d:02d}", "{Y:04d}-{m:02d}", "{Y:04d}")):
-        """Format the FlexiDate according to the given format. *format* must be a 3-tuple of
-        format strings, where the first one if used if year, month and day are specified,
-        the second one is used if only the day misses, and the third one is used if there
-        is only a year. The format strings are python format strings, where Y=year, m=month, d=day."""
-        if self.month:
-            if self.day:
-                format = format[0]
-            else: format = format[1]
-        else: format = format[2]
+    def strftime(self,format=None):
+        """Format the FlexiDate according to the given format. If *format* is None, choose a format based
+        on the locale. Otherwise, *format* must be a 3-tuple of format strings, where the first one is used
+        if only a year is specified, the second one is used if month and year are specified and the last
+        one is used if year, month and day are specified.
+        The format strings are python format strings, using the keys Y=year, m=month, d=day.
+        """
+        if format is None:
+            FlexiDate._initFormat()
+            if self.month:
+                if self.day:
+                    index = 2
+                else: index = 1
+            else: index = 0
+            format = FlexiDate._dateFormat[index]
         return format.format(Y=self.year, m=self.month, d=self.day)
         
     def toSql(self,maximum=False):
