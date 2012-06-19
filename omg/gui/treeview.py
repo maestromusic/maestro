@@ -27,7 +27,7 @@ from . import selection, treeactions
 
 
 class NodeSelection(selection.NodeSelection):
-    """Objects of this class store a selection of nodes a TreeView. Different than a QItemSelectionModel,
+    """Objects of this class store a selection of nodes in a TreeView. Different than a QItemSelectionModel,
     a NodeSelection knows about Nodes, Elements etc and provides special methods to determine properties
     of the selection. Actions can use this information to decide whether they are enabled or not.
 

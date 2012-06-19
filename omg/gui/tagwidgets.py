@@ -23,6 +23,7 @@ from PyQt4.QtCore import Qt
 
 from .. import application, utils, database as db, constants
 from ..core import tags
+from .misc import lineedits
 
 translate = QtCore.QCoreApplication.translate
 
@@ -444,9 +445,11 @@ class TagValueEditor(QtGui.QWidget):
         """Return a class of widgets suitable to edit values of the given tag (e.g. QLineEdit)."""
         if tag is None:
             tag = self.tag
-        if tag.type == tags.TYPE_TEXT:
+        if tag.type == tags.TYPE_VARCHAR:
+            return QtGui.QLineEdit
+        elif tag.type == tags.TYPE_TEXT:
             return EnhancedTextEdit
-        else: return QtGui.QLineEdit
+        else: return DateLineEdit
                 
     def getText(self):
         """Return the current text of this editor. This might be invalid for the current tag type."""
@@ -662,7 +665,15 @@ class EnhancedComboBox(QtGui.QComboBox):
             self._popup = None
             return True
         return False # don't stop the event
-
+    
+    
+class DateLineEdit(lineedits.LineEditWithHint):
+    """A lineedit with the additional feature that it draws a human readable format string in its right
+    corner (if there is enough space. The format string is drawn in gray."""
+    def __init__(self,text='',parent=None):
+        super().__init__(text,parent)
+        self.setRightText(utils.FlexiDate.getHumanReadableFormat())
+        
 
 class TagValuePropertiesWidget(QtGui.QWidget):
     """A widget that displays properties of tag values (sort tags, hidden status) and allows to change them."""

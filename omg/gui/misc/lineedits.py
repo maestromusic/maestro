@@ -72,3 +72,54 @@ class IconLineEdit(QtGui.QLineEdit):
     def resizeEvent(self,resizeEvent):
         sizeHint = self.button.sizeHint()
         self.button.move(self.rect().right() - sizeHint.width(),self.rect().bottom() - sizeHint.height())
+
+
+class LineEditWithHint(QtGui.QLineEdit):
+    """A lineedit with the additional feature that it draws a gray text in its right corner. The text is
+    only visible if there is enough space."""
+    def __init__(self,text='',parent=None):
+        super().__init__(text,parent)
+        self._rightText = None
+        
+    def rightText(self):
+        """Return the text that is displayed in the right corner."""
+        return self._rightText
+    
+    def setRightText(self,text):
+        """Set the text that will be displayed in the right corner. *text* may be None."""
+        if text != self._rightText:
+            self._rightText = text
+            self.update()
+            
+    def paintEvent(self,event):
+        super().paintEvent(event)
+        
+        # Much of the code here is similarly used in QLineEdit::paintEvent to draw the placeHolderText
+        # (which is uncool because it is not shown when the lineedit has focus...)
+        
+        spaceRight = 5
+        spaceLeft = 10
+        
+        # Compute available rect
+        option = QtGui.QStyleOptionFrameV2()
+        self.initStyleOption(option)
+        style = QtGui.QApplication.style()
+        r = style.subElementRect(QtGui.QStyle.SE_LineEditContents,option,self)
+        
+        margins = self.getTextMargins()
+        r.setX(r.x() + margins[0])
+        r.setY(r.y() + margins[1])
+        r.setRight(r.right() - margins[2] - spaceRight)
+        r.setBottom(r.bottom() - margins[3])
+        
+        # Decide whether there is enough space to draw
+        fm = self.fontMetrics()
+        if fm.width(self.text()) + fm.width(self._rightText) + spaceLeft <= r.width(): 
+            painter = QtGui.QPainter(self)
+            oldPen = painter.pen()
+            color = self.palette().text().color()
+            color.setAlpha(128)
+            painter.setPen(color)
+            painter.drawText(r,Qt.AlignRight | Qt.AlignVCenter,self._rightText)
+            painter.setPen(oldPen)
+            

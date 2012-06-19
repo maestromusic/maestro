@@ -21,7 +21,7 @@ from PyQt4.QtCore import Qt
 
 from . import searchparser
 from .. import utils
-from ..gui.misc.iconlineedit import IconLineEdit
+from ..gui.misc.lineedits import IconLineEdit
 
 
 class SearchBox(IconLineEdit):

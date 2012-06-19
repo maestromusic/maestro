@@ -19,9 +19,11 @@
 import datetime, os, functools, re, locale
 from collections import OrderedDict
 
-from PyQt4 import QtGui
+from PyQt4 import QtCore, QtGui
 
 from . import config, strutils
+
+translate = QtCore.QCoreApplication.translate
 
 
 def mapRecursively(f,aList):
@@ -173,8 +175,8 @@ class FlexiDate(object):
             format = locale.nl_langinfo(locale.D_FMT)
             match = re.match('%[dmY]([.\-/])%[dmY]([.\-/])%[dmY]',format)
             if match is not None:
-                sep1 = match.group(1)
-                sep2 = match.group(2)
+                sep1, sep2 = match.group(1), match.group(2)
+                FlexiDate._sep1, FlexiDate._sep2 = sep1, sep2
             else: sep1,sep2 = '//'
             if format.index('%d') < format.index('%m'):
                 FlexiDate._dateFormat = ('{Y:04d}',
@@ -186,6 +188,18 @@ class FlexiDate(object):
                                          '{m:02d}'+sep2+'{Y:04d}',
                                          '{m:02d}'+sep1+'{d:02d}'+sep2+'{Y:04d}')
                 FlexiDate._dateOrder = (('year',),('month','year'),('month','day','year'))
+    
+    @staticmethod
+    def getHumanReadableFormat():
+        """Return a format string for the format used by FlexiDate that is easily readable.
+        For example "mm/dd/YYYY"."""
+        FlexiDate._initFormat()
+        dateOrder = FlexiDate._dateOrder[2]
+        tr = {'day': translate("FlexiDate","dd"),
+              'month': translate("FlexiDate","mm"),
+              'year': translate("FlexiDate","YYYY")
+        }
+        return tr[dateOrder[0]] + FlexiDate._sep1 + tr[dateOrder[1]] + FlexiDate._sep2 + tr[dateOrder[2]]
         
     @staticmethod
     def strptime(string):
