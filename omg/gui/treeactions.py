@@ -78,9 +78,10 @@ class EditTagsAction(TreeAction):
         """
         from ..gui import tageditor
         dialog = tageditor.TagEditorDialog(self.parent().model().level,
-                                           [w.element for w in self.parent().nodeSelection.elements(self.recursive)],
+                                           self.parent().nodeSelection.elements(self.recursive),
                                            self.parent())
         dialog.exec_()
+   
    
 class DeleteAction(TreeAction):
     """Action to remove selected elements. Works for editor and browser.

@@ -311,7 +311,7 @@ class ExpandLine(QtGui.QLabel):
         event.accept()
     
     def mousePressEvent(self,event):
-        if self._expanderVisible and event.pos().y() < self.indent():
+        if event.button() == Qt.LeftButton and self._expanderVisible and event.pos().y() < self.indent():
             self.setExpanded(not self._expanded)
             event.accept()
         else: event.ignore() # let parent widget handle it (otherwise it is not possible to select records)

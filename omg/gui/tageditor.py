@@ -21,9 +21,8 @@ import os.path
 from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
-from .. import strutils, utils, config, logging, modify
-from ..core import tags, levels
-from ..core.elements import File
+from .. import strutils, utils, config, logging, application
+from ..core import tags, levels, commands
 from ..models import tageditor as tageditormodel, simplelistmodel, flageditor as flageditormodel
 from ..gui import singletageditor, tagwidgets, mainwindow, editor, flageditor, dialogs
 from ..gui.misc import widgetlist, dynamicgridlayout
@@ -114,47 +113,77 @@ mainwindow.addWidgetData(mainwindow.WidgetData(
     
     
 class TagEditorDialog(QtGui.QDialog):
-    #TODO rewrite so that it uses its own level
+    """The tageditor as dialog. It uses its own level and commits the level when the dialog is accepted."""
     def __init__(self,level,elements,parent=None):
         QtGui.QDialog.__init__(self,parent)
-        return #disable
-        self.setLayout(QtGui.QVBoxLayout())
-        self.tagedit = TagEditorWidget(level,elements)
-        self.layout().addWidget(self.tagedit)
         self.setWindowTitle(self.tr("Edit tags"))
         self.resize(600,450) #TODO: make this cleverer
+        self.stack = QtGui.QUndoStack()
+        self.level = levels.Level("TagEditor",level)
+        elements = self.level.getFromIds([element.id for element in elements])
+        
+        self.setLayout(QtGui.QVBoxLayout())
+        self.tagedit = TagEditorWidget(self.level,elements,stack=self.stack,flagEditorInTitleLine=False)
+        self.layout().addWidget(self.tagedit)
         
         style = QtGui.QApplication.style()
         
         buttonLayout = QtGui.QHBoxLayout()
         self.layout().addLayout(buttonLayout)
         
-        self.undoButton = QtGui.QPushButton(self.tr("Undo"))
-        self.redoButton = QtGui.QPushButton(self.tr("Redo"))
-        self.resetButton = QtGui.QPushButton(style.standardIcon(QtGui.QStyle.SP_DialogResetButton),
+        undoButton = QtGui.QPushButton(self.tr("Undo"))
+        undoButton.clicked.connect(self.stack.undo)
+        self.stack.canUndoChanged.connect(undoButton.setEnabled)
+        undoButton.setEnabled(False)
+        buttonLayout.addWidget(undoButton)
+        redoButton = QtGui.QPushButton(self.tr("Redo"))
+        redoButton.clicked.connect(self.stack.redo)
+        self.stack.canRedoChanged.connect(redoButton.setEnabled)
+        redoButton.setEnabled(False)
+        buttonLayout.addWidget(redoButton)
+        
+        resetButton = QtGui.QPushButton(style.standardIcon(QtGui.QStyle.SP_DialogResetButton),
                                              self.tr("Reset"))
-        self.cancelButton = QtGui.QPushButton(style.standardIcon(QtGui.QStyle.SP_DialogCancelButton),
+        resetButton.clicked.connect(self._handleReset)
+        cancelButton = QtGui.QPushButton(style.standardIcon(QtGui.QStyle.SP_DialogCancelButton),
                                              self.tr("Cancel"))
-        self.cancelButton.clicked.connect(self.reject)
-        self.commitButton = QtGui.QPushButton(style.standardIcon(QtGui.QStyle.SP_DialogSaveButton),
-                                              self.tr("OK"))
-        buttonLayout.addWidget(self.undoButton)
-        buttonLayout.addWidget(self.redoButton)
-        buttonLayout.addWidget(self.resetButton)
+        cancelButton.clicked.connect(self.reject)
+        commitButton = QtGui.QPushButton(style.standardIcon(QtGui.QStyle.SP_DialogSaveButton),
+                                         self.tr("OK"))
+        commitButton.clicked.connect(self._handleCommit)
+        buttonLayout.addWidget(resetButton)
         buttonLayout.addStretch()
-        buttonLayout.addWidget(self.cancelButton)
-        buttonLayout.addWidget(self.commitButton)
+        buttonLayout.addWidget(cancelButton)
+        buttonLayout.addWidget(commitButton)
+    
+    def _handleReset(self):
+        """Handle clicks on the reset button: Reload all elements and clear the stack."""
+        self.stack.clear()
+        self.level.elements = {}
+        elements = self.level.getFromIds([element.id for element in self.tagedit.model.getElements()])
+        self.tagedit.setElements(self.level,elements)
+    
+    def _handleCommit(self):
+        """Handle a click on the commit button: Commit the level and close the dialog."""
+        ids = [element.id for element in self.tagedit.model.getElements()]
+        command = commands.CommitCommand(self.level,ids)
+        application.stack.push(command)
+        self.accept()
         
         
 class TagEditorWidget(QtGui.QWidget):
+    #TODO: comment
+    
     # This hack is necessary to ignore changes in the tagboxes while changing the tag programmatically
     # confer _handleTagChanged and _handleTagChangedByUser.
     _ignoreHandleTagChangedByUser = False
     
-    def __init__(self,level=None,elements=None,vertical=False,stack=None,dock=None):
+    def __init__(self,level=None,elements=None,vertical=False,flagEditorInTitleLine=True,
+                 stack=None,dock=None):
         QtGui.QWidget.__init__(self)
         self.vertical = None # will be set in setVertical below
         self.dock = dock
+        self.flagEditorInTitleLine = flagEditorInTitleLine
         
         self.model = tageditormodel.TagEditorModel(stack=stack)
         self.model.tagInserted.connect(self._handleTagInserted)
@@ -163,9 +192,6 @@ class TagEditorWidget(QtGui.QWidget):
         self.model.resetted.connect(self._handleReset)
 
         self.flagModel = flageditormodel.FlagEditorModel(stack=stack)
-        #self.flagModel.resetted.connect(self._checkFlagEditorVisibility)
-        #self.flagModel.recordInserted.connect(self._checkFlagEditorVisibility)
-        #self.flagModel.recordRemoved.connect(self._checkFlagEditorVisibility)
 
         self.selectionManager = widgetlist.SelectionManager()
         # Do not allow the user to select ExpandLines
@@ -173,7 +199,7 @@ class TagEditorWidget(QtGui.QWidget):
             lambda wList,widget: not isinstance(widget,singletageditor.ExpandLine)
         
         self.setLayout(QtGui.QVBoxLayout())
-        self.layout().setSpacing(0)
+        self.layout().setSpacing(1)
         self.layout().setContentsMargins(0,0,0,0)
         self.topLayout = QtGui.QHBoxLayout()
         # Spacings and margins are inherited. Reset the horizontal values for topLayout
@@ -233,7 +259,6 @@ class TagEditorWidget(QtGui.QWidget):
         
         self.setVertical(vertical)
         
-        
         if elements is None:
             elements = []
         self.setElements(level,elements)
@@ -252,13 +277,13 @@ class TagEditorWidget(QtGui.QWidget):
             self.addButton.setText(self.tr("Add tag"))
             self.removeButton.setText(self.tr("Remove selected"))
         
-        self.horizontalFlagEditor.setVisible(not vertical)
+        self.horizontalFlagEditor.setVisible(self.flagEditorInTitleLine and not vertical)
         # The place left by the horizontalFlagEditor is filled by the stretch we put there
         self.topLayout.setStretch(self.topLayout.count()-2,int(vertical))
-        self.verticalFlagEditor.setVisible(vertical)
+        self.verticalFlagEditor.setVisible(not self.flagEditorInTitleLine or vertical)
             
         self.vertical = vertical
-            
+        
     def setElements(self,level,elements):
         """Set the elements that are edited in the tageditor. *level* is the level that contains the
         elements."""
@@ -368,21 +393,6 @@ class TagEditorWidget(QtGui.QWidget):
             tagBox.tagChanged.disconnect(self._handleTagChangedByUser)
             tagBox.setTag(oldTag)
             tagBox.tagChanged.connect(self._handleTagChangedByUser)
-        
-    def _handleSave(self):
-        #TODO
-        """Handle the save button (only if ''saveDirectly'' is True)."""
-        if self.model.saveDirectly:
-            raise RuntimeError("You must not call save in a TagEditor that saves directly.") 
-        
-        if not all(singleTagEditor.isValid() for singleTagEditor in self.singleTagEditors.values()):
-            QtGui.QMessageBox.warning(self,self.tr("Invalid value"),self.tr("At least one value is invalid."))
-        else:
-            application.push(modify.commands.TagFlagUndoCommand(self.level,
-                                                                self.model.getChanges(),
-                                                                self.flagModel.getChanges(),
-                                                                elements = self.model.getElements()))
-            self.saved.emit()
                 
     def contextMenuEvent(self,contextMenuEvent,record=None):
         menu = QtGui.QMenu(self)
@@ -468,10 +478,6 @@ class TagEditorWidget(QtGui.QWidget):
         dialog = RecordDialog(self,self.model.getElements(),record=record)
         if dialog.exec_() == QtGui.QDialog.Accepted:
             self.model.changeRecord(record,dialog.getRecord())
-
-    #def _checkFlagEditorVisibility(self):
-    #    """Set the flag editor's visibility depending on whether flags are present."""
-    #    self.flagWidget.setVisible(not self.flagModel.isEmpty())
         
     def _getSelectedRecords(self):
         """Return all records that are selected and visible (i.e. not hidden by a collapsed ExpandLine."""
