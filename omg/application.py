@@ -83,16 +83,16 @@ def run(cmdConfig=[],exitPoint=None,console=False):
 
     # Initialize config and logging
     config.init(cmdConfig)
+    
     # Initialize logging as early as possible -- but after the config variables have been read.
     logging.init()
     global logger
     logger = logging.getLogger("omg")
     logger.debug("START")
+    
     # Lock the lockfile to prevent a second OMG-instance from starting.
     if not console:
         lock()
-    
-    setLocale()
                      
     if exitPoint == 'config':
         return app
@@ -169,6 +169,7 @@ def run(cmdConfig=[],exitPoint=None,console=False):
     # Create GUI
     # First import all modules that want to add WidgetData
     from .gui import filesystembrowser, editor, browser, tageditor, mainwindow, playback, playlist
+    
     from .gui.delegates import configuration as delegateconfiguration
     global mainWindow
     
@@ -228,17 +229,6 @@ def lock():
     except IOError:
         logger.error("Another instance is already running, quitting.")
         sys.exit(-1)
-
-
-def setLocale():
-    """Set the locale based on config.options.i18n.locale."""
-    import locale
-    try:
-        # This locale stuff is famous for all sorts of funny errors on different platforms
-        locale.setlocale(locale.LC_ALL,(config.options.i18n.locale,'UTF-8'))
-    except locale.Error:
-        # Setting the default locale should always work. But might be different than the config option.
-        locale.setlocale(locale.LC_ALL,'')
     
     
 def loadTranslators(app,logger):
