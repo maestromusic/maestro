@@ -333,12 +333,19 @@ class TagTypeButton(QtGui.QPushButton):
         menu.addSeparator()
         action = menu.addAction(self.tr("New tagtype..."))
         action.triggered.connect(self._handleNewTagTypeAction)
+        action = menu.addAction(self.tr("Tagmanager..."))
+        action.triggered.connect(self._handleManagerButton)
         
     def _handleNewTagTypeAction(self):
         """Handle the last action in the menu: Ask the user to create a new tagtype."""
         tagType = NewTagTypeDialog.createTagType()
         if tagType is not None:
             self.tagChosen.emit(tagType)
+            
+    def _handleManagerButton(self):
+        """Open the tagmanager."""
+        from . import preferences
+        preferences.show('main/tagmanager')
         
     def _handleDispatcher(self,event):
         """React upon TagTypeChangedEvents and TagTypeOrderChangeEvents from the dispatcher."""
