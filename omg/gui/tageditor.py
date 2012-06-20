@@ -80,7 +80,7 @@ class TagEditorDock(QtGui.QDockWidget):
         mimeData = event.mimeData()
         
         if mimeData.hasFormat(config.options.gui.mime):
-            allElements = (w.element for w in mimeData.getWrappers())
+            allElements = (w.element for w in mimeData.wrappers())
             level = mimeData.level
         elif mimeData.hasUrls():
             allElements = levels.real.getFromPaths(url for url in event.mimeData().urls()

@@ -22,6 +22,7 @@ from PyQt4 import QtCore
 from PyQt4.QtCore import Qt
 
 from .. import config
+from ..gui import selection
 from ..core.nodes import Wrapper
 from ..utils import absPath
 
@@ -32,17 +33,17 @@ class MimeData(QtCore.QMimeData):
     "gui->mime". The second one is "text/uri-list" and contains a list of URLs to all files in the tree. This
     type is used by applications like Amarok and Dolphin.
     
-    The tree may contain arbitrary Nodes, use getFiles to get all files (recursively) or getWrappers to get
+    The tree may contain arbitrary Nodes, use files to get all files (recursively) or wrappers to get
     the toplevel wrappers.
     
     Use the attribute 'level' to check whether the wrappers in the MimeData are on the level used by the
     widget/model where they are dropped. If not, they might contain elements that do not exist on the second
     level as well as an invalid tree structure.
     """
-    def __init__(self,level,nodeList):
+    def __init__(self,nodeSelection):
         super().__init__()
-        self.level = level
-        self._nodeList = nodeList
+        self.level = nodeSelection.level
+        self._selection = nodeSelection
         
     def hasFormat(self,format):
         return format in self.formats()
@@ -62,30 +63,24 @@ class MimeData(QtCore.QMimeData):
             # return a null variant of the given type (confer the documentation of retrieveData)
             return QtCore.QVariant(type) if type is not None else QtCore.QVariant()
 
-    def getNodes(self):
+    def nodes(self):
         """Return the list of nodes stored in this MimeData instance."""
-        return self._nodeList
+        return self._selection.nodes()
     
-    def getFiles(self):
+    def files(self):
         """Return all wrappers storing files in this MimeData instance."""
-        return itertools.chain.from_iterable(node.getAllFiles() for node in self.getNodes())
+        return self._selection.files(recursive=True)
     
-    def getWrappers(self):
+    def wrappers(self):
         """Search the tree for the toplevel wrappers and return them. This differs from the result of
         getNodes only if some nodes are no wrappers (but e.g. ValueNodes from the broswer).
         In other words: Strip everything at the top of the tree that is not a Wrapper and remove the rest.
         """
-        return self._getWrappers(self.getNodes())
-         
-    def _getWrappers(self,nodes):
-        """Like getWrappers, but use the given nodes."""
-        return itertools.chain.from_iterable(
-                        [node] if isinstance(node,Wrapper) else self._getWrappers(node.getContents())
-                    for node in nodes)
+        return self._selection.toplevelWrappers()
         
     def paths(self):
         """Return a list of absolute paths to all files contained in this MimeData-instance."""
-        return [absPath(file.element.path) for file in self.getFiles()]
+        return [absPath(file.element.path) for file in self.files()]
         
     def urls(self):
         return [QtCore.QUrl("file://"+path) for path in self.paths()]
@@ -93,19 +88,8 @@ class MimeData(QtCore.QMimeData):
     @staticmethod
     def fromIndexes(model,indexList,sortNodes = True):
         """Generate a MimeData instance from the indexes in *indexList*. *model* must be the model containing
-        these indexes. This method will remove an index when an ancestor is contained in *indexList*, too.
+        these indexes.
         """
         nodes = [model.data(index,role=Qt.EditRole) for index in indexList]
-        # Filter away nodes if a parent is also contained in the indexList. 
-        nodes = [n for n in nodes if not any(parent in nodes for parent in n.getParents())]
-        
-        # Sort nodes
-        def indexGenerator(node):
-            """Return the index of *node* in its parent, the index of the parent in the grandparent and
-            so on."""
-            while node != model.getRoot():
-                yield node.parent.index(node)
-                node = node.parent
-        nodes.sort(key=lambda n: tuple(indexGenerator(n)))
-        
-        return MimeData(model.level,nodes)
+        return MimeData(selection.NodeSelection(model.level,nodes))
+    

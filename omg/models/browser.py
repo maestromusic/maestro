@@ -26,6 +26,7 @@ from .. import config, search, database as db, logging, utils
 from ..core import tags, levels
 from ..core.elements import Element
 from ..core.nodes import Node, RootNode, Wrapper
+from ..gui import selection
 
 logger = logging.getLogger(__name__)
 
@@ -443,24 +444,22 @@ class LoadingNode(Node):
     def toolTipText(self):
         None
     
-#TODO: rewrite getelementsinstantly stuff to respect wrappers
+
 class BrowserMimeData(mimedata.MimeData):
     """This is the subclass of mimedata.MimeData that is used by the browser. The main differences are that
     the browser contains nodes that are no elements and that they may not have loaded their contents yet.   
     """  
-    def __init__(self, browserNodeList):
-        super().__init__(levels.real,None) # The element list will be computed when it is needed.
-        self._browserNodeList = browserNodeList
+    def __init__(self, nodeSelection):
+        super().__init__(nodeSelection)
+        self._wrappersLoaded = False
 
-    def getNodes(self):
-        if self._nodeList is not None:
-            return self._nodeList
-        
-        # self.browserNodeList may contain CriterionNodes or (unlikely) LoadingNodes.
-        self._nodeList = list(itertools.chain.from_iterable(self._getElementsInstantly(node)
-                                                               for node in self._browserNodeList))
-        self._browserNodeList = None # Save memory
-        return self._nodeList
+    def wrappers(self):
+        if not self._wrappersLoaded:
+            # self.nodes() may contain CriterionNodes or (unlikely) LoadingNodes.
+            self._wrappers = list(itertools.chain.from_iterable(self._getElementsInstantly(node)
+                                                                   for node in self.nodes()))
+            self._wrappersLoaded = True
+        return self._wrappers
                                           
     def _getElementsInstantly(self,node):
         """If *node* is a CriterionNode return all (toplevel) elements contained in it. If contents have to
@@ -473,20 +472,11 @@ class BrowserMimeData(mimedata.MimeData):
             return itertools.chain.from_iterable(self._getElementsInstantly(child)
                                                     for child in node.getContents())
         else: return [] # Should be a LoadingNode
-    
-    def paths(self):
-        """Return a list of absolute paths to all files contained in this MimeData-instance."""
-        return [utils.absPath(file.element.path) for file in self.getFiles()]
 
     @staticmethod
     def fromIndexes(model,indexList):
         """Generate a MimeData instance from the indexes in *indexList*. *model* must be the model containing
-        these indexes. This method will remove an index when an ancestor is contained in *indexList*, too.
+        these indexes.
         """
         nodes = [model.data(index,role=Qt.EditRole) for index in indexList]
-        # Filter away nodes if a parent is also contained in the indexList. 
-        nodes = [n for n in nodes if not any(parent in nodes for parent in n.getParents())]
-        return BrowserMimeData(nodes)
-
-
-    
+        return BrowserMimeData(selection.NodeSelection(model.level,nodes))

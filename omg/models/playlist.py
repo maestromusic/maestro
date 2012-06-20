@@ -126,7 +126,7 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         
         # Handle internal moves separately
         if self._internalMove:
-            return self.move(list(mimeData.getWrappers()),parent,position)
+            return self.move(list(mimeData.wrappers()),parent,position)
 
         application.stack.beginMacro(self.tr("Drop elements"))
         
@@ -134,10 +134,10 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         if mimeData.hasFormat(config.options.gui.mime):
             # Do not simply copy wrappers from other levels as they might be invalid on real level
             if hasattr(mimeData,'level') and mimeData.level is levels.real:
-                wrappers = [wrapper.copy() for wrapper in mimeData.getWrappers()]
+                wrappers = [wrapper.copy() for wrapper in mimeData.wrappers()]
             else:
                 # Note that files might be loaded into the real level via their TID. 
-                wrappers = [levels.real.get(id) for id in mimeData.getFiles()]   
+                wrappers = [levels.real.get(id) for id in mimeData.files()]   
         else:
             paths = [utils.relPath(path) for path in itertools.chain.from_iterable(
                                     utils.collectFiles(u.path() for u in mimeData.urls()).values())]

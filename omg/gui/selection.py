@@ -16,7 +16,9 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from ..core.nodes import Wrapper
+import itertools
+
+from ..core.nodes import RootNode, Wrapper
 
 _globalSelection = None
 
@@ -47,12 +49,24 @@ class NodeSelection:
     at least one file is selected or to get all selected wrappers including all of their descendants.
     Actions can use this information to decide whether they are enabled or not.
 
-    *level* is the level that contains all selected wrappers. *nodes* are the selected nodes. If it is clear
-    that only wrappers can be selected, you can set *onlyWrappers* to True to increase performance.
+    *level* is the level that contains all selected wrappers.
+    *nodes* are the selected nodes. This must be a list and it will be sorted.
+    If it is clear that only wrappers can be selected, you can set *onlyWrappers* to True to increase
+    performance.
     """
     def __init__(self,level,nodes,onlyWrappers=False):
         self.level = level
         self._nodes = nodes
+        
+        # Sort nodes
+        def indexGenerator(node):
+            """Return the index of *node* in its parent, the index of the parent in the grandparent and
+            so on."""
+            while not isinstance(node,RootNode):
+                yield node.parent.index(node)
+                node = node.parent
+        nodes.sort(key=lambda n: tuple(indexGenerator(n)))
+        
         if onlyWrappers or all(isinstance(node,Wrapper) for node in self._nodes):
             self._wrappers = self._nodes
         else: self._wrappers = [node for node in self._nodes if isinstance(node,Wrapper)]
@@ -62,18 +76,20 @@ class NodeSelection:
         return len(self._nodes) == 0
     
     def nodes(self,onlyToplevel=False):
-        """Return all nodes that are currently selected. If *onlyToplevel* is True, nodes will be excluded
-        if an ancestor is also selected.
+        """Return all nodes that are currently selected. If *onlyToplevel* is True, exclude nodes if an
+        ancestor is also selected.
         """
         if not onlyToplevel:
             return self._nodes
         else:
-            #TODO (this is implemented using model.isSelected in the subclass used by treeview.TreeView)
-            raise NotImplementedError()
+            # this is reimplemented using model.isSelected in the subclass used by treeview.TreeView
+            return [n for n in self._nodes if not any(parent in self._nodes for parent in n.getParents())]
         
     def wrappers(self,recursive=False):
-        """Returns a list of all selected element wrappers. If *recursive* is True, all children of selected
-        wrappers are also returned."""
+        """Return a list of all selected element wrappers. If *recursive* is True return all children of
+        selected wrappers. If a wrapper is selected and one of its parents is also selected, don't return
+        it twice.
+        """
         if not recursive:
             return self._wrappers
         else:
@@ -82,6 +98,19 @@ class NodeSelection:
             for node in selectedNodes:
                 wrappers.extend(filter(lambda x: isinstance(x,Wrapper),node.getAllNodes()))
             return wrappers
+        
+    def toplevelWrappers(self):
+        """Search the tree for the toplevel wrappers and return them. This differs from the result of
+        getNodes only if some nodes are no wrappers (but e.g. ValueNodes from the broswer).
+        In other words: Strip everything at the top of the tree that is not a Wrapper and remove the rest.
+        """
+        return self._toplevelWrappers(self._nodes)
+         
+    def _toplevelWrappers(self,nodes):
+        """Like getWrappers, but use the given nodes."""
+        return itertools.chain.from_iterable(
+                        [node] if isinstance(node,Wrapper) else self._toplevelWrappers(node.getContents())
+                    for node in nodes)
         
     def elements(self,recursive=False):
         """Return all elements that are selected. Remove duplicates (elements might be selected in several
@@ -96,12 +125,12 @@ class NodeSelection:
         return (w.element for w in self.wrappers(recursive) if check(w))
         
     def singleWrapper(self):
-        """Returns True iff one single element is selected. This does not exclude that other non-element
+        """Return True iff one single element is selected. This does not exclude that other non-element
         nodes are selected too."""
         return len(self._wrappers) == 1
     
     def singleParent(self, requireParentElement = False):
-        """Returns True iff all selected elements share the same parent. IF *requireParentElement* is True,
+        """Return True iff all selected elements share the same parent. IF *requireParentElement* is True,
         that parent must also be an element, otherwise False is returned."""
         if len(self._wrappers) == 0:
             return False
@@ -121,4 +150,9 @@ class NodeSelection:
     def hasFiles(self):
         """True iff at least one file is selected."""
         return any(el.isFile() for el in self._elements)
+    
+    def files(self,recursive=False):
+        """Return all file wrappers that are selected. If *recursive* is True, also return files of which
+        at least one parent is selected."""
+        return (w for w in self.wrappers(recursive) if w.isFile())
         

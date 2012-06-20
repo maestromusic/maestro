@@ -82,12 +82,12 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
             insertPosition = None
         application.stack.beginMacro(self.tr("drop"))
         if mimeData.hasFormat(config.options.gui.mime):
-            ids = [ node.element.id for node in mimeData.getNodes() if isinstance(node, Wrapper) ]
+            ids = [ node.element.id for node in mimeData.wrappers() ]
             if action == Qt.MoveAction:
                 removals = utils.listDict(( (node.parent, node.parent.contents.index(node))
                                                 if isinstance(node.parent, RootNode)
                                                 else (node.parent.element.id,node.position) )
-                                            for node in mimeData.getNodes() if isinstance(node, Wrapper))
+                                            for node in mimeData.wrappers())
                 for rparent, positions in removals.items():
                     if isinstance(rparent, int):
                         commands.removeElements(self.level, rparent, positions, self.tr("remove elements"))
