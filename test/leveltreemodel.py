@@ -34,27 +34,26 @@ class LevelTestCase(unittest.TestCase):
         self.checks = []
         
     def check(self,*args):
-        """Check whether the current tree structure as well as the flat playlist is in agreement with
-        *wrapperString* (a string in the format for TestLevel.getWrappers).
-        
-        If *redo* is True, record the test so that it can be performed again when checkUndo is called.
-        """
+        """Add a Check-instance initialized with the given arguments to the internal lists of checks and
+        perform the check."""
         check = Check(self,*args)
         check.check()
         self.checks.append((check,application.stack.index()))
         
     def checkUndo(self):
-        """Undo all changes to the playlist and do the checks again at the right moments."""
+        """Undo all changes to the model and perform all checks again at the right moments."""
         for check,index in reversed(self.checks):
             application.stack.setIndex(index)
             check.check()
         
         application.stack.setIndex(0)
-        # Check empty
+        # Check that the model is empty
         Check(self,'').check()
 
 
 class Check:
+    """A Check stores the target state of the model at one moment. The check method compares the actual state
+    with the target state using assert*-methods from *testCase*."""
     def __init__(self,testCase,wrapperString):
         self.testCase = testCase
         self.wrapperString = wrapperString
