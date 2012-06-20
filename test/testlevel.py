@@ -27,6 +27,7 @@ class TestLevel(levels.Level):
         super().__init__(name,None) # no parent => no db access
         self.currentId = 0
         self.nameToElement = {}
+        self.nameToId = {}
         
     def addContainer(self,name):
         """Add a container with the given name."""
@@ -36,6 +37,7 @@ class TestLevel(levels.Level):
         container.tags.add(tags.TITLE,name)
         self.elements[self.currentId] = container
         self.nameToElement[name] = container
+        self.nameToId[name] = self.currentId
         return container
     
     def addFile(self,name):
@@ -46,6 +48,7 @@ class TestLevel(levels.Level):
         file.tags.add(tags.TITLE,name)
         self.elements[self.currentId] = file
         self.nameToElement[name] = file
+        self.nameToId[name] = self.currentId
         return file
         
     def addChild(self,parent,child):
@@ -70,7 +73,11 @@ class TestLevel(levels.Level):
             file = self.addFile(name+str(i))
             self.addChild(container,file)
         return container
-    
+
+    def ids(self,names):
+        """Given a comma-separated list of element names, return a list of their ids."""
+        return [self.nameToId[name] for name in names.split(',')]
+        
     def createWrappers(self,s,*wrapperNames):
         """Create a wrapper tree containing elements of this level and return its root node.
         *s* must be a string like   "X[A[A1,A2],B[B1,B2]],Z"

@@ -53,7 +53,6 @@ class PlaylistTestCase(unittest.TestCase):
         self.level = level
         self.playlist = playlist
         self.checks = []
-        self.lastStackIndex = 0
         
     def check(self,wrapperString,redo=True):
         """Check whether the current tree structure as well as the flat playlist is in agreement with
