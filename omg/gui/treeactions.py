@@ -342,7 +342,7 @@ class ClearPlaylistAction(TreeAction):
         self.setText(self.tr('clear playlist'))
         
     def initialize(self):
-        self.setEnabled(len(self.parent().backend.paths) > 0)
+        self.setEnabled(self.parent().model().root.hasContents() > 0)
         
     def doAction(self):
         self.parent().backend.clearPlaylist()
