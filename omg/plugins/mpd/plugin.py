@@ -33,6 +33,7 @@ CONNECTION_TIMEOUT = 10 # time in seconds before an initial connection to MPD is
 POLLING_INTERVAL = 200 # milliseconds between two MPD polls
 MPD_STATES = { 'play': PLAY, 'stop': STOP, 'pause': PAUSE}
 
+
 class MPDThread(QtCore.QThread):
     """Helper class for the MPD player backend. An MPDThread communicates with
     the mpd server via the network. This is done in a distinguished thread in order
@@ -51,8 +52,8 @@ class MPDThread(QtCore.QThread):
         self.backend = backend
         self.host, self.port, self.password = host, port, password
         self.playlistVersion = self.state   = \
-            self.currentSong = self.elapsed = \
-            self.currentSongLength = self.volume = None
+            self.current = self.elapsed = \
+            self.currentLength = self.volume = None
         self.doPolling = threading.Event()
         self.seekRequest = None
         self.connected = False
@@ -64,7 +65,7 @@ class MPDThread(QtCore.QThread):
         last seek command in self.seekRequest we ensure that the last seek is
         performed in any case."""
         if self.seekRequest is not None:
-            self.client.seek(self.currentSong, self.seekRequest)
+            self.client.seek(self.current, self.seekRequest)
             self.seekRequest = None
         
     def _handleMainChange(self, what, how):
@@ -87,14 +88,20 @@ class MPDThread(QtCore.QThread):
             
         elif what == "setState":
             if how == player.PLAY:
+                print("self.client.play()")
                 self.client.play()
+                print("done")
             elif how == player.PAUSE:
+                print("self.client.pause(1)")
                 self.client.pause(1)
             elif how == player.STOP:
+                print("self.client.stop()")
                 self.client.stop()
         
-        elif what == "setCurrentSong":
-            self.client.play(how)
+        elif what == "setCurrent":
+            print("self.client.play({})".format(how if how is not None else -1))
+            self.client.play(how if how is not None else -1)
+            print("done")
         
         elif what == "nextSong":
             self.client.next()
@@ -125,7 +132,7 @@ class MPDThread(QtCore.QThread):
             self.playlistVersion += len(how)
             # If the current song has been removed MPD plays the next song automatically. Because the
             # song number does not change this is not sent to OMG. So we force emitting the current song.
-            self._updateAttributes(emitCurrentSong=True)
+            self._updateAttributes(emitCurrent=True)
             
         else:
             logger.error('Unknown command: {}'.format(what, how))
@@ -188,12 +195,13 @@ class MPDThread(QtCore.QThread):
                 self.mpd_playlist.append(file)
         self.changeFromMPD.emit('playlist', self.mpd_playlist[:])
         
-    def _updateAttributes(self, emit = True, emitCurrentSong=False):
+    def _updateAttributes(self, emit = True, emitCurrent=False):
         """Get current status from MPD, update attributes of this object and emit
         messages if something has changed."""
          
         # fetch information from MPD
         self.mpd_status = self.client.status()
+        #print("Status: {}".format(self.mpd_status['song'] if 'song' in self.mpd_status else 'Blubb'))
         
         # check for volume change
         volume = int(self.mpd_status['volume'])
@@ -208,18 +216,19 @@ class MPDThread(QtCore.QThread):
             
         # check if current song has changed. If so, update length of current song
         if "song" in self.mpd_status:
-            currentSong = int(self.mpd_status["song"])
-        else:
-            currentSong = -1
-        if currentSong != self.currentSong or emitCurrentSong:
-            self.currentSong = currentSong
-            if currentSong != -1:
+            current = int(self.mpd_status["song"])
+        else: current = None
+        if current != self.current or emitCurrent:
+            self.current = current
+            if current != None:
+                print("self.client.currentsong")
                 self.mpd_current = self.client.currentsong()
-                self.currentSongLength = int(self.mpd_current["time"])
+                print("={}".format(self.mpd_current['id']))
+                self.currentLength = int(self.mpd_current["time"])
             else:
-                self.currentSongLength = 0 # no current song
+                self.currentLength = 0 # no current song
             if emit:
-                self.changeFromMPD.emit('currentSong', (self.currentSong, self.currentSongLength))
+                self.changeFromMPD.emit('current', (self.current, self.currentLength))
              
         # check for a change of playing state
         state = MPD_STATES[self.mpd_status["state"]]
@@ -227,10 +236,10 @@ class MPDThread(QtCore.QThread):
             if emit:
                 self.changeFromMPD.emit('state', state)
             if state == STOP:
-                self.currentSongLength = 0
-                self.currentSong = -1
+                self.currentLength = 0
+                self.current = None
                 if emit:
-                    self.changeFromMPD.emit('currentSong', (-1, 0))
+                    self.changeFromMPD.emit('current', (None, 0))
         self.state = state
         
         # check if elapsed time has changed
@@ -249,8 +258,8 @@ class MPDThread(QtCore.QThread):
             self._updateAttributes(emit = False)
             self.changeFromMPD.emit('init_done',
                                     (self.mpd_playlist[:],
-                                     self.currentSong,
-                                     self.currentSongLength,
+                                     self.current,
+                                     self.currentLength,
                                      self.elapsed,
                                      self.state))
             self.connected = True
@@ -314,7 +323,7 @@ class MPDPlayerBackend(player.PlayerBackend):
             #    getattr(player.PlayerBackend, what)(self, *args)
             self.changeFromMain.emit(what, arg)
             
-        for what in ("setElapsed", "setState", "setCurrentSong", "setPlaylist",
+        for what in ("setElapsed", "setState", "setCurrent", "setPlaylist",
                 "_insertIntoPlaylist", "_removeFromPlaylist", "nextSong",
                 "previousSong", "setVolume", "_move"):
             setattr(self, what, functools.partial(_emitChange, what))
@@ -322,31 +331,47 @@ class MPDPlayerBackend(player.PlayerBackend):
     def config(self):
         return self.mpdthread.host, self.mpdthread.port, self.mpdthread.password
     
+    def state(self):
+        return self._state
+    
+    def volume(self):
+        return self._volume
+    
+    def current(self):
+        return self.playlist.current
+
+    def currentOffset(self):
+        if self._current < 0:
+            return None
+        else: return self._current
+        
+    def elapsed(self):
+        return self._elapsed
+    
     @QtCore.pyqtSlot(str, object)
     def _handleMPDChange(self, what, how):
         if what == 'init_done':
-            self.paths, self.currentSong, self.currentSongLength, self.elapsed, self.state = how
+            self.paths, self._current, self._currentLength, self._elapsed, self._state = how
             self.playlist.initFromPaths(self.paths) 
-            if self.currentSong != -1:
-                self.playlist.setCurrent(self.currentSong)
+            self.playlist.setCurrent(self._current)
             self.connectionState = player.CONNECTED
             self.connectionStateChanged.emit(player.CONNECTED)
         
         elif what == 'elapsed':
-            self.elapsed = how
-            self.elapsedChanged.emit(how, self.currentSongLength)
+            self._elapsed = how
+            self.elapsedChanged.emit(how)
             
         elif what == 'state':
-            self.state = how
+            self._state = how
             self.stateChanged.emit(how)
             
-        elif what == 'currentSong':
-            self.currentSong, self.currentSongLength = how
-            self.playlist.setCurrent(self.currentSong)
-            self.currentSongChanged.emit(self.currentSong)
+        elif what == 'current':
+            self._current, self._currentLength = how
+            self.playlist.setCurrent(self._current)
+            self.currentChanged.emit(self._current)
         
         elif what == 'volume':
-            self.volume = how
+            self._volume = how
             self.volumeChanged.emit(how)
             
         elif what == 'remove':

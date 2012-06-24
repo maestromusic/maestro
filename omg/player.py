@@ -51,30 +51,53 @@ class PlayerBackend(profiles.Profile):
     
     stateChanged = QtCore.pyqtSignal(int) #Emits on of {PLAY, STOP,PAUSE} if the backend's state has changed
     volumeChanged = QtCore.pyqtSignal(int)
-    currentSongChanged = QtCore.pyqtSignal(int)
-    elapsedChanged = QtCore.pyqtSignal(float, float)
+    currentChanged = QtCore.pyqtSignal(int)
+    elapsedChanged = QtCore.pyqtSignal(float)
     connectionStateChanged = QtCore.pyqtSignal(int)
     
     def __init__(self, name):
         super().__init__(name)
-        self.state = STOP
         self.connectionState = DISCONNECTED
-        self.volume = 0
-        self.currentSong = -1
-        self.elapsed = 0
-        self.currentSongLength = 0
-        self.playlist = None
+    
+    def state(self):
+        """Return the current player state from STOP, PLAY, PAUSE."""
+        raise NotImplementedError()
     
     def setState(self, state):
         """Set the state of the player to one of STOP, PLAY, PAUSE."""
         raise NotImplementedError()
      
+    def play(self):
+        self.setState(PLAY)
+    
+    def stop(self):
+        self.setState(STOP)
+    
+    def pause(self):
+        self.setState(PAUSE)
+        
+    def volume(self):
+         """Return the current volume as integer between 0 and 100."""
+         raise NotImplementedError()
+     
     def setVolume(self, volume):
         """Set the volume of the player. *volume* must be an integer between 0 and 100."""
         raise NotImplementedError()
     
-    def setCurrentSong(self, index):
-        """Set the song at offset *index* as active."""
+    def current(self):
+        """Return the current song as wrapper."""
+        raise NotImplementedError()
+    
+    def currentOffset(self):
+        """Return the offset of the current song."""
+        raise NotImplementedError()
+    
+    def setCurrent(self, offset):
+        """Set the song at offset *offset* as active and start playing it."""
+        raise NotImplementedError()
+    
+    def elapsed(self):
+        """Return the position of the currently playing song in seconds (as float)."""
         raise NotImplementedError()
     
     def setElapsed(self, seconds):

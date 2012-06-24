@@ -39,8 +39,6 @@ class PlaylistTreeView(treeview.TreeView):
     sect = translate(__name__, "playlist")
     actionConfig.addActionDefinition(((sect, 'removeFromPL'),), RemoveFromPlaylistAction)
     actionConfig.addActionDefinition(((sect, 'clearPL'),), ClearPlaylistAction)
-
-    songSelected = QtCore.pyqtSignal(int)
     
     def __init__(self, parent = None):
         super().__init__(levels.real,parent)
@@ -57,24 +55,19 @@ class PlaylistTreeView(treeview.TreeView):
     def setBackend(self, backend):
         if self.backend is not None:
             self.model().modelReset.disconnect(self.expandAll)
-            self.songSelected.disconnect(self.backend.setCurrentSong)
         self.backend = backend
         self.setDisabled(backend is None)
         if backend is not None:
             model = backend.playlist
-            #if self.selectionModel():
-             #   self.selectionModel().selectionChanged.disconnect(self.updateGlobalSelection)
             self.setModel(model)
             self.itemDelegate().model = model
-            #self.selectionModel().selectionChanged.connect(self.updateGlobalSelection)
-            self.songSelected.connect(backend.setCurrentSong)
             self.updateNodeSelection()
             self.model().modelReset.connect(self.expandAll)
         
     def _handleDoubleClick(self, idx):
         if idx.isValid():
             offset = idx.internalPointer().offset()
-            self.songSelected.emit(offset)
+            self.backend.setCurrent(offset)
         
     def dropEvent(self,event):
         self.model()._internalMove = event.source() == self and event.dropAction() == Qt.MoveAction

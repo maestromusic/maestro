@@ -91,15 +91,20 @@ class PlaybackWidget(QtGui.QDockWidget):
     def updateSeekLabel(self, value):
         self.seekLabel.setText("{}-{}".format(formatTime(value), formatTime(self.seekSlider.maximum())))
         
-    def updateSlider(self, current, total):
+    def updateSlider(self, current):
         if not self.seekSlider.isSliderDown():
+            if self.backend.current() is not None:
+                total = self.backend.current().element.length
+            else:
+                assert current == 0
+                total = 0
             if self.seekSlider.maximum() != total:
                 self.seekSlider.setRange(0, int(total))
             self.seekSlider.setValue(current)
         self.updateSeekLabel(current)
     
     def updateCurrent(self, pos):
-        current = self.backend.playlist.current
+        current = self.backend.current()
         if current is not None:
             self.titleLabel.setText("{}: <i>{}</i>".format(self.tr("Current song"), current.getTitle()))
         else:
@@ -125,9 +130,9 @@ class PlaybackWidget(QtGui.QDockWidget):
         elif state == player.DISCONNECTED:
             self.titleLabel.setText(self.tr("unable to connect"))
         else:
-            self.updateCurrent(self.backend.currentSong)
-            self.updateState(self.backend.state)
-            self.volumeLabel.setVolume(self.backend.volume)
+            self.updateCurrent(self.backend.current())
+            self.updateState(self.backend.state())
+            self.volumeLabel.setVolume(self.backend.volume())
             
     def setBackend(self, name):
         logger.debug("setBackend {}".format(name))
@@ -136,7 +141,7 @@ class PlaybackWidget(QtGui.QDockWidget):
             self.backend.volumeChanged.disconnect(self.volumeLabel.setVolume)
             self.volumeLabel.volumeRequested.disconnect(self.backend.setVolume)
             self.backend.stateChanged.disconnect(self.updateState)
-            self.backend.currentSongChanged.disconnect(self.updateCurrent)
+            self.backend.currentChanged.disconnect(self.updateCurrent)
             self.ppButton.stateChanged.disconnect(self.backend.setState)
             self.seekSlider.sliderMoved.disconnect(self.backend.setElapsed)
             self.previousButton.clicked.disconnect(self.backend.previousSong)
@@ -151,7 +156,7 @@ class PlaybackWidget(QtGui.QDockWidget):
         self.backend = backend 
         self.backend.elapsedChanged.connect(self.updateSlider)
         self.backend.stateChanged.connect(self.updateState)
-        self.backend.currentSongChanged.connect(self.updateCurrent)
+        self.backend.currentChanged.connect(self.updateCurrent)
         self.ppButton.stateChanged.connect(self.backend.setState)
         self.stopButton.clicked.connect(self.handleStop)
         self.seekSlider.sliderMoved.connect(self.backend.setElapsed)

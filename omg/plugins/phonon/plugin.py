@@ -38,19 +38,17 @@ class PhononPlayerBackend(player.PlayerBackend):
                     self.playlist.setCurrent(config['current'])
 
         self._nextSource = None # used in self._handleSourceChanged
+        
+        self.connectionState = player.CONNECTED
 
         # Initialize Phonon        
         self.mediaObject = phonon.MediaObject()
         self.mediaObject.aboutToFinish.connect(self._handleAboutToFinish)
         self.mediaObject.currentSourceChanged.connect(self._handleSourceChanged)
+        self.mediaObject.setTickInterval(200)
+        self.mediaObject.tick.connect(self._handleTick)
         self.audioOutput = phonon.AudioOutput(phonon.MusicCategory)
         phonon.createPath(self.mediaObject,self.audioOutput)
-    
-    def current(self):
-        """Return the offset of the current song or None if there is no current song."""
-        if self.playlist.current is None:
-            return None
-        else: return self.playlist.current.offset()
     
     # Insert etc. are handled by the PlaylistModel
     def insertIntoPlaylist(self,pos,paths): pass
@@ -72,47 +70,71 @@ class PhononPlayerBackend(player.PlayerBackend):
         }[self.mediaObject.state()]
         
     def setState(self, state):
-        if state == player.STOP:
-            self.setCurrentSong(None)
-            self.mediaObject.stop()
-        elif state == player.PLAY:
-            self.mediaObject.play()
-        else: self.mediaObject.pause()
+        if state != self.state():
+            if state == player.STOP:
+                self.setCurrent(None)
+                self.mediaObject.stop()
+            elif state == player.PLAY:
+                if self.state() == player.STOP:
+                    self.setCurrent(0)
+                self.mediaObject.play()
+            else: self.mediaObject.pause()
+            self.stateChanged.emit(state)
      
+    def volume(self):
+        return int(self.audioOutput.volume() * 100)
+    
     def setVolume(self, volume):
         assert type(volume) == int and 0 <= volume <= 100
         self.audioOutput.setVolume(volume / 100)
+        self.volumeChange.emit(volume)
     
-    def setCurrentSong(self, offset):
-        if offset != self.current():
+    def current(self):
+        return self.playlist.current
+    
+    def currentOffset(self):
+        if self.playlist.current is None:
+            return None
+        else: return self.playlist.current.offset()
+    
+    def setCurrent(self, offset):
+        if offset != self.currentOffset():
             self.playlist.setCurrent(offset)
-            if offset >= 0:
+            if offset is not None:
                 source = phonon.MediaSource(self._getPath(offset))
                 self.mediaObject.setCurrentSource(source)
-                self.setState(player.PLAY)
+                self.mediaObject.play()
             else:
                 self.setState(player.STOP)
+            self.currentChanged.emit(offset)
+    
+    def elapsed(self):
+        return self.mediaObject.currentTime() / 1000
     
     def setElapsed(self, seconds):
         self.mediaObject.seek(int(seconds * 1000))
+        self.elapsedChanged.emit(seconds)
     
     def nextSong(self):
-        if self.state() != player.STOP and self.current() < self.playlist.root.fileCount() - 1:
-            self.setCurrentSong(self.current()+1)
+        if self.state() != player.STOP and self.currentOffset() < self.playlist.root.fileCount() - 1:
+            self.setCurrent(self.currentOffset()+1)
     
     def previousSong(self):
-        if self.state() != player.STOP and self.current() > 0:
-            self.setCurrentSong(self.current()-1)
+        if self.state() != player.STOP and self.currentOffset() > 0:
+            self.setCurrent(self.currentOffset()-1)
     
     def _handleAboutToFinish(self):
-        if self.current() < self.playlist.root.fileCount() - 1:
-            self._nextSource = phonon.MediaSource(self._getPath(self.current()+1))
+        if self.currentOffset() < self.playlist.root.fileCount() - 1:
+            self._nextSource = phonon.MediaSource(self._getPath(self.currentOffset()+1))
             self.mediaObject.enqueue(self._nextSource)
             
     def _handleSourceChanged(self,newSource):
         if newSource == self._nextSource:
-            self.playlist.setCurrent(self.current() + 1)
+            self.playlist.setCurrent(self.currentOffset() + 1)
             self._nextSource = None
+            
+    def _handleTick(self,pos):
+        self.elapsedChanged.emit(pos / 1000)
     
     def _getPath(self,offset):
         """Return the absolute path of the file at the given offset."""
