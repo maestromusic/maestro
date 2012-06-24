@@ -245,6 +245,60 @@ class Level(QtCore.QObject):
         for id in ids:
             level.getFromIds(self.children(id))
         return level
+        
+    def createWrappers(self,wrapperString,createFunc=None):
+        """Create a wrapper tree containing elements of this level and return its root node.
+        *s* must be a string like   "X[A[A1,A2],B[B1,B2]],Z"
+        where the identifiers must be names of existing elements of this level. This method does not check
+        whether the given structure is valid.
+        
+        Often it is necessary to have references to some of the wrappers in the tree. For this reason
+        this method accepts names of wrappers as optional arguments. It will then return a tuple consisting
+        of the usual result (as above) and the wrappers with the given names (do not use this if there is
+        more than one wrapper with the same name).
+        """  
+        roots = []
+        currentWrapper = None
+        currentList = roots
+        
+        for token in _getTokens(wrapperString):
+            #print("Token: {}".format(token))
+            if token == ',':
+                continue
+            if token == '[':
+                currentWrapper = currentList[-1]
+                currentList = currentWrapper.contents
+            elif token == ']':
+                currentWrapper = currentWrapper.parent
+                if currentWrapper is None:
+                    currentList = roots
+                else: currentList = currentWrapper.contents
+            else:
+                if createFunc is None:
+                    element = self.get(int(token))
+                    wrapper = Wrapper(element)
+                    if currentWrapper is not None:
+                        assert currentWrapper.element.id in wrapper.element.parents
+                        wrapper.parent = currentWrapper
+                else: wrapper = createFunc(currentWrapper,token)
+                currentList.append(wrapper)
+        return roots
+    
+
+def _getTokens(s):
+    """Helper for Level.getWrappers: Yield each token of *s*."""
+    # s should be a string like "A,B[B1,B2],C[C1[C11,C12],C2],D"
+    last = 0
+    i = 0
+    while i < len(s):
+        if s[i] in (',','[',']'):
+            if last != i:
+                yield s[last:i]
+            last = i+1
+            yield s[i]
+        i += 1
+    if last != i:
+        yield s[last:i]
 
 
 class RealLevel(Level):

@@ -16,6 +16,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+import functools
+
 from omg.core import levels, tags
 from omg.core.elements import Container, File, Element
 from omg.core.nodes import Wrapper
@@ -78,7 +80,7 @@ class TestLevel(levels.Level):
         """Given a comma-separated list of element names, return a list of their ids."""
         return [self.nameToId[name] for name in names.split(',')]
         
-    def createWrappers(self,s,*wrapperNames):
+    def makeWrappers(self,wrapperString,*wrapperNames):
         """Create a wrapper tree containing elements of this level and return its root node.
         *s* must be a string like   "X[A[A1,A2],B[B1,B2]],Z"
         where the identifiers must be names of existing elements of this level. This method does not check
@@ -89,62 +91,28 @@ class TestLevel(levels.Level):
         of the usual result (as above) and the wrappers with the given names (do not use this if there is
         more than one wrapper with the same name).
         """  
-        roots = []
-        currentWrapper = None
-        currentList = roots
-        # Will be appended to the result
         wrappersToReturn = [None]*len(wrapperNames)
-        for token in _getTokens(s):
-            #print("Token: {}".format(token))
-            if token == ',':
-                continue
-            if token == '[':
-                currentWrapper = currentList[-1]
-                currentList = currentWrapper.contents
-            elif token == ']':
-                currentWrapper = currentWrapper.parent
-                if currentWrapper is None:
-                    currentList = roots
-                else: currentList = currentWrapper.contents
-            else:
-                wrapper = Wrapper(self.nameToElement[token])
-                if token in wrapperNames:
-                    wrappersToReturn[wrapperNames.index(token)] = wrapper
-                currentList.append(wrapper)
-                if currentWrapper is not None:
-                    assert currentWrapper.element.id in wrapper.element.parents
-                    wrapper.parent = currentWrapper
+        createFunc = functools.partial(self._createFunc,wrapperNames,wrappersToReturn)
+        roots = self.createWrappers(wrapperString,createFunc)
         
         if len(wrapperNames) == 0:
             return roots
         else:
             wrappersToReturn.insert(0,roots)
             return wrappersToReturn
-    
-
-def _getTokens(s):
-    """Helper for TestLevel.getWrappers: Yield each token of *s*."""
-    last = 0
-    i = 0
-    while i < len(s):
-        if s[i] in (',','[',']'):
-            if last != i:
-                yield s[last:i]
-            last = i+1
-            yield s[i]
-        i += 1
-    if last != i:
-        yield s[last:i]
+        
+    def _createFunc(self,wrapperNames,wrappersToReturn,parent,token):
+        wrapper = Wrapper(self.nameToElement[token])
+        if parent is not None:
+            assert parent.element.id in wrapper.element.parents
+            wrapper.parent = parent
+        if token in wrapperNames:
+            wrappersToReturn[wrapperNames.index(token)] = wrapper
+        return wrapper
     
         
 def getWrapperString(node):
-    """Return a string that would - if submitted to TestLevel.getWrappers - create the tree structure below
+    """Return a string that would - if submitted to TestLevel.makeWrappers - create the tree structure below
     *node*.""" 
-    parts = []
-    for child in node.contents:
-        if child.isFile() or child.getContentsCount() == 0:
-            parts.append(child.element.tags[tags.TITLE][0])
-        else:
-            parts.append(child.element.tags[tags.TITLE][0]+'['+getWrapperString(child)+']')
-    return ','.join(parts)
-    
+    strFunc = lambda n: n.element.tags[tags.TITLE][0]
+    return node.wrapperString(strFunc=strFunc)

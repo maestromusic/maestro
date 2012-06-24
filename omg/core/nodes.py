@@ -209,14 +209,48 @@ class Node:
         else: return self.getContents()[index],innerOffset
     
     def firstLeaf(self,allowSelf=False):
+        """Return the first leaf below this node (i.e. the node without children with the lowest offset). If
+        this node does not have children, return None or, if *allowSelf* is True, return the node itself.
+        """
         if self.hasContents():
             return self.getContents()[0].firstLeaf(allowSelf=True)
         else: return self if allowSelf else None
         
     def lastLeaf(self,allowSelf=False):
+        """Return the last leaf below this node (i.e. the node without children with the highest offset). If
+        this node does not have children, return None or, if *allowSelf* is True, return the node itself.
+        """
         if self.hasContents():
             return self.getContents()[-1].lastLeaf(allowSelf=True)
         else: return self if allowSelf else None
+            
+    def wrapperString(self,includeSelf=False,strFunc=None):
+        """Return a string that stores the tree structure below this node. If this string is submitted to
+        Level.createWrappers the same tree will be created again. There are some limitations though:
+        
+            - the tree below this node must contain only Wrappers,
+            - to store Wrappers their id is used. Thus you cannot persistently store trees that contain
+              temporary elements (negative ids).
+              
+        Both limitations can be circumvented specifying a custom *strFunc*: It must take a node and
+        return a string and is used to convert the node to a string. Strings returned by *strFunc* must not
+        contain the characters ',[]'.
+        """
+        if includeSelf:
+            if strFunc is None and not isinstance(self,Wrapper):
+                raise ValueError('wrapperString: Tree must contain only Wrappers if *strFunc* is None')
+            selfString = str(self.element.id) if strFunc is None else strFunc(self)
+            
+        if self.hasContents():
+            childrenString = ','.join(c.wrapperString(includeSelf=True,strFunc=strFunc)
+                                      for c in self.getContents())
+            if includeSelf:
+                return selfString+'['+childrenString+']'
+            else: return childrenString
+        else:
+            if includeSelf:
+                return selfString
+            else: return ''
         
     def printStructure(self, indent = ''):
         """Debug method: print the tree below this node using indentation."""

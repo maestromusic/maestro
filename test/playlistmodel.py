@@ -87,7 +87,7 @@ class InsertTestCase(PlaylistTestCase):
         playlist = self.playlist
         
         # Insert a single wrapper. Do not add a parent
-        playlist.insert(playlist.root,0,level.createWrappers('A1'))
+        playlist.insert(playlist.root,0,level.makeWrappers('A1'))
         self.check('A1')
         
         # Check clear
@@ -95,62 +95,62 @@ class InsertTestCase(PlaylistTestCase):
         self.check('')
         
         # Insert some wrappers with no useful container structure
-        playlist.insert(playlist.root,0,level.createWrappers('D1,E1,D1'))
+        playlist.insert(playlist.root,0,level.makeWrappers('D1,E1,D1'))
         self.check('D1,E1,D1')
         playlist.clear()
 
         # Insert a container
-        playlist.insert(playlist.root,0,level.createWrappers('A[A1,A2,A3]'))
+        playlist.insert(playlist.root,0,level.makeWrappers('A[A1,A2,A3]'))
         self.check('A[A1,A2,A3]')
         playlist.clear()
                 
         # Insert part of an album. Also check that single parents are not added
-        playlist.insert(playlist.root,0,level.createWrappers('A1,A2,A3'))
+        playlist.insert(playlist.root,0,level.makeWrappers('A1,A2,A3'))
         self.check('A[A1,A2,A3]')
         playlist.clear()
 
         # Now the playlist has the longest sequence. Do not create any of A,C,X,Y,Z,T
-        playlist.insert(playlist.root,0,level.createWrappers('A3,A2,A1,E3,D5,D4,D3'))
+        playlist.insert(playlist.root,0,level.makeWrappers('A3,A2,A1,E3,D5,D4,D3'))
         self.check('A3,Pl[A2,A1,E3,D5,D4],D3')
         playlist.clear()
         
         # Insert into a node
-        A = level.createWrappers('A')[0]
+        A = level.makeWrappers('A')[0]
         playlist.insert(playlist.root,0,[A])
-        playlist.insert(A,0,level.createWrappers('A1'))
+        playlist.insert(A,0,level.makeWrappers('A1'))
         self.check('A[A1]')
-        playlist.insert(A,1,level.createWrappers('A2'))
+        playlist.insert(A,1,level.makeWrappers('A2'))
         self.check('A[A1,A2]')
         playlist.clear()
         
         # Create appropriate parents when inserting into a node
-        X = level.createWrappers('X')[0]
+        X = level.makeWrappers('X')[0]
         playlist.insert(playlist.root,0,[X])
-        playlist.insert(X,0,level.createWrappers('A1'))
+        playlist.insert(X,0,level.makeWrappers('A1'))
         self.check('X[A[A1]]')
         playlist.clear()
         
         # Split checks
         #=========================
         
-        wrappers,A = level.createWrappers('A[A1,A2]','A')
+        wrappers,A = level.makeWrappers('A[A1,A2]','A')
         playlist.insert(playlist.root,0,wrappers)
-        playlist.insert(A,1,level.createWrappers('B'))
+        playlist.insert(A,1,level.makeWrappers('B'))
         self.check('A[A1],B,A[A2]')
         playlist.clear()
         
         # Split over several levels
-        wrappers,toplevel,A = level.createWrappers('T[X[A[A1,A2]]]','T','A')
+        wrappers,toplevel,A = level.makeWrappers('T[X[A[A1,A2]]]','T','A')
         playlist.insert(playlist.root,0,wrappers)
         self.check('T[X[A[A1,A2]]]')
-        playlist.insert(A,1,level.createWrappers('E1'))
+        playlist.insert(A,1,level.makeWrappers('E1'))
         self.check('T[X[A[A1]]],E1,T[X[A[A2]]]')
         playlist.clear()
         
         # Split some levels and create an appropriate parent 
-        wrappers,toplevel,A = level.createWrappers('T[X[A[A1,A2]]]','T','A')
+        wrappers,toplevel,A = level.makeWrappers('T[X[A[A1,A2]]]','T','A')
         playlist.insert(playlist.root,0,wrappers)
-        playlist.insert(A,1,level.createWrappers('D1'))
+        playlist.insert(A,1,level.makeWrappers('D1'))
         self.check('T[X[A[A1]],Y[D[D1]],X[A[A2]]]')
         playlist.clear()
                 
@@ -158,39 +158,39 @@ class InsertTestCase(PlaylistTestCase):
         #=====================
         
         # Check simple glueing
-        playlist.insert(playlist.root,0,level.createWrappers('A2,A3'))
+        playlist.insert(playlist.root,0,level.makeWrappers('A2,A3'))
         self.check('A[A2,A3]')
-        playlist.insert(playlist.root,1,level.createWrappers('A4,A5'))
+        playlist.insert(playlist.root,1,level.makeWrappers('A4,A5'))
         self.check('A[A2,A3,A4,A5]')
         # Don't create parent containers here
-        playlist.insert(playlist.root,1,level.createWrappers('B1,B2'))
+        playlist.insert(playlist.root,1,level.makeWrappers('B1,B2'))
         self.check('A[A2,A3,A4,A5],B[B1,B2]')
         playlist.clear()
         
         # Check glueing with a container that is not below the insertion parent
-        wrappers,A = level.createWrappers('A[A1],E[E2]','A')
+        wrappers,A = level.makeWrappers('A[A1],E[E2]','A')
         playlist.insert(playlist.root,0,wrappers)
-        playlist.insert(A,1,level.createWrappers('A2,E1'))
+        playlist.insert(A,1,level.makeWrappers('A2,E1'))
         self.check('A[A1,A2],E[E1,E2]')
         playlist.clear()
         
         # Glue over several levels
-        playlist.insert(playlist.root,0,level.createWrappers('T[X[A[A1,A2]]]'))
-        playlist.insert(playlist.root,1,level.createWrappers('A3,A4'))
+        playlist.insert(playlist.root,0,level.makeWrappers('T[X[A[A1,A2]]]'))
+        playlist.insert(playlist.root,1,level.makeWrappers('A3,A4'))
         self.check('T[X[A[A1,A2,A3,A4]]]')
         playlist.clear()      
         
         # Complicated glue (both ends, several levels)
-        wrappers,toplevel = level.createWrappers('T[X[A[A1]],Y[D[D2]]]','T')
+        wrappers,toplevel = level.makeWrappers('T[X[A[A1]],Y[D[D2]]]','T')
         playlist.insert(playlist.root,0,wrappers)
-        playlist.insert(toplevel,1,level.createWrappers('B1,C1,D1'))
+        playlist.insert(toplevel,1,level.makeWrappers('B1,C1,D1'))
         self.check('T[X[A[A1],B[B1],C[C1]],Y[D[D1,D2]]]')
         playlist.clear()
         
         # Glue and split together
-        wrappers,X = level.createWrappers('T[X[A[A1],B[B1]]','X')
+        wrappers,X = level.makeWrappers('T[X[A[A1],B[B1]]','X')
         playlist.insert(playlist.root,0,wrappers)
-        playlist.insert(X,1,level.createWrappers('A2,E1,B2'))
+        playlist.insert(X,1,level.makeWrappers('A2,E1,B2'))
         self.check('T[X[A[A1,A2]]],E1,T[X[B[B2,B1]]]')
         playlist.clear()
         
@@ -207,74 +207,74 @@ class RemoveTestCase(PlaylistTestCase):
         playlist = self.playlist
         
         # Simple remove
-        playlist.insert(playlist.root,0,level.createWrappers('A1,E2,A3'))
+        playlist.insert(playlist.root,0,level.makeWrappers('A1,E2,A3'))
         playlist.remove(playlist.root,1,1)
         self.check('A1,A3')
         playlist.clear()
         
         # From a parent
-        wrappers,A = level.createWrappers('A[A1,A2,A3]','A')
+        wrappers,A = level.makeWrappers('A[A1,A2,A3]','A')
         playlist.insert(playlist.root,0,wrappers)
         playlist.remove(A,1,1)
         self.check('A[A1,A3]')
         playlist.clear()
         
         # Recursive
-        playlist.insert(playlist.root,0,level.createWrappers('A[A1,A2],E1'))
+        playlist.insert(playlist.root,0,level.makeWrappers('A[A1,A2],E1'))
         playlist.remove(playlist.root,0,0)
         self.check('E1')
         playlist.clear()
         
         # Remove parent and node below
-        wrappers,A = level.createWrappers('A[A1,A2],E1','A')
+        wrappers,A = level.makeWrappers('A[A1,A2],E1','A')
         playlist.insert(playlist.root,0,wrappers)
         playlist.removeMany([(playlist.root,0,0),(A,0,0)])
         self.check('E1')
         playlist.clear()
         
         # Remove several ranges below the same parent
-        wrappers,A = level.createWrappers('A[A1,A2,A3,A4,A5,A1,A2,A3]','A')
+        wrappers,A = level.makeWrappers('A[A1,A2,A3,A4,A5,A1,A2,A3]','A')
         playlist.insert(playlist.root,0,wrappers)
         playlist.removeMany([(A,1,3),(A,5,6)])
         self.check('A[A1,A5,A3]')
         playlist.clear()
         
         # Remove empty parent
-        wrappers,A = level.createWrappers('A[A1,A2],E1','A')
+        wrappers,A = level.makeWrappers('A[A1,A2],E1','A')
         playlist.insert(playlist.root,0,wrappers)
         playlist.remove(A,0,1)
         self.check('E1')
         playlist.clear()
         
         # Remove several empty parents (making another parent empty)
-        wrappers,A,B = level.createWrappers('T[X[A[A1,A2],B[B1,B2]],Y[D[D1]]','A','B')
+        wrappers,A,B = level.makeWrappers('T[X[A[A1,A2],B[B1,B2]],Y[D[D1]]','A','B')
         playlist.insert(playlist.root,0,wrappers)
         playlist.removeMany([(A,0,1),(B,0,1)])
         self.check('T[Y[D[D1]]]')
         playlist.clear()
         
         # Glue
-        playlist.insert(playlist.root,0,level.createWrappers('A[A1,A2],E1,A[A3,A4]'))
+        playlist.insert(playlist.root,0,level.makeWrappers('A[A1,A2],E1,A[A3,A4]'))
         playlist.remove(playlist.root,1,1)
         self.check('A[A1,A2,A3,A4]')
         playlist.clear()
         
         # Glue several levels
-        wrappers,X = level.createWrappers('X[A[A1,A2],B[B1],A[A3,A4]]','X')
+        wrappers,X = level.makeWrappers('X[A[A1,A2],B[B1],A[A3,A4]]','X')
         playlist.insert(playlist.root,0,wrappers)
         playlist.remove(X,1,1)
         self.check('X[A[A1,A2,A3,A4]]')
         playlist.clear()
         
         # Glue several levels after removing empty parents (this changes the glue position)
-        wrappers,B,C = level.createWrappers('X[A[A1,A2],B[B1],C[C1],A[A3,A4]]','B','C')
+        wrappers,B,C = level.makeWrappers('X[A[A1,A2],B[B1],C[C1],A[A3,A4]]','B','C')
         playlist.insert(playlist.root,0,wrappers)
         playlist.removeMany([(B,0,0),(C,0,0)])
         self.check('X[A[A1,A2,A3,A4]]')
         playlist.clear()
         
         # Several glues below the same parent (indexes might get wrong)
-        wrappers,B1,B3 = level.createWrappers('X[A[A1],B[B1],A[A2],B[B2],A[A3],B[B3],A[A4]]','B1','B3')
+        wrappers,B1,B3 = level.makeWrappers('X[A[A1],B[B1],A[A2],B[B2],A[A3],B[B3],A[A4]]','B1','B3')
         playlist.insert(playlist.root,0,wrappers)
         playlist.removeMany([(B1.parent,0,0),(B3.parent,0,0)])
         self.check('X[A[A1,A2],B[B2],A[A3,A4]]')
@@ -293,42 +293,42 @@ class MoveTestCase(PlaylistTestCase):
         playlist = self.playlist
         
         # Simply swap some elements
-        wrappers,A = level.createWrappers('A[A1,A2,A3]','A')
+        wrappers,A = level.makeWrappers('A[A1,A2,A3]','A')
         playlist.insert(playlist.root,0,wrappers)
         playlist.move([A.contents[1]],A,3)
         self.check('A[A1,A3,A2]')
         playlist.clear()
         
         # Other direction
-        wrappers,A = level.createWrappers('A[A1,A2,A3]','A')
+        wrappers,A = level.makeWrappers('A[A1,A2,A3]','A')
         playlist.insert(playlist.root,0,wrappers)
         playlist.move([A.contents[2]],A,1)
         self.check('A[A1,A3,A2]')
         playlist.clear()
         
         # Move several elements
-        wrappers,A = level.createWrappers('A[A1,A2,A3,A4,A5]','A')
+        wrappers,A = level.makeWrappers('A[A1,A2,A3,A4,A5]','A')
         playlist.insert(playlist.root,0,wrappers)
         playlist.move([A.contents[0],A.contents[2],A.contents[3]],A,5)
         self.check('A[A2,A5,A1,A3,A4]')
         playlist.clear()
         
         # Move recursively
-        wrappers,X,A = level.createWrappers('X[A[A1,A2,A3],B[B1,B2],C[C1]]','X','A')
+        wrappers,X,A = level.makeWrappers('X[A[A1,A2,A3],B[B1,B2],C[C1]]','X','A')
         playlist.insert(playlist.root,0,wrappers)
         playlist.move([A],X,2)
         self.check('X[B[B1,B2],A[A1,A2,A3],C[C1]]')
         playlist.clear()
         
         # Move in between
-        wrappers,A = level.createWrappers('A[A1,A2,A3,A4,A5]','A')
+        wrappers,A = level.makeWrappers('A[A1,A2,A3,A4,A5]','A')
         playlist.insert(playlist.root,0,wrappers)
         playlist.move([A.contents[0],A.contents[3],A.contents[4]],A,3)
         self.check('A[A2,A3,A1,A4,A5]')
         playlist.clear()
         
         # Move into child (must not work)
-        wrappers,X,B,Y = level.createWrappers('X[A[A1,A2,A3],B[B1,B2]],Y[D[D1]]','X','B','Y')
+        wrappers,X,B,Y = level.makeWrappers('X[A[A1,A2,A3],B[B1,B2]],Y[D[D1]]','X','B','Y')
         playlist.insert(playlist.root,0,wrappers)
         oldStackPos = application.stack.index()
         self.assertFalse(playlist.move([X,Y],B,0))
@@ -336,28 +336,28 @@ class MoveTestCase(PlaylistTestCase):
         playlist.clear()
         
         # Move with glue, split and remove empty parents
-        wrappers,A,A5,B1,B2 = level.createWrappers('X[A[A1,A2,A3,A4,A5],B[B1,B2]]','A','A5','B1','B2')
+        wrappers,A,A5,B1,B2 = level.makeWrappers('X[A[A1,A2,A3,A4,A5],B[B1,B2]]','A','A5','B1','B2')
         playlist.insert(playlist.root,0,wrappers)
         playlist.move([A5,B1,B2],A,2)
         self.check('X[A[A1,A2,A5],B[B1,B2],A[A3,A4]]')
         playlist.clear()
         
         # Remove wrappers in a way that decreases the insert position by glueing and removing empty parents
-        wrappers,E1,E2,E3 = level.createWrappers('A[A1,A2],E1,A[A3,A4],E[E2,E3],A[A5]','E1','E2','E3')
+        wrappers,E1,E2,E3 = level.makeWrappers('A[A1,A2],E1,A[A3,A4],E[E2,E3],A[A5]','E1','E2','E3')
         playlist.insert(playlist.root,0,wrappers)
         playlist.move([E1,E2,E3],playlist.root,5) # Real insert position will be 1!
         self.check('A[A1,A2,A3,A4,A5],E[E1,E2,E3]')
         playlist.clear()
         
         # Horrible move: After removing the nodes, the move target might be glued away
-        wrappers,X,B1 = level.createWrappers('X[A[A1,A2],B[B1],A[A3,A4,A5]]','X','B1')
+        wrappers,X,B1 = level.makeWrappers('X[A[A1,A2],B[B1],A[A3,A4,A5]]','X','B1')
         playlist.insert(playlist.root,0,wrappers)
         playlist.move([B1],X.contents[2],3)
         self.check('X[A[A1,A2,A3,A4,A5],B[B1]]')
         playlist.clear()
         
         # Horrible move in the other direction
-        wrappers,X,B1 = level.createWrappers('X[A[A1,A2],B[B1],A[A3,A4,A5]]','X','B1')
+        wrappers,X,B1 = level.makeWrappers('X[A[A1,A2],B[B1],A[A3,A4,A5]]','X','B1')
         playlist.insert(playlist.root,0,wrappers)
         playlist.move([B1],X.contents[0],0)
         self.check('X[B[B1],A[A1,A2,A3,A4,A5]]')

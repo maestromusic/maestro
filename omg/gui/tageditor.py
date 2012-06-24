@@ -25,7 +25,7 @@ from .. import strutils, utils, config, logging, application
 from ..core import tags, levels, commands
 from ..models import tageditor as tageditormodel, simplelistmodel, flageditor as flageditormodel
 from ..gui import singletageditor, tagwidgets, mainwindow, editor, flageditor, dialogs
-from ..gui.misc import widgetlist, dynamicgridlayout
+from ..gui.misc import widgetlist
 
 
 translate = QtCore.QCoreApplication.translate
@@ -236,13 +236,7 @@ class TagEditorWidget(QtGui.QWidget):
         self.layout().addWidget(scrollArea,1)
             
         self.viewport = QtGui.QWidget()
-        self.viewport.setLayout(QtGui.QVBoxLayout())
-        self.viewport.layout().setContentsMargins(2,2,2,2)
-        self.tagEditorLayout = dynamicgridlayout.DynamicGridLayout()
-        self.tagEditorLayout.setColumnStretch(1,1) # Stretch the column holding the values
-        self.tagEditorLayout.setSpacing(1)
-        self.viewport.layout().addLayout(self.tagEditorLayout)
-        self.viewport.layout().addStretch()
+        self.tagEditorLayout = TagEditorLayout(self.viewport)
         scrollArea.setWidget(self.viewport)
 
         self.flagWidget = QtGui.QWidget()
@@ -293,29 +287,19 @@ class TagEditorWidget(QtGui.QWidget):
         self.flagModel.setElements(level,elements)
         
     def _insertSingleTagEditor(self,row,tag):
-        self.tagEditorLayout.insertRow(row)
-        
         # Create the tagbox
         self.tagBoxes[tag] = SmallTagTypeBox(tag,self.vertical)
         self.tagBoxes[tag].tagChanged.connect(self._handleTagChangedByUser)
-        self.tagEditorLayout.addWidget(self.tagBoxes[tag],row,0)
         
         # Create the Tag-Editor
         self.singleTagEditors[tag] = singletageditor.SingleTagEditor(self,tag,self.model)
         self.singleTagEditors[tag].commonList.setSelectionManager(self.selectionManager)
         self.singleTagEditors[tag].uncommonList.setSelectionManager(self.selectionManager)
-        self.tagEditorLayout.addWidget(self.singleTagEditors[tag],row,1)
+        
+        self.tagEditorLayout.insertPair(row,tag,self.tagBoxes[tag],self.singleTagEditors[tag])
 
     def _removeSingleTagEditor(self,tag):
-        # Simply removing the items would leave an empty row. Thus we use DynamicGridLayout.removeRow.
-        # First we have to find the row
-        row = None
-        for r in range(self.tagEditorLayout.rowCount()):
-            if self.tagEditorLayout.itemAtPosition(r,0).widget() == self.tagBoxes[tag]:
-                row = r
-                break
-        assert row is not None
-        self.tagEditorLayout.removeRow(row)
+        self.tagEditorLayout.removePair(tag)
 
         # Tidy up
         # When changing a tag via the tagbox we are about to remove the widget having the current focus.
@@ -610,4 +594,140 @@ class OptionDialog(dialogs.FancyPopup):
         
     def _handleLoadRecursivelyBox(self,state):
         self.tagEditor.dock.loadRecursively = state == Qt.Checked
+        
+
+class TagEditorLayout(QtGui.QLayout):
+    innerHSpace = 5
+    columnSpacing = 10
+    rowSpacing = 1
+    
+    def __init__(self,parent=None):
+        super().__init__(parent)
+        self.setContentsMargins(2,2,2,2)
+        self._columnCount = 3
+        self._minColumnWidth = 200
+        self._pairs = []
+        
+        # itemAt must return QLayoutItems and when we return an item without keeping a reference to it,
+        # we'll get a segfault. Thus we additionally store the items.
+        self._items = []
+        
+    def count(self):
+        return 2*len(self._pairs)
+    
+    def itemAt(self,index):
+        if index >= self.count():
+            return None
+        else: return self._items[index // 2][index % 2]
+    
+    def insertPair(self,row,tag,tagBox,singleTagEditor):
+        self.addChildWidget(tagBox)
+        self.addChildWidget(singleTagEditor)
+        self._pairs.insert(row,(tagBox,singleTagEditor))
+        self._items.insert(row,(QtGui.QWidgetItem(tagBox),QtGui.QWidgetItem(singleTagEditor)))
+        self.invalidate() # this is also called by for example QBoxLayout::addItem
+        
+    def removePair(self,tag):
+        for i,pair in enumerate(self._pairs):
+            tagBox,singleTagEditor = pair
+            if tagBox.getTag() == tag:
+                del self._pairs[i]
+                del self._items[i]
+                self.invalidate() # this is also called by for example QLayout::removeItem
+                return
+        raise ValueError("Tag '{}' is not present in the tageditor".format(tag.name))
+    
+    def minimumSize(self):
+        return self.sizeHint()
+    
+    def sizeHint(self):
+        return QtCore.QSize(*self.doLayout(really=False))
+        
+    def setGeometry(self,rect):
+        self.doLayout(really=True,outerRect=rect)
+        
+    def doLayout(self,really,outerRect=None):
+        contentsMargins = self.getContentsMargins()
+        if len(self._pairs) == 0:
+            return contentsMargins[0] + contentsMargins[2], contentsMargins[1] + contentsMargins[3]
+        if really:
+            availableWidth = outerRect.width() - contentsMargins[0] - contentsMargins[2]
+        
+        tbSizeHints = []
+        steSizeHints = []
+        heights = []
+        widths = []
+        for tagBox,singleTagEditor in self._pairs:
+            hint1 = tagBox.sizeHint()
+            hint2 = singleTagEditor.sizeHint()
+            tbSizeHints.append(hint1)
+            steSizeHints.append(hint2)
+            widths.append(hint1.width() + self.innerHSpace + hint2.width())
+            heights.append(max(hint1.height(),hint2.height()))
+        
+        rowsInColumns = self._computeColumns(3,heights)
+        columnCount = len(rowsInColumns)
+        
+        columnWidths = []
+        columnHeights = []
+        
+        # Compute width of columns
+        i = 0
+        for rowCount in rowsInColumns:
+            columnWidths.append(max(self._minColumnWidth,max(widths[i:i+rowCount])))
+            i += rowCount
+        
+        # If some horizontal space is left, distribute it evenly
+        if really and sum(columnWidths) + (columnCount-1) * self.columnSpacing < availableWidth:
+            remainingSpace = availableWidth - sum(columnWidths) - (columnCount-1) * self.columnSpacing
+            for i in range(columnCount):
+                columnWidths[i] += remainingSpace // columnCount
+                if i < remainingSpace % columnCount:
+                    columnWidths[i] += 1  
+            
+        x = contentsMargins[0]
+        i = 0
+        for colIndex,rowCount in enumerate(rowsInColumns):
+            y = contentsMargins[1]
+            tbWidth = max(tbSizeHints[j].width() for j in range(i,i+rowCount))
+            steWidth = columnWidths[colIndex] - tbWidth - self.innerHSpace
+            for _ in range(rowCount):
+                tagBox,singleTagEditor = self._pairs[i]
+                
+                if really:
+                    rect = QtCore.QRect(x,y,tbWidth,tbSizeHints[i].height())
+                    tagBox.setGeometry(rect)
+                
+                    rect = QtCore.QRect(x+tbWidth+self.innerHSpace, y,
+                                        steWidth, max(tbSizeHints[i].height(),steSizeHints[i].height()))
+                    singleTagEditor.setGeometry(rect)
+                
+                y += heights[i] + self.rowSpacing
+                i += 1
+            
+            columnHeights.append(y)
+            x += columnWidths[colIndex] + self.columnSpacing
+            
+        x += contentsMargins[2]
+        return x,max(columnHeights) + contentsMargins[3]
+            
+    def _computeColumns(self,columnCount,heights):
+        if len(heights) == 0:
+            return []
+        
+        columns = [0]
+        
+        perColumn = sum(heights) / columnCount
+        
+        currentHeight = 0
+        for height in heights:
+            if columns[-1] == 0 or len(columns) == columnCount or currentHeight + self.rowSpacing + 0.5 * height <= perColumn:
+                columns[-1] += 1
+                currentHeight += self.rowSpacing + height
+            else:
+                columns.append(1)
+                currentHeight =  height
+            
+        return columns
+     
         

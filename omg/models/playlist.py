@@ -379,6 +379,19 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         self.split(parent,position)
         self.__class__ = PlaylistModel
         return
+    
+    def wrapperString(self):
+        """Return a representation of the playlist as wrapperstring (see Node.getWrapperString). External
+        files will be stored by their path (and not by their temporary id) so this representation can be
+        used to store the playlist tree structure persistently.
+        """
+        return self.root.wrapperString(strFunc=_strFunc)
+    
+    def initFromWrapperString(self,wrapperString):
+        """Initialize the playlist from a wrapperstring created with PlaylistModel.getWrapperString."""
+        wrappers = levels.real.createWrappers(wrapperString,createFunc=_createFunc)
+        #TODO: check wrappers for consistency
+        self._setRootContents(wrappers)
         
         
 class PlaylistInsertCommand(wrappertreemodel.InsertCommand):
@@ -505,3 +518,25 @@ class ConditionalCommand(QtGui.QUndoCommand):
     def undo(self):
         if not self.onRedo:
             self.method()
+
+
+# Helper functions for playlist<->wrapperstring conversion
+def _createFunc(parent,token):
+    """This is used as createFunc-argument for Level.createWrappers."""
+    if token.startswith('EXT:'):
+        path = urllib.parse.unquote(token[4:]) # remove EXT:
+        element = levels.real.get(path)
+    else:
+        element = levels.real.get(int(token))
+    return Wrapper(element,parent=parent)
+        
+def _strFunc(wrapper):
+    """This is used as strFunc-argument for Node.wrapperString. It returns external files as url-encoded
+    paths because these don't contain the characters ',[]'."""
+    if wrapper.element.id > 0:
+        return str(wrapper.element.id)
+    else:
+        # only exception are external files in the playlist
+        assert wrapper.isFile()
+        return 'EXT:'+urllib.parse.quote(wrapper.element.path)
+    

@@ -17,43 +17,49 @@
 #
 
 from PyQt4.phonon import Phonon as phonon
+import urllib.parse
 
-from ... import player, config, profiles, utils
+from ... import player, config, profiles, utils, strutils
 from ...models import playlist
             
             
 class PhononPlayerBackend(player.PlayerBackend):
     className = "Phonon"
     
-    def __init__(self, name,*args):
+    def __init__(self, name, config=None):
         super().__init__(name)
         
-        # The list of paths in the playlist is stored directly in the model's tree
+        # The list of paths in the playlist and the current song are stored directly in the model's tree
         self.playlist = playlist.PlaylistModel(self)
-        # This is the offset of the current song ( == self.playlist.current.offset())
-        self.current = None
-        self._nextSource = None
-        
+        if config is not None:
+            if 'playlist' in config:
+                self.playlist.initFromWrapperString(config['playlist'])
+                if 'current' in config:
+                    self.playlist.setCurrent(config['current'])
+
+        self._nextSource = None # used in self._handleSourceChanged
+
+        # Initialize Phonon        
         self.mediaObject = phonon.MediaObject()
         self.mediaObject.aboutToFinish.connect(self._handleAboutToFinish)
         self.mediaObject.currentSourceChanged.connect(self._handleSourceChanged)
         self.audioOutput = phonon.AudioOutput(phonon.MusicCategory)
         phonon.createPath(self.mediaObject,self.audioOutput)
     
-    def insertIntoPlaylist(self,pos,paths):
-        if self.current is not None and pos <= self.current:
-           self.current += len(paths)
+    def current(self):
+        """Return the offset of the current song or None if there is no current song."""
+        if self.playlist.current is None:
+            return None
+        else: return self.playlist.current.offset()
+    
+    # Insert etc. are handled by the PlaylistModel
+    def insertIntoPlaylist(self,pos,paths): pass
+    def move(self,fromOffset,toOffset): pass
     
     def removeFromPlaylist(self,begin,end):
-        if self.current is not None:
-            if end <= self.current:
-                self.current -= end-begin
-            elif begin <= self.current < end:
-                self.setState(player.STOP)
+        if self.playlist.current is None:
+            self.setState(player.STOP)
         
-    def move(self,fromOffset,toOffset):
-        pass
-    
     def state(self):
         """Return the current state (one of player.STOP, player.PLAY, player.PAUSE)."""
         return {
@@ -78,8 +84,7 @@ class PhononPlayerBackend(player.PlayerBackend):
         self.audioOutput.setVolume(volume / 100)
     
     def setCurrentSong(self, offset):
-        if offset != self.current:
-            self.current = offset
+        if offset != self.current():
             self.playlist.setCurrent(offset)
             if offset >= 0:
                 source = phonon.MediaSource(self._getPath(offset))
@@ -92,22 +97,21 @@ class PhononPlayerBackend(player.PlayerBackend):
         self.mediaObject.seek(int(seconds * 1000))
     
     def nextSong(self):
-        if self.state() != player.STOP and self.current < self.playlist.root.fileCount() - 1:
-            self.setCurrentSong(self.current+1)
+        if self.state() != player.STOP and self.current() < self.playlist.root.fileCount() - 1:
+            self.setCurrentSong(self.current()+1)
     
     def previousSong(self):
-        if self.state() != player.STOP and self.current > 0:
-            self.setCurrentSong(self.current-1)
+        if self.state() != player.STOP and self.current() > 0:
+            self.setCurrentSong(self.current()-1)
     
     def _handleAboutToFinish(self):
-        if self.current < self.playlist.root.fileCount() - 1:
-            self._nextSource = phonon.MediaSource(self._getPath(self.current+1))
+        if self.current() < self.playlist.root.fileCount() - 1:
+            self._nextSource = phonon.MediaSource(self._getPath(self.current()+1))
             self.mediaObject.enqueue(self._nextSource)
             
     def _handleSourceChanged(self,newSource):
         if newSource == self._nextSource:
-            self.current += 1
-            self.playlist.setCurrent(self.current + 1)
+            self.playlist.setCurrent(self.current() + 1)
             self._nextSource = None
     
     def _getPath(self,offset):
@@ -119,15 +123,21 @@ class PhononPlayerBackend(player.PlayerBackend):
     
     @classmethod
     def configurationWidget(cls, profile = None):
-        """Return a config widget, initialized with the data of the given *profile*."""
         return None
         
     def __str__(self):
         return "PhononAudioBackend({})".format(self.name)
 
-
+    
 def enable():
     player.profileConf.addClass(PhononPlayerBackend)
 
 def disable():
     player.profileConf.removeClass(PhononPlayerBackend)
+    
+    
+def defaultStorage():
+    return {"SECTION:phonon": {
+            "current": None,
+            "playlist": ""
+        }}
