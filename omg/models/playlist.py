@@ -50,7 +50,6 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
     def setCurrent(self, offset):
         """Set the currently playing song to the song with the given offset. If offset is None, no song is
         currently playing."""
-        print("SETCURRENT({})".format(offset))
         if offset is None:     
             self.clearCurrent() 
         else:

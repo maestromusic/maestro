@@ -88,20 +88,14 @@ class MPDThread(QtCore.QThread):
             
         elif what == "setState":
             if how == player.PLAY:
-                print("self.client.play()")
                 self.client.play()
-                print("done")
             elif how == player.PAUSE:
-                print("self.client.pause(1)")
                 self.client.pause(1)
             elif how == player.STOP:
-                print("self.client.stop()")
                 self.client.stop()
         
         elif what == "setCurrent":
-            print("self.client.play({})".format(how if how is not None else -1))
             self.client.play(how if how is not None else -1)
-            print("done")
         
         elif what == "nextSong":
             self.client.next()
@@ -201,7 +195,6 @@ class MPDThread(QtCore.QThread):
          
         # fetch information from MPD
         self.mpd_status = self.client.status()
-        #print("Status: {}".format(self.mpd_status['song'] if 'song' in self.mpd_status else 'Blubb'))
         
         # check for volume change
         volume = int(self.mpd_status['volume'])
@@ -221,9 +214,7 @@ class MPDThread(QtCore.QThread):
         if current != self.current or emitCurrent:
             self.current = current
             if current != None:
-                print("self.client.currentsong")
                 self.mpd_current = self.client.currentsong()
-                print("={}".format(self.mpd_current['id']))
                 self.currentLength = int(self.mpd_current["time"])
             else:
                 self.currentLength = 0 # no current song

@@ -604,7 +604,7 @@ class TagEditorLayout(QtGui.QLayout):
     def __init__(self,parent=None):
         super().__init__(parent)
         self.setContentsMargins(2,2,2,2)
-        self._columnCount = 3
+        self._columnCount = 1
         self._minColumnWidth = 200
         self._pairs = []
         
@@ -665,7 +665,7 @@ class TagEditorLayout(QtGui.QLayout):
             widths.append(hint1.width() + self.innerHSpace + hint2.width())
             heights.append(max(hint1.height(),hint2.height()))
         
-        rowsInColumns = self._computeColumns(3,heights)
+        rowsInColumns = self._computeColumns(self._columnCount,heights)
         columnCount = len(rowsInColumns)
         
         columnWidths = []
