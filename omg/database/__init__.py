@@ -356,7 +356,7 @@ def idFromHash(hash):
 
 # values_* tables
 #=======================================================================         
-@functools.lru_cache(1000)
+#@functools.lru_cache(1000)
 def valueFromId(tagSpec,valueId):
     """Return the value from the tag *tagSpec* with id *valueId* or raise an sql.EmptyResultException if
     that id does not exist. Date tags will be returned as FlexiDate.

@@ -28,6 +28,9 @@ DISK, DB, CONTENTS = range(3) # modes for removing elements
 
 # Type of a change
 ADDED,CHANGED,DELETED = 1,2,3
+# Use remove if an item is removed from a list, selection etc., but does still exist.
+# Use delete if an item is completely deleted (even if it can be restored via undo. If the user wants to get rid of it, use delete)
+REMOVED = DELETED
 CHANGE_TYPES = (ADDED,CHANGED,DELETED)
 
 

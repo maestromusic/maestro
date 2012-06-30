@@ -282,7 +282,7 @@ class TagTypeBox(QtGui.QStackedWidget):
             else:
                 self._dialogOpen = True
                 from . import dialogs
-                newTag = NewTagTypeDialog.createTagType(tagname=text,privateEditable=True)
+                newTag = NewTagTypeDialog.createTagType(text)
                 self._dialogOpen = False
                 if newTag is not None:
                     self._addTagToBox(newTag)
@@ -522,54 +522,32 @@ class TagValueEditor(QtGui.QWidget):
                 self.editor.setFixed(True)
 
 
-class NewTagTypeDialog(QtGui.QDialog):
-    """This dialog is opened when a new tagtype appears for the first time. The user is asked to enter a
-    tags.ValueType for the new tag."""
-    Delete, DeleteAlways = -1, -2
-    def __init__(self,tagname,parent=None,text=None,tagnameEditable=False,
-                 privateEditable=False,includeDeleteOption = False):
+class AddTagTypeDialog(QtGui.QDialog):
+    #TODO comment
+    def __init__(self,tagName='',parent=None):
         QtGui.QDialog.__init__(self, parent)
-        self.setWindowModality(QtCore.Qt.WindowModal)
-        self.setWindowTitle(self.tr("New tag type"))
-        self.setLayout(QtGui.QVBoxLayout(self))
-        self.tagname = tagname
-        self.tagnameEditable = tagnameEditable
-        self._newTag = None
-        
-        if text is None:
-            if tagnameEditable:
-                text = self.tr("Please enter the name and type of the new tag:")
-            else:
-                text = self.tr("The tag '{}' occurred for the first time. Please enter its type:") \
-                                    .format(tagname)
-        label = QtGui.QLabel(text)
-        label.setWordWrap(True)
-        self.layout().addWidget(label)
+        self.setWindowTitle(self.tr("Add tag type"))
+        self.tagType = None
+                
+        self.setLayout(QtGui.QVBoxLayout())
+        formLayout = QtGui.QFormLayout()
+        buttonLayout = QtGui.QHBoxLayout()
+        self.layout().addLayout(formLayout)
+        self.layout().addLayout(buttonLayout)
             
-        if tagnameEditable:
-            self.lineEdit = QtGui.QLineEdit(tagname)
-            self.layout().addWidget(self.lineEdit)
+        self.lineEdit = QtGui.QLineEdit(tagName)
+        formLayout.addRow(self.tr("Name"),self.lineEdit)
             
         self.combo = ValueTypeBox()
-        self.layout().addWidget(self.combo)
+        formLayout.addRow(self.tr("Type"),self.combo)
         
-        self.layout().addWidget(QtGui.QLabel(self.tr("Title:")))
-        self.titleLineEdit = QtGui.QLineEdit(tagname)
-        self.layout().addWidget(self.titleLineEdit)
+        self.titleLineEdit = QtGui.QLineEdit(tagName.capitalize())
+        formLayout.addRow(self.tr("Title"),self.titleLineEdit)
         
-        self.privateBox = QtGui.QCheckBox(self.tr("Private?"))
-        self.privateBox.setEnabled(privateEditable)
-        self.layout().addWidget(self.privateBox)
-        
-        buttonLayout = QtGui.QHBoxLayout()
-        if includeDeleteOption:
-            self.deleteCheckbox = QtGui.QCheckBox(self.tr('from all future files'))
-            self.deleteButton = QtGui.QPushButton(self.tr('delete'))
-            buttonLayout.addWidget(self.deleteButton)
-            buttonLayout.addWidget(self.deleteCheckbox)
-            self.deleteButton.clicked.connect(self._handleDeleteClicked)
+        self.privateBox = QtGui.QCheckBox()
+        formLayout.addRow(self.tr("Private"),self.privateBox)
+                
         buttonLayout.addStretch()
-        self.layout().addLayout(buttonLayout)
         
         self.abortButton = QtGui.QPushButton(self.tr("Abort"))
         self.abortButton.clicked.connect(self.reject)
@@ -579,49 +557,26 @@ class NewTagTypeDialog(QtGui.QDialog):
         self.okButton.clicked.connect(self._handleOk)
         self.okButton.setDefault(True)
         buttonLayout.addWidget(self.okButton)
-    
-    def _handleDeleteClicked(self):
-        self.done(NewTagTypeDialog.DeleteAlways if self.deleteCheckbox.isChecked() else NewTagTypeDialog.Delete)
-        
-    def tagType(self):
-        """Return the new tagtype selected by the user."""
-        return self._newTag
 
     def _handleOk(self):
-        if self.tagnameEditable:
-            tagname = self.lineEdit.text()
-            if tags.exists(tagname):
-                QtGui.QMessageBox.warning(self,self.tr("Tag exists already"),
-                                          self.tr("There is already a tag named '{}'.").format(tagname))
-                return
-            if not tags.isValidTagname(tagname):
-                QtGui.QMessageBox.warning(self,self.tr("Invalid tagname"),
-                                          self.tr("'{}' is not a valid tagname.").format(tagname))
-                return
-            self.tagname = tagname
-            
-        if len(self.titleLineEdit.text()) == 0 or self.titleLineEdit.text().isspace():
-            QtGui.QMessageBox.warning(self,self.tr("Empty title"),
-                                      self.tr("The title must not be empty."))
+        tagName = self.lineEdit.text()
+        if tags.isInDB(tagName):
+            QtGui.QMessageBox.warning(self,self.tr("Tag exists already"),
+                                      self.tr("There is already a tag named '{}'.").format(tagName))
             return
-        if self._newTag is None:
-            application.stack.push(tags.TagTypeUndoCommand(constants.ADDED,
-                                                           name=self.tagname,
-                                                           type=self.combo.getType(),
-                                                           title=self.titleLineEdit.text(),
-                                                           iconPath=None,
-                                                           private=self.privateBox.isChecked()))
-            self._newTag = tags.get(self.tagname)
-        self.accept()
+        if not tags.isValidTagname(tagName):
+            QtGui.QMessageBox.warning(self,self.tr("Invalid tagname"),
+                                      self.tr("'{}' is not a valid tagname.").format(tagName))
+            return
         
-    @staticmethod
-    def createTagType(*args,**kargs):
-        """Open a NewTagTypeDialog and return the selected tags.ValueType or None if the user aborted or closed
-        the dialog. *name* is the new tag's name."""
-        dialog = NewTagTypeDialog(*args,**kargs)
-        if dialog.exec_() == QtGui.QDialog.Accepted:
-            return dialog.tagType()
-        else: return None
+        self.tagType = tags.get(tagName)
+        application.stack.push(tags.TagTypeUndoCommand(constants.ADDED,
+                                                       tagType = self.tagType,
+                                                       type=self.combo.getType(),
+                                                       title=self.titleLineEdit.text(),
+                                                       iconPath=None,
+                                                       private=self.privateBox.isChecked()))
+        self.accept()
         
         
 class EnhancedTextEdit(QtGui.QTextEdit):

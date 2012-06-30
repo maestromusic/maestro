@@ -38,7 +38,7 @@ def init():
     """Initialize the search module."""
     criteriaModule.SEARCH_TAGS = set()
     for tagname in config.options.tags.search_tags:
-        if tags.exists(tagname):
+        if tags.isInDB(tagname):
             criteriaModule.SEARCH_TAGS.add(tags.get(tagname))
 
 

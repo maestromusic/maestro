@@ -30,7 +30,7 @@ from .delegates import browser as browserdelegate, configuration as delegateconf
 
 # Layers that can be selected in BrowserDialog's comboboxes. Each item in the list is a list containing for
 # each layer a list of the tagnames in that layer.
-selectableLayers = utils.mapRecursively(partial(tags.get, createDialogIfNew = True),[
+selectableLayers = utils.mapRecursively(partial(tags.get,addDialogIfNew=True),[
      [['composer','artist','performer']],
      [['genre'],['composer','artist','performer']],
      [['composer','artist','performer'],['album']],

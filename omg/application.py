@@ -68,7 +68,7 @@ def run(cmdConfig=[],exitPoint=None,console=False):
     
         - 'config':    Initialize only config
         - 'database':  Stop after database connection has been established
-        - 'tags':      Stop after tags module has been initialized (this needs a db connection.
+        - 'tags':      Stop after tags module has been initialized (this needs a db connection)
         - 'noplugins': Stop before plugins would be loaded
         - 'nogui':     Stop right before the GUI would be created (plugins are enabled at this point)
         
