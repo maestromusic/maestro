@@ -140,7 +140,11 @@ def run(cmdConfig=[],exitPoint=None,console=False):
     flags.init()
     if exitPoint == 'tags':
         return app
-        
+    
+    # In most test scripts using the exitPoint 'tags' these caches would only be overhead.
+    # Thus fill them after the exitpoint.
+    database.cacheTagValues()
+    
     # Load and initialize remaining modules
     from .core import levels
     levels.init()

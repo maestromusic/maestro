@@ -121,7 +121,13 @@ class ValueType:
 
     def sqlFormat(self,value):
         """Convert *value* into a string that can be inserted into database queries."""
-        if self.name == 'date':
+        if self is TYPE_VARCHAR:
+            if len(value.encode()) > constants.TAG_VARCHAR_LENGTH:
+                logger.error("Attempted to encode the following string for a varchar column although its "
+                             "encoded size exceeds constants.TAG_VARCHAR_LENGTH. The string will be "
+                             "truncated: '{}'.".format(value))
+            return value
+        elif self.name == 'date':
             if isinstance(value,utils.FlexiDate):
                 return value.sqlFormat()
             else: return utils.FlexiDate.strptime(value).sqlFormat()

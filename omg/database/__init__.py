@@ -355,69 +355,83 @@ def idFromHash(hash):
 
 
 # values_* tables
-#=======================================================================         
-#@functools.lru_cache(1000)
+#=======================================================================
+_idToValue = {}
+_valueToId = {}
+
+def cacheTagValues():
+    """Cache all id<->value relations from the values_varchar table."""
+    for tag in tagsModule.tagList:
+        result = query("SELECT id,value FROM {}values_varchar WHERE tag_id = ?".format(prefix),tag.id)
+        _idToValue[tag] = {id: value for id,value in result}
+        # do not traverse result twice
+        _valueToId[tag] = {value: id for id,value in _idToValue[tag].items()}
+      
+
 def valueFromId(tagSpec,valueId):
     """Return the value from the tag *tagSpec* with id *valueId* or raise an sql.EmptyResultException if
     that id does not exist. Date tags will be returned as FlexiDate.
     """
     tag = tagsModule.get(tagSpec)
-    value = query("SELECT value FROM {}values_{} WHERE tag_id = ? AND id = ?"
-                    .format(prefix,tag.type), tag.id,valueId).getSingle()
-    if tag.type == tagsModule.TYPE_DATE:
+    
+    # Check cache
+    if tag in _idToValue:
+        value = _idToValue[tag].get(valueId)
+        if value is not None:
+            return value
+        
+    # Look up value
+    try:
+        value = query("SELECT value FROM {}values_{} WHERE tag_id = ? AND id = ?"
+                        .format(prefix,tag.type.name), tag.id,valueId).getSingle()
+    except sql.EmptyResultException:
+        raise KeyError("There is no value of tag '{}' for id {}".format(tag,valueId))
+                    
+    # Store value in cache
+    if tag.type is tagsModule.TYPE_VARCHAR:
+        if tag not in _idToValue:
+            _idToValue[tag] = {}
+        _idToValue[tag][id] = value
+    elif tag.type is tagsModule.TYPE_DATE:
         value = utils.FlexiDate.fromSql(value)
     return value
 
 
-_cachedValues = None
-
-
-def initCachedValues():
-    global _cachedValues
-    _cachedValues = dict()
-    for tagType in (tagsModule.TYPE_DATE, tagsModule.TYPE_VARCHAR):
-        _cachedValues[tagType] = dict()
-        result = query("SELECT id, tag_id, value FROM {}values_{}".format(prefix, tagType.name))
-        for id, tag_id, value in result:
-            _cachedValues[tagType][(tag_id, value)] = id
-          
-            
 def idFromValue(tagSpec,value,insert=False):
     """Return the id of the given value in the tag-table of tag *tagSpec*. If the value does not exist,
     raise an sql.EmptyResultException, unless the optional parameter *insert* is set to True. In that case
     insert the value into the table and return its id.
     """
-    if _cachedValues is None:
-        initCachedValues()
-    
     tag = tagsModule.get(tagSpec)
-    value = _encodeValue(tag.type,value)
+    value = tag.sqlFormat(value)
+    
+    # Check cache
+    if tag in _valueToId:
+        id = _valueToId[tag].get(value)
+        if id is not None:
+            return id
 
-    if tag.type in _cachedValues:
-        try:
-            return _cachedValues[tag.type][(tag.id, value)]
-        except KeyError:
-            if insert:
-                id = query("INSERT INTO {}values_{} (tag_id, value) VALUES (?,?)"
-                           .format(prefix, tag.type), tag.id, value).insertId()
-                _cachedValues[tag.type][(tag.id, value)] = id
-                return id
-            else:
-                raise KeyError("No value id for tag '{}' and value '{}'".format(tag, value))
-    else:
-        try:
-            if type == 'mysql':
-                # Compare exactly (using binary collation)
-                q = "SELECT id FROM {}values_{} WHERE tag_id = ? AND value COLLATE utf8_bin = ?"\
-                     .format(prefix,tag.type)
-            else: q = "SELECT id FROM {}values_{} WHERE tag_id = ? AND value = ?".format(prefix,tag.type)
-            return query(q,tag.id,value).getSingle()
-        except sql.EmptyResultException as e:
-            if insert:
-                result = query("INSERT INTO {}values_{} (tag_id,value) VALUES (?,?)"
-                                 .format(prefix,tag.type),tag.id,value)
-                return result.insertId()
-            else: raise KeyError("No value id for tag '{}' and value '{}'".format(tag, value))
+    # Look up id
+    try:
+        if type == 'mysql':
+            # Compare exactly (using binary collation)
+            q = "SELECT id FROM {}values_{} WHERE tag_id = ? AND value COLLATE utf8_bin = ?"\
+                 .format(prefix,tag.type.name)
+        else: q = "SELECT id FROM {}values_{} WHERE tag_id = ? AND value = ?".format(prefix,tag.type)
+        id = query(q,tag.id,value).getSingle()
+    except sql.EmptyResultException as e:
+        if insert:
+            result = query("INSERT INTO {}values_{} (tag_id,value) VALUES (?,?)"
+                             .format(prefix,tag.type.name),tag.id,value)
+            id = result.insertId()
+        else: raise KeyError("No value id for tag '{}' and value '{}'".format(tag, value))
+    
+    # Store id in cache
+    if tag.type is tagsModule.TYPE_VARCHAR:
+        if tag not in _valueToId:
+            _valueToId[tag] = {}
+        _valueToId[tag][value] = id
+    return id
 
 
 def hidden(tagSpec, valueId):
@@ -512,7 +526,6 @@ def flags(elid):
 
 # folders table
 #=======================================================================
-
 def folderState(path):
     return query('SELECT state FROM {}folders WHERE path=?'.format(prefix), path).getSingle()
 
@@ -526,24 +539,7 @@ def updateFolder(path, state):
 
 
 # Help methods
-#=======================================================================
-def _encodeValue(tagType,value):
-    if tagType == tagsModule.TYPE_VARCHAR:
-        value = str(value)
-        if len(value.encode()) > constants.TAG_VARCHAR_LENGTH:
-            logger.error("Attempted to encode the following string for a varchar column although its encoded"
-                         " size exceeds constants.TAG_VARCHAR_LENGTH. The string will be truncated. '{}'."
-                         .format(value))
-        return value
-    elif tagType == tagsModule.TYPE_TEXT:
-        return str(value)
-    elif tagType == tagsModule.TYPE_DATE:
-        if isinstance(value,utils.FlexiDate):
-            return value.toSql()
-        else: return utils.FlexiDate.strptime(value).toSql()
-    else: raise ValueError("Unknown tag type '{}'.".format(tagType))
-    
-    
+#=======================================================================  
 def csList(values):
     """Return a comma-separated list of the string-representation of the given values. If *values* is not
     iterable, return simply its string representation."""
