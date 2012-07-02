@@ -25,11 +25,12 @@ from ..utils import absPath
 logger = logging.getLogger(__name__)
 
 
-def get(path, ignoreUnknownTags = False):
+def get(path):
     """Create a RealFile-instance for the given path, which may be a relative or absolute path."""
     if not os.path.isabs(path):
         path = absPath(path)
-    return rfClass(path, ignoreUnknownTags)
+    return rfClass(path)
+
 
 def parsePosition(string):
         """Parse a string like "7" or "2/5" to a (integer) position. If <string> has the form "2/5", the first number will be returned."""
@@ -40,6 +41,7 @@ def parsePosition(string):
         elif re.match('\d+\s*/\s*\d+$',string):
             return int(string.split('/')[0])
         else: return None
+        
         
 class RealFile:
     """Abstract base class for file classes."""
@@ -53,8 +55,9 @@ class RealFile:
     
     def read(self):
         """Read the tags of the file and convert them according to a tags.Storage object according to
-        OMG's internal rules. This might raise an UnknownTagException."""
+        OMG's internal rules."""
         raise NotImplementedError()
+    
     def remove(self,tags):
         """Remove the tags in the given list from the file. If a tag from the list is not contained in the file, skip it without warning."""
         raise NotImplementedError()
@@ -95,7 +98,7 @@ try:
     import taglib
     class TagLibFile(RealFile):
         """A RealFile implementation using pytaglib, the wrapper for taglib."""
-        def __init__(self, path, ignoreUnknownTags = False):
+        def __init__(self, path):
             # TODO: this is due to a bug in taglib, which
             # crashes on opening non-existing OGG files
             # instead of just reporting an error.
@@ -103,7 +106,6 @@ try:
                 raise OSError('file does not exist')
             RealFile.__init__(self, path)
             self._f = taglib.File(path)
-            self.ignoreUnknownTags = ignoreUnknownTags
         
         def read(self):
             self.tags = tags.Storage()
@@ -118,20 +120,13 @@ try:
                 elif key in config.options.tags.always_delete:
                     toDelete.append(key)
                 else:
-                    try:
-                        self._parseAndAdd(key, values)
-                    except tags.UnknownTagError as e:
-                        if self.ignoreUnknownTags:
-                            logger.warning('Ignored unknown tag {} on reading file'.format(key))
-                        else:
-                            e.values = values
-                            self.remove(toDelete)
-                            raise e
+                    self._parseAndAdd(key, values)
                         
             self.remove(toDelete)        
             self.length = self._f.length
             
         def _parseAndAdd(self, key, values):
+            #TODO handle ValueErrors which arise if key is not a valid tagname
             tag = tags.get(key)
             vals = []
             for value in values:
@@ -140,7 +135,6 @@ try:
                     vals.append(value)
             if len(vals) > 0:
                 self.tags.add(tag, *vals)
-            
             
         def saveTags(self, reallySave = True):
             self._f.tags = dict()

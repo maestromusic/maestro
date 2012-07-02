@@ -133,7 +133,8 @@ class ValueTypeBox(QtGui.QComboBox):
         
     def wheelEvent(self,wheelEvent):
         if self.disableMouseWheel:
-            wheelEvent.ignore() # Let the parent widget handle it
+            # Let the parent widget handle it. If that parent is a scrollarea, it will scroll
+            wheelEvent.ignore() 
         else: QtGui.QComboBox.wheelEvent(self,wheelEvent)
     
     def _handleCurrentIndexChanged(self,index):
@@ -141,8 +142,9 @@ class ValueTypeBox(QtGui.QComboBox):
         
         
 class TagTypeBox(QtGui.QStackedWidget):
-    """A combobox to select a tagtype from those in the tagids table. By default the box will be editable
-    and in this case the box will handle tag titles and if the entered tagname is unknown it will add
+    """A combobox to select a tagtype from those in the tagids table. By default the box will be editable.
+    Text entered by the user will be interpreted as tag title
+    and allowin this case the box will handle tag titles and if the entered tagname is unknown it will add
     a new tag to the table (querying the user for a type). If the entered text is invalid it will reset the
     box. Thus getTag will always return a valid tag. Use the tagChanged-signal to get informed about
     changes.
@@ -151,18 +153,18 @@ class TagTypeBox(QtGui.QStackedWidget):
     
         - defaultTag: The tag selected at the beginning. If it is None, the first tag will be selected.
         - parent: The parent object.
-        - editable: Whether the box is editable.
+        - editable: Whether the user can enter arbitrary text into the box.
         - useCoverLabel: If True, the box will be hidden behind a TagLabel, unless it has the focus. This
           feature is for example used by the tageditor.
-    
-    \ """
+          
+    """
     tagChanged = QtCore.pyqtSignal(tags.Tag)
     
     # This variable is used to prevent handling editingFinished twice (if _handleEditingFinished opens
     # a dialog, the box will loose focus and emit the signal again).
     _dialogOpen = False
     
-    def __init__(self,defaultTag = None,parent = None,editable=True,useCoverLabel=False):
+    def __init__(self,defaultTag=None,parent=None,editable=True,useCoverLabel=False):
         QtGui.QStackedWidget.__init__(self,parent)
         self.setSizePolicy(QtGui.QSizePolicy(QtGui.QSizePolicy.Minimum,QtGui.QSizePolicy.Fixed))
         
@@ -202,12 +204,16 @@ class TagTypeBox(QtGui.QStackedWidget):
             if tag == self._tag:
                 self.box.setCurrentIndex(self.box.count()-1)
                 
+        if not self._tag.isInDB():
+            self.box.insertSeparator(self.box.count())
+            self.box.addItem(self.tr("Add tag to DB..."))
+                
     def _addTagToBox(self,tag):
         """Add a tag to the box. Display icon and title if available."""
         if tag.icon is not None:
             self.box.addItem(tag.icon,tag.title,tag)
-        else: self.box.addItem(tag.title,tag)
-        
+        else: self.box.addItem(tag.title,tag)            
+            
     def showLabel(self):
         """Display the label and hide the editor."""
         if self.label is not None:
@@ -231,6 +237,12 @@ class TagTypeBox(QtGui.QStackedWidget):
         if tag != self._parseTagFromBox():
             self.box.setEditText(tag.title)
         if tag != self._tag:
+            if self._tag.isInDB() and not tag.isInDB():
+                self.box.insertSeparator(self.box.count())
+                self.box.addItem(self.tr("Add tag to DB..."))
+            elif not self._tag.isInDB() and tag.isInDB():
+                self.box.removeItem(self.box.count())
+                self.box.removeItem(self.box.count())
             self._tag = tag
             self.tagChanged.emit(tag)
     
@@ -242,14 +254,14 @@ class TagTypeBox(QtGui.QStackedWidget):
         usual 'title'-tag), he has to quote the tagname (using " or '): inserting "titel" into the combobox 
         will do the job.
         Note that the case of the entered text does not matter; all tags have lowercase names. This method 
-        returns None if no tag can be generated, because e.g. the text is not a valid tagname.
+        returns None if no tag can be returned, because the name is invalid.
         """
         text = self.box.currentText().strip()
         try:
             if text[0] == text[-1] and text[0] in ['"',"'"]: # Don't translate if the text is quoted
                 return tags.get(text[1:-1])
             else: return tags.fromTitle(text)
-        except tags.UnknownTagError:
+        except tags.ValueError: # invalid tagname
             return None
         
     def focusInEvent(self,focusEvent):
@@ -270,26 +282,12 @@ class TagTypeBox(QtGui.QStackedWidget):
             self.setTag(tag)
             self.showLabel()
         else:
-            text = self.box.currentText().strip()
-            if text[0] == text[-1] and text[0] in ['"',"'"]:
-                text = text[1:-1]
-            if not tags.isValidTagname(text):
-                self.box.setEditText(self._tag.title) # Reset
-                self._dialogOpen = True
-                QtGui.QMessageBox.warning(self,self.tr("Invalid tagname"),
-                                          self.tr("'{}' is not a valid tagname").format(text))
-                self._dialogOpen = False
-            else:
-                self._dialogOpen = True
-                from . import dialogs
-                newTag = NewTagTypeDialog.createTagType(text)
-                self._dialogOpen = False
-                if newTag is not None:
-                    self._addTagToBox(newTag)
-                    self.setTag(newTag)
-                    self.showLabel()
-                else:
-                    self.box.setEditText(self._tag.title) # Reset
+            # invalid tagname
+            self.box.setEditText(self._tag.title) # Reset
+            self._dialogOpen = True
+            QtGui.QMessageBox.warning(self,self.tr("Invalid tagname"),
+                                      self.tr("'{}' is not a valid tagname").format(text))
+            self._dialogOpen = False
     
     def keyPressEvent(self,keyEvent):
         if keyEvent.key() == Qt.Key_Escape:
@@ -523,42 +521,62 @@ class TagValueEditor(QtGui.QWidget):
 
 
 class AddTagTypeDialog(QtGui.QDialog):
-    #TODO comment
-    def __init__(self,tagName='',parent=None):
-        QtGui.QDialog.__init__(self, parent)
+    """This dialog allows the user to add a tagtype to the database. To do this, the user has to specify
+    name and type and may specify a title and set the private flag. The dialog can be initialized with an
+    external tag *tagType*, otherwise the name field will be empty at first. If given, *text* will be
+    displayed at the top of the dialog.
+    
+    After the tag has been added to the database, it is available as attribute 'tagType'. If the user aborted
+    the dialog, this attribute is None.
+
+    WARNING: The user is allowed to change the tagname in the dialog and thus the final tagType that was
+    added to the database and is stored in the attribute 'tagType' may differ from the argument *tagType*.
+    """
+    def __init__(self,tagType=None,text=None):
+        QtGui.QDialog.__init__(self)
         self.setWindowTitle(self.tr("Add tag type"))
-        self.tagType = None
+        
+        if tagType is not None and tagType.isInDB():
+            raise ValueError("Cannot open AddTagTypeDialog for an internal tagtype.")
+        self.tagType = None # only set this, if the type has been added to the database
                 
         self.setLayout(QtGui.QVBoxLayout())
+        
+        if text is not None:
+            label = QtGui.QLabel(text)
+            label.setWordWrap(True)
+            self.layout().addWidget(label)
+        
         formLayout = QtGui.QFormLayout()
-        buttonLayout = QtGui.QHBoxLayout()
         self.layout().addLayout(formLayout)
-        self.layout().addLayout(buttonLayout)
             
-        self.lineEdit = QtGui.QLineEdit(tagName)
-        formLayout.addRow(self.tr("Name"),self.lineEdit)
+        self.lineEdit = QtGui.QLineEdit(tagType.name if tagType is not None else '')
+        formLayout.addRow(self.tr("Name:"),self.lineEdit)
             
         self.combo = ValueTypeBox()
-        formLayout.addRow(self.tr("Type"),self.combo)
+        formLayout.addRow(self.tr("Type:"),self.combo)
         
-        self.titleLineEdit = QtGui.QLineEdit(tagName.capitalize())
-        formLayout.addRow(self.tr("Title"),self.titleLineEdit)
+        self.titleLineEdit = QtGui.QLineEdit(tagType.name.capitalize() if tagType is not None else '')
+        formLayout.addRow(self.tr("Title:"),self.titleLineEdit)
         
         self.privateBox = QtGui.QCheckBox()
-        formLayout.addRow(self.tr("Private"),self.privateBox)
+        formLayout.addRow(self.tr("Private:"),self.privateBox)
                 
+        buttonLayout = QtGui.QHBoxLayout()
+        self.layout().addLayout(buttonLayout)
         buttonLayout.addStretch()
         
-        self.abortButton = QtGui.QPushButton(self.tr("Abort"))
-        self.abortButton.clicked.connect(self.reject)
-        buttonLayout.addWidget(self.abortButton)
+        self.cancelButton = QtGui.QPushButton(self.tr("Cancel"))
+        self.cancelButton.clicked.connect(self.reject)
+        buttonLayout.addWidget(self.cancelButton)
         
-        self.okButton = QtGui.QPushButton(self.tr("Ok"))
+        self.okButton = QtGui.QPushButton(self.tr("OK"))
         self.okButton.clicked.connect(self._handleOk)
         self.okButton.setDefault(True)
         buttonLayout.addWidget(self.okButton)
 
     def _handleOk(self):
+        """Handle OK button: Check if everything is fine and add the type to the database."""
         tagName = self.lineEdit.text()
         if tags.isInDB(tagName):
             QtGui.QMessageBox.warning(self,self.tr("Tag exists already"),
@@ -568,15 +586,37 @@ class AddTagTypeDialog(QtGui.QDialog):
             QtGui.QMessageBox.warning(self,self.tr("Invalid tagname"),
                                       self.tr("'{}' is not a valid tagname.").format(tagName))
             return
+        title = self.titleLineEdit.text()
+        if len(title) == 0:
+            title = None
+        elif tags.isTitle(title):
+            QtGui.QMessageBox.warning(self,self.tr("Title exists already"),
+                                      self.tr("There is already a tag with title '{}'.").format(title))
+            return
         
         self.tagType = tags.get(tagName)
         application.stack.push(tags.TagTypeUndoCommand(constants.ADDED,
                                                        tagType = self.tagType,
                                                        type=self.combo.getType(),
-                                                       title=self.titleLineEdit.text(),
+                                                       title=title,
                                                        iconPath=None,
                                                        private=self.privateBox.isChecked()))
         self.accept()
+        
+    @classmethod
+    def addTagType(cls,tagType=None,text=None):
+        """Show an AddTagTypeDialog to allow the user to add a tagtype to the database.  The dialog can be
+        initialized with an external tag *tagType*, otherwise the name field will be empty at first. If
+        given, *text* will be displayed at the top of the dialog.
+        
+        Return the tag that was added to the database or None, if the user aborted the dialog.
+        
+        WARNING: The user is allowed to change the tagtype in the dialog. Thus this method may return a
+        different tagType than the argument *tagType*.
+        """
+        dialog = cls(tagType,text)
+        dialog.exec_()
+        return dialog.tagType
         
         
 class EnhancedTextEdit(QtGui.QTextEdit):

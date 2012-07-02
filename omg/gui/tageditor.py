@@ -359,6 +359,10 @@ class TagEditorWidget(QtGui.QWidget):
     def _handleTagChangedByUser(self,changedTag):
         if self._ignoreHandleTagChangedByUser:
             return
+        # Sometimes we want to ignore this event handler (e.g. when we reset the tagBox inside this event
+        # handler to the old tag)
+        self._ignoreHandleTagChangedByUser = True
+        
         # First we have to get the tagBox responsible for this event and its tag
         tagBox = self.sender()
         oldTag = None
@@ -369,14 +373,24 @@ class TagEditorWidget(QtGui.QWidget):
         assert oldTag is not None
         newTag = tagBox.getTag()
 
+        # Do not allow external tags in internal elements
+        if not newTag.isInDB() and any(element.id > 0 for record in self.model.getRecords(oldTag)
+                                                      for element in record.elementsWithValue):
+            text = self.tr("You must add tagtypes to the database before adding such tags to elements "
+                           "within the database.")
+            newTag = tagwidgets.AddTagTypeDialog.addTagType(newTag,text)
+            if newTag is None: # user aborted the dialog
+                tagBox.setTag(oldTag)
+                return
+                
         # If changeTag fails, then reset the box
         if not self.model.changeTag(oldTag,newTag):
             QtGui.QMessageBox.warning(self,self.tr("Invalid value"),
                                       self.tr("At least one value is invalid for the new type."))
-            # reset the editor...unfortunately this emits valueChanged again
-            tagBox.tagChanged.disconnect(self._handleTagChangedByUser)
             tagBox.setTag(oldTag)
-            tagBox.tagChanged.connect(self._handleTagChangedByUser)
+        else:
+            # This is important if the user changed newTag within the AddTagTypeDialog 
+            tagBox.setTag(newTag)
                 
     def contextMenuEvent(self,contextMenuEvent,record=None):
         menu = QtGui.QMenu(self)
@@ -533,22 +547,42 @@ class RecordDialog(QtGui.QDialog):
     
     def _handleOkButton(self):
         """Check whether at least one element is selected and the current value is valid and if so, exit."""
-        if self.elementsBox.selectionModel().hasSelection():
-            if self.valueEditor.getValue() is not None:
-                self.accept()
-            else: QtGui.QMessageBox.warning(self,self.tr("Invalid value"),
-                                            self.tr("The given value is invalid."))
-        else: QtGui.QMessageBox.warning(self,self.tr("No element selected"),
-                                        self.tr("You must select at lest one element."))
+        if not self.elementsBox.selectionModel().hasSelection():
+            QtGui.QMessageBox.warning(self,self.tr("No element selected"),
+                                      self.tr("You must select at lest one element."))
+            return
+        
+        # Do not allow external tags in internal elements
+        tagType = self.typeEditor.getTag()
+        if not tagType.isInDB() and any(element.id > 0 for element in self._getSelectedElements()):
+            text = self.tr("You must add tagtypes to the database before adding such tags to elements "
+                           "within the database.")
+            newTag = tagwidgets.AddTagTypeDialog.addTagType(tagType,text)
+            if newTag is None: # user aborted the dialog
+                return
+            if newTag != tagType: # user changed the tagtype
+                self.valueEditor.setTag(newTag)
+                self.typeEditor.setTag(newTag)
+                tagType = newTag
+            
+        if self.valueEditor.getValue() is None: # valueEditor.getValue returns None if the value is invalid
+            QtGui.QMessageBox.warning(self,self.tr("Invalid value"),self.tr("The given value is invalid."))
+            return
+        
+        self.accept()
         
     def getRecord(self):
         """Return a record with the data from the dialog."""
         allElements = self.elementsBox.model().getItems()
-        selectedElements = [allElements[i] for i in range(len(allElements))
-                                if self.elementsBox.selectionModel().isRowSelected(i,QtCore.QModelIndex())]
         return tageditormodel.Record(self.typeEditor.getTag(),self.valueEditor.getValue(),
-                                     allElements,selectedElements)
+                                     allElements,self.getSelectedElements())
 
+    def _getSelectedElements(self):
+        """Return the elements selected for the record."""
+        allElements = self.elementsBox.model().getItems()
+        return [allElements[i] for i in range(len(allElements))
+                                if self.elementsBox.selectionModel().isRowSelected(i,QtCore.QModelIndex())]
+        
     def _handleTagChanged(self,tag):
         """Change the tag of the ValueEditor."""
         self.valueEditor.setTag(tag)

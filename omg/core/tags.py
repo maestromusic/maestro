@@ -18,9 +18,21 @@
 
 """Module for tag handling.
 
-This module provides methods to store tags, convert them between different values, to convert tag-ids to
-tagnames and vice versa and so on. Call init at program start to initialize the module using the
-information in the tagids-table and use one of the following ways to get tags:
+This module provides methods and structures
+
+    * to manage tagtypes: convert tag-ids to tagnames and vice versa, add tagtypes to the database and remove
+      them again, modify tagtypes (icon, title etc.)
+    * to store tags in elements (or elsewhere)
+
+There is one tagtype for each valid tagname. Some tagtypes are stored in the database and called 'internal'
+while the other ones are called 'external'. Internal tags have an id, a type and may have a title, an icon
+or be private (i.e. they will not be stored in files but only in the database).
+
+For each tagtype there can be only one instance of Tag which is created in the init-method for internal tags
+or when the get-method is invoked for the first time with the type's tagname. 
+
+Call init at program start to initialize the module using the information in the tagids-table and use one of 
+the following ways to get tags:
 
     * The easiest way is the get-method which takes a tag-id or a tag-name as parameter. Because you must
       never create your own Tag instances, this is the only method to get instances of external tags.
@@ -28,9 +40,9 @@ information in the tagids-table and use one of the following ways to get tags:
       (e.g. ``'Künstler'``).
     * For some tags which have a special meaning to the program and cannot always be treated generically
       (e.g. the title-tag) there exist constants (e.g. TITLE). This allows to use tags.TITLE instead of
-      tags.get(options.tags.title_tag) as the user may decide to use another tagname than 'title'
-      for his titles.
-    * To iterate over all tags in the database using the user-defined order use the module variable tagList.
+      tags.get(options.tags.title_tag). Do not use tags.get('title') as the user may decide to use another
+      tagname than 'title' for his titles.
+    * To iterate over all internal tags in the user-defined order use the module variable tagList.
     
 \ """
 from collections import Sequence
@@ -194,6 +206,7 @@ class Tag:
         self.private = private
     
     def _getData(self):
+        """Return some attributes as dict."""
         return {'id': self.id,
                 'type':self.type,
                 'title': self.title,
@@ -202,6 +215,7 @@ class Tag:
                 }
     
     def _setData(self,data):
+        """Set some attributes from a dict created with _getData."""
         # self.__dict__.update(data)  would be nicer but doesn't work with properties
         if 'id' in data:
             self.id = data['id']
@@ -215,9 +229,11 @@ class Tag:
             self.private = data['private']
     
     def _clearData(self):
+        """Clear some attributes. This happens when adding a tagtype to the database is undone."""
         self.id,self.type,self.rawTitle,self.iconPath,self.private = None,None,None,None,False
     
     def isInDB(self):
+        """Return whether this tagtype is internal, i.e. contained in the database."""
         return self.id is not None
     
     @property
@@ -349,7 +365,7 @@ class TagTypeUndoCommand(QtGui.QUndoCommand):
             self.position = tagList.index(tagType)
         else:
             self.tagType = tagType
-            self.oldData = tagType.getData()
+            self.oldData = tagType._getData()
             self.newData = data
         
     def redo(self):
@@ -831,5 +847,4 @@ class TagDict(dict):
     
     def __iter__(self):
         return self.keys()
-    
-        
+         

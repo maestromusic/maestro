@@ -102,22 +102,22 @@ class Level(QtCore.QObject):
             self.parent.loadIntoChild([param],self)
         return self.elements[param]
     
-    def getFromIds(self,ids,ignoreUnknownTags=False):
+    def getFromIds(self,ids):
         """Load all elements given by the list of ids *ids* into this level (do nothing for elements which
         are already loaded."""
         notFound = []
         for id in ids:
             if id not in self.elements:
                 notFound.append(id)
-        self.parent.loadIntoChild(notFound,self,ignoreUnknownTags)
+        self.parent.loadIntoChild(notFound,self)
         return [self.elements[id] for id in ids]
                 
-    def getFromPaths(self,paths,ignoreUnknownTags=False):
+    def getFromPaths(self,paths):
         """Load elements for the given paths and return them."""
         ids = [idFromPath(path) for path in paths]
-        return self.getFromIds(ids,ignoreUnknownTags)
+        return self.getFromIds(ids)
         
-    def loadIntoChild(self,ids,child,ignoreUnknownTags=False):
+    def loadIntoChild(self,ids,child):
         """Load all elements given by the list of ids *ids* into the level *child*. Do not check whether
         elements are already loaded there."""
         notFound = []
@@ -126,7 +126,7 @@ class Level(QtCore.QObject):
                 child.elements[id] = self.elements[id].copy()
                 child.elements[id].level = child
             else: notFound.append(id)
-        self.parent.loadIntoChild(notFound,self,ignoreUnknownTags)
+        self.parent.loadIntoChild(notFound,self)
         
     def __contains__(self, id):
         """Returns if the given id is loaded in this level. Note that if the id could be loaded from the
@@ -392,31 +392,8 @@ class RealLevel(Level):
         for path in paths:
             rpath = utils.relPath(path)
             try:
-                readOk = False
-                while not readOk:
-                    try:
-                        real = realfiles.get(path)
-                        real.read()
-                        readOk = True
-                    except tags.UnknownTagError as e:
-                        # TODO: respect askOnNEwTags parameter (or remove it)
-                        # TODO: wrap this up as a separate function stored somewhere else
-                        from ..gui.tagwidgets import NewTagTypeDialog
-                        QtGui.QApplication.changeOverrideCursor(Qt.ArrowCursor)
-                        text = self.tr('Unknown tag\n{1}={2}\n found in \n{0}.\n What should its type be?')\
-                                           .format(rpath,e.tagname,e.values)
-                        dialog = NewTagTypeDialog(e.tagname, text = text, includeDeleteOption = True)
-                        ret = dialog.exec_()
-                        if ret == dialog.Accepted:
-                            pass
-                        elif ret == dialog.Delete or ret == dialog.DeleteAlways:
-                            if ret == dialog.DeleteAlways:
-                                config.options.tags.always_delete.append(e.tagname)
-                            logger.info('REMOVE TAG {0} from {1}'.format(e.tagname, rpath))
-                            re = realfiles.get(path)
-                            re.remove(e.tagname)
-                        else:
-                            raise ElementGetError('User aborted "new tag" dialog')
+                real = realfiles.get(path)
+                real.read()
                 fileTags = real.tags
                 length = real.length
                 fileTags.position = real.position
