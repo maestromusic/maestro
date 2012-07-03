@@ -141,8 +141,8 @@ class ValueType:
             return value
         elif self.name == 'date':
             if isinstance(value,utils.FlexiDate):
-                return value.sqlFormat()
-            else: return utils.FlexiDate.strptime(value).sqlFormat()
+                return value.toSql()
+            else: return utils.FlexiDate.strptime(value).toSql()
         else: return value
 
     @staticmethod
@@ -174,8 +174,8 @@ TYPE_VARCHAR = ValueType('varchar', translate('tags', 'Standard type for normal 
 TYPE_TEXT = ValueType('text', translate('tags', 'Type for long texts (like e.g. lyrics)'))
 TYPE_DATE = ValueType('date', translate('tags', 'Type for dates'))
 TYPES = [TYPE_VARCHAR,TYPE_TEXT,TYPE_DATE]
-
-
+    
+    
 class Tag:
     """
         A tagtype like 'artist'. 'title', etc.. Public attributes of tags are
@@ -261,8 +261,25 @@ class Tag:
         """Return whether the given value is a valid tag-value for this tag (this depends only on the
         tag-type).
         """
-        return self.type.isValid(value)
+        if self.type is not None:
+            return self.type.isValid(value)
+        else: return True
+
+    def convertValue(self,newTag,value):
+        """Convert a value from this tag type to *newTag*. Raise a ValueError if conversion is not possible.
+        """
+        if newTag.type is None:
+            return str(value)
+        if self.type is None:
+            return newTag.type.valueFromString(value)
+        return self.type.convertValue(newTag.type,value)
      
+    def valueFromString(self,string):
+        """Get a value for this tag from a string."""
+        if self.type is not None:
+            return self.type.valueFromString(string)
+        else: return string
+        
     def sqlFormat(self,value):
         """Convert *value* into a string that can be inserted into database queries."""
         return self.type.sqlFormat(value)

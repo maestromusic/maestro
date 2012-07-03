@@ -430,8 +430,10 @@ class RealLevel(Level):
         super().addTagValue(tag,value,elements,emitEvent=False)
         failedElements = self.saveTagsToFileSystem(elements)
         #TODO: Correct failedElements
-        dbwrite.addTagValues([el.id for el in elements if el.isInDB() and not el in failedElements],
-                             tag,[value])
+        dbElements = [el.id for el in elements if el.isInDB() and not el in failedElements]
+        if len(dbElements):
+            dbwrite.addTagValues(dbElements,tag,[value])
+        
         if emitEvent:
             self.emitEvent([element.id for element in elements])
             
@@ -439,8 +441,11 @@ class RealLevel(Level):
         super().removeTagValue(tag,value,elements,emitEvent=False)
         failedElements = self.saveTagsToFileSystem(elements)
         #TODO: Correct failedElements
-        dbwrite.removeTagValuesById([el.id for el in elements if el.isInDB() and not el in failedElements],
-                                 tag,db.idFromValue(tag,value))
+        dbElements = [el.id for el in elements if el.isInDB() and not el in failedElements]
+        if len(dbElements):
+            dbwrite.removeTagValuesById(dbElements,tag,db.idFromValue(tag,value))
+        else: assert all(element.id < 0 for element in elements)
+        
         if emitEvent:
             self.emitEvent([element.id for element in elements])
             
@@ -448,8 +453,10 @@ class RealLevel(Level):
         super().changeTagValue(tag,oldValue,newValue,elements,emitEvent=False)
         failedElements = self.saveTagsToFileSystem(elements)
         #TODO: Correct failedElements
-        dbwrite.changeTagValueById([el.id for el in elements if el.isInDB() and not el in failedElements],
-                                 tag,db.idFromValue(tag,oldValue),db.idFromValue(tag,newValue,insert=True))
+        dbElements = [el.id for el in elements if el.isInDB() and not el in failedElements]
+        if len(dbElements):
+            dbwrite.changeTagValueById(dbElements,tag,db.idFromValue(tag,oldValue),
+                                       db.idFromValue(tag,newValue,insert=True))
         if emitEvent:
             self.emitEvent([element.id for element in elements])
         

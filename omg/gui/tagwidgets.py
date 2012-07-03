@@ -187,6 +187,11 @@ class TagTypeBox(QtGui.QStackedWidget):
         self.box.setInsertPolicy(QtGui.QComboBox.NoInsert)
 
         self._createItems()
+        
+        if not defaultTag.isInDB():
+            # _createItems will select the correct tag, if it is in the DB but can't help if it is an
+            # external tag.
+            self.box.setEditText(defaultTag.title)
 
         if editable:
             self.box.editingFinished.connect(self._handleEditingFinished)
@@ -330,13 +335,13 @@ class TagTypeButton(QtGui.QPushButton):
         
         menu.addSeparator()
         action = menu.addAction(self.tr("New tagtype..."))
-        action.triggered.connect(self._handleNewTagTypeAction)
+        action.triggered.connect(self._handleAddTagTypeAction)
         action = menu.addAction(self.tr("Tagmanager..."))
         action.triggered.connect(self._handleManagerButton)
         
-    def _handleNewTagTypeAction(self):
-        """Handle the last action in the menu: Ask the user to create a new tagtype."""
-        tagType = NewTagTypeDialog.createTagType()
+    def _handleAddTagTypeAction(self):
+        """Handle the last action in the menu: Ask the user to add a tagtype to the database."""
+        tagType = AddTagTypeDialog.addTagType()
         if tagType is not None:
             self.tagChosen.emit(tagType)
             
@@ -469,7 +474,7 @@ class TagValueEditor(QtGui.QWidget):
         (e.g. creating a FlexiDate) and return None if the current text is not valid."""
         if not self.tag.isValid(self.getText()):
             return None
-        else: return self.tag.type.valueFromString(self.getText())
+        else: return self.tag.valueFromString(self.getText())
         
     def setValue(self,value):
         """Set the current value. *value* must be either a string or FlexiDate if the current tag type is

@@ -138,9 +138,13 @@ class NodeSelection:
         if requireParentElement and not isinstance(parent,Wrapper):
             return False
         return all(w.parent == parent for w in self._wrappers[1:])
-    
+
     def hasWrappers(self):
-        """True iff at least one element is selected."""
+        """True iff at least one wrapper is selected."""
+        return len(self._wrappers) > 0
+    
+    def hasElements(self):
+        """True iff at least one element is selected (this element might be contained in a wrapper)."""
         return len(self._wrappers) > 0
     
     def hasContainers(self):
@@ -149,7 +153,7 @@ class NodeSelection:
 
     def hasFiles(self):
         """True iff at least one file is selected."""
-        return any(el.isFile() for el in self._elements)
+        return any(el.isFile() for el in self._wrappers)
     
     def files(self,recursive=False):
         """Return all file wrappers that are selected. If *recursive* is True, also return files of which

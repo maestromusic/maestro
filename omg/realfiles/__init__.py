@@ -87,7 +87,7 @@ class RealFile:
                 if len(value) in (13,16,19) and re.match("\d{4}-\d{2}-\d{2} \d{2}(:\d{2}){0,2}$",value) is not None:
                     value = value[:10]
                     
-            return tag.type.valueFromString(value)
+            return tag.valueFromString(value)
         except ValueError:
             logger.warning("Found invalid tag-value '{}' for tag {} in file {}".format(value,tag,self.path))
             return None 

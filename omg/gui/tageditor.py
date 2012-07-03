@@ -67,7 +67,7 @@ class TagEditorDock(QtGui.QDockWidget):
     def _handleSelectionChanged(self,nodeSelection):
         """React to changes to the global selection: Load the elements of the selected wrappers
         into the TagEditorWidget."""
-        if not nodeSelection.hasWrappers():
+        if not nodeSelection.hasElements():
             return
         elements = list(nodeSelection.elements(recursive=self.loadRecursively))
         self.editorWidget.setElements(nodeSelection.level,elements)
@@ -575,7 +575,7 @@ class RecordDialog(QtGui.QDialog):
         """Return a record with the data from the dialog."""
         allElements = self.elementsBox.model().getItems()
         return tageditormodel.Record(self.typeEditor.getTag(),self.valueEditor.getValue(),
-                                     allElements,self.getSelectedElements())
+                                     allElements,self._getSelectedElements())
 
     def _getSelectedElements(self):
         """Return the elements selected for the record."""
