@@ -44,8 +44,9 @@ class ElementGetError(RuntimeError):
 
 
 class ConsistencyError(RuntimeError):
-    """Error signaling a consistency violation of the element data."""
+    """Error signaling a consistency violation of element data."""
     pass
+
 
 class ElementChangedEvent(ChangeEvent):
     #TODO comment
@@ -57,6 +58,7 @@ class ElementChangedEvent(ChangeEvent):
         if contentIds is None:
             self.contentIds = []
         else: self.contentIds = contentIds
+
 
 class FileCreateDeleteEvent(ElementChangedEvent):
     """Special event for creation and/or deletion of files in the database. Has
@@ -70,11 +72,13 @@ class FileCreateDeleteEvent(ElementChangedEvent):
         self.deleted = deleted if deleted is not None else []
         self.disk = disk
 
+
 class FileRenameEvent(ElementChangedEvent):
     """Event indicating that files have been renamed on disk."""
     def __init__(self, renamings):
         super().__init__()
         self.renamings = renamings
+
 
 class Level(QtCore.QObject):
     #TODO comment
@@ -103,8 +107,7 @@ class Level(QtCore.QObject):
         return self.elements[param]
     
     def getFromIds(self,ids):
-        """Load all elements given by the list of ids *ids* into this level (do nothing for elements which
-        are already loaded."""
+        """Load all elements given by the list of ids *ids* into this level and return them."""
         notFound = []
         for id in ids:
             if id not in self.elements:
@@ -240,7 +243,7 @@ class Level(QtCore.QObject):
             return set.union(set((id,)), *[self.children(cid) for cid in self.get(id).contents.ids])
     
     def subLevel(self, ids, name):
-        """Return a new level containing copies of the elements with given *ids*, named *name*."""
+        """Return a new level containing copies of the elements with the given *ids* and named *name*."""
         level = Level(name, self)
         for id in ids:
             level.getFromIds(self.children(id))
@@ -308,7 +311,7 @@ class RealLevel(Level):
         # implementation of loadIntoChild
         self.parent = self
     
-    def loadIntoChild(self,ids,child, askOnNewTags = True):
+    def loadIntoChild(self,ids,child):
         notFound = []
         for id in ids:
             if id in self.elements:
@@ -321,7 +324,7 @@ class RealLevel(Level):
             if len(positiveIds) > 0:
                 self.loadFromDB(positiveIds,child)
             if len(paths) > 0:
-                self.loadFromFileSystem(paths,child,askOnNewTags)
+                self.loadFromFileSystem(paths,child)
             
     def loadFromDB(self,idList,level):
         #TODO: comment
@@ -387,7 +390,7 @@ class RealLevel(Level):
             id,flagId = row
             level.elements[id].flags.append(flags.get(flagId))
     
-    def loadFromFileSystem(self,paths,level, askOnNewTags = True):
+    def loadFromFileSystem(self,paths,level):
         #TODO: comment
         for path in paths:
             rpath = utils.relPath(path)

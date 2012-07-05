@@ -187,11 +187,6 @@ class TagTypeBox(QtGui.QStackedWidget):
         self.box.setInsertPolicy(QtGui.QComboBox.NoInsert)
 
         self._createItems()
-        
-        if not defaultTag.isInDB():
-            # _createItems will select the correct tag, if it is in the DB but can't help if it is an
-            # external tag.
-            self.box.setEditText(defaultTag.title)
 
         if editable:
             self.box.editingFinished.connect(self._handleEditingFinished)
@@ -210,6 +205,10 @@ class TagTypeBox(QtGui.QStackedWidget):
                 self.box.setCurrentIndex(self.box.count()-1)
                 
         if not self._tag.isInDB():
+            # _createItems will select the correct tag, if it is in the DB but can't help if it is an
+            # external tag.
+            self.box.setEditText(defaultTag.title)
+                        
             self.box.insertSeparator(self.box.count())
             self.box.addItem(self.tr("Add tag to DB..."))
                 
