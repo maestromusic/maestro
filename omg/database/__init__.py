@@ -413,7 +413,7 @@ def idFromValue(tagSpec,value,insert=False):
 
     # Look up id
     try:
-        if type == 'mysql':
+        if type == 'mysql' and tag.type in (tagsModule.TYPE_VARCHAR,tagsModule.TYPE_TEXT):
             # Compare exactly (using binary collation)
             q = "SELECT id FROM {}values_{} WHERE tag_id = ? AND value COLLATE utf8_bin = ?"\
                  .format(prefix,tag.type.name)
