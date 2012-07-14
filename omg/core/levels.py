@@ -595,7 +595,11 @@ class RealLevel(Level):
         if emitEvent:
             self.emitEvent(ids)
             
-
+    def _setData(self,element,type,data):
+        # Currently this is not used
+        raise NotImplementedError()
+    
+    
 def idFromPath(path):
     """Return the id for the given path. For elements in the database this is a positive number. Otherwise
     the temporary id is returned or a new one is created."""

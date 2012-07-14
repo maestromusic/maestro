@@ -21,14 +21,15 @@ import os.path, functools
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from ...core import commands
+from ...core import commands, covers
 from ...core.elements import Element
 from ...gui import treeactions
 
 
-coverProviderClasses = []
-
 BIG_COVER_SIZE = 400
+AVAILABLE_COVER_SIZE = 100
+SMALL_COVER_SIZE = 40
+
 
 def enable():
     from omg.gui import editor, browser
@@ -67,7 +68,7 @@ class DummyProviderClass(QtCore.QObject):
     def hasFinished(self,element):
         return element in self._finished
     
-coverProviderClasses.append(DummyProviderClass)
+covers.providerClasses.append(DummyProviderClass)
 
     
 class CoverAction(treeactions.TreeAction):
@@ -97,34 +98,95 @@ class Cover:
         else: self.pixmap = QtGui.QPixmap(path)
             
 
-class CoverDialog(QtGui.QDialog):
-    def __init__(self,parent,level,elids):
-        super().__init__(parent)
-        self.setWindowTitle(self.tr("Edit covers"))
-        self.stack = QtGui.QUndoStack()
-        self.level = level.subLevel(elids,"coverdialog")
+class CoverDialogModel(QtCore.QObject):
+    providerStatusChanged = QtCore.pyqtSignal()
+    availableCoversChanged = QtCore.pyqtSignal()
+    currentCoverChanged = QtCore.pyqtSignal()
+    
+    def __init__(self,stack,level,elids):
+        super().__init__()
+        self.stack = stack
+        self.level = level
         self.level.changed.connect(self._handleLevelChanged)
-        
-        self.elements = [self.level.get(id) for id in elids]
+        self.elements = level.getFromIds(elids)
+        self.currentElement = self.elements[0]
+                                 
+        # Initialize available covers        
         self.availableCovers = {}
-        self.coverProviders = []
-        self.coverProviderButtons = {}
-        
         for element in self.elements:
             self.availableCovers[element] = []
             if element.hasCover():
                 self.availableCovers[element].append(Cover(element.getCoverPath()))
+                
+        # Initialize cover providers
+        self.coverProviders = []
+        for providerClass in covers.providerClasses:
+            coverProvider = providerClass()
+            coverProvider.finished.connect(self._handleProviderFinished)
+            self.coverProviders.append(coverProvider)
+    
+    def startFetchingCovers(self):
+        elementsWithoutCover = [element for element in self.elements if not element.hasCover()]
+        if len(elementsWithoutCover) > 0:
+            for coverProvider in self.coverProviders:
+                coverProvider.fetch(elementsWithoutCover)
+            
+    def _handleProviderFinished(self,coverDict):
+        if self.currentElement in coverDict:
+            self.providerStatusChanged.emit()
+        self.addAvailableCovers(coverDict)
+                
+    def addAvailableCovers(self,coverDict):
+        for element,covers in coverDict.items():
+            self.availableCovers[element].extend(covers)
+        if self.currentElement in coverDict:
+            self.availableCoversChanged.emit()
+         
+    def setElement(self,element):
+        if element != self.currentElement:
+            self.currentElement = element
+            self.currentCoverChanged.emit()
+            self.availableCoversChanged.emit()
+            self.providerStatusChanged.emit()
+    
+    def setCover(self,cover):
+        if cover.path is not None:
+            if cover.path != self.currentElement.getCoverPath():
+                self.level.setCover(self.stack,self.currentElement,cover.path)
+        else:
+            self.level.setCover(self.stack,self.currentElement,cover.pixmap)
+            cover.path = self.currentElement.getCoverPath()
         
+    def removeCover(self):
+        self.level.setCover(self.stack,self.currentElement,None)
+            
+    def _handleLevelChanged(self,event):               
+        if self.currentElement.id in event.dataIds:
+            self.currentCoverChanged.emit()
+            self.availableCoversChanged.emit()
+        
+        
+class CoverDialog(QtGui.QDialog):
+    def __init__(self,parent,level,elids):
+        super().__init__(parent)
+        self.setWindowTitle(self.tr("Edit covers"))
+        
+        level = level.subLevel(elids,"coverdialog")
+        self.model = CoverDialogModel(QtGui.QUndoStack(),level,elids)
+        self.model.providerStatusChanged.connect(self._handleProviderStatusChanged)
+        self.model.availableCoversChanged.connect(self._fillAvailableCovers)
+        self.model.currentCoverChanged.connect(self._handleCurrentCoverChanged)
+        level.changed.connect(self._handleLevelChanged)
+                
         style = QtGui.QApplication.style()
         
         self.setLayout(QtGui.QVBoxLayout())
         layout = QtGui.QHBoxLayout()
         self.layout().addLayout(layout)
         
-        
         self.elementList = QtGui.QListWidget()
-        self.elementList.setIconSize(QtCore.QSize(40,40))
-        self.elementList.currentItemChanged.connect(self._handleCurrentElementChanged)
+        self.elementList.setIconSize(QtCore.QSize(SMALL_COVER_SIZE,SMALL_COVER_SIZE))
+        self.elementList.currentItemChanged.connect(self._handleElementSelected)
         layout.addWidget(self.elementList)
         
         rightLayout = QtGui.QVBoxLayout()
@@ -148,28 +210,25 @@ class CoverDialog(QtGui.QDialog):
         openFromURLButton = QtGui.QPushButton(self.tr("Open from URL..."))
         coverButtonLayout.addWidget(openFromURLButton)
         
-        for coverProviderClass in coverProviderClasses:
-            coverProvider = coverProviderClass()
-            coverProvider.finished.connect(functools.partial(self._handleCoverProviderFinished,coverProvider))
-            self.coverProviders.append(coverProvider)
-            
-            button = QtGui.QPushButton(self.tr("Fetch from {}").format(coverProviderClass.name()))
-            if coverProviderClass.icon() is not None:
-                button.setIcon(coverProviderClass.icon())
-            button.clicked.connect(functools.partial(self._handleCoverProviderButton,coverProvider))
+        self.providerButtons = {}
+        for coverProvider in self.model.coverProviders:
+            button = QtGui.QPushButton(self.tr("Fetch from {}").format(coverProvider.name()))
+            if coverProvider.icon() is not None:
+                button.setIcon(coverProvider.icon())
+            button.clicked.connect(functools.partial(self._handleProviderButton,coverProvider))
+            self.providerButtons[coverProvider] = button
             coverButtonLayout.addWidget(button)
-            self.coverProviderButtons[coverProvider] = button
             
         coverButtonLayout.addStretch()
         
         self.removeCoverButton = QtGui.QPushButton(self.tr("Remove cover"))
-        self.removeCoverButton.clicked.connect(self._handleRemoveButton)
+        self.removeCoverButton.clicked.connect(self.model.removeCover)
         coverButtonLayout.addWidget(self.removeCoverButton)
             
         self.coverList = QtGui.QListWidget()
         self.coverList.setFlow(QtGui.QListView.LeftToRight)
-        self.coverList.setIconSize(QtCore.QSize(100,100))
-        self.coverList.currentItemChanged.connect(self._handleCurrentCoverChanged)
+        self.coverList.setIconSize(QtCore.QSize(AVAILABLE_COVER_SIZE,AVAILABLE_COVER_SIZE))
+        self.coverList.itemSelectionChanged.connect(self._handleCoverSelected)
         rightLayout.addWidget(self.coverList)
         
         rightLayout.addStretch()
@@ -179,13 +238,13 @@ class CoverDialog(QtGui.QDialog):
         self.layout().addLayout(buttonLayout)
         
         undoButton = QtGui.QPushButton(self.tr("Undo"))
-        undoButton.clicked.connect(self.stack.undo)
-        self.stack.canUndoChanged.connect(undoButton.setEnabled)
+        undoButton.clicked.connect(self.model.stack.undo)
+        self.model.stack.canUndoChanged.connect(undoButton.setEnabled)
         undoButton.setEnabled(False)
         buttonLayout.addWidget(undoButton)
         redoButton = QtGui.QPushButton(self.tr("Redo"))
-        redoButton.clicked.connect(self.stack.redo)
-        self.stack.canRedoChanged.connect(redoButton.setEnabled)
+        redoButton.clicked.connect(self.model.stack.redo)
+        self.model.stack.canRedoChanged.connect(redoButton.setEnabled)
         redoButton.setEnabled(False)
         buttonLayout.addWidget(redoButton)
         
@@ -205,35 +264,29 @@ class CoverDialog(QtGui.QDialog):
         buttonLayout.addWidget(cancelButton)
         buttonLayout.addWidget(commitButton)
         
-        self.currentElement = None
-        self._fillElementsList()
-        self.elementList.setCurrentItem(self.elementList.item(0)) # will call setElement
-        self._startFetchingCovers()
         
-    def _fillElementsList(self):
-        self.elementList.clear()
-        for element in self.elements:
+        # Fill element list
+        for element in self.model.elements:
             item = QtGui.QListWidgetItem(element.getTitle())
             item.setData(Qt.UserRole,element)
             if element.hasCover():
                 cover = element.getCover()
                 item.setIcon(QtGui.QIcon(cover))
             self.elementList.addItem(item)
-            
-    def setElement(self,element):
-        if element != self.currentElement:
-            self.currentElement = element
-            self._updateLabel()
-            self._fillAvailableCovers()
-            
-            for coverProvider,button in self.coverProviderButtons.items():
-                button.setEnabled(not coverProvider.hasFinished(element))
-                
-            self.removeCoverButton.setEnabled(self.currentElement.hasCover())
+        self.elementList.setCurrentItem(self.elementList.item(0)) # will call setElement
+        
+        self.model.startFetchingCovers()
+        self._fillAvailableCovers()
+        self._handleCurrentCoverChanged()
+        
+    def _handleProviderStatusChanged(self):
+        for provider,button in self.providerButtons.items():
+            button.setEnabled(not provider.hasFinished(self.model.currentElement))
     
     def _fillAvailableCovers(self):
+        print("_fillAvailableCovers")
         self.coverList.clear()
-        for cover in self.availableCovers[self.currentElement]:
+        for cover in self.model.availableCovers[self.model.currentElement]:
             pixmap = cover.pixmap
             item = QtGui.QListWidgetItem("{}x{}".format(pixmap.width(),pixmap.height()))
             item.setIcon(QtGui.QIcon(pixmap))
@@ -241,76 +294,41 @@ class CoverDialog(QtGui.QDialog):
             if cover.path is not None:
                 item.setData(Qt.ToolTipRole,cover.path)
             self.coverList.addItem(item)
-            if cover.path is not None and cover.path == self.currentElement.getCoverPath():
-                #self.coverList.setCurrentItem(item)
-                pass #TODO
+            if cover.path is not None and cover.path == self.model.currentElement.getCoverPath():
+                item.setSelected(True)
+                self.coverList.setCurrentItem(item)
     
-    def _updateLabel(self):
-        element = self.currentElement
+    def _handleCurrentCoverChanged(self):
+        #print("_handleCurrentCoverChanged")
+        element = self.model.currentElement
         if element.hasCover():
             pixmap = element.getCover()
             if pixmap.width() > BIG_COVER_SIZE or pixmap.height() > BIG_COVER_SIZE:
-                pixmap = pixmap.scaled(400,400,transformMode=Qt.SmoothTransform)
+                pixmap = pixmap.scaled(BIG_COVER_SIZE,BIG_COVER_SIZE,transformMode=Qt.SmoothTransform)
             self.label.setPixmap(pixmap)
         else: self.label.setPixmap(QtGui.QPixmap())
         
-    def addAvailableCovers(self,coverDict):
-        for element,covers in coverDict.items():
-            self.availableCovers[element].extend(covers)
-            if element == self.currentElement:
-                self._fillAvailableCovers()
+        for i in range(self.coverList.count()):
+            item = self.coverList.item(i)
+            cover = item.data(Qt.UserRole)
+            if element.hasCover() and element.getCoverPath() == cover.path:
+                item.setSelected(True)
+                self.coverList.setCurrentItem(item)
+            else: item.setSelected(False)
+            
+        self.removeCoverButton.setEnabled(element.hasCover())
+    
+    def _handleElementSelected(self,current,previous):
+        self.model.setElement(current.data(Qt.UserRole))
                 
-    def _handleCoverProviderFinished(self,provider,coverDict):
-        if self.currentElement in coverDict:
-            self.coverProviderButtons[provider].setEnabled(False)
-        self.addAvailableCovers(coverDict)
+    def _handleCoverSelected(self):
+        selectedItems = self.coverList.selectedItems()
+        print("_handleCoverSelected {}".format([item.data(Qt.UserRole).path for item in selectedItems]))
+        if len(selectedItems) == 0:
+            return # This happens due to self.coverList.clear in _fillAvailableCovers
+        cover = selectedItems[0].data(Qt.UserRole)
+        self.model.setCover(cover)
             
-    def _handleCurrentElementChanged(self,current,previous):
-        self.setElement(current.data(Qt.UserRole))
-        
-    def _handleCurrentCoverChanged(self,current,previous):
-        if current is None:
-            return
-        cover = current.data(Qt.UserRole)
-        print("_handleCurrentCoverChanged: {}".format(cover.path))
-        if cover.path is None: # only a pixmap is contained
-            self.level.setCover(self.stack,self.currentElement,cover.pixmap)
-            cover.path = self.currentElement.getCoverPath()
-            current.setData(Qt.ToolTipRole,cover.path)
-        elif cover.path != self.currentElement.getCoverPath():
-            self.level.setCover(self.stack,self.currentElement,cover.path)
-            
-    def _startFetchingCovers(self):
-        elementsWithoutCover = [element for element in self.elements if not element.hasCover()]
-        if len(elementsWithoutCover) > 0:
-            for coverProvider in self.coverProviders:
-                coverProvider.fetch(elementsWithoutCover)
-            
-    def _handleLevelChanged(self,event):
-        for id in event.dataIds:
-            element = self.level.get(id)
-            for i in range(self.elementList.count()):
-                item = self.elementList.item(i)
-                if item.data(Qt.UserRole) == element:
-                    if element.hasCover():
-                        item.setIcon(QtGui.QIcon(element.getCover()))
-                    else: item.setIcon(QtGui.QIcon())
-                    break
-                
-        if self.currentElement.id in event.dataIds:
-            self._updateLabel()
-            if self.currentElement.getCoverPath() is None:
-                print("Remove current item")
-                self.coverList.setCurrentRow(-1)
-            else:
-                for i in range(self.coverList.count()):
-                    item = self.coverList.item(i)
-                    if item.data(Qt.UserRole).path == self.currentElement.getCoverPath():
-                        print("Set current item {}".format(i))
-                        #TODOself.coverList.setCurrentItem(item)
-                        break
-            self.removeCoverButton.setEnabled(self.currentElement.hasCover())
-        
     def _handleOpenFromFile(self):
         fileName = QtGui.QFileDialog.getOpenFileName(
                                                 self,
@@ -325,14 +343,19 @@ class CoverDialog(QtGui.QDialog):
             QtGui.QMessageBox(QtGui.QMessageBox.Warning,self.tr("Failed to open the file"),
                               self.tr("The file could not be opened."),QtGui.QMessageBox.Ok,self).exec_()
         else:
-            self.level.setCover(self.stack,self.currentElement,pixmap)
-            cover = Cover(path=self.currentElement.getCoverPath())
-            self.addAvailableCovers({self.currentElement: [cover]})
+            cover = Cover(pixmap=pixmap)
+            self.model.setCover(cover)
+            self.model.addAvailableCovers({self.model.currentElement: [cover]})
         
-    def _handleCoverProviderButton(self,coverProvider):
-        coverProvider.fetch([self.currentElement])
+    def _handleProviderButton(self,coverProvider):
+        coverProvider.fetch([self.model.currentElement])
         
-    def _handleRemoveButton(self):
-        self.level.setCover(self.stack,self.currentElement,None)
-        
-        
+    def _handleLevelChanged(self,event):
+        for i in range(self.elementList.count()):
+            item = self.elementList.item(i)
+            element = item.data(Qt.UserRole)
+            if element.id in event.dataIds:
+                if element.hasCover():
+                    item.setIcon(QtGui.QIcon(element.getCover()))
+                else: item.setIcon(QtGui.QIcon())
+                

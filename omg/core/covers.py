@@ -26,6 +26,11 @@ from . import tags
 
 COVER_DIR = None
 
+
+#TODO documentation
+providerClasses = []
+
+
 cacheSizes = [80,100]
 _coversToDelete = set()
 
