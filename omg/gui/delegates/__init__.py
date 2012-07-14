@@ -79,10 +79,10 @@ class StandardDelegate(AbstractDelegate):
                 self.newRow()
             
         # Cover
-        #if element.hasCover():
-        #    coverSize = self.config.options['coverSize'].value
-        #    self.addLeft(CoverItem(element.getCover(coverSize),coverSize))
-         #   availableWidth -= coverSize + self.hSpace
+        if element.hasCover():
+            coverSize = self.config.options['coverSize'].value
+            self.addLeft(ImageItem(element.getCover(coverSize)))
+            availableWidth -= coverSize + self.hSpace
         
         # Title and Major
         preTitleItem = self.getPreTitleItem(wrapper)

@@ -80,6 +80,24 @@ class FileRenameEvent(ElementChangedEvent):
         self.renamings = renamings
 
 
+class DataUndoCommand(QtGui.QUndoCommand):
+    def __init__(self,level,element,type,new):
+        self.level = level
+        self.element = element
+        self.type = type
+        if type in element.data:
+            self.old = element.data[type]
+        else: self.old = None
+        self.new = new
+        assert isinstance(self.old,tuple) and isinstance(self.new,tuple)
+
+    def redo(self):
+        self.level._setData(self.element,self.type,self.new)
+        
+    def undo(self):
+        self.level._setData(self.element,self.type,self.old)
+        
+    
 class Level(QtCore.QObject):
     #TODO comment
     changed = QtCore.pyqtSignal(ChangeEvent)
@@ -181,7 +199,52 @@ class Level(QtCore.QObject):
             element.flags.remove(flag)
         if emitEvent:
             self.emitEvent([element.id for element in elements])
+        
+    def addData(self,stack,element,type,*data):
+        if type not in element.data:
+            newData = data
+        else: newData = element.data[type] + data
+        stack.push(DataUndoCommand(self,element,type,newData))
+
+    def _setData(self,element,type,data):
+        assert data is None or isinstance(data,tuple)
+        print("_setData {}".format(data))
+        if data is not None and len(data) > 0:
+            element.data[type] = data
+        elif type in element.data:
+            del element.data[type]
+        self.emitEvent([element.id])
+    
+#    def insertData(self,elements,type,pos,*data):
+#        if pos == 0:
+#            self.addData(elements,type,*data)
+#        else:
+#            # Assume the data[type] exists already
+#            for element in elements:
+#                element.data[type][pos:pos] = data
+#        self.emitEvent([element.id for element in elements])
+#        
+#    def removeData(self,elements,type,*data):
+#        for element in elements:
+#            for d in data:
+#                element.data[type].remove(d)
+#                if len(element.data[type]) == 0:
+#                    del element.data[type]
+#        self.emitEvent([element.id for element in elements])
+    
+#    def setData(self,elements,type,*data):
+#        for element in elements:
+#            if len(data) > 0:
+#                element.data[type] = list(data)
+#            elif type in element.data:
+#                del elment.data[type]  
+#        self.emitEvent([element.id for element in elements])
+        
+    def setCover(self,stack,element,coverOrPath):
+        from . import covers
+        stack.push(covers.CoverUndoCommand(self,element,coverOrPath))
             
+        
     def changeId(self, old, new):
         """Change the id of some element from *old* to *new*. This should only be called from within
         appropriate UndoCommands, and only if (old in self) is True. Takes care of contents and parents, too.
@@ -389,6 +452,34 @@ class RealLevel(Level):
         for row in result:
             id,flagId = row
             level.elements[id].flags.append(flags.get(flagId))
+        
+        # data
+        result = db.query("""
+                SELECT element_id,type,data
+                FROM {}data
+                WHERE element_id IN ({})
+                ORDER BY element_id,type,sort
+                """.format(db.prefix,idList))
+        
+        # This is a bit complicated because the data should be stored in tuples, not lists
+        # Changing the lists would break undo/redo
+        current = None
+        buffer = []
+        for id,type,data in result:
+            if current is None:
+                current = (id,type)
+            elif current != (id,type):
+                level.elements[current[0]].data[current[1]] = tuple(buffer)
+                current = (id,type)
+                buffer = []
+                
+            element = level.elements[id]
+            if element.data is None:
+                element.data = {}
+            buffer.append(data)
+        if current is not None:
+            level.elements[current[0]].data[current[1]] = tuple(buffer)
+            
     
     def loadFromFileSystem(self,paths,level):
         #TODO: comment

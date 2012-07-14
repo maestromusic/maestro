@@ -357,22 +357,20 @@ class TextItem(DelegateItem):
         return bRect.width(),max(bRect.height(),self.minHeight)
     
     
-class CoverItem(DelegateItem):
-    """A CoverItem displays a single cover in the given size (the cover is always quadratic)."""
-    def __init__(self,coverPath,size):
-        self.coverPath = coverPath
-        self.size = size
+class ImageItem(DelegateItem):
+    """A ImageItem displays a single pixmap."""
+    def __init__(self,pixmap):
+        self.pixmap = pixmap
 
     def sizeHint(self,delegate,availableWidth=None):
-        return self.size,self.size
+        return self.pixmap.width(),self.pixmap.height()
         
     def paint(self,delegate,rect,align=LEFT):
         if align == RIGHT:
-            coverLeft = rect.x() + rect.width() - self.size
-        else: coverLeft = rect.x()
-        delegate.painter.drawPixmap(QtCore.QRect(coverLeft,rect.y(),self.size,self.size),
-                                    QtGui.QPixmap(self.coverPath))
-        return self.size,self.size
+            imageLeft = rect.x() + rect.width() - self.pixmap.width()
+        else: imageLeft = rect.x()
+        delegate.painter.drawPixmap(imageLeft,rect.y(),self.pixmap.width(),self.pixmap.height(),self.pixmap)
+        return self.pixmap.width(),self.pixmap.height()
 
 
 class ColorBarItem(DelegateItem):
