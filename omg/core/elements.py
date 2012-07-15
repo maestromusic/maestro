@@ -21,7 +21,7 @@ import os.path, bisect
 from PyQt4 import QtCore
 translate = QtCore.QCoreApplication.translate
 
-from . import tags as tagsModule, covers
+from . import tags as tagsModule
 from .. import config
 
 class Element:
@@ -77,6 +77,7 @@ class Element:
         paths = self.getData('COVER')
         if paths is None:
             return None
+        from . import covers
         return covers.get(paths[0],size)
     
     def getCoverPath(self):
@@ -85,7 +86,9 @@ class Element:
             return None
         if os.path.isabs(paths[0]):
             return paths[0]
-        else: return os.path.join(covers.COVER_DIR,paths[0])
+        else:
+            from . import covers
+            return os.path.join(covers.COVER_DIR,paths[0])
         
     def inParentLevel(self):
         if self.level.parent is None:

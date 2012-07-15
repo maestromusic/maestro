@@ -23,18 +23,27 @@ from PyQt4.QtCore import Qt
 
 from .. import config
 from . import tags
+from .elements import Element
 
 COVER_DIR = None
 
+# Maximum length of an encoded filename. Since the names aren't really important there is no need to get
+# the real limit which depends on the filesystem and operating system, of course.
+# Actually filenames may be a little bit longer due to the suffixes that are used to avoid collisions.
+MAX_FILENAME_LENGTH = 80
 
-#TODO documentation
+
 providerClasses = []
 
-
+#TODO make editable
 cacheSizes = [80,100]
-_coversToDelete = set()
+
+#TODO: make this a config variable
+extension = '.png'
+
 
 def init():
+    """Initialize the cover framework."""
     global COVER_DIR
     coverPath = config.options.misc.cover_path
     if os.path.isabs(coverPath):
@@ -46,12 +55,17 @@ def init():
     
     
 def shutdown():
-    # Delete unused covers
-    print("COVERS TO DELETE: {}".format(_coversToDelete))
-    #TODO: remember deleting cached files
+    """Shut down the cover framework. Occasionally this will delete superfluous cover files from the 
+    internal folder."""
+    # TODO: From time to time delete unused covers
+    pass
     
     
 def get(path,size=None):
+    """Return a QPixmap with the cover from the specified path which can be absolute or relative to the
+    cover folder. If *size* is given, the result will be scaled to have *size* for width and height.
+    If *size* is one of the cached sizes, this method will use the cache to skip the scaling.
+    """ 
     if not os.path.isabs(path):
         path = os.path.join(COVER_DIR,path)
     if size in cacheSizes:
@@ -67,6 +81,26 @@ def get(path,size=None):
     return pixmap
 
 
+class AbstractCoverProvider(QtCore.QObject):
+    loaded = QtCore.pyqtSignal(Element,QtGui.QPixmap)
+    error = QtCore.pyqtSignal(str)
+    finished = QtCore.pyqtSignal(Element)
+            
+    @classmethod
+    def name(cls):
+        """Return a name that represents this provider class. The name should be translated."""
+        raise NotImplementedError()
+    
+    @classmethod
+    def icon(self):
+        """Return an icon that represents this provider class."""
+        raise NotImplementedError()
+    
+    def fetch(self,elements):
+        """Start fetching covers for the given elements."""
+        raise NotImplementedError()
+
+
 class CoverUndoCommand(QtGui.QUndoCommand):
     def __init__(self,level,element,coverOrPath):
         super().__init__()
@@ -74,10 +108,10 @@ class CoverUndoCommand(QtGui.QUndoCommand):
         self.element = element
         if isinstance(coverOrPath,QtGui.QPixmap):
             pixmap = coverOrPath
-            self.newPath = _makeFilePath('large',element,allowUnicode=True)
+            self.newPath = _makeFilePath(element)
             os.makedirs(os.path.dirname(self.newPath),exist_ok=True)
             if not pixmap.save(self.newPath):
-                self.newPath = _makeFilePath('large',element,allowUnicode=False)
+                self.newPath = _makeFilePath(element,forceAscii=True)
                 pixmap.save(self.newPath) #TODO do something if this goes wrong
         elif isinstance(coverOrPath,str) or coverOrPath is None:
             self.newPath = coverOrPath
@@ -109,14 +143,21 @@ class CoverUndoCommand(QtGui.QUndoCommand):
 
 
 def _cachePath(path,size):
-    # Compute filename of cached file
-    # We'd like to use the same filenames as in the directory 'large'. But then external files might lead
-    # to collisions. So let's use hashes.
+    """Return the filename that is used for the cached versions of the cover at *path*. Of course, it would
+    be best to use the same filenames as in *path*. But then external files might collide with internal ones.
+    Hence this method uses hashes.
+    """
     md5 = hashlib.md5(path).digest()
-    return os.path.join(COVER_DIR,str(size),md5)
+    return os.path.join(COVER_DIR,'cache_{}'.format(size),md5)
     
         
-def _makeFilePath(folder,element,allowUnicode):
+def _makeFilePath(element,forceAscii=False):
+    """Return an absolute file path that can be used to save the large cover of the given element. The 
+    path should be based on the element's artist-tags and title-tags. If *forceAscii* is True, the result
+    will only contain ASCII characters. Otherwise the result might contain all unicode letters, but
+    not all unicode characters.
+    """ 
+    # Concatenate all artist-tags and all title-tags
     if tags.get("artist") in element.tags:
         fileName = "-".join(element.tags[tags.get("artist")])+' - '
     else: fileName = ''
@@ -127,24 +168,32 @@ def _makeFilePath(folder,element,allowUnicode):
         # before a commit, so the id will be negative and change soon.
         fileName += 'notitle'
     
+    # Handle unicode characters
     if not allowUnicode:
         # How to automatically replace characters by their closest ASCII character?
         # unicodedata.normalize('NFKD') represents characters like e.g. 'á' in its decomposed form '´a'.
         # Since the accent is a 'combining accent' it will be combined with the letter automatically and
         # you won't see the difference unless you check the length of the string.
-        # encode('ascii','ignore') throws all those scary characters out.
+        # encode('ascii','ignore') throws all those scary characters away.
         import unicodedata
         fileName = unicodedata.normalize('NFKD',fileName).encode('ascii','ignore').decode()
-        
+    
+    # Remove weird characters and weird use of whitespace
     fileName = re.sub('[^\w\s_-]','',fileName).strip()
     fileName = re.sub('\s+',' ',fileName)
-
-    path = os.path.join(COVER_DIR,folder,fileName)
-    if not os.path.exists(path+'.png'):
-        return path+'.png'
+    
+    # Handle filenames that are too long
+    if len(fileName.encoded()) > MAX_FILENAME_LENGTH-len(extension):
+        # ignore errors that may arise from cropping the string inside a multibyte character
+        fileName = fileName.encoded()[:MAX_FILENAME_LENGTH-len(extension)].decode('utf-8','ignore')
+        
+    # Append extension and a suffix to make the filename unique
+    path = os.path.join(COVER_DIR,'large',fileName)
+    if not os.path.exists(path+extension):
+        return path+extension
     else:
         i = 1
-        while os.path.exists('{}_{}.png'.format(path,i)):
+        while os.path.exists('{}_{}{}'.format(path,i,extension)):
             i += 1
-        return '{}_{}.png'.format(path,i)
+        return '{}_{}{}'.format(path,i,extension)
     
