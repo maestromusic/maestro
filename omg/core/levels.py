@@ -92,10 +92,10 @@ class DataUndoCommand(QtGui.QUndoCommand):
         assert isinstance(self.old,tuple) and isinstance(self.new,tuple)
 
     def redo(self):
-        self.level._setData(self.element,self.type,self.new)
+        self.level._setData(self.type,{self.element: self.new})
         
     def undo(self):
-        self.level._setData(self.element,self.type,self.old)
+        self.level._setData(self.type,{self.element: self.old})
         
     
 class Level(QtCore.QObject):
@@ -200,50 +200,22 @@ class Level(QtCore.QObject):
         if emitEvent:
             self.emitEvent([element.id for element in elements])
         
-    def addData(self,stack,element,type,*data):
-        if type not in element.data:
-            newData = data
-        else: newData = element.data[type] + data
-        stack.push(DataUndoCommand(self,element,type,newData))
-
-    def _setData(self,element,type,data):
-        assert data is None or isinstance(data,tuple)
-        print("_setData {}".format(data))
-        if data is not None and len(data) > 0:
-            element.data[type] = data
-        elif type in element.data:
-            del element.data[type]
-        self.emitEvent([element.id])
-    
-#    def insertData(self,elements,type,pos,*data):
-#        if pos == 0:
-#            self.addData(elements,type,*data)
-#        else:
-#            # Assume the data[type] exists already
-#            for element in elements:
-#                element.data[type][pos:pos] = data
-#        self.emitEvent([element.id for element in elements])
-#        
-#    def removeData(self,elements,type,*data):
-#        for element in elements:
-#            for d in data:
-#                element.data[type].remove(d)
-#                if len(element.data[type]) == 0:
-#                    del element.data[type]
-#        self.emitEvent([element.id for element in elements])
-    
-#    def setData(self,elements,type,*data):
-#        for element in elements:
-#            if len(data) > 0:
-#                element.data[type] = list(data)
-#            elif type in element.data:
-#                del elment.data[type]  
-#        self.emitEvent([element.id for element in elements])
-        
-    def setCover(self,stack,element,coverOrPath):
+    def setCovers(self,stack,coverDict):
+        """Set the covers for one or more elements. Add a command for doing this to *stack*.
+        *coverDict* must be a dict mapping elements to either a cover path or a QPixmap or None.
+        """
         from . import covers
-        stack.push(covers.CoverUndoCommand(self,element,coverOrPath))
-            
+        stack.push(covers.CoverUndoCommand(self,coverDict))
+    
+    def _setData(self,type,elementToData):
+        for element,data in elementToData.items():
+            if data is not None:
+                if isinstance(data,tuple):
+                    element.data[type] = data
+                else: element.data[type] = tuple(data)
+            elif type in element.data:
+                del element.data[type]
+        self.emitEvent([element.id for element in elementToData])
         
     def changeId(self, old, new):
         """Change the id of some element from *old* to *new*. This should only be called from within
@@ -595,10 +567,20 @@ class RealLevel(Level):
         if emitEvent:
             self.emitEvent(ids)
             
-    def _setData(self,element,type,data):
-        # Currently this is not used
-        raise NotImplementedError()
-    
+    def _setData(self,type,elementToData):
+        super()._setData(type,elementToData)
+        values = []
+        for element,data in elementToData.items():
+            if data is not None:
+                values.extend((element.id,type,i,d) for i,d in enumerate(data))
+        db.transaction()
+        db.query("DELETE FROM {}data WHERE type = ? AND element_id IN ({})"
+                 .format(db.prefix,db.csIdList(elementToData.keys())),type)
+        if len(values) > 0:
+            db.multiQuery("INSERT INTO {}data (element_id,type,sort,data) VALUES (?,?,?,?)"
+                          .format(db.prefix),values)
+        db.commit()
+        
     
 def idFromPath(path):
     """Return the id for the given path. For elements in the database this is a positive number. Otherwise

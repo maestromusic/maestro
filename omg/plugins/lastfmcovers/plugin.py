@@ -81,7 +81,6 @@ class LastFMCoverProvider(covers.AbstractCoverProvider):
             url.addQueryItem('album',album)
             url.addQueryItem('api_key',LASTFM_API_KEY)
             urls.append(url)
-            print(url.toString())
         return urls
         
     def _handleNetworkError(self,reply):
@@ -120,7 +119,7 @@ class LastFMCoverProvider(covers.AbstractCoverProvider):
         requests for them.""" 
         try:
             if reply.error() != QtNetwork.QNetworkReply.NoError:
-                # an error occured and has been handled by _handleNetworkError
+                # an error occurred and has been handled by _handleNetworkError
                 return 
             urls = self._getURLsFromXml(reply.readAll())
             for url in urls:
@@ -141,7 +140,7 @@ class LastFMCoverProvider(covers.AbstractCoverProvider):
         from them and emit the loaded-signal."""
         try:
             if reply.error() != QtNetwork.QNetworkReply.NoError:
-                # an error occured and has been handled by _handleNetworkError
+                # an error occurred and has been handled by _handleNetworkError
                 return
             pixmap = QtGui.QPixmap()
             if not pixmap.loadFromData(reply.readAll()):

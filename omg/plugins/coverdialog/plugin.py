@@ -26,7 +26,7 @@ from ...core.elements import Element
 from ...gui import treeactions
 from ... import application
 
-
+# Various cover sizes used in the dialog
 BIG_COVER_SIZE = 400
 AVAILABLE_COVER_SIZE = 100
 SMALL_COVER_SIZE = 40
@@ -40,49 +40,36 @@ def enable():
 def disable():
     editor.EditorTreeView.actionConfig.removeActionDefinition((("plugins", 'covers'),))
     browser.BrowserTreeView.actionConfig.removeActionDefinition((("plugins", 'covers'),))
-
-
-class DummyProvider(covers.AbstractCoverProvider):       
-    @staticmethod
-    def icon():
-        return QtGui.QIcon("/home/martin/temp/beta.png")
-    @staticmethod
-    def name():
-        return "Dummy"
     
-    def fetch(self,elements):
-        self.elements = elements
-        QtCore.QTimer.singleShot(200,self._handleTimer)
-        
-    def _handleTimer(self):
-        for element in self.elements:
-            self.loaded.emit(element,QtGui.QPixmap("/home/martin/Musik/stravinsky.jpg"))
-            self.finished.emit(element)
-    
-#covers.providerClasses.append(DummyProviderClass)
-
     
 class CoverAction(treeactions.TreeAction):
-    """Action to rename files in a container according to the tags and the container structure."""
-    
+    """Action to open the CoverDialog with the currently selected elements."""
     def __init__(self, parent):
         super().__init__(parent)
-        self.setText(self.tr('Edit covers...'))
+        self.setText(self.tr("Edit covers..."))
     
     def initialize(self):
         self.setEnabled(self.parent().nodeSelection.hasWrappers())
     
     def doAction(self):
-        dialog = CoverDialog(self.parent(), self.level(),
-                              [wrap.element.id for wrap in self.parent().nodeSelection.wrappers()])
-        dialog.exec_()
-        if dialog.result() == dialog.Accepted:
-            application.stack.push(commands.CommitCommand(dialog.level,dialog.ids,self.tr("Edit covers")))
+        CoverDialog(self.parent(), self.level(),
+                            [wrap.element.id for wrap in self.parent().nodeSelection.wrappers()]).exec_()
             
             
 class Cover:
+    """The core stores covers simply by their paths (because it uses the data-table). This does not work
+    in the CoverDialog since downloaded covers temporarily do not have a path. Thus this class is used
+    which stores
+    
+        - a path (if present)
+        - a pixmap
+        - optionally a text
+        
+    Either *path* or *pixmap* must be given. If only *path* is given, the pixmap is loaded from that path.
+    """
     def __init__(self,path=None,pixmap=None,text=None):
-        assert path is not None or pixmap is not None
+        if path is None and pixmap is None:
+            raise ValueError("Either path or pixmap must not be None")
         self.path = path
         if pixmap is not None:
             self.pixmap = pixmap
@@ -90,18 +77,19 @@ class Cover:
         self.text = text
         
     def __eq__(self,other):
+        if not isinstance(other,Cover): 
+            return False
         if self.path is not None:
             return self.path == other.path
         else: return self is other
         
     def __ne__(self,other):
-        if self.path is not None:
-            return self.path != other.path
-        else: return self is not other
-        
-            
+        return not self.__eq__(other)
+
 
 class CoverUndoCommand(QtGui.QUndoCommand):
+    """UndoCommand that is internally used by the CoverDialog. It sets the cover of *element* in the
+    CoverDialogModel *model* to *new* (which may be None)."""
     def __init__(self,model,element,new):
         super().__init__()
         self.model = model
@@ -117,10 +105,23 @@ class CoverUndoCommand(QtGui.QUndoCommand):
         
         
 class CoverDialogModel(QtCore.QObject):
+    """Model that is used by the CoverDialog.
+    
+        - *stack* is the QUndoStack used by the dialog
+        - *level* is the level from which the elements are taken
+        - *elids* specifies the elements by their id
+        
+    """
+    
+    # Emitted when the user has selected a different element.
+    currentElementChanged = QtCore.pyqtSignal()
+    # Emitted when the status of a cover provider at the current element has changed.
     providerStatusChanged = QtCore.pyqtSignal()
+    # Emitted when the available covers for the current element have changed
     availableCoversChanged = QtCore.pyqtSignal()
-    currentCoverChanged = QtCore.pyqtSignal()
+    # Emitted when the current cover of an element has changed. The element is passed as argument.
     coverChanged = QtCore.pyqtSignal(Element)
+    # Emitted when an error happens while loading a cover. The argument is an error message.
     error = QtCore.pyqtSignal(str)
     
     def __init__(self,stack,level,elids):
@@ -130,10 +131,10 @@ class CoverDialogModel(QtCore.QObject):
         self.elements = level.getFromIds(elids)
         self.currentElement = self.elements[0]
                                  
-        # Initialize available covers
-        self.availableCovers = {}
-        self.currentCovers = {}
-        self._fetchedCovers = {}
+        # Initialize covers
+        self.availableCovers = {} # element -> list of all available covers (as Cover instances)
+        self.currentCovers = {}   # element -> current cover or None
+        self._fetchedCovers = {}  # element -> list of all covers that have been fetched from all providers
         for element in self.elements:
             self.availableCovers[element] = []
             if element.hasCover():
@@ -152,7 +153,8 @@ class CoverDialogModel(QtCore.QObject):
             self.coverProviders.append(coverProvider)
     
     def startFetchingCovers(self):
-        elementsWithoutCover = [element for element in self.elements if not element.hasCover()]
+        """Start fetching covers from all cover providers for those elements that do not have a cover yet."""
+        elementsWithoutCover = [element for element in self.elements if self.currentCovers[element] is None]
         if len(elementsWithoutCover) > 0:
             for element in elementsWithoutCover:
                 self._fetchedCovers[element] = []
@@ -160,6 +162,7 @@ class CoverDialogModel(QtCore.QObject):
                 coverProvider.fetch(elementsWithoutCover)
             
     def _handleProviderLoaded(self,provider,element,pixmap):
+        """Handle the loaded-signal of cover providers."""
         if element is self.currentElement:
             self.providerStatusChanged.emit()
         cover = Cover(pixmap=pixmap,text=provider.name())
@@ -167,9 +170,11 @@ class CoverDialogModel(QtCore.QObject):
         self.addAvailableCovers({element: [cover]})
     
     def _handleProviderError(self,provider,message):
+        """Handle the error-signal of cover providers."""
         self.error.emit(self.tr("{}: {}").format(provider.name(),message))
         
     def _handleProviderFinished(self,provider,element):
+        """Handle the finished-signal of cover providers."""
         if len(self._fetchedCovers[element]) == 0:
             message = self.tr("Could not fetch any cover for {}").format(element.getTitle())
             self._handleProviderError(provider,message)
@@ -181,37 +186,42 @@ class CoverDialogModel(QtCore.QObject):
                 self._setCover(element,self._fetchedCovers[element][0])
                 
     def addAvailableCovers(self,coverDict):
+        """Add available covers. *coverDict* must map elements to lists of new covers (as instances of
+        Cover)."""
         for element,covers in coverDict.items():
             self.availableCovers[element].extend(covers)
         if self.currentElement in coverDict:
             self.availableCoversChanged.emit()
          
     def setElement(self,element):
+        """Set the current element."""
         if element != self.currentElement:
             self.currentElement = element
-            self.currentCoverChanged.emit()
-            self.availableCoversChanged.emit()
-            self.providerStatusChanged.emit()
+            self.currentElementChanged.emit()
         
     def getCover(self,element):
+        """Return the current cover of *element* (may be None)."""
         return self.currentCovers[element]
     
     def setCover(self,cover):
+        """Set the cover of the current element (undoable)."""
         if cover != self.currentCovers[self.currentElement]:
             command = CoverUndoCommand(self,self.currentElement,cover)
             self.stack.push(command)
     
     def _setCover(self,element,cover):
+        """Set the cover of the given element (not undoable)."""
         if cover != self.currentCovers[element]:
             self.currentCovers[element] = cover
             self.coverChanged.emit(element)
-            if element == self.currentElement:
-                self.currentCoverChanged.emit()
         
     def removeCover(self):
+        """Remove the cover of the current element (undoable)."""
         self.setCover(None)
         
     def reset(self):
+        """Add a command to the dialog's stack that will reset all covers to the state of the underlying
+        level."""
         self.stack.beginMacro(self.tr("Reset"))
         for element in self.elements:
             path = element.getCoverPath()
@@ -224,28 +234,35 @@ class CoverDialogModel(QtCore.QObject):
                 self.stack.push(command)
         
         self.stack.endMacro()
-
-
-class ErrorPanel(QtGui.QTextEdit):
-    def __init__(self):
-        super().__init__()
-        self.setReadOnly(True)
         
-    def add(self,message):
-        self.append(message)
-        if not self.isVisible():
-            self.setVisible(True)
+    def save(self):
+        """Add a command to the application's stack that will save the covers from the dialog to the
+        underlying level."""
+        covers = {}
+        for element in self.elements:
+            cover = self.currentCovers[element]
+            if cover is not None:
+                if cover.path is not None:
+                    cover = cover.path
+                else: cover = cover.pixmap
+            covers[element] = cover
+        
+        self.level.setCovers(application.stack,covers)
         
         
 class CoverDialog(QtGui.QDialog):
+    """A dialog that allows to change covers of some elements on the given level. The elements are specified
+    by their ids in *elids*. The dialog will allow the user to load covers from files, urls or cover
+    providers from the covers-module.
+    """
     def __init__(self,parent,level,elids):
         super().__init__(parent)
         self.setWindowTitle(self.tr("Edit covers"))
         
         self.model = CoverDialogModel(QtGui.QUndoStack(),level,elids)
+        self.model.currentElementChanged.connect(self._handleCurrentElementChanged)
         self.model.providerStatusChanged.connect(self._handleProviderStatusChanged)
         self.model.availableCoversChanged.connect(self._fillAvailableCovers)
-        self.model.currentCoverChanged.connect(self._handleCurrentCoverChanged)
         self.model.coverChanged.connect(self._handleCoverChanged)
                 
         style = QtGui.QApplication.style()
@@ -339,7 +356,7 @@ class CoverDialog(QtGui.QDialog):
         cancelButton.clicked.connect(self.reject)
         commitButton = QtGui.QPushButton(style.standardIcon(QtGui.QStyle.SP_DialogSaveButton),
                                          self.tr("OK"))
-        #commitButton.clicked.connect(self._handleCommit)
+        commitButton.clicked.connect(self._handleOkButton)
         
         buttonLayout.addWidget(resetButton)
         buttonLayout.addWidget(cancelButton)
@@ -353,17 +370,13 @@ class CoverDialog(QtGui.QDialog):
             if cover is not None:
                 item.setIcon(QtGui.QIcon(cover.pixmap))
             self.elementList.addItem(item)
-        #self.elementList.setCurrentItem(self.elementList.item(0)) # will call setElement
         
         self.model.startFetchingCovers()
         self._fillAvailableCovers()
-        self._handleCurrentCoverChanged()
-        
-    def _handleProviderStatusChanged(self):
-        for provider,button in self.providerButtons.items():
-            button.setEnabled(self.model.currentElement not in self.model._fetchedCovers)
+        self._updateCoverLabel()
     
     def _fillAvailableCovers(self):
+        """Fill the list of available covers with those of the current element."""
         self.coverList.clear()
         for cover in self.model.availableCovers[self.model.currentElement]:
             pixmap = cover.pixmap
@@ -381,7 +394,17 @@ class CoverDialog(QtGui.QDialog):
                 item.setSelected(True)
                 self.coverList.setCurrentItem(item)
     
+    def _handleCurrentElementChanged(self):
+        """Handle changes of the current element (selected by the user."""
+        # We do not need to update self.elementList, because that list provides the only way to change the
+        # current element and thus is always correct.
+        self._updateCoverLabel()
+        self._fillAvailableCovers()
+        self._handleProviderStatusChanged()
+        self.removeCoverButton.setEnabled(self.model.getCover(self.model.currentElement) is not None)
+        
     def _handleCoverChanged(self,element):
+        """Handle cover changed signals from the model: Update the GUI."""
         for i in range(self.elementList.count()):
             item = self.elementList.item(i)
             if item.data(Qt.UserRole) == element:
@@ -390,8 +413,22 @@ class CoverDialog(QtGui.QDialog):
                     item.setIcon(QtGui.QIcon(cover.pixmap))
                 else: item.setIcon(QtGui.QIcon())
                 break
+        
+        if element == self.model.currentElement:
+            self._updateCoverLabel()
             
-    def _handleCurrentCoverChanged(self):    
+            for i in range(self.coverList.count()):
+                item = self.coverList.item(i)
+                cover = item.data(Qt.UserRole)
+                if cover == self.model.getCover(element):
+                    item.setSelected(True)
+                    self.coverList.setCurrentItem(item)
+                else: item.setSelected(False)
+            
+            self.removeCoverButton.setEnabled(self.model.getCover(element) is not None)
+            
+    def _updateCoverLabel(self):
+        """Let the cover label display the cover of the current element."""
         element = self.model.currentElement
         currentCover = self.model.getCover(element)
         if currentCover is not None:
@@ -401,20 +438,18 @@ class CoverDialog(QtGui.QDialog):
             self.label.setPixmap(pixmap)
         else: self.label.setPixmap(QtGui.QPixmap())
         
-        for i in range(self.coverList.count()):
-            item = self.coverList.item(i)
-            cover = item.data(Qt.UserRole)
-            if cover == currentCover:
-                item.setSelected(True)
-                self.coverList.setCurrentItem(item)
-            else: item.setSelected(False)
-            
-        self.removeCoverButton.setEnabled(element.hasCover())
+    def _handleProviderStatusChanged(self):
+        """Enable/disable the buttons for cover providers depending on whether the cover of the provider
+        has already started (or even finished) to fetch the current element's cover."""
+        for provider,button in self.providerButtons.items():
+            button.setEnabled(self.model.currentElement not in self.model._fetchedCovers)
     
     def _handleElementSelected(self,current,previous):
+        """This is called when the user selects elements in the element list."""
         self.model.setElement(current.data(Qt.UserRole))
                 
     def _handleCoverSelected(self):
+        """This is called when the user selects a cover in the list of available covers."""
         selectedItems = self.coverList.selectedItems()
         if len(selectedItems) == 0:
             return # This happens due to self.coverList.clear in _fillAvailableCovers
@@ -422,6 +457,7 @@ class CoverDialog(QtGui.QDialog):
         self.model.setCover(cover)
             
     def _handleOpenFromFile(self):
+        """Handle the "Open from File..." button."""
         fileName = QtGui.QFileDialog.getOpenFileName(
                                                 self,
                                                 self.tr("Open cover file"),
@@ -440,6 +476,7 @@ class CoverDialog(QtGui.QDialog):
             self.model.addAvailableCovers({self.model.currentElement: [cover]})
         
     def _handleOpenFromUrl(self):
+        """Handle the "Open from URL..." button."""
         url,ok = QtGui.QInputDialog.getText(self,self.tr("Open cover URL"),
                                             self.tr("Please enter the URL of the cover:"))
         if not ok: # user canceled the dialog
@@ -456,7 +493,10 @@ class CoverDialog(QtGui.QDialog):
         reply.error.connect(functools.partial(self._handleURLReplyError,reply))
         
     def _handleURLReplyFinished(self,reply):
+        """This is called when a download request started with the "Open from URL..." button has finished.
+        This is not used for cover providers."""
         if reply.error() != QtNetwork.QNetworkReply.NoError:
+            # an error occurred and has been handled by _handleNetworkError
             return 
         pixmap = QtGui.QPixmap()
         if not pixmap.loadFromData(reply.readAll()):
@@ -469,9 +509,28 @@ class CoverDialog(QtGui.QDialog):
             self.model.addAvailableCovers({self.model.currentElement: [cover]})
 
     def _handleURLReplyError(self,reply,code):
-        QtGui.QMessageBox.warning(self,self.tr("Network error"),
-                                  self.tr("A network error appeared: ")+reply.errorString())
+        """Handle errors from download requests started with the "Open from URL..." button."""
+        self.errorPanel.add(self.tr("A network error appeared: {}").format(reply.errorString()))
                           
     def _handleProviderButton(self,coverProvider):
+        """Handle the button of the given cover provider."""
         coverProvider.fetch([self.model.currentElement])
+        
+    def _handleOkButton(self):
+        """Handle the OK button."""
+        self.model.save()
+        self.accept()
+
+
+class ErrorPanel(QtGui.QTextEdit):
+    """QTextEdit that is used to display error messages from cover providers."""
+    def __init__(self):
+        super().__init__()
+        self.setReadOnly(True)
+        
+    def add(self,message):
+        """Add *message* as new line and make this panel visible."""
+        self.append(message)
+        if not self.isVisible():
+            self.setVisible(True)
                 
