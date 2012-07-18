@@ -153,14 +153,21 @@ class ValueType:
                 return type
         else: raise IndexError("There is no value type with name '{}'.".format(name))
 
-    def valueFromString(self,string):
+    def valueFromString(self, string):
         """Convert a string (which must be valid for this value type) to the preferred representation of
-        values of this type. Actually this method does nothing except converting strings to FlexiDate
+        values of this type. Currently, this method does nothing except converting strings to FlexiDate
         if this is the date-type.
         """
         if self == TYPE_DATE:
             return utils.FlexiDate.strptime(string)
         else: return string
+    
+    def fileFormat(self, value):
+        """Return value as a string suitable for writing to a file. This currently makes a difference only
+        for date tags which are always written as yyyy-mm-dd."""
+        if self == TYPE_DATE:
+            return value.strftime(format = ("{Y:04d}", "{Y:04d}-{m:02d}", "{Y:04d}-{m:02d}-{d:02d}"))
+        return value
     
     def __repr__(self):
         return 'ValueType({})'.format(self.name)
@@ -274,12 +281,18 @@ class Tag:
             return newTag.type.valueFromString(value)
         return self.type.convertValue(newTag.type,value)
      
-    def valueFromString(self,string):
+    def valueFromString(self, string):
         """Get a value for this tag from a string."""
         if self.type is not None:
             return self.type.valueFromString(string)
         else: return string
         
+    def fileFormat(self, string):
+        """Format a value suitable for writing to a file."""
+        if self.type is not None:
+            return self.type.fileFormat(string)
+        return string
+    
     def sqlFormat(self,value):
         """Convert *value* into a string that can be inserted into database queries."""
         return self.type.sqlFormat(value)

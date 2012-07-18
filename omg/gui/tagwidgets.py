@@ -207,7 +207,7 @@ class TagTypeBox(QtGui.QStackedWidget):
         if not self._tag.isInDB():
             # _createItems will select the correct tag, if it is in the DB but can't help if it is an
             # external tag.
-            self.box.setEditText(defaultTag.title)
+            self.box.setEditText(self._tag.title)
                         
             self.box.insertSeparator(self.box.count())
             self.box.addItem(self.tr("Add tag to DB..."))
