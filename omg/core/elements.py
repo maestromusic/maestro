@@ -185,7 +185,7 @@ class File(Element):
         else: self.data = {}
         
     def copy(self):
-        return File(level = self.level,
+        ret = File(level = self.level,
                     id = self.id,
                     path = self.path,
                     length = self.length,
@@ -193,6 +193,11 @@ class File(Element):
                     tags = self.tags.copy(),
                     flags = self.flags[:],
                     data = self.data.copy())
+        if hasattr(self, "fileTags"):
+            ret.fileTags = self.fileTags.copy()
+        if hasattr(self, "filePosition"):
+            ret.filePosition = self.filePosition
+        return ret
     
     def isFile(self):
         return True

@@ -38,16 +38,13 @@ class CommitCommand(QtGui.QUndoCommand):
         super().__init__(text)
         self.level = level
         
-        allIds = set(ids)
-        # add IDs of all children to ensure a consistent commit
-        additionalIds = set()
-        for id in allIds:
-            additionalIds.update(level.children(id))
-        allIds.update(additionalIds)
         
+        # add IDs of all children to ensure a consistent commit
+        ids = self.level.children(ids)
+
         self.real = level.parent is levels.real # a handy shortcut
         if self.real:
-            self.newInDatabase = [ id for id in allIds if id < 0 ]
+            self.newInDatabase = [ id for id in ids if id < 0 ]
             self.realFileChanges = {}
             self.idMap = None # maps tempId -> realId
         else:
@@ -58,7 +55,7 @@ class CommitCommand(QtGui.QUndoCommand):
         self.flagChanges, self.tagChanges, self.contentsChanges, self.majorChanges = {}, {}, {}, {}
         self.pathChanges = {}
         self.ids, self.contents = [], [] # for the events
-        for id in allIds:
+        for id in ids:
             element, contents =  self.recordChanges(id)
             if element:
                 self.ids.append(id)

@@ -83,6 +83,7 @@ def run(cmdConfig=[],exitPoint=None,console=False):
     
     # Some Qt-classes need a running QApplication before they can be created
     app = QtGui.QApplication(sys.argv)
+    app.setApplicationName("OMG")
 
     # Initialize config and logging
     config.init(cmdConfig)

@@ -42,7 +42,7 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
         if ids:
             self._changeContents(QtCore.QModelIndex(), ids)
         level.changed.connect(self._handleLevelChanged)
-
+        
     def supportedDropActions(self):
         return Qt.CopyAction | Qt.MoveAction
 
@@ -227,8 +227,7 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
         for wrapper in wrappers:
             wrapper.loadContents(recursive = True)
         self.data(index, Qt.EditRole).insertContents(row, wrappers) 
-        self.endInsertRows()            
-
+        self.endInsertRows()
 
 class MergeCommand(QtGui.QUndoCommand):
     """Merge creates a new container between *parent* and the children at the given *indices*.
@@ -383,7 +382,7 @@ class ChangeRootCommand(QtGui.QUndoCommand):
         self.old = old
         self.new = new
         self.setText(text)
-        
+    
     def redo(self):
         logger.debug("change root: {} --> {}".format(self.old, self.new))
         self.model._changeContents(QtCore.QModelIndex(), self.new )

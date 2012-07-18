@@ -102,7 +102,7 @@ class StandardGuesser(profiles.Profile):
         else:
             application.stack.beginMacro(self.tr('Guess Albums'))
             if self.directoryMode:
-                for k, v in sorted(files.items()):
+                for _, v in sorted(files.items()):
                     self._guessHelper(v)
             else:
                 self._guessHelper(itertools.chain(*files.values()))
@@ -130,18 +130,18 @@ class StandardGuesser(profiles.Profile):
         self.albums.extend(list(existingParents))
         for key, elements in byKey.items():
             if pureDirMode or (self.albumTag in elements[0].tags):
-                elementsWithoutPos = { e for e in elements if e.tags.position is None }
-                elementsWithPos = sorted(set(elements) - elementsWithoutPos, key = lambda e: e.tags.position)
+                elementsWithoutPos = { e for e in elements if e.filePosition is None }
+                elementsWithPos = sorted(set(elements) - elementsWithoutPos, key = lambda e: e.filePosition)
                 children = {}
                 for element in elementsWithPos:
-                    if element.tags.position in children:
+                    if element.filePosition in children:
                         from ..gui.dialogs import warning
                         warning(self.tr("Error guessing albums"),
                                 self.tr("position {} appears twice in {}").format(element.tags.position, key))
                         self.errors.append(elements)
                     else:
-                        children[element.tags.position] = element.id
-                firstFreePosition = elementsWithPos[-1].tags.position+1 if len(elementsWithPos) > 0 else 1
+                        children[element.filePosition] = element.id
+                firstFreePosition = elementsWithPos[-1].filePosition+1 if len(elementsWithPos) > 0 else 1
                 for i, element in enumerate(elementsWithoutPos, start = firstFreePosition):
                     children[i] = element.id
                 albumTags = tags.findCommonTags(elements)

@@ -86,7 +86,7 @@ class PhononPlayerBackend(player.PlayerBackend):
     def setVolume(self, volume):
         assert type(volume) == int and 0 <= volume <= 100
         self.audioOutput.setVolume(volume / 100)
-        self.volumeChange.emit(volume)
+        self.volumeChanged.emit(volume)
     
     def current(self):
         return self.playlist.current
@@ -144,7 +144,7 @@ class PhononPlayerBackend(player.PlayerBackend):
     
     @classmethod
     def configurationWidget(cls, profile = None):
-        return None
+        return profiles.ConfigurationWidget()
         
     def __str__(self):
         return "PhononAudioBackend({})".format(self.name)
