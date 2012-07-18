@@ -37,7 +37,7 @@ def init():
     global real,editor
     real = RealLevel()
     from ..models import leveltreemodel
-    editor = Level("EDITOR",real, cleanupModelClass=leveltreemodel.LevelTreeModel)
+    editor = Level("EDITOR", real)
     
 
 class ElementGetError(RuntimeError):
