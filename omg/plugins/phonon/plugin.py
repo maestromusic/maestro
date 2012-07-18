@@ -72,12 +72,11 @@ class PhononPlayerBackend(player.PlayerBackend):
     def setState(self, state):
         if state != self.state():
             if state == player.STOP:
-                self.setCurrent(None)
                 self.mediaObject.stop()
             elif state == player.PLAY:
-                if self.state() == player.STOP:
-                    self.setCurrent(0)
-                self.mediaObject.play()
+                if self.current() is None:
+                    self.setCurrent(0) # this starts playing
+                else: self.mediaObject.play()
             else: self.mediaObject.pause()
             self.stateChanged.emit(state)
      

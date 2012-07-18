@@ -37,7 +37,7 @@ class BrowserDelegate(StandardDelegate):
                     ['t:composer','t:artist','t:performer'],
                     ['t:date','t:conductor'],
                     overwrite={"fitInTitleRowData": configuration.DataPiece(tags.get("date"))
-                                            if tags.exists("date") else None},
+                                            if tags.isInDB("date") else None},
                     addOptions={"showSortValues": configuration.DelegateOption("showSortValues",
                             translate("Delegates","Display sort values instead of real values"),"bool",False)}
     )

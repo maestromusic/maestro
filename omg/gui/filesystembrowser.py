@@ -21,9 +21,10 @@ import os
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
-from . import mainwindow
+from . import mainwindow, selection
 from .. import filesystem, config
 from ..utils import relPath, absPath, getIcon
+from ..core import levels
 
 
 """This module contains a dock widget that displays the music in directory view, i.e. without
@@ -70,10 +71,9 @@ class FileSystemBrowserModel(QtGui.QFileSystemModel):
                 except KeyError as e:
                     status = 'nomusic'
                 return self.icons[status]
-        return super().data(index, role)
+        return super().data(index, role) 
     
 class FileSystemBrowser(QtGui.QTreeView):
-    
     def __init__(self, rootDirectory = config.options.main.collection, parent = None):
         QtGui.QTreeView.__init__(self, parent)
         self.setAlternatingRowColors(True)
@@ -82,6 +82,14 @@ class FileSystemBrowser(QtGui.QTreeView):
         self.setRootIndex(musikindex)
         self.setSelectionMode(self.ExtendedSelection)
         self.setDragDropMode(QtGui.QAbstractItemView.DragOnly)
+        
+    def selectionChanged(self, selected, deselected):
+        super().selectionChanged(selected, deselected)
+        paths = [relPath(self.model().filePath(index)) for index in self.selectedIndexes()
+                        if not self.model().isDir(index)] # TODO: remove this restriction
+        s = FileSystemSelection(paths)
+        if s.hasFiles():
+            selection.setGlobalSelection(s) 
 
 class FileSystemBrowserDock(QtGui.QDockWidget):
     """A DockWidget wrapper for the FileSystemBrowser."""
@@ -89,6 +97,24 @@ class FileSystemBrowserDock(QtGui.QDockWidget):
         QtGui.QDockWidget.__init__(self, parent)
         self.setWindowTitle(translate(__name__,"Filesystem: {}").format(config.options.main.collection))
         self.setWidget(FileSystemBrowser())
+        
+
+class FileSystemSelection(selection.NodeSelection):
+    def __init__(self,paths):
+        super().__init__(levels.real,[])
+        self._files = levels.real.getFromPaths(paths)
+        
+    def elements(self,recursive=False):
+        return self._files
+    
+    def files(self,recursive=False):
+        return self._files
+        
+    def hasFiles(self):
+        return len(self._files) > 0
+    
+    def hasElements(self):
+        return len(self._files) > 0
         
         
 # register this widget in the main application

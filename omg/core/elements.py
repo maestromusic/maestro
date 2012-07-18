@@ -50,7 +50,7 @@ class Element:
         """
         result = ''
         
-        if hasattr(self,'id') and config.options.misc.show_ids:
+        if config.options.misc.show_ids:
             result += "[{}] ".format(self.id)
             
         if tagsModule.TITLE in self.tags:
@@ -61,6 +61,35 @@ class Element:
 
         return result
     
+    def getData(self,type):
+        if type not in self.data:
+            return None
+        else:
+            result = self.data[type]
+            if len(result) > 0:
+                return result
+            else: return None
+            
+    def hasCover(self):
+        return self.getData('COVER') is not None
+    
+    def getCover(self,size=None):
+        paths = self.getData('COVER')
+        if paths is None:
+            return None
+        from . import covers
+        return covers.get(paths[0],size)
+    
+    def getCoverPath(self):
+        paths = self.getData('COVER')
+        if paths is None:
+            return None
+        if os.path.isabs(paths[0]):
+            return paths[0]
+        else:
+            from . import covers
+            return os.path.join(covers.COVER_DIR,paths[0])
+        
     def inParentLevel(self):
         if self.level.parent is None:
             return None
@@ -74,11 +103,12 @@ class Container(Element):
     major. Keyword-arguments that are not specified will be set to empty lists/tag.Storage instances.
     Note that *contents* must be a ContentList.
     """
-    def __init__(self, level, id, major,*, contents=None, parents=None, tags=None, flags=None):
+    def __init__(self, level, id, major,*, contents=None, parents=None, tags=None, flags=None, data=None):
         self.level = level
         self.id = id
         self.level = level
         self.major = major
+        
         if contents is not None:
             if type(contents) is not ContentList:
                 raise TypeError("contents must be a ContentList")
@@ -93,6 +123,9 @@ class Container(Element):
         if flags is not None:
             self.flags = flags
         else: self.flags = []
+        if data is not None:
+            self.data = data
+        else: self.data = {}
     
     def copy(self):
         """Create a copy of this container. Create copies of all attributes. Because contents are stored as
@@ -105,7 +138,8 @@ class Container(Element):
                          contents = self.contents.copy(),
                          parents = self.parents[:],
                          tags = self.tags.copy(),
-                         flags = self.flags[:])
+                         flags = self.flags[:],
+                         data = self.data.copy())
         
     def isContainer(self):
         return True
@@ -127,7 +161,7 @@ class File(Element):
     """Element-subclass for files. You must specify the level, id, path and length in seconds of the file.
     Keyword-arguments that are not specified will be set to empty lists/tag.Storage instances.
     """
-    def __init__(self, level, id, path, length,*, parents=None, tags=None, flags=None):
+    def __init__(self, level, id, path, length,*, parents=None, tags=None, flags=None, data=None):
         if not isinstance(id,int) or not isinstance(path,str) or not isinstance(length,int):
             raise TypeError("Invalid type (id,path,length): ({},{},{}) of types ({},{},{})"
                             .format(id,path,length,type(id),type(path),type(length)))
@@ -146,6 +180,9 @@ class File(Element):
         if flags is not None:
             self.flags = flags
         else: self.flags = []
+        if data is not None:
+            self.data = data
+        else: self.data = {}
         
     def copy(self):
         ret = File(level = self.level,
@@ -154,7 +191,8 @@ class File(Element):
                     length = self.length,
                     parents = self.parents[:],
                     tags = self.tags.copy(),
-                    flags = self.flags[:])
+                    flags = self.flags[:],
+                    data = self.data.copy())
         if hasattr(self, "fileTags"):
             ret.fileTags = self.fileTags.copy()
         if hasattr(self, "filePosition"):

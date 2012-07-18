@@ -447,8 +447,13 @@ class TagEditorModel(QtCore.QObject):
     
         # Use lists instead of ordered dicts in the result
         result = utils.OrderedDict()
+        
+        # First add all internal tags in their order, then the external tags
         for tag in tags.tagList:
             if tag in records:
+                result[tag] = list(records[tag].values())
+        for tag in records:
+            if not tag.isInDB():
                 result[tag] = list(records[tag].values())
         return result
     
@@ -547,7 +552,7 @@ class TagEditorModel(QtCore.QObject):
         try:
             for record in self.records[oldTag]:
                 # Do nothing with the return value, we only check whether conversion is possible
-                oldTag.type.convertValue(newTag.type,record.value)
+                oldTag.convertValue(newTag,record.value)
         except ValueError:
             return False # conversion not possible
         command = TagEditorUndoCommand(self,self.tr("Change tag"))
@@ -560,14 +565,14 @@ class TagEditorModel(QtCore.QObject):
             for record in self.records[newTag]:
                 newRecord = record.copy()
                 newRecord.tag = newTag
-                newRecord.value = oldTag.type.convertValue(newTag.type,record.value)
+                newRecord.value = oldTag.convertValue(newTag,record.value)
                 command.addMethod(self.records.changeRecord,newTag,record,newRecord)
         else: # Now we have to add all converted records to the existing tag
             # The easiest way to do this is to remove all records and add the converted records again
             for record in self.records[oldTag]:
                 newRecord = record.copy()
                 newRecord.tag = newTag
-                newRecord.value = oldTag.type.convertValue(newTag.type,record.value)
+                newRecord.value = oldTag.convertValue(newTag,record.value)
                 self._insertRecord(command,None,newRecord)
                 command.addMethod(self.records.removeRecord,record)
             # Finally remove the old tag

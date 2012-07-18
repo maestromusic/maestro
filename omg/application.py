@@ -23,7 +23,7 @@ OMG's framework without starting a GUI.
 
 import sys, os, fcntl, getopt
 
-from PyQt4 import QtCore, QtGui
+from PyQt4 import QtCore, QtGui, QtNetwork
 from PyQt4.QtCore import Qt
 
 from . import config, logging, constants
@@ -36,6 +36,9 @@ mainWindow = None
 
 # The application's undo stack
 stack = None
+
+# The application's QNetworkAccessManager
+network = None
 
 # Store translators so that they are not garbage-collected
 _translators = []
@@ -68,7 +71,7 @@ def run(cmdConfig=[],exitPoint=None,console=False):
     
         - 'config':    Initialize only config
         - 'database':  Stop after database connection has been established
-        - 'tags':      Stop after tags module has been initialized (this needs a db connection.
+        - 'tags':      Stop after tags module has been initialized (this needs a db connection)
         - 'noplugins': Stop before plugins would be loaded
         - 'nogui':     Stop right before the GUI would be created (plugins are enabled at this point)
         
@@ -140,17 +143,26 @@ def run(cmdConfig=[],exitPoint=None,console=False):
     flags.init()
     if exitPoint == 'tags':
         return app
-        
+    
+    # In most test scripts using the exitPoint 'tags' these caches would only be overhead.
+    # Thus fill them after the exitpoint.
+    database.cacheTagValues()
+    
     # Load and initialize remaining modules
     from .core import levels
     levels.init()
     from . import resources, search
+    from .core import covers
     search.init()
+    covers.init()
     
     # Initialize stack (because most models need the stack we create it before the noplugins-exitpoint, so
     # that it is available for console scripts/unittests)    
     global stack
     stack = QtGui.QUndoStack()
+    
+    global network
+    network = QtNetwork.QNetworkAccessManager()
     
     if exitPoint == 'noplugins':
         return app
@@ -189,6 +201,7 @@ def run(cmdConfig=[],exitPoint=None,console=False):
     mainWindow.saveLayout()
     delegateconfiguration.save()
     plugins.shutdown()
+    covers.shutdown()
     config.shutdown()
     logging.shutdown()
     sys.exit(returnValue)

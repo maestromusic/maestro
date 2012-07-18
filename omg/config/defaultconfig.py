@@ -93,6 +93,8 @@ defaults = OrderedDict((
 }),
 ("misc", {
     "show_ids": (bool,False,"Whether OMG should display element IDs"),
+    "cover_path": (str,"covers","Path where OMG stores and caches covers. Relative paths are interpreted as relative to the config directory."),
+    "cover_extension": (str,"png","Extension that is used to save covers. Must be supported by Qt. Note that Last.fm, which is where covers are downloaded by default, uses png's."),
     "consoleLogLevel": (str,"",
                         "Log-messages of this loglevel and higher are additionally printed to stderr. Leave it empty to use the configuration specified in the logging configuration (storage.options.main.logging)."),
     "debug_events": (bool,False,"Whether to print a debug message for each change event.")

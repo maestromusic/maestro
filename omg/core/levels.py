@@ -46,8 +46,9 @@ class ElementGetError(RuntimeError):
 
 
 class ConsistencyError(RuntimeError):
-    """Error signaling a consistency violation of the element data."""
+    """Error signaling a consistency violation of element data."""
     pass
+
 
 class ElementChangedEvent(ChangeEvent):
     #TODO comment
@@ -59,6 +60,7 @@ class ElementChangedEvent(ChangeEvent):
         if contentIds is None:
             self.contentIds = []
         else: self.contentIds = contentIds
+
 
 class FileCreateDeleteEvent(ElementChangedEvent):
     """Special event for creation and/or deletion of files in the database. Has
@@ -72,12 +74,32 @@ class FileCreateDeleteEvent(ElementChangedEvent):
         self.deleted = deleted if deleted is not None else []
         self.disk = disk
 
+
 class FileRenameEvent(ElementChangedEvent):
     """Event indicating that files have been renamed on disk."""
     def __init__(self, renamings):
         super().__init__()
         self.renamings = renamings
 
+
+class DataUndoCommand(QtGui.QUndoCommand):
+    def __init__(self,level,element,type,new):
+        self.level = level
+        self.element = element
+        self.type = type
+        if type in element.data:
+            self.old = element.data[type]
+        else: self.old = None
+        self.new = new
+        assert isinstance(self.old,tuple) and isinstance(self.new,tuple)
+
+    def redo(self):
+        self.level._setData(self.type,{self.element: self.new})
+        
+    def undo(self):
+        self.level._setData(self.type,{self.element: self.old})
+        
+    
 class Level(QtCore.QObject):
     #TODO comment
     changed = QtCore.pyqtSignal(ChangeEvent)
@@ -104,22 +126,21 @@ class Level(QtCore.QObject):
             self.parent.loadIntoChild([param],self)
         return self.elements[param]
     
-    def getFromIds(self,ids,ignoreUnknownTags=False):
-        """Load all elements given by the list of ids *ids* into this level (do nothing for elements which
-        are already loaded."""
+    def getFromIds(self,ids):
+        """Load all elements given by the list of ids *ids* into this level and return them."""
         notFound = []
         for id in ids:
             if id not in self.elements:
                 notFound.append(id)
-        self.parent.loadIntoChild(notFound,self,ignoreUnknownTags)
+        self.parent.loadIntoChild(notFound,self)
         return [self.elements[id] for id in ids]
                 
-    def getFromPaths(self,paths,ignoreUnknownTags=False):
+    def getFromPaths(self,paths):
         """Load elements for the given paths and return them."""
         ids = [idFromPath(path) for path in paths]
-        return self.getFromIds(ids,ignoreUnknownTags)
+        return self.getFromIds(ids)
         
-    def loadIntoChild(self,ids,child,ignoreUnknownTags=False):
+    def loadIntoChild(self,ids,child):
         """Load all elements given by the list of ids *ids* into the level *child*. Do not check whether
         elements are already loaded there."""
         notFound = []
@@ -128,7 +149,7 @@ class Level(QtCore.QObject):
                 child.elements[id] = self.elements[id].copy()
                 child.elements[id].level = child
             else: notFound.append(id)
-        self.parent.loadIntoChild(notFound,self,ignoreUnknownTags)
+        self.parent.loadIntoChild(notFound,self)
         
     def __contains__(self, id):
         """Returns if the given id is loaded in this level. Note that if the id could be loaded from the
@@ -180,7 +201,24 @@ class Level(QtCore.QObject):
             element.flags.remove(flag)
         if emitEvent:
             self.emitEvent([element.id for element in elements])
-            
+        
+    def setCovers(self,stack,coverDict):
+        """Set the covers for one or more elements. Add a command for doing this to *stack*.
+        *coverDict* must be a dict mapping elements to either a cover path or a QPixmap or None.
+        """
+        from . import covers
+        stack.push(covers.CoverUndoCommand(self,coverDict))
+    
+    def _setData(self,type,elementToData):
+        for element,data in elementToData.items():
+            if data is not None:
+                if isinstance(data,tuple):
+                    element.data[type] = data
+                else: element.data[type] = tuple(data)
+            elif type in element.data:
+                del element.data[type]
+        self.emitEvent([element.id for element in elementToData])
+        
     def changeId(self, old, new):
         """Change the id of some element from *old* to *new*. This should only be called from within
         appropriate UndoCommands, and only if (old in self) is True. Takes care of contents and parents, too.
@@ -247,7 +285,7 @@ class Level(QtCore.QObject):
             return set.union(set((id,)), *(self.children(cid) for cid in self.get(id).contents.ids))
     
     def subLevel(self, ids, name):
-        """Return a new level containing copies of the elements with given *ids*, named *name*."""
+        """Return a new level containing copies of the elements with the given *ids* and named *name*."""
         level = Level(name, self)
         for id in ids:
             level.getFromIds(self.children(id))
@@ -314,7 +352,7 @@ class RealLevel(Level):
         # implementation of loadIntoChild
         self.parent = self
     
-    def loadIntoChild(self,ids,child, askOnNewTags = True):
+    def loadIntoChild(self,ids,child):
         notFound = []
         for id in ids:
             if id in self.elements:
@@ -327,7 +365,7 @@ class RealLevel(Level):
             if len(positiveIds) > 0:
                 self.loadFromDB(positiveIds,child)
             if len(paths) > 0:
-                self.loadFromFileSystem(paths,child,askOnNewTags)
+                self.loadFromFileSystem(paths,child)
             
     def loadFromDB(self,idList,level):
         #TODO: comment
@@ -392,37 +430,42 @@ class RealLevel(Level):
         for row in result:
             id,flagId = row
             level.elements[id].flags.append(flags.get(flagId))
+        
+        # data
+        result = db.query("""
+                SELECT element_id,type,data
+                FROM {}data
+                WHERE element_id IN ({})
+                ORDER BY element_id,type,sort
+                """.format(db.prefix,idList))
+        
+        # This is a bit complicated because the data should be stored in tuples, not lists
+        # Changing the lists would break undo/redo
+        current = None
+        buffer = []
+        for id,type,data in result:
+            if current is None:
+                current = (id,type)
+            elif current != (id,type):
+                level.elements[current[0]].data[current[1]] = tuple(buffer)
+                current = (id,type)
+                buffer = []
+                
+            element = level.elements[id]
+            if element.data is None:
+                element.data = {}
+            buffer.append(data)
+        if current is not None:
+            level.elements[current[0]].data[current[1]] = tuple(buffer)
+            
     
-    def loadFromFileSystem(self,paths,level, askOnNewTags = True):
+    def loadFromFileSystem(self,paths,level):
         #TODO: comment
         for path in paths:
             rpath = utils.relPath(path)
             try:
-                readOk = False
-                while not readOk:
-                    try:
-                        real = realfiles.get(path)
-                        real.read()
-                        readOk = True
-                    except tags.UnknownTagError as e:
-                        # TODO: respect askOnNEwTags parameter (or remove it)
-                        # TODO: wrap this up as a separate function stored somewhere else
-                        from ..gui.tagwidgets import NewTagTypeDialog
-                        QtGui.QApplication.changeOverrideCursor(Qt.ArrowCursor)
-                        text = self.tr('Unknown tag\n{1}={2}\n found in \n{0}.\n What should its type be?')\
-                                           .format(rpath,e.tagname,e.values)
-                        dialog = NewTagTypeDialog(e.tagname, text = text, includeDeleteOption = True)
-                        ret = dialog.exec_()
-                        if ret == dialog.Accepted:
-                            pass
-                        elif ret == dialog.Delete or ret == dialog.DeleteAlways:
-                            if ret == dialog.DeleteAlways:
-                                config.options.tags.always_delete.append(e.tagname)
-                            logger.info('REMOVE TAG {0} from {1}'.format(e.tagname, rpath))
-                            re = realfiles.get(path)
-                            re.remove(e.tagname)
-                        else:
-                            raise ElementGetError('User aborted "new tag" dialog')
+                real = realfiles.get(path)
+                real.read()
                 fileTags = real.tags
                 length = real.length
                 filePosition = real.position
@@ -462,8 +505,10 @@ class RealLevel(Level):
         super().addTagValue(tag,value,elements,emitEvent=False)
         failedElements = self.saveTagsToFileSystem(elements)
         #TODO: Correct failedElements
-        dbwrite.addTagValues([el.id for el in elements if el.isInDB() and not el in failedElements],
-                             tag,[value])
+        dbElements = [el.id for el in elements if el.isInDB() and not el in failedElements]
+        if len(dbElements):
+            dbwrite.addTagValues(dbElements,tag,[value])
+        
         if emitEvent:
             self.emitEvent([element.id for element in elements])
             
@@ -471,8 +516,11 @@ class RealLevel(Level):
         super().removeTagValue(tag,value,elements,emitEvent=False)
         failedElements = self.saveTagsToFileSystem(elements)
         #TODO: Correct failedElements
-        dbwrite.removeTagValuesById([el.id for el in elements if el.isInDB() and not el in failedElements],
-                                 tag,db.idFromValue(tag,value))
+        dbElements = [el.id for el in elements if el.isInDB() and not el in failedElements]
+        if len(dbElements):
+            dbwrite.removeTagValuesById(dbElements,tag,db.idFromValue(tag,value))
+        else: assert all(element.id < 0 for element in elements)
+        
         if emitEvent:
             self.emitEvent([element.id for element in elements])
             
@@ -480,8 +528,10 @@ class RealLevel(Level):
         super().changeTagValue(tag,oldValue,newValue,elements,emitEvent=False)
         failedElements = self.saveTagsToFileSystem(elements)
         #TODO: Correct failedElements
-        dbwrite.changeTagValueById([el.id for el in elements if el.isInDB() and not el in failedElements],
-                                 tag,db.idFromValue(tag,oldValue),db.idFromValue(tag,newValue,insert=True))
+        dbElements = [el.id for el in elements if el.isInDB() and not el in failedElements]
+        if len(dbElements):
+            dbwrite.changeTagValueById(dbElements,tag,db.idFromValue(tag,oldValue),
+                                       db.idFromValue(tag,newValue,insert=True))
         if emitEvent:
             self.emitEvent([element.id for element in elements])
         
@@ -526,6 +576,20 @@ class RealLevel(Level):
         if emitEvent:
             self.emitEvent(ids)
             
+    def _setData(self,type,elementToData):
+        super()._setData(type,elementToData)
+        values = []
+        for element,data in elementToData.items():
+            if data is not None:
+                values.extend((element.id,type,i,d) for i,d in enumerate(data))
+        db.transaction()
+        db.query("DELETE FROM {}data WHERE type = ? AND element_id IN ({})"
+                 .format(db.prefix,db.csIdList(elementToData.keys())),type)
+        if len(values) > 0:
+            db.multiQuery("INSERT INTO {}data (element_id,type,sort,data) VALUES (?,?,?,?)"
+                          .format(db.prefix),values)
+        db.commit()
+        
 def idFromPath(path):
     """Return the id for the given path. For elements in the database this is a positive number. Otherwise
     the temporary id is returned or a new one is created."""

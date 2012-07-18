@@ -375,23 +375,29 @@ END
 """.format(db.prefix)
 )
 
-#-------#
-# media #
-#-------#
+#------#
+# data #
+#------#
 _addMySQL("""
-CREATE TABLE {}media (
-    id          MEDIUMINT UNSIGNED  NOT NULL AUTO_INCREMENT,
-    path        VARCHAR(512)    NOT NULL,
-    type        VARCHAR(255)    NOT NULL,
-    PRIMARY KEY(id)
+CREATE TABLE {0}data (
+    element_id  MEDIUMINT UNSIGNED  NOT NULL,
+    type        VARCHAR(255)        NOT NULL,
+    sort        SMALLINT UNSIGNED   NOT NULL,
+    data        TEXT                NOT NULL,
+    INDEX data_idx(element_id,type,sort),
+    FOREIGN KEY(element_id) REFERENCES {0}elements(id) ON DELETE CASCADE
 ) ENGINE InnoDB, CHARACTER SET 'utf8'
 """.format(db.prefix))
 _addSQLite("""
-CREATE TABLE {}media (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    path        VARCHAR(512)    NOT NULL,
-    type        VARCHAR(255)    NOT NULL
+CREATE TABLE {0}data (
+    element_id  INTEGER         NOT NULL,
+    type        VARCHAR(255)    NOT NULL,
+    sort        INTEGER         NOT NULL,
+    data        TEXT            NOT NULL,
+    FOREIGN KEY(element_id) REFERENCES {0}elements(id) ON DELETE CASCADE
 )
-""".format(db.prefix))
+""".format(db.prefix),
+"CREATE INDEX data_idx ON {}data (element_id,type,sort)".format(db.prefix)
+)
 
 tables = [SQLTable(queries) for queries in tables]

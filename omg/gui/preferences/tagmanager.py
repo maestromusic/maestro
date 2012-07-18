@@ -71,7 +71,9 @@ class TagManager(QtGui.QWidget):
     
     def _handleAddButton(self):
         """Open a NewTagTypeDialog and create a new tag."""
-        tagwidgets.NewTagTypeDialog.createTagType(tagname='',tagnameEditable=True,privateEditable=True)
+        # We cannot connect the add button to createTagType directly because the clicked-signal has an
+        # argument 'checked'
+        tagwidgets.AddTagTypeDialog().exec_()
 
     def _checkUndoRedoButtons(self):
         """Enable or disable the undo and redo buttons depending on stack state."""
