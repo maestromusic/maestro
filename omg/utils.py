@@ -213,13 +213,10 @@ class FlexiDate:
         # YYYY-MM-DD HH:MM
         # YYYY-MM-DD HH
         # These formats are allowed in the ID3 specification and used by Mutagen
-        try:
-            re.match("\d{4}-\d{2}-\d{2} \d{2}(:\d{2}){0,2}$",string)
+        if re.match("\d{4}-\d{2}-\d{2} \d{2}(:\d{2}){0,2}$",string) is not None:
             from . import logging
             logging.getLogger(__name__).warning("dropping time of day in date string '{}'".format(string))
             string = string[:10]
-        except TypeError:
-            pass
         try:
             y,m,d = map(lambda v: None if v is None else int(v), re.match("(\d{4})(?:-(\d{2})(?:\-(\d{2}))?)?", string).groups() )
             return FlexiDate(y, m, d)
