@@ -135,7 +135,7 @@ def getPixmap(name):
     return QtGui.QPixmap(":omg/icons/" + name)
 
 
-class FlexiDate(object):
+class FlexiDate:
     """A FlexiDate is a date which can store a date consisting simply of a year or of a year and a month or of
     year, month and day. OMG uses this class to store tags of type date, where most users will only specify a
     year, but some may give month and day, too.
@@ -205,9 +205,27 @@ class FlexiDate(object):
     def strptime(string):
         """Parse FlexiDates from strings in a format depending on the locale.
         Raise a :exc:`ValueError` if that fails."""
-        if not isinstance(string,str):
-            raise TypeError("Argument must be a string.")
+        assert isinstance(string, str)
         
+        # check for the default file format yyyy-mm-dd first
+        # Chop of the time part of values of the form
+        # YYYY-MM-DD HH:MM:SS
+        # YYYY-MM-DD HH:MM
+        # YYYY-MM-DD HH
+        # These formats are allowed in the ID3 specification and used by Mutagen
+        try:
+            re.match("\d{4}-\d{2}-\d{2} \d{2}(:\d{2}){0,2}$",string)
+            from . import logging
+            logging.getLogger(__name__).warning("dropping time of day in date string '{}'".format(string))
+            string = string[:10]
+        except TypeError:
+            pass
+        try:
+            y,m,d = map(lambda v: None if v is None else int(v), re.match("(\d{4})(?:-(\d{2})(?:\-(\d{2}))?)?", string).groups() )
+            return FlexiDate(y, m, d)
+        except AttributeError: # if no match, re.match returns None -> has no attr "groups"
+            pass
+        # now use locale
         string = strutils.replace(string,{'/':'-','.':'-'}) # Recognize all kinds of separators
         numbers = [int(n) for n in string.split('-')]
         if len(numbers) > 3:
@@ -223,14 +241,17 @@ class FlexiDate(object):
         one is used if year, month and day are specified.
         The format strings are python format strings, using the keys Y=year, m=month, d=day.
         """
+        if self.month:
+            if self.day:
+                index = 2
+            else: index = 1
+        else: index = 0
+        
         if format is None:
-            FlexiDate._initFormat()
-            if self.month:
-                if self.day:
-                    index = 2
-                else: index = 1
-            else: index = 0
+            FlexiDate._initFormat()    
             format = FlexiDate._dateFormat[index]
+        else:
+            format = format[index]
         return format.format(Y=self.year, m=self.month, d=self.day)
         
     def toSql(self,maximum=False):

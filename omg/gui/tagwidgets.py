@@ -205,7 +205,6 @@ class TagTypeBox(QtGui.QStackedWidget):
                 self.box.setCurrentIndex(self.box.count()-1)
         
         if not self._tag.isInDB():
-            # Above loop will select the correct tag, if it is in the DB
             self.box.setEditText(self._tag.name)
                         
             self.box.insertSeparator(self.box.count())

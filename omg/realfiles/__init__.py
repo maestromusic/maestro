@@ -74,23 +74,6 @@ class RealFile:
         """Store tags and position in the file."""
         self.saveTags()
         self.savePosition()
-    
-    def _valueFromString(self,tag,value):
-        """Convert the string <value> to the preferred format of <tag> (e.g. convert "2010" to a FlexiDate-instance). Return None and log a message if conversion fails."""
-        try:
-            if tag.type == tags.TYPE_DATE:
-                # Chop of the time part of values of the form
-                # YYYY-MM-DD HH:MM:SS
-                # YYYY-MM-DD HH:MM
-                # YYYY-MM-DD HH
-                # These formats are allowed in the ID3 specification and used by Mutagen
-                if len(value) in (13,16,19) and re.match("\d{4}-\d{2}-\d{2} \d{2}(:\d{2}){0,2}$",value) is not None:
-                    value = value[:10]
-                    
-            return tag.valueFromString(value)
-        except ValueError:
-            logger.warning("Found invalid tag-value '{}' for tag {} in file {}".format(value,tag,self.path))
-            return None 
 
 rfClass = None
 
@@ -126,13 +109,8 @@ try:
             self.length = self._f.length
             
         def _parseAndAdd(self, key, values):
-            #TODO handle ValueErrors which arise if key is not a valid tagname
             tag = tags.get(key)
-            vals = []
-            for value in values:
-                value = self._valueFromString(tag, value)
-                if value is not None and value not in vals:
-                    vals.append(value)
+            vals = [ tag.valueFromString(value) for value in values]
             if len(vals) > 0:
                 self.tags.add(tag, *vals)
             
@@ -140,8 +118,8 @@ try:
             self._f.tags = dict()
             for tag, values in self.ignoredTags.items():
                 self._f.tags[tag.upper()] = values
-            for tag,values in self.tags.items():
-                values = [str(value) for value in values]
+            for tag, values in self.tags.items():
+                values = [tag.fileFormat(value) for value in values]
                 self._f.tags[tag.name.upper()] = values
             if reallySave:
                 self._f.save()
