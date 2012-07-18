@@ -77,7 +77,7 @@ class ProfileConfiguration(QtCore.QObject):
             toRemove = [ name for name,profile in self.profiles.items() if profile.className == cls.className ]
             for name in toRemove:
                 self.removeProfile(name)
-            self.classRemove.emit(cls.className)
+            self.classRemoved.emit(cls.className)
     
     def newProfile(self, name = None, className = None):
         if name is None:

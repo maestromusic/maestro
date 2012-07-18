@@ -21,11 +21,12 @@ from PyQt4.QtCore import Qt
 
 from . import tags, flags
 from .elements import File, Container
+from .nodes import Wrapper
 from .. import database as db, realfiles, utils, config, logging
 from ..database import write as dbwrite
 from ..application import ChangeEvent
 
-import os.path
+import os.path, collections
 
 real = None
 editor = None
@@ -35,7 +36,8 @@ logger = logging.getLogger(__name__)
 def init():
     global real,editor
     real = RealLevel()
-    editor = Level("EDITOR",real)
+    from ..models import leveltreemodel
+    editor = Level("EDITOR",real, cleanupModelClass=leveltreemodel.LevelTreeModel)
     
 
 class ElementGetError(RuntimeError):
@@ -83,7 +85,7 @@ class Level(QtCore.QObject):
     whose tags, flags, major status, ... has changed (things affecting only the element itself). The second list
     contains IDs of containers whose contents have changed."""
     
-    def __init__(self,name,parent):
+    def __init__(self, name, parent):
         super().__init__()
         self.name = name
         self.parent = parent
@@ -233,11 +235,16 @@ class Level(QtCore.QObject):
             self.emitEvent(list(map.keys()))
     
     def children(self, id):
-        """Returns a set of (recursively) all children of the element with *id*."""
+        """Returns a set of (recursively) all children of the element with *id*. *id* may also be an
+        iterable of ids."""
+        if isinstance(id, collections.Iterable):
+            if len(id) == 0:
+                return set()
+            return set.union(*(self.children(i) for i in id))
         if self.get(id).isFile():
             return set((id,))
         else:
-            return set.union(set((id,)), *[self.children(cid) for cid in self.get(id).contents.ids])
+            return set.union(set((id,)), *(self.children(cid) for cid in self.get(id).contents.ids))
     
     def subLevel(self, ids, name):
         """Return a new level containing copies of the elements with given *ids*, named *name*."""
@@ -283,7 +290,6 @@ class Level(QtCore.QObject):
                 else: wrapper = createFunc(currentWrapper,token)
                 currentList.append(wrapper)
         return roots
-    
 
 def _getTokens(s):
     """Helper for Level.getWrappers: Yield each token of *s*."""
@@ -419,10 +425,11 @@ class RealLevel(Level):
                             raise ElementGetError('User aborted "new tag" dialog')
                 fileTags = real.tags
                 length = real.length
-                fileTags.position = real.position
+                filePosition = real.position
             except OSError as e:
                 if not os.path.exists(path):
                     fileTags = tags.Storage()
+                    filePosition = None
                     length = 0
                     fileTags[tags.TITLE] = ["[NOT FOUND] {}".format(os.path.basename(rpath))]
                 else:
@@ -439,6 +446,8 @@ class RealLevel(Level):
                 # TODO: Load private tags!
             elem = File(level,id = id,path=rpath,length=length,tags=fileTags,flags=flags)
             elem.fileTags = fileTags.copy()
+            if filePosition is not None:
+                elem.filePosition = filePosition
             level.elements[id] = elem
     
     def insertChildren(self, parentId, insertions):
@@ -517,7 +526,6 @@ class RealLevel(Level):
         if emitEvent:
             self.emitEvent(ids)
             
-
 def idFromPath(path):
     """Return the id for the given path. For elements in the database this is a positive number. Otherwise
     the temporary id is returned or a new one is created."""

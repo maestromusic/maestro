@@ -122,7 +122,7 @@ class DeleteAction(TreeAction):
             elementParents = {}
             for wrapper in self.parent().nodeSelection.wrappers():
                 parent = wrapper.parent
-                if isinstance(parent, RootNode):
+                if parent is model.root:
                     rootParents.append(parent.contents.index(wrapper))
                 else:
                     if parent.element.id not in elementParents:
@@ -131,9 +131,10 @@ class DeleteAction(TreeAction):
             
             if len(rootParents) > 0:
                 newContents = [node.element.id for node in model.root.contents]
+                oldContents = newContents[:]
                 for idx in sorted(rootParents, reverse = True):
                     del newContents[idx]
-                application.stack.push(leveltreemodel.ChangeRootCommand(model, model.root.contents, newContents))
+                application.stack.push(leveltreemodel.ChangeRootCommand(model, oldContents, newContents))
             if len(elementParents) > 0:
                 application.stack.beginMacro(self.modeText[self.mode])
                 for parentId, removals in elementParents.items():
