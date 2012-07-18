@@ -59,12 +59,11 @@ class LastFMCoverProvider(covers.AbstractCoverProvider):
     
     def fetch(self,elements):
         for element in elements:
-            urls = self._getLastFmURLs(element)
-            if len(urls) == 0:
+            if tags.get('artist') not in element.tags or tags.ALBUM not in element.tags:
                 self.error.emit(self.tr("Cannot fetch a cover for an element without artist or album."))
                 self.finished.emit(element)
             else:
-                for url in urls:
+                for url in self._getLastFmURLs(element):
                     reply = application.network.get(QtNetwork.QNetworkRequest(url))
                     reply.finished.connect(functools.partial(self._handleXmlReplyFinished,element,reply))
                     reply.error.connect(functools.partial(self._handleNetworkError,reply))
