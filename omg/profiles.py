@@ -150,9 +150,9 @@ class ConfigurationWidget(QtGui.QWidget):
     def currentConfig(self):
         """Returns the current configuration represented by the state of the widget.
         
-        Subclasses must implement this method; it should return a tuple of data suitable
-        to pass to the Profile's constructor"""
-        raise NotImplementedError()
+        Configurable subclasses should implement this method; it returns a tuple of data
+        suitable to pass to the Profile's constructor"""
+        return tuple()
     
 class ClassComboBox(QtGui.QComboBox):
     """This class provides a combo box for choosing a profile implementation class."""
@@ -165,7 +165,7 @@ class ClassComboBox(QtGui.QComboBox):
         self.supressEvent = False
         profileConf.classAdded.connect(self.addItem)
         profileConf.classRemoved.connect(self.handleClassRemoved)
-        self.currentIndexChanged[str].connect(lambda name: self.classChosen(name) if self.supressEvent else None)
+        self.currentIndexChanged[str].connect(lambda name: self.classChosen.emit(name) if not self.supressEvent else None)
         
     def handleClassRemoved(self, name):
         for i in range(self.count()):
@@ -312,6 +312,7 @@ class ProfileConfigurationDisplay(QtGui.QWidget):
         self.saveButton.setIconSize(QtCore.QSize(16,16))
         self.secondLayout.addWidget(self.saveButton,0)
         self.classChooser = ClassComboBox(profileConf)
+        self.classChooser.classChosen.connect(self.setClass)
         if len(self.profileConf.classes) > 1:
             self.enableClassChooser()
         
@@ -373,6 +374,7 @@ class ProfileConfigurationDisplay(QtGui.QWidget):
         self.profileChanged.emit(name)
     
     def setClass(self, className, profileName = None):
+        print('setClass {}'.format(className))
         if className == '':
             self.classChooser.setEnabled(False)
             self._removeConfigWidget()
