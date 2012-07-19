@@ -224,7 +224,6 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
         """
         toplevelIds = list(db.query("SELECT id FROM {} WHERE toplevel = 1".format(table)).getSingleColumn())
         allIds = list(db.query("SELECT id FROM {}".format(table)).getSingleColumn())
-        print(allIds)
        
         if node.contents is not None:
             # Only use beginRemoveRows and friends if there are already contents. If we are going to add the
