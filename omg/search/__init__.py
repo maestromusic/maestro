@@ -498,12 +498,11 @@ class SearchThread(threading.Thread):
         
         setTopLevelFlags(resultTable)
         # Always include all children of direct results => select from elements
-        addChildren(resultTable,db.prefix+"elements")
+        addChildren(resultTable)
 
 
-def addChildren(resultTable,fromTable):
-    """Add to *resultTable* all descendants of direct results. The descendants must be contained in
-    *fromTable*."""
+def addChildren(resultTable):
+    """Add to *resultTable* all descendants of direct results."""
     # In the first step select direct results which have children, in the other steps select new results.
     attribute = 'direct'
     while True:
@@ -519,11 +518,11 @@ def addChildren(resultTable,fromTable):
         db.query("UPDATE {} SET new = 0".format(resultTable))
         db.query("""
             REPLACE INTO {1} (id,file,toplevel,direct,major,new)
-                SELECT c    .element_id,el.file,0,0,el.major,1
+                SELECT       c.element_id,el.file,0,0,el.major,1
                 FROM {2} AS p JOIN {0}contents AS c ON p.id = c.container_id
-                              JOIN {3} AS el ON el.id = c.element_id
+                              JOIN {0}elements AS el ON el.id = c.element_id
                 GROUP BY c.element_id
-                """.format(db.prefix,resultTable,TT_HELP,fromTable))
+                """.format(db.prefix,resultTable,TT_HELP))
         attribute = 'new'
 
 
@@ -545,8 +544,7 @@ def setTopLevelFlags(table):
                                       JOIN {2} AS children ON c.element_id = children.id
                 """.format(db.prefix,TT_HELP,table))
 
-    db.query("UPDATE {} SET toplevel = 1".format(table))
-    db.query("REPLACE INTO {} (id,toplevel) SELECT id,0 FROM {}".format(table,TT_HELP))
+    db.query("UPDATE {} SET toplevel = id NOT in (SELECT id FROM {})".format(table,TT_HELP))
 
 
 def truncate(tableName):

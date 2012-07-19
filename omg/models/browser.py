@@ -222,26 +222,26 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
         this creates all children of *node* and not only the next level of the tree-structure as _loadTagLayer
         does. For performance reasons this method does not load the data (''Element.fromId(loadData=False)'').
         """
-        ids = list(db.query("SELECT id FROM {0} WHERE toplevel = 1".format(table)).getSingleColumn())
-        childIds = ids
-        while len(childIds) > 0:
-            childIds = list(itertools.chain.from_iterable(element.contents.ids
-                                for element in levels.real.getFromIds(childIds) if element.isContainer()))       
+        toplevelIds = list(db.query("SELECT id FROM {} WHERE toplevel = 1".format(table)).getSingleColumn())
+        allIds = list(db.query("SELECT id FROM {}".format(table)).getSingleColumn())
+        print(allIds)
+       
         if node.contents is not None:
             # Only use beginRemoveRows and friends if there are already contents. If we are going to add the
             # first contents to node (this happens thanks to the directload shortcut), we must not call
             # those methods as Qt will then try to access the contents...resulting in _startLoading.
-            contentsNone = True
+            contentsWereNone = False
             self.beginRemoveRows(self.getIndex(node),0,len(node.contents)-1)
             node.setContents([])
             self.endRemoveRows()
-        else: contentsNone = False
+        else: contentsWereNone = True
         
-        if contentsNone:
-            self.beginInsertRows(self.getIndex(node),0,len(ids)-1)
-        node.setContents([Wrapper(levels.real.get(id)) for id in ids])
+        if not contentsWereNone:
+            self.beginInsertRows(self.getIndex(node),0,len(toplevelIds)-1)
+        node.setContents([Wrapper(levels.real.get(id)) for id in toplevelIds])
         for child in node.getContents():
-            child.loadContents(recursive=True)
+            if child.isContainer():
+                self._loadFilteredContents(child,allIds)
         
         # Finally sort the contents
         sortTags = [tags.TITLE] # by default sort for titles
@@ -261,15 +261,16 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
                 reverse = reverse
             )
                 
-        if contentsNone:
+        if not contentsWereNone:
             self.endInsertRows()
 
-    def applyEvent(self, ids, contents):
-        """Apply an event to all elements."""
-        for node in self.getAllNodes():
-            if isinstance(node, Wrapper) and node.element.id in ids:
-                index = self.getIndex(node)
-                self.dataChanged.emit(index,index)
+    def _loadFilteredContents(self,node,ids):
+        node.setContents([Wrapper(levels.real.get(id),position = pos)
+                          for pos,id in node.element.contents.items()
+                          if id in ids])
+        for child in node.contents:
+            if child.isContainer():
+                self._loadFilteredContents(child,ids)
 
 
 class CriterionNode(Node):
