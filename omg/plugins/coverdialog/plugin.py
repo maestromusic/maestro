@@ -24,6 +24,7 @@ from PyQt4.QtCore import Qt
 from ...core import commands, covers
 from ...core.elements import Element
 from ...gui import treeactions
+from ...gui.misc import busyindicator
 from ... import application
 
 # Various cover sizes used in the dialog
@@ -123,6 +124,8 @@ class CoverDialogModel(QtCore.QObject):
     coverChanged = QtCore.pyqtSignal(Element)
     # Emitted when an error happens while loading a cover. The argument is an error message.
     error = QtCore.pyqtSignal(str)
+    # Emitted when the busy-state changes. The argument states whether at least one provider is busy
+    busyChanged = QtCore.pyqtSignal(bool)
     
     def __init__(self,stack,level,elids):
         super().__init__()
@@ -156,11 +159,19 @@ class CoverDialogModel(QtCore.QObject):
         """Start fetching covers from all cover providers for those elements that do not have a cover yet."""
         elementsWithoutCover = [element for element in self.elements if self.currentCovers[element] is None]
         if len(elementsWithoutCover) > 0:
+            self.busyChanged.emit(True)
             for element in elementsWithoutCover:
                 self._fetchedCovers[element] = []
             for coverProvider in self.coverProviders:
                 coverProvider.fetch(elementsWithoutCover)
-            
+        
+    def fetchCovers(self,coverProvider):
+        """Fetch covers for the current element using the given cover provider."""
+        self.busyChanged.emit(True)
+        if self.currentElement not in self._fetchedCovers:
+            self._fetchedCovers[self.currentElement] = []
+        coverProvider.fetch([self.currentElement])
+        
     def _handleProviderLoaded(self,provider,element,pixmap):
         """Handle the loaded-signal of cover providers."""
         if element is self.currentElement:
@@ -184,7 +195,10 @@ class CoverDialogModel(QtCore.QObject):
             # before the user has time to do something.
             if self.currentCovers[element] is None and self.stack.count() == 0:
                 self._setCover(element,self._fetchedCovers[element][0])
-                
+        
+        if all(not provider.isBusy() for provider in self.coverProviders):
+            self.busyChanged.emit(False)
+                  
     def addAvailableCovers(self,coverDict):
         """Add available covers. *coverDict* must map elements to lists of new covers (as instances of
         Cover)."""
@@ -264,6 +278,7 @@ class CoverDialog(QtGui.QDialog):
         self.model.providerStatusChanged.connect(self._handleProviderStatusChanged)
         self.model.availableCoversChanged.connect(self._fillAvailableCovers)
         self.model.coverChanged.connect(self._handleCoverChanged)
+        # busyChanged is connected below
                 
         style = QtGui.QApplication.style()
         
@@ -307,10 +322,16 @@ class CoverDialog(QtGui.QDialog):
             button = QtGui.QPushButton(self.tr("Fetch from {}").format(coverProvider.name()))
             if coverProvider.icon() is not None:
                 button.setIcon(coverProvider.icon())
-            button.clicked.connect(functools.partial(self._handleProviderButton,coverProvider))
+            button.clicked.connect(functools.partial(self.model.fetchCovers,coverProvider))
             self.providerButtons[coverProvider] = button
             coverButtonLayout.addWidget(button)
             
+        coverButtonLayout.addStretch()
+        
+        busyLabel = busyindicator.BusyLabel(self.tr("Covers are\nbeing loaded"))
+        self.model.busyChanged.connect(busyLabel.setRunning)
+        coverButtonLayout.addWidget(busyLabel)
+        
         coverButtonLayout.addStretch()
         
         self.removeCoverButton = QtGui.QPushButton(self.tr("Remove cover"))
@@ -511,10 +532,6 @@ class CoverDialog(QtGui.QDialog):
     def _handleURLReplyError(self,reply,code):
         """Handle errors from download requests started with the "Open from URL..." button."""
         self.errorPanel.add(self.tr("A network error appeared: {}").format(reply.errorString()))
-                          
-    def _handleProviderButton(self,coverProvider):
-        """Handle the button of the given cover provider."""
-        coverProvider.fetch([self.model.currentElement])
         
     def _handleOkButton(self):
         """Handle the OK button."""

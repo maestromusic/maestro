@@ -69,6 +69,12 @@ class LastFMCoverProvider(covers.AbstractCoverProvider):
                     reply.error.connect(functools.partial(self._handleNetworkError,reply))
                     self.xmlReplies[element].append(reply)
     
+    def isBusy(self,element=None):
+        if element is None:
+            return any(len(l) > 0 for l in self.xmlReplies.values()) \
+                  or any (len(l) > 0 for l in self.imageReplies.values())
+        return len(self.xmlReplies[element]) > 0 or len(self.imageReplies[element]) > 0
+    
     def _getLastFmURLs(self,element):
         """Based on *element*'s artist-tags and album-tags, return a list of URLs where album information
         including cover URLs may be found.""" 
@@ -132,7 +138,8 @@ class LastFMCoverProvider(covers.AbstractCoverProvider):
             self.error.emit("Cannot fetch cover URL from XML at '{}'.".format(url))
         finally:
             self.xmlReplies[element].remove(reply)
-            self._checkFinished(element)
+            if not self.isBusy(element):
+                self.finished.emit(element)
                         
     def _handleImageReplyFinished(self,element,reply):
         """React to finished image replies. These replies really contain image data. So create a QPixmap
@@ -150,11 +157,6 @@ class LastFMCoverProvider(covers.AbstractCoverProvider):
             self.loaded.emit(element,pixmap)
         finally:
             self.imageReplies[element].remove(reply)
-            self._checkFinished(element)
-        
-    def _checkFinished(self,element):
-        """This is called when a reply for *element* is finished and emits the finished-signal if that reply
-        was the last one for this element."""
-        if len(self.xmlReplies[element]) == 0 and len(self.imageReplies[element]) == 0:
-            self.finished.emit(element)
+            if not self.isBusy(element):
+                self.finished.emit(element)
         

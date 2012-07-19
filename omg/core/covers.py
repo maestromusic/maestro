@@ -107,6 +107,10 @@ class AbstractCoverProvider(QtCore.QObject):
     def fetch(self,elements):
         """Start fetching covers for the given elements asynchronously."""
         raise NotImplementedError()
+    
+    def isBusy(self):
+        """Return whether the cover provider is currently busy (e.g. downloading a cover)."""
+        raise NotImplementedError()
 
 
 class CoverUndoCommand(QtGui.QUndoCommand):
