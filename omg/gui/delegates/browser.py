@@ -18,7 +18,7 @@
 
 from PyQt4 import QtCore
 
-from ...core import tags
+from ...core import tags, covers
 from ...core.nodes import Wrapper
 from . import StandardDelegate, configuration, TextItem, ITALIC_STYLE
 from ...models import browser as browsermodel
@@ -42,6 +42,11 @@ class BrowserDelegate(StandardDelegate):
                             translate("Delegates","Display sort values instead of real values"),"bool",False)}
     )
     
+    def __init__(self,view,config=None):
+        super().__init__(view,config)
+        # Don't worry, addCacheSize won't add sizes twice
+        covers.addCacheSize(self.config.options['coverSize'].value)
+    
     def layout(self,index,availableWidth):
         node = self.model.data(index)
         
@@ -58,3 +63,9 @@ class BrowserDelegate(StandardDelegate):
             self.addCenter(TextItem(self.tr("Loading..."),ITALIC_STYLE))
         elif isinstance(node,Wrapper):
             super().layout(index,availableWidth)
+    
+    def _handleDispatcher(self,event):
+        """React to the configuration dispatcher."""
+        super()._handleDispatcher(event)
+        if event.config == self.config and event.type == configuration.CHANGED:
+            covers.addCacheSize(self.config.options['coverSize'].value)

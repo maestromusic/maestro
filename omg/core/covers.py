@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import os, os.path, hashlib, re
+import os, os.path, hashlib, re, time
 
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
@@ -32,12 +32,17 @@ COVER_DIR = None
 # the real limit which depends on the filesystem and operating system.
 MAX_FILENAME_LENGTH = 120
 
+# When the last check for unused covers is more than this number of seconds ago, a new one will start at
+# application shutdown.
+DELETE_UNUSED_COVERS_INTERVAL = 604800 # one week
+
 # Registered providers classes which must be subclasses of AbstractCoverProvider. Plugins may add and remove
 # own classes to this list directly.
 providerClasses = []
 
-#TODO make editable
-cacheSizes = [40]
+# Whenever a cover is requested in one of the sizes in this list, it will be cached in the corresponding
+# cache_<size>-folder. Use addCacheSize to modify this list.
+cacheSizes = []
 
 
 def init():
@@ -55,30 +60,77 @@ def init():
 def shutdown():
     """Shut down the cover framework. Occasionally this will delete superfluous cover files from the 
     internal folder."""
-    # TODO: From time to time delete unused covers and cache folders
-    pass
     
+    # Delete cached covers in sizes that have not been added to cacheSizes in this application run
+    for folder in os.listdir(COVER_DIR):
+        if re.match('cache_\d+$',folder) is not None:
+            size = int(folder[len('cache_'):])
+            if size not in cacheSizes:
+                absFolder = os.path.join(COVER_DIR,folder)
+                for file in os.listdir(absFolder):
+                    os.remove(os.path.join(absFolder,file))
+                os.rmdir(absFolder)
+                
+    # From time to time remove unused covers
+    lastCoverCheck = config.storage.misc.last_cover_check
+    if lastCoverCheck < time.time() - DELETE_UNUSED_COVERS_INTERVAL:
+        removeUnusedCovers()
+        config.storage.misc.last_cover_check = int(time.time())
+
     
 def get(path,size=None):
     """Return a QPixmap with the cover from the specified path which can be absolute or relative to the
     cover folder. If *size* is given, the result will be scaled to have *size* for width and height.
     If *size* is one of the cached sizes, this method will use the cache to skip the scaling.
     """ 
-    if not os.path.isabs(path):
-        path = os.path.join(COVER_DIR,path)
+    # First try to return from cache
     if size in cacheSizes:
         cachePath = _cachePath(path,size)
         if os.path.exists(cachePath):
             return QtGui.QPixmap(cachePath)
+        
+    # Read the file
+    if not os.path.isabs(path):
+        path = os.path.join(COVER_DIR,path)
     pixmap = QtGui.QPixmap(path)
     if size is not None and (pixmap.width() != size or pixmap.height() != size):
         pixmap = pixmap.scaled(size,size,transformMode=Qt.SmoothTransformation)
+        
+    # Store in cache
     if size in cacheSizes:
         os.makedirs(os.path.dirname(cachePath),exist_ok=True)
         pixmap.save(cachePath,config.options.misc.cover_extension)
+        
     return pixmap
 
 
+def addCacheSize(size):
+    """Add the given size (size=width=height) to the list of sizes that will be cached. Make sure it is not
+    added twice."""
+    if size not in cacheSizes:
+        cacheSizes.append(size)
+
+
+def removeUnusedCovers():
+    """Check whether the 'large' folder contains covers that are not used in the data-table and delete
+    those covers. Also delete cached versions of those covers.
+    """
+    from .. import database as db
+    usedPaths = [path
+                 for path in db.query("SELECT data FROM {}data WHERE type = 'COVER'".format(db.prefix))
+                                .getSingleColumn()
+                 if not os.path.isabs(path)] # never remove external covers
+    for path in os.listdir(os.path.join(COVER_DIR,'large')):
+        path = os.path.join('large',path)
+        if path not in usedPaths:
+            os.remove(os.path.join(COVER_DIR,path))
+            cacheFile = _cachePath(path,None)
+            for folder in os.listdir(COVER_DIR):
+                if re.match('cache_\d+$',folder) is not None:
+                    if os.path.exists(os.path.join(COVER_DIR,folder,cacheFile)):
+                        os.remove(os.path.join(COVER_DIR,folder,cacheFile))
+    
+        
 class AbstractCoverProvider(QtCore.QObject):
     """Abstract base class for cover providers. A cover provider fetches covers for elements, typically from
     a webservice. It may process several elements at the same time and may return more than one cover for
@@ -152,9 +204,13 @@ def _cachePath(path,size):
     """Return the filename that is used for the cached versions of the cover at *path*. Of course, it would
     be best to use the same filenames as in *path*. But then external files might collide with internal ones.
     Hence this method uses hashes.
+    
+    If *size* is None, only return the filename without path.
     """
     md5 = hashlib.md5(path.encode()).hexdigest()
-    return os.path.join(COVER_DIR,'cache_{}'.format(size),md5)
+    if size is not None:
+        return os.path.join(COVER_DIR,'cache_{}'.format(size),md5)
+    else: return md5
     
         
 def _makeFilePath(element,forceAscii=False):

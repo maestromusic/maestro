@@ -20,6 +20,7 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from . import StandardDelegate, configuration, abstractdelegate
+from ...core import covers
 
 translate = QtCore.QCoreApplication.translate
 
@@ -38,8 +39,19 @@ class PlaylistDelegate(StandardDelegate):
                  }
     )
     
+    def __init__(self,view,config=None):
+        super().__init__(view,config)
+        # Don't worry, addCacheSize won't add sizes twice
+        covers.addCacheSize(self.config.options['coverSize'].value)
+    
     def getPreTitleItem(self,wrapper):
         if wrapper in self.model.currentlyPlayingNodes:
             return abstractdelegate.PlayTriangleItem(QtGui.QColor(20,200,20),9)
         return None
+    
+    def _handleDispatcher(self,event):
+        """React to the configuration dispatcher."""
+        super()._handleDispatcher(event)
+        if event.config == self.config and event.type == configuration.CHANGED:
+            covers.addCacheSize(self.config.options['coverSize'].value)
     

@@ -155,4 +155,7 @@ storage = OrderedDict((
 ("SECTION:player", {
     'profiles': [],
 }),
+("SECTION:misc", {
+    'last_cover_check': 0
+})
 ))

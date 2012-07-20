@@ -325,7 +325,7 @@ class StandardDelegate(AbstractDelegate):
         first line. This is used by PlaylistDelegate to add a small triangle in front of the currently
         playing element."""
         return None
-    
+            
             
 def _join(sep,strings):
     """Join *strings* using *sep* but removing empty strings."""

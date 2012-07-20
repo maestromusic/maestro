@@ -45,7 +45,6 @@ class DelegateStyle:
         self.color = color
             
 
-
 # Some standard styles used in the delegates
 STD_STYLE = DelegateStyle(1,False,False)
 ITALIC_STYLE = DelegateStyle(1,False,True)
