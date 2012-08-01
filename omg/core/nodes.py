@@ -53,7 +53,7 @@ class Node:
         for node in nodes:
             node.parent = self
         self.contents[index:index] = nodes
-        
+    
     def isFile(self):
         """Return whether this node holds a file. Note that this is in general not the opposite of 
         isContainer as e.g. rootnodes are neither."""

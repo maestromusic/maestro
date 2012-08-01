@@ -16,15 +16,16 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import datetime, os, functools, re, locale
+import datetime, locale
+import os
+import functools
+import re
 from collections import OrderedDict
 
 from PyQt4 import QtCore, QtGui
-
 from . import config, strutils
 
 translate = QtCore.QCoreApplication.translate
-
 
 def mapRecursively(f,aList):
     """Take *aList* which may contain (recursively) further lists and apply *f* to each element in these
@@ -107,13 +108,13 @@ def collectFiles(paths):
     """Find all music files below the given *paths*. Return them as dict mapping directory to list of paths
     within."""
     filePaths ={}
-    def add(file, parent = None):
+    def add(file, parent=None):
         if not hasKnownExtension(file):
             return
         dir = parent or os.path.dirname(file)
         if dir not in filePaths:
             filePaths[dir] = []
-        filePaths[dir].append(file)
+        filePaths[dir].append(relPath(file))
     for path in paths:
         if os.path.isfile(path):
             add(path)

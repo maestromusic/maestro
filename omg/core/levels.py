@@ -98,8 +98,8 @@ class DataUndoCommand(QtGui.QUndoCommand):
         
     def undo(self):
         self.level._setData(self.type,{self.element: self.old})
-        
-    
+
+
 class Level(QtCore.QObject):
     #TODO comment
     changed = QtCore.pyqtSignal(ChangeEvent)
@@ -139,6 +139,24 @@ class Level(QtCore.QObject):
         """Load elements for the given paths and return them."""
         ids = [idFromPath(path) for path in paths]
         return self.getFromIds(ids)
+    
+    def reload(self, id):
+        """Reload the file with *id* from the parent level and returns the new version.
+        
+        This will (by means of an undo command) detach the file from all potential parents;
+        afterwards it is reloaded from the parent level (or filesystem, if it is not found
+        there).
+        """
+        assert id in self.elements
+        assert self.get(id).isFile()
+        from . import commands
+        from .. import application
+        for parentId in self.elements[id].parents:
+            command = commands.RemoveElementsCommand(self, parentId,
+                                                     self.get(parentId).contents.getPositions(id))
+            application.stack.push(command)
+        del self.elements[id]
+        return self.get(id)
         
     def loadIntoChild(self,ids,child):
         """Load all elements given by the list of ids *ids* into the level *child*. Do not check whether
@@ -151,10 +169,19 @@ class Level(QtCore.QObject):
             else: notFound.append(id)
         self.parent.loadIntoChild(notFound,self)
         
-    def __contains__(self, id):
-        """Returns if the given id is loaded in this level. Note that if the id could be loaded from the
+    def __contains__(self, arg):
+        """Returns if the given element is loaded in this level.
+        
+        *arg* may be either an ID or a path. Note that if the element could be loaded from the
         parent but is not contained in this level, then *False* is returned."""
-        return self.elements.__contains__(id)
+        
+        if not isinstance(arg, int):
+            try:
+                arg = idFromPath(arg, create=False)
+            except KeyError:
+                #  no id for that path -> element can not be contained
+                return False
+        return self.elements.__contains__(arg)
     
     def __str__(self):
         return 'Level({})'.format(self.name)
@@ -590,13 +617,18 @@ class RealLevel(Level):
                           .format(db.prefix),values)
         db.commit()
         
-def idFromPath(path):
-    """Return the id for the given path. For elements in the database this is a positive number. Otherwise
-    the temporary id is returned or a new one is created."""
+def idFromPath(path, create=True):
+    """Return the id for the given path.
+    
+    For elements in the database this is a positive number. Otherwise if the path is known
+    under a temporary id, that one is returned. If not and *create* is True, a new temporary
+    id is created and returned. Otherwise a KeyError is raised.
+    """
+    
     id = db.idFromPath(path)
     if id is not None:
         return id
-    else: return tIdFromPath(path)
+    else: return tIdFromPath(path, create)
 
 def pathFromId(id):
     if id < 0:
@@ -608,15 +640,22 @@ _currentTId = 0 # Will be decreased by one every time a new TID is assigned
 _tIds = {} # TODO: Is there any chance that items will be removed from here?
 _paths = {}
 
-def tIdFromPath(path):
+def tIdFromPath(path, create=True):
+    """Return the temporary id for *path*, if it exists.
+    
+    If it does not exist and *create* is True, a new one is inserted and returned.
+    Otherwise, a KeyError is raised.
+    """
     if path in _tIds:
         return _tIds[path]
-    else:
+    elif create:
         global _currentTId
         _currentTId -= 1
         _paths[_currentTId] = path
         _tIds[path] = _currentTId
         return _currentTId
+    else:
+        raise KeyError("No id for path '{}' is known".format(path))
 
 def createTId():
     global _currentTId

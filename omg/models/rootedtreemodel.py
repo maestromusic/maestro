@@ -173,9 +173,8 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
                     queue.append(child)
                 yield child
                 
-    def contains(self,node):
+    def __contains__(self,node):
         """Return whether *node* is contained in this model."""
         if node == self.root:
             return True
-        else: return node in node.parent.contents and self.contains(node.parent)
-        
+        else: return node in node.parent.contents and node.parent in self

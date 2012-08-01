@@ -20,9 +20,8 @@ from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
 from .. import application, config, database as db, logging, utils
-from ..core import commands, levels, tags
+from ..core import commands, elements, levels, tags
 from ..core.nodes import RootNode, Wrapper
-from ..core.elements import ContentList, Container
 from ..models import rootedtreemodel, albumguesser
 from .. import modify
 from ..modify import real
@@ -36,7 +35,8 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
     def __init__(self, level, ids = None):
         """Initializes the model. A new RootNode will be set as root.
         
-        If *ids* is given, these elements will be initially loaded under the root node"""
+        If *ids* is given, these elements will be initially loaded under the root node.
+        """
         super().__init__()
         self.level = level
         if ids:
@@ -131,7 +131,11 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
             commands.removeElements(self.level, parent.element.id,
                                     [parent.contents[i].position for i in rows],
                                     self.tr("Remove elements"))
-        
+    
+    def loadFile(self, path):
+        """Load a file into this model. The default implementations calls level.get()."""
+        return self.level.get(path)
+    
     def prepareURLs(self, urls, parent):
         '''This method is called if url MIME data is dropped onto this model, from an external file manager
         or a filesystembrowser widget.'''
@@ -150,7 +154,7 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
                 filesByFolder[folder] = []
                 for file in filesInOneFolder:
                     progress.setValue(progress.value() + 1)
-                    element = self.level.get(file)
+                    element = self.loadFile(file)
                     filesByFolder[folder].append(element)
                     ids.append(element.id)
                     
@@ -167,7 +171,18 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
             print(e)
             return []
         
-            
+    def __contains__(self, arg):
+        """If *arg* is an id, returns if an element with that id is contained. Else call superclass."""
+        if isinstance(arg, int):
+            for node in self.root.getAllNodes():
+                try:
+                    if node.element.id == arg:
+                        return True
+                except AttributeError:
+                    pass  # not an Element
+            return False
+        return super().__contains__(arg)
+    
     def _handleLevelChanged(self, event):
         dataIds = event.dataIds
         contentIds = event.contentIds
@@ -182,7 +197,7 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
     def _changeContents(self, index, new):
         parent = self.data(index, Qt.EditRole)
         old = [ node.element.id for node in parent.contents ]
-        if isinstance(new, ContentList):
+        if isinstance(new, elements.ContentList):
             newP = new.positions
             new = new.ids
         else:
@@ -302,7 +317,7 @@ class MergeCommand(QtGui.QUndoCommand):
                 self.containerID = levels.createTId()
         elif self.level is levels.real:
             db.write.createElementsWithIds([(self.containerID, False, not self.elementParent, len(self.parentChanges), False)])
-        container = Container(self.level, self.containerID, major = False)
+        container = elements.Container(self.level, self.containerID, major = False)
         elements = []
         self.level.elements[self.containerID] = container
         logger.debug("merge: inserted new container with ID {} into level {}".format(self.containerID, self.level))
@@ -374,6 +389,7 @@ class MergeCommand(QtGui.QUndoCommand):
         del self.level.elements[self.containerID]
         self.level.emitEvent(dataIds = list(self.positionChanges.keys()),
                              contentIds = [self.parentID] if self.elementParent else [])            
+
 
 class ChangeRootCommand(QtGui.QUndoCommand):
     def __init__(self, model, old, new, text = "<change root>"):
