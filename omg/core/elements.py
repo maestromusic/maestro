@@ -272,6 +272,10 @@ class ContentList:
             index = bisect.bisect(self.positions, start)
             return self.positions[self.ids[index:].index(id)+index]
     
+    def getPositions(self, id):
+        """Return a list of all positions in which *id* appears."""
+        return [ pos for (pos, theId) in self.items() if theId==id ]
+    
     def getId(self, position):
         """Return the id at position *position*."""
         return self.ids[self.positions.index(position)]

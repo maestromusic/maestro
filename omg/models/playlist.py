@@ -63,7 +63,7 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
 
         if self.current is None:
             self.currentlyPlayingNodes = []
-        elif not self.contains(self.current):
+        elif self.current not in self:
             self.current = None
             self.currentlyPlayingNodes = []
         else:
