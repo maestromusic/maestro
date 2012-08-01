@@ -140,15 +140,15 @@ class SqlTestCase(unittest.TestCase):
         self.assertRaises(db.sql.EmptyResultException,result.getSingleRow)
         
 
+suite = unittest.TestSuite()
+for driver in ["qtsql","pymysql","myconnpy"]:
+    suite.addTest(SqlTestCase("mysql",driver))
+    
+    
 if __name__ == "__main__":
-    # Force temporary values for these config variables (that is, changes to these variables will not be
-    # written to the file).
+    # Force temporary values for these config variables (If an option is set via cmdConfig it will not be
+    # written to the config file even if it is later changed again).
     application.init(cmdConfig=['database.type=mysql','database.mysql_drivers=','database.sqlite_path='],
                      exitPoint='config')
-
-    suite = unittest.TestSuite()
-    for driver in ["qtsql","pymysql","myconnpy"]:
-        suite.addTest(SqlTestCase("mysql",driver))
-    suite.addTest(SqlTestCase("sqlite"))
         
     unittest.TextTestRunner(verbosity=2).run(suite)
