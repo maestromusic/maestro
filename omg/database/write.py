@@ -158,7 +158,7 @@ def makeValueIDs(data):
         except KeyError:
             if tag.type not in valuesToAdd:
                 valuesToAdd[tag.type] = set()
-            valuesToAdd[tag.type].add((tag.id, db._encodeValue(tag.type, value)))
+            valuesToAdd[tag.type].add((tag.id, tag.type.sqlFormat(value)))
     for tagType, values in valuesToAdd.items():
         values = list(values)
         queryString = "INSERT INTO {}values_{} (tag_id, value) VALUES (?,?)".format(db.prefix, tagType)
