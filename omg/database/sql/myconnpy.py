@@ -23,8 +23,11 @@ from ... import utils
 
 class Sql(AbstractSql):
     def connect(self,username,password,database,host="localhost",port=3306,**kwargs):
-        self._db = mysql.connector.Connect(database=database,user=username,password=password,host=host,
-                                           port=port,buffered=True)
+        try:
+            self._db = mysql.connector.Connect(database=database,user=username,password=password,host=host,
+                                               port=port,buffered=True)
+        except mysql.connector.errors.Error as e:
+            raise DBException("DB-connection failed: {}".format(str(e)))
 
     def close(self):
         self._db.close()

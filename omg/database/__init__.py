@@ -123,13 +123,14 @@ def _connect(drivers,authValues, **kwargs):
     
 
 def close():
-    """Close the database connection of this thread. If you use the context manager returned by
+    """Close the database connection of this thread, if present. If you use the context manager returned by
     :func:`connect`, this method is called automatically.
     """
     threadId = threading.current_thread().ident
-    connection = connections[threading.current_thread().ident]
-    del connections[threading.current_thread().ident]
-    connection.close()
+    if threadId in connections:
+        connection = connections[threadId]
+        del connections[threadId]
+        connection.close()
     
 
 def listTables():
