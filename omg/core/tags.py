@@ -446,8 +446,10 @@ def addTagType(tagType,position=None,**data):
             db.query("UPDATE {}tagids SET sort=sort+1 WHERE sort >= ?".format(db.prefix),sort)
     else:
         sort = db.query("SELECT MAX(sort)+1 FROM {}tagids".format(db.prefix)).getSingle()
+        if sort is None: # no tagids so far
+            sort = 1
         position = len(tagList)
-        
+    
     tagType._setData(data)
     
     if tagType.id is not None:
@@ -637,16 +639,9 @@ def init():
         raise RuntimeError()
     
     loadTagTypesFromDB()
-        
-    if config.options.tags.title_tag not in _tagsByName:
-        logger.error("Title tag '{}' is missing in tagids table.".format(config.options.tags.title_tag))
-        raise RuntimeError()
-    if config.options.tags.album_tag not in _tagsByName:
-        logger.error("Album tag '{}' is missing in tagids table.".format(config.options.tags.album_tag))
-        raise RuntimeError()
 
-    TITLE = _tagsByName[config.options.tags.title_tag]
-    ALBUM = _tagsByName[config.options.tags.album_tag]
+    TITLE = get(config.options.tags.title_tag)
+    ALBUM = get(config.options.tags.album_tag)
 
 
 class TagValueList(list):

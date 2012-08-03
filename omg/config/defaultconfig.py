@@ -48,7 +48,7 @@ defaults = OrderedDict((
 }),
 
 ("database",{
-    "type": (str,"mysql",'Either "mysql" or "sqlite".'),
+    "type": (str,"sqlite",'Either "mysql" or "sqlite".'),
     "prefix":  (str,"","Prefix which will be prepended to the table names."),
     
     "mysql_drivers": (list,["qtsql"], "List of drivers OMG will use to try to connect to a MySQL database."),
