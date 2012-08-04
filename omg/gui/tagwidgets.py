@@ -589,20 +589,16 @@ class AddTagTypeDialog(QtGui.QDialog):
                                       self.tr("'{}' is not a valid tagname.").format(tagName))
             return
         title = self.titleLineEdit.text()
-        if len(title) == 0:
-            title = None
-        elif tags.isTitle(title):
+        if tags.isTitle(title):
             QtGui.QMessageBox.warning(self,self.tr("Title exists already"),
                                       self.tr("There is already a tag with title '{}'.").format(title))
             return
+        if len(title) == 0 or title == tagName:
+            title = None
         
-        self.tagType = tags.get(tagName)
-        application.stack.push(tags.TagTypeUndoCommand(constants.ADDED,
-                                                       tagType = self.tagType,
-                                                       type=self.combo.getType(),
-                                                       title=title,
-                                                       iconPath=None,
-                                                       private=self.privateBox.isChecked()))
+        self.tagType = tags.addTagType(tagName,self.combo.getType(),
+                                       title=title,private=self.privateBox.isChecked())
+
         self.accept()
         
     @classmethod
