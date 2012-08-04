@@ -41,10 +41,11 @@ class TestLoader(unittest.TestLoader):
     def __init__(self):
         from omg import application
         from omg.core import tags
-        application.init(cmdConfig=[],type="test",exitPoint='noplugins')
+        # Save the app from the garbage collector
+        self.app = application.init(cmdConfig=[],type="test",exitPoint='noplugins')
         for name,type in  [("artist","varchar"),("title","varchar"),("album","varchar"),("date","date"),
                            ("genre","varchar"),("comment","text")]:
-            tags.addTagType(tags.get(name),type=tags.ValueType.byName(type))
+            tags.addTagType(name,tags.ValueType.byName(type))
             
     def loadTestsFromModule(self,module):
         if hasattr(module,'load_tests'):

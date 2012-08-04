@@ -36,12 +36,26 @@ class SqlTestCase(unittest.TestCase):
     def __init__(self,type,driver=None):
         super().__init__()
         self.type, self.driver = type, driver
+    
+    # setUpClass is called before the first test of this class, tearDownClass after the last one. They
+    # contain an ugly hack to save the usual test database during the tests of this module. That database
+    # is in memory and would be lost if we closed the connection to test a different db connector.
+    @classmethod
+    def setUpClass(cls):
+        import threading
+        cls.oldConnection = db.connections[threading.current_thread().ident]
+        # make the database module believe that we did not connect to the database yet
+        del db.connections[threading.current_thread().ident]
+         
+    @classmethod
+    def tearDownClass(cls):
+        import threading
+        config.options.database.type = 'sqlite'
+        db.connections[threading.current_thread().ident] = cls.oldConnection
         
     def setUp(self):
-        db.close()
         if self.type == 'sqlite':
             config.options.database.type = 'sqlite'
-            config.options.database.sqlite_path = ':memory:'
             print("Checking SQLite...")
         else:
             config.options.database.type = 'mysql'
