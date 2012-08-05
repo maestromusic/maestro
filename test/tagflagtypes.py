@@ -19,7 +19,7 @@
 import unittest
 
 from omg import application, database as db
-from omg.core import tags
+from omg.core import flags, tags
 
 
 class TagTypeTestCase(unittest.TestCase):
@@ -83,6 +83,62 @@ class TagTypeTestCase(unittest.TestCase):
         
         tags.moveTagType(newTag,0)
         self.check(("text",None,None,False,0))
+        
+        self.checkUndo()
+        
+        
+class FlagTypeTestCase(unittest.TestCase):
+    def setUp(self):
+        application.stack.clear()
+        self.checks = []
+        
+    def check(self,name,iconPath,redo=True):
+        result = db.query("SELECT name,icon FROM {}flag_names WHERE name='testflag' OR name='testflag2'"
+                .format(db.prefix))
+        if name is None: # no flag should exist
+            self.assertRaises(db.sql.EmptyResultException,result.getSingle)
+        else:
+            for dbName,dbIconPath in result:
+                if db.isNull(dbIconPath):
+                    dbIconPath = None
+                flag = flags.get(name)
+                self.assertEqual(flag.name,name)
+                self.assertEqual(dbName,name)
+                self.assertEqual(flag.iconPath,iconPath)
+                self.assertEqual(dbIconPath,iconPath)
+                break;
+            else: self.fail() # two flags found by the db query
+            
+        if redo:
+            self.checks.append((name,iconPath,application.stack.index()))
+    
+    def checkUndo(self):
+        """Undo all changes and do the checks again at the right moments."""
+        for name,iconPath,index in reversed(self.checks):
+            application.stack.setIndex(index)
+            self.check(name,iconPath,redo=False)
+        
+        application.stack.setIndex(0)
+        self.check(None,None,redo=False) # all steps undone
+        
+    def runTest(self):
+        flagType = flags.addFlagType('testflag')
+        self.check('testflag',None)
+        
+        flags.changeFlagType(flagType,iconPath='testpath')
+        self.check('testflag','testpath')
+        
+        flags.changeFlagType(flagType,name='testflag2')
+        self.check('testflag2','testpath')
+        
+        flags.changeFlagType(flagType,iconPath=None)
+        self.check('testflag2',None)
+        
+        flags.deleteFlagType(flagType)
+        self.check(None,None)
+        
+        flags.addFlagType('testflag',iconPath='testpath2')
+        self.check('testflag','testpath2')
         
         self.checkUndo()
         
