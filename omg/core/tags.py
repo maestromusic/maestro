@@ -432,7 +432,8 @@ def addTagType(tagType,type,**data):
     
     
 def _addTagType(tagType,**data):
-    """Like addTagType, but not undoable. The valueType must be given as keyword-argument *type*."""
+    """Similar to addTagType, but not undoable. *tagType* must be an external Tag instance. Its value-type
+    must be given as keyword-argument 'type'."""
     assert not tagType.isInDB()
     assert tagType.name in _tagsByName # if the tag was created with get, it is already contained there
     assert 'type' in data

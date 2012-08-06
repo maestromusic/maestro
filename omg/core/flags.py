@@ -116,6 +116,8 @@ def allFlags():
 
 
 def addFlagType(name,**data):
+    """Add a new flagtype with the given name to the database. *data* may be used to set attributes. 
+    Currently only 'iconPath' is supported."""
     if exists(name):
         raise ValueError("There is already a flag with name '{}'.".format(name))
     if not isValidFlagname(name):
@@ -126,12 +128,11 @@ def addFlagType(name,**data):
     
     
 def _addFlagType(**data):
-    """Adds a new flagType to the database. The keyword arguments may contain either
+    """Like addFlagType, but not undoable. The keyword arguments may contain either
     
         - a single argument 'flagType': In this case the given flagType is inserted into the database and
           some internal lists. Use this to undo a flagType's deletion.
-        - a subset of the arguments of Flag.__init__. In this case this data is used to create a new flag.
-          The subset must not contain 'id' and must contain at least 'name'.
+        - a 'name' and optionally an 'iconPath'
           
     After creation the a FlagTypeChangedEvent is emitted.
     """
@@ -157,11 +158,12 @@ def _addFlagType(**data):
 
 
 def deleteFlagType(flagType):
+    """Delete a flagtype from the database."""
     application.stack.push(FlagTypeUndoCommand(DELETE,flagType))
     
     
 def _deleteFlagType(flagType):
-    """Delete the given *flagType* from the database and emit a FlagTypeChangedEvent."""
+    """Like deleteFlagType but not undoable."""
     if not exists(flagType.name):
         raise ValueError("Cannot remove flagtype '{}' because it does not exist.".format(flagType))
     
@@ -173,17 +175,17 @@ def _deleteFlagType(flagType):
 
 
 def changeFlagType(flagType,**data):
+    """Change a flagtype. The attributes that should be changed must be specified by keyword arguments.
+    Supported are 'name' and 'iconPath':
+
+        changeFlagType(flagType,name='Great',iconPath=None)
+    
+    """
     application.stack.push(FlagTypeUndoCommand(CHANGE,flagType,**data))
     
     
 def _changeFlagType(flagType,**data):
-    """Change the name and/or iconPath of *flagType* in the database and emit an event. The keyword arguments
-    determine which properties should be changed::
-
-        changeFlagType(flagType,name='Great',iconPath=None)
-        
-    Allowed keyword arguments are the arguments of Flag.__init__ except id.
-    """
+    """Like changeFlagType but not undoable."""
     # Below we will build a query like UPDATE flag_names SET ... using the list of assignments (e.g. (name=?).
     # The parameters will be sent with the query to replace the questionmarks.
     assignments = []
@@ -214,16 +216,8 @@ def _changeFlagType(flagType,**data):
 
 class FlagTypeUndoCommand(QtGui.QUndoCommand):
     """This command adds, changes or deletes a flagtype. Which keyword arguments are necessary depends on the
-    first parameter *action* which may be one of
-    
-        - constants.ADDED: In this case *data* must be a subset of the arguments of Flag.__init__ including
-          'name' and excluding 'id' (the id is generated automatically by the database).
-        - constants.CHANGED: This will change the flagType specified in the argument *flagType* according to
-          the other arguments, which may be a subset of the arguments of Flag.__init__ except of 'id':
-          
-              FlagTypeUndoCommand(flagType=flagType,name='Great',iconPath=None)
-              
-        - constants.DELETED: A single argument *flagType*. The given flagType will be removed.
+    first argument *action*. Use the methods addFlagType, deleteFlagType and changeFlagType instead of
+    creating a command directly.
     """
     def __init__(self,action,flagType=None,**data):
         texts = {ADD:   translate("FlagTypeUndoCommand","Add flagType"),
@@ -271,8 +265,6 @@ class FlagTypeChangedEvent(ChangeEvent):
         assert action in constants.CHANGE_TYPES
         self.action = action
         self.flagType = flagType
-
-
 
 
 class FlagDifference:
