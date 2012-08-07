@@ -100,12 +100,16 @@ class TestCase(unittest.TestCase):
             
             self.checkUndo()
             
+            self.checks = []
+            
             # Restore the state to check whether commit works
             level.commit()
             self.check('contents',(self.C1,[self.F1]))
             self.check('parents',(self.F1,[self.C1]))
             self.check('parents',(self.F2,[]))
             self.check('parents',(self.F3,[]))
+            
+            self.checkUndo()
 
         
 def load_tests(loader, standard_tests, pattern):

@@ -243,7 +243,16 @@ class CommitCommand(QtGui.QUndoCommand):
                 if id in self.flagChanges:
                     self.flagChanges[id].revert(pElem.flags)
                 if id in self.contentsChanges:
-                    pElem.contents = self.contentsChanges[id][0].copy()
+                    oldContents, newContents = self.contentsChanges[id]
+                    pElem.contents = oldContents.copy()
+                    # Update parents
+                    for child in oldContents.ids:
+                        if child not in newContents.ids:
+                            self.level.parent.get(child).parents.append(id)
+                    for child in newContents.ids:
+                        if child not in oldContents.ids:
+                            self.level.parent.get(child).parents.remove(id)               
+                            
                 if id in self.pathChanges:
                     pElem.path = self.pathChanges[id][0]
         
