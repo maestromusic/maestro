@@ -22,7 +22,7 @@ from PyQt4.QtCore import Qt
 from . import tags, flags
 from .elements import File, Container
 from .nodes import Wrapper
-from .. import database as db, realfiles, utils, config, logging
+from .. import application, database as db, realfiles, utils, config, logging
 from ..database import write as dbwrite
 from ..application import ChangeEvent
 
@@ -36,8 +36,7 @@ logger = logging.getLogger(__name__)
 def init():
     global real,editor
     real = RealLevel()
-    from ..models import leveltreemodel
-    editor = Level("EDITOR", real)
+    editor = Level("EDITOR",real)
     
 
 class ElementGetError(RuntimeError):
@@ -107,11 +106,13 @@ class Level(QtCore.QObject):
     whose tags, flags, major status, ... has changed (things affecting only the element itself). The second list
     contains IDs of containers whose contents have changed."""
     
-    def __init__(self, name, parent):
+    def __init__(self, name, parent, stack=None):
         super().__init__()
         self.name = name
         self.parent = parent
         self.elements = {}
+        self.stack = stack if stack is not None else application.stack
+        
         if config.options.misc.debug_events:
             def _debugAll(event):
                 logger.debug("EVENT[{}]: {}".format(self.name,str(event)))
@@ -140,24 +141,6 @@ class Level(QtCore.QObject):
         ids = [idFromPath(path) for path in paths]
         return self.getFromIds(ids)
     
-    def reload(self, id):
-        """Reload the file with *id* from the parent level and returns the new version.
-        
-        This will (by means of an undo command) detach the file from all potential parents;
-        afterwards it is reloaded from the parent level (or filesystem, if it is not found
-        there).
-        """
-        assert id in self.elements
-        assert self.get(id).isFile()
-        from . import commands
-        from .. import application
-        for parentId in self.elements[id].parents:
-            command = commands.RemoveElementsCommand(self, parentId,
-                                                     self.get(parentId).contents.getPositions(id))
-            application.stack.push(command)
-        del self.elements[id]
-        return self.get(id)
-        
     def loadIntoChild(self,ids,child):
         """Load all elements given by the list of ids *ids* into the level *child*. Do not check whether
         elements are already loaded there."""
@@ -189,6 +172,48 @@ class Level(QtCore.QObject):
     def emitEvent(self,dataIds=None,contentIds=None):
         """Simple shortcut to emit an event."""
         self.changed.emit(ElementChangedEvent(dataIds,contentIds))
+    
+    def insertContents(self,parent,index,contents):
+        from . import commands
+        commands.insertElements(self,parent.id,index,[c.id for c in contents])
+        
+    def removeContents(self,parent,indexes):
+        from . import commands
+        commands.removeElements(self,parent.id,[parent.contents.positions[i] for i in indexes])
+   
+    def commit(self,ids=None):
+        from . import commands
+        if ids is None:
+            ids = list(self.elements.keys())
+        self.stack.push(commands.CommitCommand(self,ids))
+    
+    
+    
+    
+    
+    
+    
+    def reload(self, id):
+        """Reload the file with *id* from the parent level and return the new version.
+        
+        This will (by means of an undo command) detach the file from all potential parents;
+        afterwards it is reloaded from the parent level (or filesystem, if it is not found
+        there).
+        """
+        assert id in self.elements
+        assert self.get(id).isFile()
+        from . import commands
+        from .. import application
+        for parentId in self.elements[id].parents:
+            command = commands.RemoveElementsCommand(self, parentId,
+                                                     self.get(parentId).contents.getPositions(id))
+            application.stack.push(command)
+        del self.elements[id]
+        return self.get(id)
+        
+   
+        
+    
   
     def addTagValue(self,tag,value,elements,emitEvent=True):
         """Add a tag of type *tag* and value *value* to the given elements. If *emitEvent* is False, do not
@@ -617,6 +642,7 @@ class RealLevel(Level):
                           .format(db.prefix),values)
         db.commit()
         
+        
 def idFromPath(path, create=True):
     """Return the id for the given path.
     
@@ -630,15 +656,18 @@ def idFromPath(path, create=True):
         return id
     else: return tIdFromPath(path, create)
 
+
 def pathFromId(id):
     if id < 0:
         return pathFromTId(id)
     else:
         return db.path(id)
 
+
 _currentTId = 0 # Will be decreased by one every time a new TID is assigned
 _tIds = {} # TODO: Is there any chance that items will be removed from here?
 _paths = {}
+
 
 def tIdFromPath(path, create=True):
     """Return the temporary id for *path*, if it exists.
@@ -657,10 +686,12 @@ def tIdFromPath(path, create=True):
     else:
         raise KeyError("No id for path '{}' is known".format(path))
 
+
 def createTId():
     global _currentTId
     _currentTId -= 1
     return _currentTId
+
 
 def pathFromTId(tid):
     return _paths[tid]

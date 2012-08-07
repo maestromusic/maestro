@@ -31,6 +31,9 @@ def load_tests(loader, standard_tests, pattern):
     from . import tagflagtypes
     suite.addTests(loader.loadTestsFromModule(tagflagtypes))
     
+    from . import levels
+    suite.addTests(loader.loadTestsFromModule(levels))
+    
     from . import realfiles
     suite.addTests(loader.loadTestsFromModule(realfiles))
     

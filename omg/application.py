@@ -167,6 +167,10 @@ def run(cmdConfig=[],type='gui',exitPoint=None):
     if exitPoint == 'tags':
         return app
     
+    # Initialize stack before levels are initialized    
+    global stack
+    stack = QtGui.QUndoStack()
+    
     # Load and initialize remaining modules
     from .core import levels
     levels.init()
@@ -174,11 +178,6 @@ def run(cmdConfig=[],type='gui',exitPoint=None):
     from .core import covers
     search.init()
     covers.init()
-    
-    # Initialize stack (because most models need the stack we create it before the noplugins-exitpoint, so
-    # that it is available for console scripts/unittests)    
-    global stack
-    stack = QtGui.QUndoStack()
     
     global network
     network = QtNetwork.QNetworkAccessManager()
