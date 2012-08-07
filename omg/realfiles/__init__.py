@@ -93,8 +93,8 @@ try:
             # instead of just reporting an error.
             if not os.path.exists(path):
                 raise OSError('file does not exist')
-            RealFile.__init__(self, path)
             self._f = taglib.File(path)
+            RealFile.__init__(self, path)
         
         def read(self):
             self.tags = tags.Storage()

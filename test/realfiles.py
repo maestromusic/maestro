@@ -18,6 +18,7 @@ from omg.core import tags
 PATH_BASE = os.path.join(os.getcwd(),os.path.dirname(__file__))
 PATH_EMPTY = os.path.join(PATH_BASE,'realfiles/empty')
 PATH_FULL = os.path.join(PATH_BASE,'realfiles/full')
+PATH_INVALID = os.path.join(PATH_BASE,'realfiles/invalid')
 PATH_TEST = os.path.join(PATH_BASE,'realfiles/test')
 
 ORIGINAL_TAGS = {
@@ -44,6 +45,7 @@ class BaseTest(unittest.TestCase):
         super().__init__()
         self.full = PATH_FULL + "." + ext
         self.empty = PATH_EMPTY + "." + ext
+        self.invalid = PATH_INVALID + "." + ext
         self.test = PATH_TEST + "." + ext
 
    
@@ -96,6 +98,18 @@ class EmptyFileTest(BaseTest):
         os.remove(self.test)
 
 
+class InvalidTagsTest(BaseTest):
+    def setUp(self):
+        shutil.copyfile(self.invalid,self.test)
+        
+    def runTest(self):
+        self.file = realfiles.get(self.test)
+        tag = tags.get('artist')
+        self.assertEqual(list(self.file.tags.keys()),[tag])
+        self.assertTrue(len(self.file.tags[tag]) == 1)
+        self.assertTrue(tag.isValid(self.file.tags[tag][0]))
+
+
 class WriteTest(BaseTest):
     def setUp(self):
         shutil.copyfile(self.full,self.test)
@@ -122,6 +136,7 @@ def load_tests(loader=None, standard_tests=None, pattern=None):
         suite.addTest(RemoveTest(ext))
         suite.addTest(EmptyFileTest(ext))
         suite.addTest(WriteTest(ext))
+    suite.addTest(InvalidTagsTest('ogg')) # invalid tag handling is independent of file format
     return suite
 
 if __name__ == "__main__":
