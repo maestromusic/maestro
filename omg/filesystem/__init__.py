@@ -154,7 +154,6 @@ class FileSystemSynchronizer(QtCore.QThread):
         
         dbTags = db.tags(id)
         rfile = realfiles.get(path)
-        rfile.read()
         if dbTags.withoutPrivateTags() != rfile.tags:
             logger.debug('Detected modification on file "{}": tags differ'.format(path))
             self.modifiedTags[id] = (dbTags, rfile.tags)

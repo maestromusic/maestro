@@ -57,7 +57,6 @@ class ReadTest(BaseTest):
         self.file = realfiles.get(self.full)
 
     def runTest(self):
-        self.file.read()
         self.assertEqual(self.file.position,ORIGINAL_POSITION)
         for key,values in self.file.tags.items():
             self.assertEqual(values,ORIGINAL_TAGS[key])
@@ -71,7 +70,6 @@ class RemoveTest(BaseTest):
     def setUp(self):
         shutil.copyfile(self.full,self.test)
         self.file = realfiles.get(self.test)
-        self.file.read()
 
     def runTest(self):
         tagsToRemove = [tags.get(name) for name in ('artist','title','conductor','notexistent2')]
@@ -87,7 +85,6 @@ class EmptyFileTest(BaseTest):
     def setUp(self):
         shutil.copyfile(self.empty,self.test)
         self.file = realfiles.get(self.test)
-        self.file.read()
 
     def runTest(self):
         self.file.tags[tags.get('artist')] = ['Someone','Everyone']
@@ -103,7 +100,6 @@ class WriteTest(BaseTest):
     def setUp(self):
         shutil.copyfile(self.full,self.test)
         self.file = realfiles.get(self.test)
-        self.file.read()
 
     def runTest(self):
         self.file.tags = TAGS_TO_WRITE

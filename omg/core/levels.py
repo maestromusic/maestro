@@ -517,7 +517,6 @@ class RealLevel(Level):
             rpath = utils.relPath(path)
             try:
                 real = realfiles.get(path)
-                real.read()
                 fileTags = real.tags
                 length = real.length
                 filePosition = real.position
@@ -594,7 +593,6 @@ class RealLevel(Level):
                 continue
             try:
                 real = realfiles.get(element.path)
-                real.read()
                 real.tags = element.tags.withoutPrivateTags()
                 real.saveTags()
             except IOError as e:

@@ -106,7 +106,6 @@ def changeFlags(changes, reverse = False):
 
 def changeFileTags(path, tagDiff, reverse = False):
     file = realfiles.get(path)
-    file.read()
     if reverse:
         tagDiff.revert(file.tags, False)
     else:

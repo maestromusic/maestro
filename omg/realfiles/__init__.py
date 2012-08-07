@@ -51,6 +51,8 @@ class RealFile:
         self.tags = tags.Storage()
         self.length = None
         self.position = None
+        
+        self.read()
   
     def read(self):
         """Read the tags of the file and convert them according to a tags.Storage object according to
@@ -100,13 +102,10 @@ try:
             if "TRACKNUMBER" in self._f.tags:
                 # Further tracknumbers are ignored
                 self.position = parsePosition(self._f.tags["TRACKNUMBER"][0]) 
-            toDelete = []
             for key,values in self._f.tags.items():
                 key = key.lower()
                 if key in ["tracknumber", "discnumber"]:
                     self.ignoredTags[key] = values
-                elif key in config.options.tags.always_delete:
-                    toDelete.append(key)
                 else:
                     tag = tags.get(key)
                     validValues = []
@@ -117,11 +116,10 @@ try:
                             logger.error("Invalid value for tag '{}' found: {}".format(tag.name,string))
                     if len(validValues) > 0:
                         self.tags.add(tag, *validValues)
-                        
-            self.remove(toDelete)        
+                               
             self.length = self._f.length
             
-        def saveTags(self, reallySave = True):
+        def saveTags(self, reallySave=True):
             self._f.tags = dict()
             for tag, values in self.ignoredTags.items():
                 self._f.tags[tag.upper()] = values
@@ -131,14 +129,14 @@ try:
             if reallySave:
                 self._f.save()
         
-        def savePosition(self, reallySave = True):
+        def savePosition(self, reallySave=True):
             self._f.tags["TRACKNUMBER"] = str(self.position)
             if reallySave:
                 self._f.save()
         
         def save(self):
             """Reimplemented for efficiency: Only call self._f.save() once."""
-            self.saveTags(False)
+            self.saveTags(reallySave=False)
             self.savePosition()
         
         def remove(self, tagList):
