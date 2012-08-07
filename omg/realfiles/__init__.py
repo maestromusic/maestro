@@ -16,11 +16,10 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import subprocess, pickle, re, os
+import re, os
 
-from .. import config, logging
+from .. import config, logging, utils
 from ..core import tags
-from ..utils import absPath
 
 logger = logging.getLogger(__name__)
 
@@ -28,12 +27,13 @@ logger = logging.getLogger(__name__)
 def get(path):
     """Create a RealFile-instance for the given path, which may be a relative or absolute path."""
     if not os.path.isabs(path):
-        path = absPath(path)
+        path = utils.absPath(path)
     return rfClass(path)
 
 
 def parsePosition(string):
-        """Parse a string like "7" or "2/5" to a (integer) position. If <string> has the form "2/5", the first number will be returned."""
+        """Parse a string like "7" or "2/5" to a (integer) position. If *string* has the form "2/5", the
+        first number will be returned."""
         string = string.strip()
         if string.isdecimal():
             return int(string)
@@ -51,15 +51,15 @@ class RealFile:
         self.tags = tags.Storage()
         self.length = None
         self.position = None
-
-    
+  
     def read(self):
         """Read the tags of the file and convert them according to a tags.Storage object according to
         OMG's internal rules."""
         raise NotImplementedError()
     
     def remove(self,tags):
-        """Remove the tags in the given list from the file. If a tag from the list is not contained in the file, skip it without warning."""
+        """Remove the tags in the given list from the file. If a tag from the list is not contained in the 
+        file, skip it without warning."""
         raise NotImplementedError()
 
     def saveTags(self):
@@ -67,7 +67,8 @@ class RealFile:
         raise NotImplementedError()
         
     def savePosition(self):
-        """Store the position that is currently stored in self.position or remove it from the file if self.position is None."""
+        """Store the position that is currently stored in self.position or remove it from the file if
+        self.position is None."""
         raise NotImplementedError()
         
     def save(self):
@@ -75,10 +76,13 @@ class RealFile:
         self.saveTags()
         self.savePosition()
 
+
 rfClass = None
+
 
 try:
     import taglib
+    
     class TagLibFile(RealFile):
         """A RealFile implementation using pytaglib, the wrapper for taglib."""
         def __init__(self, path):
@@ -94,7 +98,8 @@ try:
             self.tags = tags.Storage()
             self.ignoredTags = dict()
             if "TRACKNUMBER" in self._f.tags:
-                self.position = parsePosition(self._f.tags["TRACKNUMBER"][0])  # Further tracknumbers are ignored
+                # Further tracknumbers are ignored
+                self.position = parsePosition(self._f.tags["TRACKNUMBER"][0]) 
             toDelete = []
             for key,values in self._f.tags.items():
                 key = key.lower()
@@ -103,16 +108,18 @@ try:
                 elif key in config.options.tags.always_delete:
                     toDelete.append(key)
                 else:
-                    self._parseAndAdd(key, values)
+                    tag = tags.get(key)
+                    validValues = []
+                    for string in values:
+                        try:
+                            validValues.append(tag.valueFromString(string,crop=True))
+                        except ValueError:
+                            logger.error("Invalid value for tag '{}' found: {}".format(tag.name,string))
+                    if len(validValues) > 0:
+                        self.tags.add(tag, *validValues)
                         
             self.remove(toDelete)        
             self.length = self._f.length
-            
-        def _parseAndAdd(self, key, values):
-            tag = tags.get(key)
-            vals = [ tag.valueFromString(value) for value in values]
-            if len(vals) > 0:
-                self.tags.add(tag, *vals)
             
         def saveTags(self, reallySave = True):
             self._f.tags = dict()
@@ -153,3 +160,4 @@ except ImportError:
 
 if not rfClass:
     logger.error('Could not load any realfiles backend!! :(')
+    

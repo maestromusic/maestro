@@ -137,9 +137,9 @@ def getPixmap(name):
 
 
 class FlexiDate:
-    """A FlexiDate is a date which can store a date consisting simply of a year or of a year and a month or of
-    year, month and day. OMG uses this class to store tags of type date, where most users will only specify a
-    year, but some may give month and day, too.
+    """A FlexiDate is a date which can store a date consisting simply of a year or of a year and a month or
+    of year, month and day. OMG uses this class to store tags of type date, where most users will only
+    specify a year, but some may give month and day, too.
 
     Note that while MySQL's DATE type can store dates where day and month may be unspecified, neither
     datetime.date nor QDate can. Thus binding FlexiDates to SQL-queries does not work. For this reason
@@ -203,9 +203,11 @@ class FlexiDate:
         return tr[dateOrder[0]] + FlexiDate._sep1 + tr[dateOrder[1]] + FlexiDate._sep2 + tr[dateOrder[2]]
         
     @staticmethod
-    def strptime(string):
-        """Parse FlexiDates from strings in a format depending on the locale.
-        Raise a :exc:`ValueError` if that fails."""
+    def strptime(string,crop=False):
+        """Parse FlexiDates from strings in a format depending on the locale. Raise a ValueError if that
+        fails.
+        If *crop* is True, the method is allowed to crop *string* to obtain a valid value.
+        """
         assert isinstance(string, str)
         
         # check for the default file format yyyy-mm-dd first
@@ -214,19 +216,25 @@ class FlexiDate:
         # YYYY-MM-DD HH:MM
         # YYYY-MM-DD HH
         # These formats are allowed in the ID3 specification and used by Mutagen
-        if re.match("\d{4}-\d{2}-\d{2} \d{2}(:\d{2}){0,2}$",string) is not None:
+        if crop and re.match("\d{4}-\d{2}-\d{2} \d{2}(:\d{2}){0,2}$",string) is not None:
             from . import logging
             logging.getLogger(__name__).warning("dropping time of day in date string '{}'".format(string))
             string = string[:10]
+            
         try:
-            y,m,d = map(lambda v: None if v is None else int(v), re.match("(\d{4})(?:-(\d{2})(?:\-(\d{2}))?)?", string).groups() )
+            y,m,d = map(lambda v: None if v is None else int(v),
+                        re.match("(\d{4})(?:-(\d{2})(?:\-(\d{2}))?)?", string).groups() )
             return FlexiDate(y, m, d)
         except AttributeError: # if no match, re.match returns None -> has no attr "groups"
             pass
+        
         # now use locale
         string = strutils.replace(string,{'/':'-','.':'-'}) # Recognize all kinds of separators
-        numbers = [int(n) for n in string.split('-')]
-        if len(numbers) > 3:
+        try:
+            numbers = [int(n) for n in string.split('-')]
+            if len(numbers) > 3:
+                raise ValueError()
+        except ValueError:
             raise ValueError('Invalid date format: "{}"'.format(string))
         FlexiDate._initFormat()
         dateOrder = FlexiDate._dateOrder[len(numbers)-1]

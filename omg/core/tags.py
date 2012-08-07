@@ -200,14 +200,32 @@ class ValueType:
                 return type
         else: raise IndexError("There is no value type with name '{}'.".format(name))
 
-    def valueFromString(self, string):
+    def valueFromString(self, string, crop=False):
         """Convert a string (which must be valid for this value type) to the preferred representation of
-        values of this type. Currently, this method does nothing except converting strings to FlexiDate
-        if this is the date-type.
+        values of this type. Always return a valid value for this type. If that is not possible, raise a
+        ValueError.
+        
+        If *crop* is True, the method is allowed to crop *string* to obtain a valid value.
         """
         if self == TYPE_DATE:
-            return utils.FlexiDate.strptime(string)
-        else: return string
+            return utils.FlexiDate.strptime(string,crop)
+        elif self == TYPE_TEXT:
+            if len(string) > 0:
+                return string
+            else: raise ValueError("text tags must have length > 0")
+        else: # TYPE_VARCHAR
+            if len(string) == 0:
+                raise ValueError("varchar tags must have length > 0")
+            if len(string.encode()) > constants.TAG_VARCHAR_LENGTH:
+                if crop:
+                    logger.warning('Cropping a string that is too long for varchar tags: {}...'
+                                   .format(string[:30]))
+                    # Of course this might split in the middle of a unicode character. But errors='ignore'
+                    # will silently remove the fragments 
+                    encoded = string.encode()[:constants.TAG_VARCHAR_LENGTH]
+                    return encoded.decode(errors='ignore')
+                else: raise ValueError("String is too long for a varchar tag: {}...".format(string[:30]))
+            return string
     
     def fileFormat(self, value):
         """Return value as a string suitable for writing to a file. This currently makes a difference only
@@ -234,7 +252,7 @@ class Tag:
     """
         A tagtype like 'artist'. 'title', etc.. Public attributes of tags are
         
-            * id: The id of the tag. This is None for tags that have never been in the database (see isInDB).
+            * id: The id of the tag. This is None for tags that are not in the database.
             * name: The name of the tag,
             * type: The value-type of this tag (e.g. varchar) as instance of ValueType,
             * title: A nice title to be displayed to the user (usually a translation of the name),
@@ -328,10 +346,11 @@ class Tag:
             return newTag.type.valueFromString(value)
         return self.type.convertValue(newTag.type,value)
      
-    def valueFromString(self, string):
-        """Get a value for this tag from a string."""
+    def valueFromString(self, string, crop=False):
+        """Get a value for this tag from a string. If *crop* is True, the method is allowed to crop *string*
+        to obtain a valid value."""
         if self.type is not None:
-            return self.type.valueFromString(string)
+            return self.type.valueFromString(string,crop)
         else: return string
         
     def fileFormat(self, string):
@@ -342,6 +361,8 @@ class Tag:
     
     def sqlFormat(self,value):
         """Convert *value* into a string that can be inserted into database queries."""
+        if self.type is None:
+            raise ValueError("sqlFormat can only be used with internal tags.")
         return self.type.sqlFormat(value)
 
     def __repr__(self):
