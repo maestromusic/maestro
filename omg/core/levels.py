@@ -522,7 +522,7 @@ class RealLevel(Level):
     
     def insertChildren(self, parentId, insertions):
         db.write.addContents([(parentId, pos, id) for pos,id in insertions])
-        super().removeChildren(parentId, insertions)
+        super().insertChildren(parentId, insertions)
         
     def removeChildren(self, parentId, positions):
         db.write.removeContents([(parentId, pos) for pos in positions])
