@@ -18,12 +18,12 @@
 
 """Unittests for the PlaylistModel."""
 
-import sys, unittest, os.path
-sys.path.insert(0,os.path.normpath(os.path.join(os.getcwd(),os.path.dirname(__file__),'../')))
+import unittest
 
 from omg import application, config, database as db, utils
 from omg.models import playlist as playlistmodel
-from testlevel import *
+
+from .testlevel import *
 
 
 class PseudoBackend:
@@ -48,7 +48,7 @@ class PseudoBackend:
 
 class PlaylistTestCase(unittest.TestCase):
     """Base test case for playlist test cases."""
-    def __init__(self,level,playlist):
+    def __init__(self,level,playlist=None):
         super().__init__()
         self.level = level
         self.playlist = playlist
@@ -366,47 +366,44 @@ class MoveTestCase(PlaylistTestCase):
         self.checkUndo()
     
 
-class TestSuite(unittest.TestSuite):
-    def __init__(self):
-        super().__init__()
-    
-        level = TestLevel()
-        level.addAlbum('A')
-        level.addAlbum('B')
-        level.addAlbum('C')
-        level.addAlbum('D')
-        level.addAlbum('E')
-        level.addContainer('X')
-        level.addContainer('Y')
-        level.addContainer('Z')
-        level.addContainer('T')
-        level.addChild('T','X')
-        level.addChild('T','Y')
-        level.addChild('X','A')
-        level.addChild('X','B')
-        level.addChild('X','C')
-        level.addChild('Y','C')
-        level.addChild('Y','D')
-        level.addContainer('Pl')
-        level.addChild('Pl','A1')
-        level.addChild('Pl','A2')
-        level.addChild('Pl','E3')
-        level.addChild('Pl','D4')
-        level.addChild('Pl','D5')
-    
-        #print({id: element.tags[tags.TITLE][0] for id,element in level.elements.items()})
+def load_tests(loader, standard_tests, pattern):
+    # See http://docs.python.org/py3k/library/unittest.html#load-tests-protocol
+    suite = unittest.TestSuite()
         
-        playlist = playlistmodel.PlaylistModel(backend=PseudoBackend(),level=level)
-        
-        self.addTest(InsertTestCase(level,playlist))
-        self.addTest(RemoveTestCase(level,playlist))
-        self.addTest(MoveTestCase(level,playlist))
+    level = TestLevel()
+    level.addAlbum('A')
+    level.addAlbum('B')
+    level.addAlbum('C')
+    level.addAlbum('D')
+    level.addAlbum('E')
+    level.addContainer('X')
+    level.addContainer('Y')
+    level.addContainer('Z')
+    level.addContainer('T')
+    level.addChild('T','X')
+    level.addChild('T','Y')
+    level.addChild('X','A')
+    level.addChild('X','B')
+    level.addChild('X','C')
+    level.addChild('Y','C')
+    level.addChild('Y','D')
+    level.addContainer('Pl')
+    level.addChild('Pl','A1')
+    level.addChild('Pl','A2')
+    level.addChild('Pl','E3')
+    level.addChild('Pl','D4')
+    level.addChild('Pl','D5')
 
-
+    #print({id: element.tags[tags.TITLE][0] for id,element in level.elements.items()})
+    
+    playlist = playlistmodel.PlaylistModel(backend=PseudoBackend(),level=level)
+    
+    suite.addTest(InsertTestCase(level,playlist))
+    suite.addTest(RemoveTestCase(level,playlist))
+    suite.addTest(MoveTestCase(level,playlist))
+    
+    return suite
+    
 if __name__ == "__main__":
-    application.init(exitPoint='noplugins')
-    suite = TestSuite()
-    unittest.TextTestRunner(verbosity=2).run(suite)
-else:
-    suite = TestSuite()
+    print("To run this test use: python setup.py test --test-suite=test.playlistmodel")
     

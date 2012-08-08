@@ -28,7 +28,6 @@ from PyQt4.QtCore import Qt
 
 from . import config, logging, constants
 
-
 logger = None # Will be set when logging is initialized
         
 # The application's main window
@@ -58,13 +57,18 @@ class ChangeEventDispatcher(QtCore.QObject):
 dispatcher = None
  
 
-def run(cmdConfig=[],exitPoint=None,console=False):
+def run(cmdConfig=[],type='gui',exitPoint=None):
     """This is the entry point of OMG. With the default arguments OMG will start the GUI. Use init if you
     only want to initialize the framework without starting the GUI.
     
     *cmdConfig* is a list of options given on the command line that will
     overwrite the corresponding option from the file or the default. Each list item has to be a string like
     ``main.collection=/var/music``.
+    
+    *type* is determines how the application should be initialized and run: "gui" will start the usual
+    application, "console" will initialize the framework without starting the the GUI. "test" is similar
+    to "console" but will connect to an in-memory SQLite-database instead of the usual database. All tables
+    will be created and empty in this database.
     
     Using the optional argument *exitPoint* you may also initialize only part of the framework. Allowed
     values are (in this order):
@@ -76,8 +80,6 @@ def run(cmdConfig=[],exitPoint=None,console=False):
         - 'nogui':     Stop right before the GUI would be created (plugins are enabled at this point)
         
     If *exitPoint* is not None, this method returns the created QApplication-instance.
-    
-    If *console* is True, the lockfile and the (graphical) installer are turned off.
     """
     handleCommandLineOptions(cmdConfig)
     
@@ -86,27 +88,25 @@ def run(cmdConfig=[],exitPoint=None,console=False):
     app.setApplicationName("OMG")
 
     # Initialize config and logging
-    config.init(cmdConfig)
+    config.init(cmdConfig,testMode=type=='test')
     
     # Initialize logging as early as possible -- but after the config variables have been read.
     logging.init()
     global logger
     logger = logging.getLogger("omg")
     logger.debug("START")
-    
-    # Lock the lockfile to prevent a second OMG-instance from starting.
-    if not console:
-        lock()
                      
     if exitPoint == 'config':
         return app
+    
+    # Lock the lockfile to prevent a second OMG-instance from starting.
+    if type == 'gui':
+        lock()
         
     # Check for a collection directory
-    if config.options.main.collection == '':
+    if type == 'gui' and config.options.main.collection == '':
         logger.error("No collection directory defined.")
-        if not console:
-            runInstaller()
-        else: sys.exit(1)
+        runInstaller()
     
     loadTranslators(app,logger)
 
@@ -120,16 +120,24 @@ def run(cmdConfig=[],exitPoint=None,console=False):
         dispatcher.changes.connect(_debugAll)
         
     # Initialize database
+    if type == 'test':
+        config.options.database.type = 'sqlite'
+        config.options.database.prefix = 'test'
+        config.options.database.sqlite_path = ':memory:'
     from . import database
     try:
-        logger.debug('Application connecting with thread {}'.format(QtCore.QThread.currentThreadId()))
         database.connect()
     except database.sql.DBException as e:
-        logger.error("I cannot connect to the database. Did you provide the correct information in the config"
-                     " file? MySQL error: {}".format(e.message))
-        if not console:
+        logger.error("I cannot connect to the database. Did you provide the correct information in the"
+                     " config file? SQL error: {}".format(e.message))
+        if type == 'gui':
             runInstaller()
-        else: sys.exit(1)
+            
+    if type == 'test':
+        from omg.database import tables
+        for table in tables.tables:
+            table.create()
+            
     if exitPoint == 'database':
         return app
         
@@ -138,16 +146,30 @@ def run(cmdConfig=[],exitPoint=None,console=False):
     try:
         tags.init()
     except RuntimeError:
-        if not console:
+        if type == 'gui':
             runInstaller()
         else: sys.exit(1)
+
+    if type == 'gui':
+        # Weird things might happen if these tagtypes are external
+        if not tags.get(config.options.tags.title_tag).isInDB():
+            logger.error("Title tag '{}' is missing in tagids table.".format(config.options.tags.title_tag))
+            runInstaller()
+        if not tags.get(config.options.tags.album_tag).isInDB():
+            logger.error("Album tag '{}' is missing in tagids table.".format(config.options.tags.album_tag))
+            runInstaller()
+            
+        # In most test scripts these caches would only be overhead.
+        database.cacheTagValues()
+        
     flags.init()
+    
     if exitPoint == 'tags':
         return app
     
-    # In most test scripts using the exitPoint 'tags' these caches would only be overhead.
-    # Thus fill them after the exitpoint.
-    database.cacheTagValues()
+    # Initialize stack before levels are initialized    
+    global stack
+    stack = QtGui.QUndoStack()
     
     # Load and initialize remaining modules
     from .core import levels
@@ -157,15 +179,10 @@ def run(cmdConfig=[],exitPoint=None,console=False):
     search.init()
     covers.init()
     
-    # Initialize stack (because most models need the stack we create it before the noplugins-exitpoint, so
-    # that it is available for console scripts/unittests)    
-    global stack
-    stack = QtGui.QUndoStack()
-    
     global network
     network = QtNetwork.QNetworkAccessManager()
     
-    if exitPoint == 'noplugins':
+    if type == 'test' or exitPoint == 'noplugins':
         return app
     
     # Load Plugins
@@ -173,7 +190,7 @@ def run(cmdConfig=[],exitPoint=None,console=False):
     plugins.init()
     plugins.enablePlugins()
     
-    if exitPoint == 'nogui':
+    if type != 'gui':
         return app
         
     from . import filesystem
@@ -283,7 +300,7 @@ def loadTranslators(app,logger):
                                 .format(translatorFile,translatorDir))
 
 
-def init(cmdConfig=[],exitPoint='noplugins',console=True):
+def init(cmdConfig=[],type='console',exitPoint='noplugins'):
     """Initialize OMG's framework (database, tags etc.) but do not run a GUI. Use this for tests on the
     terminal:
 
@@ -296,7 +313,7 @@ def init(cmdConfig=[],exitPoint='noplugins',console=True):
     If *exitPoint* is not None, return the created QApplication-instance.
     Actually this method is the same as run, but with different default arguments.
     """
-    return run(cmdConfig,exitPoint,console)
+    return run(cmdConfig,type,exitPoint)
 
 
 def runInstaller():

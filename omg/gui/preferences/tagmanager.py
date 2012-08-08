@@ -219,14 +219,14 @@ class TagManagerTableWidget(QtGui.QTableWidget):
         itemInFirstColumn = self.item(row,self._getColumnIndex('sort'))
         return itemInFirstColumn.data(Qt.UserRole)
     
-    def _handleRemoveButton(self,tag):
+    def _handleRemoveButton(self,tagType):
         """Ask the user if he really wants this and if so, remove the tag."""
-        allowChanges = self._checkTag(tag)[0]
+        allowChanges = self._checkTag(tagType)[0]
         if not allowChanges:
             dialogs.warning(self.tr("Cannot remove tag"),
                             self.tr("Cannot remove a tag that appears in elements."))
             return
-        application.stack.push(tags.TagTypeUndoCommand(constants.DELETED,tagType=tag))
+        tags.removeTagType(tagType)
     
     def _handleItemChanged(self,item):
         """Handle changes to the name or private state of a tag."""
@@ -247,13 +247,22 @@ class TagManagerTableWidget(QtGui.QTableWidget):
                     dialogs.warning(self.tr("Cannot change tag"),message)
                     item.setText(oldName) # Reset
                     return
-            application.stack.push(tags.TagTypeUndoCommand(constants.CHANGED,tagType=tag,name=newName))
+            type,title,iconPath,private = tag.type,tag.rawTitle,tag.iconPath,tag.private
+            index = tags.tagList.index(tag)
+            application.stack.beginMacro(self.tr("Change tag name"))
+            tags.removeTagType(tag)
+            tags.addTagType(newName,type=type,title=title,iconPath=iconPath,private=private,index=index)
+            application.stack.endMacro()
         
         elif item.column() == self._getColumnIndex('title'):
             tag = self._getTag(item.row())
             itemText = item.text() if item.text() != '' else None
             if itemText != tag.rawTitle:
-                application.stack.push(tags.TagTypeUndoCommand(constants.CHANGED,tagType=tag,title=itemText))
+                if itemText is not None and tags.isTitle(itemText):
+                    dialogs.warning(self.tr("Cannot change title"),"A tag with this title exists already.")
+                    item.setText(tag.rawTitle) # Reset
+                    return
+                tags.changeTagType(tag,title=itemText)
             
         elif item.column() == self._getColumnIndex('private'): 
             tag = self._getTag(item.row())
@@ -266,7 +275,7 @@ class TagManagerTableWidget(QtGui.QTableWidget):
                 # the item (which would cause problems with Drag&Drop).
                 item.setCheckState(Qt.Checked if tag.private else Qt.Unchecked)
                 return
-            application.stack.push(tags.TagTypeUndoCommand(constants.CHANGED,tagType=tag,private=newPrivate))
+            tags.changeTagType(tag,private=newPrivate)
         
     def _handleValueTypeChanged(self,tag,type):
         """Handle changes to the comboboxes containing valuetypes."""
@@ -275,7 +284,7 @@ class TagManagerTableWidget(QtGui.QTableWidget):
             dialogs.warning(self.tr("Cannot change tag"),
                             self.tr("Cannot change a tag that appears in elements."))
             return
-        application.stack.push(tags.TagTypeUndoCommand(constants.CHANGED,tagType=tag,type=type))
+        tags.changeTagType(tag,type=type)
     
     def _handleCellDoubleClicked(self,row,column):
         """Handle double clicks on the first column containing icons. A click will open a file dialog to
@@ -315,7 +324,7 @@ class TagManagerTableWidget(QtGui.QTableWidget):
     def _setIcon(self,row,tagType,iconPath):
         """Set the icon(-path) of *tagType* to *iconPath* and update the GUI. Assume that the tag
         is in the given *row* (depends on current sorting)."""
-        application.stack.push(tags.TagTypeUndoCommand(constants.CHANGED,tagType=tagType,iconPath=iconPath))
+        tags.changeTagType(tagType,iconPath=iconPath)
         # Update the widget
         label = self.cellWidget(row,self._getColumnIndex('icon'))
         if tagType.icon is not None:
@@ -348,7 +357,7 @@ class TagManagerTableWidget(QtGui.QTableWidget):
                 return True # Nothing to move
             
             newPos = insertPos if insertPos < oldPos else insertPos-1
-            application.stack.push(tags.TagTypeOrderUndoCommand.move(mimeData.tagType,newPos))
+            tags.moveTagType(mimeData.tagType,newPos)
             return True
         return False   
     

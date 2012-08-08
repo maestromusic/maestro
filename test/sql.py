@@ -18,8 +18,7 @@
 
 """Unittests for the sql-package."""
 
-import sys, unittest, os.path
-sys.path.insert(0,os.path.normpath(os.path.join(os.getcwd(),os.path.dirname(__file__),'../')))
+import unittest
 
 from omg import application, config, database as db, utils
 
@@ -32,21 +31,43 @@ data = (
 
 testTable = "sqltest"
 
+
 class SqlTestCase(unittest.TestCase):
     def __init__(self,type,driver=None):
         super().__init__()
         self.type, self.driver = type, driver
+    
+    # setUpClass is called before the first test of this class, tearDownClass after the last one. They
+    # contain an ugly hack to save the usual test database during the tests of this module. That database
+    # is in memory and would be lost if we closed the connection to test a different db connector.
+    @classmethod
+    def setUpClass(cls):
+        import threading
+        cls.oldConnection = db.connections[threading.current_thread().ident]
+        # make the database module believe that we did not connect to the database yet
+        del db.connections[threading.current_thread().ident]
+         
+    @classmethod
+    def tearDownClass(cls):
+        import threading
+        config.options.database.type = 'sqlite'
+        db.connections[threading.current_thread().ident] = cls.oldConnection
         
     def setUp(self):
         if self.type == 'sqlite':
             config.options.database.type = 'sqlite'
-            config.options.database.sqlite_path = ':memory:'#os.path.join(os.getcwd(),os.path.dirname(__file__),
-                                                             #  'test.sqlite')
             print("Checking SQLite...")
         else:
+            config.options.database.type = 'mysql'
             config.options.database.mysql_drivers = [self.driver]
             print("Checking MySQL with driver '{}'...".format(self.driver))
-        db.connect()
+        
+        try:
+            db.connect()
+        except db.sql.DBException as e:
+            self.skipTest("I cannot connect to the '{}' database using driver '{}'. Did you provide the"
+                          " correct information in the testconfig file? SQL error: {}"
+                          .format(self.type,self.driver,e.message))
 
     def tearDown(self):
         db.close()
@@ -140,15 +161,16 @@ class SqlTestCase(unittest.TestCase):
         self.assertRaises(db.sql.EmptyResultException,result.getSingleRow)
         
 
-suite = unittest.TestSuite()
-for driver in ["qtsql","pymysql","myconnpy"]:
-    suite.addTest(SqlTestCase("mysql",driver))
+def load_tests(loader, standard_tests, pattern):
+    # See http://docs.python.org/py3k/library/unittest.html#load-tests-protocol
+    suite = unittest.TestSuite()
+
+    for driver in ["qtsql","pymysql","myconnpy"]:
+        suite.addTest(SqlTestCase("mysql",driver))
+    suite.addTest(SqlTestCase("sqlite"))
     
-    
+    return suite
+
+
 if __name__ == "__main__":
-    # Force temporary values for these config variables (If an option is set via cmdConfig it will not be
-    # written to the config file even if it is later changed again).
-    application.init(cmdConfig=['database.type=mysql','database.mysql_drivers=','database.sqlite_path='],
-                     exitPoint='config')
-        
-    unittest.TextTestRunner(verbosity=2).run(suite)
+    print("To run this test use: python setup.py test --test-suite=test.sql")

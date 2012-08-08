@@ -16,22 +16,32 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-"""Run all unittests except sql.py which requires a different database connection."""
+"""Run all unittests."""
+
+import unittest
+
+def load_tests(loader, standard_tests, pattern):
+    # See http://docs.python.org/py3k/library/unittest.html#load-tests-protocol
+    # Remember that OMG uses its own test loader (see testloader.py)
+    suite = unittest.TestSuite()
+
+    from . import sql
+    suite.addTests(loader.loadTestsFromModule(sql))
+    
+    from . import tagflagtypes
+    suite.addTests(loader.loadTestsFromModule(tagflagtypes))
+    
+    from . import levels
+    suite.addTests(loader.loadTestsFromModule(levels))
+    
+    from . import realfiles
+    suite.addTests(loader.loadTestsFromModule(realfiles))
+    
+    from . import playlistmodel
+    suite.addTests(loader.loadTestsFromModule(playlistmodel))
+    
+    return suite
 
 if __name__ == "__main__":
-    import sys, unittest, os.path
-    sys.path.insert(0,os.path.normpath(os.path.join(os.getcwd(),os.path.dirname(__file__),'../')))
-    
-    from omg import application
-    application.init(exitPoint='noplugins')
-    
-    suite = unittest.TestSuite()
-    
-    import playlistmodel
-    suite.addTest(playlistmodel.suite)
-    
-    import realfiles
-    suite.addTest(realfiles.suite)
-    
-    unittest.TextTestRunner(verbosity=2).run(suite)
+    print("To run all tests use: python setup.py test")
     

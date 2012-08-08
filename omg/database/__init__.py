@@ -86,11 +86,12 @@ class ConnectionContextManager:
 
 
 def connect(**kwargs):
-    """Connect to the database server with information from the config file. The drivers specified in
-    ``config.options.database.mysql_drivers`` are tried in the given order. This method must be called 
+    """Connect to the database server with information from the config file. This method must be called 
     exactly once for each thread that wishes to access the database. If successful, it returns a
     :class:`ConnectionContextManager` that will automatically close the connection if used in a ``with``
     statement. If the connection fails, it will raise a DBException.
+    
+    Keyword arguments are passed to the connect-method of the new connection.
     """
     threadId = threading.current_thread().ident
     if threadId in connections:
@@ -123,13 +124,14 @@ def _connect(drivers,authValues, **kwargs):
     
 
 def close():
-    """Close the database connection of this thread. If you use the context manager returned by
+    """Close the database connection of this thread, if present. If you use the context manager returned by
     :func:`connect`, this method is called automatically.
     """
     threadId = threading.current_thread().ident
-    connection = connections[threading.current_thread().ident]
-    del connections[threading.current_thread().ident]
-    connection.close()
+    if threadId in connections:
+        connection = connections[threadId]
+        del connections[threadId]
+        connection.close()
     
 
 def listTables():

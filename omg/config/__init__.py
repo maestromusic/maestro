@@ -79,10 +79,12 @@ binary = None
 logger = logging.getLogger("config")
 
 
-def init(cmdOptions = []):
-    """Initialize the config-module: Read the config files and create the module variables. *cmdOptions* is a
+def init(cmdConfig = [],testMode=False):
+    """Initialize the config-module: Read the config files and create the module variables. *cmdConfig* is a
     list of options given on the command line that will overwrite the corresponding option from the file or
     the default. Each list item has to be a string like ``main.collection=/var/music``.
+    If *testMode* is True, a different file will be used for config options (testconfig instead of config),
+    storage will be set to the default values and binary will be empty.
     """
     
     # Find the config directory and ensure that it exists
@@ -103,22 +105,22 @@ def init(cmdOptions = []):
 
     # Initialize config and storage
     global options, storage, optionObject, storageObject
-    optionObject = MainSection(cmdOptions,storage=False)
-    storageObject = MainSection([],storage=True)
+    optionObject = MainSection(_getPath("config" if not testMode else "testconfig"),cmdConfig,storage=False)
+    storageObject = MainSection(_getPath("storage") if not testMode else None,[],storage=True)
     options = ValueSection(optionObject)
     storage = ValueSection(storageObject)
 
-    # Initialize pickled
+    # Initialize pickled part of the configuration
     global binary
-    path = _getPath("binary")
-    if os.path.exists(path):
-        try:
-            with open(path,'rb') as file:
-                binary = pickle.load(file)
-        except:
-            logger.exception("Could not load binary configuration from '{}'.".format(path))
-            binary = {}
-    else: binary = {}
+    binary = {}
+    if not testMode:
+        path = _getPath("binary")
+        if os.path.exists(path):
+            try:
+                with open(path,'rb') as file:
+                    binary = pickle.load(file)
+            except:
+                logger.exception("Could not load binary configuration from '{}'.".format(path))
 
 
 def shutdown():
@@ -323,37 +325,38 @@ class Section:
 
 class MainSection(Section):
     """This is the main object of the config-module and stores the configuration of one config file.
-    It is itself a section with the name ''<Main>''. Upon creation this class will read the defaults
-    and then the config/storage-file.The parameters are:
+    It is itself a section with the name ''<Main>''. The parameters are:
 
-        * *cmdOptions*: a list of strings of the form “main.collection=/var/music”. The options given in
+        * *path*: path to the config file. May be None in which case no file is used.
+        * *cmdConfig*: a list of strings of the form “main.collection=/var/music”. The options given in
           these strings will overwrite the options from the file or the defaults.
         * *storage*: whether this object corresponds to a storage file (confer module documentation).
 
     On initialization this object will read the correct default values, overwrite them with values from
     the corresponding file and (if storage is False) finally set temporary values according to *cmdConfig*.
     \ """
-    def __init__(self,cmdConfig,storage):
+    def __init__(self,path,cmdConfig,storage):
         # First initialize with default values
         from . import defaultconfig
         defaults = defaultconfig.storage if storage else defaultconfig.defaults
         Section.__init__(self,"<Main>",storage,defaults)
 
         # Then update with values from config/storage file
-        self._path = _getPath("storage" if self.storage else "config")
-        from . import configio
-        try:
-            if storage:
-                self._rawDict = configio.readStorage(self._path)
-            else: self._rawDict = configio.readConfig(self._path)
-            # Allow unknown sections on first level as they might be plugin configurations
-            self.updateFromDict(self._rawDict,allowUnknownSections=True)
-        except configio.ConfigError as e:
-            logger.critical(str(e))
-            logger.critical("There is an error in config file '{}'. Deleting the file should help (but also "
-                            "erase your configuration...).".format(self._path))
-            sys.exit(1)
-            
+        self._path = path
+        if path is not None:
+            from . import configio
+            try:
+                if storage:
+                    self._rawDict = configio.readStorage(self._path)
+                else: self._rawDict = configio.readConfig(self._path)
+                # Allow unknown sections on first level as they might be plugin configurations
+                self.updateFromDict(self._rawDict,allowUnknownSections=True)
+            except configio.ConfigError as e:
+                logger.critical(str(e))
+                logger.critical("There is an error in config file '{}'. Deleting the file should help "
+                                "(but also erase your configuration...).".format(self._path))
+                sys.exit(1)
+                
         # Finally set temporary values from cmdConfig
         if not storage:
             for line in cmdConfig:
@@ -395,12 +398,13 @@ class MainSection(Section):
     
     def write(self):
         """Write this configuration to the correct file."""
-        try:
-            if self.storage:
-                configio.writeStorage(self._path,self)
-            else: configio.writeConfig(self._path,self)
-        except configio.ConfigError as e:
-            logger.error(e)
+        if self._path is not None:
+            try:
+                if self.storage:
+                    configio.writeStorage(self._path,self)
+                else: configio.writeConfig(self._path,self)
+            except configio.ConfigError as e:
+                logger.error(e)
         
     def pprint(self):
         """Debug method: Print this configuration."""

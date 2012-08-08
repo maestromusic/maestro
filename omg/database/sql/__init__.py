@@ -83,7 +83,7 @@ class EmptyResultException(Exception):
     """
 
 
-def newConnection(drivers=["qtsql"]):
+def newConnection(drivers):
     """Create a new database connection object. *drivers* is a list of driver-module names which will be
     tried in the given order until one is loaded successfully. If no driver can be loaded, a
     :exc:`DBException <omg.database.sql.DBException>` is raised. This method does not actually open a

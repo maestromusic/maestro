@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 class TagEditorDock(QtGui.QDockWidget):
     """DockWidget containing the TagEditor."""
     def __init__(self,parent=None,state=None,location=None):
-        QtGui.QDockWidget.__init__(self,parent)
+        super().__init__(parent)
         self.setWindowTitle(self.tr("Tageditor"))
         if location is not None:
             vertical = location.floating or location.area in [Qt.LeftDockWidgetArea,Qt.RightDockWidgetArea]

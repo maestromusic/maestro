@@ -9,14 +9,10 @@
 
 """Unittests for the realfiles-package."""
 
-import sys, unittest, shutil, os
-sys.path.insert(0,os.path.normpath(os.path.join(os.getcwd(),os.path.dirname(__file__),'../')))
+import unittest, shutil, os
 
-from omg import application, utils, realfiles
+from omg import application, utils, realfiles, database as db
 from omg.core import tags
-    
-if __name__ == "__main__":
-    application.init(exitPoint="tags")
     
     
 PATH_BASE = os.path.join(os.getcwd(),os.path.dirname(__file__))
@@ -121,13 +117,17 @@ class WriteTest(BaseTest):
         os.remove(self.test)
 
 
-suite = unittest.TestSuite()
-for ext in ('ogg','mp3'):
-    suite.addTest(OpenTest(ext))
-    suite.addTest(ReadTest(ext))
-    suite.addTest(RemoveTest(ext))
-    suite.addTest(EmptyFileTest(ext))
-    suite.addTest(WriteTest(ext))
-    
+def load_tests(loader=None, standard_tests=None, pattern=None):
+    # See http://docs.python.org/py3k/library/unittest.html#load-tests-protocol
+    suite = unittest.TestSuite()
+    for ext in ('ogg','mp3'):
+        suite.addTest(OpenTest(ext))
+        suite.addTest(ReadTest(ext))
+        suite.addTest(RemoveTest(ext))
+        suite.addTest(EmptyFileTest(ext))
+        suite.addTest(WriteTest(ext))
+    return suite
+
 if __name__ == "__main__":
-    unittest.TextTestRunner(verbosity=2).run(suite)
+    print("To run this test use: python setup.py test --test-suite=test.realfiles")
+    

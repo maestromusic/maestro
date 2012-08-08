@@ -22,8 +22,11 @@ from ... import utils
 
 class Sql(AbstractSql):
     def connect(self,username,password,database,host="localhost",port=3306,**kwargs):
-        self._db = pymysql.connect(db=database,user=username,passwd=password,
-                                   host=host,port=port,use_unicode=True,charset='utf8')
+        try:
+            self._db = pymysql.connect(db=database,user=username,passwd=password,
+                                       host=host,port=port,use_unicode=True,charset='utf8')
+        except pymysql.err.Error as e:
+            raise DBException("DB-connection failed: {}".format(str(e)))
 
     def close(self):
         self._db.close()

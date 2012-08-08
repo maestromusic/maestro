@@ -19,7 +19,7 @@
 from PyQt4 import QtGui
 
 from .. import application, constants, database as db, logging
-from ..constants import ADDED, DELETED, CHANGED
+from ..constants import ADDED, DELETED, CHANGED, ADD, DELETE, CHANGE
 from ..application import ChangeEvent
 
 
@@ -115,74 +115,24 @@ def allFlags():
     return _flagsById.values()
 
 
-class FlagTypeUndoCommand(QtGui.QUndoCommand):
-    """This command adds, changes or deletes a flagtype. Which keyword arguments are necessary depends on the
-    first parameter *action* which may be one of
+def addFlagType(name,**data):
+    """Add a new flagtype with the given name to the database. *data* may be used to set attributes. 
+    Currently only 'iconPath' is supported."""
+    if exists(name):
+        raise ValueError("There is already a flag with name '{}'.".format(name))
+    if not isValidFlagname(name):
+        raise ValueError("'{}' is not a valid flagname.".format(name))
+    command = FlagTypeUndoCommand(ADD,name=name,**data)
+    application.stack.push(command)
+    return command.flagType
     
-        - constants.ADDED: In this case *data* must be a subset of the arguments of Flag.__init__ including
-          'name' and excluding 'id' (the id is generated automatically by the database).
-        - constants.CHANGED: This will change the flagType specified in the argument *flagType* according to
-          the other arguments, which may be a subset of the arguments of Flag.__init__ except of 'id':
-          
-              FlagTypeUndoCommand(flagType=flagType,name='Great',iconPath=None)
-              
-        - constants.DELETED: A single argument *flagType*. The given flagType will be removed.
-    """
-    def __init__(self,action,flagType=None,**data):
-        texts = {ADDED:   translate("FlagTypeUndoCommand","Add flagType"),
-                 DELETED: translate("FlagTypeUndoCommand","Delete flagType"),
-                 CHANGED: translate("FlagTypeUndoCommand","Change flagType")
-                }
-        super().__init__(texts[action])
-        self.action = action
-        if self.action == ADDED:
-            self.addData = data
-            self.flagType = None
-        elif self.action == DELETED:
-            self.flagType = flagType
-        else:
-            self.flagType = flagType
-            self.oldData = {'name': flagType.name,'iconPath': flagType.iconPath}
-            self.newData = data
-        
-    def redo(self):
-        if self.action == ADDED:
-            if self.flagType is None: # This is the first time this command is redone
-                self.flagType = addFlagType(**self.addData)
-                del self.addData
-            else:
-                # On subsequent redos ensure that the same object is recreated,
-                # because it might be used in many elements within the undohistory.
-                addFlagType(flagType=self.flagType)
-        elif self.action == DELETED:
-            removeFlagType(self.flagType)
-        else: changeFlagType(self.flagType,**self.newData)
-
-    def undo(self):
-        if self.action == ADDED:
-            removeFlagType(self.flagType)
-        elif self.action == DELETED:
-            # Ensure that the same object is recreated, because it might be used in many elements
-            # within the undohistory.
-            addFlagType(flagType=self.flagType)
-        else: changeFlagType(self.flagType,**self.oldData)
-
-
-class FlagTypeChangedEvent(ChangeEvent):
-    """FlagTypeChangedEvent are used when a flagtype is added, changed or deleted."""
-    def __init__(self,action,flagType):
-        assert action in constants.CHANGE_TYPES
-        self.action = action
-        self.flagType = flagType
-
-
-def addFlagType(**data):
-    """Adds a new flagType to the database. The keyword arguments may contain either
+    
+def _addFlagType(**data):
+    """Like addFlagType, but not undoable. The keyword arguments may contain either
     
         - a single argument 'flagType': In this case the given flagType is inserted into the database and
           some internal lists. Use this to undo a flagType's deletion.
-        - a subset of the arguments of Flag.__init__. In this case this data is used to create a new flag.
-          The subset must not contain 'id' and must contain at least 'name'.
+        - a 'name' and optionally an 'iconPath'
           
     After creation the a FlagTypeChangedEvent is emitted.
     """
@@ -207,8 +157,13 @@ def addFlagType(**data):
     return flagType
 
 
-def removeFlagType(flagType):
-    """Remove the given *flagType* from the database and emit a FlagTypeChangedEvent."""
+def deleteFlagType(flagType):
+    """Delete a flagtype from the database."""
+    application.stack.push(FlagTypeUndoCommand(DELETE,flagType))
+    
+    
+def _deleteFlagType(flagType):
+    """Like deleteFlagType but not undoable."""
     if not exists(flagType.name):
         raise ValueError("Cannot remove flagtype '{}' because it does not exist.".format(flagType))
     
@@ -220,13 +175,17 @@ def removeFlagType(flagType):
 
 
 def changeFlagType(flagType,**data):
-    """Change the name and/or iconPath of *flagType* in the database and emit an event. The keyword arguments
-    determine which properties should be changed::
+    """Change a flagtype. The attributes that should be changed must be specified by keyword arguments.
+    Supported are 'name' and 'iconPath':
 
         changeFlagType(flagType,name='Great',iconPath=None)
-        
-    Allowed keyword arguments are the arguments of Flag.__init__ except id.
+    
     """
+    application.stack.push(FlagTypeUndoCommand(CHANGE,flagType,**data))
+    
+    
+def _changeFlagType(flagType,**data):
+    """Like changeFlagType but not undoable."""
     # Below we will build a query like UPDATE flag_names SET ... using the list of assignments (e.g. (name=?).
     # The parameters will be sent with the query to replace the questionmarks.
     assignments = []
@@ -255,9 +214,61 @@ def changeFlagType(flagType,**data):
         application.dispatcher.changes.emit(FlagTypeChangedEvent(CHANGED,flagType))
 
 
+class FlagTypeUndoCommand(QtGui.QUndoCommand):
+    """This command adds, changes or deletes a flagtype. Which keyword arguments are necessary depends on the
+    first argument *action*. Use the methods addFlagType, deleteFlagType and changeFlagType instead of
+    creating a command directly.
+    """
+    def __init__(self,action,flagType=None,**data):
+        texts = {ADD:   translate("FlagTypeUndoCommand","Add flagType"),
+                 DELETE: translate("FlagTypeUndoCommand","Delete flagType"),
+                 CHANGE: translate("FlagTypeUndoCommand","Change flagType")
+                }
+        super().__init__(texts[action])
+        self.action = action
+        if self.action == ADD:
+            self.addData = data
+            self.flagType = None
+        elif self.action == DELETE:
+            self.flagType = flagType
+        else:
+            self.flagType = flagType
+            self.oldData = {'name': flagType.name,'iconPath': flagType.iconPath}
+            self.newData = data
+        
+    def redo(self):
+        if self.action == ADD:
+            if self.flagType is None: # This is the first time this command is redone
+                self.flagType = _addFlagType(**self.addData)
+                del self.addData
+            else:
+                # On subsequent redos ensure that the same object is recreated,
+                # because it might be used in many elements within the undohistory.
+                _addFlagType(flagType=self.flagType)
+        elif self.action == DELETE:
+            _deleteFlagType(self.flagType)
+        else: _changeFlagType(self.flagType,**self.newData)
+
+    def undo(self):
+        if self.action == ADD:
+            _deleteFlagType(self.flagType)
+        elif self.action == DELETE:
+            # Ensure that the same object is recreated, because it might be used in many elements
+            # within the undohistory.
+            _addFlagType(flagType=self.flagType)
+        else: _changeFlagType(self.flagType,**self.oldData)
+
+
+class FlagTypeChangedEvent(ChangeEvent):
+    """FlagTypeChangedEvent are used when a flagtype is added, changed or deleted."""
+    def __init__(self,action,flagType):
+        assert action in constants.CHANGE_TYPES
+        self.action = action
+        self.flagType = flagType
+
+
 class FlagDifference:
     """See tags.TagDifference"""
-    
     def __init__(self, flagsA, flagsB):
         self.removals = set(flagsA) - set(flagsB)
         self.additions = set(flagsB) - set(flagsA)

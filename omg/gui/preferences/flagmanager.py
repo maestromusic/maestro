@@ -30,7 +30,7 @@ translate = QtCore.QCoreApplication.translate
 
 
 class FlagManager(QtGui.QWidget):
-    """The FlagManager allows to add, edit and remove flagtypes."""
+    """The FlagManager allows to add, edit and delete flagtypes."""
     def __init__(self,dialog,parent=None):
         super().__init__(parent)
         self.setLayout(QtGui.QVBoxLayout())
@@ -120,7 +120,7 @@ class FlagManager(QtGui.QWidget):
             column = self._getColumnIndex("actions")
             buttons = iconbuttonbar.IconButtonBar()
             buttons.addIcon(utils.getIcon('delete.png'),
-                                 functools.partial(self._handleRemoveButton,flagType),
+                                 functools.partial(self._handleDeleteButton,flagType),
                                  self.tr("Delete flag"))
             buttons.addIcon(utils.getIcon('goto.png'),
                                  toolTip=self.tr("Show in browser"))
@@ -138,13 +138,13 @@ class FlagManager(QtGui.QWidget):
         """Create a new flag (querying the user for the flag's name)."""
         createNewFlagType(self) # FlagManager will be reloaded via the dispatcher event
     
-    def _handleRemoveButton(self,flagType):
-        """Ask the user if he really wants this and if so, remove the flag."""
+    def _handleDeleteButton(self,flagType):
+        """Ask the user if he really wants this and if so, delete the flag."""
         number,allowChanges = self._appearsInElements(flagType)
         if not allowChanges:
-            question = self.tr("Do you really want to remove the flag '{}'? It will be removed from %n element(s).",None,number)
-        else: question = self.tr("Do you really want to remove the flag '{}'?")
-        if (QtGui.QMessageBox.question(self,self.tr("Remove flag?"),
+            question = self.tr("Do you really want to delete the flag '{}'? It will be deleted from %n element(s).",None,number)
+        else: question = self.tr("Do you really want to delete the flag '{}'?")
+        if (QtGui.QMessageBox.question(self,self.tr("Delete flag?"),
                                        question.format(flagType.name),
                                        QtGui.QMessageBox.Yes | QtGui.QMessageBox.No,
                                        QtGui.QMessageBox.Yes)
@@ -152,7 +152,7 @@ class FlagManager(QtGui.QWidget):
             if number > 0:
                 # TODO
                 raise NotImplementedError()
-            application.stack.push(flags.FlagTypeUndoCommand(constants.DELETED,flagType))
+            flags.deleteFlagType(flagType)
 
     def _handleItemChanged(self,item):
         """When the name of a flag has been changed, ask the user if he really wants this and if so perform
@@ -187,7 +187,7 @@ class FlagManager(QtGui.QWidget):
                         != QtGui.QMessageBox.Yes):
                 item.setText(oldName)
                 return
-        application.stack.push(flags.FlagTypeUndoCommand(constants.CHANGED,flagType,name=newName))
+        flags.changeFlagType(flagType,name=newName)
     
     def _checkUndoRedoButtons(self):
         """Enable or disable the undo and redo buttons depending on stack state."""
@@ -234,7 +234,7 @@ class FlagManager(QtGui.QWidget):
             
     def _setIcon(self,flagType,iconPath):
         """Set the icon(-path) of *flagType* to *iconPath* and update the GUI.""" 
-        application.stack.push(flags.FlagTypeUndoCommand(constants.CHANGED,flagType,iconPath=iconPath))
+        flags.changeFlagType(flagType,iconPath=iconPath)
         # Update the widget
         row = self._flagTypes.index(flagType)
         index = self.tableWidget.model().index(row,0)                     
@@ -284,7 +284,6 @@ def createNewFlagType(parent = None):
         QtGui.QMessageBox.warning(parent,translate("FlagManager","Invalid flagname"),
                                   translate("FlagManager","This is no a valid flagname."))
         return None
-    else:
-        application.stack.push(flags.FlagTypeUndoCommand(constants.ADDED,name=name))
-        return flags.get(name)
+    
+    return flags.addFlagType(name)
     
