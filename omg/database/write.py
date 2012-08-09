@@ -23,99 +23,109 @@ from ..core import tags
 
 
 def createElements(data):
-    """Creates elements in the database and returns their IDs. *data* is a list of
-    (file, toplevel, elementcount, major) tuples specifying the new elements."""
-    queryString = "INSERT INTO {}elements (file,toplevel, elements, major) VALUES (?,?,?,?)".format(db.prefix)
+    """Creates elements in the database and returns their IDs.
+    
+    The argument *data* must be a list of
+        (file, toplevel, elementcount, major)
+    tuples specifying the new elements.
+    """
+    queryString = "INSERT INTO {}elements (file, toplevel, elements, major)\
+                          VALUES (?,?,?,?)".format(db.prefix)
     if len(data) > 1:
         db.multiQuery(queryString, data[:-1])
     last = db.query(queryString, *data[-1]).insertId()
     first = last - len(data) + 1
     return list(range(first, last+1))
 
+
 def createElementsWithIds(data):
-    """Creates elements in the database whose IDs are given *data* is a list of
-    (id, file, toplevel, elementcount, major) tuples."""
-    db.multiQuery("INSERT INTO {}elements (id, file,toplevel, elements, major) VALUES (?,?,?,?,?)"
-                  .format(db.prefix), data)                       
+    """Creates elements in the database with predefined IDs.
+    
+    The argument *data* must be a list of
+        (id, file, toplevel, elementcount, major)
+    tuples that specify the elements.
+    """
+    db.multiQuery("INSERT INTO {}elements (id, file,toplevel, elements, major)\
+                          VALUES (?,?,?,?,?)".format(db.prefix), data)                       
+
 
 def addFiles(data):
-    """Adds entries to the files table specified by *data*, a list of
-    (id, path, hash, length) tuples."""
+    """Adds entries to the files table.
+    
+    The files to add are specified by *data*, a list of
+        (id, path, hash, length)
+    tuples.
+    """
     db.multiQuery("INSERT INTO {}files (element_id, path, hash, length) VALUES(?,?,?,?)"
                   .format(db.prefix),data)
-                      
+
+
 def deleteElements(ids):
-    """Delete the elements with the given ids from the database and update element counter and toplevel
-    flags. Due to the foreign keys in the database, this will also delete all tag, flag and content relations
-    of the elements.
+    """Delete the elements with the given ids from the database.
+    
+    Also updates element counters and toplevel flags. Due to the foreign keys in the database,
+    this will delete all tag, flag and content relations of the deleted elements.
     """
     if len(ids) == 0:
         return
     parentIds = db.parents(ids)
     contentsIds = db.contents(ids)
-    db.query("DELETE FROM {}elements WHERE id IN ({})".format(db.prefix,db.csList(ids)))
+    db.query("DELETE FROM {}elements WHERE id IN ({})".format(db.prefix, db.csList(ids)))
     updateElementsCounter(parentIds)
     updateToplevelFlags(contentsIds)
 
-def setContents(data):
-    """Set contents of one or more elements. *data* is a dict mapping ids to lists of contents. The lists
-    of contents must contain elements with an id and a position. This method is not recursive."""
-    db.transaction()
-    
-    # Remove old contents but remember their ids
-    oldContents = db.contents(data.keys())
-    db.query("DELETE FROM {}contents WHERE container_id IN ({})".format(db.prefix,db.csList(data.keys())))
-    
-    newContents = [element.id for element in itertools.chain.from_iterable(data.values())]
-    
-    # Insert new contents
-    if len(newContents):
-        params = ((cid,el.position,el.id) for cid,contents in data.items() for el in contents)  
-        db.multiQuery("INSERT INTO {}contents (container_id,position,element_id) VALUES(?,?,?)"
-                        .format(db.prefix),params)
-                    
-    # Update element counter of changed containers
-    updateElementsCounter(data.keys())
-
-    # Set toplevel flag of all contents to 0
-    if len(newContents):
-        db.query("UPDATE {}elements SET toplevel = 0 WHERE id IN ({})"
-                    .format(db.prefix,db.csList(newContents)))
-                
-    # Finally update the toplevel flag of elements that got removed from the contents
-    updateToplevelFlags((id for id in oldContents if not id in newContents))
-    
-    db.commit()
 
 def addContents(data):
-    """Add contents relations to the database without touching existing ones. *data* is a list of
-    (parentID, position, elementID) tuples."""
+    """Add content relations to the database without touching existing ones.
+    
+    The *data* arguments is a list of
+        (parentID, position, elementID)
+    tuples.
+    """
     if len(data) > 0:
         db.multiQuery("INSERT INTO {}contents (container_id, position, element_id) VALUES (?,?,?)"
                       .format(db.prefix), data)
     
+
 def removeContents(data):
-    """Remove contents of one or more elements. *data* is a list of (parentID, position) tuples."""
+    """Remove content relations from  elements.
+    
+    The argument is a list of
+        (parentID, position)
+    tuples.
+    """
     db.multiQuery("DELETE FROM {}contents WHERE container_id = ? AND position = ?"
                    .format(db.prefix), data)
 
-def removeAllContents(data):
-    """Remove *all* contents of the parents whose IDs are given by the list *data*."""
-    db.multiQuery("DELETE FROM {}contents WHERE container_id = ?".format(db.prefix), [(d,) for d in data])
-    
+
+def removeAllContents(ids):
+    """Remove *all* content relations of parents specidiefd by *ids*."""
+    db.multiQuery("DELETE FROM {}contents WHERE container_id = ?".format(db.prefix), [(id,) for id in ids])
+
+
 def changePositions(parentID, changes):
-    """Change the positions of children of *parentID* as given by *changes*, which is a list of (oldPos, newPos)
-    tuples."""
-    db.multiQuery("UPDATE {}contents SET position=? WHERE container_id=? AND position=?"
-                  .format(db.prefix), [(newPos,parentID,oldPos)
-                        for (oldPos,newPos) in sorted(changes, key = lambda cng: cng[1], reverse = True) if newPos > oldPos])
-    db.multiQuery("UPDATE {}contents SET position=? WHERE container_id=? AND position=?"
-                  .format(db.prefix), [(newPos,parentID,oldPos)
-                        for (oldPos,newPos) in sorted(changes, key = lambda cng: cng[1]) if newPos < oldPos])
-     
-def updateElementsCounter(elids = None):
-    """Update the elements counter. If *elids* is a list of elements-ids, the counters of those elements will
-    be updated. If *elids* is None, all counters will be set to their correct value."""
+    """Change the positions of children of the element with ID *parentID*.
+    
+    The *changes* must be given by means of a list of (oldPos, newPos) tuples.
+    """
+    #  The operation is split in two parts to avoid errors caused by DB uniqueness constraints.
+    changesOne = [ (newPos, parentID, oldPos)
+                    for (oldPos, newPos) in sorted(changes, key=lambda cng: cng[1], reverse=True)
+                    if newPos > oldPos ]
+    changesTwo = [ (newPos, parentID, oldPos)
+                    for (oldPos, newPos) in sorted(changes, key=lambda chng: chng[1])
+                    if newPos < oldPos ]
+    for data in changesOne, changesTwo:
+        db.multiQuery("UPDATE {}contents SET position=? WHERE container_id=? AND position=?"
+                      .format(db.prefix), data)
+
+
+def updateElementsCounter(elids=None):
+    """Update the elements counter.
+    
+    If *elids* is a list of elements-ids, only the counters of those elements will be updated. If
+    *elids* is None, all counters will be set to their correct value.
+    """
     if elids is not None:
         cslist = db.csList(elids)
         if cslist == '':
@@ -126,12 +136,15 @@ def updateElementsCounter(elids = None):
         UPDATE {0}elements
         SET elements = (SELECT COUNT(*) FROM {0}contents WHERE container_id = id)
         {1}
-        """.format(db.prefix,whereClause))
+        """.format(db.prefix, whereClause))
         
         
-def updateToplevelFlags(elids = None):
-    """Update the toplevel flags. If *elids* is a list of elements-ids, the flags of those elements will
-    be updated. If *elids* is None, all flags will be set to their correct value."""
+def updateToplevelFlags(elids=None):
+    """Update the toplevel flags.
+    
+    If *elids* is a list of elements-ids, the flags of those elements will be updated. If *elids*
+    is None, all flags will be set to their correct value.
+    """
     if elids is not None:
         cslist = db.csList(elids)
         if cslist == '':
@@ -144,13 +157,17 @@ def updateToplevelFlags(elids = None):
         {1}
         """.format(db.prefix,whereClause))
 
+
 def changeFilePaths(data):
     """Change the paths of files by the (id, path) list *data*."""
     db.multiQuery("UPDATE {}files SET path = ? WHERE element_id = ?".format(db.prefix), data)
 
+
 def makeValueIDs(data):
-    """Ensures that tag values are present in values_* tables. *data* must
-    be a list of (*tag*, *value*) tuples."""
+    """Ensures that tag values are present in values_* tables.
+    
+    *data* must be a list of (*tag*, *value*) tuples.
+    """
     valuesToAdd = {}
     for tag, value in data:
         try:
