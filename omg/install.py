@@ -40,7 +40,7 @@ from PyQt4.QtCore import Qt
 # This script tries to include as few modules as possible
 from omg import config, logging, database as db
 from omg.application import loadTranslators
-from omg.core.tags import isValidTagname
+from omg.core.tags import isValidTagName
 from omg.gui.misc import iconchooser
 
 logger = logging.getLogger("Install tool")
@@ -523,7 +523,7 @@ class TagWidget(SettingsWidget):
             name = self.tableWidget.item(row,column).text()
             
             # Check invalid tag names
-            if not isValidTagname(name):
+            if not isValidTagName(name):
                 QtGui.QMessageBox.warning(self,self.tr("Invalid tagname"),
                                           self.tr("'{}' is not a valid tagname.").format(name))
                 return False

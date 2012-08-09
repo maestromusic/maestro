@@ -117,9 +117,20 @@ class EditorWidget(QtGui.QDockWidget):
         except:
             expand = True
             guessProfile = None
+            
+        self.splitter = QtGui.QSplitter(Qt.Vertical)
+        vb.addWidget(self.splitter)
+        
         self.editor = EditorTreeView()
         self.editor.setAutoExpand(expand)
-        vb.addWidget(self.editor)
+        
+        self.externalTagsWidget = ExternalTagsWidget(self.editor.model())
+        
+        self.splitter.addWidget(self.externalTagsWidget)
+        self.splitter.addWidget(self.editor)
+        self.splitter.setStretchFactor(0,0)
+        self.splitter.setStretchFactor(1,1)
+        
         hb = QtGui.QHBoxLayout()
         vb.addLayout(hb)
         
@@ -148,6 +159,7 @@ class EditorWidget(QtGui.QDockWidget):
         hb.addWidget(delegateconfig.ConfigurationCombo(editordelegate.EditorDelegate.configurationType,
                                                        [self.editor]))
         hb.addStretch()
+        
         self.toolbar = QtGui.QToolBar(self)
         self.toolbar.addAction(self.editor.treeActions['clearEditor'])
         commitAction = CommitTreeAction(self.editor)
@@ -172,6 +184,58 @@ class EditorWidget(QtGui.QDockWidget):
         else:
             profile = None
         return (self.autoExpandCheckbox.isChecked(),profile)
+
+
+class ExternalTagsWidget(QtGui.QScrollArea):
+    def __init__(self,model):
+        super().__init__()
+        self.model = model
+        model.externalTagInfosChanged.connect(self.updateText)
+        
+        self.label = QtGui.QLabel()
+        self.label.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+        self.setWidget(self.label)
+        self.setWidgetResizable(True)
+        self.label.setWordWrap(False)
+        self.label.setContentsMargins(5,2,5,2)
+        
+        self.updateText()
+    
+    def _createButton(self,link,text):
+        return '<a href="{}" style="text-decoration:none">[{}]</a>'.format(link,text)
+    
+    def updateText(self):
+        lines = []
+        
+        for infoList in self.model.externalTagInfos.values():
+            for info in infoList:
+                if info.type == 'delete':
+                    lines.append(self.tr("Tag '{}' was deleted from %n element(s) {} {}",'',
+                                                                    info.elementCount())
+                                    .format(info.tag.name,
+                                            self._createButton('select',self.tr('Select')),
+                                            self._createButton('undo',self.tr('Undo'))
+                                    ))
+                elif info.type == 'replace':
+                    lines.append(self.tr("Tag '{}' was replaced by '{}' in %n element(s) {} {}",'',
+                                                                    info.elementCount())
+                                    .format(info.tag.name,
+                                            info.newTag.name,
+                                            self._createButton('select',self.tr('Select')),
+                                            self._createButton('undo',self.tr('Undo'))
+                                    ))
+            
+                elif info.type == 'unknown':
+                    lines.append(self.tr("Unknown tag '{}' found in %n element(s) {} {} {}",'',
+                                                                    info.elementCount())
+                                    .format(info.tag.name,
+                                            self._createButton('select',self.tr('Select')),
+                                            self._createButton('add',self.tr('Add to database')),
+                                            self._createButton('delete',self.tr('Delete'))
+                                    ))
+            
+        self.label.setText('<br>'.join(lines))
+
 
 # register this widget in the main application
 eData = mainwindow.WidgetData(id = "editor",

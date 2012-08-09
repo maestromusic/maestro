@@ -85,9 +85,9 @@ class TestCase(unittest.TestCase):
         self.level.insertContents(self.C1,1,[self.F2])
         self.check('contents',(self.C1,[self.F1,self.F2,self.F3]))
         
-        self.level.removeContents(self.C1,[1,2])
-        self.check('contents',(self.C1,[self.F1]))
-        self.check('parents',(self.F2,[]))
+        self.level.removeContents(self.C1, indexes=(1, 2))
+        self.check('contents',(self.C1, [self.F1]))
+        self.check('parents',(self.F2, []))
         
         #container = self.level.merge([self.C1,self.F2,self.F3])
         

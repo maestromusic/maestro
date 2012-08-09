@@ -36,18 +36,19 @@ class AlbumGuessCommand(QtGui.QUndoCommand):
         self.level = level
         self.ids = list(children.values())
         self.containerTags = containerTags
-        self.containerID = None
+        self.container = self.containerID = None
         self.children = children
         self.meta = meta
     
     def redo(self):
-        if self.containerID is None:
+        if self.container is None:
             self.containerID = levels.createTId()
             self.ids.append(self.containerID)
             self.contents = [self.containerID]
-        album = Container(self.level, self.containerID, major = True)
+        album = Container(self.level, self.containerID, major=True)
         album.tags = self.containerTags
         self.level.elements[self.containerID] = album
+        self.container = album
         for position, childID in self.children.items():
             child = self.level.get(childID)
             child.parents.append(self.containerID)
@@ -98,7 +99,7 @@ class StandardGuesser(profiles.Profile):
         self.level = level
         if len(self.groupTags) == 0 and not self.directoryMode:
             # no grouping -> concatenate filesByFolder
-            self.singles = [f.id for f in itertools.chain(*files.values())]
+            self.singles = list(itertools.chain(*files.values()))
         else:
             application.stack.beginMacro(self.tr('Guess Albums'))
             if self.directoryMode:
@@ -127,7 +128,7 @@ class StandardGuesser(profiles.Profile):
                 if key not in byKey:
                     byKey[key] = []
                 byKey[key].append(element)
-        self.albums.extend(list(existingParents))
+        self.albums.extend(self.level.get(id) for id in existingParents)
         for key, elements in byKey.items():
             if pureDirMode or (self.albumTag in elements[0].tags):
                 elementsWithoutPos = { e for e in elements if e.filePosition is None }
@@ -148,14 +149,13 @@ class StandardGuesser(profiles.Profile):
                 albumTags[tags.TITLE] = [key] if pureDirMode else elements[0].tags[self.albumTag]
                 command = AlbumGuessCommand(self.level, albumTags, children)
                 application.stack.push(command)
-                self.albums.append(command.containerID)
+                self.albums.append(command.container)
             else:
-                self.singles.extend(element.id for element in elements)
+                self.singles.extend(elements)
                 
     def guessMetaContainers(self):
         byKey = {}
-        for albumID in self.albums:
-            album = self.level.get(albumID)
+        for album in self.albums:
             name = ", ".join(album.tags[tags.TITLE])
             discstring = re.findall(self.metaRegex, name,flags=re.IGNORECASE)
             if len(discstring) > 0:
@@ -179,10 +179,10 @@ class StandardGuesser(profiles.Profile):
             metaTags[tags.TITLE] = [key[1]]
             command = AlbumGuessCommand(self.level, metaTags, {pos:album.id for pos,album in contents.items()}, meta = True)
             application.stack.push(command)
-            self.albums.append(command.containerID)
+            self.albums.append(command.container)
             for c in contents.values():
-                if c.id in self.albums:
-                    self.albums.remove(c.id)
+                if c in self.albums:
+                    self.albums.remove(c)
 
     @classmethod    
     def configurationWidget(cls, profile = None, parent = None):

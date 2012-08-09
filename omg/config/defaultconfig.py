@@ -70,9 +70,10 @@ defaults = OrderedDict((
 ("tags", {    
     "title_tag": (str,"title","Key of the title-tag."),
     "album_tag": (str,"album","Key of the album-tag."),
-    "search_tags":(list,["album","performer","conductor","title","lyricist","composer","date","artist"],
+    "search_tags": (list,["album","performer","conductor","title","lyricist","composer","date","artist"],
                     "Tags that will be searched, if you type a text without prefix in a searchbox. Use prefixes to search for other tags."),
-    "always_delete": (list, [], "Tags which will be deleted from all files in which they occur.")
+    "auto_delete": (list,[],"list of tags that will be removed from files when they are imported into the editor"),
+    "auto_replace": (str,'',"list of of tag pairs. When files are imported to the editor, tags are replaced according to these pairs. Each list entry must be of the form '(albumartist,performer)'.")
 }),
 
 ("gui", {

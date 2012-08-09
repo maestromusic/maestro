@@ -348,7 +348,7 @@ class Tag:
      
     def valueFromString(self, string, crop=False):
         """Get a value for this tag from a string. If *crop* is True, the method is allowed to crop *string*
-        to obtain a valid value."""
+        to obtain a valid value. If that is not possible, raise a ValueError."""
         if self.type is not None:
             return self.type.valueFromString(string,crop)
         else: return string
@@ -372,7 +372,7 @@ class Tag:
         return self.title
 
 
-def isValidTagname(name):
+def isValidTagName(name):
     """Return whether *name* is a valid tag name. OMG uses the restrictions imposed by the
     Vorbis-specification: ASCII 0x20 through 0x7D, 0x3D ('=') excluded.
     Confer http://xiph.org/vorbis/doc/v-comment.html.
@@ -405,7 +405,7 @@ def get(identifier,addDialogIfNew=False):
         if identifier in _tagsByName:
             return _tagsByName[identifier]
         else:
-            if not isValidTagname(identifier):
+            if not isValidTagName(identifier):
                 raise ValueError("'{}' is not a valid tagname".format(identifier))
             newTag = Tag(identifier)
             _tagsByName[identifier] = newTag
@@ -893,7 +893,11 @@ class TagDict(dict):
         return utils.OrderedDictItems(self,self.keys())
 
     def keys(self):
-        return [tag for tag in tagList if tag in self]
+        result = [tag for tag in tagList if tag in self]
+        external = [tag for tag in super().keys() if not tag.isInDB()]
+        external.sort(key=lambda tag: tag.name)
+        result.extend(external)
+        return result 
     
     def values(self):
         return utils.OrderedDictValues(self,self.keys())

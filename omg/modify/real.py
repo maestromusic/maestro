@@ -111,9 +111,3 @@ def changeFileTags(path, tagDiff, reverse = False):
     else:
         tagDiff.apply(file.tags, False)
     file.save()
-
-def deleteFilesFromDisk(paths):
-    """Delete the given files from the filesystem. *paths* is a list of paths."""
-    for path in paths:
-        logger.warning('permanently removing file "{}"'.format(path))
-        os.remove(utils.absPath(path))

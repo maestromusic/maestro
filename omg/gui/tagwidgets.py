@@ -584,7 +584,7 @@ class AddTagTypeDialog(QtGui.QDialog):
             QtGui.QMessageBox.warning(self,self.tr("Tag exists already"),
                                       self.tr("There is already a tag named '{}'.").format(tagName))
             return
-        if not tags.isValidTagname(tagName):
+        if not tags.isValidTagName(tagName):
             QtGui.QMessageBox.warning(self,self.tr("Invalid tagname"),
                                       self.tr("'{}' is not a valid tagname.").format(tagName))
             return
