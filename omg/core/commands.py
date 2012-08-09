@@ -323,58 +323,26 @@ class InsertElementsCommand(QtGui.QUndoCommand):
     
 class RemoveElementsCommand(QtGui.QUndoCommand):
     """Remove some elements from a single parent."""
-    def __init__(self, level, parentId, positions, text = None):
+    def __init__(self, level, parent, positions, text=None):
         super().__init__()
         if text:
             self.setText(text)
         self.level = level
-        self.parentId = parentId
+        self.parent = parent
         self.positions = positions
-        parent = level.get(parentId)
-        self.childIds = [parent.contents.getId(position) for position in positions]
+        self.children = [self.level.get(parent.contents.getId(position))
+                         for position in positions]
         
     def redo(self):
-        self.level.removeChildren(self.parentId, self.positions)
-        self.level.emitEvent(contentIds= (self.parentId,) )
+        self.level.removeChildren(self.parent, self.positions)
+        self.level.emitEvent(contentIds=(self.parent.id,) )
     
     def undo(self):
-        self.level.insertChildren(self.parentId, list(zip(self.positions, self.childIds)))
-        self.level.emitEvent(contentIds= (self.parentId,) )
+        self.level.insertChildren(self.parent, list(zip(self.positions, self.children)))
+        self.level.emitEvent(contentIds= (self.parent.id,) )
 
-def removeElements(level, parentId, positions, text = None):
-    """Remove elements from a parent and intelligently adjust subsequent positions.
-    
-    If there is an element following the last one deleted, and that element's position
-    is the previous one's plus 1, then positions of subsequent elements are reduced
-    to fit."""
-    from .. import application
-    import itertools
-    parent = level.get(parentId)
-    positions = sorted(positions)
-    lastRemovePosition = positions[-1]
-    lastRemoveIndex = parent.contents.positions.index(lastRemovePosition)
-    for i,p1,p2 in zip(
-        itertools.count(start=1),
-        reversed(positions),
-        reversed(parent.contents.positions[lastRemoveIndex-len(positions):lastRemoveIndex+1])):
-        if p1 == p2:
-            shift = -i
-        else:
-            break
-            
-                 
-    if len(parent.contents) > lastRemoveIndex+1 and parent.contents.positions[lastRemoveIndex+1] == positions[-1] + 1:
-        shiftPositions = parent.contents.positions[lastRemoveIndex+1:]
-    else:
-        shiftPositions = None
-    removeCommand = RemoveElementsCommand(level, parentId, positions, text)
-    application.stack.beginMacro(text)
-    application.stack.push(removeCommand)
-    if shiftPositions:
-        posCommand = ChangePositionsCommand(level, parentId, shiftPositions, shift)
-        application.stack.push(posCommand)
-    application.stack.endMacro()
-    
+
+ 
 class ChangeMajorFlagCommand(QtGui.QUndoCommand):
     def __init__(self, level, ids):
         super().__init__()
@@ -398,11 +366,11 @@ class ChangeMajorFlagCommand(QtGui.QUndoCommand):
 class ChangePositionsCommand(QtGui.QUndoCommand):
     """Change the positions of several elements below the same parent. Checks for
     invalid changes."""
-    def __init__(self, level, parentId, oldPositions, shift):
+    def __init__(self, level, parent, oldPositions, shift):
         super().__init__()
         self.level = level
-        self.parentId = parentId
-        self.oldPositions = level.get(parentId).contents.positions[:]
+        self.parent = parent
+        self.oldPositions = parent.contents.positions[:]
         self.newPositions = list(map(lambda p:p + shift if p in oldPositions else p, self.oldPositions))
         if any(i <=0 for i in self.newPositions):
             raise levels.ConsistencyError('Positions may not drop below one')
@@ -412,15 +380,13 @@ class ChangePositionsCommand(QtGui.QUndoCommand):
             self.changes = [ (p,p+shift) for p in oldPositions ]
         
     def redo(self):
-        parent = self.level.get(self.parentId)
-        parent.contents.positions = self.newPositions[:]
+        self.parent.contents.positions = self.newPositions[:]
         if self.level is levels.real:
-            db.write.changePositions(self.parentId, self.changes)
-        self.level.emitEvent(contentIds = (self.parentId,))
+            db.write.changePositions(self.parent.id, self.changes)
+        self.level.emitEvent(contentIds=(self.parent.id,))
     
     def undo(self):
-        parent = self.level.get(self.parentId)
-        parent.contents.positions = self.oldPositions[:]
+        self.parent.contents.positions = self.oldPositions[:]
         if self.level is levels.real:
-            db.write.changePositions(self.parentId, [(b,a) for a,b in self.changes])
-        self.level.emitEvent(contentIds = (self.parentId,))
+            db.write.changePositions(self.parent.id, [(b,a) for a,b in self.changes])
+        self.level.emitEvent(contentIds = (self.parent.id,))

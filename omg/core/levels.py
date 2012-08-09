@@ -188,19 +188,46 @@ class Level(QtCore.QObject):
             lastPosition = firstPos + len(elements) - 1
             shift = lastPosition - parent.contents.positions[index] + 1
             if shift > 0:
-                posCom = commands.ChangePositionsCommand(self,
-                                                       parent.id,
-                                                       parent.contents.positions[index:],
-                                                       shift)
+                posCom = commands.ChangePositionsCommand(self, parent,
+                                                         parent.contents.positions[index:],
+                                                         shift)
                 application.stack.push(posCom)
         insertCom = commands.InsertElementsCommand(self, parent, index, elements)
         application.stack.push(insertCom)
         application.stack.endMacro()
         
-    def removeContents(self, parent, indexes):
+    def removeContents(self, parent, positions=None, indexes=None):
+        """Undoably remove contents under the container *parent*.
+        
+        The elements to remove may be given either by specifying their *positions* or
+        *indexes*.        
+        If there are subsequent elements behind the deleted ones, their positions will be
+        diminished so that no gap results.
+        """
         from . import commands
-        commands.removeElements(self,parent.id,[parent.contents.positions[i] for i in indexes])
-   
+        if positions is None:
+            positions = [ parent.contents.positions[i] for i in indexes ]
+        positions = sorted(positions)
+        
+        lastRemovePosition = positions[-1]
+        lastRemoveIndex = parent.contents.positions.index(lastRemovePosition)
+        shiftPositions = None
+        if len(parent.contents) > lastRemoveIndex+1 \
+                and parent.contents.positions[lastRemoveIndex+1] == positions[-1] + 1:
+            shiftPositions = parent.contents.positions[lastRemoveIndex+1:]
+            for i in range(1, len(positions)+1):
+                if positions[-i] == parent.contents.positions[lastRemoveIndex+1-i]:
+                    shift = -i
+                else:
+                    break
+        application.stack.beginMacro(self.tr("remove"))
+        removeCommand = commands.RemoveElementsCommand(self, parent, positions)
+        application.stack.push(removeCommand)
+        if shiftPositions is not None:
+            posCommand = commands.ChangePositionsCommand(self, parent, shiftPositions, shift)
+            application.stack.push(posCommand)
+        application.stack.endMacro()
+        
     def commit(self,ids=None):
         from . import commands
         if ids is None:
@@ -223,18 +250,15 @@ class Level(QtCore.QObject):
         assert id in self.elements
         assert self.get(id).isFile()
         from . import commands
-        from .. import application
         for parentId in self.elements[id].parents:
-            command = commands.RemoveElementsCommand(self, parentId,
-                                                     self.get(parentId).contents.getPositions(id))
+            parent = self.get(parentId)
+            command = commands.RemoveElementsCommand(self,
+                                                     parent,
+                                                     parent.contents.getPositions(id))
             application.stack.push(command)
         del self.elements[id]
         return self.get(id)
-        
-   
-        
-    
-  
+
     def addTagValue(self,tag,value,elements,emitEvent=True):
         """Add a tag of type *tag* and value *value* to the given elements. If *emitEvent* is False, do not
         emit an event."""
@@ -329,10 +353,10 @@ class Level(QtCore.QObject):
     def removeChildren(self, parent, positions):
         childIds = [parent.contents.getId(position) for position in positions]
         for pos in positions:
-            parent.contents.remove(pos = pos)
+            parent.contents.remove(pos=pos)
         for id in childIds:
             if id not in parent.contents.ids:
-                self.get(id).parents.remove(parent)
+                self.get(id).parents.remove(parent.id)
                 
     def renameFiles(self, map, emitEvent=True):
         """Rename files based on *map*, which is a dict from ids to new paths.
@@ -565,13 +589,13 @@ class RealLevel(Level):
                 elem.filePosition = filePosition
             level.elements[id] = elem
     
-    def insertChildren(self, parentId, insertions):
-        db.write.addContents([(parentId, pos, id) for pos,id in insertions])
-        super().insertChildren(parentId, insertions)
+    def insertChildren(self, parent, insertions):
+        db.write.addContents([(parent.id, pos, child.id) for pos, child in insertions])
+        super().insertChildren(parent, insertions)
         
-    def removeChildren(self, parentId, positions):
-        db.write.removeContents([(parentId, pos) for pos in positions])
-        super().removeChildren(parentId, positions)
+    def removeChildren(self, parent, positions):
+        db.write.removeContents([(parent.id, pos) for pos in positions])
+        super().removeChildren(parent, positions)
     
     def addTagValue(self,tag,value,elements,emitEvent=True):
         super().addTagValue(tag,value,elements,emitEvent=False)

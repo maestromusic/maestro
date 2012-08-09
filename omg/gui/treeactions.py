@@ -24,6 +24,7 @@ from ..constants import DB, DISK, CONTENTS
 from ..core import levels, tags, commands
 from ..core.nodes import RootNode, Wrapper
 from ..models import leveltreemodel
+from omg.models.browser import BrowserModel
 
 translate = QtGui.QApplication.translate
 
@@ -118,29 +119,27 @@ class DeleteAction(TreeAction):
     def doAction(self):
         model = self.parent().model()
         if self.mode == CONTENTS:
-            rootParents = []
-            elementParents = {}
+            byParent = {}
             for wrapper in self.parent().nodeSelection.wrappers():
                 parent = wrapper.parent
-                if parent is model.root:
-                    rootParents.append(parent.contents.index(wrapper))
-                else:
-                    if parent.element.id not in elementParents:
-                        elementParents[parent.element.id] = []
-                    elementParents[parent.element.id].append(wrapper.position)
+                if parent not in byParent:
+                    byParent[parent] = []
+                byParent[parent].append(parent.contents.index(wrapper))
+            for parent, indexes in byParent.items():
+                byParent[parent] = sorted(set(indexes))
             
-            if len(rootParents) > 0:
-                newContents = [node.element for node in model.root.contents]
-                for idx in sorted(rootParents, reverse = True):
-                    del newContents[idx]
-                application.stack.push(leveltreemodel.ChangeRootCommand(model, newContents))
-            if len(elementParents) > 0:
-                application.stack.beginMacro(self.modeText[self.mode])
-                for parentId, removals in elementParents.items():
-                    application.stack.push(commands.RemoveElementsCommand(self.level(), parentId, removals))
-                application.stack.endMacro()
+            application.stack.beginMacro("remove")
+            if isinstance(model, leveltreemodel.LevelTreeModel):
+                for parent, indexes in byParent.items():
+                    model.removeElements(parent, indexes)
+            elif isinstance(model, BrowserModel):
+                for parent, indexes in byParent.items():
+                    self.level().removeContents(parent.element, indexes=indexes)
+            
+            application.stack.endMacro()
         else:
             raise NotImplementedError()
+        
 
 class MergeAction(TreeAction):
     """Action to merge selected elements into a new container."""

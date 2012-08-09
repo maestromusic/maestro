@@ -127,13 +127,12 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
     def removeElements(self, parent, rows):
         """Undoably remove elements in *rows* under *parent* (a wrapper)."""
         if parent is self.root:
-            oldContentIDs = [node.element.id for node in self.root.contents ]
-            newContentIDs = [oldContentIDs[i] for i in range(len(oldContentIDs)) if i not in rows]
-            application.stack.push(ChangeRootCommand(self, oldContentIDs, newContentIDs))
+            newContents = [ self.root.contents[i].element
+                           for i in range(len(self.root.contents))
+                           if i not in rows]
+            application.stack.push(ChangeRootCommand(self, newContents))
         else:
-            commands.removeElements(self.level, parent.element.id,
-                                    [parent.contents[i].position for i in rows],
-                                    self.tr("Remove elements"))
+            self.level.removeContents(parent.element, indexes=rows)
     
     def loadFile(self, path):
         """Load a file into this model. The default implementations calls level.get()."""
