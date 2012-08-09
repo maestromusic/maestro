@@ -186,8 +186,8 @@ def makeValueIDs(data):
         # Update cache
         if valueType == tags.TYPE_VARCHAR:
             for id, (tagId, value) in enumerate(values,start=lastId-len(values)+1):
-                db._idToValue[tag][id] = value
-                db._valueToId[tag][value] = id
+                db._idToValue[tags.get(tagId)][id] = value
+                db._valueToId[tags.get(tagId)][value] = id
 
 
 def addTagValuesMulti(data):
