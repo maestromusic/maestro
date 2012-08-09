@@ -122,24 +122,24 @@ class FlagEditorUndoCommand(tageditor.TagFlagEditorUndoCommand):
     def modifyLevel(self,method,params):
         if method.__name__ == 'insertRecord':
             pos,record = params
-            self.model.level.addFlag(record.flag,record.elementsWithFlag,emitEvent=False)
+            self.model.level._addFlag(record.flag,record.elementsWithFlag,emitEvent=False)
         elif method.__name__ == 'removeRecord':
             record = params[0] # 'record, = params' would work, too.
-            self.model.level.removeFlag(record.flag,record.elementsWithFlag,emitEvent=False)
+            self.model.level._removeFlag(record.flag,record.elementsWithFlag,emitEvent=False)
         elif method.__name__ == 'changeRecord':
             oldRecord,newRecord = params
             if oldRecord.flag != newRecord.flag:
-                self.model.level.removeFlag(oldRecord.flag,oldRecord.elementsWithFlag,emitEvent=False)
-                self.model.level.addFlag(newRecord.flag,newRecord.elementsWithFlag,emitEvent=False)
+                self.model.level._removeFlag(oldRecord.flag,oldRecord.elementsWithFlag,emitEvent=False)
+                self.model.level._addFlag(newRecord.flag,newRecord.elementsWithFlag,emitEvent=False)
             else:
                 oldElements = set(oldRecord.elementsWithFlag)
                 newElements = set(newRecord.elementsWithFlag)
                 removeList = list(oldElements - newElements)
                 addList = list(newElements - oldElements)
                 if len(removeList):
-                    self.model.level.removeFlag(oldRecord.flag,removeList,emitEvent=False)
+                    self.model.level._removeFlag(oldRecord.flag,removeList,emitEvent=False)
                 if len(addList):
-                    self.model.level.addFlag(newRecord.flag,addList,emitEvent=False)
+                    self.model.level._addFlag(newRecord.flag,addList,emitEvent=False)
                      
         
 class FlagEditorModel(QtCore.QObject):

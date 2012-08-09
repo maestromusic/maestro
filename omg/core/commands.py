@@ -18,6 +18,8 @@
 
 """This module contains common QUndoCommands for modifying Elements in Levels."""
 
+import itertools
+
 from PyQt4 import QtCore, QtGui
 
 from . import levels, tags, flags
@@ -26,6 +28,7 @@ from .. import database as db, logging, utils
 from ..modify import real as modifyReal
 from ..database import write
 
+translate = QtCore.QCoreApplication.translate
 logger = logging.getLogger(__name__)
 
 
@@ -155,9 +158,9 @@ class CommitCommand(QtGui.QUndoCommand):
                 modifyReal.createNewElements(self.level, self.newInDatabase, self.idMap)
             #  change IDs of new elements in both current and parent level
             for id in self.newInDatabase:
-                self.level.changeId(id, self.newId(id))
+                self.level._changeId(id, self.newId(id))
                 if id in self.level.parent:
-                    self.level.parent.changeId(id, self.newId(id))
+                    self.level.parent._changeId(id, self.newId(id))
             #  TODO: what about child levels!?
         # ** At this point, all elements have their IDs, if applicable **
         for id in set(self.ids + self.contents):
@@ -211,7 +214,7 @@ class CommitCommand(QtGui.QUndoCommand):
                 modifyReal.changeFlags({self.newId(id):diff for id,diff in self.flagChanges.items()})            
             db.commit()
             if len(self.pathChanges) > 0:
-                levels.real.renameFiles({self.newId(id):diff for id,diff in self.pathChanges.items()})
+                levels.real._renameFiles({self.newId(id):diff for id,diff in self.pathChanges.items()})
             for path,changes in self.realFileChanges.items():
                 logger.debug("changing file tags: {0}-->{1}".format(path, changes))
                 modifyReal.changeFileTags(path, changes)
@@ -236,7 +239,7 @@ class CommitCommand(QtGui.QUndoCommand):
                 logger.debug("reverting file tags: {0}<--{1}".format(path, changes))
                 modifyReal.changeFileTags(path, changes, reverse=True)
             if len(self.pathChanges) > 0:
-                levels.real.renameFiles({self.newId(id):(b,a) for id,(a,b) in self.pathChanges.items()})
+                levels.real._renameFiles({self.newId(id):(b,a) for id,(a,b) in self.pathChanges.items()})
             db.transaction()
             if len(self.newInDatabase) > 0:
                 db.write.deleteElements(list(self.idMap.values()))
@@ -284,9 +287,9 @@ class CommitCommand(QtGui.QUndoCommand):
         # ** At this point, the parent level is in its original state
         if self.real:
             for id in self.newInDatabase:
-                self.level.changeId(self.newId(id), id)
+                self.level._changeId(self.newId(id), id)
                 if self.newId(id) in self.level.parent:
-                    self.level.parent.changeId(self.newId(id), id)
+                    self.level.parent._changeId(self.newId(id), id)
             db.commit()
         # **  At this point, IDs have been reset **
         self.level.parent.emitEvent(self.ids, self.contents)
@@ -296,37 +299,40 @@ class CommitCommand(QtGui.QUndoCommand):
 
 
 class InsertElementsCommand(QtGui.QUndoCommand):
-    """A specialized command to insert elements into an existing container."""
+    """A command to insert elements into an existing container."""
     
-    def __init__(self, level, parent, row, elements, text='insert elements'):
-        """Create the command for inserting elements into *parent* at index *row*.
+    def __init__(self, level, parent, row, elements, text=None):
+        """Create the command for inserting *elements* into *parent* at index *row*."""
         
-        *elements* is the list of the elements to be inserted. This will lead
-        to unpredictable problems if the needed position range is not free."""
         super().__init__()
-        self.row = row
+        if text is None:
+            text = translate(__name__, "insert")
+        self.setText(text)
         self.level = level
         self.parent = parent
         oldContents = parent.contents
         firstPosition = 1 if row == 0 else oldContents.positions[row-1]+1
-        import itertools
         self.insertions = list(zip(itertools.count(start=firstPosition), elements))
         
     def redo(self):
-        self.level.insertChildren(self.parent, self.insertions)
+        self.level._insertContents(self.parent, self.insertions)
         self.level.emitEvent(contentIds = (self.parent.id, ))
         
     def undo(self):
-        self.level.removeChildren(self.parent, list(zip(*self.insertions))[0])
+        self.level._removeContents(self.parent, list(zip(*self.insertions))[0])
         self.level.emitEvent(contentIds = (self.parent.id, ))
 
-    
+
 class RemoveElementsCommand(QtGui.QUndoCommand):
     """Remove some elements from a single parent."""
+    
     def __init__(self, level, parent, positions, text=None):
+        """Create the command to remove elements at *positions* under *parent* in *level*."""
+        
         super().__init__()
-        if text:
-            self.setText(text)
+        if text is None:
+            text = translate(__name__, "remove")
+        self.setText(text)
         self.level = level
         self.parent = parent
         self.positions = positions
@@ -334,15 +340,17 @@ class RemoveElementsCommand(QtGui.QUndoCommand):
                          for position in positions]
         
     def redo(self):
-        self.level.removeChildren(self.parent, self.positions)
+        self.level._removeContents(self.parent, self.positions)
         self.level.emitEvent(contentIds=(self.parent.id,) )
     
     def undo(self):
-        self.level.insertChildren(self.parent, list(zip(self.positions, self.children)))
+        self.level._insertContents(self.parent, list(zip(self.positions, self.children)))
         self.level.emitEvent(contentIds= (self.parent.id,) )
 
  
 class ChangeMajorFlagCommand(QtGui.QUndoCommand):
+    """A command to change the major flag of several elements."""
+    
     def __init__(self, level, ids):
         super().__init__()
         self.level = level

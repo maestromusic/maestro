@@ -85,8 +85,18 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
                 self.dataChanged.emit(index,index)
 
     def _buildWrappersFromPaths(self,paths):
-        """Build wrappers for the given paths and if possible add containers. In other words: convert a flat
-        playlist to a tree playlist."""
+        """Build wrappers for the given paths and if possible add containers.
+        
+        In other words: convert a flat playlist to a tree playlist."""
+        def stubFileGenerator(path):
+            """Error handler function for level: if the backend's playlist contains
+            a file that can't be loaded, we insert a dummy file instead."""
+            id = levels.tIdFromPath(path, create=True)
+            from ..core import elements, tags
+            import os.path
+            dummyTags = tags.Storage()
+            dummyTags[tags.TITLE] = ["NOT FOUND " + os.path.basename(path)]
+            return elements.File(self.level, id, path, length=0, tags=dummyTags)
         files = [Wrapper(element) for element in self.level.getFromPaths(paths)]
         wrappers = treebuilder.buildTree(self.level,files)
         for i in range(len(wrappers)):
@@ -98,10 +108,10 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         """Initialize the playlist to contain the given files. This method is not undoable."""
         self._setRootContents(self._buildWrappersFromPaths(paths))
         
-    def resetFromPaths(self,paths,updateBackend=True):
+    def resetFromPaths(self, paths, updateBackend=True):
         """Reset the playlist to contain the given files. This method is undoable."""
         wrappers = self._buildWrappersFromPaths(paths)
-        application.stack.push(PlaylistChangeCommand(self,wrappers,updateBackend))
+        application.stack.push(PlaylistChangeCommand(self, wrappers, updateBackend))
 
     def clear(self,updateBackend=True):
         """Clear the playlist."""

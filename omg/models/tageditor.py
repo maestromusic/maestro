@@ -318,17 +318,17 @@ class TagEditorUndoCommand(TagFlagEditorUndoCommand):
     def modifyLevel(self,method,params):
         if method.__name__ == 'insertRecord':
             pos,record = params
-            self.model.level.addTagValue(record.tag,record.value,record.elementsWithValue,emitEvent=False)
+            self.model.level._addTagValue(record.tag,record.value,record.elementsWithValue,emitEvent=False)
         elif method.__name__ == 'removeRecord':
             record = params[0] # 'record, = params' would work, too.
-            self.model.level.removeTagValue(record.tag,record.value,record.elementsWithValue,emitEvent=False)
+            self.model.level._removeTagValue(record.tag,record.value,record.elementsWithValue,emitEvent=False)
         elif method.__name__ == 'changeRecord':
             tag,oldRecord,newRecord = params
             
             if oldRecord.tag != newRecord.tag:
-                self.model.level.removeTagValue(oldRecord.tag,oldRecord.value,
+                self.model.level._removeTagValue(oldRecord.tag,oldRecord.value,
                                                 oldRecord.elementsWithValue,emitEvent=False)
-                self.model.level.addTagValue(newRecord.tag,newRecord.value,
+                self.model.level._addTagValue(newRecord.tag,newRecord.value,
                                              newRecord.elementsWithValue,emitEvent=False)
             else:
                 oldElements = set(oldRecord.elementsWithValue)
@@ -336,14 +336,14 @@ class TagEditorUndoCommand(TagFlagEditorUndoCommand):
                 removeList = list(oldElements - newElements)
                 addList = list(newElements - oldElements)
                 if len(removeList):
-                    self.model.level.removeTagValue(oldRecord.tag,oldRecord.value,removeList,emitEvent=False)
+                    self.model.level._removeTagValue(oldRecord.tag,oldRecord.value,removeList,emitEvent=False)
                 if len(addList):
-                    self.model.level.addTagValue(newRecord.tag,newRecord.value,addList,emitEvent=False)
+                    self.model.level._addTagValue(newRecord.tag,newRecord.value,addList,emitEvent=False)
                     
                 if oldRecord.value != newRecord.value:
                     changeList = list(newElements.intersection(oldElements))
                     if len(changeList):
-                        self.model.level.changeTagValue(tag,oldRecord.value,newRecord.value,
+                        self.model.level._changeTagValue(tag,oldRecord.value,newRecord.value,
                                                         changeList,emitEvent=False)
                         
                         
