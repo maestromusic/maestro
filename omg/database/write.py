@@ -187,16 +187,22 @@ def makeValueIDs(data):
             firstId = lastId - len(values) + 1
             for id, (tagId, value) in enumerate(values, start= firstId):
                 db._cachedValues[tagType][(tagId, value)] = id
-                
+
 
 def addTagValuesMulti(data):
-    """Add multiple tag values. *data* is a list of (elementID, tagID, valueID) tuples."""
+    """Add tag values for multiple element/tag combinations.
+    
+    The argument *data* is a list of (elementID, tagID, valueID) tuples.
+    """
     db.multiQuery("INSERT INTO {}tags (element_id, tag_id, value_id) VALUES (?,?,?)"
                   .format(db.prefix), data)
+
+
+def addTagValuesById(elids, tag, valueIds):
+    """Add tag values given by their valueIDs to some elements.
     
-def addTagValuesById(elids,tag,valueIds):
-    """Add tag values given by their id to some elements. *elids* is either a single id or a list of ids,
-    *tag* is the affected tag and *valueIds* is a list of values-ids for *tag*.
+    *elids* is either a single id or a list of ids, *tag* is the affected tag and *valueIds* is a
+    list of values-ids for *tag*.
     
     This method does not check for duplicates!
     """
@@ -205,49 +211,64 @@ def addTagValuesById(elids,tag,valueIds):
     db.multiQuery("INSERT INTO {}tags (element_id,tag_id,value_id) VALUES (?,{},?)"
                    .format(db.prefix,tag.id),
                    itertools.product(elids,valueIds))
+
+
+def addTagValues(elids, tag, values):
+    """Add tag values to some elements.
     
-    
-def addTagValues(elids,tag,values):
-    """Add tag values to some elements. *elids* is either a single id or a list of ids, *tag* is the
-    affected tag and *values* is a list of values. If a value does not already exist in the database, it
-    will be inserted.
+    *elids* is either a single id or a list of ids, *tag* is the affected tag and *values* is a
+    list of values. If a value does not already exist in the database, it will be inserted.
     
     This method does not check for duplicates!
     """
     addTagValuesById(elids,tag,[db.idFromValue(tag,value,insert=True) for value in values])
     
     
-def removeAllTagValues(elids,tags):
-    """Remove all values of the given tag from some elements. *elids* is either a single id or a list of ids.
-    Analogously *tags* may be a single tag or a list of tags.
+def removeAllTagValues(elids, tags):
+    """Remove all values of the given tag from some elements.
+    
+    *elids* is either a single id or a list of ids. Analogously *tags* may be a single tag or a
+    list of tags.
     """
     db.query("DELETE FROM {}tags WHERE element_id IN ({}) AND tag_id IN ({})"
                .format(db.prefix,db.csList(elids),db.csIdList(tags)))
 
 
-def removeTagValuesById(elids,tag,valueIds):
-    """Remove some values of one tag from some elements. *elids* is either a single id or a list of ids,
-    *tag* is the affected tag, *valueIds* is a list of value-ids of *tag*."""
+def removeTagValuesById(elids, tag, valueIds):
+    """Remove some values of one tag from some elements.
+    
+    *elids* is either a single id or a list of ids,
+    *tag* is the affected tag, *valueIds* is a list of value-ids of *tag*.
+    """
     db.query("DELETE FROM {}tags WHERE element_id IN ({}) AND tag_id = {} AND value_id IN ({})"
                 .format(db.prefix,db.csList(elids),tag.id,db.csList(valueIds)))
-    
-    
+
+
 def removeTagValues(data):
-    """Remove tag values from elements. *data* must be a list of (elementID, tagID, valueID) tuples."""
-    db.multiQuery("DELETE FROM {}tags WHERE element_id = ? AND tag_id = ? AND value_id = ?".format(db.prefix), data)
+    """Remove tag values from elements.
     
+    *data* must be a list of (elementID, tagID, valueID) tuples.
+    """
+    db.multiQuery("DELETE FROM {}tags WHERE element_id = ? AND tag_id = ? AND value_id = ?".
+                  format(db.prefix), data)
+
+
+def changeTagValueById(elids, tag, oldId, newId):
+    """Change a tag value in some elements.
     
-def changeTagValueById(elids,tag,oldId,newId):
-    """Change a tag value in some elements. *elids* is either a single id or a list of ids, *tag* is the
-    affected tag, *oldId* and *newId* are the ids of the old and new value, respectively."""
+    *elids* is either a single id or a list of ids, *tag* is the affected tag, *oldId* and *newId*
+    are the ids of the old and new value, respectively.
+    """
     db.query("UPDATE {}tags SET value_id = ? WHERE element_id IN ({}) AND tag_id = ? AND value_id = ?"
                .format(db.prefix,db.csList(elids)),newId,tag.id,oldId)
 
 
-def changeTagValue(elids,tag,oldValue,newValue):
-    """Change a tag value in some elements. *elids* is either a single id or a list of ids, *tag* is the
-    affected tag, *oldValue* and *newValue* are the old and new value, respectively. If the new value does
-    not already exist in the database, it will be created.
+def changeTagValue(elids, tag, oldValue, newValue):
+    """Change a tag value in some elements.
+    
+    *elids* is either a single id or a list of ids, *tag* is the affected tag, *oldValue* and
+    *newValue* are the old and new value, respectively. If the new value does not already exist
+    in the database, it will be created.
     """
     oldId = db.idFromValue(tag,oldValue)
     newId = db.idFromValue(tag,newValue,insert=True)
@@ -255,8 +276,9 @@ def changeTagValue(elids,tag,oldValue,newValue):
 
 
 def setTags(elid,tags):
-    """Set the tags of the element with it *elid* to the tags.Storage-instance *tags*, removing all existing
-    tags of that element."""
+    """Set the tags of the element with it *elid* to the tags.Storage-instance *tags*.
+    
+    Removes all existing tags of that element."""
     db.query("DELETE FROM {}tags WHERE element_id = ?".format(db.prefix),elid)
     for tag in tags:
         db.multiQuery("INSERT INTO {}tags (element_id,tag_id,value_id) VALUES (?,?,?)".format(db.prefix),
@@ -265,8 +287,8 @@ def setTags(elid,tags):
 
 def setSortValue(tag, valueId, sortValue):
     """Set the sort-value of the value of *tag* with id *valueId* to *sortValue*."""
-    db.query("UPDATE {}values_{} SET sort_value = ? WHERE tag_id = ? AND id = ?".format(db.prefix, tag.type),
-             sortValue, tag.id, valueId)
+    db.query("UPDATE {}values_{} SET sort_value = ? WHERE tag_id = ? AND id = ?".
+             format(db.prefix, tag.type), sortValue, tag.id, valueId)
 
 
 def setHidden(tagSpec, valueId, state):
@@ -277,21 +299,25 @@ def setHidden(tagSpec, valueId, state):
 
 
 def addFlag(elids,flag):
-    """Add the given flag to the elements with the given ids, ignoring elements that already have the
-    flag."""
+    """Add the given flag to the elements with the given ids.
+    
+    Ignores elements that already have the flag set.
+    """
     values = ','.join('({},{})'.format(elid,flag.id) for elid in elids)
     db.query("REPLACE INTO {}flags (element_id,flag_id) VALUES {}".format(db.prefix,values))
     
     
 def removeFlag(elids,flag):
-    """Remove a flag from the elements with the specified ids, ignoring elements that do not have the
-    flag."""
+    """Remove a flag from the elements with the specified ids.
+    
+    Ignores elements that do not have the flag.
+    """
     db.query("DELETE FROM {}flags WHERE flag_id = {} AND element_id IN ({})"
                 .format(db.prefix,flag.id,db.csList(elids)))
-    
-    
+
+
 def addFlags(data):
-    """Add entries to the flags table. *data* is a list of (elementid, flagid) tuples."""
+    """Add entries to the flags table.  *data* is a list of (elementid, flagid) tuples."""
     db.multiQuery("INSERT INTO {}flags (element_id,flag_id) VALUES (?,?)".format(db.prefix), data)
     
     
@@ -307,8 +333,8 @@ def setFlags(elid,flags):
     if len(flags) > 0:
         values = ["({},{})".format(elid,flag.id) for flag in flags]
         db.query("INSERT INTO {}flags (element_id,flag_id) VALUES {}".format(db.prefix,','.join(values)))
-    
-    
+
+
 def setMajor(data):
     """Changes the "major" flag of elements. *data* is a list of (id, newMajor) tuples."""
     db.multiQuery("UPDATE {}elements SET major = ? WHERE id = ?".format(db.prefix), [(b,a) for a,b in data])
