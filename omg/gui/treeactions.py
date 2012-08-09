@@ -130,11 +130,10 @@ class DeleteAction(TreeAction):
                     elementParents[parent.element.id].append(wrapper.position)
             
             if len(rootParents) > 0:
-                newContents = [node.element.id for node in model.root.contents]
-                oldContents = newContents[:]
+                newContents = [node.element for node in model.root.contents]
                 for idx in sorted(rootParents, reverse = True):
                     del newContents[idx]
-                application.stack.push(leveltreemodel.ChangeRootCommand(model, oldContents, newContents))
+                application.stack.push(leveltreemodel.ChangeRootCommand(model, newContents))
             if len(elementParents) > 0:
                 application.stack.beginMacro(self.modeText[self.mode])
                 for parentId, removals in elementParents.items():

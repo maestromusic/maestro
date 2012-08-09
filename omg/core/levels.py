@@ -169,15 +169,35 @@ class Level(QtCore.QObject):
     def __str__(self):
         return 'Level({})'.format(self.name)
     
-    def emitEvent(self,dataIds=None,contentIds=None):
+    def emitEvent(self,dataIds=None, contentIds=None):
         """Simple shortcut to emit an event."""
         self.changed.emit(ElementChangedEvent(dataIds,contentIds))
     
-    def insertContents(self,parent,index,contents):
-        from . import commands
-        commands.insertElements(self,parent.id,index,[c.id for c in contents])
+    def insertContents(self, parent, index, elements):
+        """Undoably insert elements into a parent container.
         
-    def removeContents(self,parent,indexes):
+        *parent* is the container in which to insert the elements *elements*. The insert index
+        (not position) is given by *index*; the position is automatically determined, and
+        subsequent elements' positions are shifted if necessary.
+        """
+        from . import commands
+        application.stack.beginMacro(self.tr("insert"))
+        if len(parent.contents) > index:
+            #  need to alter positions of subsequent elements
+            firstPos = 1 if index == 0 else parent.contents.positions[index-1]+1
+            lastPosition = firstPos + len(elements) - 1
+            shift = lastPosition - parent.contents.positions[index] + 1
+            if shift > 0:
+                posCom = commands.ChangePositionsCommand(self,
+                                                       parent.id,
+                                                       parent.contents.positions[index:],
+                                                       shift)
+                application.stack.push(posCom)
+        insertCom = commands.InsertElementsCommand(self, parent, index, elements)
+        application.stack.push(insertCom)
+        application.stack.endMacro()
+        
+    def removeContents(self, parent, indexes):
         from . import commands
         commands.removeElements(self,parent.id,[parent.contents.positions[i] for i in indexes])
    
@@ -288,33 +308,33 @@ class Level(QtCore.QObject):
                     self.elements[childID].parents = [ new if id == old else old
                                                       for id in self.elements[childID].parents ]
     
-    def insertChild(self, parentId, position, childId):
-        """Insert element with id *childId* at *position* under *parentId*."""
-        self.insertChildren(parentId, ( (position, childId), ))
+    def insertChild(self, parent, position, child):
+        """Insert element *child* at *position* under *parent*."""
+        self.insertChildren(parent, ( (position, child), ))
     
-    def insertChildren(self, parentId, insertions):
-        """Insert elements under *parentId*, which are given by an iterable of (position, id)
-        tuples."""
-        parent = self.get(parentId)
-        for pos, id in insertions:
-            parent.contents.insert(pos, id)
-            if not parentId in self.get(id).parents:
-                self.get(id).parents.append(parentId)
+    def insertChildren(self, parent, insertions):
+        """Insert some elements under *parent*.
         
-    def removeChild(self, parentId, position):
-        """Remove element at *position* from container with id *parentId*."""
-        self.removeChildren(parentId, (position,) )
+        The insertions are given by an iterable of (position, element) tuples.
+        """
+        for pos, element in insertions:
+            parent.contents.insert(pos, element.id)
+            if parent.id not in element.parents:
+                element.parents.append(parent.id)
+        
+    def removeChild(self, parent, position):
+        """Remove element at *position* from container *parent*."""
+        self.removeChildren(parent, (position,) )
     
-    def removeChildren(self, parentId, positions):
-        parent = self.get(parentId)
+    def removeChildren(self, parent, positions):
         childIds = [parent.contents.getId(position) for position in positions]
         for pos in positions:
             parent.contents.remove(pos = pos)
         for id in childIds:
             if id not in parent.contents.ids:
-                self.get(id).parents.remove(parentId)
+                self.get(id).parents.remove(parent)
                 
-    def renameFiles(self, map, emitEvent = True):
+    def renameFiles(self, map, emitEvent=True):
         """Rename files based on *map*, which is a dict from ids to new paths.
         
         On a normal level, this just changes the path attributes and emits an event."""

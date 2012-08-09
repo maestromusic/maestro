@@ -52,7 +52,7 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
             return defaultFlags | Qt.ItemIsDropEnabled | Qt.ItemIsDragEnabled
         else: return defaultFlags | Qt.ItemIsDropEnabled
         
-    def dropMimeData(self,mimeData,action,row,column,parentIndex):
+    def dropMimeData(self, mimeData, action, row, column, parentIndex):
         """Drop stuff into a leveltreemodel. Handles OMG mime and text/uri-list.
         
         If URLs are dropped, they are loaded into the level. If there is an album
@@ -82,7 +82,7 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
             insertPosition = None
         application.stack.beginMacro(self.tr("drop"))
         if mimeData.hasFormat(config.options.gui.mime):
-            ids = [ node.element.id for node in mimeData.wrappers() ]
+            elements = [ node.element for node in mimeData.wrappers() ]
             if action == Qt.MoveAction:
                 removals = utils.listDict(( (node.parent, node.parent.contents.index(node))
                                                 if isinstance(node.parent, RootNode)
@@ -98,10 +98,10 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
                         rparent.model.removeElements(rparent, rows)
                 
         else: # text/uri-list
-            ids = self.prepareURLs(mimeData.urls(), parent)
-        
-        ret = len(ids) != 0        
-        self.insertElements(parent, row, ids)
+            elements = self.prepareURLs(mimeData.urls(), parent)
+        logger.debug("drop mime data: {}".format(elements))
+        ret = len(elements) != 0        
+        self.insertElements(parent, row, elements)
         application.stack.endMacro()
         return ret   
     
@@ -109,17 +109,20 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
         """Qt should not handle removals."""
         return True
         
-    def insertElements(self, parent, row, ids):
-        """Undoably insert elements with *ids* (a list) under *parent*, which
-        is a wrapper. This convenience function either fires a ChangeRootCommand, if the parent
-        is the RootNode, or updates the level, if it's an element. In the latter case, a list
-        of positions for the new elements may be given; if not, it is automatically inferred."""
+    def insertElements(self, parent, row, elements):
+        """Undoably insert *elements* (a list of Elements) under *parent*, which is a wrapper.
+        
+        This convenience function either fires a ChangeRootCommand, if *parent* is this model's
+        root, or updates the level otherwise. In the latter case, a list of positions for the
+        new elements may be given; if not, they are canonically inferred.
+        """
+        
         if parent is self.root:
-            oldContentIDs = [node.element.id for node in self.root.contents ]
-            newContentIDs = oldContentIDs[:row] + ids + oldContentIDs[row:]
-            application.stack.push(ChangeRootCommand(self, oldContentIDs, newContentIDs))
+            oldContents = [ node.element for node in self.root.contents ]
+            newContents = oldContents[:row] + elements + oldContents[row:]
+            application.stack.push(ChangeRootCommand(self, newContents))
         else:
-            commands.insertElements(self.level, parent.element.id, row, ids)
+            self.level.insertContents(parent.element, row, elements)
     
     def removeElements(self, parent, rows):
         """Undoably remove elements in *rows* under *parent* (a wrapper)."""
@@ -137,8 +140,8 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
         return self.level.get(path)
     
     def prepareURLs(self, urls, parent):
-        '''This method is called if url MIME data is dropped onto this model, from an external file manager
-        or a filesystembrowser widget.'''
+        """Prepare *urls* to be dropped under *parent*; returns a list of Elements."""
+        
         files = utils.collectFiles(sorted(url.path() for url in urls))
         numFiles = sum(len(v) for v in files.values())
         progress = QtGui.QProgressDialog()
@@ -147,7 +150,7 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
         progress.setMinimumDuration(200)
         progress.setWindowModality(Qt.WindowModal)
         filesByFolder = {}
-        ids = []
+        elements = []
         try:
             # load files into editor level
             for folder, filesInOneFolder in files.items():
@@ -156,12 +159,12 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
                     progress.setValue(progress.value() + 1)
                     element = self.loadFile(file)
                     filesByFolder[folder].append(element)
-                    ids.append(element.id)
+                    elements.append(element)
                     
             progress.close()
             # call album guesser
             if self.guessProfile is None:
-                return ids
+                return elements
             else:
                 profile = albumguesser.profileConfig[self.guessProfile]
                 profile.guessAlbums(self.level, filesByFolder)
@@ -195,6 +198,10 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
                     contents[:] = [wrapper for wrapper in contents if wrapper in node.contents ]
 
     def _changeContents(self, index, new):
+        """Change contents of a node in the tree.
+        
+        The node is specified by a QModelIndex *index*, the new contents must be given as a
+        list of elements or an elements.ContentList."""
         parent = self.data(index, Qt.EditRole)
         old = [ node.element.id for node in parent.contents ]
         if isinstance(new, elements.ContentList):
@@ -202,6 +209,7 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
             new = new.ids
         else:
             newP = None
+            new = [ elem.id for elem in new ]
         i = 0
         while i < len(new):
             id = new[i]
@@ -233,7 +241,7 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
         del self.data(index, Qt.EditRole).contents[first:last+1]
         self.endRemoveRows()
         
-    def _insertContents(self, index, row, ids, positions = None):
+    def _insertContents(self, index, row, ids, positions=None):
         self.beginInsertRows(index, row, row + len(ids) - 1)
         wrappers = [Wrapper(self.level.get(id)) for id in ids]
         if positions:
@@ -392,11 +400,12 @@ class MergeCommand(QtGui.QUndoCommand):
 
 
 class ChangeRootCommand(QtGui.QUndoCommand):
-    def __init__(self, model, old, new, text = "<change root>"):
+    
+    def __init__(self, model, newContents, text="<change root>"):
         super().__init__()
         self.model = model
-        self.old = old
-        self.new = new
+        self.old = [ wrapper.element for wrapper in model.root.contents ]
+        self.new = newContents
         self.setText(text)
     
     def redo(self):
