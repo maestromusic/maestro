@@ -364,10 +364,11 @@ _valueToId = {}
 def cacheTagValues():
     """Cache all id<->value relations from the values_varchar table."""
     for tag in tagsModule.tagList:
-        result = query("SELECT id,value FROM {}values_varchar WHERE tag_id = ?".format(prefix),tag.id)
-        _idToValue[tag] = {id: value for id,value in result}
-        # do not traverse result twice
-        _valueToId[tag] = {value: id for id,value in _idToValue[tag].items()}
+        if tag.type == tagsModule.TYPE_VARCHAR:
+            result = query("SELECT id,value FROM {}values_varchar WHERE tag_id = ?".format(prefix),tag.id)
+            _idToValue[tag] = {id: value for id,value in result}
+            # do not traverse result twice
+            _valueToId[tag] = {value: id for id,value in _idToValue[tag].items()}
       
 
 def valueFromId(tagSpec,valueId):

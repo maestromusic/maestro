@@ -159,17 +159,19 @@ def makeValueIDs(data):
             if tag.type not in valuesToAdd:
                 valuesToAdd[tag.type] = set()
             valuesToAdd[tag.type].add((tag.id, tag.type.sqlFormat(value)))
-    for tagType, values in valuesToAdd.items():
+    for valueType, values in valuesToAdd.items():
         values = list(values)
-        queryString = "INSERT INTO {}values_{} (tag_id, value) VALUES (?,?)".format(db.prefix, tagType)
+        queryString = "INSERT INTO {}values_{} (tag_id, value) VALUES (?,?)".format(db.prefix,valueType.name)
         if len(values) > 1:
             db.multiQuery(queryString, values[:-1])
         lastId = db.query(queryString, *(values[-1])).insertId()
-        if tagType in db._cachedValues:
-            # update cache
-            firstId = lastId - len(values) + 1
-            for id, (tagId, value) in enumerate(values, start= firstId):
-                db._cachedValues[tagType][(tagId, value)] = id
+        
+        if valueType == tags.TYPE_VARCHAR:
+            for id, (tagId, value) in enumerate(values,start=lastId-len(values)+1):
+                db._idToValue[tag][id] = value
+                db._valueToId[tag][value] = id
+                
+                print('inserted: {} {}  {}'.format(id,tag.id,value))
                 
 
 def addTagValuesMulti(data):
