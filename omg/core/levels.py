@@ -24,7 +24,6 @@ from .elements import File, Container
 from .nodes import Wrapper
 from .. import application, database as db, realfiles, utils, config, logging
 from ..database import write as dbwrite
-from ..application import ChangeEvent
 
 import os.path, collections, numbers
 
@@ -49,7 +48,7 @@ class ConsistencyError(RuntimeError):
     pass
 
 
-class ElementChangedEvent(ChangeEvent):
+class ElementChangedEvent(application.ChangeEvent):
     #TODO comment
     def __init__(self,dataIds=None,contentIds=None):
         super().__init__()
@@ -131,7 +130,7 @@ class Level(QtCore.QObject):
             self.changed.connect(_debugAll)
     
     """Signal that is emitted if something changes on this level."""
-    changed = QtCore.pyqtSignal(ChangeEvent)
+    changed = QtCore.pyqtSignal(application.ChangeEvent)
         
     def emitEvent(self, dataIds=None, contentIds=None):
         """Simple shortcut to emit an event."""
@@ -541,7 +540,7 @@ class RealLevel(Level):
                 FROM {0}elements AS el JOIN {0}contents AS c ON el.id = c.element_id
                 WHERE el.id IN ({1})
                 """.format(db.prefix, idList))
-        for (i, contentId) in result:
+        for (id, contentId) in result:
             level.elements[id].parents.append(contentId)
         #  tags
         result = db.query("""
