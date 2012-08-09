@@ -341,7 +341,6 @@ class RemoveElementsCommand(QtGui.QUndoCommand):
         self.level.insertChildren(self.parent, list(zip(self.positions, self.children)))
         self.level.emitEvent(contentIds= (self.parent.id,) )
 
-
  
 class ChangeMajorFlagCommand(QtGui.QUndoCommand):
     def __init__(self, level, ids):
@@ -362,6 +361,7 @@ class ChangeMajorFlagCommand(QtGui.QUndoCommand):
         if self.level is levels.real:
             write.setMajor(list(self.previous.items()))
         self.level.emitEvent(list(self.previous.keys()))
+
 
 class ChangePositionsCommand(QtGui.QUndoCommand):
     """Change the positions of several elements below the same parent. Checks for
