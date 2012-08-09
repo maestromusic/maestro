@@ -86,6 +86,16 @@ def hasKnownExtension(file):
     else:
         return s[1].lower() in config.options.main.extensions
 
+def parsePosition(string):
+        """Parse a string like "7" or "2/5" to a (integer) position. If *string* has the form "2/5", the
+        first number will be returned."""
+        string = string.strip()
+        if string.isdecimal():
+            return int(string)
+        # Watch for positions of the form 2/5
+        elif re.match('\d+\s*/\s*\d+$',string):
+            return int(string.split('/')[0])
+        else: return None
 
 def relPath(file):
     """Return the relative path of a music file against the collection base path."""
@@ -103,9 +113,13 @@ def absPath(file):
     else:
         return file
 
+def makeUrl(path):
+    if os.path.isabs(path):
+        path = relPath(path)
+    return "file:///" + path
 
 def collectFiles(paths):
-    """Find all music files below the given *paths*. Return them as dict mapping directory to list of paths
+    """Find all music files below the given *paths*. Return them as dict mapping directory to list of urls
     within."""
     filePaths ={}
     def add(file, parent=None):
@@ -114,7 +128,7 @@ def collectFiles(paths):
         dir = parent or os.path.dirname(file)
         if dir not in filePaths:
             filePaths[dir] = []
-        filePaths[dir].append(relPath(file))
+        filePaths[dir].append(makeUrl(file))
     for path in paths:
         if os.path.isfile(path):
             add(path)

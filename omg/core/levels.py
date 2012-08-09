@@ -22,7 +22,7 @@ from PyQt4.QtCore import Qt
 from . import tags, flags
 from .elements import File, Container
 from .nodes import Wrapper
-from .. import application, database as db, realfiles, utils, config, logging
+from .. import application, filebackends, database as db, utils, config, logging
 from ..database import write as dbwrite
 
 import os.path, collections, numbers
@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 def init():
     global real,editor
     real = RealLevel()
-    editor = Level("EDITOR",real)
+    editor = Level("EDITOR", parent=real)
     
 
 class ElementGetError(RuntimeError):
@@ -142,7 +142,7 @@ class Level(QtCore.QObject):
         *param* may be either the id or, in case of files, the path.
         """
         if not isinstance(param,int):
-            param = idFromPath(utils.relPath(param))
+            param = idFromUrl(utils.relPath(param))
         if param not in self.elements:
             self.parent.loadIntoChild([param],self)
         return self.elements[param]
@@ -158,7 +158,7 @@ class Level(QtCore.QObject):
                 
     def getFromPaths(self, paths):
         """Load elements for the given paths and return them."""
-        ids = [idFromPath(path) for path in paths]
+        ids = [idFromUrl(path) for path in paths]
         return self.getFromIds(ids)
     
     def loadIntoChild(self, ids, child):
@@ -183,7 +183,7 @@ class Level(QtCore.QObject):
         """
         if not isinstance(arg, int):
             try:
-                arg = idFromPath(arg, create=False)
+                arg = idFromUrl(arg, create=False)
             except KeyError:
                 #  no id for that path -> element can not be contained
                 return False
@@ -503,11 +503,11 @@ class RealLevel(Level):
             else: notFound.append(id)
         if len(notFound) > 0:
             positiveIds = [id for id in notFound if id > 0]
-            paths = [pathFromTId(id) for id in notFound if id < 0]
+            urls = [urlFromTId(id) for id in notFound if id < 0]
             if len(positiveIds) > 0:
                 self.loadFromDB(positiveIds, child)
-            if len(paths) > 0:
-                self.loadFromFileSystem(paths, child)
+            if len(urls) > 0:
+                self.loadURLs(urls, child)
             
     def loadFromDB(self, idList, level):
         """Load elements specified by *idList* from the database into *level*."""
@@ -584,33 +584,26 @@ class RealLevel(Level):
         if current is not None:
             level.elements[current[0]].data[current[1]] = tuple(buffer)
             
-    def loadFromFileSystem(self, paths, level, errorHandler=None):
-        """Loads files given by relatve *paths* into *level* by reading the filesystem."""
-        for path in paths:
-            assert not os.path.isabs(path)
-            try:
-                real = realfiles.get(path)
-                fileTags = real.tags
-                length = real.length
-                filePosition = real.position
-                id = db.idFromPath(path)
-                if id is None:
-                    id = tIdFromPath(path)
-                    flags = []
-                else:
-                    flags = db.flags(id)
-                    # TODO: Load private tags!
-                    logger.warning("loadFromFilesystem called on '{}', which is in DB. Are you "
-                               " sure this is correct?".format(path))
-                elem = File(level, id=id, path=path, length=length, tags=fileTags, flags=flags)
-                elem.fileTags = fileTags.copy()
-                if filePosition is not None:
-                    elem.filePosition = filePosition
-            except OSError as e:
-                if errorHandler is not None:
-                    elem = errorHandler(path)
-                else:
-                    raise ElementGetError('could not open file "{}":\n{}'.format(path, e))            
+    def loadURLs(self, urls, level):
+        """Loads files given by *urls* into *level*."""
+        for url in urls:
+            backendFile = filebackends.get(url)
+            fTags = backendFile.tags
+            fLength = backendFile.length
+            fPosition = backendFile.position
+            id = db.idFromUrl(url)
+            if id is None:
+                id = tIdFromUrl(url)
+                flags = []
+            else:
+                flags = db.flags(id)
+                # TODO: Load private tags!
+                logger.warning("loadFromURLs called on '{}', which is in DB. Are you "
+                           " sure this is correct?".format(url))
+            elem = File(level, id=id, url=url, length=fLength, tags=fTags, flags=flags)
+            elem.fileTags = fTags.copy()
+            if fPosition is not None:
+                elem.filePosition = fPosition            
             level.elements[id] = elem
     
             
@@ -713,48 +706,48 @@ class RealLevel(Level):
         db.commit()
         
         
-def idFromPath(path, create=True):
-    """Return the id for the given path.
+def idFromUrl(url, create=True):
+    """Return the id for the given url.
     
-    For elements in the database this is a positive number. Otherwise if the path is known
+    For elements in the database this is a positive number. Otherwise if the url is known
     under a temporary id, that one is returned. If not and *create* is True, a new temporary
     id is created and returned. Otherwise a KeyError is raised.
     """
     
-    id = db.idFromPath(path)
+    id = db.idFromUrl(url)
     if id is not None:
         return id
-    else: return tIdFromPath(path, create)
+    else: return tIdFromUrl(url, create)
 
 
-def pathFromId(id):
+def urlFromId(id):
     if id < 0:
-        return pathFromTId(id)
+        return urlFromTId(id)
     else:
-        return db.path(id)
+        return db.url(id)
 
 
 _currentTId = 0 # Will be decreased by one every time a new TID is assigned
 _tIds = {} # TODO: Is there any chance that items will be removed from here?
-_paths = {}
+_urls = {}
 
 
-def tIdFromPath(path, create=True):
-    """Return the temporary id for *path*, if it exists.
+def tIdFromUrl(url, create=True):
+    """Return the temporary id for *url*, if it exists.
     
     If it does not exist and *create* is True, a new one is inserted and returned.
     Otherwise, a KeyError is raised.
     """
-    if path in _tIds:
-        return _tIds[path]
+    if url in _tIds:
+        return _tIds[url]
     elif create:
         global _currentTId
         _currentTId -= 1
-        _paths[_currentTId] = path
-        _tIds[path] = _currentTId
+        _urls[_currentTId] = url
+        _tIds[url] = _currentTId
         return _currentTId
     else:
-        raise KeyError("No id for path '{}' is known".format(path))
+        raise KeyError("No id for url '{}' is known".format(url))
 
 
 def createTId():
@@ -763,5 +756,5 @@ def createTId():
     return _currentTId
 
 
-def pathFromTId(tid):
-    return _paths[tid]
+def urlFromTId(tid):
+    return _urls[tid]

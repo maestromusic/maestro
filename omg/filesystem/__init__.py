@@ -23,7 +23,7 @@ import os.path, subprocess, hashlib, datetime, threading, queue, time
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
-from .. import logging, config, utils, database as db, realfiles
+from .. import logging, config, utils, database as db, filebackends
 from ..core import levels
 
 logger = logging.getLogger(__name__)

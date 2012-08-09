@@ -289,8 +289,8 @@ def elementCount(elid):
 
 # Files-Table
 #================================================
-def path(elid):
-    """Return the path of the file with id *elid* or raise an sql.EmptyResultException if that element does 
+def url(elid):
+    """Return the url of the file with id *elid* or raise an sql.EmptyResultException if that element does 
     not exist."""
     try:
         return query("SELECT path FROM {}files WHERE element_id=?".format(prefix),elid).getSingle()
@@ -338,10 +338,10 @@ def verified(elid):
                  "Element with id {} is not a file (or at least not in the files table).".format(elid))
 
 
-def idFromPath(path):
-    """Return the element_id of a file from the given path or None if that element does not exist."""
+def idFromUrl(url):
+    """Return the element_id of a file from the given  url or None if that element does not exist."""
     try:
-        return query("SELECT element_id FROM {}files WHERE path=?".format(prefix),path).getSingle()
+        return query("SELECT element_id FROM {}files WHERE path=?".format(prefix), url).getSingle()
     except sql.EmptyResultException:
         return None
 
