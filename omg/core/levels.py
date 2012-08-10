@@ -516,18 +516,18 @@ class RealLevel(Level):
         idList = ','.join(str(id) for id in idList)
         #  bare elements
         result = db.query("""
-                SELECT el.id,el.file,el.major,f.path,f.length
+                SELECT el.id, el.file, el.major, f.url, f.length
                 FROM {0}elements AS el LEFT JOIN {0}files AS f ON el.id = f.element_id
                 WHERE el.id IN ({1})
                 """.format(db.prefix, idList))
-        for (id, file, major, path, length) in result:
+        for (id, file, major, url, length) in result:
             if file:
-                level.elements[id] = File(level, id, path=path, length=length)
+                level.elements[id] = File(level, id, url=url, length=length)
             else:
                 level.elements[id] = Container(level, id, major=major)
         #  contents
         result = db.query("""
-                SELECT el.id,c.position,c.element_id
+                SELECT el.id, c.position, c.element_id
                 FROM {0}elements AS el JOIN {0}contents AS c ON el.id = c.container_id
                 WHERE el.id IN ({1})
                 ORDER BY position
@@ -588,6 +588,7 @@ class RealLevel(Level):
         """Loads files given by *urls* into *level*."""
         for url in urls:
             backendFile = filebackends.get(url)
+            backendFile.readTags()
             fTags = backendFile.tags
             fLength = backendFile.length
             fPosition = backendFile.position
@@ -671,8 +672,8 @@ class RealLevel(Level):
     def _renameFiles(self, renamings, emitEvent=True):
         """on the real level, files are renamed on disk and in DB."""
         super()._renameFiles(renamings, emitEvent)
-        for id, (oldPath, newPath) in renamings.items():
-            os.renames(utils.absPath(oldPath), utils.absPath(newPath))
+        for id, (_, newPath) in renamings.items():
+            filebackends.get(self.get(id).url).rename(newPath)
         db.write.changeFilePaths([ (id, newPath) for id, (_, newPath) in renamings.items()])
         if emitEvent:
             self.changed.emit(FileRenameEvent(list(renamings.items())))

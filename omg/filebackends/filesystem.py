@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import os.path
+import os.path, urllib.parse
 
 import taglib
 
@@ -40,11 +40,10 @@ class RealFile(BackendFile):
     def __init__(self, url):
         """Create a file for the given path. Raises IOError if the file cannot be read."""
         super().__init__(url)
-        self.relpath = url.path[1:] # remove leading slash
-        self.abspath = utils.absPath(self.relpath)
-        self._read()
+        self.path = url.path[1:] # remove leading slash
+        self.abspath = utils.absPath(self.path)
         
-    def _read(self):
+    def readTags(self):
         self._taglibFile = taglib.File(self.abspath) 
         self.tags = tags.Storage()
         self.ignoredTags = dict()
@@ -74,7 +73,19 @@ class RealFile(BackendFile):
     def readOnly(self):
         return self._taglibFile.readOnly
     
-    def save(self):
+    @property
+    def canRename(self):
+        return not self.readOnly
+    
+    def rename(self, newPath):
+        # TODO: handle open taglib file references
+        assert not os.path.isabs(newPath)
+        newAbsPath = utils.absPath(newPath)
+        os.renames(self.absPath, newAbsPath)
+        self.path = newPath
+        self.url = urllib.parse.urlparse("file:///" + newPath)
+        
+    def saveTags(self):
         self._taglibFile.tags = dict()
         for tag, values in self.ignoredTags.items():
             self._taglibFile.tags[tag.upper()] = values
@@ -88,5 +99,3 @@ class RealFile(BackendFile):
                 ret[key.upper()] = values
             return ret
         return None
-    
-registerBackend(RealFile)

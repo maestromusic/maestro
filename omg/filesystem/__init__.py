@@ -35,6 +35,7 @@ def init():
     global syncThread, notifier, null, enabled
     if config.options.filesystem.disable:
         return
+    return # DISABLE MODULE DOES NOT WORK ATM
     syncThread = FileSystemSynchronizer()
     null = open(os.devnull)
     levels.real.changed.connect(syncThread.handleEvent, Qt.QueuedConnection)

@@ -45,19 +45,31 @@ def get(string):
     
 class BackendFile:
     
-    def __init__(self, url):
-        """Initialize the backend file and read tags etc."""
-        self.url = url
-    
-    def save(self):
-        """Store any changes made to the tags."""
-        pass
-    
     @staticmethod
     def tryLoad(url):
         pass
     
+    def __init__(self, url):
+        """Initialize the backend file, but don't read any tags etc."""
+        self.url = url
+        
+    def readTags(self):
+        """Read the tags which will be available in the *tags* attribute afterwards."""
+        pass
+    
+    def saveTags(self):
+        """Store any changes made to the tags."""
+        pass
+    
+    def rename(self, newPath):
+        pass
+    
+    def computeHash(self):
+        pass
+    
     readOnly = False
+    canRename = False
+    path = None
     position = None
     length = -1
     

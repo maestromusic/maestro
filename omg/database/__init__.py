@@ -293,7 +293,7 @@ def url(elid):
     """Return the url of the file with id *elid* or raise an sql.EmptyResultException if that element does 
     not exist."""
     try:
-        return query("SELECT path FROM {}files WHERE element_id=?".format(prefix),elid).getSingle()
+        return query("SELECT url FROM {}files WHERE element_id=?".format(prefix),elid).getSingle()
     except sql.EmptyResultException:
         raise sql.EmptyResultException(
                  "Element with id {} is not a file (or at least not in the files table).".format(elid))
@@ -311,9 +311,9 @@ def hash(elid):
 
 def setHash(element, hash):
     """Set the hash of file given by *element* to the given string and update the timestamp.
-    *element* must either be the pathname or the id of the file."""
+    *element* must either be the url or the id of a file."""
     if isinstance(element, str):
-        query("UPDATE {}files SET hash=? WHERE path=?".format(prefix), hash, element)
+        query("UPDATE {}files SET hash=? WHERE url=?".format(prefix), hash, element)
     else:
         query("UPDATE {}files SET hash=? WHERE element_id=?".format(prefix), hash, element)
     
@@ -341,7 +341,7 @@ def verified(elid):
 def idFromUrl(url):
     """Return the element_id of a file from the given  url or None if that element does not exist."""
     try:
-        return query("SELECT element_id FROM {}files WHERE path=?".format(prefix), url).getSingle()
+        return query("SELECT element_id FROM {}files WHERE url=?".format(prefix), url).getSingle()
     except sql.EmptyResultException:
         return None
 

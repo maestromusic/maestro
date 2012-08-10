@@ -130,12 +130,12 @@ CREATE TABLE {0}contents (
 _addMySQL("""
 CREATE TABLE {0}files (
     element_id MEDIUMINT UNSIGNED NOT NULL,
-    path       VARCHAR(511)       NOT NULL,
+    url        VARCHAR(511)       NOT NULL,
     hash       VARCHAR(63),
     verified   TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     length     MEDIUMINT UNSIGNED NOT NULL,
     PRIMARY KEY(element_id),
-    INDEX path_idx(path(333)),
+    INDEX url_idx(url(333)),
     INDEX hash_idx(hash),
     INDEX length_idx(length),
     FOREIGN KEY(element_id) REFERENCES {0}elements(id) ON DELETE CASCADE
@@ -144,14 +144,14 @@ CREATE TABLE {0}files (
 _addSQLite("""
 CREATE TABLE {0}files (
     element_id MEDIUMINT UNSIGNED NOT NULL,
-    path       VARCHAR(511)       NOT NULL,
+    url        VARCHAR(511)       NOT NULL,
     hash       VARCHAR(63),
     verified   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     length     MEDIUMINT UNSIGNED NOT NULL,
     FOREIGN KEY(element_id) REFERENCES {0}elements(id) ON DELETE CASCADE
 )
 """.format(db.prefix),
-"CREATE INDEX files_path_idx ON {}files (path)".format(db.prefix),
+"CREATE INDEX files_url_idx ON {}files (url)".format(db.prefix),
 "CREATE INDEX files_hash_idx ON {}files (hash)".format(db.prefix),
 "CREATE INDEX files_length_idx ON {}files (length)".format(db.prefix),
 """
