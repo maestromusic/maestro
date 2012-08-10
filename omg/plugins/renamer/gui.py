@@ -18,7 +18,7 @@
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from omg import application
+from omg import application, filebackends
 from omg.gui import treeview, treeactions, delegates
 from omg.gui.delegates import configuration, abstractdelegate
 from omg.models import leveltreemodel
@@ -34,14 +34,24 @@ class RenameFilesAction(treeactions.TreeAction):
         self.setText(self.tr('rename files'))
     
     def initialize(self):
-        self.setEnabled(self.parent().nodeSelection.hasWrappers())
+        for fileW in self.parent().nodeSelection.fileWrappers(True):
+            if fileW.element.url.CAN_RENAME:
+                self.setEnabled(True)
+                return
+        self.setEnabled(False)
     
     def doAction(self):
-        dialog = RenameDialog(self.parent(), self.level(),
-                              [wrap.element.id for wrap in self.parent().nodeSelection.wrappers()])
+        def check(element):
+            """Check if all files under this parent can be renamed."""
+            for file in element.getAllFiles():
+                if not file.url.CAN_RENAME:
+                    return False
+            return True
+        elements = [elem for elem in self.parent().nodeSelection.elements() if check(elem)]
+        dialog = RenameDialog(self.parent(), self.level(), elements)
         dialog.exec_()
         if dialog.result() == dialog.Accepted:
-            application.stack.push(CommitCommand(dialog.sublevel, dialog.ids, self.tr("rename")))
+            application.stack.push(CommitCommand(dialog.sublevel, [dialog.sublevel.files()], self.tr("rename")))
             
 
 class PathDelegate(delegates.StandardDelegate):
@@ -57,17 +67,18 @@ class PathDelegate(delegates.StandardDelegate):
                  'showFlagIcons' : False}
     )
     
-    def __init__(self, view): 
+    def __init__(self, view, newPaths): 
         super().__init__(view) 
         self.newPathStyleNew = abstractdelegate.DelegateStyle(1, False, True, Qt.darkGreen)
         self.newPathStyleOld = abstractdelegate.DelegateStyle(1, False, True, Qt.red)
-        self.unchangedStyle = abstractdelegate.DelegateStyle(1, False, True, Qt.gray) 
+        self.unchangedStyle = abstractdelegate.DelegateStyle(1, False, True, Qt.gray)
+        self.newPaths = newPaths
         self.result = {} 
         
     def addPath(self, element):
         if element.isFile():
-            oldPath = element.inParentLevel().path
-            newPath= element.path
+            oldPath = element.inParentLevel().url.path
+            newPath = element.url.path
             if oldPath != newPath:
                     self.addCenter(delegates.TextItem(self.tr("From: {}").format(oldPath),
                                                       self.newPathStyleOld))
@@ -75,18 +86,19 @@ class PathDelegate(delegates.StandardDelegate):
                     self.addCenter(delegates.TextItem(self.tr("To: {}").format(newPath),
                                                   self.newPathStyleNew))
             else:
-                self.addCenter(delegates.TextItem(self.tr("Unchanged: {}").format(element.path),
+                self.addCenter(delegates.TextItem(self.tr("Unchanged: {}").format(oldPath),
                                                   self.unchangedStyle))
             
     
 class RenameDialog(QtGui.QDialog):
-    def __init__(self, parent, level, ids):
+    def __init__(self, parent, level, elements):
         super().__init__(parent)
         
         self.setModal(True)
-        self.ids = ids
+        elements = list(elements)
+        
         self.level = level
-        self.setWindowTitle(self.tr("Rename {} containers").format(len(ids)))
+        self.setWindowTitle(self.tr("Rename {} containers").format(len(elements)))
         mainLayout = QtGui.QVBoxLayout()
         
         configDisplay = plugin.profileConfig.configurationDisplay()
@@ -104,11 +116,18 @@ class RenameDialog(QtGui.QDialog):
         self.statusLabel.setPalette(pal)
 
         
-        self.sublevel = level.subLevel(ids, "rename")
-        self.model = leveltreemodel.LevelTreeModel(self.sublevel, ids)
+        self.sublevel = level.subLevel(elements, "rename")
+        self.elementsParent = elements
+        self.elementsSub = [self.sublevel.get(element.id) for element in elements]
+        self.proposedPaths = {}
+        for file in self.sublevel.files():
+            if file not in self.proposedPaths:
+                self.proposedPaths[file] = [file.url.path]
+        
+        self.model = leveltreemodel.LevelTreeModel(self.sublevel, self.elementsSub)
         self.tree = treeview.TreeView(self.sublevel,affectGlobalSelection=False)
         self.tree.setModel(self.model)
-        self.delegate = PathDelegate(self.tree)
+        self.delegate = PathDelegate(self.tree, self.proposedPaths)
         self.tree.setItemDelegate(self.delegate)
         self.tree.expandAll()
         
@@ -133,12 +152,12 @@ class RenameDialog(QtGui.QDialog):
         """handle changes to the format text edit box"""
         try:
             totalResult = dict()
-            for id in self.ids:
-                result = renamer.renameContainer(self.level, id)
+            for element in self.elementsParent:
+                result = renamer.renameContainer(self.level, element)
                 totalResult.update(result)
-            for id, elem in self.sublevel.elements.items():
-                if id in totalResult:
-                    elem.path = totalResult[id]
+            for elem, newPath in totalResult.items():
+                if elem.id in self.sublevel:
+                    self.sublevel.get(elem.id).url.setPath(newPath)
             if len(set(totalResult.values())) != len(totalResult): # duplicate paths!
                 self.bb.button(QtGui.QDialogButtonBox.Ok).setEnabled(False)
                 self.statusLabel.setText(self.tr("New paths are not unique! Please fix"))

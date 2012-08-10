@@ -190,7 +190,7 @@ class StandardDelegate(AbstractDelegate):
         two items for an old and a new path.""" 
         if self.config.options['showPaths'].value and element.isFile():
             self.newRow()
-            self.addCenter(TextItem(element.url, ITALIC_STYLE))
+            self.addCenter(TextItem(element.url.path, ITALIC_STYLE))
         
     def appendAncestors(self,element,ancestors,ancestorIds,filter,onlyMajor):
         """Recursively add all ancestors of *element* to the list *ancestors* and their ids to the list

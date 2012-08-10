@@ -35,8 +35,8 @@ SMALL_COVER_SIZE = 40
 
 def enable():
     from omg.gui import editor, browser
-    editor.EditorTreeView.actionConfig.addActionDefinition((("plugins", 'renamer'),), CoverAction)
-    browser.BrowserTreeView.actionConfig.addActionDefinition((("plugins", 'renamer'),), CoverAction)
+    editor.EditorTreeView.actionConfig.addActionDefinition((("plugins", 'covers'),), CoverAction)
+    browser.BrowserTreeView.actionConfig.addActionDefinition((("plugins", 'covers'),), CoverAction)
         
 def disable():
     editor.EditorTreeView.actionConfig.removeActionDefinition((("plugins", 'covers'),))

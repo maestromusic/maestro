@@ -113,14 +113,11 @@ def absPath(file):
     else:
         return file
 
-def makeUrl(path):
-    if os.path.isabs(path):
-        path = relPath(path)
-    return "file:///" + path
-
 def collectFiles(paths):
-    """Find all music files below the given *paths*. Return them as dict mapping directory to list of urls
-    within."""
+    """Find all music files below the given *paths*.
+    
+    Return them as dict mapping directory to list of FileURLs within."""
+    from .filebackends.filesystem import FileURL
     filePaths ={}
     def add(file, parent=None):
         if not hasKnownExtension(file):
@@ -128,7 +125,7 @@ def collectFiles(paths):
         dir = parent or os.path.dirname(file)
         if dir not in filePaths:
             filePaths[dir] = []
-        filePaths[dir].append(makeUrl(file))
+        filePaths[dir].append(FileURL(file))
     for path in paths:
         if os.path.isfile(path):
             add(path)

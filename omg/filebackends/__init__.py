@@ -17,31 +17,53 @@
 #
 
 from urllib.parse import urlparse
+import os.path
+
 class InvalidFileProtocol(Exception):
     pass
 
-fileBackends = {}
-def registerBackend(cls):
-    global fileBackends
-    for proto in cls.protocols:
-        if proto not in fileBackends:
-            fileBackends[proto] = []
-        fileBackends[proto].append(cls)
+class BackendURL:
+    
+    CAN_RENAME = False
+    """A class constant indicating whether this URL type supports renaming in general.
+    
+    Note that individual files may still be readOnly although CAN_RENAME is True.
+    """
+    
+    def __init__(self, urlString):
+        self.parsedUrl = urlparse(urlString)
+        self.proto = self.parsedUrl.scheme
+        
+    def getBackendFile(self):
+        for cls in self.IMPLEMENTATIONS:
+            backendFile = cls.tryLoad(self)
+            if backendFile is not None:
+                return backendFile
+        raise ValueError("No backend succeeded to load {}".format(self))
+    
+    def extension(self):
+        ext = os.path.splitext(str(self))[1]
+        if len(ext) > 1:
+            return ext[1:]
+        return None
+    
+    def copy(self):
+        return getURL(str(self))
+    
+    def __str__(self):
+        return self.parsedUrl.geturl()
 
-def unregisterBackend(cls):
-    global fileBackends
-    for proto in cls.protocols:
-        fileBackends[proto].remove(cls)
+urlTypes = {}
 
-def get(string):
-    url = urlparse(string)
-    if url.scheme not in fileBackends:
-        raise InvalidFileProtocol("Protcol {} not known".format(url.scheme))
-    for cls in fileBackends[url.scheme]:
-        backendFile = cls.tryLoad(url)
-        if backendFile is not None:
-            return backendFile
-    raise ValueError("No backend succeeded to load {}".format(string))
+def getURL(urlString):
+    """Create an URL object for the given string. The type is derived from the protocol part."""
+    proto = urlString.split("://", 1)[0]
+    return urlTypes[proto](urlString)
+
+def getFile(urlString):
+    """Convenience method: first gets URL and then the backend file object."""
+    url = getURL(urlString)
+    return url.getBackendFile()
     
 class BackendFile:
     

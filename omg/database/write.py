@@ -53,7 +53,7 @@ def addFiles(data):
     """Adds entries to the files table.
     
     The files to add are specified by *data*, a list of
-        (id, url, hash, length)
+        (id, urlString, hash, length)
     tuples.
     """
     db.multiQuery("INSERT INTO {}files (element_id, url, hash, length) VALUES(?,?,?,?)"
@@ -159,7 +159,7 @@ def updateToplevelFlags(elids=None):
 
 
 def changeUrls(data):
-    """Change the urls of files by the (id, url) list *data*."""
+    """Change the urls of files by the (id, urlString) list *data*."""
     db.multiQuery("UPDATE {}files SET url = ? WHERE element_id = ?".format(db.prefix), data)
 
 

@@ -32,15 +32,15 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
     """Model class for the editors where users can edit elements before they are commited into
     the database."""
     
-    def __init__(self, level, ids = None):
+    def __init__(self, level, elements=None):
         """Initializes the model. A new RootNode will be set as root.
         
-        If *ids* is given, these elements will be initially loaded under the root node.
+        If *elements* is given, these elements will be initially loaded under the root node.
         """
         super().__init__()
         self.level = level
-        if ids:
-            self._changeContents(QtCore.QModelIndex(), ids)
+        if elements:
+            self._changeContents(QtCore.QModelIndex(), elements)
         level.changed.connect(self._handleLevelChanged)
         
     def supportedDropActions(self):
@@ -142,7 +142,6 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
         """Prepare *urls* to be dropped under *parent*; returns a list of Elements."""
         
         files = utils.collectFiles(sorted(url.path() for url in urls))
-        print(files)
         numFiles = sum(len(v) for v in files.values())
         progress = QtGui.QProgressDialog()
         progress.setLabelText(self.tr("Importing {0} files...").format(numFiles))

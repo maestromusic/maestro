@@ -180,8 +180,7 @@ def run(cmdConfig=[],type='gui',exitPoint=None):
     covers.init()
     
     from . import filebackends
-    from .filebackends.filesystem import RealFile
-    filebackends.registerBackend(RealFile)
+    from .filebackends import filesystem as fsBackend
     
     global network
     network = QtNetwork.QNetworkAccessManager()

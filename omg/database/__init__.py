@@ -339,9 +339,12 @@ def verified(elid):
 
 
 def idFromUrl(url):
-    """Return the element_id of a file from the given  url or None if that element does not exist."""
+    """Return the element_id of a file from the given url.
+    
+    *url* must be an instance of BackendURL or an URL string. The method returns None if no file
+    with that URL exists."""
     try:
-        return query("SELECT element_id FROM {}files WHERE url=?".format(prefix), url).getSingle()
+        return query("SELECT element_id FROM {}files WHERE url=?".format(prefix), str(url)).getSingle()
     except sql.EmptyResultException:
         return None
 

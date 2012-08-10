@@ -142,7 +142,8 @@ class Level(QtCore.QObject):
         *param* may be either the id or, in case of files, the path.
         """
         if not isinstance(param,int):
-            param = idFromUrl(utils.relPath(param))
+            assert isinstance(param, filebackends.BackendURL)
+            param = idFromUrl(param)
         if param not in self.elements:
             self.parent.loadIntoChild([param],self)
         return self.elements[param]
@@ -209,11 +210,16 @@ class Level(QtCore.QObject):
             return set.union(set( (spec.id, ) ),
                              *(self.children(childId) for childId in spec.contents.ids))
     
-    def subLevel(self, ids, name):
-        """Return a child level of *self* containing copies of the given *ids* and named *name*.
+    def files(self):
+        """Return a generator of all files in this level."""
+        return ( elem for elem in self.elements.values() if elem.isFile() )
+ 
+    def subLevel(self, elements, name):
+        """Return a child level of *self* containing copies of the given *elements* and
+        named *name*.
         """
         level = Level(name, self)
-        level.getFromIds(self.children(ids))
+        level.getFromIds(self.children(elements))
         return level
     
     def createWrappers(self, wrapperString, createFunc=None):
@@ -472,7 +478,7 @@ class Level(QtCore.QObject):
         On a normal level, this just changes the path attributes and emits an event.
         """
         for id, (_, newPath) in renamings.items():
-            self.get(id).path = newPath
+            self.get(id).url.path = newPath
         if emitEvent:
             self.emitEvent(list(renamings.keys()))
     
@@ -522,7 +528,7 @@ class RealLevel(Level):
                 """.format(db.prefix, idList))
         for (id, file, major, url, length) in result:
             if file:
-                level.elements[id] = File(level, id, url=url, length=length)
+                level.elements[id] = File(level, id, url=filebackends.getURL(url), length=length)
             else:
                 level.elements[id] = Container(level, id, major=major)
         #  contents
@@ -585,9 +591,9 @@ class RealLevel(Level):
             level.elements[current[0]].data[current[1]] = tuple(buffer)
             
     def loadURLs(self, urls, level):
-        """Loads files given by *urls* into *level*."""
+        """Loads files given by *urls*, into *level*."""
         for url in urls:
-            backendFile = filebackends.get(url)
+            backendFile = url.getBackendFile()
             backendFile.readTags()
             fTags = backendFile.tags
             fLength = backendFile.length
@@ -615,7 +621,7 @@ class RealLevel(Level):
             if not element.isFile():
                 continue
             try:
-                real = realfiles.get(element.path)
+                real = element.url.getBackendFile()
                 real.tags = element.tags.withoutPrivateTags()
                 real.saveTags()
             except IOError as e:
@@ -673,8 +679,8 @@ class RealLevel(Level):
         """on the real level, files are renamed on disk and in DB."""
         super()._renameFiles(renamings, emitEvent)
         for id, (_, newPath) in renamings.items():
-            filebackends.get(self.get(id).url).rename(newPath)
-        db.write.changeFilePaths([ (id, newPath) for id, (_, newPath) in renamings.items()])
+            self.get(id).url.getBackendFile().rename(newPath)
+        db.write.changeUrls([ (id, self.get(id).url.path) for id in renamings])
         if emitEvent:
             self.changed.emit(FileRenameEvent(list(renamings.items())))
             

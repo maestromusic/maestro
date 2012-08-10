@@ -20,31 +20,47 @@ import os.path, urllib.parse
 
 import taglib
 
-from . import BackendFile, registerBackend
+from . import BackendFile, BackendURL, urlTypes
 from .. import logging, utils
 from ..core import tags
 
 logger = logging.getLogger(__name__)
+
+class FileURL(BackendURL):
+    """A standard URL pointing to the local filesystem; starting with file:///PATH.
+    
+    The PATH is always understood as being relative to the music base directory.
+    """
+    
+    PROTOCOL = "file"
+    CAN_RENAME = True
+    IMPLEMENTATIONS = [ ]
+    def __init__(self, urlString):
+        if "://" not in urlString:
+            urlString = "file:///" + utils.relPath(urlString)
+        super().__init__(urlString)
+        self.path = self.parsedUrl.path[1:]
+        self.absPath = utils.absPath(self.path)
         
+    def setPath(self, path):
+        self.__init__("file:///" + path)
+    
+         
 class RealFile(BackendFile):
     """A normal file that is accessed directly on the filesystem."""
     
-    protocols = ["file"]
-    
     @staticmethod
     def tryLoad(url):
-        if url.scheme == 'file' and os.path.exists(utils.absPath(url.path[1:])):
+        if url.proto == 'file' and os.path.exists(url.absPath):
             return RealFile(url)
         return None
-            
+    
     def __init__(self, url):
-        """Create a file for the given path. Raises IOError if the file cannot be read."""
+        assert url.proto == "file"
         super().__init__(url)
-        self.path = url.path[1:] # remove leading slash
-        self.abspath = utils.absPath(self.path)
         
     def readTags(self):
-        self._taglibFile = taglib.File(self.abspath) 
+        self._taglibFile = taglib.File(self.url.absPath) 
         self.tags = tags.Storage()
         self.ignoredTags = dict()
         if "TRACKNUMBER" in self._taglibFile.tags:
@@ -71,19 +87,16 @@ class RealFile(BackendFile):
 
     @property
     def readOnly(self):
-        return self._taglibFile.readOnly
-    
-    @property
-    def canRename(self):
-        return not self.readOnly
+        if hasattr(self, '_taglibFile'):
+            return self._taglibFile.readOnly
+        return False
     
     def rename(self, newPath):
         # TODO: handle open taglib file references
         assert not os.path.isabs(newPath)
-        newAbsPath = utils.absPath(newPath)
-        os.renames(self.absPath, newAbsPath)
-        self.path = newPath
-        self.url = urllib.parse.urlparse("file:///" + newPath)
+        newUrl = FileURL("file:///" + newPath)
+        os.renames(self.url.absPath, newUrl.absPath)
+        self.url = newUrl
         
     def saveTags(self):
         self._taglibFile.tags = dict()
@@ -93,9 +106,13 @@ class RealFile(BackendFile):
             values = [tag.fileFormat(value) for value in values]
             self._taglibFile.tags[tag.name.upper()] = values
         unsuccessful = self._taglibFile.save()
+        del self._taglibFile
         if len(unsuccessful) > 0:
             ret = tags.Storage()
             for key, values in unsuccessful.items():
                 ret[key.upper()] = values
             return ret
         return None
+
+FileURL.IMPLEMENTATIONS.append(RealFile)
+urlTypes["file"] = FileURL

@@ -53,7 +53,7 @@ def createNewElements(level, ids, idMap=None):
         def hash(path):
             from .. import filesystem
             return filesystem.fileHash(path)
-        db.write.addFiles([ (idMap[file.id], file.url, hash(file.url), file.length) for file in elements if file.isFile() ])
+        db.write.addFiles([ (idMap[file.id], str(file.url), 0, file.length) for file in elements if file.isFile() ])
     return idMap
     
 def changeContents(changes):
