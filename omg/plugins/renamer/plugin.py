@@ -45,7 +45,10 @@ def enable():
     browser.BrowserTreeView.actionConfig.addActionDefinition((("plugins", 'renamer'),), RenameFilesAction)
 
 def disable():
+    from omg.gui import editor, browser
+    from .gui import RenameFilesAction
     editor.EditorTreeView.actionConfig.removeActionDefinition((("plugins", 'renamer'),))
+    browser.BrowserTreeView.actionConfig.addActionDefinition((("plugins", 'renamer'),), RenameFilesAction)
 
 
 profileConfig = None
