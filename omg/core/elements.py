@@ -196,7 +196,7 @@ class File(Element):
     def copy(self):
         ret = File(level=self.level,
                     id=self.id,
-                    url=self.url.copy(),
+                    url=self.url,
                     length=self.length,
                     parents=self.parents[:],
                     tags=self.tags.copy(),

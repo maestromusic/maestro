@@ -321,7 +321,7 @@ class MergeCommand(QtGui.QUndoCommand):
             if self.level is levels.real:
                 self.containerID = db.write.createElements([(False, not self.elementParent, len(self.parentChanges), False)])[0]
             else:
-                self.containerID = levels.createTId()
+                self.containerID = levels.tIdManager.createTId()
         elif self.level is levels.real:
             db.write.createElementsWithIds([(self.containerID, False, not self.elementParent, len(self.parentChanges), False)])
         container = elements.Container(self.level, self.containerID, major = False)

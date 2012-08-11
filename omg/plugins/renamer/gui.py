@@ -157,7 +157,8 @@ class RenameDialog(QtGui.QDialog):
                 totalResult.update(result)
             for elem, newPath in totalResult.items():
                 if elem.id in self.sublevel:
-                    self.sublevel.get(elem.id).url.setPath(newPath)
+                    subelem = self.sublevel.get(elem.id)
+                    subelem.url = subelem.url.renamed(newPath)
             if len(set(totalResult.values())) != len(totalResult): # duplicate paths!
                 self.bb.button(QtGui.QDialogButtonBox.Ok).setEnabled(False)
                 self.statusLabel.setText(self.tr("New paths are not unique! Please fix"))

@@ -34,7 +34,8 @@ class FileURL(BackendURL):
     
     PROTOCOL = "file"
     CAN_RENAME = True
-    IMPLEMENTATIONS = [ ]
+    IMPLEMENTATIONS = []
+    
     def __init__(self, urlString):
         if "://" not in urlString:
             urlString = "file:///" + utils.relPath(urlString)
@@ -42,8 +43,9 @@ class FileURL(BackendURL):
         self.path = self.parsedUrl.path[1:]
         self.absPath = utils.absPath(self.path)
         
-    def setPath(self, path):
-        self.__init__("file:///" + path)
+    def renamed(self, newPath):
+        """Return a new FileURL with the given *newPath* as path."""
+        return FileURL("file:///" + newPath)
     
          
 class RealFile(BackendFile):
@@ -91,10 +93,8 @@ class RealFile(BackendFile):
             return self._taglibFile.readOnly
         return False
     
-    def rename(self, newPath):
+    def rename(self, newUrl):
         # TODO: handle open taglib file references
-        assert not os.path.isabs(newPath)
-        newUrl = FileURL("file:///" + newPath)
         os.renames(self.url.absPath, newUrl.absPath)
         self.url = newUrl
         

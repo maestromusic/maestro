@@ -22,10 +22,10 @@ from PyQt4.QtCore import Qt
 from . import tags, flags
 from .elements import File, Container
 from .nodes import Wrapper
-from .. import application, filebackends, database as db, utils, config, logging
+from .. import application, filebackends, database as db, config, logging
 from ..database import write as dbwrite
 
-import os.path, collections, numbers
+import collections, numbers
 
 real = None
 editor = None
@@ -158,8 +158,9 @@ class Level(QtCore.QObject):
         return [self.elements[id] for id in ids]
                 
     def getFromPaths(self, paths):
-        """Load elements for the given paths and return them."""
-        ids = [idFromUrl(path) for path in paths]
+        """Convenience method: load elements for the given paths and return them."""
+        ids = [ idFromUrl(filebackends.BackendURL.fromString("file:///" + path))
+                for path in paths ]
         return self.getFromIds(ids)
     
     def loadIntoChild(self, ids, child):
@@ -473,12 +474,12 @@ class Level(QtCore.QObject):
                 self.get(id).parents.remove(parent.id)
 
     def _renameFiles(self, renamings, emitEvent=True):
-        """Rename files based on *renamings*, which is a dict from ids to (oldPath, newPath) pairs.
+        """Rename files based on *renamings*, which is a dict from ids to (oldUrl, newUrl) pairs.
         
-        On a normal level, this just changes the path attributes and emits an event.
+        On a normal level, this just changes the Url attributes and emits an event.
         """
-        for id, (_, newPath) in renamings.items():
-            self.get(id).url.path = newPath
+        for id, (_, newUrl) in renamings.items():
+            self.get(id).url = newUrl
         if emitEvent:
             self.emitEvent(list(renamings.keys()))
     
@@ -509,7 +510,7 @@ class RealLevel(Level):
             else: notFound.append(id)
         if len(notFound) > 0:
             positiveIds = [id for id in notFound if id > 0]
-            urls = [urlFromTId(id) for id in notFound if id < 0]
+            urls = [ tIdManager(id) for id in notFound if id < 0 ]
             if len(positiveIds) > 0:
                 self.loadFromDB(positiveIds, child)
             if len(urls) > 0:
@@ -528,7 +529,9 @@ class RealLevel(Level):
                 """.format(db.prefix, idList))
         for (id, file, major, url, length) in result:
             if file:
-                level.elements[id] = File(level, id, url=filebackends.getURL(url), length=length)
+                level.elements[id] = File(level, id,
+                                          url=filebackends.BackendURL.fromString(url),
+                                          length=length)
             else:
                 level.elements[id] = Container(level, id, major=major)
         #  contents
@@ -600,7 +603,7 @@ class RealLevel(Level):
             fPosition = backendFile.position
             id = db.idFromUrl(url)
             if id is None:
-                id = tIdFromUrl(url)
+                id = tIdManager.tIdFromUrl(url)
                 flags = []
             else:
                 flags = db.flags(id)
@@ -678,9 +681,9 @@ class RealLevel(Level):
     def _renameFiles(self, renamings, emitEvent=True):
         """on the real level, files are renamed on disk and in DB."""
         super()._renameFiles(renamings, emitEvent)
-        for id, (_, newPath) in renamings.items():
-            self.get(id).url.getBackendFile().rename(newPath)
-        db.write.changeUrls([ (id, self.get(id).url.path) for id in renamings])
+        for id, (oldUrl, newUrl) in renamings.items():
+            oldUrl.getBackendFile().rename(newUrl)
+        db.write.changeUrls([ (id, str(newUrl)) for id, (_, newUrl) in renamings.items() ])
         if emitEvent:
             self.changed.emit(FileRenameEvent(list(renamings.items())))
             
@@ -724,44 +727,51 @@ def idFromUrl(url, create=True):
     id = db.idFromUrl(url)
     if id is not None:
         return id
-    else: return tIdFromUrl(url, create)
+    else: return tIdManager.tIdFromUrl(url, create)
 
 
 def urlFromId(id):
     if id < 0:
-        return urlFromTId(id)
+        return tIdManager(id)
     else:
-        return db.url(id)
+        return filebackends.BackendURL.fromString(db.url(id))
 
-
-_currentTId = 0 # Will be decreased by one every time a new TID is assigned
-_tIds = {} # TODO: Is there any chance that items will be removed from here?
-_urls = {}
-
-
-def tIdFromUrl(url, create=True):
-    """Return the temporary id for *url*, if it exists.
+class TIDManager:
+    """Manages temporary IDs and related URLs.
     
-    If it does not exist and *create* is True, a new one is inserted and returned.
-    Otherwise, a KeyError is raised.
+    Acts as a bidirectional map tId<->URL where the URL of a file always refers to the REAL level.
     """
-    if url in _tIds:
-        return _tIds[url]
-    elif create:
-        global _currentTId
-        _currentTId -= 1
-        _urls[_currentTId] = url
-        _tIds[url] = _currentTId
-        return _currentTId
-    else:
-        raise KeyError("No id for url '{}' is known".format(url))
+    
+    def __init__(self):
+        self.tIdToUrl = {}
+        self.urlToTId = {}
+        self.currentTId = 0
+        
+    def __call__(self, key):
+        if isinstance(key, filebackends.BackendURL):
+            return self.urlToTId[key]
+        return self.tIdToUrl[key]
+    
+    def tIdFromUrl(self, url, create=True):
+        """Return the temporary id for *url*, if it exists.
+        
+        If it does not exist and *create* is True, a new one is inserted and returned.
+        Otherwise, a KeyError is raised.
+        """
+        try:
+            return self.urlToTId[url]
+        except KeyError as e:
+            if create:
+                newId = self.createTId()
+                self.urlToTId[url] = newId
+                self.tIdToUrl[newId] = url
+                return newId
+            else:
+                raise e
+            
+    def createTId(self):
+        """Create a temporary ID without relating a URL to it. Use for temporary containers."""
+        self.currentTId -= 1
+        return self.currentTId         
 
-
-def createTId():
-    global _currentTId
-    _currentTId -= 1
-    return _currentTId
-
-
-def urlFromTId(tid):
-    return _urls[tid]
+tIdManager = TIDManager()

@@ -475,7 +475,7 @@ class OrderedDictValues:
         for key in self.keyList:
             yield self.aDict[key]
             
-            
+
 @functools.total_ordering
 class PointAtInfinity:
     """Depending on the parameter *plus* this object is either bigger or smaller than any other object

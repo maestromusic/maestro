@@ -23,6 +23,11 @@ class InvalidFileProtocol(Exception):
     pass
 
 class BackendURL:
+    """Class for URLs defining backend "files" (real files, CDDA tracks, ...).
+    
+    Objects are immutable to support usage in dictionaries. BackendURLs are uniquely
+    identified by their URL string which can be obtained by str()-ing the object.
+    """
     
     CAN_RENAME = False
     """A class constant indicating whether this URL type supports renaming in general.
@@ -31,9 +36,13 @@ class BackendURL:
     """
     
     def __init__(self, urlString):
+        """Don't call this directly; use the static "fromString" instead."""
         self.parsedUrl = urlparse(urlString)
-        self.proto = self.parsedUrl.scheme
-        
+    
+    @property
+    def proto(self):
+        return self.parsedUrl.scheme
+    
     def getBackendFile(self):
         for cls in self.IMPLEMENTATIONS:
             backendFile = cls.tryLoad(self)
@@ -44,25 +53,40 @@ class BackendURL:
     def extension(self):
         ext = os.path.splitext(str(self))[1]
         if len(ext) > 1:
-            return ext[1:]
+            return ext[1:].lower()
         return None
     
-    def copy(self):
-        return getURL(str(self))
+    def renamed(self, newPath):
+        """Return a new URL object with pat h*newPath*, while all other attributes are unchanged.
+        """ 
+        pass
+
+    def __hash__(self):
+        return hash(str(self))
+    
+    def __eq__(self, other):
+        return type(self) is type(other) and str(self) == str(other)
+    
+    def __neq__(self, other):
+        return type(self) is not type(other) or str(self) != str(other)
     
     def __str__(self):
         return self.parsedUrl.geturl()
+    
+    def __repr__(self):
+        return "{}({})".format(self.__class__.__name__, str(self))
+    
+    @staticmethod
+    def fromString(urlString):
+        """Create an URL object for the given string. The type is derived from the protocol part."""
+        proto = urlString.split("://", 1)[0]
+        return urlTypes[proto](urlString)
 
 urlTypes = {}
 
-def getURL(urlString):
-    """Create an URL object for the given string. The type is derived from the protocol part."""
-    proto = urlString.split("://", 1)[0]
-    return urlTypes[proto](urlString)
-
 def getFile(urlString):
     """Convenience method: first gets URL and then the backend file object."""
-    url = getURL(urlString)
+    url = BackendURL.fromString(urlString)
     return url.getBackendFile()
     
 class BackendFile:

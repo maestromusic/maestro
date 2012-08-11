@@ -64,7 +64,7 @@ class CommitCommand(QtGui.QUndoCommand):
         self.newElements = [] # elements which are not in parent level before the commit
         self.newFilesUrls = [] #  the URLs of new files; for FS module
         self.flagChanges, self.tagChanges, self.contentsChanges = {}, {}, {}
-        self.majorChanges, self.renamings = {}, {}
+        self.majorChanges, self.urlChanges = {}, {}
         self.ids, self.contents = [], []  # for the events
         for id in ids:
             element, contents = self.recordChanges(id)
@@ -130,8 +130,8 @@ class CommitCommand(QtGui.QUndoCommand):
             if oldMajor != myEl.major:
                 self.majorChanges[id] = (oldMajor, myEl.major)
                 changeElement = True
-        elif oldUrl.path != myEl.url.path:
-            self.renamings[id] = (oldUrl.path, myEl.url.path)
+        elif oldUrl != myEl.url:
+            self.urlChanges[id] = (oldUrl, myEl.url)
             changeElement = True 
         return changeElement, changeContents
             
@@ -211,11 +211,13 @@ class CommitCommand(QtGui.QUndoCommand):
             if len(self.flagChanges) > 0:
                 modifyReal.changeFlags({self.newId(id):diff for id,diff in self.flagChanges.items()})            
             db.commit()
-        if len(self.renamings) > 0:
-            levels.real._renameFiles({self.newId(id):diff for id,diff in self.renamings.items()})
-            for url, changes in self.realFileChanges.items():
-                logger.debug("changing file tags: {0}-->{1}".format(url, changes))
-                modifyReal.changeFileTags(url, changes)
+        if len(self.urlChanges) > 0:
+            print(self.urlChanges)
+            self.level.parent._renameFiles({self.newId(id):diff for id,diff in self.urlChanges.items()})
+            if self.real:
+                for url, changes in self.realFileChanges.items():
+                    logger.debug("changing file tags: {0}-->{1}".format(url, changes))
+                    modifyReal.changeFileTags(url, changes)
         # ** At this point, database and filesystem have been updated **
         self.level.parent.emitEvent([self.newId(id) for id in self.ids], [self.newId(id) for id in self.contents])
         self.level.emitEvent([self.newId(id) for id in self.ids], [])       
@@ -236,8 +238,9 @@ class CommitCommand(QtGui.QUndoCommand):
             for url, changes in self.realFileChanges.items():
                 logger.debug("reverting file tags: {0}<--{1}".format(url, changes))
                 modifyReal.changeFileTags(url, changes, reverse=True)
-            if len(self.renamings) > 0:
-                levels.real._renameFiles({self.newId(id):(b,a) for id,(a,b) in self.urlChanges.items()})
+        if len(self.urlChanges) > 0:
+            self.level.parent._renameFiles({self.newId(id):(b,a) for id,(a,b) in self.urlChanges.items()})
+        if self.real:
             db.transaction()
             if len(self.newInDatabase) > 0:
                 db.write.deleteElements(list(self.idMap.values()))
