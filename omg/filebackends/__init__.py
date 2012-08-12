@@ -19,8 +19,15 @@
 from urllib.parse import urlparse
 import os.path
 
-class InvalidFileProtocol(Exception):
-    pass
+urlTypes = {}
+"""Maps protocol to implementing BackendURL subclass, e.g. "file"->RealFile."""
+
+
+def getFile(urlString):
+    """Convenience method: first creates an URL and then the according backend file object."""
+    url = BackendURL.fromString(urlString)
+    return url.getBackendFile()
+
 
 class BackendURL:
     """Class for URLs defining backend "files" (real files, CDDA tracks, ...).
@@ -36,7 +43,8 @@ class BackendURL:
     """
     
     def __init__(self, urlString):
-        """Don't call this directly; use the static "fromString" instead."""
+        #  constructor should only be used from subclasses
+        assert type(self) is not BackendURL
         self.parsedUrl = urlparse(urlString)
     
     @property
@@ -44,6 +52,11 @@ class BackendURL:
         return self.parsedUrl.scheme
     
     def getBackendFile(self):
+        """Create and return a BackendFile object matching this URL.
+        
+        Tries the classes in self.IMPLEMENTATIONS one by one (via tryLoad()) until the first
+        succeeds.
+        """
         for cls in self.IMPLEMENTATIONS:
             backendFile = cls.tryLoad(self)
             if backendFile is not None:
@@ -51,15 +64,16 @@ class BackendURL:
         raise ValueError("No backend succeeded to load {}".format(self))
     
     def extension(self):
+        """Return the extension of this file as lower case string."""
         ext = os.path.splitext(str(self))[1]
         if len(ext) > 1:
             return ext[1:].lower()
         return None
     
     def renamed(self, newPath):
-        """Return a new URL object with pat h*newPath*, while all other attributes are unchanged.
-        """ 
-        pass
+        """Return a new URL object with path h*newPath*, while all other attributes are unchanged.
+        """
+        raise NotImplementedError()
 
     def __hash__(self):
         return hash(str(self))
@@ -82,17 +96,13 @@ class BackendURL:
         proto = urlString.split("://", 1)[0]
         return urlTypes[proto](urlString)
 
-urlTypes = {}
 
-def getFile(urlString):
-    """Convenience method: first gets URL and then the backend file object."""
-    url = BackendURL.fromString(urlString)
-    return url.getBackendFile()
-    
 class BackendFile:
+    """Abstract base for a file representation in a specific backend."""
     
     @staticmethod
     def tryLoad(url):
+        """If the class can load *url*, return an object; otherwise return None."""
         pass
     
     def __init__(self, url):
@@ -101,17 +111,18 @@ class BackendFile:
         
     def readTags(self):
         """Read the tags which will be available in the *tags* attribute afterwards."""
-        pass
+        raise NotImplementedError()
     
     def saveTags(self):
         """Store any changes made to the tags."""
-        pass
+        raise NotImplementedError()
     
     def rename(self, newPath):
-        pass
+        raise NotImplementedError()
     
     def computeHash(self):
-        pass
+        """Compute a hash suitable for identifying this file even when tags have changed."""
+        raise NotImplementedError()
     
     readOnly = False
     canRename = False

@@ -26,9 +26,7 @@ logger = logging.getLogger(__name__)
 STOP, PLAY, PAUSE = range(3)
 DISCONNECTED, CONNECTING, CONNECTED = range(3)
 
-
 _runningBackends = {}
-
 profileConf = profiles.ProfileConfiguration("playback", config.storage.player, [])
 
 

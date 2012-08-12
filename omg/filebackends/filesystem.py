@@ -16,7 +16,9 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import os.path, urllib.parse
+"""This module implements the BackendFile and BackendURL for files on the local filesystem."""
+
+import os.path
 
 import taglib
 
@@ -26,33 +28,14 @@ from ..core import tags
 
 logger = logging.getLogger(__name__)
 
-class FileURL(BackendURL):
-    """A standard URL pointing to the local filesystem; starting with file:///PATH.
-    
-    The PATH is always understood as being relative to the music base directory.
-    """
-    
-    PROTOCOL = "file"
-    CAN_RENAME = True
-    IMPLEMENTATIONS = []
-    
-    def __init__(self, urlString):
-        if "://" not in urlString:
-            urlString = "file:///" + utils.relPath(urlString)
-        super().__init__(urlString)
-        self.path = self.parsedUrl.path[1:]
-        self.absPath = utils.absPath(self.path)
-        
-    def renamed(self, newPath):
-        """Return a new FileURL with the given *newPath* as path."""
-        return FileURL("file:///" + newPath)
-    
-         
+
 class RealFile(BackendFile):
     """A normal file that is accessed directly on the filesystem."""
     
     @staticmethod
     def tryLoad(url):
+        """Returns a RealFile instance if the url protocol fits and the file exists.
+        """
         if url.proto == 'file' and os.path.exists(url.absPath):
             return RealFile(url)
         return None
@@ -62,6 +45,12 @@ class RealFile(BackendFile):
         super().__init__(url)
         
     def readTags(self):
+        """Load the tags from disk using pytaglib.
+        
+        If the file has a TRACKNUMBER tag, its value is stored in the position attribute of
+        this object, but won't be contained in self.tags. Likewise, discnumber is ignored.
+        """
+        
         self._taglibFile = taglib.File(self.url.absPath) 
         self.tags = tags.Storage()
         self.ignoredTags = dict()
@@ -99,6 +88,11 @@ class RealFile(BackendFile):
         self.url = newUrl
         
     def saveTags(self):
+        """Save what's in self.tags to the file.
+        
+        In addition to the tags in self.tags, any ignored tags (TRACKNUMBER etc.) that were read
+        using readTags() will be stored in to the file such that they aren't lost.
+        """
         self._taglibFile.tags = dict()
         for tag, values in self.ignoredTags.items():
             self._taglibFile.tags[tag.upper()] = values
@@ -114,5 +108,27 @@ class RealFile(BackendFile):
             return ret
         return None
 
-FileURL.IMPLEMENTATIONS.append(RealFile)
+
+class FileURL(BackendURL):
+    """A standard URL pointing to the local filesystem; the form is file:///path/to/file.flac.
+    
+    Note that the path is always understood as being relative to the music base directory.
+    """
+    
+    CAN_RENAME = True
+    IMPLEMENTATIONS = [ RealFile ]
+    
+    def __init__(self, urlString):
+        if "://" not in urlString:
+            urlString = "file:///" + utils.relPath(urlString)
+        super().__init__(urlString)
+        self.path = self.parsedUrl.path[1:]
+        self.absPath = utils.absPath(self.path)
+        
+    def renamed(self, newPath):
+        """Return a new FileURL with the given *newPath* as path."""
+        return FileURL("file:///" + newPath)
+
+
+# register the file:// URL protocol
 urlTypes["file"] = FileURL
