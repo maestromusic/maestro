@@ -16,8 +16,6 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import collections
-
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
@@ -121,19 +119,19 @@ class PlayerBackend(profiles.Profile):
         *addAction* method."""
         pass
     
-    def setPlaylist(self,paths):
-        """Clear the playlist and set it to the given paths."""
+    def setPlaylist(self, urls):
+        """Clear the playlist and set it to the given urls."""
         pass
     
-    def insertIntoPlaylist(self,pos,paths):
-        """Insert the given paths at *pos* into the playlist."""
+    def insertIntoPlaylist(self, pos, urls):
+        """Insert the given urls at *pos* into the playlist."""
         pass
     
-    def removeFromPlaylist(self,begin,end):
+    def removeFromPlaylist(self, begin, end):
         """Remove the songs with offsets >= *begin* and < *end* from the playlist."""
         pass
     
-    def move(self,fromOffset,toOffset):
+    def move(self, fromOffset, toOffset):
         """Move a song within the playlist. If the current song is moved the player should keep playing at
         the same position.
         *fromOffset* is the old position in the playlist, *toOffset* is the new one, after the move. That

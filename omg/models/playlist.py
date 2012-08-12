@@ -24,7 +24,8 @@ from PyQt4.QtCore import Qt
 from . import wrappertreemodel, treebuilder
 from .. import application, config, utils
 from ..core import levels
-from ..core.nodes import Node, RootNode, Wrapper
+from ..core.nodes import RootNode, Wrapper
+from ..filebackends.filesystem import FileURL
 
  
 class PlaylistModel(wrappertreemodel.WrapperTreeModel):
@@ -75,7 +76,7 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         
         # Emit events for nodes whose state changed
         for node in oldPlayingNodes:
-            if node not in self.currentlyPlayingNodes and self.contains(node):
+            if node not in self.currentlyPlayingNodes and node in self:
                 index = self.getIndex(node)
                 self.dataChanged.emit(index,index)
                 
@@ -84,20 +85,20 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
                 index = self.getIndex(node)
                 self.dataChanged.emit(index,index)
 
-    def _buildWrappersFromPaths(self,paths):
-        """Build wrappers for the given paths and if possible add containers.
+    def _buildWrappersFromUrls(self, urls):
+        """Build wrappers for the given urls and if possible add containers.
         
         In other words: convert a flat playlist to a tree playlist."""
-        files = [Wrapper(element) for element in self.level.getFromPaths(paths)]
-        wrappers = treebuilder.buildTree(self.level,files)
+        files = [Wrapper(element) for element in self.level.getFromUrls(urls)]
+        wrappers = treebuilder.buildTree(self.level, files)
         for i in range(len(wrappers)):
             while wrappers[i].getContentsCount() == 1:
                 wrappers[i] = wrappers[i].contents[0]
         return wrappers
     
-    def initFromPaths(self,paths):
+    def initFromUrls(self, urls):
         """Initialize the playlist to contain the given files. This method is not undoable."""
-        self._setRootContents(self._buildWrappersFromPaths(paths))
+        self._setRootContents(self._buildWrappersFromUrls(urls))
         
     def resetFromPaths(self, paths, updateBackend=True):
         """Reset the playlist to contain the given files. This method is undoable."""
@@ -140,9 +141,9 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
                 # Note that files might be loaded into the real level via their TID. 
                 wrappers = [levels.real.get(id) for id in mimeData.files()]   
         else:
-            paths = [utils.relPath(path) for path in itertools.chain.from_iterable(
-                                    utils.collectFiles(u.path() for u in mimeData.urls()).values())]
-            wrappers = [Wrapper(element) for element in self.level.getFromPaths(paths)]
+            urls = itertools.chain.from_iterable(
+                                    utils.collectFiles(u.path() for u in mimeData.urls()).values())
+            wrappers = [Wrapper(element) for element in self.level.getFromUrls(urls)]
                
         self.insert(parent,position,wrappers)
         application.stack.endMacro()
@@ -227,9 +228,9 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         
         application.stack.endMacro()
         
-    def insertPathsAtOffset(self,offset,paths,updateBackend=True):
+    def insertUrlsAtOffset(self, offset, urls, updateBackend=True):
         """Insert the given paths at the given offset."""
-        wrappers = [Wrapper(element) for element in self.level.getFromPaths(paths)]
+        wrappers = [Wrapper(element) for element in self.level.getFromUrls(urls)]
         file = self.root.fileAtOffset(offset,allowFileCount=True)
         if file is None:
             parent = self.root
@@ -408,7 +409,7 @@ class PlaylistInsertCommand(wrappertreemodel.InsertCommand):
         if self._updateBackend:
             offset = self.parent.contents[self.position].offset()
             files = itertools.chain.from_iterable(w.getAllFiles() for w in self.wrappers)
-            self.model.backend.insertIntoPlaylist(offset,(f.element.path for f in files))
+            self.model.backend.insertIntoPlaylist(offset,(f.element.url for f in files))
         else: self._updateBackend = True
         
     def undo(self):

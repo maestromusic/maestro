@@ -707,9 +707,11 @@ class Storage(dict):
     list and adds a few useful functions to deal with such datastructures.
     """
     def __init__(self,*args):
-        if len(args) == 1 and isinstance(args[0],dict):
-            assert all(isinstance(v,TagValueList) for v in args[0].values())
-        dict.__init__(self,*args)
+        if len(args) == 1 and type(args[0]) is dict:
+            dict.__init__(self)
+            self.merge(args[0])
+        else:
+            dict.__init__(self,*args)
     
     def copy(self):
         """Return a copy of this storage-object containing copies of the original tag-value-lists."""

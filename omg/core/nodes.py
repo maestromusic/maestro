@@ -360,6 +360,8 @@ class Wrapper(Node):
                                     for tag,values in self.element.tags.items()))
         if self.element.flags is not None and len(self.element.flags) > 0:
             parts.append('Flags: ' + ', '.join(flag.name for flag in self.element.flags))
+        if self.element.isFile():
+            parts.append('Protocol: ' + self.element.url.proto)
         if len(parts) > 0:
             return '\n'.join(parts)
         else: return str(self)

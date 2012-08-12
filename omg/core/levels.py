@@ -157,10 +157,9 @@ class Level(QtCore.QObject):
         self.parent.loadIntoChild(notFound, self)
         return [self.elements[id] for id in ids]
                 
-    def getFromPaths(self, paths):
-        """Convenience method: load elements for the given paths and return them."""
-        ids = [ idFromUrl(filebackends.BackendURL.fromString("file:///" + path))
-                for path in paths ]
+    def getFromUrls(self, urls):
+        """Convenience method: load elements for the given urls and return them."""
+        ids = [ idFromUrl(url) for url in urls ]
         return self.getFromIds(ids)
     
     def loadIntoChild(self, ids, child):

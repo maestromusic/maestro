@@ -16,23 +16,31 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import mpd, functools, threading
+import functools
+import threading
 
+import mpd
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from ... import player, config, logging, profiles
-from ...models import playlist
-from ...player import STOP, PLAY, PAUSE
-
+from omg import player, logging, profiles, filebackends
+from omg.core import tags
+from omg.filebackends import filesystem as fsFileBackend
+from omg.models import playlist
 
 logger = logging.getLogger(__name__)
 
 
 CONNECTION_TIMEOUT = 10 # time in seconds before an initial connection to MPD is given up
 POLLING_INTERVAL = 200 # milliseconds between two MPD polls
-MPD_STATES = { 'play': PLAY, 'stop': STOP, 'pause': PAUSE}
+MPD_STATES = { 'play': player.PLAY, 'stop': player.STOP, 'pause': player.PAUSE}
 
+def enable():
+    player.profileConf.addClass(MPDPlayerBackend)
+    filebackends.urlTypes["mpd"] = MPDURL
+
+def disable():
+    player.profileConf.removeClass(MPDPlayerBackend)
 
 class MPDThread(QtCore.QThread):
     """Helper class for the MPD player backend. An MPDThread communicates with
@@ -55,6 +63,7 @@ class MPDThread(QtCore.QThread):
             self.current = self.elapsed = \
             self.currentLength = self.volume = None
         self.doPolling = threading.Event()
+        self.getInfoEvent = threading.Event()
         self.seekRequest = None
         self.connected = False
     
@@ -74,9 +83,9 @@ class MPDThread(QtCore.QThread):
         is the corresponding argument."""
         if what == "setPlaylist":
             self.client.clear()
-            for path in how:
-                self.client.add(path)
-            self.mpd_playlist = how
+            for url in how:
+                self.client.add(url.path)
+            self.mpd_playlist = [url.path for url in how]
             self.playlistVersion += len(how) + 1
             
         elif what == "setElapsed":
@@ -112,22 +121,38 @@ class MPDThread(QtCore.QThread):
                 self.playlistVersion += 1
             
         elif what == "_insertIntoPlaylist":
-            for position,path in how:
-                self.client.addid(path, position)
+            for position, url in how:
+                self.client.addid(url.path, position)
                 # mpd's playlist counter increases by two if addid is called somewhere else
                 # than at the end
                 self.playlistVersion += 1 if position == len(self.mpd_playlist) else 2
-                self.mpd_playlist[position:position] = [path]
+                self.mpd_playlist[position:position] = [url.path]
                 
         elif what == "_removeFromPlaylist":
-            for position, path in reversed(how):
+            for position, url in reversed(how):
                 self.client.delete(position)
                 del self.mpd_playlist[position]
             self.playlistVersion += len(how)
             # If the current song has been removed MPD plays the next song automatically. Because the
             # song number does not change this is not sent to OMG. So we force emitting the current song.
             self._updateAttributes(emitCurrent=True)
-            
+        
+        elif what == "getTags":
+            info = self.client.listallinfo(how)[0]
+            storage = tags.Storage()
+            length = None
+            for key, value in info.items():
+                if key in ("file", "last-modified", "track"):
+                    #  mpd delivers these but they aren't keys
+                    continue
+                if key == "time":
+                    length = int(value)
+                    continue
+                if not isinstance(value, list):
+                    value = [ value ]
+                storage[tags.get(key)] = value
+            self.getInfoData = (how, storage, length)
+            self.getInfoEvent.set()
         else:
             logger.error('Unknown command: {}'.format(what, how))
     
@@ -226,7 +251,7 @@ class MPDThread(QtCore.QThread):
         if state != self.state:
             if emit:
                 self.changeFromMPD.emit('state', state)
-            if state == STOP:
+            if state == player.STOP:
                 self.currentLength = 0
                 self.current = None
                 if emit:
@@ -234,7 +259,7 @@ class MPDThread(QtCore.QThread):
         self.state = state
         
         # check if elapsed time has changed
-        if state != STOP:
+        if state != player.STOP:
             elapsed = float(self.mpd_status['elapsed'])
             if emit and elapsed != self.elapsed:
                 self.changeFromMPD.emit('elapsed', elapsed)
@@ -291,10 +316,10 @@ class MPDPlayerBackend(player.PlayerBackend):
     className = "MPD"
     changeFromMain = QtCore.pyqtSignal(str, object)
     
-    def __init__(self, name, host = 'localhost', port = '6600', password = None):
+    def __init__(self, name, host='localhost', port='6600', password=None):
         super().__init__(name)
         self.playlist = playlist.PlaylistModel(self)
-        self.paths = []
+        self.urls = []
         self.mpdthread = MPDThread(self, host, port, password)
         self.mpdthread.changeFromMPD.connect(self._handleMPDChange, Qt.QueuedConnection)
         self.changeFromMain.connect(self.mpdthread._handleMainChange)
@@ -339,11 +364,16 @@ class MPDPlayerBackend(player.PlayerBackend):
     def elapsed(self):
         return self._elapsed
     
+    def makeUrl(self, path):
+        mpdurl = MPDURL("mpd://" + self.name + "/" + path)
+        return mpdurl.getBackendFile().url
+    
     @QtCore.pyqtSlot(str, object)
     def _handleMPDChange(self, what, how):
         if what == 'init_done':
-            self.paths, self._current, self._currentLength, self._elapsed, self._state = how
-            self.playlist.initFromPaths(self.paths) 
+            paths, self._current, self._currentLength, self._elapsed, self._state = how
+            self.urls = [self.makeUrl(path) for path in paths]
+            self.playlist.initFromUrls(self.urls)
             self.playlist.setCurrent(self._current)
             self.connectionState = player.CONNECTED
             self.connectionStateChanged.emit(player.CONNECTED)
@@ -369,20 +399,22 @@ class MPDPlayerBackend(player.PlayerBackend):
             print("Change from MPD: remove")
             print(how)
             self.playlist.removeByOffset(how[0][0],len(how),updateBackend=False)
-            for pos,path in reversed(how):
+            for pos, path in reversed(how):
                 del self.paths[pos]
         
         elif what == 'insert':
             print("Change from MPD: insert")
             print(how)
-            self.playlist.insertPathsAtOffset(how[0][0],[entry[1] for entry in how],updateBackend=False)
-            for pos, path in how:
-                self.paths[pos:pos] = path
+            pos = how[0][0]
+            urlified = [ (pos,self.makeUrl(path)) for pos,path in how ]
+            self.playlist.insertUrlsAtOffset(how[0][0], [tup[1] for tup in urlified], updateBackend=False)
+            for pos, url in urlified:
+                self.urls[pos:pos] = [ url ]
             
         elif what == 'playlist':
             print("Change from MPD: playlist")
             print(how)
-            self.playlist.resetFromPaths(how)
+            self.playlist.resetFromPaths([self.makeUrl(path) for path in how])
             
         elif what == 'disconnect':
             self.connectionStateChanged.emit(player.DISCONNECTED)
@@ -405,19 +437,31 @@ class MPDPlayerBackend(player.PlayerBackend):
         if self._numFrontends == 0:
             self.mpdthread.doPolling.clear()
     
-    def insertIntoPlaylist(self,pos,paths):
-        self._insertIntoPlaylist(list(enumerate(paths,start=pos)))
+    def insertIntoPlaylist(self, pos, urls):
+        self._insertIntoPlaylist(list(enumerate(urls, start=pos)))
     
-    def removeFromPlaylist(self,begin,end):
+    def removeFromPlaylist(self, begin, end):
         self._removeFromPlaylist([(begin,'') for i in range(end-begin)])
         
     def move(self,fromOffset,toOffset):
         self._move((fromOffset,toOffset))
     
     @classmethod
-    def configurationWidget(cls, profile = None):
+    def configurationWidget(cls, profile=None):
         """Return a config widget, initialized with the data of the given *profile*."""
         return MPDConfigWidget(profile)
+    
+    def getInfo(self, path):
+        """Query MPD to get tags & length of the file at *path* (relative to this MPD instance).
+        
+        Since MPD connection is delegated to a subthread, this method might be slow.
+        """
+        self.mpdthread.getInfoEvent.clear()
+        self.changeFromMain.emit("getTags", path)
+        self.mpdthread.getInfoEvent.wait()
+        getPath, getTags, getLength = self.mpdthread.getInfoData
+        assert getPath == path
+        return getTags, getLength
         
     def __str__(self):
         return "MPDPlayerBackend({})".format(self.name)
@@ -456,9 +500,38 @@ class MPDConfigWidget(profiles.ConfigurationWidget):
         port = int(self.portEdit.text())
         password = self.passwordEdit.text()
         return (host, port, password)
-        
-def enable():
-    player.profileConf.addClass(MPDPlayerBackend)
 
-def disable():
-    player.profileConf.removeClass(MPDPlayerBackend)
+class MPDURL(filebackends.BackendURL):
+    
+    protocol = "mpd"
+    CAN_RENAME = False
+    IMPLEMENTATIONS = []
+    
+    def __init__(self, urlString):
+        super().__init__(urlString)
+        self.profile = self.parsedUrl.netloc
+        self.path = self.parsedUrl.path[1:]
+        
+    def asLocalFile(self):
+        return fsFileBackend.FileURL("file:///" + self.path)
+
+class MPDFile(filebackends.BackendFile):
+
+    readOnly = True
+    
+    @staticmethod
+    def tryLoad(url):
+        rf = fsFileBackend.RealFile.tryLoad(url.asLocalFile())
+        if rf is not None:
+            return rf
+        return MPDFile(url)
+        
+    def __init__(self, url):
+        assert url.proto == "mpd"
+        super().__init__(url)
+        
+    def readTags(self):
+        mpdProfile = player.profileConf[self.url.profile]
+        self.tags, self.length = mpdProfile.getInfo(self.url.path)
+        
+MPDURL.IMPLEMENTATIONS = [MPDFile]
