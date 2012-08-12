@@ -21,7 +21,7 @@ import os.path, functools
 from PyQt4 import QtCore, QtGui, QtNetwork
 from PyQt4.QtCore import Qt
 
-from ...core import commands, covers
+from ...core import covers
 from ...core.elements import Element
 from ...gui import treeactions
 from ...gui.misc import busyindicator
@@ -261,7 +261,7 @@ class CoverDialogModel(QtCore.QObject):
                 else: cover = cover.pixmap
             covers[element] = cover
         
-        self.level.setCovers(application.stack,covers)
+        self.level.setCovers(covers)
         
         
 class CoverDialog(QtGui.QDialog):
