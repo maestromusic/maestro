@@ -137,7 +137,8 @@ class PhononPlayerBackend(player.PlayerBackend):
     
     def _getPath(self,offset):
         """Return the absolute path of the file at the given offset."""
-        return utils.absPath(self.playlist.root.fileAtOffset(offset).element.path)
+        #TODO: do something if element.url is not a FileURL
+        return utils.absPath(self.playlist.root.fileAtOffset(offset).element.url.path)
     
     def config(self):
         return []
