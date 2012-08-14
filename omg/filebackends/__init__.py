@@ -92,9 +92,13 @@ class BackendURL:
     
     @staticmethod
     def fromString(urlString):
-        """Create an URL object for the given string. The type is derived from the protocol part."""
-        proto = urlString.split("://", 1)[0]
-        return urlTypes[proto](urlString)
+        """Create an URL object for the given string. The type is derived from the scheme part."""
+        try:
+            scheme,url = urlString.split("://", 1)
+        except ValueError:
+            raise ValueError("Invalid URL (no scheme?): {}".format(urlString)) 
+        else:
+            return urlTypes[scheme](urlString)
 
 
 class BackendFile:
