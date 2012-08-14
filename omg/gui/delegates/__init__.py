@@ -88,6 +88,11 @@ class StandardDelegate(AbstractDelegate):
         preTitleItem = self.getPreTitleItem(wrapper)
         if preTitleItem is not None:
             self.addCenter(preTitleItem)
+        if element.isFile() and element.url.proto != "file":
+            stl = DelegateStyle(bold=True, color=Qt.red)
+            urlWarning = TextItem(element.url.proto, stl)
+        else:
+            urlWarning = None
         titleItem = TextItem(wrapper.getTitle(prependPosition=self.config.options['showPositions'].value,
                                            usePath=False),
                              BOLD_STYLE if element.isContainer() else STD_STYLE,
@@ -95,6 +100,8 @@ class StandardDelegate(AbstractDelegate):
         
         if self.config.options['showMajor'].value and element.isContainer() and element.major:
             self.addCenter(ColorBarItem(QtGui.QColor(255,0,0),5,titleItem.sizeHint(self)[1]))
+        if urlWarning is not None:
+            self.addCenter(urlWarning)
         self.addCenter(titleItem)
         
         # showInTitleRow
@@ -190,7 +197,7 @@ class StandardDelegate(AbstractDelegate):
         two items for an old and a new path.""" 
         if self.config.options['showPaths'].value and element.isFile():
             self.newRow()
-            self.addCenter(TextItem(element.path,ITALIC_STYLE))
+            self.addCenter(TextItem(element.url.path, ITALIC_STYLE))
         
     def appendAncestors(self,element,ancestors,ancestorIds,filter,onlyMajor):
         """Recursively add all ancestors of *element* to the list *ancestors* and their ids to the list

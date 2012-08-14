@@ -42,7 +42,7 @@ class AlbumGuessCommand(QtGui.QUndoCommand):
     
     def redo(self):
         if self.container is None:
-            self.containerID = levels.createTId()
+            self.containerID = levels.tIdManager.createTId()
             self.ids.append(self.containerID)
             self.contents = [self.containerID]
         album = Container(self.level, self.containerID, major=True)

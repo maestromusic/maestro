@@ -23,12 +23,12 @@ do any Undo-/Redo-stuff.
 
 import os
  
-from .. import database as db, realfiles, logging, utils
+from .. import database as db, logging, utils, filebackends
 
 logger = logging.getLogger(__name__)
 
 
-def createNewElements(level, ids, idMap = None):
+def createNewElements(level, ids, idMap=None):
     """Creates database entries for the elements with *ids* in *level*, returning a
     dictionary mapping the temporary ids to the new (positive) ones. This map may be 
     given in advance via the *idMap* argument, if the database IDs are not to be chosen
@@ -53,7 +53,7 @@ def createNewElements(level, ids, idMap = None):
         def hash(path):
             from .. import filesystem
             return filesystem.fileHash(path)
-        db.write.addFiles([ (idMap[file.id], file.path, hash(file.path), file.length) for file in elements if file.isFile() ])
+        db.write.addFiles([ (idMap[file.id], str(file.url), 0, file.length) for file in elements if file.isFile() ])
     return idMap
     
 def changeContents(changes):
@@ -104,8 +104,8 @@ def changeFlags(changes, reverse = False):
     if len(removeTuples) > 0:
         db.write.removeFlags(removeTuples)
 
-def changeFileTags(path, tagDiff, reverse = False):
-    file = realfiles.get(path)
+def changeFileTags(url, tagDiff, reverse = False):
+    file = filebackends.get(url)
     if reverse:
         tagDiff.revert(file.tags, False)
     else:

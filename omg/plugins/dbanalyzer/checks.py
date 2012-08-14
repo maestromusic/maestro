@@ -275,7 +275,7 @@ class ValueIdsCheck(Check):
 class WithoutTagsCheck(Check):
     """Check for elements without tags. WARNING: Fixing this means removing those elements from the
     database!"""
-    _columnHeaders = (translate("DBAnalyzerChecks","ID"),translate("DBAnalyzerChecks","Path"),
+    _columnHeaders = (translate("DBAnalyzerChecks","ID"),translate("DBAnalyzerChecks","URL"),
                       translate("DBAnalyzerChecks","Elements"))
                       
     _name = translate("DBAnalyzerChecks","Without Tags")
@@ -293,7 +293,7 @@ class WithoutTagsCheck(Check):
             query = self._query('SELECT COUNT(*)')
             return db.query(query).getSingle()
         else:
-            query = self._query('SELECT el.id,f.path,el.elements')
+            query = self._query('SELECT el.id, f.url, el.elements')
             return [row for row in db.query(query)]
         
     def fix(self):
@@ -306,7 +306,7 @@ class DoubledFilesCheck(Check):
     """
     _columnHeaders = (translate("DBAnalyzerChecks","ID 1"),translate("DBAnalyzerChecks","ID 2"),
                       translate("DBAnalyzerChecks","Title"),
-                      translate("DBAnalyzerChecks","Path"))
+                      translate("DBAnalyzerChecks","URL"))
     
     _name = translate("DBAnalyzerChecks","Doubled files")
     
@@ -315,13 +315,13 @@ class DoubledFilesCheck(Check):
             return db.query("""
                     SELECT COUNT(DISTINCT f1.element_id)
                     FROM {0}files AS f1 JOIN {0}files AS f2
-                                            ON f1.path = f2.path AND f1.element_id != f2.element_id
+                                            ON f1.url = f2.url AND f1.element_id != f2.element_id
                 """.format(db.prefix)).getSingle()
         else:
             return [(row[0],row[1],getTitle(row[1]),row[2]) for row in db.query("""
-                    SELECT f1.element_id,f2.element_id,f1.path
+                    SELECT f1.element_id,f2.element_id,f1.url
                     FROM {0}files AS f1 JOIN {0}files AS f2
-                                            ON f1.path = f2.path AND f1.element_id != f2.element_id
+                                            ON f1.url = f2.url AND f1.element_id != f2.element_id
                 """.format(db.prefix))]
         
     def fix(self): pass

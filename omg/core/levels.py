@@ -22,11 +22,10 @@ from PyQt4.QtCore import Qt
 from . import tags, flags
 from .elements import File, Container
 from .nodes import Wrapper
-from .. import application, database as db, realfiles, utils, config, logging
+from .. import application, filebackends, database as db, config, logging
 from ..database import write as dbwrite
-from ..application import ChangeEvent
 
-import os.path, collections
+import collections, numbers
 
 real = None
 editor = None
@@ -36,7 +35,7 @@ logger = logging.getLogger(__name__)
 def init():
     global real,editor
     real = RealLevel()
-    editor = Level("EDITOR",real)
+    editor = Level("EDITOR", parent=real)
     
 
 class ElementGetError(RuntimeError):
@@ -49,7 +48,7 @@ class ConsistencyError(RuntimeError):
     pass
 
 
-class ElementChangedEvent(ChangeEvent):
+class ElementChangedEvent(application.ChangeEvent):
     #TODO comment
     def __init__(self,dataIds=None,contentIds=None):
         super().__init__()
@@ -100,13 +99,25 @@ class DataUndoCommand(QtGui.QUndoCommand):
 
 
 class Level(QtCore.QObject):
-    #TODO comment
-    changed = QtCore.pyqtSignal(ChangeEvent)
-    """Signal that is emitted if something changes on this level. The first argument is a list of Ids of elements
-    whose tags, flags, major status, ... has changed (things affecting only the element itself). The second list
-    contains IDs of containers whose contents have changed."""
+    """A collection of elements corresponding to a specific state.
+    
+    A level consists of a consistent set of elements: All children of an element in a level must
+    also be contained in the level.
+    The "same" element (i.e. element with the same ID) might be present in different levels with
+    different states (different tags, flags, contents, ...). Via the concept of a parent level,
+    these are connected. The topmost levels is the "real" level reflecting the state of the
+    database and the filesystem. Child levels can commit their changes into the parent level and
+    load new elements from there.
+    A level offers undo-aware methods to alter elements as well as content relations. The according
+    bare methods not handling undo/redo are marked by a leading underscore.
+    If elements change in a level, its signal *changed* is emitted.
+    """ 
     
     def __init__(self, name, parent, stack=None):
+        """Create a level named *name* with parent *parent* and an optional undo stack.
+        
+        If no undo stack is given, the main application.stack will be used.
+        """
         super().__init__()
         self.name = name
         self.parent = parent
@@ -117,61 +128,157 @@ class Level(QtCore.QObject):
             def _debugAll(event):
                 logger.debug("EVENT[{}]: {}".format(self.name,str(event)))
             self.changed.connect(_debugAll)
+    
+    """Signal that is emitted if something changes on this level."""
+    changed = QtCore.pyqtSignal(application.ChangeEvent)
         
-    def get(self,param):
-        """Return the element determined by *param* from this level. Load the element, if it is not already
-        present on the level. Currently, *param* may be either the id or the path."""
+    def emitEvent(self, dataIds=None, contentIds=None):
+        """Simple shortcut to emit an event."""
+        self.changed.emit(ElementChangedEvent(dataIds,contentIds))
+    
+    def get(self, param):
+        """Return the element determined by *param*. Load it if necessary.
+        
+        *param* may be either the id or, in case of files, the path.
+        """
         if not isinstance(param,int):
-            param = idFromPath(utils.relPath(param))
+            assert isinstance(param, filebackends.BackendURL)
+            param = idFromUrl(param)
         if param not in self.elements:
             self.parent.loadIntoChild([param],self)
         return self.elements[param]
     
-    def getFromIds(self,ids):
+    def getFromIds(self, ids):
         """Load all elements given by the list of ids *ids* into this level and return them."""
         notFound = []
         for id in ids:
             if id not in self.elements:
                 notFound.append(id)
-        self.parent.loadIntoChild(notFound,self)
+        self.parent.loadIntoChild(notFound, self)
         return [self.elements[id] for id in ids]
                 
-    def getFromPaths(self,paths):
-        """Load elements for the given paths and return them."""
-        ids = [idFromPath(path) for path in paths]
+    def getFromUrls(self, urls):
+        """Convenience method: load elements for the given urls and return them."""
+        ids = [ idFromUrl(url) for url in urls ]
         return self.getFromIds(ids)
     
-    def loadIntoChild(self,ids,child):
-        """Load all elements given by the list of ids *ids* into the level *child*. Do not check whether
-        elements are already loaded there."""
+    def loadIntoChild(self, ids, child):
+        """Load all elements given by the list of ids *ids* into the level *child*.
+        
+        This method does not check whether elements are already loaded in the child. Note that
+        elements are *not* loaded into the *self* level if they were not contained there before.
+        """
         notFound = []
         for id in ids:
             if id in self.elements:
                 child.elements[id] = self.elements[id].copy()
                 child.elements[id].level = child
             else: notFound.append(id)
-        self.parent.loadIntoChild(notFound,self)
+        self.parent.loadIntoChild(notFound, self)
         
     def __contains__(self, arg):
         """Returns if the given element is loaded in this level.
         
         *arg* may be either an ID or a path. Note that if the element could be loaded from the
-        parent but is not contained in this level, then *False* is returned."""
-        
+        parent but is not contained in this level, then *False* is returned.
+        """
         if not isinstance(arg, int):
             try:
-                arg = idFromPath(arg, create=False)
+                arg = idFromUrl(arg, create=False)
             except KeyError:
                 #  no id for that path -> element can not be contained
                 return False
-        return self.elements.__contains__(arg)
+        return (arg in self.elements)
     
-    def __str__(self):
-        return 'Level({})'.format(self.name)
+    def children(self, spec):
+        """Returns a set of (recursively) all children of one or more elements.
+        
+        *spec* may be a single element, a list of elements, a single ID or a list of IDs.
+        """
+        if isinstance(spec, collections.Iterable):
+            spec = list(spec)
+            if len(spec) == 0:
+                return set()
+            if isinstance(spec[0], numbers.Integral):
+                spec = [self.get(id) for id in spec]
+            return set.union(*(self.children(element) for element in spec))
+        if isinstance(spec, numbers.Integral):
+            spec = self.get(spec)
+        if spec.isFile():
+            return set( (spec.id, ) )
+        else:
+            return set.union(set( (spec.id, ) ),
+                             *(self.children(childId) for childId in spec.contents.ids))
     
-    def emitEvent(self,dataIds=None, contentIds=None):
-        """Simple shortcut to emit an event."""
-        self.changed.emit(ElementChangedEvent(dataIds,contentIds))
+    def files(self):
+        """Return a generator of all files in this level."""
+        return ( elem for elem in self.elements.values() if elem.isFile() )
+ 
+    def subLevel(self, elements, name):
+        """Return a child level of *self* containing copies of the given *elements* and
+        named *name*.
+        """
+        level = Level(name, self)
+        level.getFromIds(self.children(elements))
+        return level
+    
+    def createWrappers(self, wrapperString, createFunc=None):
+        """Create a wrapper tree containing elements of this level and return its root node.
+        
+        *wrapperString* must be a string like   "X[A[A1,A2],B[B1,B2]],Z"
+        where the identifiers must be names of existing elements of this level. This method does not check
+        whether the given structure is valid.
+        
+        Often it is necessary to have references to some of the wrappers in the tree. For this reason
+        this method accepts names of wrappers as optional arguments. It will then return a tuple consisting
+        of the usual result (as above) and the wrappers with the given names (do not use this if there is
+        more than one wrapper with the same name).
+        """  
+        roots = []
+        currentWrapper = None
+        currentList = roots
+        
+        def _getTokens(s):
+            """Helper: Yield each token of *s*."""
+            # s should be a string like "A,B[B1,B2],C[C1[C11,C12],C2],D"
+            last = 0
+            i = 0
+            while i < len(s):
+                if s[i] in (',','[',']'):
+                    if last != i:
+                        yield s[last:i]
+                    last = i+1
+                    yield s[i]
+                i += 1
+            if last != i:
+                yield s[last:i]
+
+        for token in _getTokens(wrapperString):
+            #print("Token: {}".format(token))
+            if token == ',':
+                continue
+            if token == '[':
+                currentWrapper = currentList[-1]
+                currentList = currentWrapper.contents
+            elif token == ']':
+                currentWrapper = currentWrapper.parent
+                if currentWrapper is None:
+                    currentList = roots
+                else: currentList = currentWrapper.contents
+            else:
+                if createFunc is None:
+                    element = self.get(int(token))
+                    wrapper = Wrapper(element)
+                    if currentWrapper is not None:
+                        assert currentWrapper.element.id in wrapper.element.parents
+                        wrapper.parent = currentWrapper
+                else: wrapper = createFunc(currentWrapper,token)
+                currentList.append(wrapper)
+        return roots
+
+    # ===========================================================================
+    # The following functions provide undo-aware implementations of level changes
+    # ===========================================================================
     
     def insertContents(self, parent, index, elements):
         """Undoably insert elements into a parent container.
@@ -181,7 +288,7 @@ class Level(QtCore.QObject):
         subsequent elements' positions are shifted if necessary.
         """
         from . import commands
-        application.stack.beginMacro(self.tr("insert"))
+        self.stack.beginMacro(self.tr("insert"))
         if len(parent.contents) > index:
             #  need to alter positions of subsequent elements
             firstPos = 1 if index == 0 else parent.contents.positions[index-1]+1
@@ -191,10 +298,10 @@ class Level(QtCore.QObject):
                 posCom = commands.ChangePositionsCommand(self, parent,
                                                          parent.contents.positions[index:],
                                                          shift)
-                application.stack.push(posCom)
+                self.stack.push(posCom)
         insertCom = commands.InsertElementsCommand(self, parent, index, elements)
-        application.stack.push(insertCom)
-        application.stack.endMacro()
+        self.stack.push(insertCom)
+        self.stack.endMacro()
         
     def removeContents(self, parent, positions=None, indexes=None):
         """Undoably remove contents under the container *parent*.
@@ -220,26 +327,30 @@ class Level(QtCore.QObject):
                     shift = -i
                 else:
                     break
-        application.stack.beginMacro(self.tr("remove"))
+        self.stack.beginMacro(self.tr("remove"))
         removeCommand = commands.RemoveElementsCommand(self, parent, positions)
-        application.stack.push(removeCommand)
+        self.stack.push(removeCommand)
         if shiftPositions is not None:
             posCommand = commands.ChangePositionsCommand(self, parent, shiftPositions, shift)
-            application.stack.push(posCommand)
-        application.stack.endMacro()
+            self.stack.push(posCommand)
+        self.stack.endMacro()
+    
+    def setCovers(self, coverDict):
+        """Set the covers for one or more elements.
         
-    def commit(self,ids=None):
+        The action can be undone. *coverDict* must be a dict mapping elements to either
+        a cover path or a QPixmap or None.
+        """
+        from . import covers
+        self.stack.push(covers.CoverUndoCommand(self, coverDict))
+    
+    def commit(self, ids=None):
+        """Undoably commit given *ids* (or everything, if not specified) into the parent level."""
         from . import commands
         if ids is None:
             ids = list(self.elements.keys())
-        self.stack.push(commands.CommitCommand(self,ids))
-    
-    
-    
-    
-    
-    
-    
+        self.stack.push(commands.CommitCommand(self, ids))
+
     def reload(self, id):
         """Reload the file with *id* from the parent level and return the new version.
         
@@ -259,23 +370,29 @@ class Level(QtCore.QObject):
         del self.elements[id]
         return self.get(id)
 
-    def addTagValue(self,tag,value,elements,emitEvent=True):
-        """Add a tag of type *tag* and value *value* to the given elements. If *emitEvent* is False, do not
-        emit an event."""
+    # ====================================================================================
+    # The following functions implement no undo/redo handling and should be used with care
+    # ====================================================================================
+    
+    def _addTagValue(self, tag, value, elements, emitEvent=True):
+        """Add a tag of type *tag* and value *value* to the given elements.
+        
+        If *emitEvent* is False, do not emit the event self.changed."""
         for element in elements:
-            element.tags.add(tag,value)
+            element.tags.add(tag, value)
         if emitEvent:
             self.emitEvent([element.id for element in elements])
             
-    def removeTagValue(self,tag,value,elements,emitEvent=True):
-        """Remove a tag of type *tag* and *value* value from the given elements. If *emitEvent* is False,
-        do not emit an event."""
+    def _removeTagValue(self, tag, value, elements, emitEvent=True):
+        """Remove a tag of type *tag* and *value* value from the given elements.
+        
+        If *emitEvent* is False, do not emit self.changed."""
         for element in elements:
-            element.tags.remove(tag,value)
+            element.tags.remove(tag, value)
         if emitEvent:
             self.emitEvent([element.id for element in elements])
             
-    def changeTagValue(self,tag,oldValue,newValue,elements,emitEvent=True):
+    def _changeTagValue(self, tag, oldValue, newValue, elements, emitEvent=True):
         """Change a tag of type *tag* in the given elements changing the value from *oldValue* to *newValue*.
         If *emitEvent* is False, do not emit an event."""
         for element in elements:
@@ -283,7 +400,7 @@ class Level(QtCore.QObject):
         if emitEvent:
             self.emitEvent([element.id for element in elements])
     
-    def addFlag(self,flag,elements,emitEvent=True):
+    def _addFlag(self, flag, elements, emitEvent=True):
         """Add *flag* to the given elements. If *emitEvent* is False, do not emit an event."""
         for element in elements:
             if flag not in element.flags:
@@ -291,19 +408,12 @@ class Level(QtCore.QObject):
         if emitEvent:
             self.emitEvent([element.id for element in elements])
             
-    def removeFlag(self,flag,elements,emitEvent=True):
+    def _removeFlag(self,flag,elements,emitEvent=True):
         """Remove *flag* from the given elements. If *emitEvent* is False, do not emit an event."""
         for element in elements:
             element.flags.remove(flag)
         if emitEvent:
             self.emitEvent([element.id for element in elements])
-        
-    def setCovers(self,stack,coverDict):
-        """Set the covers for one or more elements. Add a command for doing this to *stack*.
-        *coverDict* must be a dict mapping elements to either a cover path or a QPixmap or None.
-        """
-        from . import covers
-        stack.push(covers.CoverUndoCommand(self,coverDict))
     
     def _setData(self,type,elementToData):
         for element,data in elementToData.items():
@@ -315,9 +425,11 @@ class Level(QtCore.QObject):
                 del element.data[type]
         self.emitEvent([element.id for element in elementToData])
         
-    def changeId(self, old, new):
-        """Change the id of some element from *old* to *new*. This should only be called from within
-        appropriate UndoCommands, and only if (old in self) is True. Takes care of contents and parents, too.
+    def _changeId(self, old, new):
+        """Change the id of some element from *old* to *new*.
+        
+        This should only be called from within appropriate UndoCommands, and only if "old in self"
+        is True. Takes care of contents and parents, too.
         """
         elem = self.elements[old]
         del self.elements[old]
@@ -332,11 +444,12 @@ class Level(QtCore.QObject):
                     self.elements[childID].parents = [ new if id == old else old
                                                       for id in self.elements[childID].parents ]
     
-    def insertChild(self, parent, position, child):
-        """Insert element *child* at *position* under *parent*."""
-        self.insertChildren(parent, ( (position, child), ))
+    # TODO: used anywhere?
+    def _insertSingle(self, parent, position, element):
+        """Insert single child *element* at *position* under *parent*."""
+        self._insertContents(parent, ( (position, element), ))
     
-    def insertChildren(self, parent, insertions):
+    def _insertContents(self, parent, insertions):
         """Insert some elements under *parent*.
         
         The insertions are given by an iterable of (position, element) tuples.
@@ -346,109 +459,48 @@ class Level(QtCore.QObject):
             if parent.id not in element.parents:
                 element.parents.append(parent.id)
         
-    def removeChild(self, parent, position):
+    # TODO: used anywhere?
+    def _removeSingle(self, parent, position):
         """Remove element at *position* from container *parent*."""
-        self.removeChildren(parent, (position,) )
+        self._removeContents(parent, (position,) )
     
-    def removeChildren(self, parent, positions):
+    def _removeContents(self, parent, positions):
         childIds = [parent.contents.getId(position) for position in positions]
         for pos in positions:
             parent.contents.remove(pos=pos)
         for id in childIds:
             if id not in parent.contents.ids:
                 self.get(id).parents.remove(parent.id)
-                
-    def renameFiles(self, map, emitEvent=True):
-        """Rename files based on *map*, which is a dict from ids to new paths.
-        
-        On a normal level, this just changes the path attributes and emits an event."""
-        #TODO: this contradicts the docstring
-        for id, (_, newPath) in map.items():
-            self.get(id).path = newPath
-        if emitEvent:
-            self.emitEvent(list(map.keys()))
-    
-    def children(self, id):
-        """Returns a set of (recursively) all children of the element with *id*. *id* may also be an
-        iterable of ids."""
-        if isinstance(id, collections.Iterable):
-            if len(id) == 0:
-                return set()
-            return set.union(*(self.children(i) for i in id))
-        if self.get(id).isFile():
-            return set((id,))
-        else:
-            return set.union(set((id,)), *(self.children(cid) for cid in self.get(id).contents.ids))
-    
-    def subLevel(self, ids, name):
-        """Return a new level containing copies of the elements with the given *ids* and named *name*."""
-        level = Level(name, self)
-        for id in ids:
-            level.getFromIds(self.children(id))
-        return level
-        
-    def createWrappers(self,wrapperString,createFunc=None):
-        """Create a wrapper tree containing elements of this level and return its root node.
-        *s* must be a string like   "X[A[A1,A2],B[B1,B2]],Z"
-        where the identifiers must be names of existing elements of this level. This method does not check
-        whether the given structure is valid.
-        
-        Often it is necessary to have references to some of the wrappers in the tree. For this reason
-        this method accepts names of wrappers as optional arguments. It will then return a tuple consisting
-        of the usual result (as above) and the wrappers with the given names (do not use this if there is
-        more than one wrapper with the same name).
-        """  
-        roots = []
-        currentWrapper = None
-        currentList = roots
-        
-        for token in _getTokens(wrapperString):
-            #print("Token: {}".format(token))
-            if token == ',':
-                continue
-            if token == '[':
-                currentWrapper = currentList[-1]
-                currentList = currentWrapper.contents
-            elif token == ']':
-                currentWrapper = currentWrapper.parent
-                if currentWrapper is None:
-                    currentList = roots
-                else: currentList = currentWrapper.contents
-            else:
-                if createFunc is None:
-                    element = self.get(int(token))
-                    wrapper = Wrapper(element)
-                    if currentWrapper is not None:
-                        assert currentWrapper.element.id in wrapper.element.parents
-                        wrapper.parent = currentWrapper
-                else: wrapper = createFunc(currentWrapper,token)
-                currentList.append(wrapper)
-        return roots
 
-def _getTokens(s):
-    """Helper for Level.getWrappers: Yield each token of *s*."""
-    # s should be a string like "A,B[B1,B2],C[C1[C11,C12],C2],D"
-    last = 0
-    i = 0
-    while i < len(s):
-        if s[i] in (',','[',']'):
-            if last != i:
-                yield s[last:i]
-            last = i+1
-            yield s[i]
-        i += 1
-    if last != i:
-        yield s[last:i]
+    def _renameFiles(self, renamings, emitEvent=True):
+        """Rename files based on *renamings*, which is a dict from ids to (oldUrl, newUrl) pairs.
+        
+        On a normal level, this just changes the Url attributes and emits an event.
+        """
+        for id, (_, newUrl) in renamings.items():
+            self.get(id).url = newUrl
+        if emitEvent:
+            self.emitEvent(list(renamings.keys()))
+    
+    def __str__(self):
+        return 'Level({})'.format(self.name)
 
 
 class RealLevel(Level):
+    """The real level, comprising the state of database and filesystem.
+    
+    Changes made here do not only change the element objects but also the database and, if
+    files are affected, the filesystem state.
+    """
+    
     def __init__(self):
-        super().__init__('REAL',None)
+        super().__init__('REAL', None)
         # This hack makes the inherited implementations of get and load work with the overwritten
         # implementation of loadIntoChild
         self.parent = self
     
-    def loadIntoChild(self,ids,child):
+    def loadIntoChild(self, ids, child):
+        """Loads IDs which are not yet known from database (if positive) or filesystem (else)."""
         notFound = []
         for id in ids:
             if id in self.elements:
@@ -457,96 +509,82 @@ class RealLevel(Level):
             else: notFound.append(id)
         if len(notFound) > 0:
             positiveIds = [id for id in notFound if id > 0]
-            paths = [pathFromTId(id) for id in notFound if id < 0]
+            urls = [ tIdManager(id) for id in notFound if id < 0 ]
             if len(positiveIds) > 0:
-                self.loadFromDB(positiveIds,child)
-            if len(paths) > 0:
-                self.loadFromFileSystem(paths,child)
+                self.loadFromDB(positiveIds, child)
+            if len(urls) > 0:
+                self.loadURLs(urls, child)
             
-    def loadFromDB(self,idList,level):
-        #TODO: comment
+    def loadFromDB(self, idList, level):
+        """Load elements specified by *idList* from the database into *level*."""
         if len(idList) == 0: # queries will fail otherwise
             return 
         idList = ','.join(str(id) for id in idList)
+        #  bare elements
         result = db.query("""
-                SELECT el.id,el.file,el.major,f.path,f.length
+                SELECT el.id, el.file, el.major, f.url, f.length
                 FROM {0}elements AS el LEFT JOIN {0}files AS f ON el.id = f.element_id
                 WHERE el.id IN ({1})
-                """.format(db.prefix,idList))
-        
-        for row in result:
-            id,file,major,path,length = row
+                """.format(db.prefix, idList))
+        for (id, file, major, url, length) in result:
             if file:
-                level.elements[id] = File(level,id,path=path,length=length)
+                level.elements[id] = File(level, id,
+                                          url=filebackends.BackendURL.fromString(url),
+                                          length=length)
             else:
-                level.elements[id] = Container(level,id,major=major)
-        
-        # contents
+                level.elements[id] = Container(level, id, major=major)
+        #  contents
         result = db.query("""
-                SELECT el.id,c.position,c.element_id
+                SELECT el.id, c.position, c.element_id
                 FROM {0}elements AS el JOIN {0}contents AS c ON el.id = c.container_id
                 WHERE el.id IN ({1})
                 ORDER BY position
-                """.format(db.prefix,idList))
-        
-        for row in result:
-            id,pos,contentId = row
+                """.format(db.prefix, idList))
+        for (id, pos, contentId) in result:
             level.elements[id].contents.insert(pos, contentId)
-        
-        # parents
+        #  parents
         result = db.query("""
                 SELECT el.id,c.container_id
                 FROM {0}elements AS el JOIN {0}contents AS c ON el.id = c.element_id
                 WHERE el.id IN ({1})
-                """.format(db.prefix,idList))
-        
-        for row in result:
-            id,contentId = row
+                """.format(db.prefix, idList))
+        for (id, contentId) in result:
             level.elements[id].parents.append(contentId)
-        
-        # tags
+        #  tags
         result = db.query("""
                 SELECT el.id,t.tag_id,t.value_id
                 FROM {0}elements AS el JOIN {0}tags AS t ON el.id = t.element_id
                 WHERE el.id IN ({1})
-                """.format(db.prefix,idList))
-        
-        for row in result:
-            id,tagId,valueId = row
+                """.format(db.prefix, idList))
+        for (id,tagId,valueId) in result:
             tag = tags.get(tagId)
-            level.elements[id].tags.add(tag,db.valueFromId(tag,valueId))
-            
+            level.elements[id].tags.add(tag, db.valueFromId(tag, valueId))
         # flags
         result = db.query("""
                 SELECT el.id,f.flag_id
                 FROM {0}elements AS el JOIN {0}flags AS f ON el.id = f.element_id
                 WHERE el.id IN ({1})
-                """.format(db.prefix,idList))
-        
-        for row in result:
-            id,flagId = row
+                """.format(db.prefix, idList))
+        for (id, flagId) in result:
             level.elements[id].flags.append(flags.get(flagId))
-        
         # data
         result = db.query("""
                 SELECT element_id,type,data
                 FROM {}data
                 WHERE element_id IN ({})
                 ORDER BY element_id,type,sort
-                """.format(db.prefix,idList))
-        
+                """.format(db.prefix, idList))
         # This is a bit complicated because the data should be stored in tuples, not lists
         # Changing the lists would break undo/redo
         current = None
         buffer = []
-        for id,type,data in result:
+        for (id, type, data) in result:
             if current is None:
-                current = (id,type)
-            elif current != (id,type):
+                current = (id, type)
+            elif current != (id, type):
                 level.elements[current[0]].data[current[1]] = tuple(buffer)
                 current = (id,type)
                 buffer = []
-                
             element = level.elements[id]
             if element.data is None:
                 element.data = {}
@@ -554,89 +592,38 @@ class RealLevel(Level):
         if current is not None:
             level.elements[current[0]].data[current[1]] = tuple(buffer)
             
-    
-    def loadFromFileSystem(self,paths,level):
-        #TODO: comment
-        for path in paths:
-            rpath = utils.relPath(path)
-            try:
-                real = realfiles.get(path)
-                fileTags = real.tags
-                length = real.length
-                filePosition = real.position
-            except OSError as e:
-                if not os.path.exists(path):
-                    fileTags = tags.Storage()
-                    filePosition = None
-                    length = 0
-                    fileTags[tags.TITLE] = ["[NOT FOUND] {}".format(os.path.basename(rpath))]
-                else:
-                    raise ElementGetError('could not open file "{}":\n{}'.format(rpath, e))
-            
-            id = db.idFromPath(rpath)
+    def loadURLs(self, urls, level):
+        """Loads files given by *urls*, into *level*."""
+        for url in urls:
+            backendFile = url.getBackendFile()
+            backendFile.readTags()
+            fTags = backendFile.tags
+            fLength = backendFile.length
+            fPosition = backendFile.position
+            id = db.idFromUrl(url)
             if id is None:
-                id = tIdFromPath(rpath)
+                id = tIdManager.tIdFromUrl(url)
                 flags = []
             else:
                 flags = db.flags(id)
-                logger.warning("loadFromFilesystem called on '{}', which is in DB. Are you sure "
-                               "this is correct?".format(rpath))
                 # TODO: Load private tags!
-            elem = File(level,id = id,path=rpath,length=length,tags=fileTags,flags=flags)
-            elem.fileTags = fileTags.copy()
-            if filePosition is not None:
-                elem.filePosition = filePosition
+                logger.warning("loadFromURLs called on '{}', which is in DB. Are you "
+                           " sure this is correct?".format(url))
+            elem = File(level, id=id, url=url, length=fLength, tags=fTags, flags=flags)
+            elem.fileTags = fTags.copy()
+            if fPosition is not None:
+                elem.filePosition = fPosition            
             level.elements[id] = elem
     
-    def insertChildren(self, parent, insertions):
-        db.write.addContents([(parent.id, pos, child.id) for pos, child in insertions])
-        super().insertChildren(parent, insertions)
-        
-    def removeChildren(self, parent, positions):
-        db.write.removeContents([(parent.id, pos) for pos in positions])
-        super().removeChildren(parent, positions)
-    
-    def addTagValue(self,tag,value,elements,emitEvent=True):
-        super().addTagValue(tag,value,elements,emitEvent=False)
-        failedElements = self.saveTagsToFileSystem(elements)
-        #TODO: Correct failedElements
-        dbElements = [el.id for el in elements if el.isInDB() and not el in failedElements]
-        if len(dbElements):
-            dbwrite.addTagValues(dbElements,tag,[value])
-        
-        if emitEvent:
-            self.emitEvent([element.id for element in elements])
             
-    def removeTagValue(self,tag,value,elements,emitEvent=True):
-        super().removeTagValue(tag,value,elements,emitEvent=False)
-        failedElements = self.saveTagsToFileSystem(elements)
-        #TODO: Correct failedElements
-        dbElements = [el.id for el in elements if el.isInDB() and not el in failedElements]
-        if len(dbElements):
-            dbwrite.removeTagValuesById(dbElements,tag,db.idFromValue(tag,value))
-        else: assert all(element.id < 0 for element in elements)
-        
-        if emitEvent:
-            self.emitEvent([element.id for element in elements])
-            
-    def changeTagValue(self,tag,oldValue,newValue,elements,emitEvent=True):
-        super().changeTagValue(tag,oldValue,newValue,elements,emitEvent=False)
-        failedElements = self.saveTagsToFileSystem(elements)
-        #TODO: Correct failedElements
-        dbElements = [el.id for el in elements if el.isInDB() and not el in failedElements]
-        if len(dbElements):
-            dbwrite.changeTagValueById(dbElements,tag,db.idFromValue(tag,oldValue),
-                                       db.idFromValue(tag,newValue,insert=True))
-        if emitEvent:
-            self.emitEvent([element.id for element in elements])
-        
-    def saveTagsToFileSystem(self,elements):
+    def saveTagsToFileSystem(self, elements):
+        """Helper function to store the tags of *elements* on the filesystem."""
         failedElements = []
         for element in elements:
             if not element.isFile():
                 continue
             try:
-                real = realfiles.get(element.path)
+                real = element.url.getBackendFile()
                 real.tags = element.tags.withoutPrivateTags()
                 real.saveTags()
             except IOError as e:
@@ -646,36 +633,79 @@ class RealLevel(Level):
                 continue
         return failedElements
     
-    def renameFiles(self, map, emitEvent = True):
+    # =============================================================
+    # Overridden from Level: these methods modify DB and filesystem
+    # =============================================================
+    
+    def _insertContents(self, parent, insertions):
+        db.write.addContents([(parent.id, pos, child.id) for pos, child in insertions])
+        super()._insertContents(parent, insertions)
+        
+    def _removeContents(self, parent, positions):
+        db.write.removeContents([(parent.id, pos) for pos in positions])
+        super()._removeContents(parent, positions)
+    
+    def _addTagValue(self, tag, value, elements, emitEvent=True):
+        super()._addTagValue(tag, value, elements, emitEvent=False)
+        failedElements = self.saveTagsToFileSystem(elements)
+        #TODO: Correct failedElements
+        dbElements = [el.id for el in elements if el.isInDB() and not el in failedElements]
+        if len(dbElements):
+            dbwrite.addTagValues(dbElements, tag, [value])
+        if emitEvent:
+            self.emitEvent([element.id for element in elements])
+            
+    def _removeTagValue(self, tag, value, elements, emitEvent=True):
+        super()._removeTagValue(tag, value, elements, emitEvent=False)
+        failedElements = self.saveTagsToFileSystem(elements)
+        #TODO: Correct failedElements
+        dbElements = [el.id for el in elements if el.isInDB() and not el in failedElements]
+        if len(dbElements) > 0:
+            dbwrite.removeTagValuesById(dbElements, tag, db.idFromValue(tag, value))
+        else: assert all(element.id < 0 for element in elements)
+        if emitEvent:
+            self.emitEvent([element.id for element in elements])
+
+    def _changeTagValue(self, tag, oldValue, newValue, elements, emitEvent=True):
+        super()._changeTagValue(tag, oldValue, newValue, elements, emitEvent=False)
+        failedElements = self.saveTagsToFileSystem(elements)
+        #TODO: Correct failedElements
+        dbElements = [el.id for el in elements if el.isInDB() and not el in failedElements]
+        if len(dbElements):
+            dbwrite.changeTagValueById(dbElements, tag, db.idFromValue(tag, oldValue),
+                                       db.idFromValue(tag, newValue, insert=True))
+        if emitEvent:
+            self.emitEvent([element.id for element in elements])
+    
+    def _renameFiles(self, renamings, emitEvent=True):
         """on the real level, files are renamed on disk and in DB."""
-        super().renameFiles(map, emitEvent)
-        import os
-        for id, (oldPath, newPath) in map.items():
-            os.renames(utils.absPath(oldPath), utils.absPath(newPath))
-        db.write.changeFilePaths([ (id, newPath) for id, (_, newPath) in map.items()])
+        super()._renameFiles(renamings, emitEvent)
+        for id, (oldUrl, newUrl) in renamings.items():
+            oldUrl.getBackendFile().rename(newUrl)
+        db.write.changeUrls([ (id, str(newUrl)) for id, (_, newUrl) in renamings.items() ])
         if emitEvent:
-            self.changed.emit(FileRenameEvent(list(map.items())))
+            self.changed.emit(FileRenameEvent(list(renamings.items())))
             
-    def addFlag(self,flag,elements,emitEvent=True):
-        super().addFlag(flag,elements,emitEvent=False)
+    def _addFlag(self, flag, elements, emitEvent=True):
+        super()._addFlag(flag, elements, emitEvent=False)
         ids = [element.id for element in elements]
-        db.write.addFlag(ids,flag)
+        db.write.addFlag(ids, flag)
         if emitEvent:
             self.emitEvent(ids)
             
-    def removeFlag(self,flag,elements,emitEvent=True):
-        super().removeFlag(flag,elements,emitEvent=False)
+    def _removeFlag(self, flag, elements, emitEvent=True):
+        super()._removeFlag(flag, elements, emitEvent=False)
         ids = [element.id for element in elements]
-        db.write.removeFlag(ids,flag)
+        db.write.removeFlag(ids, flag)
         if emitEvent:
             self.emitEvent(ids)
             
-    def _setData(self,type,elementToData):
-        super()._setData(type,elementToData)
+    def _setData(self,type, elementToData):
+        super()._setData(type, elementToData)
         values = []
-        for element,data in elementToData.items():
+        for element, data in elementToData.items():
             if data is not None:
-                values.extend((element.id,type,i,d) for i,d in enumerate(data))
+                values.extend((element.id, type, i, d) for i, d in enumerate(data))
         db.transaction()
         db.query("DELETE FROM {}data WHERE type = ? AND element_id IN ({})"
                  .format(db.prefix,db.csIdList(elementToData.keys())),type)
@@ -685,55 +715,62 @@ class RealLevel(Level):
         db.commit()
         
         
-def idFromPath(path, create=True):
-    """Return the id for the given path.
+def idFromUrl(url, create=True):
+    """Return the id for the given url.
     
-    For elements in the database this is a positive number. Otherwise if the path is known
+    For elements in the database this is a positive number. Otherwise if the url is known
     under a temporary id, that one is returned. If not and *create* is True, a new temporary
     id is created and returned. Otherwise a KeyError is raised.
     """
     
-    id = db.idFromPath(path)
+    id = db.idFromUrl(url)
     if id is not None:
         return id
-    else: return tIdFromPath(path, create)
+    else: return tIdManager.tIdFromUrl(url, create)
 
 
-def pathFromId(id):
+def urlFromId(id):
     if id < 0:
-        return pathFromTId(id)
+        return tIdManager(id)
     else:
-        return db.path(id)
+        return filebackends.BackendURL.fromString(db.url(id))
 
-
-_currentTId = 0 # Will be decreased by one every time a new TID is assigned
-_tIds = {} # TODO: Is there any chance that items will be removed from here?
-_paths = {}
-
-
-def tIdFromPath(path, create=True):
-    """Return the temporary id for *path*, if it exists.
+class TIDManager:
+    """Manages temporary IDs and related URLs.
     
-    If it does not exist and *create* is True, a new one is inserted and returned.
-    Otherwise, a KeyError is raised.
+    Acts as a bidirectional map tId<->URL where the URL of a file always refers to the REAL level.
     """
-    if path in _tIds:
-        return _tIds[path]
-    elif create:
-        global _currentTId
-        _currentTId -= 1
-        _paths[_currentTId] = path
-        _tIds[path] = _currentTId
-        return _currentTId
-    else:
-        raise KeyError("No id for path '{}' is known".format(path))
+    
+    def __init__(self):
+        self.tIdToUrl = {}
+        self.urlToTId = {}
+        self.currentTId = 0
+        
+    def __call__(self, key):
+        if isinstance(key, filebackends.BackendURL):
+            return self.urlToTId[key]
+        return self.tIdToUrl[key]
+    
+    def tIdFromUrl(self, url, create=True):
+        """Return the temporary id for *url*, if it exists.
+        
+        If it does not exist and *create* is True, a new one is inserted and returned.
+        Otherwise, a KeyError is raised.
+        """
+        try:
+            return self.urlToTId[url]
+        except KeyError as e:
+            if create:
+                newId = self.createTId()
+                self.urlToTId[url] = newId
+                self.tIdToUrl[newId] = url
+                return newId
+            else:
+                raise e
+            
+    def createTId(self):
+        """Create a temporary ID without relating a URL to it. Use for temporary containers."""
+        self.currentTId -= 1
+        return self.currentTId         
 
-
-def createTId():
-    global _currentTId
-    _currentTId -= 1
-    return _currentTId
-
-
-def pathFromTId(tid):
-    return _paths[tid]
+tIdManager = TIDManager()

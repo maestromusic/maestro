@@ -38,7 +38,8 @@ class DelegateStyle:
     three attributes *relFontSize*, *bold* and *italic*. *relFontSize* is a factor which is multiplied with
     the delegate option ''fontSize''.
     """
-    def __init__(self,relFontSize,bold,italic,color = QtGui.qApp.palette().color(QtGui.QPalette.WindowText)):
+    def __init__(self, relFontSize=1, bold=False, italic=False,
+                 color=QtGui.qApp.palette().color(QtGui.QPalette.WindowText)):
         self.bold = bold
         self.italic = italic
         self.relFontSize = relFontSize

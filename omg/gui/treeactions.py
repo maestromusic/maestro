@@ -208,10 +208,7 @@ class ClearTreeAction(TreeAction):
     
     def doAction(self):
         model = self.parent().model()
-        application.stack.push(leveltreemodel.ChangeRootCommand(model,
-                                      [node.element.id for node in model.root.contents],
-                                      [],
-                                      self.tr('clear view')))
+        application.stack.push(leveltreemodel.ChangeRootCommand(model, [], self.tr('clear')))
 
 class CommitTreeAction(TreeAction):
     

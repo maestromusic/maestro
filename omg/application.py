@@ -179,6 +179,9 @@ def run(cmdConfig=[],type='gui',exitPoint=None):
     search.init()
     covers.init()
     
+    from . import filebackends
+    from .filebackends import filesystem as fsBackend
+    
     global network
     network = QtNetwork.QNetworkAccessManager()
     

@@ -85,7 +85,7 @@ class NodeSelection:
             # this is reimplemented using model.isSelected in the subclass used by treeview.TreeView
             return [n for n in self._nodes if not any(parent in self._nodes for parent in n.getParents())]
         
-    def wrappers(self,recursive=False):
+    def wrappers(self, recursive=False):
         """Return a list of all selected element wrappers. If *recursive* is True return all children of
         selected wrappers. If a wrapper is selected and one of its parents is also selected, don't return
         it twice.
@@ -151,12 +151,25 @@ class NodeSelection:
         """True iff at least one container is selected."""
         return any(w.isContainer() for w in self._wrappers)
 
-    def hasFiles(self):
-        """True iff at least one file is selected."""
-        return any(el.isFile() for el in self._wrappers)
+    def hasFiles(self, recursive=False, protocols=None):
+        """True iff at least one file is selected.
+        
+        The parameters *recursive* and *protocols* behave like in files()."""
+        iter = self.fileWrappers(recursive, protocols)
+        try:
+            next(iter)
+            return True
+        except StopIteration:
+            return False
     
-    def files(self,recursive=False):
-        """Return all file wrappers that are selected. If *recursive* is True, also return files of which
-        at least one parent is selected."""
-        return (w for w in self.wrappers(recursive) if w.isFile())
+    def fileWrappers(self, recursive=False, protocols=None):
+        """Return a generator of all file wrappers that are selected.
+        
+        If *recursive* is True, also return files of which at least one parent is selected. If
+        *protocols* is specified it must be a list of file backend protocols; then only files
+        with that protocols will be returned."""
+        if protocols is None:
+            return (w for w in self.wrappers(recursive) if w.isFile())
+        return (w for w in self.wrappers(recursive)
+                  if w.isFile() and w.url.split("://", 1)[0] in protocols)
         

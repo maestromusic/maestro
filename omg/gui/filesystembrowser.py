@@ -22,7 +22,7 @@ from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
 from . import mainwindow, selection
-from .. import filesystem, config
+from .. import filebackends, filesystem, config
 from ..utils import relPath, absPath, getIcon
 from ..core import levels
 
@@ -100,9 +100,11 @@ class FileSystemBrowserDock(QtGui.QDockWidget):
         
 
 class FileSystemSelection(selection.NodeSelection):
-    def __init__(self,paths):
+    
+    def __init__(self, paths):
         super().__init__(levels.real,[])
-        self._files = levels.real.getFromPaths(paths)
+        urls = [filebackends.BackendURL.fromString("file:///" + path) for path in paths]
+        self._files = levels.real.getFromUrls(urls)
         
     def elements(self,recursive=False):
         return self._files

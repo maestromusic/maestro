@@ -36,6 +36,7 @@ def defaultConfig():
         }}
 
 initialized = False
+
 def enable():
     if not initialized:
         init()
@@ -45,7 +46,10 @@ def enable():
     browser.BrowserTreeView.actionConfig.addActionDefinition((("plugins", 'renamer'),), RenameFilesAction)
 
 def disable():
+    from omg.gui import editor, browser
+    from .gui import RenameFilesAction
     editor.EditorTreeView.actionConfig.removeActionDefinition((("plugins", 'renamer'),))
+    browser.BrowserTreeView.actionConfig.addActionDefinition((("plugins", 'renamer'),), RenameFilesAction)
 
 
 profileConfig = None
@@ -87,7 +91,7 @@ class GrammarRenamer(profiles.Profile):
                 if len(self.currentParents) > 0:
                     ret["value"] = self.positionFormat.format(self.currentParents[0][0])
         if macro != "#":
-            if tags.exists(macro.lower()):
+            if tags.isInDB(macro.lower()):
                 tag = tags.get(macro.lower())
                 if tag in elemTag:
                     ret["value"] = ",".join(map(str, elemTag[tag])).translate(self.translation)
@@ -148,7 +152,7 @@ class GrammarRenamer(profiles.Profile):
     
     def computeNewPath(self):
         """Computes the new path for the element defined by *self.currentElem* and *self.currentParents*."""
-        extension = self.currentElem.path.rsplit(".", 1)[1]
+        extension = self.currentElem.getExtension()
         try:
             return  "".join(map(str, self.expression.parseString(self.formatString))) + "." + extension
         except pyparsing.ParseException as e:
@@ -158,15 +162,15 @@ class GrammarRenamer(profiles.Profile):
         self.currentElem = element
         self.currentParents = parents
         if element.isFile():
-            self.result[element.id] = self.computeNewPath()
+            self.result[element] = self.computeNewPath()
         else:
             for pos, childId in element.contents.items():
                 self.traverse(self.level.get(childId), (pos, element), *parents)
         
-    def renameContainer(self, level, id):
+    def renameContainer(self, level, element):
         self.result = dict()
         self.level = level
-        self.traverse(level.get(id))
+        self.traverse(element)
         return self.result
 
     def config(self):

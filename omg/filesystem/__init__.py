@@ -23,7 +23,7 @@ import os.path, subprocess, hashlib, datetime, threading, queue, time
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
-from .. import logging, config, utils, database as db, realfiles
+from .. import logging, config, utils, database as db, filebackends
 from ..core import levels
 
 logger = logging.getLogger(__name__)
@@ -35,6 +35,7 @@ def init():
     global syncThread, notifier, null, enabled
     if config.options.filesystem.disable:
         return
+    return # DISABLE MODULE DOES NOT WORK ATM
     syncThread = FileSystemSynchronizer()
     null = open(os.devnull)
     levels.real.changed.connect(syncThread.handleEvent, Qt.QueuedConnection)

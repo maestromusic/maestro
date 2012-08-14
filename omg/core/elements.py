@@ -22,7 +22,7 @@ from PyQt4 import QtCore
 translate = QtCore.QCoreApplication.translate
 
 from . import tags as tagsModule
-from .. import config
+from .. import config, filebackends
 
 class Element:
     """Abstract base class for elements (files or containers)."""   
@@ -46,7 +46,7 @@ class Element:
     def getTitle(self,usePath=True):
         """Return the title of this element or some dummy title, if the element does not have a title tag.
         If config.options.misc.show_ids is True, the title will be prepended by the element's id.
-        If *usePath* is True, the path will be used as title for files without a title tag.
+        If *usePath* is True, the url will be used as title for files without a title tag.
         """
         result = ''
         
@@ -56,10 +56,19 @@ class Element:
         if tagsModule.TITLE in self.tags:
             result += " - ".join(self.tags[tagsModule.TITLE])
         elif usePath and self.isFile():
-            result += self.path
+            result += self.url
         else: result += translate("Element","<No title>")
 
         return result
+    
+    def getAllFiles(self):
+        """Return all files below this element. Doesn't eliminate duplicates."""
+        if self.isFile():
+            yield self
+        else:
+            for id in self.contents.ids:
+                for file in self.level.get(id).getAllFiles():
+                    yield file
     
     def getData(self,type):
         if type not in self.data:
@@ -158,17 +167,17 @@ class Container(Element):
 
 
 class File(Element):
-    """Element-subclass for files. You must specify the level, id, path and length in seconds of the file.
+    """Element-subclass for files. You must specify the level, id, url and length in seconds of the file.
     Keyword-arguments that are not specified will be set to empty lists/tag.Storage instances.
     """
-    def __init__(self, level, id, path, length,*, parents=None, tags=None, flags=None, data=None):
-        if not isinstance(id,int) or not isinstance(path,str) or not isinstance(length,int):
-            raise TypeError("Invalid type (id,path,length): ({},{},{}) of types ({},{},{})"
-                            .format(id,path,length,type(id),type(path),type(length)))
+    def __init__(self, level, id, url, length,*, parents=None, tags=None, flags=None, data=None):
+        if not isinstance(id,int) or not isinstance(url, filebackends.BackendURL) or not isinstance(length,int):
+            raise TypeError("Invalid type (id,url,length): ({},{},{}) of types ({},{},{})"
+                            .format(id,url,length,type(id),type(url),type(length)))
         self.level = level
         self.id = id
         self.level = level
-        self.path = path
+        self.url = url
         self.length = length
         
         if parents is not None:
@@ -185,14 +194,14 @@ class File(Element):
         else: self.data = {}
         
     def copy(self):
-        ret = File(level = self.level,
-                    id = self.id,
-                    path = self.path,
-                    length = self.length,
-                    parents = self.parents[:],
-                    tags = self.tags.copy(),
-                    flags = self.flags[:],
-                    data = self.data.copy())
+        ret = File(level=self.level,
+                    id=self.id,
+                    url=self.url,
+                    length=self.length,
+                    parents=self.parents[:],
+                    tags=self.tags.copy(),
+                    flags=self.flags[:],
+                    data=self.data.copy())
         if hasattr(self, "fileTags"):
             ret.fileTags = self.fileTags.copy()
         if hasattr(self, "filePosition"):
@@ -207,13 +216,10 @@ class File(Element):
     
     def getExtension(self):
         """Return the filename extension of this file."""
-        ext = os.path.splitext(self.path)[1]
-        if len(ext) > 0:
-            return ext[1:].lower() # remove the dot
-        else: return None
+        return self.url.extension()
         
     def __repr__(self):
-        return "<File[{}] {}>".format(self.id, self.path)
+        return "<File[{}] {}>".format(self.id, self.url)
 
 
 class ContentList:

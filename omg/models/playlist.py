@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import itertools
+import itertools, urllib
 
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt 
@@ -24,7 +24,7 @@ from PyQt4.QtCore import Qt
 from . import wrappertreemodel, treebuilder
 from .. import application, config, utils
 from ..core import levels
-from ..core.nodes import Node, RootNode, Wrapper
+from ..core.nodes import RootNode, Wrapper
 
  
 class PlaylistModel(wrappertreemodel.WrapperTreeModel):
@@ -38,7 +38,7 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         self.backend = backend
         self.current = None
         
-         # self.current and all of its parents. The delegate draws an arrow in front of these nodes
+        # self.current and all of its parents. The delegate draws an arrow in front of these nodes
         self.currentlyPlayingNodes = []
         self.level.changed.connect(self._handleLevelChanged)
     
@@ -75,7 +75,7 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         
         # Emit events for nodes whose state changed
         for node in oldPlayingNodes:
-            if node not in self.currentlyPlayingNodes and self.contains(node):
+            if node not in self.currentlyPlayingNodes and node in self:
                 index = self.getIndex(node)
                 self.dataChanged.emit(index,index)
                 
@@ -84,24 +84,25 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
                 index = self.getIndex(node)
                 self.dataChanged.emit(index,index)
 
-    def _buildWrappersFromPaths(self,paths):
-        """Build wrappers for the given paths and if possible add containers. In other words: convert a flat
-        playlist to a tree playlist."""
-        files = [Wrapper(element) for element in self.level.getFromPaths(paths)]
-        wrappers = treebuilder.buildTree(self.level,files)
+    def _buildWrappersFromUrls(self, urls):
+        """Build wrappers for the given urls and if possible add containers.
+        
+        In other words: convert a flat playlist to a tree playlist."""
+        files = [Wrapper(element) for element in self.level.getFromUrls(urls)]
+        wrappers = treebuilder.buildTree(self.level, files)
         for i in range(len(wrappers)):
             while wrappers[i].getContentsCount() == 1:
                 wrappers[i] = wrappers[i].contents[0]
         return wrappers
     
-    def initFromPaths(self,paths):
+    def initFromUrls(self, urls):
         """Initialize the playlist to contain the given files. This method is not undoable."""
-        self._setRootContents(self._buildWrappersFromPaths(paths))
+        self._setRootContents(self._buildWrappersFromUrls(urls))
         
-    def resetFromPaths(self,paths,updateBackend=True):
+    def resetFromPaths(self, paths, updateBackend=True):
         """Reset the playlist to contain the given files. This method is undoable."""
         wrappers = self._buildWrappersFromPaths(paths)
-        application.stack.push(PlaylistChangeCommand(self,wrappers,updateBackend))
+        application.stack.push(PlaylistChangeCommand(self, wrappers, updateBackend))
 
     def clear(self,updateBackend=True):
         """Clear the playlist."""
@@ -139,9 +140,9 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
                 # Note that files might be loaded into the real level via their TID. 
                 wrappers = [levels.real.get(id) for id in mimeData.files()]   
         else:
-            paths = [utils.relPath(path) for path in itertools.chain.from_iterable(
-                                    utils.collectFiles(u.path() for u in mimeData.urls()).values())]
-            wrappers = [Wrapper(element) for element in self.level.getFromPaths(paths)]
+            urls = itertools.chain.from_iterable(
+                                    utils.collectFiles(u.path() for u in mimeData.urls()).values())
+            wrappers = [Wrapper(element) for element in self.level.getFromUrls(urls)]
                
         self.insert(parent,position,wrappers)
         application.stack.endMacro()
@@ -226,9 +227,9 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         
         application.stack.endMacro()
         
-    def insertPathsAtOffset(self,offset,paths,updateBackend=True):
+    def insertUrlsAtOffset(self, offset, urls, updateBackend=True):
         """Insert the given paths at the given offset."""
-        wrappers = [Wrapper(element) for element in self.level.getFromPaths(paths)]
+        wrappers = [Wrapper(element) for element in self.level.getFromUrls(urls)]
         file = self.root.fileAtOffset(offset,allowFileCount=True)
         if file is None:
             parent = self.root
@@ -385,10 +386,29 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         files will be stored by their path (and not by their temporary id) so this representation can be
         used to store the playlist tree structure persistently.
         """
+        def _strFunc(wrapper):
+            """This is used as strFunc-argument for Node.wrapperString. It returns external files as url-encoded
+            paths because these don't contain the characters ',[]'."""
+            if wrapper.element.id > 0:
+                return str(wrapper.element.id)
+            else:
+                # only exception are external files in the playlist
+                assert wrapper.isFile()
+                return 'EXT:'+urllib.parse.quote(wrapper.element.path)
+
         return self.root.wrapperString(strFunc=_strFunc)
     
     def initFromWrapperString(self,wrapperString):
         """Initialize the playlist from a wrapperstring created with PlaylistModel.getWrapperString."""
+        # Helper functions for playlist<->wrapperstring conversion
+        def _createFunc(parent,token):
+            """This is used as createFunc-argument for Level.createWrappers."""
+            if token.startswith('EXT:'):
+                path = urllib.parse.unquote(token[4:]) # remove EXT:
+                element = levels.real.get(path)
+            else:
+                element = levels.real.get(int(token))
+            return Wrapper(element,parent=parent)
         wrappers = levels.real.createWrappers(wrapperString,createFunc=_createFunc)
         #TODO: check wrappers for consistency
         self._setRootContents(wrappers)
@@ -407,7 +427,7 @@ class PlaylistInsertCommand(wrappertreemodel.InsertCommand):
         if self._updateBackend:
             offset = self.parent.contents[self.position].offset()
             files = itertools.chain.from_iterable(w.getAllFiles() for w in self.wrappers)
-            self.model.backend.insertIntoPlaylist(offset,(f.element.path for f in files))
+            self.model.backend.insertIntoPlaylist(offset,(f.element.url for f in files))
         else: self._updateBackend = True
         
     def undo(self):
@@ -440,7 +460,7 @@ class PlaylistRemoveCommand(wrappertreemodel.RemoveCommand):
             self.model._insert(parent,pos,wrappers)
             offset = parent.contents[pos].offset()
             files = itertools.chain.from_iterable(w.getAllFiles() for w in wrappers)
-            self.model.backend.insertIntoPlaylist(offset,(f.element.path for f in files))
+            self.model.backend.insertIntoPlaylist(offset,(f.element.url for f in files))
 
 
 class PlaylistChangeCommand(wrappertreemodel.ChangeCommand):
@@ -517,26 +537,4 @@ class ConditionalCommand(QtGui.QUndoCommand):
             
     def undo(self):
         if not self.onRedo:
-            self.method()
-
-
-# Helper functions for playlist<->wrapperstring conversion
-def _createFunc(parent,token):
-    """This is used as createFunc-argument for Level.createWrappers."""
-    if token.startswith('EXT:'):
-        path = urllib.parse.unquote(token[4:]) # remove EXT:
-        element = levels.real.get(path)
-    else:
-        element = levels.real.get(int(token))
-    return Wrapper(element,parent=parent)
-        
-def _strFunc(wrapper):
-    """This is used as strFunc-argument for Node.wrapperString. It returns external files as url-encoded
-    paths because these don't contain the characters ',[]'."""
-    if wrapper.element.id > 0:
-        return str(wrapper.element.id)
-    else:
-        # only exception are external files in the playlist
-        assert wrapper.isFile()
-        return 'EXT:'+urllib.parse.quote(wrapper.element.path)
-    
+            self.method()   

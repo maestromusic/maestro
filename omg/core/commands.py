@@ -18,6 +18,8 @@
 
 """This module contains common QUndoCommands for modifying Elements in Levels."""
 
+import itertools
+
 from PyQt4 import QtCore, QtGui
 
 from . import levels, tags, flags
@@ -26,6 +28,7 @@ from .. import database as db, logging, utils
 from ..modify import real as modifyReal
 from ..database import write
 
+translate = QtCore.QCoreApplication.translate
 logger = logging.getLogger(__name__)
 
 
@@ -59,9 +62,9 @@ class CommitCommand(QtGui.QUndoCommand):
             # if non-real parent, newId is the identity function
             self.newId = self.oldId = lambda x : x
         self.newElements = [] # elements which are not in parent level before the commit
-        self.newFilesPaths = [] #  the paths of new files; for FS module
+        self.newFilesUrls = [] #  the URLs of new files; for FS module
         self.flagChanges, self.tagChanges, self.contentsChanges = {}, {}, {}
-        self.majorChanges, self.pathChanges = {}, {}
+        self.majorChanges, self.urlChanges = {}, {}
         self.ids, self.contents = [], []  # for the events
         for id in ids:
             element, contents = self.recordChanges(id)
@@ -86,7 +89,7 @@ class CommitCommand(QtGui.QUndoCommand):
                 oldMajor = oldEl.major
                 oldContents = oldEl.contents
             else:
-                oldPath = oldEl.path
+                oldUrl = oldEl.url
         else:
             changeElement = True
             self.newElements.append(id)
@@ -96,26 +99,26 @@ class CommitCommand(QtGui.QUndoCommand):
                 oldMajor = None
                 oldContents = ContentList()
             else:
-                oldPath = levels.pathFromId(id)
-                self.newFilesPaths.append(myEl.path)
+                oldUrl = levels.urlFromId(id)
+                self.newFilesUrls.append(myEl.url)
         if oldTags != myEl.tags:
             changes = tags.TagDifference(oldTags, myEl.tags)
             self.tagChanges[id] = changes
             if self.real and myEl.isFile():
                 if id not in self.newElements:
                     if not changes.onlyPrivateChanges():
-                        self.realFileChanges[myEl.path] = changes
+                        self.realFileChanges[myEl.url] = changes
                 else:
                     if hasattr(myEl, "fileTags"):
                         fileTags = myEl.fileTags # set by Element drop into editor; avoids costly disk access
                     else:
-                        from .. import realfiles
-                        realFile = realfiles.get(myEl.path)
-                        realFile.read()
+                        
+                        realFile = myEl.url.getBackendFile()
+                        realFile.readTags()
                         fileTags = realFile.tags
                     fileChanges = tags.TagDifference(fileTags, myEl.tags)
                     if not fileChanges.onlyPrivateChanges():
-                        self.realFileChanges[myEl.path] = fileChanges
+                        self.realFileChanges[myEl.url] = fileChanges
             changeElement = True
         if oldFlags != myEl.flags:
             self.flagChanges[id] = flags.FlagDifference(oldFlags, myEl.flags)
@@ -127,8 +130,8 @@ class CommitCommand(QtGui.QUndoCommand):
             if oldMajor != myEl.major:
                 self.majorChanges[id] = (oldMajor, myEl.major)
                 changeElement = True
-        elif oldPath != myEl.path:
-            self.pathChanges[id] = (oldPath, myEl.path)
+        elif oldUrl != myEl.url:
+            self.urlChanges[id] = (oldUrl, myEl.url)
             changeElement = True 
         return changeElement, changeContents
             
@@ -155,9 +158,9 @@ class CommitCommand(QtGui.QUndoCommand):
                 modifyReal.createNewElements(self.level, self.newInDatabase, self.idMap)
             #  change IDs of new elements in both current and parent level
             for id in self.newInDatabase:
-                self.level.changeId(id, self.newId(id))
+                self.level._changeId(id, self.newId(id))
                 if id in self.level.parent:
-                    self.level.parent.changeId(id, self.newId(id))
+                    self.level.parent._changeId(id, self.newId(id))
             #  TODO: what about child levels!?
         # ** At this point, all elements have their IDs, if applicable **
         for id in set(self.ids + self.contents):
@@ -186,8 +189,6 @@ class CommitCommand(QtGui.QUndoCommand):
                     for child in newContents.ids:
                         if child not in oldContents.ids:
                             self.level.parent.get(child).parents.append(id)
-                if id in self.pathChanges:
-                    pElem.path = self.pathChanges[id][1]
         # ** At this point, elements in parent level equal those in current level **
         if self.real:
             if len(self.majorChanges) > 0:
@@ -210,17 +211,19 @@ class CommitCommand(QtGui.QUndoCommand):
             if len(self.flagChanges) > 0:
                 modifyReal.changeFlags({self.newId(id):diff for id,diff in self.flagChanges.items()})            
             db.commit()
-            if len(self.pathChanges) > 0:
-                levels.real.renameFiles({self.newId(id):diff for id,diff in self.pathChanges.items()})
-            for path,changes in self.realFileChanges.items():
-                logger.debug("changing file tags: {0}-->{1}".format(path, changes))
-                modifyReal.changeFileTags(path, changes)
+        if len(self.urlChanges) > 0:
+            print(self.urlChanges)
+            self.level.parent._renameFiles({self.newId(id):diff for id,diff in self.urlChanges.items()})
+            if self.real:
+                for url, changes in self.realFileChanges.items():
+                    logger.debug("changing file tags: {0}-->{1}".format(url, changes))
+                    modifyReal.changeFileTags(url, changes)
         # ** At this point, database and filesystem have been updated **
         self.level.parent.emitEvent([self.newId(id) for id in self.ids], [self.newId(id) for id in self.contents])
         self.level.emitEvent([self.newId(id) for id in self.ids], [])       
-        if len(self.newFilesPaths) > 0:
+        if len(self.newFilesUrls) > 0:
             # specialized event for filesystem module
-            self.level.parent.changed.emit(levels.FileCreateDeleteEvent(self.newFilesPaths))
+            self.level.parent.changed.emit(levels.FileCreateDeleteEvent(self.newFilesUrls))
         
     def undo(self):
         """Undo the commit.
@@ -232,11 +235,12 @@ class CommitCommand(QtGui.QUndoCommand):
         """
         
         if self.real:
-            for path, changes in self.realFileChanges.items():
-                logger.debug("reverting file tags: {0}<--{1}".format(path, changes))
-                modifyReal.changeFileTags(path, changes, reverse=True)
-            if len(self.pathChanges) > 0:
-                levels.real.renameFiles({self.newId(id):(b,a) for id,(a,b) in self.pathChanges.items()})
+            for url, changes in self.realFileChanges.items():
+                logger.debug("reverting file tags: {0}<--{1}".format(url, changes))
+                modifyReal.changeFileTags(url, changes, reverse=True)
+        if len(self.urlChanges) > 0:
+            self.level.parent._renameFiles({self.newId(id):(b,a) for id,(a,b) in self.urlChanges.items()})
+        if self.real:
             db.transaction()
             if len(self.newInDatabase) > 0:
                 db.write.deleteElements(list(self.idMap.values()))
@@ -279,54 +283,57 @@ class CommitCommand(QtGui.QUndoCommand):
                         if child not in oldContents.ids:
                             self.level.parent.get(child).parents.remove(id)               
                             
-                if id in self.pathChanges:
-                    pElem.path = self.pathChanges[id][0]
+                if id in self.urlChanges:
+                    pElem.url = self.urlChanges[id][0]
         # ** At this point, the parent level is in its original state
         if self.real:
             for id in self.newInDatabase:
-                self.level.changeId(self.newId(id), id)
+                self.level._changeId(self.newId(id), id)
                 if self.newId(id) in self.level.parent:
-                    self.level.parent.changeId(self.newId(id), id)
+                    self.level.parent._changeId(self.newId(id), id)
             db.commit()
         # **  At this point, IDs have been reset **
         self.level.parent.emitEvent(self.ids, self.contents)
         self.level.emitEvent(self.ids, [])
-        if len(self.newFilesPaths) > 0:
-            self.level.parent.changed.emit(levels.FileCreateDeleteEvent(None, self.newFilesPaths))
+        if len(self.newFilesUrls) > 0:
+            self.level.parent.changed.emit(levels.FileCreateDeleteEvent(None, self.newFilesUrls))
 
 
 class InsertElementsCommand(QtGui.QUndoCommand):
-    """A specialized command to insert elements into an existing container."""
+    """A command to insert elements into an existing container."""
     
-    def __init__(self, level, parent, row, elements, text='insert elements'):
-        """Create the command for inserting elements into *parent* at index *row*.
+    def __init__(self, level, parent, row, elements, text=None):
+        """Create the command for inserting *elements* into *parent* at index *row*."""
         
-        *elements* is the list of the elements to be inserted. This will lead
-        to unpredictable problems if the needed position range is not free."""
         super().__init__()
-        self.row = row
+        if text is None:
+            text = translate(__name__, "insert")
+        self.setText(text)
         self.level = level
         self.parent = parent
         oldContents = parent.contents
         firstPosition = 1 if row == 0 else oldContents.positions[row-1]+1
-        import itertools
         self.insertions = list(zip(itertools.count(start=firstPosition), elements))
         
     def redo(self):
-        self.level.insertChildren(self.parent, self.insertions)
+        self.level._insertContents(self.parent, self.insertions)
         self.level.emitEvent(contentIds = (self.parent.id, ))
         
     def undo(self):
-        self.level.removeChildren(self.parent, list(zip(*self.insertions))[0])
+        self.level._removeContents(self.parent, list(zip(*self.insertions))[0])
         self.level.emitEvent(contentIds = (self.parent.id, ))
 
-    
+
 class RemoveElementsCommand(QtGui.QUndoCommand):
     """Remove some elements from a single parent."""
+    
     def __init__(self, level, parent, positions, text=None):
+        """Create the command to remove elements at *positions* under *parent* in *level*."""
+        
         super().__init__()
-        if text:
-            self.setText(text)
+        if text is None:
+            text = translate(__name__, "remove")
+        self.setText(text)
         self.level = level
         self.parent = parent
         self.positions = positions
@@ -334,15 +341,17 @@ class RemoveElementsCommand(QtGui.QUndoCommand):
                          for position in positions]
         
     def redo(self):
-        self.level.removeChildren(self.parent, self.positions)
+        self.level._removeContents(self.parent, self.positions)
         self.level.emitEvent(contentIds=(self.parent.id,) )
     
     def undo(self):
-        self.level.insertChildren(self.parent, list(zip(self.positions, self.children)))
+        self.level._insertContents(self.parent, list(zip(self.positions, self.children)))
         self.level.emitEvent(contentIds= (self.parent.id,) )
 
  
 class ChangeMajorFlagCommand(QtGui.QUndoCommand):
+    """A command to change the major flag of several elements."""
+    
     def __init__(self, level, ids):
         super().__init__()
         self.level = level

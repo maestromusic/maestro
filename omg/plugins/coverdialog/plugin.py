@@ -21,7 +21,7 @@ import os.path, functools
 from PyQt4 import QtCore, QtGui, QtNetwork
 from PyQt4.QtCore import Qt
 
-from ...core import commands, covers
+from ...core import covers
 from ...core.elements import Element
 from ...gui import treeactions
 from ...gui.misc import busyindicator
@@ -35,8 +35,8 @@ SMALL_COVER_SIZE = 40
 
 def enable():
     from omg.gui import editor, browser
-    editor.EditorTreeView.actionConfig.addActionDefinition((("plugins", 'renamer'),), CoverAction)
-    browser.BrowserTreeView.actionConfig.addActionDefinition((("plugins", 'renamer'),), CoverAction)
+    editor.EditorTreeView.actionConfig.addActionDefinition((("plugins", 'covers'),), CoverAction)
+    browser.BrowserTreeView.actionConfig.addActionDefinition((("plugins", 'covers'),), CoverAction)
         
 def disable():
     editor.EditorTreeView.actionConfig.removeActionDefinition((("plugins", 'covers'),))
@@ -261,7 +261,7 @@ class CoverDialogModel(QtCore.QObject):
                 else: cover = cover.pixmap
             covers[element] = cover
         
-        self.level.setCovers(application.stack,covers)
+        self.level.setCovers(covers)
         
         
 class CoverDialog(QtGui.QDialog):
