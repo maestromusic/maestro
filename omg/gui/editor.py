@@ -235,6 +235,7 @@ class ExternalTagsWidget(QtGui.QScrollArea):
                                     ))
             
         self.label.setText('<br>'.join(lines))
+        self.setVisible(len(self.model.externalTagInfos) > 0)
 
 
 # register this widget in the main application

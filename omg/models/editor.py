@@ -34,15 +34,32 @@ class ExternalTagInfo:
     def __init__(self,tag,type,newTag=None):
         self.tag = tag
         self.type = type
-        self.valueMap = {}
+        if type == 'unknown':
+            self._elements = []
+        else: self.valueMap = {}
         self.newTag = newTag
         
     def elementCount(self):
-        return len(self.valueMap)
+        return len(self._elements) if self.type == 'unknown' else len(self.valueMap)
     
-    def addElement(self,element,values):
-        assert element not in self.valueMap
-        self.valueMap[element] = values
+    def addElement(self,element,values=None):
+        if self.type == 'unknown':
+            assert element not in self._elements
+            self._elements.append(element)
+        else:
+            assert element not in self.valueMap
+            assert values is not None
+            self.valueMap[element] = values
+            
+    def removeElement(self,element):
+        if self.type == 'unknown':
+            self._elements.remove(element)
+        else: del self.valueMap[element]
+        
+    def elements(self):
+        if self.type == 'unknown':
+            return self._elements
+        else: return self.valueMap.keys()
         
 
 class EditorModel(leveltreemodel.LevelTreeModel):
@@ -100,11 +117,9 @@ class EditorModel(leveltreemodel.LevelTreeModel):
             changed = True
             
             if type == 'delete':
-                print("Deleting tag '{}' from {}".format(tag.name,element.path))
                 del element.tags[tag]
             elif type == 'replace':
                 newTag = autoReplaceTags[tag]
-                print("Replacing tag '{}' by '{}' in {}".format(tag.name,newTag.name,element.path))
                 info.newTag = newTag
                 for string in element.tags[tag]:
                     try:
@@ -118,11 +133,44 @@ class EditorModel(leveltreemodel.LevelTreeModel):
         if changed:
             self.externalTagInfosChanged.emit()
 
-    #def _handleLevelChanged(self,event):
-    #    super()._handleLevelChanged(event)
-     #   for id in event.dataIds:
-     #   for node, contents in utils.walk(self.root):
+    def _handleLevelChanged(self,event):
+        super()._handleLevelChanged(event)
+        changed = False
+        for id in event.dataIds:
+            element = self.level.get(id)
+            for tag in element.tags:
+                if not tag.isInDB():
+                    info = self._getExternalTagInfos(tag,'unknown')
+                    if element not in info.elements():
+                        info.addElement(element)
+                        changed = True
+            for tag,infos in self.externalTagInfos.items():
+                if tag not in element.tags:
+                    for info in infos:
+                        if info.type == 'unknown' and element in info.elements():
+                            info.removeElement(element)
+                            changed = True
+                            
+        if len(event.contentIds) > 0:
+            # Delete all infos of type 'unknown'
+            for infos in self.externalTagInfos.values():
+                i = 0
+                while i < len(infos):
+                    if infos[i].type == 'unknown':
+                        del infos[i]
+                    else: i += 1
             
+            for wrapper in self.root.getAllNodes(skipSelf=True):
+                changed = True
+                element = wrapper.element
+                for tag in element.tags:
+                    if not tag.isInDB():
+                        info = self._getExternalTagInfos(tag, 'unknown')
+                        if not element in info.elements():
+                            info.addElement(element)
+                   
+        if changed:
+            self.externalTagInfosChanged.emit()
             
 
 def _initAutoTagProcessing():
