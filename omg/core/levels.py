@@ -63,7 +63,6 @@ class ConsistencyError(RuntimeError):
     """Error signaling a consistency violation of element data."""
     pass
 
-
 class ElementChangedEvent(application.ChangeEvent):
     #TODO comment
     def __init__(self,dataIds=None,contentIds=None):
@@ -74,27 +73,6 @@ class ElementChangedEvent(application.ChangeEvent):
         if contentIds is None:
             self.contentIds = []
         else: self.contentIds = contentIds
-
-
-class FileCreateDeleteEvent(ElementChangedEvent):
-    """Special event for creation and/or deletion of files in the database. Has
-    the attributes "created" and "deleted", which are lists of paths. The boolean
-    *disk* attribute indicates that a file removal has taken place on disk (not only
-    DB) which helps the filesystem module to efficiently update its folder states.
-    """
-    def __init__(self, created = None, deleted = None, disk = False):
-        super().__init__()
-        self.created = created if created is not None else []
-        self.deleted = deleted if deleted is not None else []
-        self.disk = disk
-
-
-class FileRenameEvent(ElementChangedEvent):
-    """Event indicating that files have been renamed on disk."""
-    def __init__(self, renamings):
-        super().__init__()
-        self.renamings = renamings
-
 
 class DataUndoCommand(QtGui.QUndoCommand):
     def __init__(self,level,element,type,new):
@@ -187,7 +165,8 @@ class Level(QtCore.QObject):
         *param* may be either the id or, in case of files, the path.
         """
         if not isinstance(param,int):
-            assert isinstance(param, filebackends.BackendURL)
+            if not isinstance(param, filebackends.BackendURL):
+                print('what is this? {}'.format(param))
             param = idFromUrl(param)
         if param not in self.elements:
             self.parent.loadIntoChild([param],self)
@@ -579,14 +558,14 @@ class Level(QtCore.QObject):
                 self.get(id).parents.remove(parent.id)
 
     def _renameFiles(self, renamings, emitEvent=True):
-        """Rename files based on *renamings*, which is a dict from ids to (oldUrl, newUrl) pairs.
+        """Rename files based on *renamings*, which is a dict from elements to (oldUrl, newUrl) pairs.
         
         On a normal level, this just changes the Url attributes and emits an event.
         """
-        for id, (_, newUrl) in renamings.items():
-            self.get(id).url = newUrl
+        for element, (_, newUrl) in renamings.items():
+            element.url = newUrl
         if emitEvent:
-            self.emitEvent(list(renamings.keys()))
+            self.emitEvent([elem.id for elem in renamings])
     
     def __str__(self):
         return 'Level({})'.format(self.name)
@@ -854,11 +833,9 @@ class RealLevel(Level):
     def _renameFiles(self, renamings, emitEvent=True):
         """on the real level, files are renamed on disk and in DB."""
         super()._renameFiles(renamings, emitEvent)
-        for id, (oldUrl, newUrl) in renamings.items():
+        for _, (oldUrl, newUrl) in renamings.items():
             oldUrl.getBackendFile().rename(newUrl)
-        db.write.changeUrls([ (id, str(newUrl)) for id, (_, newUrl) in renamings.items() ])
-        if emitEvent:
-            self.changed.emit(FileRenameEvent(list(renamings.items())))
+        db.write.changeUrls([ (element.id, str(newUrl)) for element, (_, newUrl) in renamings.items() ])
             
     def _addFlag(self, flag, elements, emitEvent=True):
         super()._addFlag(flag, elements, emitEvent=False)

@@ -23,8 +23,6 @@ from .. import application, config, database as db, logging, utils
 from ..core import commands, elements, levels, tags
 from ..core.nodes import RootNode, Wrapper
 from ..models import rootedtreemodel, albumguesser
-from .. import modify
-from ..modify import real
 
 logger = logging.getLogger(__name__)
         

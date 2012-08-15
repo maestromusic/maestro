@@ -22,10 +22,8 @@ import itertools
 
 from PyQt4 import QtCore, QtGui
 
-from . import levels, tags, flags
-from .elements import ContentList
-from .. import database as db, logging, utils
-from ..modify import real as modifyReal
+from . import levels
+from .. import database as db, logging
 from ..database import write
 
 translate = QtCore.QCoreApplication.translate
@@ -88,6 +86,7 @@ class RenameFilesCommand(QtGui.QUndoCommand):
     
     def __init__(self, level, renamings):
         super().__init__()
+        self.level = level
         self.renamings = renamings
         
     def redo(self):

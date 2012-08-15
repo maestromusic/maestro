@@ -20,10 +20,7 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from . import mimedata
-from .. import application, logging, config, utils
-from .. import database as db, modify
-from ..core import levels, tags as tagsModule
-from ..core.elements import Container, ContentList
+from .. import logging, config
 from ..core.nodes import Node, RootNode
 
 
