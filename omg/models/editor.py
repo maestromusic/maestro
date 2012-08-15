@@ -73,15 +73,15 @@ class EditorModel(leveltreemodel.LevelTreeModel):
         
         self.externalTagInfos = tags.TagDict()
     
-    def loadFile(self, path):
-        if path not in self.level:
-            element = self.level.get(path)
+    def loadFile(self, url):
+        if url not in self.level:
+            element = self.level.get(url)
         else:
-            id = levels.idFromPath(path)
+            id = levels.idFromUrl(url)
             for model in self.instances:
                 if id in model:
                     # skip autoDelete and autoReplace if the element is loaded from another editor
-                    return self.level.get(path)
+                    return self.level.get(url)
             element = self.level.reload(id)
         
         self.performAutoTagProcessing(element)

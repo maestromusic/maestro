@@ -27,34 +27,6 @@ from .. import database as db, logging, utils, filebackends
 
 logger = logging.getLogger(__name__)
 
-
-def createNewElements(level, ids, idMap=None):
-    """Creates database entries for the elements with *ids* in *level*, returning a
-    dictionary mapping the temporary ids to the new (positive) ones. This map may be 
-    given in advance via the *idMap* argument, if the database IDs are not to be chosen
-    automatically.
-    """
-    if len(ids) == 0:
-        return {}
-    elements = [ level.get(id) for id in ids ]
-    specs = [ (True, len(element.parents)==0, 0, False)
-                 if element.isFile()
-                 else
-              (False, len(element.parents)==0, len(element.contents), element.major)
-                 for element in elements ]
-    if idMap is None:
-        newIds = db.write.createElements(specs)
-        idMap = dict(zip(ids, newIds))
-    else:
-        specs = [ (idMap[ids[i]],) + spec for i,spec in enumerate(specs) ]
-        db.write.createElementsWithIds(specs)
-    
-    if any(element.isFile() for element in elements):
-        def hash(path):
-            from .. import filesystem
-            return filesystem.fileHash(path)
-        db.write.addFiles([ (idMap[file.id], str(file.url), 0, file.length) for file in elements if file.isFile() ])
-    return idMap
     
 def changeContents(changes):
     """Change content relations of containers. *changes* is a dict mapping container ID to (oldContents, newContents)
@@ -82,7 +54,7 @@ def changeTags(changes, reverse = False):
             addTuples.extend( (id, tag.id, value) for value in values)
             neededValues.update(( (tag, value) for value in values ))
     if len(removeTuples) > 0:
-        db.write.removeTagValues(removeTuples)
+        db.write.removeTagValuesMulti(removeTuples)
     neededValues = list(neededValues)
     db.write.makeValueIDs(neededValues)
     addData = []

@@ -80,7 +80,10 @@ class RealFile(BackendFile):
     def readOnly(self):
         if hasattr(self, '_taglibFile'):
             return self._taglibFile.readOnly
-        return False
+        fileAtt = os.stat(self.url.absPath)
+        import stat
+        return not (fileAtt[stat.ST_MODE] & stat.S_IWUSR)
+
     
     def rename(self, newUrl):
         # TODO: handle open taglib file references
@@ -101,12 +104,10 @@ class RealFile(BackendFile):
             self._taglibFile.tags[tag.name.upper()] = values
         unsuccessful = self._taglibFile.save()
         del self._taglibFile
-        if len(unsuccessful) > 0:
-            ret = tags.Storage()
-            for key, values in unsuccessful.items():
-                ret[key.upper()] = values
-            return ret
-        return None
+        ret = tags.Storage()
+        for key, values in unsuccessful.items():
+            ret[key.upper()] = values
+        return ret
 
 
 class FileURL(BackendURL):

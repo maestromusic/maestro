@@ -51,7 +51,7 @@ class RenameFilesAction(treeactions.TreeAction):
         dialog = RenameDialog(self.parent(), self.level(), elements)
         dialog.exec_()
         if dialog.result() == dialog.Accepted:
-            application.stack.push(CommitCommand(dialog.sublevel, [dialog.sublevel.files()], self.tr("rename")))
+            dialog.sublevel.commit()
             
 
 class PathDelegate(delegates.StandardDelegate):

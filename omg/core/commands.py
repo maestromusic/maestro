@@ -31,273 +31,133 @@ from ..database import write
 translate = QtCore.QCoreApplication.translate
 logger = logging.getLogger(__name__)
 
-
-class CommitCommand(QtGui.QUndoCommand):
-    """The CommitCommand is used to commit the state of elements of one level into the parent level.
+class CreateDBElementsCommand(QtGui.QUndoCommand):
+    """Creates several files in the database."""
+    def __init__(self, elements, newInLevel=False):
+        super().__init__()
+        self.elements = elements
+        self.idMap = None
+        self.newInLevel = newInLevel
     
-    It takes a level and list of element IDs and ensures that those elements (and all descendants)
-    - exist in the parent level, and
-    - are the same there than in this level.
-    Tags, flags, contents, the "major" property, and so on are adjusted in the parent level.
-
-    The most complex case happens when the parent level is levels.real; in that case,
-    - temporary elements must be given positive IDs,
-      and the IDs in the child level must also be changed,
-    - the database has to be updated,
-    - the filesystem has to be updated.
-    """
-    
-    def __init__(self, level, ids, text=None):
-        """Sets up a commit command for the given *ids* in *level*."""
-        super().__init__(text)
-        self.level = level
-        # add IDs of all descendants to ensure a consistent commit
-        ids = self.level.children(ids)
-        self.real = (level.parent is levels.real)  # a handy shortcut
-        if self.real:
-            self.newInDatabase = [ id for id in ids if id < 0 ]
-            self.realFileChanges = {} # maps (new) path -> changes on filesystem
-            self.idMap = None # maps tempId -> realId
-        else:
-            # if non-real parent, newId is the identity function
-            self.newId = self.oldId = lambda x : x
-        self.newElements = [] # elements which are not in parent level before the commit
-        self.newFilesUrls = [] #  the URLs of new files; for FS module
-        self.flagChanges, self.tagChanges, self.contentsChanges = {}, {}, {}
-        self.majorChanges, self.urlChanges = {}, {}
-        self.ids, self.contents = [], []  # for the events
-        for id in ids:
-            element, contents = self.recordChanges(id)
-            if element:
-                self.ids.append(id)
-            if contents:
-                self.contents.append(id)
-    
-    def recordChanges(self, id):
-        """Internally recodrs changes for a single element.
-        
-        The function returns a pair of booleans indicating whether whether the elements itself and
-        its contents have changed, respectively.
-        """
-        myEl = self.level.get(id)
-        changeElement, changeContents = False, False
-        if id in self.level.parent:
-            oldEl = self.level.parent.get(id)
-            oldTags = oldEl.tags
-            oldFlags = oldEl.flags
-            if oldEl.isContainer():
-                oldMajor = oldEl.major
-                oldContents = oldEl.contents
-            else:
-                oldUrl = oldEl.url
-        else:
-            changeElement = True
-            self.newElements.append(id)
-            oldTags = None
-            oldFlags = []
-            if myEl.isContainer():
-                oldMajor = None
-                oldContents = ContentList()
-            else:
-                oldUrl = levels.urlFromId(id)
-                self.newFilesUrls.append(myEl.url)
-        if oldTags != myEl.tags:
-            changes = tags.TagDifference(oldTags, myEl.tags)
-            self.tagChanges[id] = changes
-            if self.real and myEl.isFile():
-                if id not in self.newElements:
-                    if not changes.onlyPrivateChanges():
-                        self.realFileChanges[myEl.url] = changes
-                else:
-                    if hasattr(myEl, "fileTags"):
-                        fileTags = myEl.fileTags # set by Element drop into editor; avoids costly disk access
-                    else:
-                        
-                        realFile = myEl.url.getBackendFile()
-                        realFile.readTags()
-                        fileTags = realFile.tags
-                    fileChanges = tags.TagDifference(fileTags, myEl.tags)
-                    if not fileChanges.onlyPrivateChanges():
-                        self.realFileChanges[myEl.url] = fileChanges
-            changeElement = True
-        if oldFlags != myEl.flags:
-            self.flagChanges[id] = flags.FlagDifference(oldFlags, myEl.flags)
-            changeElement = True
-        if myEl.isContainer():
-            if oldContents != myEl.contents:
-                changeContents = True
-                self.contentsChanges[id] = (oldContents.copy(), myEl.contents.copy())
-            if oldMajor != myEl.major:
-                self.majorChanges[id] = (oldMajor, myEl.major)
-                changeElement = True
-        elif oldUrl != myEl.url:
-            self.urlChanges[id] = (oldUrl, myEl.url)
-            changeElement = True 
-        return changeElement, changeContents
-            
     def redo(self):
-        """Do the commit.
-        
-        The redo function operates in three main steps:
-        - if parent level is real, change IDs of temporary elements
-        - update the elements in the parent level
-        - if level is real, update database, rename files, update file's tags
-        """
-        if self.real:
-            #  create new elements in DB to obtain id map, and change IDs in current level 
-            db.transaction()
+        db.transaction()
+        def dataRow(el):
+            row = (el.isFile(),
+                   len(el.parents)==0,
+                   0 if el.isFile() else len(el.contents),
+                   False if el.isFile() else el.major)
             if self.idMap is None:
-                #  first redo -> prepare id mapping
-                self.idMap = modifyReal.createNewElements(self.level, self.newInDatabase)
-                self.newId = utils.dictOrIdentity(self.idMap)
-                self.oldId = utils.dictOrIdentity({b:a for a,b in self.idMap.items() })
-                #  update contentsChanges to use the new ids
-                for _, newContents in self.contentsChanges.values():
-                    newContents.ids[:] = map(self.newId, newContents.ids)
+                return row
             else:
-                modifyReal.createNewElements(self.level, self.newInDatabase, self.idMap)
-            #  change IDs of new elements in both current and parent level
-            for id in self.newInDatabase:
-                self.level._changeId(id, self.newId(id))
-                if id in self.level.parent:
-                    self.level.parent._changeId(id, self.newId(id))
-            #  TODO: what about child levels!?
-        # ** At this point, all elements have their IDs, if applicable **
-        for id in set(self.ids + self.contents):
-            # Add/update elements in parent level
-            nid = self.newId(id)
-            elem = self.level.elements[nid]
-            if id in self.newElements:
-                copy = elem.copy()
-                copy.level = self.level.parent
-                self.level.parent.elements[nid] = copy
-            else:
-                pElem = self.level.parent.elements[nid]
-                if id in self.majorChanges:
-                    pElem.major = self.majorChanges[id][1]
-                if id in self.tagChanges:
-                    self.tagChanges[id].apply(pElem.tags)
-                if id in self.flagChanges:
-                    self.flagChanges[id].apply(pElem.flags)
-                if id in self.contentsChanges:
-                    oldContents, newContents = self.contentsChanges[id]
-                    pElem.contents = newContents.copy()
-                    # Update parents
-                    for child in oldContents.ids:
-                        if child not in newContents.ids:
-                            self.level.parent.get(child).parents.remove(id)
-                    for child in newContents.ids:
-                        if child not in oldContents.ids:
-                            self.level.parent.get(child).parents.append(id)
-        # ** At this point, elements in parent level equal those in current level **
-        if self.real:
-            if len(self.majorChanges) > 0:
-                db.write.setMajor((self.newId(id), newMajor) for id,(_,newMajor) in self.majorChanges.items())
-            if len(self.contentsChanges) > 0:
-                modifyReal.changeContents({self.newId(id):changes for id, changes in self.contentsChanges.items()})
-            if len(self.tagChanges) > 0:
-                def dbDiff(id):
-                    """Return a modified TagDifference for the DB, not the level itself.
-                    
-                    From the DB's perspective, the TagDifference of a newly created element is from
-                    an empty tag storage to the current one, while self.tagChanges only captures
-                    the difference between the two level states.
-                    """ 
-                    if id in self.newInDatabase:
-                        return tags.TagDifference(None, self.level.get(self.newId(id)).tags)
-                    else:
-                        return self.tagChanges[id]
-                modifyReal.changeTags({self.newId(id):dbDiff(id) for id in self.tagChanges.keys()})
-            if len(self.flagChanges) > 0:
-                modifyReal.changeFlags({self.newId(id):diff for id,diff in self.flagChanges.items()})            
-            db.commit()
-        if len(self.urlChanges) > 0:
-            print(self.urlChanges)
-            self.level.parent._renameFiles({self.newId(id):diff for id,diff in self.urlChanges.items()})
-            if self.real:
-                for url, changes in self.realFileChanges.items():
-                    logger.debug("changing file tags: {0}-->{1}".format(url, changes))
-                    modifyReal.changeFileTags(url, changes)
-        # ** At this point, database and filesystem have been updated **
-        self.level.parent.emitEvent([self.newId(id) for id in self.ids], [self.newId(id) for id in self.contents])
-        self.level.emitEvent([self.newId(id) for id in self.ids], [])       
-        if len(self.newFilesUrls) > 0:
-            # specialized event for filesystem module
-            self.level.parent.changed.emit(levels.FileCreateDeleteEvent(self.newFilesUrls))
+                return (self.idMap[el.id], ) + row
+        specs = [ dataRow(el) for el in self.elements ] 
+        if self.idMap is None:
+            #  first redo
+            newIds = db.write.createElements(specs)
+            self.idMap = dict( (el.id, newId) for el,newId in zip(self.elements, newIds))
+        else:
+            db.write.createElementsWithIds(specs)
+        for oldId, newId in self.idMap.items():
+            levels.Level._changeId(oldId, newId)
+        db.write.addFiles([ (file.id, str(file.url), 0, file.length) # TODO: replace "0" by hash
+                           for file in self.elements if file.isFile()])
+        for element in self.elements:
+            db.write.setTags(element.id, element.tags)
+            db.write.setFlags(element.id, element.flags)
+            # TODO: data?
+            if element.isContainer():
+                db.write.setContents(element.id, element.contents)
+                db.write.setMajor([(element.id, element.major)])
+        if self.newInLevel:
+            levels.real.loadFromDB(self.idMap.values(), levels.real)
+        db.commit()
+        for level in levels.Level.allLevels:
+            level.emitEvent(set(self.idMap.values()) & set(level.elements.keys()))
         
     def undo(self):
-        """Undo the commit.
-        
-        Performs inverse operations as redo() in reverse order:
-        - restore file tags, rename files, reverse DB changes
-        - restore elements in parent level
-        - if parent level is real: restore original IDs
-        """
-        
-        if self.real:
-            for url, changes in self.realFileChanges.items():
-                logger.debug("reverting file tags: {0}<--{1}".format(url, changes))
-                modifyReal.changeFileTags(url, changes, reverse=True)
-        if len(self.urlChanges) > 0:
-            self.level.parent._renameFiles({self.newId(id):(b,a) for id,(a,b) in self.urlChanges.items()})
-        if self.real:
-            db.transaction()
-            if len(self.newInDatabase) > 0:
-                db.write.deleteElements(list(self.idMap.values()))
-            majorChangesExisting = [(self.newId(id),oldMajor) for id,(oldMajor,_) in self.majorChanges.items()
-                                        if id not in self.newInDatabase]
-            if len(majorChangesExisting) > 0:
-                db.write.setMajor(majorChangesExisting)
-            contentsChangesExisting = {self.newId(id):(b,a) for id, (a,b) in self.contentsChanges.items()
-                                        if id not in self.newInDatabase}
-            if len(contentsChangesExisting) > 0:
-                modifyReal.changeContents(contentsChangesExisting)
-            tagChangesExisting = {self.newId(id):diff for id,diff in self.tagChanges.items()
-                                    if id not in self.newInDatabase}
-            if len(tagChangesExisting) > 0:
-                modifyReal.changeTags(tagChangesExisting, reverse = True)
-            flagChangesExisting = {self.newId(id):diff for id,diff in self.tagChanges.items()
-                                    if id not in self.newInDatabase}
-            if len(flagChangesExisting) > 0:
-                modifyReal.changeFlags(flagChangesExisting, reverse = True)
-        # ** At this point, database and filesystem are in the original state **
-        for id in set(self.ids + self.contents):
-            if id in self.newElements:
-                del self.level.parent.elements[self.newId(id)]
-            else:
-                pElem = self.level.parent.elements[self.newId(id)]
-                if id in self.majorChanges:
-                    pElem.major = self.majorChanges[id][0]
-                if id in self.tagChanges:
-                    self.tagChanges[id].revert(pElem.tags)
-                if id in self.flagChanges:
-                    self.flagChanges[id].revert(pElem.flags)
-                if id in self.contentsChanges:
-                    oldContents, newContents = self.contentsChanges[id]
-                    pElem.contents = oldContents.copy()
-                    # Update parents
-                    for child in oldContents.ids:
-                        if child not in newContents.ids:
-                            self.level.parent.get(child).parents.append(id)
-                    for child in newContents.ids:
-                        if child not in oldContents.ids:
-                            self.level.parent.get(child).parents.remove(id)               
-                            
-                if id in self.urlChanges:
-                    pElem.url = self.urlChanges[id][0]
-        # ** At this point, the parent level is in its original state
-        if self.real:
-            for id in self.newInDatabase:
-                self.level._changeId(self.newId(id), id)
-                if self.newId(id) in self.level.parent:
-                    self.level.parent._changeId(self.newId(id), id)
-            db.commit()
-        # **  At this point, IDs have been reset **
-        self.level.parent.emitEvent(self.ids, self.contents)
-        self.level.emitEvent(self.ids, [])
-        if len(self.newFilesUrls) > 0:
-            self.level.parent.changed.emit(levels.FileCreateDeleteEvent(None, self.newFilesUrls))
+        db.write.deleteElements(list(self.idMap.values()))
+        for oldId, newId in self.idMap.items():
+            levels.Level._changeId(newId, oldId)
+        if self.newInLevel:
+            for id in self.idMap:
+                del levels.real.elements[id]
+        for level in levels.Level.allLevels:
+            level.emitEvent(set(self.idMap.keys()) & set(level.elements.keys()))
 
+class RenameFilesCommand(QtGui.QUndoCommand):
+    
+    def __init__(self, level, renamings):
+        super().__init__()
+        self.renamings = renamings
+        
+    def redo(self):
+        self.level._renameFiles(self.renamings, emitEvent=True)
+        
+    def undo(self):
+        self.level._renameFiles({file:(newUrl, oldUrl) for file,(oldUrl,newUrl) in self.renamings.items()},
+                                emitEvent=True)
+
+class CopyElementsCommand(QtGui.QUndoCommand):
+    
+    def __init__(self, level, elements):
+        super().__init__()
+        self.elements = elements
+        
+    def redo(self):
+        for elem in self.elements:
+            assert elem.id not in self.level.elements
+            elemCopy = self.level.elements[elem.id] = elem.copy()
+            elemCopy.level = self.level
+            
+    def undo(self):
+        for elem in self.elements:
+            del self.level.elements[elem.id]
+
+class ChangeTagsCommand(QtGui.QUndoCommand):
+    
+    def __init__(self, level, changes, filesOnly=False):
+        super().__init__()
+        self.changes = changes
+        self.level = level
+        if filesOnly:
+            assert level is levels.real
+        self.filesOnly = filesOnly
+        self.error = None
+        
+    def redo(self):
+        try:
+            if self.filesOnly:
+                self.level._changeTags(self.changes, filesOnly=True)
+            else:
+                self.level._changeTags(self.changes)
+                self.level.emitEvent([elem.id for elem in self.changes])
+        except levels.TagWriteError as e:
+            self.error = e
+        
+    def undo(self):
+        if self.error:
+            return
+        inverseChanges = {elem:diff.inverse() for elem,diff in self.changes.items()}
+        if self.filesOnly:
+            self.level._changeTags(inverseChanges, filesOnly=True)
+        else:
+            self.level._changeTags(inverseChanges)
+            self.level.emitEvent([elem.id for elem in self.changes])
+
+class ChangeFlagsCommand(QtGui.QUndoCommand):
+    
+    def __init__(self, level,changes):
+        super().__init__()
+        self.changes = changes
+        self.level = level
+        
+    def redo(self):
+        self.level._changeFlags(self.changes)
+        self.level.emitEvent([elem.id for elem in self.changes])
+        
+    def undo(self):
+        self.level._changeFlags({elem:diff.inverse() for elem, diff in self.changes.items()})
+        self.level.emitEvent([elem.id for elem in self.changes])
 
 class InsertElementsCommand(QtGui.QUndoCommand):
     """A command to insert elements into an existing container."""

@@ -859,6 +859,12 @@ class TagDifference:
             if includePrivate or not tag.private:
                 tagsB.add(tag, *values)
     
+    def inverse(self):
+        ret = TagDifference(None, None)
+        ret.additions = self.removals[:]
+        ret.removals = self.additions[:]
+        return ret
+
     def __str__(self):
         return "TagDifference(additions={}, removals={})".format(self.additions, self.removals)
                  

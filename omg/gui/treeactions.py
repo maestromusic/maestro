@@ -222,8 +222,11 @@ class CommitTreeAction(TreeAction):
         
     def doAction(self):
         model = self.parent().model()
-        ids = set(n.element.id for n in self.parent().model().root.contents)
-        application.stack.push(commands.CommitCommand(model.level, ids, self.tr("Commit editor")))
+        try:
+            self.level().commit([node.element for node in self.parent().model().root.contents])
+        except levels.TagWriteError as e:
+            e.displayMessage()
+
         
 class FlattenAction(TreeAction):
     """Action to "flatten out" containers, i.e. remove them and replace them by their
