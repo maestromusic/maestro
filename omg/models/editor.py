@@ -96,6 +96,7 @@ class EditorModel(leveltreemodel.LevelTreeModel):
                 if id in model:
                     # skip autoDelete and autoReplace if the element is loaded from another editor
                     return self.level.get(url)
+
             # Delete outdated infos before auto tag processing
             EditorModel._removeFromGlobalExtTagInfos(element)
             element = self.level.reload(id)

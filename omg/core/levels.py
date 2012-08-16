@@ -107,10 +107,10 @@ class Level(QtCore.QObject):
     bare methods not handling undo/redo are marked by a leading underscore.
     If elements change in a level, its signal *changed* is emitted.
     """ 
-    
+
     """Signal that is emitted if something changes on this level."""
     changed = QtCore.pyqtSignal(application.ChangeEvent)
-    
+
     def __init__(self, name, parent, stack=None):
         """Create a level named *name* with parent *parent* and an optional undo stack.
         
@@ -122,7 +122,7 @@ class Level(QtCore.QObject):
         self.parent = parent
         self.elements = {}
         self.stack = stack if stack is not None else application.stack
-        allLevels.add(self)
+
         if config.options.misc.debug_events:
             def _debugAll(event):
                 logger.debug("EVENT[{}]: {}".format(self.name,str(event)))
@@ -131,6 +131,33 @@ class Level(QtCore.QObject):
     def emitEvent(self, dataIds=None, contentIds=None):
         """Simple shortcut to emit an event."""
         self.changed.emit(ElementChangedEvent(dataIds,contentIds))
+    
+    @staticmethod  
+    def _changeId(old, new):
+        """Change the id of some element from *old* to *new* in ALL levels.
+        
+        This should only be called from within appropriate UndoCommands, and only if "old in self"
+        is True. Takes care of contents and parents, too.
+        """
+        for level in allLevels:
+            if old not in level:
+                continue
+            elem = level.elements[old]
+            del level.elements[old]
+            elem.id = new
+            level.elements[new] = elem
+            for parentID in elem.parents:
+                parentContents = level.elements[parentID].contents
+                parentContents.ids[:] = [ new if id == old else id for id in parentContents.ids ]
+            if elem.isContainer():
+                for childID in elem.contents.ids:
+                    if childID in level.elements:
+                        level.elements[childID].parents = [ new if id == old else old
+                                                          for id in level.elements[childID].parents ]
+        if old in tIdManager.tIdToUrl:
+            url = tIdManager.tIdToUrl[new] = tIdManager.tIdToUrl[old]
+            del tIdManager.tIdToUrl[old]
+            tIdManager.urlToTId[url] = new
     
     @staticmethod  
     def _changeId(old, new):
