@@ -214,10 +214,11 @@ class FlexiDate:
         return tr[dateOrder[0]] + FlexiDate._sep1 + tr[dateOrder[1]] + FlexiDate._sep2 + tr[dateOrder[2]]
         
     @staticmethod
-    def strptime(string,crop=False):
+    def strptime(string,crop=False,logCropping=True):
         """Parse FlexiDates from strings in a format depending on the locale. Raise a ValueError if that
         fails.
-        If *crop* is True, the method is allowed to crop *string* to obtain a valid value.
+        If *crop* is True, the method is allowed to crop *string* to obtain a valid value. If *logCropping*
+        is True, cropping will print a logger warning.
         """
         assert isinstance(string, str)
         
@@ -228,8 +229,10 @@ class FlexiDate:
         # YYYY-MM-DD HH
         # These formats are allowed in the ID3 specification and used by Mutagen
         if crop and re.match("\d{4}-\d{2}-\d{2} \d{2}(:\d{2}){0,2}$",string) is not None:
-            from . import logging
-            logging.getLogger(__name__).warning("dropping time of day in date string '{}'".format(string))
+            if logCropping:
+                from . import logging
+                logging.getLogger(__name__).warning("dropping time of day in date string '{}'"
+                                                    .format(string))
             string = string[:10]
             
         try:

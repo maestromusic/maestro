@@ -20,8 +20,8 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
-from . import treeview, mainwindow
-from .. import profiles
+from . import treeview, mainwindow, tagwidgets
+from .. import profiles, application
 from ..models import editor as editormodel, albumguesser
 from .treeactions import *
 from .delegates import editor as editordelegate, configuration as delegateconfig
@@ -108,7 +108,7 @@ class EditorWidget(QtGui.QDockWidget):
     
     def __init__(self, parent = None, state = None, location = None):
         super().__init__(parent)
-        self.setWindowTitle(self.tr('editor'))
+        self.setWindowTitle(self.tr('Editor'))
         widget = QtGui.QWidget()
         self.setWidget(widget)
         vb = QtGui.QVBoxLayout(widget)
@@ -124,7 +124,7 @@ class EditorWidget(QtGui.QDockWidget):
         self.editor = EditorTreeView()
         self.editor.setAutoExpand(expand)
         
-        self.externalTagsWidget = ExternalTagsWidget(self.editor.model())
+        self.externalTagsWidget = ExternalTagsWidget(self.editor)
         
         self.splitter.addWidget(self.externalTagsWidget)
         self.splitter.addWidget(self.editor)
@@ -187,10 +187,10 @@ class EditorWidget(QtGui.QDockWidget):
 
 
 class ExternalTagsWidget(QtGui.QScrollArea):
-    def __init__(self,model):
+    def __init__(self,editor):
         super().__init__()
-        self.model = model
-        model.externalTagInfosChanged.connect(self.updateText)
+        self.editor = editor
+        self.editor.model().extTagInfosChanged.connect(self.updateText)
         
         self.label = QtGui.QLabel()
         self.label.setAlignment(Qt.AlignLeft | Qt.AlignTop)
@@ -198,48 +198,77 @@ class ExternalTagsWidget(QtGui.QScrollArea):
         self.setWidgetResizable(True)
         self.label.setWordWrap(False)
         self.label.setContentsMargins(5,2,5,2)
+        self.label.linkActivated.connect(self._handleLink)
         
         self.updateText()
     
-    def _createButton(self,link,text):
-        return '<a href="{}" style="text-decoration:none">[{}]</a>'.format(link,text)
+    def _createButton(self,index,action,text):
+        return '<a href="{}:{}" style="text-decoration:none">[{}]</a>'.format(action,index,text)
     
     def updateText(self):
         lines = []
         
-        for infoList in self.model.externalTagInfos.values():
-            for info in infoList:
-                if info.type == 'delete':
-                    lines.append(self.tr("Tag '{}' was deleted from %n element(s) {} {}",'',
-                                                                    info.elementCount())
-                                    .format(info.tag.name,
-                                            self._createButton('select',self.tr('Select')),
-                                            self._createButton('undo',self.tr('Undo'))
-                                    ))
-                elif info.type == 'replace':
-                    lines.append(self.tr("Tag '{}' was replaced by '{}' in %n element(s) {} {}",'',
-                                                                    info.elementCount())
-                                    .format(info.tag.name,
-                                            info.newTag.name,
-                                            self._createButton('select',self.tr('Select')),
-                                            self._createButton('undo',self.tr('Undo'))
-                                    ))
-            
-                elif info.type == 'unknown':
-                    lines.append(self.tr("Unknown tag '{}' found in %n element(s) {} {} {}",'',
-                                                                    info.elementCount())
-                                    .format(info.tag.name,
-                                            self._createButton('select',self.tr('Select')),
-                                            self._createButton('add',self.tr('Add to database')),
-                                            self._createButton('delete',self.tr('Delete'))
-                                    ))
+        for i,info in enumerate(self.editor.model().extTagInfos):
+            if info.type == 'delete':
+                lines.append(self.tr("Tag '{}' was deleted from %n element(s) {} {}",'',
+                                                                info.elementCount())
+                                .format(info.tag.name,
+                                        self._createButton(i,'select',self.tr('Select')),
+                                        self._createButton(i,'undo',self.tr('Undo'))
+                                ))
+            elif info.type == 'replace':
+                lines.append(self.tr("Tag '{}' was replaced by '{}' in %n element(s) {} {}",'',
+                                                                info.elementCount())
+                                .format(info.tag.name,
+                                        info.newTag.name,
+                                        self._createButton(i,'select',self.tr('Select')),
+                                        self._createButton(i,'undo',self.tr('Undo'))
+                                ))
+        
+            elif info.type == 'unknown':
+                lines.append(self.tr("Unknown tag '{}' found in %n element(s) {} {} {}",'',
+                                                                info.elementCount())
+                                .format(info.tag.name,
+                                        self._createButton(i,'select',self.tr('Select')),
+                                        self._createButton(i,'add',self.tr('Add to database')),
+                                        self._createButton(i,'delete',self.tr('Delete'))
+                                ))
             
         self.label.setText('<br>'.join(lines))
         self.setHidden(len(lines) == 0)
+        
+    def _handleLink(self,link):
+        action, index = link.split(':',1)
+        index = int(index)
+        info = self.editor.model().extTagInfos[index]
+        
+        if action == 'delete':
+            pass #levels.editor.removeTag(info.tag,info.elements()) #TODO
+        elif action == 'add':
+            tagwidgets.AddTagTypeDialog.addTagType(info.tag)
+        elif action == 'undo':
+            if info.type == 'delete':
+                levels.editor.addTagValues(info.tag,info.valueMap)
+            elif info.type == 'replace':
+                application.stack.beginMacro()
+                #levels.editor.removeTagValues(info.newTag,info.newValueMap) #TODO
+                #levels.editor.addTagValues(info.tag,info.valueMap)
+                application.stack.endMacro()
+            else: assert False
+        elif action == 'select':
+            # Construct a QItemSelection storing the whole selection and add it to the model at once.
+            # Otherwise a selectionChanged signal would be emitted after each selected wrapper. 
+            itemSelection = QtGui.QItemSelection()
+            elements = info.elements()
+            for wrapper in self.editor.model().root.getAllNodes(skipSelf=True):
+                if wrapper.element in elements:
+                    index = self.editor.model().getIndex(wrapper)
+                    itemSelection.select(index,index)
+            self.editor.selectionModel().select(itemSelection,QtGui.QItemSelectionModel.ClearAndSelect)
 
 
 # register this widget in the main application
-eData = mainwindow.WidgetData(id = "editor",
+widgetData = mainwindow.WidgetData(id = "editor",
                              name = translate("Editor","editor"),
                              theClass = EditorWidget,
                              central = True,
@@ -247,4 +276,4 @@ eData = mainwindow.WidgetData(id = "editor",
                              default = True,
                              unique = False,
                              preferredDockArea = Qt.RightDockWidgetArea)
-mainwindow.addWidgetData(eData)
+mainwindow.addWidgetData(widgetData)

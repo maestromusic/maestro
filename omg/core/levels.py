@@ -16,6 +16,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+import collections, numbers, weakref
+
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
@@ -25,12 +27,13 @@ from .nodes import Wrapper
 from .. import application, filebackends, database as db, config, logging
 from ..database import write as dbwrite
 
-import collections, numbers
 
+instances = weakref.WeakSet() #TODO: Do not rely on the GC to delete this fast enough
 real = None
 editor = None
 
 logger = logging.getLogger(__name__)
+
 
 def init():
     global real,editor
@@ -113,12 +116,16 @@ class Level(QtCore.QObject):
     If elements change in a level, its signal *changed* is emitted.
     """ 
     
+    """Signal that is emitted if something changes on this level."""
+    changed = QtCore.pyqtSignal(application.ChangeEvent)
+    
     def __init__(self, name, parent, stack=None):
         """Create a level named *name* with parent *parent* and an optional undo stack.
         
         If no undo stack is given, the main application.stack will be used.
         """
         super().__init__()
+        instances.add(self)
         self.name = name
         self.parent = parent
         self.elements = {}
@@ -128,9 +135,6 @@ class Level(QtCore.QObject):
             def _debugAll(event):
                 logger.debug("EVENT[{}]: {}".format(self.name,str(event)))
             self.changed.connect(_debugAll)
-    
-    """Signal that is emitted if something changes on this level."""
-    changed = QtCore.pyqtSignal(application.ChangeEvent)
         
     def emitEvent(self, dataIds=None, contentIds=None):
         """Simple shortcut to emit an event."""

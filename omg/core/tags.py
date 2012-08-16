@@ -142,55 +142,6 @@ class ValueType:
     def __init__(self,name,description):
         self.name = name
         self.description = description
-        
-    def isValid(self,value):
-        """Return whether the given value is a valid tag-value for tags of this type."""
-        if self.name == 'varchar':
-            return isinstance(value,str) and 0 < len(value.encode()) <= constants.TAG_VARCHAR_LENGTH
-        elif self.name == 'text':
-            return isinstance(value,str) and len(value) > 0
-        elif self.name == 'date':
-            if isinstance(value,utils.FlexiDate):
-                return True
-            else:
-                try: 
-                    utils.FlexiDate.strptime(value)
-                    return True
-                except TypeError:
-                    return False
-                except ValueError:
-                    return False
-        else: assert False # should never happen
-
-    def convertValue(self,newType,value):
-        """Convert *value* from this type to *newType* and return the result. This method converts from
-        FlexiDate (type date) to strings (types varchar and text) and vice versa.
-        If conversion fails or the converted value is not valid for *newType* (confer isValid`), raise a 
-        ValueError.
-        """
-        if self == TYPE_DATE and newType != TYPE_DATE:
-            convertedValue = value.strftime()
-        elif self != TYPE_DATE and newType == TYPE_DATE:
-            convertedValue = utils.FlexiDate.strptime(value)
-        else: convertedValue = value # nothing to convert
-        if newType.isValid(convertedValue):
-            return convertedValue
-        else: raise ValueError("Converted value {} is not valid for valuetype {}."
-                                 .format(convertedValue,newType))
-
-    def sqlFormat(self,value):
-        """Convert *value* into a string that can be inserted into database queries."""
-        if self is TYPE_VARCHAR:
-            if len(value.encode()) > constants.TAG_VARCHAR_LENGTH:
-                logger.error("Attempted to encode the following string for a varchar column although its "
-                             "encoded size exceeds constants.TAG_VARCHAR_LENGTH. The string will be "
-                             "truncated: '{}'.".format(value))
-            return value
-        elif self.name == 'date':
-            if isinstance(value,utils.FlexiDate):
-                return value.toSql()
-            else: return utils.FlexiDate.strptime(value).toSql()
-        else: return value
 
     @staticmethod
     def byName(name):
@@ -199,33 +150,73 @@ class ValueType:
             if type.name == name:
                 return type
         else: raise IndexError("There is no value type with name '{}'.".format(name))
-
-    def valueFromString(self, string, crop=False):
-        """Convert a string (which must be valid for this value type) to the preferred representation of
-        values of this type. Always return a valid value for this type. If that is not possible, raise a
-        ValueError.
         
-        If *crop* is True, the method is allowed to crop *string* to obtain a valid value.
+    def isValid(self,value):
+        """Return whether the given value is a valid tag-value for tags of this type."""
+        if self.name == 'varchar':
+            return isinstance(value,str) and 0 < len(value.encode()) <= constants.TAG_VARCHAR_LENGTH
+        elif self.name == 'text':
+            return isinstance(value,str) and len(value) > 0
+        elif self.name == 'date':
+            return isinstance(value,utils.FlexiDate)
+        else: assert False
+
+    def convertValue(self,value,crop=False,logCropping=True):
+        """Convert *value* to this type and return the result. If conversion fails, raise a ValueError.
+        If *crop* is True, this method may crop *value* to make it valid (e.g. if *value* is too long for
+        a varchar). If *logCropping* is True, cropping will print a logger warning.
         """
-        if self == TYPE_DATE:
-            return utils.FlexiDate.strptime(string,crop)
-        elif self == TYPE_TEXT:
-            if len(string) > 0:
-                return string
-            else: raise ValueError("text tags must have length > 0")
-        else: # TYPE_VARCHAR
+        if self.name == 'varchar':
+            string = str(value)
             if len(string) == 0:
                 raise ValueError("varchar tags must have length > 0")
             if len(string.encode()) > constants.TAG_VARCHAR_LENGTH:
                 if crop:
-                    logger.warning('Cropping a string that is too long for varchar tags: {}...'
-                                   .format(string[:30]))
+                    if logCropping:
+                        logger.warning('Cropping a string that is too long for varchar tags: {}...'
+                                       .format(string[:30]))
                     # Of course this might split in the middle of a unicode character. But errors='ignore'
                     # will silently remove the fragments 
                     encoded = string.encode()[:constants.TAG_VARCHAR_LENGTH]
                     return encoded.decode(errors='ignore')
                 else: raise ValueError("String is too long for a varchar tag: {}...".format(string[:30]))
             return string
+        elif self.name == 'text':
+            string = str(value)
+            if len(string) > 0:
+                return string
+            else: raise ValueError("text tags must have length > 0")
+        elif self.name == 'date':
+            if isinstance(value,utils.FlexiDate):
+                return value
+            else:
+                string = str(value)
+                return utils.FlexiDate.strptime(string,crop,logCropping) # may raise ValueError
+        else: assert False
+
+    def canConvert(self,value,crop=False):
+        """Return whether *value* can be converted into this type using convertValue. For *crop* see
+        convertValue.
+        """
+        try:
+            self.convertValue(value,crop,logCropping=False)
+        except ValueError:
+            return False
+        else: return True
+
+    def sqlFormat(self,value):
+        """Convert *value* into a string that can be inserted into database queries."""
+        if self.name == 'varchar':
+            if len(value.encode()) > constants.TAG_VARCHAR_LENGTH:
+                logger.error("Attempted to encode the following string for a varchar column although its "
+                             "encoded size exceeds constants.TAG_VARCHAR_LENGTH. The string will be "
+                             "truncated: '{}'.".format(value))
+            return value
+        elif self.name == 'text':
+            return value
+        elif self.name == 'date':
+            return value.toSql()
+        else: assert False
     
     def fileFormat(self, value):
         """Return value as a string suitable for writing to a file. This currently makes a difference only
@@ -337,21 +328,24 @@ class Tag:
             return self.type.isValid(value)
         else: return True
 
-    def convertValue(self,newTag,value):
-        """Convert a value from this tag type to *newTag*. Raise a ValueError if conversion is not possible.
+    def convertValue(self,value,crop=False,logCropping=True):
+        """Convert a value to this tagtype. Raise a ValueError if conversion is not possible.
+        If *crop* is True, this method may crop *value* to make it valid (e.g. if *value* is too long for
+        a varchar). If *logCropping* is True, cropping will print a logger warning.
         """
-        if newTag.type is None:
-            return str(value)
         if self.type is None:
-            return newTag.type.valueFromString(value)
-        return self.type.convertValue(newTag.type,value)
-     
-    def valueFromString(self, string, crop=False):
-        """Get a value for this tag from a string. If *crop* is True, the method is allowed to crop *string*
-        to obtain a valid value. If that is not possible, raise a ValueError."""
-        if self.type is not None:
-            return self.type.valueFromString(string,crop)
-        else: return string
+            return str(value)
+        else: return self.type.convertValue(value,crop)
+    
+    def canConvert(self,value,crop=False):
+        """Return whether *value* can be converted into this type using convertValue. For *crop* see
+        convertValue.
+        """
+        try:
+            self.convertValue(value,crop,logCropping=False)
+        except ValueError:
+            return False
+        else: return True
         
     def fileFormat(self, string):
         """Format a value suitable for writing to a file."""
@@ -436,17 +430,37 @@ def fromTitle(title):
             return tag
     else: return get(title)
 
-  
+
+class TagConversionError(RuntimeError):
+    """This error is emitted when changes to a tagtype's value-type cannot be performed due to existing
+    values of that tagtype."""
+    pass
+
+    
 def addTagType(tagType,type,**data):
     """Add a tagtype to the database. *tagType* can be a valid tagname or an external tagtype. Using keyword
     arguments you can optionally set attributes of the tagtype which external tagtypes don't have
     Allowed keys are
         title, iconPath, private and index (the index of the tagtype within tags.tagList).
+        
+    If the type cannot be added because an element contains a value which is invalid for the chosen type,
+    a TagConversionError is raised.
     """
     if isinstance(tagType,str):
         tagType = get(tagType)
     if tagType.isInDB():
         raise ValueError("Cannot add tag '{}' because it is already in the DB.".format(tagType))
+    if 'title' in data:
+        if data['title'] is not None and isTitle(data['title']):
+            raise ValueError("Cannot add tag '{}' with title '{}' because that title exists already."
+                             .format(tagType,data['title']))
+    
+    from . import levels
+    for level in levels.instances:
+        for element in level.elements.values(): # only external elements possible => won't take too long
+            if tagType in element.tags and not all(type.canConvert(value) for value in element.tags[tagType]):
+                raise TagConversionError()
+        
     data['type'] = type
     application.stack.push(TagTypeUndoCommand(ADD,tagType,**data))
     return tagType
@@ -455,11 +469,8 @@ def addTagType(tagType,type,**data):
 def _addTagType(tagType,**data):
     """Similar to addTagType, but not undoable. *tagType* must be an external Tag instance. Its value-type
     must be given as keyword-argument 'type'."""
-    assert not tagType.isInDB()
     assert tagType.name in _tagsByName # if the tag was created with get, it is already contained there
     assert 'type' in data
-    if 'title' in data:
-        assert data['title'] is None or not isTitle(data['title'])
     
     if 'index' in data:
         index = data['index']
@@ -496,6 +507,8 @@ def removeTagType(tagType):
         raise ValueError("Cannot remove external tagtype '{}' from DB.".format(tagType))
     if tagType in (TITLE,ALBUM):
         raise ValueError("Cannot remove title or album tag.")
+    if db.query("SELECT COUNT(*) FROM {}tags WHERE tag_id = ?".format(db.prefix),tagType.id).getSingle() > 0:
+        raise ValueError("Cannot remove a tag that appears in internal elements.")
     application.stack.push(TagTypeUndoCommand(REMOVE,tagType))
     
     
@@ -503,7 +516,6 @@ def _removeTagType(tagType):
     """Like removeTagType, but not undoable: Remove a tagtype from the database, including all its values
     and relations. This will not touch any files though!
     """
-    assert tagType.isInDB() and tagType not in (TITLE,ALBUM)
     logger.info("Removing tag '{}'.".format(tagType.name))
     db.query("DELETE FROM {}tagids WHERE id=?".format(db.prefix),tagType.id)
     db.query("UPDATE {}tagids SET sort=sort-1 WHERE sort > ?".format(db.prefix),tagList.index(tagType))
@@ -514,15 +526,33 @@ def _removeTagType(tagType):
     
 
 def changeTagType(tagType,**data):
-    """Change a tagtype. In particular update the single instance *tagType* and the database.
+    """Change an internal tagtype. In particular update the single instance *tagType* and the database.
     The keyword arguments determine which properties should be changed::
 
-        changeTagType(tagType,name='artist',iconPath=None)
+        changeTagType(tagType,title='Artist',iconPath=None)
         
-    Allowed keyword arguments are type, title, iconPath, private. If the type is changed, the tagtype must
-    not appear in any internal elements. If private is changed, the tagtype must not appear in any internal
-    files.
+    Allowed keyword arguments are type, title, iconPath, private. If the type or private is changed,
+    the tagtype must not appear in any internal elements.
+    If the type cannot be changed because an (external) element contains a value which is invalid for the new
+    type, a TagConversionError is raised.
     """
+    if not tagType.isInDB():
+        raise ValueError("Cannot change an external tagtype '{}'.".format(tagType))
+    if ('type' in data and data['type'] != tagType.type) \
+            or ('private' in data and data['private'] != tagType.private):
+        count = db.query("SELECT COUNT(*) FROM {}tags WHERE tag_id = ?"
+                         .format(db.prefix),tagType.id).getSingle()
+        if count > 0:
+            raise ValueError("Cannot change the type of a tag that appears in internal elements.")
+        
+    if 'type' in data and data['type'] != tagType.type:
+        from . import levels
+        for level in levels.instances:
+            for element in level.elements.values(): # only external elements possible => won't take too long
+                if tagType in element.tags and not all(data['type'].canConvert(value)
+                                                       for value in element.tags[tagType]):
+                    raise TagConversionError()
+        
     application.stack.push(TagTypeUndoCommand(CHANGE,tagType,**data))
     
     
@@ -564,7 +594,7 @@ def _changeTagType(tagType,**data):
         tagType.private = bool(data['private'])
     
     if len(assignments) > 0:
-        params.append(tagType.id) # for the where clause
+        params.append(tagType.id) # for the WHERE clause
         db.query("UPDATE {}tagids SET {} WHERE id = ?"
                     .format(db.prefix,','.join(assignments)),*params)
         application.dispatcher.changes.emit(TagTypeChangedEvent(CHANGED,tagType))
@@ -634,6 +664,7 @@ def moveTagType(tagType,newIndex):
 def moveTagTypes(newList):
     """Replace tagList by *newList*. Both lists must contain the same tagtypes!."""
     application.stack.push(TagTypeOrderUndoCommand(newList))
+
 
 def _moveTagTypes(newList):
     """Like moveTagTypes, but not undoable.""" 

@@ -374,13 +374,13 @@ class TagValueEditor(QtGui.QWidget):
         self.hideEditor = hideEditor
         self.editor = None
         self.tag = None # Create the variable
-        self.valid = tag.isValid('')
+        self.valid = tag.canConvert('')
         self.setTag(tag)
 
     def canSwitchTag(self,newTag):
         """Return whether the current value is valid for the given tag, i.e. whether it is possible to
         change the tag of this editor to *newTag*."""
-        return newTag.isValid(self.getText())
+        return newTag.conConvert(self.getText())
         
     def getTag(self):
         """Return the tag type of this editor."""
@@ -469,9 +469,9 @@ class TagValueEditor(QtGui.QWidget):
     def getValue(self):
         """Return the current value. Contrary to getText, convert the text according to the current tag type
         (e.g. creating a FlexiDate) and return None if the current text is not valid."""
-        if not self.tag.isValid(self.getText()):
+        if not self.tag.canConvert(self.getText()):
             return None
-        else: return self.tag.valueFromString(self.getText())
+        else: return self.tag.convertValue(self.getText())
         
     def setValue(self,value):
         """Set the current value. *value* must be either a string or FlexiDate if the current tag type is
@@ -487,7 +487,7 @@ class TagValueEditor(QtGui.QWidget):
                 self.editor.setText(text)
             else: self.editor.setPlainText(text)
             
-            if self.tag.isValid(self.getText()):
+            if self.tag.canConvert(self.getText()):
                 self.valueChanged.emit()
 
     def clear(self):
@@ -496,7 +496,7 @@ class TagValueEditor(QtGui.QWidget):
 
     def _handleValueChanged(self):
         """Handle valueChanged or editingFinished-signals from the actual editor."""
-        if self.tag.isValid(self.getText()):
+        if self.tag.canConvert(self.getText()):
             if not self.valid: # The last value was invalid
                 self._getActualEditor().setPalette(QtGui.QPalette()) # use inherited palette
                 self.valid = True
@@ -596,10 +596,16 @@ class AddTagTypeDialog(QtGui.QDialog):
         if len(title) == 0 or title == tagName:
             title = None
         
-        self.tagType = tags.addTagType(tagName,self.combo.getType(),
-                                       title=title,private=self.privateBox.isChecked())
-
-        self.accept()
+        try:
+            self.tagType = tags.addTagType(tagName,self.combo.getType(),
+                                           title=title,private=self.privateBox.isChecked())
+        except tags.TagConversionError:
+            from . import dialogs
+            dialogs.warning(self.tr("Cannot add tagtype"),
+                            self.tr("The tag already appears in some elements with values that cannot be"
+                                    " converted to the chosen type. Change the type or edit those elements."))
+        else:
+            self.accept()
         
     @classmethod
     def addTagType(cls,tagType=None,text=None):

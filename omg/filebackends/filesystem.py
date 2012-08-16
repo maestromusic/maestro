@@ -66,7 +66,7 @@ class RealFile(BackendFile):
                 validValues = []
                 for string in values:
                     try:
-                        validValues.append(tag.valueFromString(string, crop=True))
+                        validValues.append(tag.convertValue(string, crop=True))
                     except ValueError:
                         logger.error("Invalid value for tag '{}' found: {}".format(tag.name,string))
                 if len(validValues) > 0:

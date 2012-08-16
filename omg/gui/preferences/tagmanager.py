@@ -31,7 +31,7 @@ CUSTOM_MIME = 'application/x-omgtagtype'
     
 class TagManager(QtGui.QWidget):
     """The TagManager allows to add, edit and remove tagtypes (like artist, composer,...). To make things
-    easy it only allows changing tagtypes which do not appear in any element."""
+    easy it only allows changing tagtypes which do not appear in any internal element."""
     def __init__(self,dialog,parent=None):
         super().__init__(parent)
         self.setLayout(QtGui.QVBoxLayout())
@@ -97,7 +97,7 @@ class TagManagerTableWidget(QtGui.QTableWidget):
                 ("type",   self.tr("Type")),
                 ("title",  self.tr("Title")),
                 ("private",self.tr("Private?")),
-                ("number", self.tr("# of elements")),
+                ("elementCount", self.tr("# of elements")),
                 ("actions",self.tr("Actions"))
                 ]
         self.setColumnCount(len(self.columns))
@@ -144,7 +144,7 @@ class TagManagerTableWidget(QtGui.QTableWidget):
         stdFlags = Qt.ItemIsEnabled | Qt.ItemIsSelectable | Qt.ItemIsDragEnabled
         
         for row,tag in enumerate(tags.tagList):
-            allowChanges,number,appearsInEditor = self._checkTag(tag)
+            elementCount = self._getElementCount(tag)
             
             column = self._getColumnIndex("sort")
             item = NumericSortItem("{}    ".format(row+1))
@@ -163,13 +163,13 @@ class TagManagerTableWidget(QtGui.QTableWidget):
             
             column = self._getColumnIndex("name")
             item = QtGui.QTableWidgetItem(tag.name)
-            if allowChanges:
+            if elementCount == 0:
                 item.setFlags(stdFlags | Qt.ItemIsEditable)
             else: item.setFlags(stdFlags)
             self.setItem(row,column,item)
             
             column = self._getColumnIndex("type")
-            if allowChanges:
+            if elementCount == 0:
                 combo = tagwidgets.ValueTypeBox(tag.type)
                 combo.disableMouseWheel = True
                 combo.typeChanged.connect(functools.partial(self._handleValueTypeChanged,tag))
@@ -190,18 +190,15 @@ class TagManagerTableWidget(QtGui.QTableWidget):
             item.setCheckState(Qt.Checked if tag.private else Qt.Unchecked)
             self.setItem(row,column,item)
             
-            column = self._getColumnIndex("number")
-            if number == 0 and appearsInEditor:
-                text = self.tr("0, appears in editor")
-            else: text = number
-            item = NumericSortItem("{}    ".format(text))
+            column = self._getColumnIndex("elementCount")
+            item = NumericSortItem("{}    ".format(elementCount))
             item.setTextAlignment(Qt.AlignVCenter | Qt.AlignRight)
             item.setFlags(stdFlags)
             self.setItem(row,column,item)
             
             column = self._getColumnIndex("actions")
             buttons = iconbuttonbar.IconButtonBar()
-            if allowChanges:
+            if elementCount == 0:
                 buttons.addIcon(utils.getIcon('delete.png'),
                                      functools.partial(self._handleRemoveButton,tag),
                                      self.tr("Delete tag"))
@@ -219,14 +216,13 @@ class TagManagerTableWidget(QtGui.QTableWidget):
         itemInFirstColumn = self.item(row,self._getColumnIndex('sort'))
         return itemInFirstColumn.data(Qt.UserRole)
     
-    def _handleRemoveButton(self,tagType):
+    def _handleRemoveButton(self,tag):
         """Ask the user if he really wants this and if so, remove the tag."""
-        allowChanges = self._checkTag(tagType)[0]
-        if not allowChanges:
+        if self._getElementCount(tag) != 0:
             dialogs.warning(self.tr("Cannot remove tag"),
                             self.tr("Cannot remove a tag that appears in elements."))
             return
-        tags.removeTagType(tagType)
+        tags.removeTagType(tag)
     
     def _handleItemChanged(self,item):
         """Handle changes to the name or private state of a tag."""
@@ -236,11 +232,11 @@ class TagManagerTableWidget(QtGui.QTableWidget):
             newName = item.text()
             if oldName == newName:
                 return
-            allowChanges = self._checkTag(tag)[0]
+            allowChanges = self._getElementCount(tag) == 0
             # Perform different tests via a for-loop
             for check,message in (
                     (not allowChanges,self.tr("Cannot change a tag that appears in elements.")),
-                    (tags.exists(newName),self.tr("A tag named '{}' already exists.").format(newName)),
+                    (tags.isInDB(newName),self.tr("A tag named '{}' already exists.").format(newName)),
                     (not tags.isValidTagName(newName),self.tr("'{}' is not a valid tagname.").format(newName))
                  ):
                  if check:
@@ -249,9 +245,20 @@ class TagManagerTableWidget(QtGui.QTableWidget):
                     return
             type,title,iconPath,private = tag.type,tag.rawTitle,tag.iconPath,tag.private
             index = tags.tagList.index(tag)
+            # Because tag instances are unique, the tag module does not allow to change the name of a tag.
+            # But we can add the new tag to the database and remove the old one.
             application.stack.beginMacro(self.tr("Change tag name"))
             tags.removeTagType(tag)
-            tags.addTagType(newName,type=type,title=title,iconPath=iconPath,private=private,index=index)
+            try:
+                tags.addTagType(newName,type=type,title=title,iconPath=iconPath,private=private,index=index)
+            except tags.TagConversionError:
+                dialogs.warning(self.tr("Cannot change tag name"),
+                                self.tr("The new tag name already appears in some elements with values that"
+                                        " cannot be converted to the type of this tag."))
+                application.stack.endMacro()
+                application.stack.undo() # undo removeTagType
+                #TODO: remove macro from stack (redo won't work) 
+                return
             application.stack.endMacro()
         
         elif item.column() == self._getColumnIndex('title'):
@@ -259,18 +266,18 @@ class TagManagerTableWidget(QtGui.QTableWidget):
             itemText = item.text() if item.text() != '' else None
             if itemText != tag.rawTitle:
                 if itemText is not None and tags.isTitle(itemText):
-                    dialogs.warning(self.tr("Cannot change title"),"A tag with this title exists already.")
+                    dialogs.warning(self.tr("Cannot change title"),
+                                    self.tr("A tag with this title exists already."))
                     item.setText(tag.rawTitle) # Reset
                     return
                 tags.changeTagType(tag,title=itemText)
             
         elif item.column() == self._getColumnIndex('private'): 
             tag = self._getTag(item.row())
-            allowChanges = self._checkTag(tag)[0]
             newPrivate = item.checkState() == Qt.Checked
             if newPrivate == tag.private:
                 return
-            if not allowChanges:
+            if self._getElementCount(tag) != 0:
                 # Reset. Unfortunately it is not possible to deactivate the Checkboxes without disabling
                 # the item (which would cause problems with Drag&Drop).
                 item.setCheckState(Qt.Checked if tag.private else Qt.Unchecked)
@@ -279,57 +286,68 @@ class TagManagerTableWidget(QtGui.QTableWidget):
         
     def _handleValueTypeChanged(self,tag,type):
         """Handle changes to the comboboxes containing valuetypes."""
-        allowChanges = self._checkTag(tag)[0]
-        if not allowChanges:
+        if self._getElementCount(tag) != 0:
             dialogs.warning(self.tr("Cannot change tag"),
                             self.tr("Cannot change a tag that appears in elements."))
-            return
-        tags.changeTagType(tag,type=type)
+        else:
+            try:
+                tags.changeTagType(tag,type=type)
+                return
+            except tags.TagConversionError:
+                dialogs.warning(self.tr("Cannot change tag type"),
+                                self.tr("The tag appears in some elements with values that cannot be converted"
+                                        " to the new type."))
+        # Reset
+        for row in range(self.rowCount()):
+            if tag == self._getTag(row):
+                column = self._getColumnIndex("type")
+                combo = self.cellWidget(row,column)
+                combo.setType(tag.type)
+            
     
     def _handleCellDoubleClicked(self,row,column):
         """Handle double clicks on the first column containing icons. A click will open a file dialog to
         change the icon."""
         if column == self._getColumnIndex("icon"):
-            tagType = self._getTag(row)
-            self._openIconDialog(row,tagType)
+            self._openIconDialog(row,self._getTag(row))
     
     def _handleCustomContextMenuRequested(self,pos):
         """React to customContextMenuRequested signals."""
         row = self.rowAt(pos.y())
         column = self.columnAt(pos.x())
         if column == self._getColumnIndex("icon") and row != -1:
-            tagType = self._getTag(row)
+            tag = self._getTag(row)
             menu = QtGui.QMenu(self)
-            if tagType.iconPath is None:
+            if tag.iconPath is None:
                 changeAction = QtGui.QAction(self.tr("Add icon..."),menu)
             else: changeAction = QtGui.QAction(self.tr("Change icon..."),menu)
-            changeAction.triggered.connect(lambda: self._openIconDialog(row,tagType))
+            changeAction.triggered.connect(lambda: self._openIconDialog(row,tag))
             menu.addAction(changeAction)
             removeAction = QtGui.QAction(self.tr("Remove icon"),menu)
-            removeAction.setEnabled(tagType.iconPath is not None)
-            removeAction.triggered.connect(lambda: self._setIcon(row,tagType,None))
+            removeAction.setEnabled(tag.iconPath is not None)
+            removeAction.triggered.connect(lambda: self._setIcon(row,tag,None))
             menu.addAction(removeAction)
             menu.exec_(self.viewport().mapToGlobal(pos))
     
-    def _openIconDialog(self,row,tagType):
+    def _openIconDialog(self,row,tag):
         """Open a file dialog so that the user may choose an icon for the given tag. Assume that the tag
         is in the given *row* (depends on current sorting)."""
         # Choose a sensible directory as starting point
         from ..misc import iconchooser
-        result = iconchooser.IconChooser.getIcon([':omg/tags'],tagType.iconPath,self)
+        result = iconchooser.IconChooser.getIcon([':omg/tags'],tag.iconPath,self)
         
-        if result and result[1] != tagType.iconPath:
-            self._setIcon(row,tagType,result[1])
+        if result and result[1] != tag.iconPath:
+            self._setIcon(row,tag,result[1])
             
-    def _setIcon(self,row,tagType,iconPath):
-        """Set the icon(-path) of *tagType* to *iconPath* and update the GUI. Assume that the tag
-        is in the given *row* (depends on current sorting)."""
-        tags.changeTagType(tagType,iconPath=iconPath)
+    def _setIcon(self,row,tag,iconPath):
+        """Set the icon(-path) of *tag* to *iconPath* and update the GUI. Assume that the tag is in the
+        given *row* (depends on current sorting)."""
+        tags.changeTagType(tag,iconPath=iconPath)
         # Update the widget
         label = self.cellWidget(row,self._getColumnIndex('icon'))
-        if tagType.icon is not None:
-            label.setPixmap(tagType.icon.pixmap(32,32))
-            label.setToolTip(tagType.iconPath)
+        if tag.icon is not None:
+            label.setPixmap(tag.icon.pixmap(32,32))
+            label.setToolTip(tag.iconPath)
         else:
             label.setPixmap(QtGui.QPixmap())
             label.setToolTip(None)
@@ -361,28 +379,10 @@ class TagManagerTableWidget(QtGui.QTableWidget):
             return True
         return False   
     
-    def _checkTag(self,tag):
-        """Check whether the given tag can be edited. Return a 3-tuple of
-        
-            - Whether the tag can be edited
-            - The number of (real-level) elements the tag appears in
-            - Whether the tag appears in editor-level elements.
-            
-        The tag can be edited if it appears neither on the real-level nor on the editor-level. Title and
-        album tag can never be changed.
-        """
-        number = db.query("SELECT COUNT(DISTINCT element_id) FROM {}tags WHERE tag_id = ?"
+    def _getElementCount(self,tag):
+        """Return the number of internal elements in which the tag appears."""
+        return db.query("SELECT COUNT(DISTINCT element_id) FROM {}tags WHERE tag_id = ?"
                                .format(db.prefix),tag.id).getSingle()
-        if number > 0:
-            return False,number,False
-        elif tag.name in (config.options.tags.title_tag,config.options.tags.album_tag):
-            return False,0,False
-        else:
-            from ...core import levels
-            for element in levels.editor.elements.values():
-                if tag in element.tags:
-                    return False,0,True
-            return True,0,False
         
     def _getColumnIndex(self,columnKey):
         """Return the index of the column with the given key (i.e. the first part of the corresponding tuple
