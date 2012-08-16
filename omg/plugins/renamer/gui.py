@@ -18,11 +18,9 @@
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from omg import application, filebackends
 from omg.gui import treeview, treeactions, delegates
 from omg.gui.delegates import configuration, abstractdelegate
 from omg.models import leveltreemodel
-from omg.core.commands import CommitCommand
 from . import plugin
 
 translate = QtCore.QCoreApplication.translate
@@ -51,7 +49,7 @@ class RenameFilesAction(treeactions.TreeAction):
         dialog = RenameDialog(self.parent(), self.level(), elements)
         dialog.exec_()
         if dialog.result() == dialog.Accepted:
-            application.stack.push(CommitCommand(dialog.sublevel, [dialog.sublevel.files()], self.tr("rename")))
+            dialog.sublevel.commit()
             
 
 class PathDelegate(delegates.StandardDelegate):
@@ -67,12 +65,11 @@ class PathDelegate(delegates.StandardDelegate):
                  'showFlagIcons' : False}
     )
     
-    def __init__(self, view, newPaths): 
+    def __init__(self, view): 
         super().__init__(view) 
         self.newPathStyleNew = abstractdelegate.DelegateStyle(1, False, True, Qt.darkGreen)
         self.newPathStyleOld = abstractdelegate.DelegateStyle(1, False, True, Qt.red)
         self.unchangedStyle = abstractdelegate.DelegateStyle(1, False, True, Qt.gray)
-        self.newPaths = newPaths
         self.result = {} 
         
     def addPath(self, element):
@@ -119,15 +116,10 @@ class RenameDialog(QtGui.QDialog):
         self.sublevel = level.subLevel(elements, "rename")
         self.elementsParent = elements
         self.elementsSub = [self.sublevel.get(element.id) for element in elements]
-        self.proposedPaths = {}
-        for file in self.sublevel.files():
-            if file not in self.proposedPaths:
-                self.proposedPaths[file] = [file.url.path]
-        
         self.model = leveltreemodel.LevelTreeModel(self.sublevel, self.elementsSub)
         self.tree = treeview.TreeView(self.sublevel,affectGlobalSelection=False)
         self.tree.setModel(self.model)
-        self.delegate = PathDelegate(self.tree, self.proposedPaths)
+        self.delegate = PathDelegate(self.tree)
         self.tree.setItemDelegate(self.delegate)
         self.tree.expandAll()
         

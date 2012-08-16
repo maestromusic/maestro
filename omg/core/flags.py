@@ -270,6 +270,10 @@ class FlagTypeChangedEvent(ChangeEvent):
 class FlagDifference:
     """See tags.TagDifference"""
     def __init__(self, flagsA, flagsB):
+        if flagsA is None:
+            flagsA = ()
+        if flagsB is None:
+            flagsB = ()
         self.removals = set(flagsA) - set(flagsB)
         self.additions = set(flagsB) - set(flagsA)
         
@@ -282,4 +286,10 @@ class FlagDifference:
         for flag in self.additions:
             flagsB.remove(flag)
         flagsB.extend(self.removals)
+        
+    def inverse(self):
+        ret = FlagDifference(None, None)
+        ret.removals = self.additions.copy()
+        ret.additions = self.removals.copy()
+        return ret
         

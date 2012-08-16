@@ -56,6 +56,8 @@ def addFiles(data):
         (id, urlString, hash, length)
     tuples.
     """
+    if len(data) == 0:
+        return
     db.multiQuery("INSERT INTO {}files (element_id, url, hash, length) VALUES(?,?,?,?)"
                   .format(db.prefix), data)
 
@@ -85,7 +87,12 @@ def addContents(data):
     if len(data) > 0:
         db.multiQuery("INSERT INTO {}contents (container_id, position, element_id) VALUES (?,?,?)"
                       .format(db.prefix), data)
-    
+
+def setContents(elid, contents):
+    """Set contents of element with id *elid* to *contents* (instance of elements.ContentList)."""
+    db.query("DELETE FROM {}contents WHERE container_id = ?".format(db.prefix), elid)
+    db.multiQuery("INSERT INTO {}contents (container_id, position, element_id) VALUES(?,?,?)"
+             .format(db.prefix), [(elid, pos, id) for (pos, id) in contents.items() ]) 
 
 def removeContents(data):
     """Remove content relations from  elements.
@@ -245,7 +252,7 @@ def removeTagValuesById(elids, tag, valueIds):
                 .format(db.prefix,db.csList(elids),tag.id,db.csList(valueIds)))
 
 
-def removeTagValues(data):
+def removeTagValuesMulti(data):
     """Remove tag values from elements.
     
     *data* must be a list of (elementID, tagID, valueID) tuples.
@@ -253,6 +260,14 @@ def removeTagValues(data):
     db.multiQuery("DELETE FROM {}tags WHERE element_id = ? AND tag_id = ? AND value_id = ?".
                   format(db.prefix), data)
 
+def removeTagValues(elids, tag, values):
+    """Remove tag values from some elements.
+    
+    *elids* is either a single id or a list of ids, *tag* is the affected tag and *values* is a
+    list of values.
+    """
+    removeTagValuesById(elids,tag,[db.idFromValue(tag,value) for value in values])
+   
 
 def changeTagValueById(elids, tag, oldId, newId):
     """Change a tag value in some elements.

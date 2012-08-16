@@ -87,16 +87,15 @@ class EditorModel(leveltreemodel.LevelTreeModel):
         application.dispatcher.changes.connect(self._handleDispatcher)
         self.extTagInfos = []
     
-    def loadFile(self, path):
-        if path not in self.level:
-            element = self.level.get(path)
+    def loadFile(self, url):
+        if url not in self.level:
+            element = self.level.get(url)
         else:
-            id = levels.idFromPath(path)
+            id = levels.idFromUrl(url)
             for model in self.instances:
                 if id in model:
                     # skip autoDelete and autoReplace if the element is loaded from another editor
-                    return self.level.get(path)
-            
+                    return self.level.get(url)
             # Delete outdated infos before auto tag processing
             EditorModel._removeFromGlobalExtTagInfos(element)
             element = self.level.reload(id)

@@ -456,7 +456,7 @@ def addTagType(tagType,type,**data):
                              .format(tagType,data['title']))
     
     from . import levels
-    for level in levels.instances:
+    for level in levels.allLevels:
         for element in level.elements.values(): # only external elements possible => won't take too long
             if tagType in element.tags and not all(type.canConvert(value) for value in element.tags[tagType]):
                 raise TagConversionError()
@@ -547,7 +547,7 @@ def changeTagType(tagType,**data):
         
     if 'type' in data and data['type'] != tagType.type:
         from . import levels
-        for level in levels.instances:
+        for level in levels.allLevels:
             for element in level.elements.values(): # only external elements possible => won't take too long
                 if tagType in element.tags and not all(data['type'].canConvert(value)
                                                        for value in element.tags[tagType]):
@@ -890,6 +890,12 @@ class TagDifference:
             if includePrivate or not tag.private:
                 tagsB.add(tag, *values)
     
+    def inverse(self):
+        ret = TagDifference(None, None)
+        ret.additions = self.removals[:]
+        ret.removals = self.additions[:]
+        return ret
+
     def __str__(self):
         return "TagDifference(additions={}, removals={})".format(self.additions, self.removals)
                  

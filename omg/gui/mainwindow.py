@@ -48,7 +48,7 @@ import functools
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from .. import application, config, constants, logging, modify
+from .. import application, config, constants, logging
 from ..core import levels
 from . import selection
 
