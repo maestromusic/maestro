@@ -42,7 +42,7 @@ class TestLoader(unittest.TestLoader):
         from omg import application
         from omg.core import tags
         # Save the app from the garbage collector
-        self.app = application.init(cmdConfig=[],type="test",exitPoint='noplugins')
+        self.app = application.init(cmdConfig=['main.collection=/'],type="test",exitPoint='noplugins')
         for name,type in  [("artist","varchar"),("title","varchar"),("album","varchar"),("date","date"),
                            ("genre","varchar"),("comment","text")]:
             tags.addTagType(name,tags.ValueType.byName(type))

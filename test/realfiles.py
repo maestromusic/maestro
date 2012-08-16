@@ -11,9 +11,8 @@
 
 import unittest, shutil, os
 
-from omg import application, utils, realfiles, database as db
+from omg import application, utils, filebackends, database as db
 from omg.core import tags
-    
     
 PATH_BASE = os.path.join(os.getcwd(),os.path.dirname(__file__))
 PATH_EMPTY = os.path.join(PATH_BASE,'realfiles/empty')
@@ -39,6 +38,12 @@ tags.get("conductor"): ["Absolutely","Nobody"]
 ORIGINAL_POSITION = 1
 
 
+def getFile(path):
+    file = filebackends.getFile('file://'+path)
+    file.readTags()
+    return file
+    
+    
 # Abstract base class for our test cases
 class BaseTest(unittest.TestCase):
     def __init__(self,ext):
@@ -51,12 +56,12 @@ class BaseTest(unittest.TestCase):
    
 class OpenTest(BaseTest):
     def runTest(self):
-        self.file = realfiles.get(self.full)
+        self.file = getFile(self.full)
 
 
 class ReadTest(BaseTest):
     def setUp(self):
-        self.file = realfiles.get(self.full)
+        self.file = getFile(self.full)
 
     def runTest(self):
         self.assertEqual(self.file.position,ORIGINAL_POSITION)
@@ -71,7 +76,7 @@ class ReadTest(BaseTest):
 class RemoveTest(BaseTest):
     def setUp(self):
         shutil.copyfile(self.full,self.test)
-        self.file = realfiles.get(self.test)
+        self.file = getFile(self.test)
 
     def runTest(self):
         tagsToRemove = [tags.get(name) for name in ('artist','title','conductor','notexistent2')]
@@ -86,12 +91,12 @@ class RemoveTest(BaseTest):
 class EmptyFileTest(BaseTest):
     def setUp(self):
         shutil.copyfile(self.empty,self.test)
-        self.file = realfiles.get(self.test)
+        self.file = getFile(self.test)
 
     def runTest(self):
         self.file.tags[tags.get('artist')] = ['Someone','Everyone']
-        self.file.save()
-        self.file.read()
+        self.file.saveTags()
+        self.file.readTags()
         self.assertEqual(self.file.tags,{tags.get('artist'): ['Someone','Everyone']})
 
     def tearDown(self):
@@ -103,7 +108,7 @@ class InvalidTagsTest(BaseTest):
         shutil.copyfile(self.invalid,self.test)
         
     def runTest(self):
-        self.file = realfiles.get(self.test)
+        self.file = getFile(self.test)
         tag = tags.get('artist')
         self.assertEqual(list(self.file.tags.keys()),[tag])
         self.assertTrue(len(self.file.tags[tag]) == 1)
@@ -113,13 +118,13 @@ class InvalidTagsTest(BaseTest):
 class WriteTest(BaseTest):
     def setUp(self):
         shutil.copyfile(self.full,self.test)
-        self.file = realfiles.get(self.test)
+        self.file = getFile(self.test)
 
     def runTest(self):
         self.file.tags = TAGS_TO_WRITE
         self.file.position = 2
-        self.file.save()
-        self.file.read()
+        self.file.saveTags()
+        self.file.readTags()
         self.assertEqual(self.file.position,2)
         self.assertEqual(self.file.tags,TAGS_TO_WRITE)
         

@@ -123,9 +123,9 @@ def load_tests(loader, standard_tests, pattern):
                   [(1,1,0,0,),(2,1,0,0,),(3,1,0,0,),
                    (4,0,1,3,)
                   ])
-    # Create fake files which have their id as path and hash
-    db.query("""INSERT INTO {0}files (element_id,path,hash,length)
-                            SELECT id,id,id,0 FROM {0}elements WHERE file=1"""
+    # Create fake files which have their id as url and hash
+    db.query("""INSERT INTO {0}files (element_id,url,hash,length)
+                            SELECT id,'file://',id,0 FROM {0}elements WHERE file=1"""
              .format(db.prefix))
                   
     #db.multiQuery('INSERT INTO {}contents (container_id,position,element_id) VALUES(?,?,?)'

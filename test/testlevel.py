@@ -21,6 +21,7 @@ import functools
 from omg.core import levels, tags
 from omg.core.elements import Container, File, Element
 from omg.core.nodes import Wrapper
+from omg import filebackends
 
 
 class TestLevel(levels.Level):
@@ -46,7 +47,7 @@ class TestLevel(levels.Level):
         """Add a file with the given name."""
         assert name not in self.nameToElement
         self.currentId -= 1
-        file = File(self,self.currentId,'test/'+name,100)
+        file = File(self,self.currentId,filebackends.BackendURL.fromString('file://test/'+name),100)
         file.tags.add(tags.TITLE,name)
         self.elements[self.currentId] = file
         self.nameToElement[name] = file

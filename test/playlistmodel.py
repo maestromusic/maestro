@@ -65,7 +65,7 @@ class PlaylistTestCase(unittest.TestCase):
         
         # Check flat playlist
         self.assertEqual(self.playlist.backend.playlist,
-                         [f.element.path for f in self.playlist.root.getAllFiles()])
+                         [f.element.url for f in self.playlist.root.getAllFiles()])
         
         if redo:
             self.checks.append((wrapperString,application.stack.index()))
