@@ -196,6 +196,7 @@ class EditorModel(leveltreemodel.LevelTreeModel):
             # Rebuild infos from scratch
             self._updateExtTagInfos()
         else:
+            changed = False
             # Only update infos of type 'unknown'
             for id in event.dataIds:
                 element = self.level.get(id)
