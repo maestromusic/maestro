@@ -108,6 +108,9 @@ class AbstractSql:
     :func:`newConnection <omg.database.sql.newConnection>` which will create a non-abstract subclass of
     this depending on the driver.
     """
+    def __init__(self):
+        self._transactionDepth = 0
+        
     def connect(self,username,password,database,host="localhost",port=3306,**kwargs):
         """Connect to a database using the given information."""
             
@@ -151,13 +154,25 @@ class AbstractSql:
             self.query(queryString,*parameters)
 
     def transaction(self):
-        """Start a transaction."""
+        """Start a transaction. Transactions can be nested. Only when the outermost transaction is committed,
+        all changes are performed in the database. This method returns True, if the outermost transaction has
+        been started.
+        """
+        self._transactionDepth += 1
+        return self._transactionDepth == 1
         
     def commit(self):
-        """Commit a transaction."""
+        """Commit a transaction. Return True if changes have really been written to the database (and False
+        if just a nested transaction was closed)."""
+        if self._transactionDepth == 1:
+            return True
+        else: self._transactionDepth -= 1
         
     def rollback(self):
-        """Rollback a transaction."""
+        """Rollback a transaction. Nested transactions cannot be rolled back."""
+        if self._transactionDepth > 1:
+            raise RuntimeError("Cannot rollback nested transactions")
+            
 
     def isNull(self,value):
         """Return whether *value* represents a NULL value from a MySQL table (how null values are

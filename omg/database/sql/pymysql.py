@@ -53,12 +53,19 @@ class Sql(AbstractSql):
         return SqlResult(cursor,True)
         
     def transaction(self):
-        self.query('START TRANSACTION')
+        if super().transaction():
+            self.query('START TRANSACTION')
+            return True
+        else: return False
         
     def commit(self):
-        self._db.commit()
+        if super().commit():
+            self._db.commit()
+            return True
+        else: return False
         
     def rollback(self):
+        super().rollback()
         self._db.rollback()
 
 

@@ -54,10 +54,10 @@ class Sql(AbstractSql):
     def multiQuery(self,queryString,argSets):
         while True:
             try:
-                if not self._inTransaction:
+                if self._transactionDepth == 0:
                     self.query('BEGIN TRANSACTION')
                 result = SqlResult(self._db.executemany(queryString,argSets),True)
-                if not self._inTransaction:
+                if self._transactionDepth == 0:
                     self._db.commit()
                 return result
             except Exception as e:
@@ -69,14 +69,19 @@ class Sql(AbstractSql):
                 raise DBException(str(e),query=queryString,args=argSets)
         
     def transaction(self):
-        self.query('BEGIN TRANSACTION')
-        self._inTransaction = True
+        if super().transaction():
+            self.query('BEGIN TRANSACTION')
+            return True
+        else: return False
         
     def commit(self):
-        self._db.commit()
-        self._inTransaction = False
+        if super().commit():
+            self._db.commit()
+            return True
+        else: return False
         
     def rollback(self):
+        super().rollback()
         self._db.rollback()
         
     def getDate(self,value):

@@ -88,16 +88,23 @@ class Sql(AbstractSql):
             else: raise DBException("Query failed",queryString,argSets)
 
     def transaction(self):
-        if not self._db.transaction():
-            raise DBException("Could not start a transaction.")
+        if super().transaction():
+            if not self._db.transaction():
+                raise DBException("Could not start a transaction.")
+            return True
+        else: return False
 
     def commit(self):
-        if not self._db.commit():
-            if self._db.lastError() is not None:
-                raise DBException("Commit failed: {}".format(self._db.lastError().text()))
-            else: raise DBException("Commit failed.")
+        if super().commit():
+            if not self._db.commit():
+                if self._db.lastError() is not None:
+                    raise DBException("Commit failed: {}".format(self._db.lastError().text()))
+                else: raise DBException("Commit failed.")
+            return True
+        else: return False
                     
     def rollback(self):
+        super().rollback()
         if not self._db.rollback():
             if self._db.lastError() is not None:
                 raise DBException("Rollback failed: {}".format(self._db.lastError().text()))
