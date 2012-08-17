@@ -113,8 +113,20 @@ class CopyElementsCommand(QtGui.QUndoCommand):
             del self.level.elements[elem.id]
 
 class ChangeTagsCommand(QtGui.QUndoCommand):
+    """Change tags of several elements in a level by providing TagDifference objects."""
     
     def __init__(self, level, changes, filesOnly=False):
+        """Creates the command, with *changes* mapping elements to TagDifferences.
+        
+        If the *level* is levels.real, the *filesOnly* parameter can be supplied. If it is True,
+        only the tags of files will be changed, without touching the elements or the database
+        (used during commit).
+        
+        If writing tags to the filesystem fails, this method can fail. In that case, the *error*
+        attribute will hold a TagWriteError instance after the redo(). Any subsequent undo and
+        redo calls will do nothing.
+        """ 
+        
         super().__init__()
         self.changes = changes
         self.level = level
@@ -124,6 +136,9 @@ class ChangeTagsCommand(QtGui.QUndoCommand):
         self.error = None
         
     def redo(self):
+        if self.error is not None:
+            logger.debug("ChangeTagsCommand: performing bogus redo() because of error")
+            return
         try:
             if self.filesOnly:
                 self.level._changeTags(self.changes, filesOnly=True)
@@ -135,6 +150,7 @@ class ChangeTagsCommand(QtGui.QUndoCommand):
         
     def undo(self):
         if self.error:
+            logger.debug("ChangeTagsCommand: performing bogus undo() because of error")
             return
         inverseChanges = {elem:diff.inverse() for elem,diff in self.changes.items()}
         if self.filesOnly:
@@ -142,10 +158,15 @@ class ChangeTagsCommand(QtGui.QUndoCommand):
         else:
             self.level._changeTags(inverseChanges)
             self.level.emitEvent([elem.id for elem in self.changes])
+            
 
 class ChangeFlagsCommand(QtGui.QUndoCommand):
-    
+    """Change the flags of several elements in a level by FlagDifference objects."""
+        
     def __init__(self, level, changes):
+        """Create the command for *level*. *changes* maps elements to FlagDifference objects.
+        """
+        
         super().__init__()
         self.changes = changes
         self.level = level

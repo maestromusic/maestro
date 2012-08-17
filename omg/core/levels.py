@@ -412,7 +412,9 @@ class Level(QtCore.QObject):
         self.stack.push(commands.ChangeMajorFlagCommand(self, elemToMajor))
     
     def commit(self, elements=None):
-        """Undoably commit given *ids* (or everything, if not specified) into the parent level."""
+        """Undoably commit given *ids* (or everything, if not specified) into the parent level.
+        
+        """
         from . import commands
         self.stack.beginMacro('commit')
         if elements is None:
@@ -443,14 +445,14 @@ class Level(QtCore.QObject):
             newElements = [elem for elem in elements if elem.id not in self.parent.elements ]
             oldElements = [elem for elem in elements if elem not in newElements]
             self.parent.copyElements(newElements)
-            
-        tagChanges = {}
+        #tagChanges = {}
         for oldEl in oldElements:
             inParent = self.parent.get(oldEl.id)
             if oldEl.flags != inParent.flags:
                 self.parent.changeFlags({inParent : flags.FlagDifference(inParent.flags, oldEl.flags)})
             if oldEl.tags != inParent.tags:
-                tagChanges[inParent] = tags.TagDifference(inParent.tags, oldEl.tags)
+                self.parent.changeTags({inParent : tags.TagDifference(inParent.tags, oldEl.tags)})
+                #tagChanges[inParent] = tags.TagDifference(inParent.tags, oldEl.tags)
             if oldEl.data != inParent.data:
                 self.parent.setData({inParent : oldEl.data})
             if oldEl.isContainer():
@@ -461,8 +463,8 @@ class Level(QtCore.QObject):
                     self.parent.renameFiles( {inParent:(inParent.url, oldEl.url)} )
         if self.parent is real:
             db.commit()
-        if len(tagChanges) > 0:
-            self.parent.changeTags(tagChanges)
+        #if len(tagChanges) > 0:
+        #    self.parent.changeTags(tagChanges)
         self.stack.endMacro()
             
     def copyElements(self, elements):
@@ -860,8 +862,12 @@ class RealLevel(Level):
         db.transaction()
         for element, diff in changes.items():
             for tag, values in diff.additions:
+                if not tag.isInDB():
+                    continue
                 dbwrite.addTagValues(element.id, tag, values)
             for tag, values in diff.removals:
+                if not tag.isInDB():
+                    continue
                 dbwrite.removeTagValues(element.id, tag, values)
         db.commit()
         super()._changeTags(changes)
