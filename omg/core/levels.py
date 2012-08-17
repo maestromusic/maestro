@@ -406,7 +406,11 @@ class Level(QtCore.QObject):
         """
         from . import covers
         self.stack.push(covers.CoverUndoCommand(self, coverDict))
-            
+    
+    def setMajorFlags(self, elemToMajor):
+        from . import commands
+        self.stack.push(commands.ChangeMajorFlagCommand(self, elemToMajor))
+    
     def commit(self, elements=None):
         """Undoably commit given *ids* (or everything, if not specified) into the parent level."""
         from . import commands
@@ -447,9 +451,11 @@ class Level(QtCore.QObject):
                 self.parent.changeFlags({inParent : flags.FlagDifference(inParent.flags, oldEl.flags)})
             if oldEl.tags != inParent.tags:
                 tagChanges[inParent] = tags.TagDifference(inParent.tags, oldEl.tags)
+            if oldEl.data != inParent.data:
+                self.parent.setData({inParent : oldEl.data})
             if oldEl.isContainer():
                 if oldEl.major != inParent.major:
-                    raise NotImplementedError()
+                    self.parent.setMajorFlags({inParent: oldEl.major})
             else:
                 if oldEl.url != inParent.url:
                     self.parent.renameFiles( {inParent:(inParent.url, oldEl.url)} )
@@ -549,6 +555,10 @@ class Level(QtCore.QObject):
                 del element.data[type]
         self.emitEvent([element.id for element in elementToData])
       
+    def _setMajorFlags(self, elemToMajor):
+        """Set major of several elements."""
+        for elem, major in elemToMajor.items():
+            elem.major = major
     
     def _importElements(self, elements):
         """Create the elements *elements* from a different level into this one."""
@@ -878,7 +888,7 @@ class RealLevel(Level):
         if emitEvent:
             self.emitEvent(ids)
             
-    def _setData(self,type, elementToData):
+    def _setData(self, type, elementToData):
         super()._setData(type, elementToData)
         values = []
         for element, data in elementToData.items():
@@ -892,7 +902,11 @@ class RealLevel(Level):
                           .format(db.prefix),values)
         db.commit()
         
-        
+    def _setMajorFlags(self, elemToMajor):
+        super()._setMajorFlags(elemToMajor)
+        db.write.setMajor((el.id,major) for (el, major) in elemToMajor.items() )
+
+
 def idFromUrl(url, create=True):
     """Return the id for the given url.
     

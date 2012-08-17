@@ -115,12 +115,12 @@ class NodeSelection:
     def elements(self,recursive=False):
         """Return all elements that are selected. Remove duplicates (elements might be selected in several
         wrappers."""
-        ids = set()
+        elements = set()
         def check(w):
-            if w.element.id in ids:
+            if w.element in elements:
                 return False
             else:
-                ids.add(w.element.id)
+                elements.add(w.element)
                 return True
         return (w.element for w in self.wrappers(recursive) if check(w))
         

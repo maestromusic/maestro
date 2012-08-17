@@ -145,7 +145,7 @@ class ChangeTagsCommand(QtGui.QUndoCommand):
 
 class ChangeFlagsCommand(QtGui.QUndoCommand):
     
-    def __init__(self, level,changes):
+    def __init__(self, level, changes):
         super().__init__()
         self.changes = changes
         self.level = level
@@ -157,6 +157,7 @@ class ChangeFlagsCommand(QtGui.QUndoCommand):
     def undo(self):
         self.level._changeFlags({elem:diff.inverse() for elem, diff in self.changes.items()})
         self.level.emitEvent([elem.id for elem in self.changes])
+
 
 class InsertElementsCommand(QtGui.QUndoCommand):
     """A command to insert elements into an existing container."""
@@ -211,24 +212,20 @@ class RemoveElementsCommand(QtGui.QUndoCommand):
 class ChangeMajorFlagCommand(QtGui.QUndoCommand):
     """A command to change the major flag of several elements."""
     
-    def __init__(self, level, ids):
+    def __init__(self, level, elemToMajor):
         super().__init__()
         self.level = level
-        self.previous = {id: level.get(id).major for id in ids}
+        self.elemToMajor = {elem : major
+                        for (elem, major) in elemToMajor.items()
+                        if major != elem.major }
     
     def redo(self):
-        for id, prev in self.previous.items():
-            self.level.get(id).major = not prev
-        if self.level is levels.real:
-            write.setMajor([id, not prev] for id,prev in self.previous.items())
-        self.level.emitEvent(list(self.previous.keys()))
+        self.level._setMajorFlags(self.elemToMajor)
+        self.level.emitEvent([elem.id for elem in self.elemToMajor])
     
     def undo(self):
-        for id, prev in self.previous.items():
-            self.level.get(id).major = prev
-        if self.level is levels.real:
-            write.setMajor(list(self.previous.items()))
-        self.level.emitEvent(list(self.previous.keys()))
+        self.level._setMajorFlags({elem:(not major) for (elem, major) in self.elemToMajor.items()})
+        self.level.emitEvent([elem.id for elem in self.elemToMajor])
 
 
 class ChangePositionsCommand(QtGui.QUndoCommand):

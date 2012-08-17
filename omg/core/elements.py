@@ -70,7 +70,7 @@ class Element:
                 for file in self.level.get(id).getAllFiles():
                     yield file
     
-    def getData(self,type):
+    def getData(self, type):
         if type not in self.data:
             return None
         else:

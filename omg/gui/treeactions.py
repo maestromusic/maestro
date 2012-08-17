@@ -315,8 +315,8 @@ class ToggleMajorAction(TreeAction):
         self.selection = selection
         
     def doAction(self):
-        application.stack.push(commands.ChangeMajorFlagCommand(self.parent().model().level,
-                        [w.element.id for w in self.selection.wrappers() if w.element.major == self.state]))
+        changes = {el:(not self.state) for el in self.selection.elements() if el.major == self.state}
+        application.stack.push(commands.ChangeMajorFlagCommand(self.level(), changes))
         self.toggle()
                 
 
