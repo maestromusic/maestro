@@ -146,6 +146,11 @@ def getPixmap(name):
     """Return a QPixmap for the icon with the given name."""
     return QtGui.QPixmap(":omg/icons/" + name)
 
+class ValueListDictDifference:
+    """A class that efficiently stores differences between two dicts mapping keys to value lists.
+    """
+    
+
 
 class FlexiDate:
     """A FlexiDate is a date which can store a date consisting simply of a year or of a year and a month or

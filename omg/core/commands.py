@@ -30,8 +30,22 @@ translate = QtCore.QCoreApplication.translate
 logger = logging.getLogger(__name__)
 
 class CreateDBElementsCommand(QtGui.QUndoCommand):
-    """Creates several files in the database."""
+    """Creates several elements in the database.
+    
+    This command is created with a number of temporary elements. On redo(), it creates
+    permanent IDs and changes them in all levels. Additionally, the elements are stored
+    in the database with all attributes (tags, flags, data, ...). The command however
+    does not touch the filesystem.
+    """
+    
     def __init__(self, elements, newInLevel=False):
+        """Create the command for *elements*, all of which must be temporary.
+        
+        If the parameter *newInLevel* is True, the elements will be loaded into the real
+        level after creation, and are also deleted from real on undo(). Be careful not to use
+        this when some element from *elements* is already contained in real before the command
+        is executed (e.g. external file in a playlist).
+        """
         super().__init__()
         self.elements = elements
         self.idMap = None
@@ -49,8 +63,7 @@ class CreateDBElementsCommand(QtGui.QUndoCommand):
             else:
                 return (self.idMap[el.id], ) + row
         specs = [ dataRow(el) for el in self.elements ] 
-        if self.idMap is None:
-            #  first redo
+        if self.idMap is None: #  first redo
             newIds = db.write.createElements(specs)
             self.idMap = dict( (el.id, newId) for el,newId in zip(self.elements, newIds))
         else:
@@ -62,7 +75,7 @@ class CreateDBElementsCommand(QtGui.QUndoCommand):
         for element in self.elements:
             db.write.setTags(element.id, element.tags)
             db.write.setFlags(element.id, element.flags)
-            # TODO: data?
+            db.write.setData(element.id, element.data)
             if element.isContainer():
                 db.write.setContents(element.id, element.contents)
                 db.write.setMajor([(element.id, element.major)])
@@ -82,7 +95,10 @@ class CreateDBElementsCommand(QtGui.QUndoCommand):
         for level in levels.allLevels:
             level.emitEvent(set(self.idMap.keys()) & set(level.elements.keys()))
 
+
 class RenameFilesCommand(QtGui.QUndoCommand):
+    """Rename files in a level based on a dict mapping elements to (oldURL, newURL) pairs.
+    """
     
     def __init__(self, level, renamings):
         super().__init__()
@@ -93,10 +109,12 @@ class RenameFilesCommand(QtGui.QUndoCommand):
         self.level._renameFiles(self.renamings, emitEvent=True)
         
     def undo(self):
-        self.level._renameFiles({file:(newUrl, oldUrl) for file,(oldUrl,newUrl) in self.renamings.items()},
-                                emitEvent=True)
+        reversed = {file:(newUrl, oldUrl) for file,(oldUrl,newUrl) in self.renamings.items()},
+        self.level._renameFiles(emitEvent=True)
+
 
 class CopyElementsCommand(QtGui.QUndoCommand):
+    """Copy elements from one level into another, and remove them again on undo()."""
     
     def __init__(self, level, elements):
         super().__init__()
@@ -112,6 +130,7 @@ class CopyElementsCommand(QtGui.QUndoCommand):
         for elem in self.elements:
             del self.level.elements[elem.id]
 
+
 class ChangeTagsCommand(QtGui.QUndoCommand):
     """Change tags of several elements in a level by providing TagDifference objects."""
     
@@ -126,7 +145,6 @@ class ChangeTagsCommand(QtGui.QUndoCommand):
         attribute will hold a TagWriteError instance after the redo(). Any subsequent undo and
         redo calls will do nothing.
         """ 
-        
         super().__init__()
         self.changes = changes
         self.level = level
@@ -166,7 +184,6 @@ class ChangeFlagsCommand(QtGui.QUndoCommand):
     def __init__(self, level, changes):
         """Create the command for *level*. *changes* maps elements to FlagDifference objects.
         """
-        
         super().__init__()
         self.changes = changes
         self.level = level
@@ -177,6 +194,23 @@ class ChangeFlagsCommand(QtGui.QUndoCommand):
         
     def undo(self):
         self.level._changeFlags({elem:diff.inverse() for elem, diff in self.changes.items()})
+        self.level.emitEvent([elem.id for elem in self.changes])
+
+
+class ChangeDataCommand(QtGui.QUndoCommand):
+    """Change the data of several elements in a level by DataDifference objects."""
+    
+    def __init__(self, level, changes):
+        super().__init__()
+        self.changes = changes
+        self.level = level
+        
+    def redo(self):
+        self.level._changeData(self.changes)
+        self.level.emitEvent([elem.id for elem in self.changes])
+        
+    def undo(self):
+        self.level._changeData({elem:diff.inverse() for elem, diff in self.changes.items()})
         self.level.emitEvent([elem.id for elem in self.changes])
 
 

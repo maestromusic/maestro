@@ -21,7 +21,7 @@ import collections, numbers, weakref
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from . import tags, flags
+from . import data, tags, flags
 from .elements import File, Container
 from .nodes import Wrapper
 from .. import application, filebackends, database as db, config, logging
@@ -75,23 +75,6 @@ class ElementChangedEvent(application.ChangeEvent):
             self.contentIds = []
         else: self.contentIds = contentIds
 
-class DataUndoCommand(QtGui.QUndoCommand):
-    def __init__(self,level,element,type,new):
-        self.level = level
-        self.element = element
-        self.type = type
-        if type in element.data:
-            self.old = element.data[type]
-        else: self.old = None
-        self.new = new
-        assert isinstance(self.old,tuple) and isinstance(self.new,tuple)
-
-    def redo(self):
-        self.level._setData(self.type,{self.element: self.new})
-        
-    def undo(self):
-        self.level._setData(self.type,{self.element: self.old})
-
 
 class Level(QtCore.QObject):
     """A collection of elements corresponding to a specific state.
@@ -131,34 +114,7 @@ class Level(QtCore.QObject):
     def emitEvent(self, dataIds=None, contentIds=None):
         """Simple shortcut to emit an event."""
         self.changed.emit(ElementChangedEvent(dataIds,contentIds))
-    
-    @staticmethod  
-    def _changeId(old, new):
-        """Change the id of some element from *old* to *new* in ALL levels.
-        
-        This should only be called from within appropriate UndoCommands, and only if "old in self"
-        is True. Takes care of contents and parents, too.
-        """
-        for level in allLevels:
-            if old not in level:
-                continue
-            elem = level.elements[old]
-            del level.elements[old]
-            elem.id = new
-            level.elements[new] = elem
-            for parentID in elem.parents:
-                parentContents = level.elements[parentID].contents
-                parentContents.ids[:] = [ new if id == old else id for id in parentContents.ids ]
-            if elem.isContainer():
-                for childID in elem.contents.ids:
-                    if childID in level.elements:
-                        level.elements[childID].parents = [ new if id == old else old
-                                                          for id in level.elements[childID].parents ]
-        if old in tIdManager.tIdToUrl:
-            url = tIdManager.tIdToUrl[new] = tIdManager.tIdToUrl[old]
-            del tIdManager.tIdToUrl[old]
-            tIdManager.urlToTId[url] = new
-    
+
     @staticmethod  
     def _changeId(old, new):
         """Change the id of some element from *old* to *new* in ALL levels.
@@ -394,6 +350,10 @@ class Level(QtCore.QObject):
         from . import commands
         self.stack.push(commands.ChangeFlagsCommand(self, changes))
     
+    def changeData(self, changes):
+        from . import commands
+        self.stack.push(commands.ChangeDataCommand(self, changes))
+    
     def renameFiles(self, renamings):
         from . import commands
         self.stack.push(commands.RenameFilesCommand(self, renamings))
@@ -408,12 +368,16 @@ class Level(QtCore.QObject):
         self.stack.push(covers.CoverUndoCommand(self, coverDict))
     
     def setMajorFlags(self, elemToMajor):
+        """Set the major flags of one or more containers.
+        
+        The action can be undone. *elemToMajor* maps elements to boolean values indicating the
+        desired major state.
+        """
         from . import commands
         self.stack.push(commands.ChangeMajorFlagCommand(self, elemToMajor))
     
     def commit(self, elements=None):
         """Undoably commit given *ids* (or everything, if not specified) into the parent level.
-        
         """
         from . import commands
         self.stack.beginMacro('commit')
@@ -454,7 +418,7 @@ class Level(QtCore.QObject):
                 self.parent.changeTags({inParent : tags.TagDifference(inParent.tags, oldEl.tags)})
                 #tagChanges[inParent] = tags.TagDifference(inParent.tags, oldEl.tags)
             if oldEl.data != inParent.data:
-                self.parent.setData({inParent : oldEl.data})
+                self.parent.changeData({inParent : data.DataDifference(inParent.data, oldEl.data)})
             if oldEl.isContainer():
                 if oldEl.major != inParent.major:
                     self.parent.setMajorFlags({inParent: oldEl.major})
@@ -546,7 +510,11 @@ class Level(QtCore.QObject):
                 self._addFlag(flag, (elem,), False)
             for flag in diff.removals:
                 self._removeFlag(flag, (elem,), False)
-    
+            
+    def _changeData(self, changes):
+        for element, diff in changes.items():
+            diff.apply(element.data)
+
     def _setData(self,type,elementToData):
         for element,data in elementToData.items():
             if data is not None:
@@ -556,7 +524,7 @@ class Level(QtCore.QObject):
             elif type in element.data:
                 del element.data[type]
         self.emitEvent([element.id for element in elementToData])
-      
+    
     def _setMajorFlags(self, elemToMajor):
         """Set major of several elements."""
         for elem, major in elemToMajor.items():
@@ -568,11 +536,6 @@ class Level(QtCore.QObject):
             self.elements[elem.id] = elem.copy()
             elem.level = self
 
-    # TODO: used anywhere?
-    def _insertSingle(self, parent, position, element):
-        """Insert single child *element* at *position* under *parent*."""
-        self._insertContents(parent, ( (position, element), ))
-    
     def _insertContents(self, parent, insertions):
         """Insert some elements under *parent*.
         
@@ -582,13 +545,10 @@ class Level(QtCore.QObject):
             parent.contents.insert(pos, element.id)
             if parent.id not in element.parents:
                 element.parents.append(parent.id)
-        
-    # TODO: used anywhere?
-    def _removeSingle(self, parent, position):
-        """Remove element at *position* from container *parent*."""
-        self._removeContents(parent, (position,) )
-    
+
     def _removeContents(self, parent, positions):
+        """Remove the children at given *positions* under parent.
+        """
         childIds = [parent.contents.getId(position) for position in positions]
         for pos in positions:
             parent.contents.remove(pos=pos)
@@ -597,9 +557,7 @@ class Level(QtCore.QObject):
                 self.get(id).parents.remove(parent.id)
 
     def _renameFiles(self, renamings, emitEvent=True):
-        """Rename files based on *renamings*, which is a dict from elements to (oldUrl, newUrl) pairs.
-        
-        On a normal level, this just changes the Url attributes and emits an event.
+        """Rename files based on *renamings*, a dict from elements to (oldUrl, newUrl) pairs.
         """
         for element, (_, newUrl) in renamings.items():
             element.url = newUrl
@@ -739,7 +697,6 @@ class RealLevel(Level):
                 elem.filePosition = fPosition            
             level.elements[id] = elem
     
-            
     def saveTagsToFileSystem(self, elements):
         """Helper function to store the tags of *elements* on the filesystem."""
         failedElements = []
@@ -763,6 +720,7 @@ class RealLevel(Level):
         urlChanges = {}
         for file in files:
             if hasattr(file, "fileTags"):
+                # TODO: this is not very reliable
                 diff = tags.TagDifference(file.fileTags, file.tags)
             else:
                 backendFile = file.url.getBackendFile()
@@ -827,6 +785,10 @@ class RealLevel(Level):
             self.emitEvent([element.id for element in elements])
     
     def _changeTags(self, changes, filesOnly=False):
+        """CHange tags of elements. Might raise a TagWriteError if files are involved.
+        
+        If an error is raised, any changes made before are undone.
+        The optional *filesOnly* suppresses any changes to the database."""
         doneFiles = []
         rollback = False
         problems = None
@@ -872,9 +834,9 @@ class RealLevel(Level):
         db.commit()
         super()._changeTags(changes)
 
-
     def _renameFiles(self, renamings, emitEvent=True):
-        """on the real level, files are renamed on disk and in DB."""
+        """On the real level, files are renamed both on disk and in DB."""
+        # TODO: error handling
         super()._renameFiles(renamings, emitEvent)
         for _, (oldUrl, newUrl) in renamings.items():
             oldUrl.getBackendFile().rename(newUrl)
@@ -893,7 +855,20 @@ class RealLevel(Level):
         db.write.removeFlag(ids, flag)
         if emitEvent:
             self.emitEvent(ids)
-            
+    
+    def _changeData(self, changes):
+        super()._changeData(changes)
+        db.transaction()
+        for element, diff in changes.items():
+            for type, (a, b) in diff.diffs.items():
+                if a is not None:
+                    db.query("DELETE FROM {}data WHERE type=? AND element_id=?"
+                             .format(db.prefix, type, element.id))
+                if b is not None:
+                    db.multiQuery("INSERT INTO {}data (element_id, type, sort, data) VALUES (?,?,?,?"
+                                  .format(db.prefix), [(element.id, type, i, val) for i, val in enumerate(b)])
+        db.commit()
+                
     def _setData(self, type, elementToData):
         super()._setData(type, elementToData)
         values = []
