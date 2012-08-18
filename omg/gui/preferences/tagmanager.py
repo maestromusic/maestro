@@ -120,7 +120,7 @@ class TagManagerTableWidget(QtGui.QTableWidget):
         
         self._loadTags()
         self.itemChanged.connect(self._handleItemChanged)
-        application.dispatcher.changes.connect(self._handleDispatcher)
+        application.dispatcher.connect(self._handleDispatcher)
         
     def _handleDispatcher(self,event):
         """React to TagTypeChangedEvents from the dispatcher."""
@@ -220,7 +220,8 @@ class TagManagerTableWidget(QtGui.QTableWidget):
         """Ask the user if he really wants this and if so, remove the tag."""
         if self._getElementCount(tag) != 0:
             dialogs.warning(self.tr("Cannot remove tag"),
-                            self.tr("Cannot remove a tag that appears in elements."))
+                            self.tr("Cannot remove a tag that appears in elements."),
+                            self)
             return
         tags.removeTagType(tag)
     
@@ -240,7 +241,7 @@ class TagManagerTableWidget(QtGui.QTableWidget):
                     (not tags.isValidTagName(newName),self.tr("'{}' is not a valid tagname.").format(newName))
                  ):
                  if check:
-                    dialogs.warning(self.tr("Cannot change tag"),message)
+                    dialogs.warning(self.tr("Cannot change tag"),message,self)
                     item.setText(oldName) # Reset
                     return
             type,title,iconPath,private = tag.type,tag.rawTitle,tag.iconPath,tag.private
@@ -251,10 +252,11 @@ class TagManagerTableWidget(QtGui.QTableWidget):
             tags.removeTagType(tag)
             try:
                 tags.addTagType(newName,type=type,title=title,iconPath=iconPath,private=private,index=index)
-            except tags.TagConversionError:
+            except tags.TagValueError:
                 dialogs.warning(self.tr("Cannot change tag name"),
                                 self.tr("The new tag name already appears in some elements with values that"
-                                        " cannot be converted to the type of this tag."))
+                                        " cannot be converted to the type of this tag."),
+                                self)
                 application.stack.endMacro()
                 application.stack.undo() # undo removeTagType
                 #TODO: remove macro from stack (redo won't work) 
@@ -267,7 +269,8 @@ class TagManagerTableWidget(QtGui.QTableWidget):
             if itemText != tag.rawTitle:
                 if itemText is not None and tags.isTitle(itemText):
                     dialogs.warning(self.tr("Cannot change title"),
-                                    self.tr("A tag with this title exists already."))
+                                    self.tr("A tag with this title exists already."),
+                                    self)
                     item.setText(tag.rawTitle) # Reset
                     return
                 tags.changeTagType(tag,title=itemText)
@@ -288,15 +291,17 @@ class TagManagerTableWidget(QtGui.QTableWidget):
         """Handle changes to the comboboxes containing valuetypes."""
         if self._getElementCount(tag) != 0:
             dialogs.warning(self.tr("Cannot change tag"),
-                            self.tr("Cannot change a tag that appears in elements."))
+                            self.tr("Cannot change a tag that appears in elements."),
+                            self)
         else:
             try:
                 tags.changeTagType(tag,type=type)
                 return
-            except tags.TagConversionError:
+            except tags.TagValueError:
                 dialogs.warning(self.tr("Cannot change tag type"),
                                 self.tr("The tag appears in some elements with values that cannot be converted"
-                                        " to the new type."))
+                                        " to the new type."),
+                                self)
         # Reset
         for row in range(self.rowCount()):
             if tag == self._getTag(row):

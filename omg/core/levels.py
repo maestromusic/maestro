@@ -130,7 +130,9 @@ class Level(QtCore.QObject):
         
     def emitEvent(self, dataIds=None, contentIds=None):
         """Simple shortcut to emit an event."""
-        self.changed.emit(ElementChangedEvent(dataIds,contentIds))
+        if not application.stack.inMacro():
+            self.changed.emit(ElementChangedEvent(dataIds,contentIds))
+        else: application.stack.addEvent(self.changed,ElementChangedEvent(dataIds,contentIds))
     
     @staticmethod  
     def _changeId(old, new):

@@ -46,7 +46,7 @@ class ChangeSortValueCommand(QtGui.QUndoCommand):
     
     def setSortValue(self, new, old):
         dbWrite.setSortValue(self.tag, self.valueId, new)
-        application.dispatcher.changes.emit(SortValueChangeEvent(self.tag, self.valueId, old, new))
+        application.dispatcher.emit(SortValueChangeEvent(self.tag, self.valueId, old, new))
 
 class HiddenAttributeChangeEvent(application.ChangeEvent):
     """This event is emitted when the "hidden" attribute of a tag value changes."""
@@ -73,4 +73,4 @@ class HiddenAttributeCommand(QtGui.QUndoCommand):
         
     def setHidden(self, newState):
         dbWrite.setHidden(self.tag, self.valueId, newState)
-        application.dispatcher.changes.emit(HiddenAttributeChangeEvent(self.tag, self.valueId, newState))
+        application.dispatcher.emit(HiddenAttributeChangeEvent(self.tag, self.valueId, newState))

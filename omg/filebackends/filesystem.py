@@ -67,7 +67,7 @@ class RealFile(BackendFile):
                 for string in values:
                     try:
                         validValues.append(tag.convertValue(string, crop=True))
-                    except ValueError:
+                    except tags.TagValueError:
                         logger.error("Invalid value for tag '{}' found: {}".format(tag.name,string))
                 if len(validValues) > 0:
                     self.tags.add(tag, *validValues)
@@ -96,6 +96,7 @@ class RealFile(BackendFile):
         In addition to the tags in self.tags, any ignored tags (TRACKNUMBER etc.) that were read
         using readTags() will be stored in to the file such that they aren't lost.
         """
+        return #TODO: broken
         self._taglibFile.tags = dict()
         for tag, values in self.ignoredTags.items():
             self._taglibFile.tags[tag.upper()] = values

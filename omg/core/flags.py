@@ -153,7 +153,7 @@ def _addFlagType(**data):
     
     _flagsById[flagType.id] = flagType
     _flagsByName[flagType.name] = flagType
-    application.dispatcher.changes.emit(FlagTypeChangedEvent(ADDED,flagType))
+    application.dispatcher.emit(FlagTypeChangedEvent(ADDED,flagType))
     return flagType
 
 
@@ -171,7 +171,7 @@ def _deleteFlagType(flagType):
     db.query("DELETE FROM {}flag_names WHERE id = ?".format(db.prefix),flagType.id)
     del _flagsById[flagType.id]
     del _flagsByName[flagType.name]
-    application.dispatcher.changes.emit(FlagTypeChangedEvent(DELETED,flagType))
+    application.dispatcher.emit(FlagTypeChangedEvent(DELETED,flagType))
 
 
 def changeFlagType(flagType,**data):
@@ -211,7 +211,7 @@ def _changeFlagType(flagType,**data):
     if len(assignments) > 0:
         params.append(flagType.id) # for the where clause
         db.query("UPDATE {}flag_names SET {} WHERE id = ?".format(db.prefix,','.join(assignments)),*params)
-        application.dispatcher.changes.emit(FlagTypeChangedEvent(CHANGED,flagType))
+        application.dispatcher.emit(FlagTypeChangedEvent(CHANGED,flagType))
 
 
 class FlagTypeUndoCommand(QtGui.QUndoCommand):

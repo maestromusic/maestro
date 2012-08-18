@@ -83,6 +83,12 @@ TITLE = None
 ALBUM = None
 
 
+class TagValueError(ValueError):
+    """This error is emitted by Tag.convertValue and ValueType.convertValue if a value cannot be converted
+    into a different value-type."""
+    pass
+
+
 def init():
     """Initialize the variables of this module based on the information of the tagids-table and config-file.
     At program start or after changes of that table this method must be called to ensure the module has the
@@ -162,14 +168,14 @@ class ValueType:
         else: assert False
 
     def convertValue(self,value,crop=False,logCropping=True):
-        """Convert *value* to this type and return the result. If conversion fails, raise a ValueError.
+        """Convert *value* to this type and return the result. If conversion fails, raise a TagValueError.
         If *crop* is True, this method may crop *value* to make it valid (e.g. if *value* is too long for
         a varchar). If *logCropping* is True, cropping will print a logger warning.
         """
         if self.name == 'varchar':
             string = str(value)
             if len(string) == 0:
-                raise ValueError("varchar tags must have length > 0")
+                raise TagValueError("varchar tags must have length > 0")
             if len(string.encode()) > constants.TAG_VARCHAR_LENGTH:
                 if crop:
                     if logCropping:
@@ -179,19 +185,22 @@ class ValueType:
                     # will silently remove the fragments 
                     encoded = string.encode()[:constants.TAG_VARCHAR_LENGTH]
                     return encoded.decode(errors='ignore')
-                else: raise ValueError("String is too long for a varchar tag: {}...".format(string[:30]))
+                else: raise TagValueError("String is too long for a varchar tag: {}...".format(string[:30]))
             return string
         elif self.name == 'text':
             string = str(value)
             if len(string) > 0:
                 return string
-            else: raise ValueError("text tags must have length > 0")
+            else: raise TagValueError("text tags must have length > 0")
         elif self.name == 'date':
             if isinstance(value,utils.FlexiDate):
                 return value
             else:
                 string = str(value)
-                return utils.FlexiDate.strptime(string,crop,logCropping) # may raise ValueError
+                try:
+                    return utils.FlexiDate.strptime(string,crop,logCropping)
+                except ValueError as e:
+                    raise TagValueError(str(e))
         else: assert False
 
     def canConvert(self,value,crop=False):
@@ -200,7 +209,7 @@ class ValueType:
         """
         try:
             self.convertValue(value,crop,logCropping=False)
-        except ValueError:
+        except TagValueError:
             return False
         else: return True
 
@@ -221,7 +230,7 @@ class ValueType:
     def fileFormat(self, value):
         """Return value as a string suitable for writing to a file. This currently makes a difference only
         for date tags which are always written as yyyy-mm-dd."""
-        if self == TYPE_DATE:
+        if self.name == 'date':
             return value.strftime(format = ("{Y:04d}", "{Y:04d}-{m:02d}", "{Y:04d}-{m:02d}-{d:02d}"))
         return value
     
@@ -233,9 +242,9 @@ class ValueType:
 
 
 # Module variables for the existing types
-TYPE_VARCHAR = ValueType('varchar', translate('tags', 'Standard type for normal (not too long) text values'))
-TYPE_TEXT = ValueType('text', translate('tags', 'Type for long texts (like e.g. lyrics)'))
-TYPE_DATE = ValueType('date', translate('tags', 'Type for dates'))
+TYPE_VARCHAR = ValueType('varchar', translate("tags","Standard type for normal (not too long) text values"))
+TYPE_TEXT = ValueType('text', translate("tags","Type for long texts (like e.g. lyrics)"))
+TYPE_DATE = ValueType('date', translate("tags","Type for dates"))
 TYPES = [TYPE_VARCHAR,TYPE_TEXT,TYPE_DATE]
     
     
@@ -329,7 +338,7 @@ class Tag:
         else: return True
 
     def convertValue(self,value,crop=False,logCropping=True):
-        """Convert a value to this tagtype. Raise a ValueError if conversion is not possible.
+        """Convert a value to this tagtype. Raise a TagValueError if conversion is not possible.
         If *crop* is True, this method may crop *value* to make it valid (e.g. if *value* is too long for
         a varchar). If *logCropping* is True, cropping will print a logger warning.
         """
@@ -343,7 +352,7 @@ class Tag:
         """
         try:
             self.convertValue(value,crop,logCropping=False)
-        except ValueError:
+        except TagValueError:
             return False
         else: return True
         
@@ -430,12 +439,6 @@ def fromTitle(title):
             return tag
     else: return get(title)
 
-
-class TagConversionError(RuntimeError):
-    """This error is emitted when changes to a tagtype's value-type cannot be performed due to existing
-    values of that tagtype."""
-    pass
-
     
 def addTagType(tagType,type,**data):
     """Add a tagtype to the database. *tagType* can be a valid tagname or an external tagtype. Using keyword
@@ -444,7 +447,7 @@ def addTagType(tagType,type,**data):
         title, iconPath, private and index (the index of the tagtype within tags.tagList).
         
     If the type cannot be added because an element contains a value which is invalid for the chosen type,
-    a TagConversionError is raised.
+    a TagValueError is raised.
     """
     if isinstance(tagType,str):
         tagType = get(tagType)
@@ -454,17 +457,21 @@ def addTagType(tagType,type,**data):
         if data['title'] is not None and isTitle(data['title']):
             raise ValueError("Cannot add tag '{}' with title '{}' because that title exists already."
                              .format(tagType,data['title']))
-    
-    from . import levels
-    for level in levels.allLevels:
-        for element in level.elements.values(): # only external elements possible => won't take too long
-            if tagType in element.tags and not all(type.canConvert(value) for value in element.tags[tagType]):
-                raise TagConversionError()
-        
+            
+    application.stack.beginMacro(translate("TagTypeUndoCommand","Add tagtype to DB"))
+    try:
+        _convertTagTypeOnLevels(tagType,type)
+    except TagValueError as error:
+        application.stack.endMacro()
+        #TODO: remove macro from stack
+        raise error
+
     data['type'] = type
     application.stack.push(TagTypeUndoCommand(ADD,tagType,**data))
-    return tagType
+    application.endMacro()
     
+    return tagType
+        
     
 def _addTagType(tagType,**data):
     """Similar to addTagType, but not undoable. *tagType* must be an external Tag instance. Its value-type
@@ -496,7 +503,7 @@ def _addTagType(tagType,**data):
     logger.info("Added new tag '{}' of type '{}'.".format(tagType.name,tagType.type.name))
 
     _tagsById[tagType.id] = tagType
-    application.dispatcher.changes.emit(TagTypeChangedEvent(ADDED,tagType))
+    application.dispatcher.emit(TagTypeChangedEvent(ADDED,tagType))
     return tagType
     
 
@@ -509,7 +516,16 @@ def removeTagType(tagType):
         raise ValueError("Cannot remove title or album tag.")
     if db.query("SELECT COUNT(*) FROM {}tags WHERE tag_id = ?".format(db.prefix),tagType.id).getSingle() > 0:
         raise ValueError("Cannot remove a tag that appears in internal elements.")
+    
+    application.stack.beginMacro(translate("TagTypeUndoCommand","Remove tagtype from DB"))
+    try:
+        _convertTagTypeOnLevels(tagType,None)
+    except TagValueError as error:
+        application.stack.endMacro()
+        #TODO: remove macro from stack
+        raise error
     application.stack.push(TagTypeUndoCommand(REMOVE,tagType))
+    application.stack.endMacro()
     
     
 def _removeTagType(tagType):
@@ -522,7 +538,7 @@ def _removeTagType(tagType):
     del _tagsById[tagType.id]
     tagList.remove(tagType)
     tagType._clearData()
-    application.dispatcher.changes.emit(TagTypeChangedEvent(REMOVED,tagType))
+    application.dispatcher.emit(TagTypeChangedEvent(REMOVED,tagType))
     
 
 def changeTagType(tagType,**data):
@@ -534,7 +550,7 @@ def changeTagType(tagType,**data):
     Allowed keyword arguments are type, title, iconPath, private. If the type or private is changed,
     the tagtype must not appear in any internal elements.
     If the type cannot be changed because an (external) element contains a value which is invalid for the new
-    type, a TagConversionError is raised.
+    type, a TagValueError is raised.
     """
     if not tagType.isInDB():
         raise ValueError("Cannot change an external tagtype '{}'.".format(tagType))
@@ -544,16 +560,18 @@ def changeTagType(tagType,**data):
                          .format(db.prefix),tagType.id).getSingle()
         if count > 0:
             raise ValueError("Cannot change the type of a tag that appears in internal elements.")
-        
+    
+    application.stack.beginMacro(translate("TagTypeUndoCommand","Change tagtype"))
     if 'type' in data and data['type'] != tagType.type:
-        from . import levels
-        for level in levels.allLevels:
-            for element in level.elements.values(): # only external elements possible => won't take too long
-                if tagType in element.tags and not all(data['type'].canConvert(value)
-                                                       for value in element.tags[tagType]):
-                    raise TagConversionError()
+        try:
+            _convertTagTypeOnLevels(tagType,data['type'])
+        except TagValueError as error:
+            application.stack.endMacro()
+            #TODO: remove macro from stack
+            raise error
         
     application.stack.push(TagTypeUndoCommand(CHANGE,tagType,**data))
+    application.stack.endMacro()
     
     
 def _changeTagType(tagType,**data):
@@ -597,7 +615,33 @@ def _changeTagType(tagType,**data):
         params.append(tagType.id) # for the WHERE clause
         db.query("UPDATE {}tagids SET {} WHERE id = ?"
                     .format(db.prefix,','.join(assignments)),*params)
-        application.dispatcher.changes.emit(TagTypeChangedEvent(CHANGED,tagType))
+        application.dispatcher.emit(TagTypeChangedEvent(CHANGED,tagType))
+
+
+def _convertTagTypeOnLevels(tagType,valueType):
+    """Convert all occurences of *tagType* on all levels from *tagType*'s value-type to *valueType*.
+    This method is used to adjust levels just before a tag-type's value-type changes. *valueType* may be
+    None, indicating that *tagType* is going to become an external tag.
+    Before any level is changed this method checks whether all values can be converted. If not, a
+    TagValueError is raised.
+    """
+    from . import levels, commands
+    cmds = []
+    for level in levels.allLevels:
+        diffs = {}
+        for element in level.elements.values(): # only external elements possible => won't take too long
+            if tagType in element.tags:
+                if valueType is not None:
+                    newValues = [valueType.convertValue(value) for value in element.tags[tagType]]
+                else: newValues = [str(value) for value in element.tags[tagType]]
+                diff = TagDifference.singleTagDifference(tagType,element.tags[tagType],newValues)
+                if diff is not None:
+                    diffs[element] = diff
+        if len(diffs) > 0:
+            cmds.append(commands.ChangeTagsCommand(level,diffs))
+    # Only start changing levels if all tag value conversions have been successful.
+    for command in cmds:
+        application.stack.push(command)
         
         
 class TagTypeUndoCommand(QtGui.QUndoCommand):
@@ -674,7 +718,7 @@ def _moveTagTypes(newList):
     db.multiQuery("UPDATE {}tagids SET sort = ? WHERE id = ?".format(db.prefix),
                   enumerate([t.id for t in newList]))
     tagList = newList
-    application.dispatcher.changes.emit(TagTypeOrderChangeEvent())
+    application.dispatcher.emit(TagTypeOrderChangeEvent())
     
     
 class TagTypeOrderUndoCommand(QtGui.QUndoCommand):
@@ -896,6 +940,16 @@ class TagDifference:
         ret.removals = self.additions[:]
         return ret
 
+    @staticmethod
+    def singleTagDifference(tagType,oldValues,newValues):
+        result = TagDifference(None,None)
+        result.additions = [(tagType,[value for value in newValues if value not in oldValues])]
+        result.removals = [(tagType,[value for value in oldValues if value not in newValues])]
+        
+        if len(result.additions) > 0 or len(result.removals) > 0:
+            return result
+        else: return None
+        
     def __str__(self):
         return "TagDifference(additions={}, removals={})".format(self.additions, self.removals)
                  

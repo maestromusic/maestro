@@ -43,7 +43,7 @@ class TagLabel(QtGui.QLabel):
         QtGui.QLabel.__init__(self,parent)
         self.iconOnly = iconOnly
         self.setTag(tag)
-        application.dispatcher.changes.connect(self._handleDispatcher)
+        application.dispatcher.connect(self._handleDispatcher)
 
     def text(self):
         if self.tag is not None:
@@ -194,7 +194,7 @@ class TagTypeBox(QtGui.QStackedWidget):
         
         self.addWidget(self.box)
         
-        application.dispatcher.changes.connect(self._handleDispatcher)
+        application.dispatcher.connect(self._handleDispatcher)
     
     def _createItems(self):
         """Clear the combobox and refill it with items."""
@@ -317,7 +317,7 @@ class TagTypeButton(QtGui.QPushButton):
         #https://bugreports.qt-project.org/browse/QTBUG-3624
         self.setMenu(QtGui.QMenu())
         self._fillMenu()
-        application.dispatcher.changes.connect(self._handleDispatcher)
+        application.dispatcher.connect(self._handleDispatcher)
         
     def _fillMenu(self):
         """Fill the menu with an action for each tagtype."""
@@ -599,7 +599,7 @@ class AddTagTypeDialog(QtGui.QDialog):
         try:
             self.tagType = tags.addTagType(tagName,self.combo.getType(),
                                            title=title,private=self.privateBox.isChecked())
-        except tags.TagConversionError:
+        except tags.TagValueError:
             from . import dialogs
             dialogs.warning(self.tr("Cannot add tagtype"),
                             self.tr("The tag already appears in some elements with values that cannot be"

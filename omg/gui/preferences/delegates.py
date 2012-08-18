@@ -74,7 +74,7 @@ class DelegatesPanel(QtGui.QWidget):
         if startConfig is None:
             self.showConfig(configuration.getConfiguration(self.delegateBox.itemText(0)))
         else: self.showConfig(startConfig)
-        configuration.dispatcher.changes.connect(self._handleDispatcher)
+        configuration.dispatcher.connect(self._handleDispatcher)
         
     def _populateDelegateBox(self):
         """Fill the delegate configuration combo box with a list of all configurations.""" 
@@ -410,7 +410,7 @@ class TagEditor(QtGui.QComboBox):
         super().__init__()
         self._updateBox(value)
         self.currentIndexChanged.connect(self.valueChanged)
-        application.dispatcher.changes.connect(self._handleTagTypeChanged)
+        application.dispatcher.connect(self._handleTagTypeChanged)
             
     def _updateBox(self,defaultTag):
         """Fill/update the list of tags."""
@@ -451,7 +451,7 @@ class DataPieceEditor(QtGui.QComboBox):
         super().__init__()
         self._updateBox(value)
         self.currentIndexChanged.connect(self.valueChanged)
-        application.dispatcher.changes.connect(self._handleTagTypeChanged)
+        application.dispatcher.connect(self._handleTagTypeChanged)
             
     def _updateBox(self,default):
         """Fill/update the list of datapieces."""

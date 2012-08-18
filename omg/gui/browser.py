@@ -174,7 +174,7 @@ class Browser(QtGui.QWidget):
                 # Load a reasonable default
                 self.sortTags = {tags.get('artist'): [tags.get('date')]}
             
-        application.dispatcher.changes.connect(self._handleDispatcher)
+        application.dispatcher.connect(self._handleDispatcher)
         levels.real.changed.connect(self._handleLevelChange)
         
         # Convert tag names to tags, leaving the nested list structure unchanged.

@@ -255,8 +255,7 @@ class TagFlagEditorUndoCommand(QtGui.QUndoCommand):
                 if not self._firstRedo and self._statusNumber == self.model._statusNumber:
                     method(*params)
                 self.modifyLevel(method,params)
-            event = levels.ElementChangedEvent(dataIds=self.ids) #TagFlagEditorChangedEvent(self,self.redoMethods)
-            self.model.level.changed.emit(event)
+            self.model.level.emitEvent(dataIds=self.ids)
         self._firstRedo = False
 
     def undo(self):
@@ -265,8 +264,7 @@ class TagFlagEditorUndoCommand(QtGui.QUndoCommand):
                 if self._statusNumber == self.model._statusNumber:
                     method(*params)
                 self.modifyLevel(method,params)
-            event = levels.ElementChangedEvent(dataIds=self.ids) #TagFlagEditorChangedEvent(self,self.undoMethods)
-            self.model.level.changed.emit(event)
+            self.model.level.emitEvent(dataIds=self.ids)
 
     def modifyLevel(self,method,params):
         """Modify the level according to *method* and *params*: The change to the level must be the same
