@@ -427,14 +427,14 @@ class Level(QtCore.QObject):
             newElements = [elem for elem in elements if elem.id not in self.parent.elements ]
             oldElements = [elem for elem in elements if elem not in newElements]
             self.parent.copyElements(newElements)
-        #tagChanges = {}
+        tagChanges = {}
         for oldEl in oldElements:
             inParent = self.parent.get(oldEl.id)
             if oldEl.flags != inParent.flags:
                 self.parent.changeFlags({inParent : flags.FlagDifference(inParent.flags, oldEl.flags)})
             if oldEl.tags != inParent.tags:
-                self.parent.changeTags({inParent : tags.TagDifference(inParent.tags, oldEl.tags)})
-                #tagChanges[inParent] = tags.TagDifference(inParent.tags, oldEl.tags)
+                #self.parent.changeTags({inParent : tags.TagDifference(inParent.tags, oldEl.tags)})
+                tagChanges[inParent] = tags.TagDifference(inParent.tags, oldEl.tags)
             if oldEl.data != inParent.data:
                 self.parent.changeData({inParent : data.DataDifference(inParent.data, oldEl.data)})
             if oldEl.isContainer():
@@ -443,10 +443,10 @@ class Level(QtCore.QObject):
             else:
                 if oldEl.url != inParent.url:
                     self.parent.renameFiles( {inParent:(inParent.url, oldEl.url)} )
+        if len(tagChanges) > 0:
+            self.parent.changeTags(tagChanges)
         if self.parent is real:
             db.commit()
-        #if len(tagChanges) > 0:
-        #    self.parent.changeTags(tagChanges)
         self.stack.endMacro()
             
     def copyElements(self, elements):
@@ -737,8 +737,12 @@ class RealLevel(Level):
         """Undoably set tags and URLs of the files *elements* as they are in the object.
         
         Does not alter the database."""
-        tagChanges = {}
         urlChanges = {}
+        for file in files:
+            if file.url != tIdManager(file.id):
+                urlChanges[file] = (tIdManager(file.id), file.url)
+        self.renameFiles(urlChanges)
+        tagChanges = {}
         for file in files:
             #  check if tags are different
             backendFile = file.url.getBackendFile()
@@ -746,10 +750,7 @@ class RealLevel(Level):
             diff = tags.TagDifference(backendFile.tags, file.tags)
             if not diff.onlyPrivateChanges():
                 tagChanges[file] = diff
-            if file.url != tIdManager(file.id):
-                urlChanges[file] = (tIdManager(file.id), file.url)
         self.changeTags(tagChanges, filesOnly=True)
-        self.renameFiles(urlChanges)
     
     def changeTags(self, changes, filesOnly=False):
         """Overridden method: Adds optio to only change file tags (not database or elements).

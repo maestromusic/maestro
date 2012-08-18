@@ -65,7 +65,6 @@ type = None
 prefix = None
 transactionLock = threading.Lock()
 
-# Logger for database warnings
 logger = logging.getLogger(__name__)
 
 # Each thread must have its own connection object. This maps thread identifiers to the connection object
@@ -187,14 +186,12 @@ def multiQuery(queryString,args):
 def transaction():
     try:
         connections[threading.current_thread().ident].transaction()
-        logger.debug("transaction OPEN")
     except KeyError:
         raise RuntimeError("Cannot access database before a connection for this thread has been opened.")
 
 def commit():
     try:
         connections[threading.current_thread().ident].commit()
-        logger.debug("transaction COMMIT")
     except KeyError:
         raise RuntimeError("Cannot access database before a connection for this thread has been opened.")
 
