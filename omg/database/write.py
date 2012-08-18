@@ -197,15 +197,6 @@ def makeValueIDs(data):
                 db._valueToId[tags.get(tagId)][value] = id
 
 
-def addTagValuesMulti(data):
-    """Add tag values for multiple element/tag combinations.
-    
-    The argument *data* is a list of (elementID, tagID, valueID) tuples.
-    """
-    db.multiQuery("INSERT INTO {}tags (element_id, tag_id, value_id) VALUES (?,?,?)"
-                  .format(db.prefix), data)
-
-
 def addTagValuesById(elids, tag, valueIds):
     """Add tag values given by their valueIDs to some elements.
     
@@ -232,16 +223,6 @@ def addTagValues(elids, tag, values):
     addTagValuesById(elids,tag,[db.idFromValue(tag,value,insert=True) for value in values])
     
     
-def removeAllTagValues(elids, tags):
-    """Remove all values of the given tag from some elements.
-    
-    *elids* is either a single id or a list of ids. Analogously *tags* may be a single tag or a
-    list of tags.
-    """
-    db.query("DELETE FROM {}tags WHERE element_id IN ({}) AND tag_id IN ({})"
-               .format(db.prefix,db.csList(elids),db.csIdList(tags)))
-
-
 def removeTagValuesById(elids, tag, valueIds):
     """Remove some values of one tag from some elements.
     
@@ -251,14 +232,6 @@ def removeTagValuesById(elids, tag, valueIds):
     db.query("DELETE FROM {}tags WHERE element_id IN ({}) AND tag_id = {} AND value_id IN ({})"
                 .format(db.prefix,db.csList(elids),tag.id,db.csList(valueIds)))
 
-
-def removeTagValuesMulti(data):
-    """Remove tag values from elements.
-    
-    *data* must be a list of (elementID, tagID, valueID) tuples.
-    """
-    db.multiQuery("DELETE FROM {}tags WHERE element_id = ? AND tag_id = ? AND value_id = ?".
-                  format(db.prefix), data)
 
 def removeTagValues(elids, tag, values):
     """Remove tag values from some elements.

@@ -254,17 +254,6 @@ def _contentsParentsHelper(elids,recursive,selectColumn,whereColumn):
     return(resultSet)
 
 
-def positions(parentId,elementId):
-    """Return the positions of the element with id *elementId* within the container with id *parentId*.
-    If the element is not contained in the container, a ValueException is raised.
-    """
-    try:
-        return query("SELECT position FROM {}contents WHERE container_id = ? AND element_id = ?"
-                        .format(prefix),parentId,elementId).getSingleColumn()
-    except sql.EmptyResultException:
-        raise ValueError("Element with ID {} is not contained in container {}.".format(elementId,parentId))
-
-
 # elements-table
 #=======================================================================
 def isFile(elid):
@@ -306,35 +295,6 @@ def hash(elid):
     not exist.""" 
     try:
         return query("SELECT hash FROM {}files WHERE element_id=?".format(prefix),elid).getSingle()
-    except sql.EmptyResultException:
-        raise sql.EmptyResultException(
-                 "Element with id {} is not a file (or at least not in the files table).".format(elid))
-
-
-def setHash(element, hash):
-    """Set the hash of file given by *element* to the given string and update the timestamp.
-    *element* must either be the url or the id of a file."""
-    if isinstance(element, str):
-        query("UPDATE {}files SET hash=? WHERE url=?".format(prefix), hash, element)
-    else:
-        query("UPDATE {}files SET hash=? WHERE element_id=?".format(prefix), hash, element)
-    
-    
-def length(elid):
-    """Return the length of the file with id *elid* or raise an sql.EmptyResultException if that element does 
-    not exist.""" 
-    try:
-        return query("SELECT length FROM {}files WHERE element_id=?".format(prefix),elid).getSingle()
-    except sql.EmptyResultException:
-        raise sql.EmptyResultException(
-                 "Element with id {} is not a file (or at least not in the files table).".format(elid))
-
-
-def verified(elid):
-    """Return the verified-timestamp of the file with id *elid* or raise an sql.EmptyResultException if that
-    element does not exist.""" 
-    try:
-        return query("SELECT verified FROM {}files WHERE element_id=?".format(prefix),elid).getSingle()
     except sql.EmptyResultException:
         raise sql.EmptyResultException(
                  "Element with id {} is not a file (or at least not in the files table).".format(elid))
@@ -497,31 +457,12 @@ def listTags(elid,tagList=None):
     return tags
 
 
-def tagValues(elid,tagList):
-    """Return all values which the element with id *elid* possesses in any of the tags in tagList (which may
-    be a list of tag-specifiers or simply a single tag-specifier).
-    """
-    return [value for tag,value in listTags(elid,tagList)] # return only the second tuple part
-
-
 def allTagValues(tagSpec):
     """Return all tag values in the database for the given tag."""
     tag = tagsModule.get(tagSpec)
     return query("SELECT value FROM {}values_{} WHERE tag_id = ?"
                  .format(prefix,tag.type.name), tag.id).getSingleColumn()
     
-
-def elementsWithTagValue(tagSpec, valueSpec):
-    """Return (as list) the IDs of all elements that have a tag given by *tagSpec* with a the given
-    *valueSpec*."""
-    tag = tagsModule.get(tagSpec)
-    if isinstance(valueSpec, str):
-        valueID = idFromValue(tag, valueSpec)
-    else:
-        valueID = valueSpec
-    return query("SELECT element_id FROM {}tags WHERE tag_id = ? AND value_id = ?".format(prefix),
-                 tag.id, valueID).getSingleColumn()
-
 
 # flags table
 #=======================================================================
@@ -530,20 +471,6 @@ def flags(elid):
     return [flags.get(id) for id in query(
                     "SELECT flag_id FROM {}flags WHERE element_id = ?".format(prefix),elid)
               .getSingleColumn()]
-
-
-# folders table
-#=======================================================================
-def folderState(path):
-    return query('SELECT state FROM {}folders WHERE path=?'.format(prefix), path).getSingle()
-
-
-def addFolder(path, state):
-    query('INSERT INTO {}folders (path,state) VALUES (?,?)'.format(prefix), path, state)
-    
-    
-def updateFolder(path, state):
-    query('UPDATE {}folders SET state=? WHERE path=?'.format(prefix), state, path)
 
 
 # Help methods

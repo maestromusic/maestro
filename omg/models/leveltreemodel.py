@@ -21,7 +21,7 @@ from PyQt4.QtCore import Qt
 
 from .. import application, config, database as db, logging, utils
 from ..core import elements, levels, tags
-from ..core.nodes import RootNode, Wrapper
+from ..core.nodes import Wrapper
 from ..models import rootedtreemodel, albumguesser
 
 logger = logging.getLogger(__name__)
