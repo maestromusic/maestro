@@ -58,7 +58,9 @@ class RenameFilesAction(treeactions.TreeAction):
             
 
 class PathDelegate(delegates.StandardDelegate):
-    """Delegate for the editor."""
+    """Delegate for the rename preview; shows old and new path color-coded.
+    """
+    
     configurationType, defaultConfiguration = configuration.createConfigType(
                 'path',
                 translate("Delegates","PathRename"),
@@ -93,12 +95,18 @@ class PathDelegate(delegates.StandardDelegate):
             
     
 class RenameDialog(QtGui.QDialog):
+    """A dialog for pattern-based file renaming.
+    
+    Shows a tree view with the selected containers, which acts as a preview for renaming. The
+    view uses the PathDelegate so that old and new paths of elements are shown.
+    
+    In the top area of the dialog, the configuration widget for renaming profiles is included.
+    """
+    
     def __init__(self, parent, level, elements):
         super().__init__(parent)
-        
         self.setModal(True)
         elements = list(elements)
-        
         self.level = level
         self.setWindowTitle(self.tr("Rename {} containers").format(len(elements)))
         mainLayout = QtGui.QVBoxLayout()
@@ -116,7 +124,6 @@ class RenameDialog(QtGui.QDialog):
         self.statusLabel.setFont(f)
         self.statusLabel.setAutoFillBackground(True)
         self.statusLabel.setPalette(pal)
-
         
         self.sublevel = level.subLevel(elements, "rename")
         self.elementsParent = elements
