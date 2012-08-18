@@ -376,6 +376,7 @@ class TagValueEditor(QtGui.QWidget):
         self.tag = None # Create the variable
         self.valid = tag.canConvert('')
         self.setTag(tag)
+        application.dispatcher.connect(self._handleDispatcher)
 
     def canSwitchTag(self,newTag):
         """Return whether the current value is valid for the given tag, i.e. whether it is possible to
@@ -520,6 +521,12 @@ class TagValueEditor(QtGui.QWidget):
             if self.hideEditor:
                 self.editor.showEditor()
                 self.editor.setFixed(True)
+                
+    def _handleDispatcher(self,event):
+        """Handle dispatcher: On TagTypeChangedEvents we might have to change the editor type.""" 
+        if isinstance(event,tags.TagTypeChangedEvent) and event.tagType == self.tag:
+             self.tag = None
+             self.setTag(event.tagType)
 
 
 class AddTagTypeDialog(QtGui.QDialog):
