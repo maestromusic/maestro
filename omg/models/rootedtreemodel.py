@@ -170,6 +170,18 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
                     queue.append(child)
                 yield child
                 
+    def walk(self, node):
+        """A tree iterator for nodes, inspired by os.walk.
+        
+        Yields tuples (node, contents), and contents may be modified in-place to influence further
+        processing.
+        """
+        contents = node.getContents()[:]
+        yield node, contents
+        for child in contents:
+            for x in self.walk(child):
+                yield x
+    
     def __contains__(self, node):
         """Return whether *node* is contained in this model."""
         if node == self.root:

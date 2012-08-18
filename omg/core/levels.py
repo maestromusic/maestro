@@ -505,6 +505,7 @@ class Level(QtCore.QObject):
             self.emitEvent([element.id for element in elements])
     
     def _changeFlags(self, changes):
+        """Change flags of multiple elements: *changes* maps elements to TagDifference objects."""
         for elem, diff in changes.items():
             for flag in diff.additions:
                 self._addFlag(flag, (elem,), False)

@@ -42,40 +42,6 @@ def mapRecursively(f,aList):
         else: result.append(f(item))
     return result
 
-def dictOrIdentity(dct):
-    """Returns a function that returns dct[x] if x in dct and x otherwise."""
-    return lambda x : dct[x] if x in dct else x
-
-def listDict(input):
-    """Expects *input* to be an iterable of tuples. Returns a dict mapping each object that
-    appears as a first item of a tuple to a list of those appearing as second."""
-    ret = {}
-    for a,b in input:
-        if a not in ret:
-            ret[a] = []
-        ret[a].append(b)
-    return ret
-
-def walk(node):
-    """A tree iterator for elements, inspired by os.walk: Returns a tuple (node, contents)
-    where contents may be modified in-place to influence further processing."""
-    contents = node.getContents()[:]
-    yield node, contents
-    for child in contents:
-        for x in walk(child):
-            yield x
-
-
-def groupFilePaths(paths):
-    """Take a list of file paths, split them into dirname and basename, and group them by the dirname."""
-    filesByFolder = {}
-    for path in paths:
-        dir, filename = os.path.split(path)
-        if dir not in filesByFolder:
-            filesByFolder[dir] = []
-        filesByFolder[dir].append(filename)
-    return filesByFolder
-            
             
 def hasKnownExtension(file):
     """Return True if the given path has a known extension (i.e., appears in options.main.extension).
@@ -86,16 +52,6 @@ def hasKnownExtension(file):
     else:
         return s[1].lower() in config.options.main.extensions
 
-def parsePosition(string):
-        """Parse a string like "7" or "2/5" to a (integer) position. If *string* has the form "2/5", the
-        first number will be returned."""
-        string = string.strip()
-        if string.isdecimal():
-            return int(string)
-        # Watch for positions of the form 2/5
-        elif re.match('\d+\s*/\s*\d+$',string):
-            return int(string.split('/')[0])
-        else: return None
 
 def relPath(file):
     """Return the relative path of a music file against the collection base path."""
@@ -112,6 +68,7 @@ def absPath(file):
         return os.path.join(config.options.main.collection, file)
     else:
         return file
+
 
 def collectFiles(paths):
     """Find all music files below the given *paths*.
@@ -145,11 +102,6 @@ def getIcon(name):
 def getPixmap(name):
     """Return a QPixmap for the icon with the given name."""
     return QtGui.QPixmap(":omg/icons/" + name)
-
-class ValueListDictDifference:
-    """A class that efficiently stores differences between two dicts mapping keys to value lists.
-    """
-    
 
 
 class FlexiDate:

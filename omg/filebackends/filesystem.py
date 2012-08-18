@@ -19,6 +19,7 @@
 """This module implements the BackendFile and BackendURL for files on the local filesystem."""
 
 import os.path
+import re
 
 import taglib
 
@@ -55,8 +56,20 @@ class RealFile(BackendFile):
         self.tags = tags.Storage()
         self.ignoredTags = dict()
         if "TRACKNUMBER" in self._taglibFile.tags:
+            def parsePosition(string):
+                """Parse a string like "7" or "2/5" to a (integer) position.
+                
+                If *string* has the form "2/5", the first number will be returned."""
+                string = string.strip()
+                if string.isdecimal():
+                    return int(string)
+                elif re.match('\d+\s*/\s*\d+$',string):
+                    return int(string.split('/')[0])
+                else:
+                    logger.warning("Cannot parse tracknumber '{}' in file '{}'".format(string, self.url))
+                    return None
             #  Only consider the first tracknumber ...
-            self.position = utils.parsePosition(self._taglibFile.tags["TRACKNUMBER"][0]) 
+            self.position = parsePosition(self._taglibFile.tags["TRACKNUMBER"][0]) 
         for key, values in self._taglibFile.tags.items():
             key = key.lower()
             if key in ["tracknumber", "discnumber"]:
