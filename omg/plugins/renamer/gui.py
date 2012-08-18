@@ -21,9 +21,11 @@ from PyQt4.QtCore import Qt
 from omg.gui import treeview, treeactions, delegates
 from omg.gui.delegates import configuration, abstractdelegate
 from omg.models import leveltreemodel
+from omg.core.levels import RenameFilesError
 from . import plugin
 
 translate = QtCore.QCoreApplication.translate
+
 class RenameFilesAction(treeactions.TreeAction):
     """Action to rename files in a container according to the tags and the container structure."""
     
@@ -49,7 +51,10 @@ class RenameFilesAction(treeactions.TreeAction):
         dialog = RenameDialog(self.parent(), self.level(), elements)
         dialog.exec_()
         if dialog.result() == dialog.Accepted:
-            dialog.sublevel.commit()
+            try:
+                dialog.sublevel.commit()
+            except RenameFilesError as e:
+                e.displayMessage()
             
 
 class PathDelegate(delegates.StandardDelegate):

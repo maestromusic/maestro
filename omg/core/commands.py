@@ -98,17 +98,29 @@ class CreateDBElementsCommand(QtGui.QUndoCommand):
 
 class RenameFilesCommand(QtGui.QUndoCommand):
     """Rename files in a level based on a dict mapping elements to (oldURL, newURL) pairs.
+    
+    If an error occurs when renaming files on the real level, the command will store a
+    levels.RenameFilesError in its *error* attribute. Subsequent calls to undo() or redo() don't
+    do anything.
     """
     
     def __init__(self, level, renamings):
         super().__init__()
         self.level = level
         self.renamings = renamings
+        self.error = None
         
     def redo(self):
-        self.level._renameFiles(self.renamings, emitEvent=True)
+        if self.error is not None:
+            return
+        try:
+            self.level._renameFiles(self.renamings, emitEvent=True)
+        except levels.RenameFilesError as e:
+            self.error = e
         
     def undo(self):
+        if self.error is not None:
+            return
         reversed = {file:(newUrl, oldUrl) for file,(oldUrl,newUrl) in self.renamings.items()},
         self.level._renameFiles(emitEvent=True)
 

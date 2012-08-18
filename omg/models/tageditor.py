@@ -85,7 +85,10 @@ class Record:
             return translate("TagEditor","{} except in {}").format(self.value,self.getExceptions()[0])
         else: return translate("TagEditor","{} in {} pieces").format(self.value,len(self.elementsWithValue))
 
+    def __repr__(self):
+        return str(self)
     
+
 class RecordModel(QtCore.QObject):
     """A RecordModel is basically the data-structure used by the tageditor. It stores an OrderedDict mapping
     tags to lists of records (similar to the tageditor's GUI). It provides a set of basic commands to change

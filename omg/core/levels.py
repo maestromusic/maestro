@@ -46,6 +46,8 @@ class ElementGetError(RuntimeError):
     pass
 
 class TagWriteError(RuntimeError):
+    """An error that is raised when writing tags to disk fails."""
+    
     def __init__(self, url, problems=None):
         super().__init__("Error writing tags of {}".format(url))
         self.url = url
@@ -58,6 +60,22 @@ class TagWriteError(RuntimeError):
         msgReadonly = translate(__name__, "File is readonly")
         msgProblem = translate(__name__, "Tags '{}' not supported by format").format(self.problems)
         dialogs.warning(title, msg1 + (msgReadonly if self.problems is None else msgProblem))
+
+class RenameFilesError(RuntimeError):
+    """An error that is raised when renaming files fails."""
+    
+    def __init__(self, oldUrl, newUrl, message):
+        super().__init__("Error renaming '{}' to '{}': '{}'".format(oldUrl, newUrl, message))
+        self.oldUrl = oldUrl
+        self.newUrl = newUrl
+        self.message = message
+        
+    def displayMessage(self):
+        from ..gui import dialogs
+        title = translate(__name__, "Error renaming file")
+        msg = translate(__name__, "Could not rename '{}' to '{}':\n"
+                                  "{}".format(self.oldUrl, self.newUrl, self.message))
+        dialogs.warning(title, msg)
 
 
 class ConsistencyError(RuntimeError):
@@ -401,7 +419,7 @@ class Level(QtCore.QObject):
                 if len(newElements) > 0:
                     self.stack.push(commands.CreateDBElementsCommand(newElements, newInLevel=True))
                 db.transaction()
-            except TagWriteError as e:
+            except (TagWriteError, OSError) as e:
                 self.stack.endMacro()
                 self.stack.undo()
                 raise e
@@ -716,17 +734,16 @@ class RealLevel(Level):
         return failedElements
     
     def setFileTagsAndRename(self, files):
-        """Undoably set tags and URLs of the files *elements* as they are in the object."""
+        """Undoably set tags and URLs of the files *elements* as they are in the object.
+        
+        Does not alter the database."""
         tagChanges = {}
         urlChanges = {}
         for file in files:
-            if hasattr(file, "fileTags"):
-                # TODO: this is not very reliable
-                diff = tags.TagDifference(file.fileTags, file.tags)
-            else:
-                backendFile = file.url.getBackendFile()
-                backendFile.readTags()
-                diff = tags.TagDifference(backendFile.tags, file.tags)
+            #  check if tags are different
+            backendFile = file.url.getBackendFile()
+            backendFile.readTags()
+            diff = tags.TagDifference(backendFile.tags, file.tags)
             if not diff.onlyPrivateChanges():
                 tagChanges[file] = diff
             if file.url != tIdManager(file.id):
@@ -735,8 +752,18 @@ class RealLevel(Level):
         self.renameFiles(urlChanges)
     
     def changeTags(self, changes, filesOnly=False):
+        """Overridden method: Adds optio to only change file tags (not database or elements).
+        
+        Might raise a TagWriteError if writing (some or all) tags to filesystem fails."""
         from . import commands
         command = commands.ChangeTagsCommand(self, changes, filesOnly)
+        self.stack.push(command)
+        if command.error:
+            raise command.error
+    
+    def renameFiles(self, renamings):
+        from . import commands
+        command = commands.RenameFilesCommand(self, renamings)
         self.stack.push(command)
         if command.error:
             raise command.error
@@ -824,6 +851,8 @@ class RealLevel(Level):
             return
         db.transaction()
         for element, diff in changes.items():
+            if not element.isInDB():
+                continue
             for tag, values in diff.additions:
                 if not tag.isInDB():
                     continue
@@ -837,11 +866,19 @@ class RealLevel(Level):
 
     def _renameFiles(self, renamings, emitEvent=True):
         """On the real level, files are renamed both on disk and in DB."""
-        # TODO: error handling
-        super()._renameFiles(renamings, emitEvent)
-        for _, (oldUrl, newUrl) in renamings.items():
-            oldUrl.getBackendFile().rename(newUrl)
+        doneFiles = []
+        try:
+            for elem, (oldUrl, newUrl) in renamings.items():
+                oldUrl.getBackendFile().rename(newUrl)
+                doneFiles.append(elem)
+        except OSError as e:
+            # rollback changes and throw error
+            for elem in doneFiles:
+                oldUrl, newUrl = renamings[elem]
+                newUrl.getBackendFile().rename(oldUrl)
+            raise RenameFilesError(oldUrl, newUrl, str(e))
         db.write.changeUrls([ (element.id, str(newUrl)) for element, (_, newUrl) in renamings.items() ])
+        super()._renameFiles(renamings, emitEvent)
             
     def _addFlag(self, flag, elements, emitEvent=True):
         super()._addFlag(flag, elements, emitEvent=False)
