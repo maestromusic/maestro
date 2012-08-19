@@ -84,7 +84,7 @@ class EditorModel(leveltreemodel.LevelTreeModel):
     def __init__(self, level=levels.editor, ids=None):
         super().__init__(level, ids)
         EditorModel.instances.add(self)
-        application.dispatcher.changes.connect(self._handleDispatcher)
+        application.dispatcher.connect(self._handleDispatcher)
         self.extTagInfos = []
     
     def loadFile(self, url):

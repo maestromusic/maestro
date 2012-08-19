@@ -163,8 +163,37 @@ class Level(QtCore.QObject):
         
     def emitEvent(self, dataIds=None, contentIds=None):
         """Simple shortcut to emit an event."""
-        self.changed.emit(ElementChangedEvent(dataIds,contentIds))
-
+        if not application.stack.delayEvents():
+            self.changed.emit(ElementChangedEvent(dataIds,contentIds))
+        else: application.stack.addEvent(self.changed,ElementChangedEvent(dataIds,contentIds))
+    
+    @staticmethod  
+    def _changeId(old, new):
+        """Change the id of some element from *old* to *new* in ALL levels.
+        
+        This should only be called from within appropriate UndoCommands, and only if "old in self"
+        is True. Takes care of contents and parents, too.
+        """
+        for level in allLevels:
+            if old not in level:
+                continue
+            elem = level.elements[old]
+            del level.elements[old]
+            elem.id = new
+            level.elements[new] = elem
+            for parentID in elem.parents:
+                parentContents = level.elements[parentID].contents
+                parentContents.ids[:] = [ new if id == old else id for id in parentContents.ids ]
+            if elem.isContainer():
+                for childID in elem.contents.ids:
+                    if childID in level.elements:
+                        level.elements[childID].parents = [ new if id == old else old
+                                                          for id in level.elements[childID].parents ]
+        if old in tIdManager.tIdToUrl:
+            url = tIdManager.tIdToUrl[new] = tIdManager.tIdToUrl[old]
+            del tIdManager.tIdToUrl[old]
+            tIdManager.urlToTId[url] = new
+    
     @staticmethod  
     def _changeId(old, new):
         """Change the id of some element from *old* to *new* in ALL levels.
@@ -591,6 +620,7 @@ class Level(QtCore.QObject):
     
     def _changeTags(self, changes, emitEvent=True):
         for element, diff in changes.items():
+            print("_changeTags: {} {}".format(element,diff))
             diff.apply(element.tags)
         if emitEvent:
             self.emitEvent([element.id] for element in changes)

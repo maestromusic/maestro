@@ -78,7 +78,7 @@ class FlagManager(QtGui.QWidget):
         self._loadFlags()
         self._checkUndoRedoButtons()
         application.stack.indexChanged.connect(self._checkUndoRedoButtons)
-        application.dispatcher.changes.connect(self._handleDispatcher)
+        application.dispatcher.connect(self._handleDispatcher)
         
     def _handleDispatcher(self,event):
         """React to FlagTypeChangedEvents from the dispatcher."""

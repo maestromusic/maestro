@@ -49,10 +49,22 @@ class ChangeEvent:
 
 
 class ChangeEventDispatcher(QtCore.QObject):
-    changes = QtCore.pyqtSignal(ChangeEvent)
+    _changes = QtCore.pyqtSignal(ChangeEvent)
     
     def __init__(self):
         QtCore.QObject.__init__(self)
+        
+    def emit(self,event):
+        if not stack.delayEvents():
+            self._changes.emit(event)
+        else: stack.addEvent(self._changes,event)
+    
+    def connect(self,handler):
+        self._changes.connect(handler)
+        
+    def disconnect(self,handler):
+        self._changes.disconnect(handler)
+        
 
 dispatcher = None
  
@@ -117,7 +129,7 @@ def run(cmdConfig=[],type='gui',exitPoint=None):
     if config.options.misc.debug_events:
         def _debugAll(event):
             logger.debug("EVENT: " + str(event))
-        dispatcher.changes.connect(_debugAll)
+        dispatcher.connect(_debugAll)
         
     # Initialize database
     if type == 'test':
@@ -169,7 +181,7 @@ def run(cmdConfig=[],type='gui',exitPoint=None):
     
     # Initialize stack before levels are initialized    
     global stack
-    stack = QtGui.QUndoStack()
+    stack = UndoStack()
     
     # Load and initialize remaining modules
     from .core import levels
@@ -323,6 +335,59 @@ def runInstaller():
     """Run the graphical installer."""
     os.execl(sys.executable, os.path.basename(sys.executable), "-m", "omg.install")
     
+    
+class UndoStack(QtGui.QUndoStack):
+    def __init__(self):
+        super().__init__()
+        self._macroDepth = 0
+        self._inUndoRedo = False
+        self._eventQueue = []
+    
+    def delayEvents(self):
+        return self._macroDepth > 0 or self._inUndoRedo
+    
+    def beginMacro(self,text):
+        assert not self._inUndoRedo
+        super().beginMacro(text)
+        self._macroDepth += 1
+        
+    def push(self,command):
+        assert not self._inUndoRedo
+        super().push(command)
+        
+    def endMacro(self):
+        assert not self._inUndoRedo
+        super().endMacro()
+        self._macroDepth -= 1
+        if self._macroDepth == 0:
+            for signal,event in self._eventQueue:
+                signal.emit(event)
+            self._eventQueue = []
+            
+    def addEvent(self,signal,event):
+        self._eventQueue.append((signal,event))
+    
+    @QtCore.pyqtSlot()
+    def undo(self):
+        assert not self._inUndoRedo and self._macroDepth == 0
+        self._inUndoRedo = True
+        super().undo()
+        for signal,event in self._eventQueue:
+            signal.emit(event)
+        self._eventQueue = []
+        self._inUndoRedo = False
+    
+    @QtCore.pyqtSlot()
+    def redo(self):
+        assert not self._inUndoRedo and self._macroDepth == 0
+        self._inUndoRedo = True
+        super().redo()
+        self._inUndoRedo = False
+        for signal,event in self._eventQueue:
+            signal.emit(event)
+        self._eventQueue = []
+            
+        
     
 if __name__ == "__main__":
     run()

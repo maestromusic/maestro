@@ -76,7 +76,7 @@ class Record:
         elements.extend(el for el in other.elementsWithValue if el not in elements)
         return Record(self.tag,self.value,self.allElements,elements)
     
-    def __str__(self):
+    def __repr__(self):
         if self.isCommon():
             return str(self.value)
         elif len(self.elementsWithValue) == 1:
@@ -85,8 +85,12 @@ class Record:
             return translate("TagEditor","{} except in {}").format(self.value,self.getExceptions()[0])
         else: return translate("TagEditor","{} in {} pieces").format(self.value,len(self.elementsWithValue))
 
-    def __repr__(self):
-        return str(self)
+    def __eq__(self,other):
+        return isinstance(other,Record) and self.tag == other.tag \
+                and self.value == other.value and self.elementsWithValue == other.elementsWithValue
+                
+    def __ne__(self,other):
+        return not self.__eq__(other)
     
 
 class RecordModel(QtCore.QObject):
@@ -258,8 +262,7 @@ class TagFlagEditorUndoCommand(QtGui.QUndoCommand):
                 if not self._firstRedo and self._statusNumber == self.model._statusNumber:
                     method(*params)
                 self.modifyLevel(method,params)
-            event = levels.ElementChangedEvent(dataIds=self.ids) #TagFlagEditorChangedEvent(self,self.redoMethods)
-            self.model.level.changed.emit(event)
+            self.model.level.emitEvent(dataIds=self.ids)
         self._firstRedo = False
 
     def undo(self):
@@ -268,8 +271,7 @@ class TagFlagEditorUndoCommand(QtGui.QUndoCommand):
                 if self._statusNumber == self.model._statusNumber:
                     method(*params)
                 self.modifyLevel(method,params)
-            event = levels.ElementChangedEvent(dataIds=self.ids) #TagFlagEditorChangedEvent(self,self.undoMethods)
-            self.model.level.changed.emit(event)
+            self.model.level.emitEvent(dataIds=self.ids)
 
     def modifyLevel(self,method,params):
         """Modify the level according to *method* and *params*: The change to the level must be the same
@@ -447,7 +449,7 @@ class TagEditorModel(QtCore.QObject):
                     if value not in records[tag]:
                          records[tag][value] = Record(tag,value,self.elements,[element])
                     else: records[tag][value].elementsWithValue.append(element)
-    
+        
         # Use lists instead of ordered dicts in the result
         result = utils.OrderedDict()
         
@@ -552,12 +554,9 @@ class TagEditorModel(QtCore.QObject):
         successful change it will return true.
         """
         # First check whether the existing values in oldTag are convertible to newTag
-        try:
-            for record in self.records[oldTag]:
-                # Do nothing with the return value, we only check whether conversion is possible
-                oldTag.convertValue(newTag,record.value)
-        except ValueError:
-            return False # conversion not possible
+        if not all(newTag.canConvert(record.value) for record in self.records[oldTag]):
+            return False
+        
         command = TagEditorUndoCommand(self,self.tr("Change tag"))
 
         if newTag not in self.records.tags():
@@ -568,14 +567,14 @@ class TagEditorModel(QtCore.QObject):
             for record in self.records[newTag]:
                 newRecord = record.copy()
                 newRecord.tag = newTag
-                newRecord.value = oldTag.convertValue(newTag,record.value)
+                newRecord.value = newTag.convertValue(record.value)
                 command.addMethod(self.records.changeRecord,newTag,record,newRecord)
         else: # Now we have to add all converted records to the existing tag
             # The easiest way to do this is to remove all records and add the converted records again
             for record in self.records[oldTag]:
                 newRecord = record.copy()
                 newRecord.tag = newTag
-                newRecord.value = oldTag.convertValue(newTag,record.value)
+                newRecord.value = newTag.convertValue(record.value)
                 self._insertRecord(command,None,newRecord)
                 command.addMethod(self.records.removeRecord,record)
             # Finally remove the old tag
