@@ -130,7 +130,7 @@ class Level(QtCore.QObject):
         
     def emitEvent(self, dataIds=None, contentIds=None):
         """Simple shortcut to emit an event."""
-        if not application.stack.inMacro():
+        if not application.stack.delayEvents():
             self.changed.emit(ElementChangedEvent(dataIds,contentIds))
         else: application.stack.addEvent(self.changed,ElementChangedEvent(dataIds,contentIds))
     
@@ -517,6 +517,7 @@ class Level(QtCore.QObject):
     
     def _changeTags(self, changes):
         for element, diff in changes.items():
+            print("_changeTags: {} {}".format(element,diff))
             diff.apply(element.tags)
     
     def _addFlag(self, flag, elements, emitEvent=True):

@@ -85,6 +85,13 @@ class Record:
             return translate("TagEditor","{} except in {}").format(self.value,self.getExceptions()[0])
         else: return translate("TagEditor","{} in {} pieces").format(self.value,len(self.elementsWithValue))
 
+    def __eq__(self,other):
+        return isinstance(other,Record) and self.tag == other.tag \
+                and self.value == other.value and self.elementsWithValue == other.elementsWithValue
+                
+    def __ne__(self,other):
+        return not self.__eq__(other)
+    
     
 class RecordModel(QtCore.QObject):
     """A RecordModel is basically the data-structure used by the tageditor. It stores an OrderedDict mapping
@@ -442,7 +449,7 @@ class TagEditorModel(QtCore.QObject):
                     if value not in records[tag]:
                          records[tag][value] = Record(tag,value,self.elements,[element])
                     else: records[tag][value].elementsWithValue.append(element)
-    
+        
         # Use lists instead of ordered dicts in the result
         result = utils.OrderedDict()
         

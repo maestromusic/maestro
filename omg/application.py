@@ -55,7 +55,7 @@ class ChangeEventDispatcher(QtCore.QObject):
         QtCore.QObject.__init__(self)
         
     def emit(self,event):
-        if not stack.inMacro():
+        if not stack.delayEvents():
             self._changes.emit(event)
         else: stack.addEvent(self._changes,event)
     
@@ -340,16 +340,23 @@ class UndoStack(QtGui.QUndoStack):
     def __init__(self):
         super().__init__()
         self._macroDepth = 0
+        self._inUndoRedo = False
         self._eventQueue = []
     
-    def inMacro(self):
-        return self._macroDepth > 0
+    def delayEvents(self):
+        return self._macroDepth > 0 or self._inUndoRedo
     
     def beginMacro(self,text):
+        assert not self._inUndoRedo
         super().beginMacro(text)
         self._macroDepth += 1
         
+    def push(self,command):
+        assert not self._inUndoRedo
+        super().push(command)
+        
     def endMacro(self):
+        assert not self._inUndoRedo
         super().endMacro()
         self._macroDepth -= 1
         if self._macroDepth == 0:
@@ -359,6 +366,26 @@ class UndoStack(QtGui.QUndoStack):
             
     def addEvent(self,signal,event):
         self._eventQueue.append((signal,event))
+    
+    @QtCore.pyqtSlot()
+    def undo(self):
+        assert not self._inUndoRedo and self._macroDepth == 0
+        self._inUndoRedo = True
+        super().undo()
+        for signal,event in self._eventQueue:
+            signal.emit(event)
+        self._eventQueue = []
+        self._inUndoRedo = False
+    
+    @QtCore.pyqtSlot()
+    def redo(self):
+        assert not self._inUndoRedo and self._macroDepth == 0
+        self._inUndoRedo = True
+        super().redo()
+        self._inUndoRedo = False
+        for signal,event in self._eventQueue:
+            signal.emit(event)
+        self._eventQueue = []
             
         
     

@@ -243,9 +243,7 @@ class RecordEditor(QtGui.QWidget):
         """Set the record that can be edited in this RecordEditor."""
         self.record = record
         if record.tag != self.valueEditor.getTag():
-            # Do not change the value when changing the tag since the old value may be invalid for the
-            # new tag. Wait until we set the new value in the next line.
-            self.valueEditor.setTag(record.tag,setValue=False)
+            self.valueEditor.setTag(record.tag)
         self.valueEditor.setValue(record.value)
         self._updateElementDisplay()
 

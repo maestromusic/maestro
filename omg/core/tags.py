@@ -468,7 +468,7 @@ def addTagType(tagType,type,**data):
 
     data['type'] = type
     application.stack.push(TagTypeUndoCommand(ADD,tagType,**data))
-    application.endMacro()
+    application.stack.endMacro()
     
     return tagType
         

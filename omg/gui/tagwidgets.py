@@ -375,6 +375,7 @@ class TagValueEditor(QtGui.QWidget):
         self.editor = None
         self.tag = None # Create the variable
         self.valid = tag.canConvert('')
+        self._emitValueChanged = True
         self.setTag(tag)
         application.dispatcher.connect(self._handleDispatcher)
 
@@ -387,32 +388,49 @@ class TagValueEditor(QtGui.QWidget):
         """Return the tag type of this editor."""
         return self.tag
 
-    def setTag(self,tag,setValue=True):
-        """Set the tag type of this editor. This will change the editor widget if necessary."""
-        if tag == self.tag:
-            return
+    def setTag(self,tag):
+        """Set the tag type of this editor. This will change the editor widget if necessary. This won't
+        change the value even if it is invalid for the new tag (but the widget will indicate the invalid
+        value).
+        """
+        if tag != self.tag:
+            self._setTag(tag)
         
-        if self.tag is None or self._editorClass(tag) != self._editorClass(self.tag):
+    def _setTag(self,tag):
+        """Set the tag type of this editor. Change the internal editor so that it can edit values of the
+        given tag."""
+        text = self.getText() if self.editor is not None else ''
+        
+        # Note: type(self._getActualEditor()) != self._editorClass(self.tag)
+        # if the value-type of self.tag has just changed.
+        if self.tag is None or self._editorClass(tag) != type(self._getActualEditor()):
             # We have to change the editor
             if self.editor is not None:
-                text = self.getText()
                 self.layout().removeWidget(self.editor)
-                self._createEditor(tag)
-                self.layout().addWidget(self.editor)
-                self.tag = tag
-                if setValue:
-                    self.setValue(text)
-            else: 
-                self._createEditor(tag)
-                self.layout().addWidget(self.editor)
-                self.tag = tag
-        else:
-            # It may happen that the current value interpreted as value of the new tag should be displayed
-            # differently. Therefore after changing the tag we invoke setValue with the current value.
-            text = self.getText()
-            self.tag = tag
-            if setValue:
-                self.setValue(text)
+            
+            editor = self._editorClass(tag)() # Create a new instance of that class
+            if self.hideEditor:
+                from .misc import hiddeneditor
+                shrink = self._editorClass(tag) == EnhancedTextEdit
+                self.editor = hiddeneditor.HiddenEditor(editor=editor,shrink=shrink)
+                self.editor.valueChanged.connect(self._handleValueChanged)
+            else:
+                self.editor = editor
+                self.editor.editingFinished.connect(self._handleValueChanged)
+            self.setFocusProxy(self.editor)
+            self.layout().addWidget(self.editor)
+    
+        self.tag = tag
+        
+        # It may happen that the current value interpreted as value of the new tag should be displayed
+        # differently. Therefore after changing the tag we call setValue with the current text.
+        # This must not emit a value-changed signal because conceptually only the way the value is displayed
+        # changes and not the value itself.
+        if tag.canConvert(text):
+            # This is 
+            self._emitValueChanged = False
+            self.setValue(text)
+            self._emitValueChanged = True
 
         if self._editorClass() == QtGui.QLineEdit:
             # Update the completer
@@ -429,25 +447,19 @@ class TagValueEditor(QtGui.QWidget):
             else: self._getActualEditor().setCompleter(None)
         
         self.tagChanged.emit(tag)
+                
+    def _handleDispatcher(self,event):
+        """Handle dispatcher: On TagTypeChangedEvents we might have to change the editor type.""" 
+        if isinstance(event,tags.TagTypeChangedEvent) and event.tagType == self.tag:
+            if self._editorClass(self.tag) != type(self._getActualEditor()):
+                # _setTag will change the editor type even though the tag stays the same
+                self._setTag(self.tag)
 
     def _getActualEditor(self):
         """Return the actual editor widget (e.g. a QLineEdit)."""
         if self.hideEditor:
             return self.editor.getEditor()
         else: return self.editor
-
-    def _createEditor(self,tag):
-        """Set the editor to a widget suitable to edit values of the given tag."""
-        editor = self._editorClass(tag)() # Create a new instance of that class
-        if self.hideEditor:
-            from .misc import hiddeneditor
-            shrink = self._editorClass(tag) == EnhancedTextEdit
-            self.editor = hiddeneditor.HiddenEditor(editor=editor,shrink=shrink)
-            self.editor.valueChanged.connect(self._handleValueChanged)
-        else:
-            self.editor = editor
-            self.editor.editingFinished.connect(self._handleValueChanged)
-        self.setFocusProxy(self.editor)
 
     def _editorClass(self,tag=None):
         """Return a class of widgets suitable to edit values of the given tag (e.g. QLineEdit)."""
@@ -470,9 +482,10 @@ class TagValueEditor(QtGui.QWidget):
     def getValue(self):
         """Return the current value. Contrary to getText, convert the text according to the current tag type
         (e.g. creating a FlexiDate) and return None if the current text is not valid."""
-        if not self.tag.canConvert(self.getText()):
+        try:
+            return self.tag.convertValue(self.getText())
+        except tags.TagValueError:
             return None
-        else: return self.tag.convertValue(self.getText())
         
     def setValue(self,value):
         """Set the current value. *value* must be either a string or FlexiDate if the current tag type is
@@ -487,9 +500,6 @@ class TagValueEditor(QtGui.QWidget):
             elif isinstance(self.editor,QtGui.QLineEdit):
                 self.editor.setText(text)
             else: self.editor.setPlainText(text)
-            
-            if self.tag.canConvert(self.getText()):
-                self.valueChanged.emit()
 
     def clear(self):
         """Clear the current value."""
@@ -512,7 +522,9 @@ class TagValueEditor(QtGui.QWidget):
                     # insert at the beginning, so that the most recent values will be at the top of the
                     # completer's list.
                     self.insertedValues[self.tag].insert(0,self.getText())
-            self.valueChanged.emit()
+            
+            if self._emitValueChanged:
+                self.valueChanged.emit()
         else:
             self.valid = False
             palette = self._getActualEditor().palette()
@@ -521,12 +533,6 @@ class TagValueEditor(QtGui.QWidget):
             if self.hideEditor:
                 self.editor.showEditor()
                 self.editor.setFixed(True)
-                
-    def _handleDispatcher(self,event):
-        """Handle dispatcher: On TagTypeChangedEvents we might have to change the editor type.""" 
-        if isinstance(event,tags.TagTypeChangedEvent) and event.tagType == self.tag:
-             self.tag = None
-             self.setTag(event.tagType)
 
 
 class AddTagTypeDialog(QtGui.QDialog):
