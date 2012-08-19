@@ -415,7 +415,7 @@ class MPDPlayerBackend(player.PlayerBackend):
         elif what == 'playlist':
             print("Change from MPD: playlist")
             print(how)
-            self.playlist.resetFromPaths([self.makeUrl(path) for path in how])
+            self.playlist.resetFromUrls([self.makeUrl(path) for path in how])
             
         elif what == 'disconnect':
             self.connectionStateChanged.emit(player.DISCONNECTED)

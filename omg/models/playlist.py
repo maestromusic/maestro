@@ -99,9 +99,9 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         """Initialize the playlist to contain the given files. This method is not undoable."""
         self._setRootContents(self._buildWrappersFromUrls(urls))
         
-    def resetFromPaths(self, paths, updateBackend=True):
+    def resetFromUrls(self, urls, updateBackend=True):
         """Reset the playlist to contain the given files. This method is undoable."""
-        wrappers = self._buildWrappersFromPaths(paths)
+        wrappers = self._buildWrappersFromUrls(urls)
         application.stack.push(PlaylistChangeCommand(self, wrappers, updateBackend))
 
     def clear(self,updateBackend=True):
