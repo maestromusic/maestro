@@ -554,12 +554,9 @@ class TagEditorModel(QtCore.QObject):
         successful change it will return true.
         """
         # First check whether the existing values in oldTag are convertible to newTag
-        try:
-            for record in self.records[oldTag]:
-                # Do nothing with the return value, we only check whether conversion is possible
-                oldTag.convertValue(newTag,record.value)
-        except ValueError:
-            return False # conversion not possible
+        if not all(newTag.canConvert(record.value) for record in self.records[oldTag]):
+            return False
+        
         command = TagEditorUndoCommand(self,self.tr("Change tag"))
 
         if newTag not in self.records.tags():
@@ -570,14 +567,14 @@ class TagEditorModel(QtCore.QObject):
             for record in self.records[newTag]:
                 newRecord = record.copy()
                 newRecord.tag = newTag
-                newRecord.value = oldTag.convertValue(newTag,record.value)
+                newRecord.value = newTag.convertValue(record.value)
                 command.addMethod(self.records.changeRecord,newTag,record,newRecord)
         else: # Now we have to add all converted records to the existing tag
             # The easiest way to do this is to remove all records and add the converted records again
             for record in self.records[oldTag]:
                 newRecord = record.copy()
                 newRecord.tag = newTag
-                newRecord.value = oldTag.convertValue(newTag,record.value)
+                newRecord.value = newTag.convertValue(record.value)
                 self._insertRecord(command,None,newRecord)
                 command.addMethod(self.records.removeRecord,record)
             # Finally remove the old tag
