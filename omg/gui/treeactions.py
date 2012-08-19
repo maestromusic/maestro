@@ -127,7 +127,7 @@ class DeleteAction(TreeAction):
                     model.removeElements(parent, indexes)
             elif isinstance(model, BrowserModel):
                 for parent, indexes in byParent.items():
-                    self.level().removeContents(parent.element, indexes=indexes)
+                    self.level().removeContentsAuto(parent.element, indexes=indexes)
             
             application.stack.endMacro()
         else:

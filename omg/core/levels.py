@@ -312,7 +312,6 @@ class Level(QtCore.QObject):
                 yield s[last:i]
 
         for token in _getTokens(wrapperString):
-            #print("Token: {}".format(token))
             if token == ',':
                 continue
             if token == '[':
@@ -338,42 +337,89 @@ class Level(QtCore.QObject):
     # The following functions provide undo-aware implementations of level changes
     # ===========================================================================
     
-    def insertContents(self, parent, index, elements):
+    def shiftPositions(self, parent, positions, shift):
+        """Undoably shift the positions of several children of a parent by the same amount.
+        
+        If this can not be done without conflicts, a ConsistencyError is raised.
+        """
+        untouched = set(parent.contents.positions) - set(positions)
+        changes = {pos:pos+shift for pos in positions}
+        if any(i <= 0 for i in changes.values()):
+            raise ConsistencyError('Positions may not drop below one')
+        if any(pos in untouched for pos in changes.values()):
+            raise ConsistencyError('Position conflict: cannot perform change')
+        command = GenericLevelCommand(redoMethod=self._changePositions,
+                                      redoArgs={"parent" : parent,
+                                                "changes" : changes,
+                                                "emitEvent" : True},
+                                      undoMethod=self._changePositions,
+                                      undoArgs={"parent" : parent,
+                                                "changes" : {b:a for a,b in changes.items()},
+                                                "emitEvent" : True},
+                                      text=self.tr("change positions"))
+        self.stack.push(command)
+    
+    def insertContents(self, parent, insertions):
+        """Insert contents with predefined positions into a container.
+        
+        *insertions* is a list of (position, element) tuples.
+        """
+        command = GenericLevelCommand(redoMethod=self._insertContents,
+                                      redoArgs={"parent" : parent,
+                                                "insertions" : insertions,
+                                                "emitEvent" : True},
+                                      undoMethod=self._removeContents,
+                                      undoArgs={"parent" : parent,
+                                                "positions" : [pos for pos,_ in insertions],
+                                                "emitEvent" : True},
+                                      text=self.tr("insert contents"))
+        self.stack.push(command)
+        
+    def insertContentsAuto(self, parent, index, elements):
         """Undoably insert elements into a parent container.
         
         *parent* is the container in which to insert the elements *elements*. The insert index
         (not position) is given by *index*; the position is automatically determined, and
         subsequent elements' positions are shifted if necessary.
         """
-        from . import commands
         self.stack.beginMacro(self.tr("insert"))
         if len(parent.contents) > index:
             #  need to alter positions of subsequent elements
-            firstPos = 1 if index == 0 else parent.contents.positions[index-1]+1
+            firstPos = 1 if index == 0 else parent.contents.positions[index-1] + 1
             lastPosition = firstPos + len(elements) - 1
             shift = lastPosition - parent.contents.positions[index] + 1
             if shift > 0:
-                posCom = commands.ChangePositionsCommand(self, parent,
-                                                         parent.contents.positions[index:],
-                                                         shift)
-                self.stack.push(posCom)
-        insertCom = commands.InsertElementsCommand(self, parent, index, elements)
-        self.stack.push(insertCom)
+                self.shiftPositions(parent, parent.contents.positions[index:], shift)
+        self.insertContents(parent, list(enumerate(elements, start=firstPos)))
         self.stack.endMacro()
-        
-    def removeContents(self, parent, positions=None, indexes=None):
+    
+    def removeContents(self, parent, positions):
+        """Undoably remove children with *positions* from *parent*."""
+        undoInsertions = [(pos, self.get(parent.contents.getId(pos)))
+                          for pos in positions]
+        command = GenericLevelCommand(redoMethod=self._removeContents,
+                                      redoArgs={"parent" : parent,
+                                                "positions" : positions,
+                                                "emitEvent" : True},
+                                      undoMethod=self._insertContents,
+                                      undoArgs={"parent" : parent,
+                                                "insertions" : undoInsertions,
+                                                "emitEvent" : True},
+                                      text=self.tr("remove contents"))
+        self.stack.push(command)
+
+    def removeContentsAuto(self, parent, positions=None, indexes=None):
         """Undoably remove contents under the container *parent*.
         
         The elements to remove may be given either by specifying their *positions* or
         *indexes*.        
-        If there are subsequent elements behind the deleted ones, their positions will be
-        diminished so that no gap results.
+        If there are subsequent elements behind the deleted ones, and the position of the first of
+        those is one more than the position of the last deleted element (i.e., there is no gap),
+        then their positions will be diminished such that there's no gap afterwards, too.
         """
-        from . import commands
         if positions is None:
-            positions = [ parent.contents.positions[i] for i in indexes ]
+            positions = ( parent.contents.positions[i] for i in indexes )
         positions = sorted(positions)
-        
         lastRemovePosition = positions[-1]
         lastRemoveIndex = parent.contents.positions.index(lastRemovePosition)
         shiftPositions = None
@@ -386,11 +432,9 @@ class Level(QtCore.QObject):
                 else:
                     break
         self.stack.beginMacro(self.tr("remove"))
-        removeCommand = commands.RemoveElementsCommand(self, parent, positions)
-        self.stack.push(removeCommand)
+        self.removeContents(parent, positions)
         if shiftPositions is not None:
-            posCommand = commands.ChangePositionsCommand(self, parent, shiftPositions, shift)
-            self.stack.push(posCommand)
+            self.shiftPositions(parent, shiftPositions, shift)
         self.stack.endMacro()
     
     def changeTags(self, changes, filesOnly=False):
@@ -592,7 +636,6 @@ class Level(QtCore.QObject):
     
     def _changeTags(self, changes, emitEvent=True):
         for element, diff in changes.items():
-            print("_changeTags: {} {}".format(element,diff))
             diff.apply(element.tags)
         if emitEvent:
             self.emitEvent([element.id] for element in changes)
@@ -652,7 +695,7 @@ class Level(QtCore.QObject):
             self.elements[elem.id] = elem.copy()
             elem.level = self
 
-    def _insertContents(self, parent, insertions):
+    def _insertContents(self, parent, insertions, emitEvent=True):
         """Insert some elements under *parent*.
         
         The insertions are given by an iterable of (position, element) tuples.
@@ -661,8 +704,10 @@ class Level(QtCore.QObject):
             parent.contents.insert(pos, element.id)
             if parent.id not in element.parents:
                 element.parents.append(parent.id)
+        if emitEvent:
+            self.emitEvent(contentIds=(parent.id, ))
 
-    def _removeContents(self, parent, positions):
+    def _removeContents(self, parent, positions, emitEvent=True):
         """Remove the children at given *positions* under parent.
         """
         childIds = [parent.contents.getId(position) for position in positions]
@@ -671,6 +716,8 @@ class Level(QtCore.QObject):
         for id in childIds:
             if id not in parent.contents.ids:
                 self.get(id).parents.remove(parent.id)
+        if emitEvent:
+            self.emitEvent(contentIds=(parent.id, ))
 
     def _renameFiles(self, renamings, emitEvent=True):
         """Rename files based on *renamings*, a dict from elements to (oldUrl, newUrl) pairs.
@@ -679,6 +726,14 @@ class Level(QtCore.QObject):
             element.url = newUrl
         if emitEvent:
             self.emitEvent([elem.id for elem in renamings])
+
+    def _changePositions(self, parent, changes, emitEvent=True):
+        """Change positions of elements."""
+        for i, position in enumerate(parent.contents.positions):
+            if position in changes:
+                parent.contents.positions[i] = changes[position]
+        if emitEvent:
+            self.emitEvent(contentIds=(parent.id, ))
     
     def __str__(self):
         return 'Level({})'.format(self.name)

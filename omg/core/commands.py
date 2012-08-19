@@ -18,8 +18,6 @@
 
 """This module contains common QUndoCommands for modifying Elements in Levels."""
 
-import itertools
-
 from PyQt4 import QtCore, QtGui
 
 from . import levels
@@ -111,82 +109,3 @@ class CopyElementsCommand(QtGui.QUndoCommand):
     def undo(self):
         for elem in self.elements:
             del self.level.elements[elem.id]
-
-
-class InsertElementsCommand(QtGui.QUndoCommand):
-    """A command to insert elements into an existing container."""
-    
-    def __init__(self, level, parent, row, elements, text=None):
-        """Create the command for inserting *elements* into *parent* at index *row*."""
-        
-        super().__init__()
-        if text is None:
-            text = translate(__name__, "insert")
-        self.setText(text)
-        self.level = level
-        self.parent = parent
-        oldContents = parent.contents
-        firstPosition = 1 if row == 0 else oldContents.positions[row-1]+1
-        self.insertions = list(zip(itertools.count(start=firstPosition), elements))
-        
-    def redo(self):
-        self.level._insertContents(self.parent, self.insertions)
-        self.level.emitEvent(contentIds = (self.parent.id, ))
-        
-    def undo(self):
-        self.level._removeContents(self.parent, list(zip(*self.insertions))[0])
-        self.level.emitEvent(contentIds = (self.parent.id, ))
-
-
-class RemoveElementsCommand(QtGui.QUndoCommand):
-    """Remove some elements from a single parent."""
-    
-    def __init__(self, level, parent, positions, text=None):
-        """Create the command to remove elements at *positions* under *parent* in *level*."""
-        
-        super().__init__()
-        if text is None:
-            text = translate(__name__, "remove")
-        self.setText(text)
-        self.level = level
-        self.parent = parent
-        self.positions = positions
-        self.children = [self.level.get(parent.contents.getId(position))
-                         for position in positions]
-        
-    def redo(self):
-        self.level._removeContents(self.parent, self.positions)
-        self.level.emitEvent(contentIds=(self.parent.id,) )
-    
-    def undo(self):
-        self.level._insertContents(self.parent, list(zip(self.positions, self.children)))
-        self.level.emitEvent(contentIds= (self.parent.id,) )
-
-
-class ChangePositionsCommand(QtGui.QUndoCommand):
-    """Change the positions of several elements below the same parent. Checks for
-    invalid changes."""
-    def __init__(self, level, parent, oldPositions, shift):
-        super().__init__()
-        self.level = level
-        self.parent = parent
-        self.oldPositions = parent.contents.positions[:]
-        self.newPositions = list(map(lambda p:p + shift if p in oldPositions else p, self.oldPositions))
-        if any(i <=0 for i in self.newPositions):
-            raise levels.ConsistencyError('Positions may not drop below one')
-        if len(set(self.oldPositions)) != len(set(self.newPositions)):
-            raise levels.ConsistencyError('Position conflict: cannot perform change')
-        if self.level is levels.real:
-            self.changes = [ (p,p+shift) for p in oldPositions ]
-        
-    def redo(self):
-        self.parent.contents.positions = self.newPositions[:]
-        if self.level is levels.real:
-            db.write.changePositions(self.parent.id, self.changes)
-        self.level.emitEvent(contentIds=(self.parent.id,))
-    
-    def undo(self):
-        self.parent.contents.positions = self.oldPositions[:]
-        if self.level is levels.real:
-            db.write.changePositions(self.parent.id, [(b,a) for a,b in self.changes])
-        self.level.emitEvent(contentIds = (self.parent.id,))

@@ -197,13 +197,13 @@ class RealLevel(levels.Level):
     # Overridden from Level: these methods modify DB and filesystem
     # =============================================================
     
-    def _insertContents(self, parent, insertions):
+    def _insertContents(self, parent, insertions, emitEvent=True):
         db.write.addContents([(parent.id, pos, child.id) for pos, child in insertions])
-        super()._insertContents(parent, insertions)
+        super()._insertContents(parent, insertions, emitEvent)
         
-    def _removeContents(self, parent, positions):
+    def _removeContents(self, parent, positions, emitEvent=True):
         db.write.removeContents([(parent.id, pos) for pos in positions])
-        super()._removeContents(parent, positions)
+        super()._removeContents(parent, positions, emitEvent)
     
     def _addTagValue(self, tag, value, elements, emitEvent=True):
         super()._addTagValue(tag, value, elements, emitEvent=False)
@@ -304,7 +304,11 @@ class RealLevel(levels.Level):
             raise levels.RenameFilesError(oldUrl, newUrl, str(e))
         db.write.changeUrls([ (element.id, str(newUrl)) for element, (_, newUrl) in renamings.items() ])
         super()._renameFiles(renamings, emitEvent)
-            
+    
+    def _changePositions(self, parent, changes, emitEvent=True):
+        super()._changePositions(parent, changes, emitEvent)
+        db.write.changePositions(parent.id, list(changes.items()))
+    
     def _addFlag(self, flag, elements, emitEvent=True):
         super()._addFlag(flag, elements, emitEvent=False)
         ids = [element.id for element in elements]
