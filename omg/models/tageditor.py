@@ -76,7 +76,7 @@ class Record:
         elements.extend(el for el in other.elementsWithValue if el not in elements)
         return Record(self.tag,self.value,self.allElements,elements)
     
-    def __str__(self):
+    def __repr__(self):
         if self.isCommon():
             return str(self.value)
         elif len(self.elementsWithValue) == 1:
@@ -92,7 +92,7 @@ class Record:
     def __ne__(self,other):
         return not self.__eq__(other)
     
-    
+
 class RecordModel(QtCore.QObject):
     """A RecordModel is basically the data-structure used by the tageditor. It stores an OrderedDict mapping
     tags to lists of records (similar to the tageditor's GUI). It provides a set of basic commands to change

@@ -24,7 +24,7 @@ from PyQt4.QtCore import Qt
 from .. import strutils, utils, config, logging, application
 from ..core import tags, levels, commands
 from ..models import tageditor as tageditormodel, simplelistmodel, flageditor as flageditormodel
-from ..gui import singletageditor, tagwidgets, mainwindow, editor, flageditor, dialogs
+from ..gui import singletageditor, tagwidgets, treeactions, mainwindow, flageditor, dialogs
 from ..gui.misc import widgetlist
 
 
@@ -165,10 +165,11 @@ class TagEditorDialog(QtGui.QDialog):
     
     def _handleCommit(self):
         """Handle a click on the commit button: Commit the level and close the dialog."""
-        ids = [element.id for element in self.tagedit.model.getElements()]
-        command = commands.CommitCommand(self.level,ids)
-        application.stack.push(command)
-        self.accept()
+        try:
+            self.level.commit(self.tagedit.model.getElements())
+            self.accept()
+        except levels.TagWriteError as e:
+            e.displayMessage()
         
         
 class TagEditorWidget(QtGui.QWidget):

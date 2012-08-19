@@ -28,17 +28,10 @@ from omg.models.browser import BrowserModel
 
 translate = QtGui.QApplication.translate
 
-
-class NamedList(list):
-    #TODO: comment
-    def __init__(self, name, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.name = name
-        
         
 class TreeAction(QtGui.QAction):
     """Super class for TreeActions, i.e. Actions for TreeViews."""
-    def __init__(self, parent, text = None, shortcut = None, icon = None, tooltip = None):
+    def __init__(self, parent, text=None, shortcut=None, icon=None, tooltip=None):
         super().__init__(parent)
         if shortcut:
             self.setShortcut(shortcut)
@@ -315,8 +308,8 @@ class ToggleMajorAction(TreeAction):
         self.selection = selection
         
     def doAction(self):
-        application.stack.push(commands.ChangeMajorFlagCommand(self.parent().model().level,
-                        [w.element.id for w in self.selection.wrappers() if w.element.major == self.state]))
+        changes = {el:(not self.state) for el in self.selection.elements() if el.major == self.state}
+        application.stack.push(commands.ChangeMajorFlagCommand(self.level(), changes))
         self.toggle()
                 
 

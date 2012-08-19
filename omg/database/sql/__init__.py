@@ -51,6 +51,9 @@ every driver.
 
 import datetime
 
+from ... import logging
+
+logger = logging.getLogger(__name__)
 
 # When a driver is loaded _modules[driverIdentifier] will contain the driver's module.
 _modules = {}
@@ -159,14 +162,20 @@ class AbstractSql:
         been started.
         """
         self._transactionDepth += 1
+        if self._transactionDepth == 1:
+            logger.debug("transaction OPEN")
         return self._transactionDepth == 1
         
     def commit(self):
         """Commit a transaction. Return True if changes have really been written to the database (and False
         if just a nested transaction was closed)."""
         if self._transactionDepth == 1:
+            if self._transactionDepth == 1:
+                logger.debug("transaction CLOSE")
             return True
-        else: self._transactionDepth -= 1
+        else:
+            self._transactionDepth -= 1
+            return False
         
     def rollback(self):
         """Rollback a transaction. Nested transactions cannot be rolled back."""

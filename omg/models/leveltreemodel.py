@@ -20,8 +20,8 @@ from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
 from .. import application, config, database as db, logging, utils
-from ..core import commands, elements, levels, tags
-from ..core.nodes import RootNode, Wrapper
+from ..core import elements, levels, tags
+from ..core.nodes import Wrapper
 from ..models import rootedtreemodel, albumguesser
 
 logger = logging.getLogger(__name__)
@@ -82,18 +82,26 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
         if mimeData.hasFormat(config.options.gui.mime):
             elements = [ node.element for node in mimeData.wrappers() ]
             if action == Qt.MoveAction:
-                removals = utils.listDict(( (node.parent, node.parent.contents.index(node))
-                                                if isinstance(node.parent, RootNode)
-                                                else (node.parent.element.id,node.position) )
-                                            for node in mimeData.wrappers())
-                for rparent, positions in removals.items():
-                    if isinstance(rparent, int):
-                        commands.removeElements(self.level, rparent, positions, self.tr("remove elements"))
-                        if parent is not self.root and parent.element.id == rparent:
-                            row -= len([pos for pos in positions if pos < insertPosition])
-                for rparent, rows in removals.items():
-                    if not isinstance(rparent, int):
-                        rparent.model.removeElements(rparent, rows)
+                levelRemovals = {}
+                modelRemovals = {}
+                for node in mimeData.wrappers():
+                    if isinstance(node.parent, Wrapper):
+                        a, b = node.parent.element, node.position
+                        dct = levelRemovals
+                    else:
+                        a, b = node.parent, node.parent.contents.index(node)
+                        dct = modelRemovals
+                    if a not in dct:
+                        dct[a] = [b]
+                    else:
+                        dct[a].append(b)
+                for rparent, positions in levelRemovals.items():
+                    self.level.removeContents(rparent, positions=positions)
+                    if rparent is parent:
+                        #  when elements above insert position are removed, insert row is decreased
+                        row -= len([pos for pos in positions if pos < insertPosition])
+                for rparent, rows in modelRemovals.items():
+                    rparent.model.removeElements(rparent, rows)
                 
         else: # text/uri-list
             elements = self.prepareURLs(mimeData.urls(), parent)
@@ -186,7 +194,7 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
     def _handleLevelChanged(self, event):
         dataIds = event.dataIds
         contentIds = event.contentIds
-        for node, contents in utils.walk(self.root):
+        for node, contents in self.walk(self.root):
             if isinstance(node, Wrapper):
                 if node.element.id in dataIds:
                     self.dataChanged.emit(self.getIndex(node), self.getIndex(node))

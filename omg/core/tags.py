@@ -894,9 +894,9 @@ class TagDifference:
         self.removals = []
         self.additions = []
         if tagsA is None:
-            tagsA = Storage()
+            tagsA = {}
         if tagsB is None:
-            tagsB = Storage()
+            tagsB = {}
         for tag, valuesA in tagsA.items():
             if tag not in tagsB:
                 self.removals.append((tag, valuesA[:]))
@@ -911,12 +911,22 @@ class TagDifference:
         for tag, valuesB in tagsB.items():
             if tag not in tagsA:
                 self.additions.append((tag, valuesB[:]))
-                
+
+    def inverse(self):
+        """Return the "inverse" difference object with additions and removals exchanged."""
+        ret = TagDifference(None, None)
+        ret.additions = self.removals[:]
+        ret.removals = self.additions[:]
+        return ret
+    
+    def __str__(self):
+        return "{}(additions={}, removals={})".format(str(type(self)), self.additions, self.removals)
+    
     def onlyPrivateChanges(self):
         return all(tag.private for (tag, _) in self.additions) and \
                all(tag.private for (tag, _) in self.removals)
                
-    def apply(self, tagsA, includePrivate = True):
+    def apply(self, tagsA, includePrivate=True):
         """Apply the changes to *tagsA*, transforming them into *tagsB* given to the constructor."""
         for tag, values in self.removals:
             if includePrivate or not tag.private:
@@ -925,7 +935,7 @@ class TagDifference:
             if includePrivate or not tag.private:
                 tagsA.add(tag, *values)
             
-    def revert(self, tagsB, includePrivate = True):
+    def revert(self, tagsB, includePrivate=True):
         """Revert the changes from *tagsB*, transforming them into *tagsA* as given to the constructor."""
         for tag, values in self.additions:
             if includePrivate or not tag.private:
@@ -933,12 +943,6 @@ class TagDifference:
         for tag, values in self.removals:
             if includePrivate or not tag.private:
                 tagsB.add(tag, *values)
-    
-    def inverse(self):
-        ret = TagDifference(None, None)
-        ret.additions = self.removals[:]
-        ret.removals = self.additions[:]
-        return ret
 
     @staticmethod
     def singleTagDifference(tagType,oldValues,newValues):
@@ -950,9 +954,6 @@ class TagDifference:
             return result
         else: return None
         
-    def __str__(self):
-        return "TagDifference(additions={}, removals={})".format(self.additions, self.removals)
-                 
 
 def findCommonTags(elements):
     """Returns a Storage object containing all tags that are equal in all of the elements.

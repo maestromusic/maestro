@@ -141,16 +141,17 @@ class MPDThread(QtCore.QThread):
             info = self.client.listallinfo(how)[0]
             storage = tags.Storage()
             length = None
-            for key, value in info.items():
+            for key, values in info.items():
                 if key in ("file", "last-modified", "track"):
                     #  mpd delivers these but they aren't keys
                     continue
                 if key == "time":
-                    length = int(value)
+                    length = int(values)
                     continue
-                if not isinstance(value, list):
-                    value = [ value ]
-                storage[tags.get(key)] = value
+                tag = tags.get(key)
+                if not isinstance(values, list):
+                    values = [ values ]
+                storage[tag] = [tag.convertValue(value, crop=True) for value in values ]
             self.getInfoData = (how, storage, length)
             self.getInfoEvent.set()
         else:
@@ -414,7 +415,7 @@ class MPDPlayerBackend(player.PlayerBackend):
         elif what == 'playlist':
             print("Change from MPD: playlist")
             print(how)
-            self.playlist.resetFromPaths([self.makeUrl(path) for path in how])
+            self.playlist.resetFromUrls([self.makeUrl(path) for path in how])
             
         elif what == 'disconnect':
             self.connectionStateChanged.emit(player.DISCONNECTED)

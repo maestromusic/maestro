@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import os, os.path, hashlib, re, time
+import os.path, hashlib, re, time
 
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
