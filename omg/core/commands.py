@@ -121,8 +121,8 @@ class RenameFilesCommand(QtGui.QUndoCommand):
     def undo(self):
         if self.error is not None:
             return
-        reversed = {file:(newUrl, oldUrl) for file,(oldUrl,newUrl) in self.renamings.items()},
-        self.level._renameFiles(emitEvent=True)
+        reversed = {file:(newUrl, oldUrl) for  (file,(oldUrl,newUrl)) in self.renamings.items()}
+        self.level._renameFiles(reversed, emitEvent=True)
 
 
 class CopyElementsCommand(QtGui.QUndoCommand):

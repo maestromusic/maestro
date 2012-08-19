@@ -741,7 +741,8 @@ class RealLevel(Level):
         for file in files:
             if file.url != tIdManager(file.id):
                 urlChanges[file] = (tIdManager(file.id), file.url)
-        self.renameFiles(urlChanges)
+        if len(urlChanges) > 0:
+            self.renameFiles(urlChanges)
         tagChanges = {}
         for file in files:
             #  check if tags are different
@@ -750,7 +751,8 @@ class RealLevel(Level):
             diff = tags.TagDifference(backendFile.tags, file.tags)
             if not diff.onlyPrivateChanges():
                 tagChanges[file] = diff
-        self.changeTags(tagChanges, filesOnly=True)
+        if len(tagChanges) > 0:
+            self.changeTags(tagChanges, filesOnly=True)
     
     def changeTags(self, changes, filesOnly=False):
         """Overridden method: Adds optio to only change file tags (not database or elements).
@@ -832,7 +834,7 @@ class RealLevel(Level):
             backendFile.readTags()
             curBTags = backendFile.tags.copy()
             diff.apply(backendFile.tags, includePrivate=False)
-            print('changing tags of {}: {}'.format(element.url, diff))
+            logger.debug('changing tags of {}: {}'.format(element.url, diff))
             problems = backendFile.saveTags()
             if len(problems) > 0:
                 problemUrl = element.url
