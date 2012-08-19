@@ -94,6 +94,38 @@ class ElementChangedEvent(application.ChangeEvent):
         else: self.contentIds = contentIds
 
 
+class GenericLevelCommand(QtGui.QUndoCommand):
+    
+    def __init__(self,
+                 redoMethod, redoArgs,
+                 undoMethod, undoArgs,
+                 text=None, errorClass=None):
+        super().__init__()
+        if text is not None:
+            self.setText(text)
+        self.redoMethod, self.redoArgs = redoMethod, redoArgs
+        self.undoMethod, self.undoArgs = undoMethod, undoArgs
+        self.errorClass = errorClass
+        if errorClass is not None:
+            self.error = None
+            
+    def redo(self):
+        if self.errorClass is not None:
+            if self.error is not None:
+                return
+            try:
+                self.redoMethod(**self.redoArgs)
+            except self.errorClass as e:
+                self.error = e
+        else:
+            self.redoMethod(**self.redoArgs)
+            
+    def undo(self):
+        if self.errorClass is not None and self.error is not None:
+            return
+        self.undoMethod(**self.undoArgs)
+        
+
 class Level(QtCore.QObject):
     """A collection of elements corresponding to a specific state.
     
@@ -360,21 +392,69 @@ class Level(QtCore.QObject):
             self.stack.push(posCommand)
         self.stack.endMacro()
     
-    def changeTags(self, changes):
-        from . import commands
-        self.stack.push(commands.ChangeTagsCommand(self, changes))
-    
-    def changeFlags(self, changes):
-        from . import commands
-        self.stack.push(commands.ChangeFlagsCommand(self, changes))
-    
-    def changeData(self, changes):
-        from . import commands
-        self.stack.push(commands.ChangeDataCommand(self, changes))
+    def changeTags(self, changes, filesOnly=False):
+        """Change tags of several elements. *changes* maps element to TagDifference object.
+        
+        The option *filesOnly* makes sense only on the real level; the effect is that only files
+        on disk are modified, but neither elements nor the database.
+        
+        On real level this method might raise a TagWriteError if writing (some or all) tags to the
+        filesystem fails.
+        """
+        inverseChanges = {elem:diff.inverse() for elem,diff in changes.items()}
+        assert (not filesOnly)  or (self is real)
+        command = GenericLevelCommand(redoMethod=self._changeTags,
+                                      redoArgs={"changes" : changes,
+                                                "filesOnly" : filesOnly,
+                                                "emitEvent" : not filesOnly},
+                                      undoMethod=self._changeTags,
+                                      undoArgs={"changes": inverseChanges,
+                                                "filesOnly" : filesOnly,
+                                                "emitEvent" : not filesOnly},
+                                      text=self.tr("change tags"),
+                                      errorClass=TagWriteError)
+        self.stack.push(command)
+        if command.error:
+            raise command.error
     
     def renameFiles(self, renamings):
-        from . import commands
-        self.stack.push(commands.RenameFilesCommand(self, renamings))
+        """Rename several files. *renamings* maps element to (oldUrl, newUrl) paths.
+        
+        On the real level, this can raise a FileRenameError.
+        """
+        reversed =  {file:(newUrl, oldUrl) for  (file, (oldUrl, newUrl)) in renamings.items()}
+        command = GenericLevelCommand(redoMethod=self._renameFiles,
+                                      redoArgs={"renamings" : renamings,
+                                                "emitEvent" : True},
+                                      undoMethod=self._renameFiles,
+                                      undoArgs={"renamings": reversed},
+                                      text=self.tr("rename files"),
+                                      errorClass=RenameFilesError)
+        self.stack.push(command)
+        if command.error:
+            raise command.error
+    
+    def changeFlags(self, changes):
+        reversed = {elem:diff.inverse() for elem, diff in changes.items()}
+        command = GenericLevelCommand(redoMethod=self._changeFlags,
+                                      redoArgs={"changes" : changes,
+                                                "emitEvent" : True},
+                                      undoMethod=self._changeFlags,
+                                      undoArgs={"changes" : reversed,
+                                                "emitEvent" : True},
+                                      text=self.tr("change flags"))
+        self.stack.push(command)
+    
+    def changeData(self, changes):
+        reversed = {elem:diff.inverse() for elem, diff in changes.items()}
+        command = GenericLevelCommand(redoMethod=self._changeData,
+                                      redoArgs={"changes" : changes,
+                                                "emitEvent" : True},
+                                      undoMethod=self._changeData,
+                                      undoArgs={"changes" : reversed,
+                                                "emitEvent" : True},
+                                      text=self.tr("set major flags"))
+        self.stack.push(command)
         
     def setCovers(self, coverDict):
         """Set the covers for one or more elements.
@@ -391,8 +471,14 @@ class Level(QtCore.QObject):
         The action can be undone. *elemToMajor* maps elements to boolean values indicating the
         desired major state.
         """
-        from . import commands
-        self.stack.push(commands.ChangeMajorFlagCommand(self, elemToMajor))
+        reversed = {elem:(not major) for (elem, major) in elemToMajor.items()}
+        command = GenericLevelCommand(redoMethod=self._setMajorFlags,
+                                      redoArgs={"elemToMajor" : elemToMajor,
+                                                "emitEvent" : True},
+                                      undoMethod=self._setMajorFlags,
+                                      undoArgs={"elemToMajor" : reversed,
+                                                "emitEvent" : True})
+        self.stack.push(command)
     
     def commit(self, elements=None):
         """Undoably commit given *ids* (or everything, if not specified) into the parent level.
@@ -503,9 +589,12 @@ class Level(QtCore.QObject):
         if emitEvent:
             self.emitEvent([element.id for element in elements])
     
-    def _changeTags(self, changes):
+    def _changeTags(self, changes, emitEvent=True):
         for element, diff in changes.items():
             diff.apply(element.tags)
+        if emitEvent:
+            self.emitEvent([element.id] for element in changes)
+            
     
     def _addFlag(self, flag, elements, emitEvent=True):
         """Add *flag* to the given elements. If *emitEvent* is False, do not emit an event."""
@@ -522,17 +611,21 @@ class Level(QtCore.QObject):
         if emitEvent:
             self.emitEvent([element.id for element in elements])
     
-    def _changeFlags(self, changes):
+    def _changeFlags(self, changes, emitEvent=True):
         """Change flags of multiple elements: *changes* maps elements to TagDifference objects."""
         for elem, diff in changes.items():
             for flag in diff.additions:
                 self._addFlag(flag, (elem,), False)
             for flag in diff.removals:
                 self._removeFlag(flag, (elem,), False)
+        if emitEvent:
+            self.emitEvent([element.id for element in changes])
             
-    def _changeData(self, changes):
+    def _changeData(self, changes, emitEvent=True):
         for element, diff in changes.items():
             diff.apply(element.data)
+        if emitEvent:
+            self.emitEvent([elem.id for elem in changes])
 
     def _setData(self,type,elementToData):
         for element,data in elementToData.items():
@@ -544,10 +637,12 @@ class Level(QtCore.QObject):
                 del element.data[type]
         self.emitEvent([element.id for element in elementToData])
     
-    def _setMajorFlags(self, elemToMajor):
+    def _setMajorFlags(self, elemToMajor, emitEvent=True):
         """Set major of several elements."""
         for elem, major in elemToMajor.items():
             elem.major = major
+        if emitEvent:
+            self.emitEvent([elem.id for elem in elemToMajor])
     
     def _importElements(self, elements):
         """Create the elements *elements* from a different level into this one."""
@@ -753,23 +848,7 @@ class RealLevel(Level):
                 tagChanges[file] = diff
         if len(tagChanges) > 0:
             self.changeTags(tagChanges, filesOnly=True)
-    
-    def changeTags(self, changes, filesOnly=False):
-        """Overridden method: Adds optio to only change file tags (not database or elements).
-        
-        Might raise a TagWriteError if writing (some or all) tags to filesystem fails."""
-        from . import commands
-        command = commands.ChangeTagsCommand(self, changes, filesOnly)
-        self.stack.push(command)
-        if command.error:
-            raise command.error
-    
-    def renameFiles(self, renamings):
-        from . import commands
-        command = commands.RenameFilesCommand(self, renamings)
-        self.stack.push(command)
-        if command.error:
-            raise command.error
+
         
     # =============================================================
     # Overridden from Level: these methods modify DB and filesystem
@@ -815,7 +894,7 @@ class RealLevel(Level):
         if emitEvent:
             self.emitEvent([element.id for element in elements])
     
-    def _changeTags(self, changes, filesOnly=False):
+    def _changeTags(self, changes, emitEvent=True, filesOnly=False):
         """CHange tags of elements. Might raise a TagWriteError if files are involved.
         
         If an error is raised, any changes made before are undone.
@@ -865,7 +944,7 @@ class RealLevel(Level):
                     continue
                 dbwrite.removeTagValues(element.id, tag, values)
         db.commit()
-        super()._changeTags(changes)
+        super()._changeTags(changes, emitEvent)
 
     def _renameFiles(self, renamings, emitEvent=True):
         """On the real level, files are renamed both on disk and in DB."""
@@ -897,16 +976,16 @@ class RealLevel(Level):
         if emitEvent:
             self.emitEvent(ids)
     
-    def _changeData(self, changes):
-        super()._changeData(changes)
+    def _changeData(self, changes, emitEvent):
+        super()._changeData(changes, emitEvent)
         db.transaction()
         for element, diff in changes.items():
             for type, (a, b) in diff.diffs.items():
                 if a is not None:
                     db.query("DELETE FROM {}data WHERE type=? AND element_id=?"
-                             .format(db.prefix, type, element.id))
+                             .format(db.prefix), type, element.id)
                 if b is not None:
-                    db.multiQuery("INSERT INTO {}data (element_id, type, sort, data) VALUES (?,?,?,?"
+                    db.multiQuery("INSERT INTO {}data (element_id, type, sort, data) VALUES (?,?,?,?)"
                                   .format(db.prefix), [(element.id, type, i, val) for i, val in enumerate(b)])
         db.commit()
                 
@@ -924,8 +1003,8 @@ class RealLevel(Level):
                           .format(db.prefix),values)
         db.commit()
         
-    def _setMajorFlags(self, elemToMajor):
-        super()._setMajorFlags(elemToMajor)
+    def _setMajorFlags(self, elemToMajor, emitEvent=True):
+        super()._setMajorFlags(elemToMajor, emitEvent)
         db.write.setMajor((el.id,major) for (el, major) in elemToMajor.items() )
 
 
