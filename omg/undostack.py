@@ -23,11 +23,21 @@ from PyQt4.QtCore import Qt
 
 
 class UndoStack(QtGui.QUndoStack):
+    """An UndoStack stores QUndoCommands and provides undo/redo. This subclass improves QUndoStack in
+    several ways:
+    
+        - the attempt to modify the stack during undo/redo will lead to a RuntimeError,
+        - while a macro is composed and during undo/redo, ChangeEventDispatcher won't emit events directly,
+          but add them to an internal queue. When the macro is completed or undo/redo finished, all events
+          will be emitted.
+        - Events on the queue may be merged (see ChangeEvent.merge)
+        
+    """
     def __init__(self):
         super().__init__()
-        self._macroDepth = 0
-        self._inUndoRedo = False
-        self._eventQueue = []
+        self._macroDepth = 0     # Number of open macros (# of beginMacro - # of endMacro)
+        self._inUndoRedo = False # True during undo and redo
+        self._eventQueue = []    # list of tuples (dispatcher,event)
     
     def delayEvents(self):
         """Return whether events should be delayed."""
@@ -53,15 +63,18 @@ class UndoStack(QtGui.QUndoStack):
             self._emitQueuedEvents()
         
     def _emitQueuedEvents(self):
+        """Emit all events that have been queued."""
         for dispatcher,event in self._eventQueue:
-            dispatcher.emit(event)
+            dispatcher._signal.emit(event) # Really emit! _inUndoRedo is usually still True
         self._eventQueue = []
             
     def addEvent(self,dispatcher,event):
+        """Add *event* to the queue. *dispatcher* is the ChangeEventDispatcher that should eventually emit
+        the event. Try to merge the event with existing events (of the same dispatcher, of course).
+        """ 
         for d,e in self._eventQueue:
             if d is dispatcher:
                 if e.merge(event):
-                    print("Merge successful")
                     return # event was merged
         else: self._eventQueue.append((dispatcher,event))
     

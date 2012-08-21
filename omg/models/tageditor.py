@@ -429,9 +429,9 @@ class TagEditorModel(QtCore.QObject):
         self._statusNumber += 1
         if self.level != level:
             if self.level is not None:
-                self.level.changed.connect(self._handleLevelChanged)
+                self.level.disconnect(self._handleLevelChanged)
             if level is not None:
-                level.changed.connect(self._handleLevelChanged)
+                level.connect(self._handleLevelChanged)
         self.level = level
         self.elements = elements
         self.records.setRecords(self._createRecords())

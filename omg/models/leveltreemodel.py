@@ -39,7 +39,7 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
         self.level = level
         if elements:
             self._changeContents(QtCore.QModelIndex(), elements)
-        level.changed.connect(self._handleLevelChanged)
+        level.connect(self._handleLevelChanged)
         
     def supportedDropActions(self):
         return Qt.CopyAction | Qt.MoveAction

@@ -38,7 +38,7 @@ def init():
     return # DISABLE MODULE DOES NOT WORK ATM
     syncThread = FileSystemSynchronizer()
     null = open(os.devnull)
-    levels.real.changed.connect(syncThread.handleEvent, Qt.QueuedConnection)
+    levels.real.connect(syncThread.handleEvent, Qt.QueuedConnection)
     notifier = Notifier()
     syncThread.missingFilesDetected.connect(notifier.notifyAboutMissingFiles)
     syncThread.modifiedTagsDetected.connect(notifier.changeModifiedTags)

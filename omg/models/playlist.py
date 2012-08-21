@@ -40,7 +40,7 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         
         # self.current and all of its parents. The delegate draws an arrow in front of these nodes
         self.currentlyPlayingNodes = []
-        self.level.changed.connect(self._handleLevelChanged)
+        self.level.connect(self._handleLevelChanged)
     
     def clearCurrent(self):
         """Unsets the current song and clears the currentlyPlayingNodes list."""

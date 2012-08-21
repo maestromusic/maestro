@@ -163,16 +163,10 @@ class Level(application.ChangeEventDispatcher):
         self.parent = parent
         self.elements = {}
         self.stack = stack if stack is not None else application.stack
-
-        if config.options.misc.debug_events:
-            def _debugAll(event):
-                logger.debug("EVENT[{}]: {}".format(self.name,str(event)))
-            self.changed.connect(_debugAll)
         
     def emitEvent(self, dataIds=None, contentIds=None):
         """Simple shortcut to emit an event."""
         self.emit(ElementChangedEvent(dataIds,contentIds))
-
     
     @staticmethod  
     def _changeId(old, new):
@@ -630,8 +624,7 @@ class Level(application.ChangeEventDispatcher):
     
     def _addTagValue(self, tag, value, elements, emitEvent=True):
         """Add a tag of type *tag* and value *value* to the given elements.
-        
-        If *emitEvent* is False, do not emit the event self.changed."""
+        If *emitEvent* is False, do not emit an even."""
         for element in elements:
             element.tags.add(tag, value)
         if emitEvent:
@@ -639,8 +632,7 @@ class Level(application.ChangeEventDispatcher):
             
     def _removeTagValue(self, tag, value, elements, emitEvent=True):
         """Remove a tag of type *tag* and *value* value from the given elements.
-        
-        If *emitEvent* is False, do not emit self.changed."""
+        If *emitEvent* is False, do not emit an even."""
         for element in elements:
             element.tags.remove(tag, value)
         if emitEvent:

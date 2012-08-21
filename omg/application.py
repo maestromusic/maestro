@@ -52,23 +52,33 @@ class ChangeEvent:
 
 
 class ChangeEventDispatcher(QtCore.QObject):
+    """A dispatcher emits events. Unlike a Qt-signal it communicates with the application's stack to
+    queue events during macros and undo/redo.""" 
     _signal = QtCore.pyqtSignal(ChangeEvent)
     
     def __init__(self):
-        QtCore.QObject.__init__(self)
+        super().__init__()
+        if config.options.misc.debug_events:
+            def _debugAll(event):
+                logger.debug("EVENT: " + str(event))
+            self.connect(_debugAll)
         
     def emit(self,event):
+        """Emit an event."""
         if not stack.delayEvents():
             self._signal.emit(event)
         else: stack.addEvent(self,event)
     
     def connect(self,handler):
+        """Connect a function to this dispatcher."""
         self._signal.connect(handler)
         
     def disconnect(self,handler):
+        """Disconnect a function from this dispatcher."""
         self._signal.disconnect(handler)
         
 
+# The global dispatcher. Each level is its own dispatcher
 dispatcher = None
  
 
@@ -128,11 +138,6 @@ def run(cmdConfig=[],type='gui',exitPoint=None):
     # Initialize dispatcher
     global dispatcher
     dispatcher = ChangeEventDispatcher()
-    
-    if config.options.misc.debug_events:
-        def _debugAll(event):
-            logger.debug("EVENT: " + str(event))
-        dispatcher.connect(_debugAll)
         
     # Initialize database
     if type == 'test':
