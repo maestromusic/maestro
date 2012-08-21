@@ -389,6 +389,20 @@ class Level(QtCore.QObject):
             self.stack.push(posCommand)
         self.stack.endMacro()
     
+    def addTagValues(self,tag,valueMap):
+        changes = {}
+        for element,values in valueMap.items():
+            diff = tags.TagDifference(None,None)
+            diff.additions = [(tag,values)]
+            changes[element] = diff
+        self.changeTags(changes)
+        
+    def removeTag(self,tag,elements):
+        # Small optimization: tuple() will always use the same object
+        changes = {el: tags.TagDifference.singleTagDifference(tag,el.tags[tag],tuple())
+                   for el in elements if tag in el.tags}
+        self.changeTags(changes)
+        
     def changeTags(self, changes):
         from . import commands
         self.stack.push(commands.ChangeTagsCommand(self, changes))
@@ -534,7 +548,6 @@ class Level(QtCore.QObject):
     
     def _changeTags(self, changes):
         for element, diff in changes.items():
-            print("_changeTags: {} {}".format(element,diff))
             diff.apply(element.tags)
     
     def _addFlag(self, flag, elements, emitEvent=True):
@@ -846,7 +859,7 @@ class RealLevel(Level):
             self.emitEvent([element.id for element in elements])
     
     def _changeTags(self, changes, filesOnly=False):
-        """CHange tags of elements. Might raise a TagWriteError if files are involved.
+        """Change tags of elements. Might raise a TagWriteError if files are involved.
         
         If an error is raised, any changes made before are undone.
         The optional *filesOnly* suppresses any changes to the database."""

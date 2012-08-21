@@ -242,18 +242,21 @@ class ExternalTagsWidget(QtGui.QScrollArea):
         index = int(index)
         info = self.editor.model().extTagInfos[index]
         
-        if action == 'delete':
-            pass #levels.editor.removeTag(info.tag,info.elements()) #TODO
-        elif action == 'add':
+        if action == 'add':
             tagwidgets.AddTagTypeDialog.addTagType(info.tag)
+        elif action == 'delete':
+            levels.editor.removeTag(info.tag,info.elements())
         elif action == 'undo':
             if info.type == 'delete':
                 levels.editor.addTagValues(info.tag,info.valueMap)
             elif info.type == 'replace':
-                application.stack.beginMacro()
-                #levels.editor.removeTagValues(info.newTag,info.newValueMap) #TODO
-                #levels.editor.addTagValues(info.tag,info.valueMap)
-                application.stack.endMacro()
+                changes = {}
+                for element in info.valueMap.keys():
+                    diff = tags.TagDifference(None,None)
+                    diff.additions = [(info.tag,info.valueMap[element])]
+                    diff.removals = [(info.newTag,info.newValueMap[element])]
+                    changes[element] = diff
+                levels.editor.changeTags(changes)
             else: assert False
         elif action == 'select':
             # Construct a QItemSelection storing the whole selection and add it to the model at once.

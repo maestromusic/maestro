@@ -344,6 +344,7 @@ class UndoStack(QtGui.QUndoStack):
         self._eventQueue = []
     
     def delayEvents(self):
+        """Return whether events should be delayed."""
         return self._macroDepth > 0 or self._inUndoRedo
     
     def beginMacro(self,text):
@@ -387,7 +388,6 @@ class UndoStack(QtGui.QUndoStack):
             signal.emit(event)
         self._eventQueue = []
             
-        
     
 if __name__ == "__main__":
     run()

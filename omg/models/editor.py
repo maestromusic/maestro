@@ -37,7 +37,11 @@ class ExternalTagInfo:
         self.tag = tag
         if type == 'unknown':
             self._elements = []
-        else: self.valueMap = {}
+        else:
+            self.valueMap = {}
+            if type == 'replace':
+                self.newValueMap = {}
+        
         self.newTag = newTag
         
     def elementCount(self):
@@ -128,13 +132,18 @@ class EditorModel(leveltreemodel.LevelTreeModel):
             if type == 'delete':
                 del element.tags[tag]
             elif type == 'replace':
+                newValues = []
                 for string in element.tags[tag]:
                     try:
                         value = newTag.convertValue(string,crop=True)
                     except ValueError:
                         logger.error("Invalid value for tag '{}' (replacing '{}') found: {}"
                                      .format(newTag.name,tag.name,string))
-                    else: element.tags.addUnique(newTag,value)
+                    else:
+                        if newTag not in element.tags or value not in element.tags[newTag]:
+                            newValues.append(value)
+                            element.tags.add(newTag,value)
+                info.newValueMap[element] = newValues
                 del element.tags[tag]
             
     @staticmethod
@@ -153,7 +162,7 @@ class EditorModel(leveltreemodel.LevelTreeModel):
                 return info
         else:
             info = ExternalTagInfo(type,tag,newTag)
-            EditorModel.self.extTagInfos.append(info)
+            self.extTagInfos.append(info)
             return info
     
     @staticmethod
@@ -203,7 +212,7 @@ class EditorModel(leveltreemodel.LevelTreeModel):
                 element = self.level.get(id)
                 for tag in element.tags:
                     if not tag.isInDB():
-                        info = self._getExtTagInfo(tag,'unknown')
+                        info = self._getExtTagInfo('unknown',tag)
                         if element not in info.elements():
                             info.addElement(element)
                             changed = True
