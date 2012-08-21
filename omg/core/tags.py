@@ -519,7 +519,7 @@ def removeTagType(tagType):
     
     application.stack.beginMacro(translate("TagTypeUndoCommand","Remove tagtype from DB"))
     try:
-        _convertTagTypeOnLevels(tagType,None)
+        _convertTagTypeOnLevels(tagType, None)
     except TagValueError as error:
         application.stack.endMacro()
         #TODO: remove macro from stack
@@ -618,14 +618,15 @@ def _changeTagType(tagType,**data):
         application.dispatcher.emit(TagTypeChangedEvent(CHANGED,tagType))
 
 
-def _convertTagTypeOnLevels(tagType,valueType):
+def _convertTagTypeOnLevels(tagType, valueType):
     """Convert all occurences of *tagType* on all levels from *tagType*'s value-type to *valueType*.
-    This method is used to adjust levels just before a tag-type's value-type changes. *valueType* may be
-    None, indicating that *tagType* is going to become an external tag.
+    
+    This method is used to adjust levels just before a tag-type's value-type changes. *valueType*
+    may be None, indicating that *tagType* is going to become an external tag.
     Before any level is changed this method checks whether all values can be converted. If not, a
     TagValueError is raised.
     """
-    from . import levels, commands
+    from . import levels
     cmds = []
     for level in levels.allLevels:
         diffs = {}
@@ -638,7 +639,7 @@ def _convertTagTypeOnLevels(tagType,valueType):
                 if diff is not None:
                     diffs[element] = diff
         if len(diffs) > 0:
-            cmds.append(commands.ChangeTagsCommand(level,diffs))
+            level.changeTags(diffs)
     # Only start changing levels if all tag value conversions have been successful.
     for command in cmds:
         application.stack.push(command)

@@ -96,7 +96,7 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
                     else:
                         dct[a].append(b)
                 for rparent, positions in levelRemovals.items():
-                    self.level.removeContents(rparent, positions=positions)
+                    self.level.removeContentsAuto(rparent, positions=positions)
                     if rparent is parent:
                         #  when elements above insert position are removed, insert row is decreased
                         row -= len([pos for pos in positions if pos < insertPosition])
@@ -128,7 +128,7 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
             newContents = oldContents[:row] + elements + oldContents[row:]
             application.stack.push(ChangeRootCommand(self, newContents))
         else:
-            self.level.insertContents(parent.element, row, elements)
+            self.level.insertContentsAuto(parent.element, row, elements)
     
     def removeElements(self, parent, rows):
         """Undoably remove elements in *rows* under *parent* (a wrapper)."""
@@ -138,7 +138,7 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
                            if i not in rows]
             application.stack.push(ChangeRootCommand(self, newContents))
         else:
-            self.level.removeContents(parent.element, indexes=rows)
+            self.level.removeContentsAuto(parent.element, indexes=rows)
     
     def loadFile(self, path):
         """Load a file into this model. The default implementations calls level.get()."""

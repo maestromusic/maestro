@@ -78,14 +78,14 @@ class TestCase(unittest.TestCase):
             self.assertEqual(0,db.query("SELECT COUNT(*) FROM {}contents".format(db.prefix)).getSingle())
            
     def runTest(self):
-        self.level.insertContents(self.C1,0,[self.F1,self.F3])
+        self.level.insertContentsAuto(self.C1,0,[self.F1,self.F3])
         self.check('contents',(self.C1,[self.F1,self.F3]))
         self.check('parents',(self.F1,[self.C1]))
 
-        self.level.insertContents(self.C1,1,[self.F2])
+        self.level.insertContentsAuto(self.C1,1,[self.F2])
         self.check('contents',(self.C1,[self.F1,self.F2,self.F3]))
         
-        self.level.removeContents(self.C1, indexes=(1, 2))
+        self.level.removeContentsAuto(self.C1, indexes=(1, 2))
         self.check('contents',(self.C1, [self.F1]))
         self.check('parents',(self.F2, []))
         

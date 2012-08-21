@@ -22,7 +22,11 @@ class DataDifference:
     
     def __init__(self, dataA, dataB):
         self.diffs = {}
-        for key in set(dataA.keys()) + set(dataB.keys()):
+        if dataA is None:
+            dataA = {}
+        if dataB is None:
+            dataB = {}
+        for key in set(dataA.keys()) | set(dataB.keys()):
             a = dataA[key] if key in dataA else None
             b = dataB[key] if key in dataB else None
             if a != b:
@@ -31,16 +35,18 @@ class DataDifference:
     def apply(self, dataA):
         for key, (_, b) in self.diffs.items():
             if b is None:
-                del self.dataA[key]
+                del dataA[key]
             else:
                 dataA[key] = b
                 
     def revert(self, dataB):
         for key, (a, _) in self.diffs.items():
             if a is None:
-                del self.dataB[key]
+                del dataB[key]
             else:
                 dataB[key] = a
                 
     def inverse(self):
-        return {key:(b, a) for (key, (a, b)) in self.diffs.items() }
+        ret = DataDifference(None, None)
+        ret.diffs = {key:(b, a) for (key, (a, b)) in self.diffs.items() }
+        return ret

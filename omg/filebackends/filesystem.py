@@ -44,7 +44,7 @@ class RealFile(BackendFile):
     def __init__(self, url):
         assert url.proto == "file"
         super().__init__(url)
-        
+                
     def readTags(self):
         """Load the tags from disk using pytaglib.
         
@@ -109,7 +109,6 @@ class RealFile(BackendFile):
         In addition to the tags in self.tags, any ignored tags (TRACKNUMBER etc.) that were read
         using readTags() will be stored in to the file such that they aren't lost.
         """
-        return #TODO: broken
         self._taglibFile.tags = dict()
         for tag, values in self.ignoredTags.items():
             self._taglibFile.tags[tag.upper()] = values

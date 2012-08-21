@@ -199,7 +199,7 @@ class EditorModel(leveltreemodel.LevelTreeModel):
         if parent is self.root:
             self._updateExtTagInfos()
         
-    def _handleLevelChanged(self,event):
+    def _handleLevelChanged(self, event):
         super()._handleLevelChanged(event)
         
         if len(event.contentIds) > 0:

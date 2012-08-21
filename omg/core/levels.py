@@ -22,10 +22,8 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from . import data, tags, flags
-from .elements import File, Container
 from .nodes import Wrapper
 from .. import application, filebackends, database as db, config, logging
-from ..database import write as dbwrite
 
 
 allLevels = weakref.WeakSet()
@@ -37,7 +35,8 @@ logger = logging.getLogger(__name__)
 
 def init():
     global real,editor
-    real = RealLevel()
+    from . import reallevel
+    real = reallevel.RealLevel()
     editor = Level("EDITOR", parent=real)
     
 
@@ -106,6 +105,38 @@ class ElementChangedEvent(application.ChangeEvent):
             return False
 
 
+class GenericLevelCommand(QtGui.QUndoCommand):
+    
+    def __init__(self,
+                 redoMethod, redoArgs,
+                 undoMethod, undoArgs,
+                 text=None, errorClass=None):
+        super().__init__()
+        if text is not None:
+            self.setText(text)
+        self.redoMethod, self.redoArgs = redoMethod, redoArgs
+        self.undoMethod, self.undoArgs = undoMethod, undoArgs
+        self.errorClass = errorClass
+        if errorClass is not None:
+            self.error = None
+            
+    def redo(self):
+        if self.errorClass is not None:
+            if self.error is not None:
+                return
+            try:
+                self.redoMethod(**self.redoArgs)
+            except self.errorClass as e:
+                self.error = e
+        else:
+            self.redoMethod(**self.redoArgs)
+            
+    def undo(self):
+        if self.errorClass is not None and self.error is not None:
+            return
+        self.undoMethod(**self.undoArgs)
+        
+
 class Level(application.ChangeEventDispatcher):
     """A collection of elements corresponding to a specific state.
     
@@ -141,33 +172,7 @@ class Level(application.ChangeEventDispatcher):
     def emitEvent(self, dataIds=None, contentIds=None):
         """Simple shortcut to emit an event."""
         self.emit(ElementChangedEvent(dataIds,contentIds))
-    
-    @staticmethod  
-    def _changeId(old, new):
-        """Change the id of some element from *old* to *new* in ALL levels.
-        
-        This should only be called from within appropriate UndoCommands, and only if "old in self"
-        is True. Takes care of contents and parents, too.
-        """
-        for level in allLevels:
-            if old not in level:
-                continue
-            elem = level.elements[old]
-            del level.elements[old]
-            elem.id = new
-            level.elements[new] = elem
-            for parentID in elem.parents:
-                parentContents = level.elements[parentID].contents
-                parentContents.ids[:] = [ new if id == old else id for id in parentContents.ids ]
-            if elem.isContainer():
-                for childID in elem.contents.ids:
-                    if childID in level.elements:
-                        level.elements[childID].parents = [ new if id == old else old
-                                                          for id in level.elements[childID].parents ]
-        if old in tIdManager.tIdToUrl:
-            url = tIdManager.tIdToUrl[new] = tIdManager.tIdToUrl[old]
-            del tIdManager.tIdToUrl[old]
-            tIdManager.urlToTId[url] = new
+
     
     @staticmethod  
     def _changeId(old, new):
@@ -315,7 +320,6 @@ class Level(application.ChangeEventDispatcher):
                 yield s[last:i]
 
         for token in _getTokens(wrapperString):
-            #print("Token: {}".format(token))
             if token == ',':
                 continue
             if token == '[':
@@ -341,42 +345,89 @@ class Level(application.ChangeEventDispatcher):
     # The following functions provide undo-aware implementations of level changes
     # ===========================================================================
     
-    def insertContents(self, parent, index, elements):
+    def shiftPositions(self, parent, positions, shift):
+        """Undoably shift the positions of several children of a parent by the same amount.
+        
+        If this can not be done without conflicts, a ConsistencyError is raised.
+        """
+        untouched = set(parent.contents.positions) - set(positions)
+        changes = {pos:pos+shift for pos in positions}
+        if any(i <= 0 for i in changes.values()):
+            raise ConsistencyError('Positions may not drop below one')
+        if any(pos in untouched for pos in changes.values()):
+            raise ConsistencyError('Position conflict: cannot perform change')
+        command = GenericLevelCommand(redoMethod=self._changePositions,
+                                      redoArgs={"parent" : parent,
+                                                "changes" : changes,
+                                                "emitEvent" : True},
+                                      undoMethod=self._changePositions,
+                                      undoArgs={"parent" : parent,
+                                                "changes" : {b:a for a,b in changes.items()},
+                                                "emitEvent" : True},
+                                      text=self.tr("change positions"))
+        self.stack.push(command)
+    
+    def insertContents(self, parent, insertions):
+        """Insert contents with predefined positions into a container.
+        
+        *insertions* is a list of (position, element) tuples.
+        """
+        command = GenericLevelCommand(redoMethod=self._insertContents,
+                                      redoArgs={"parent" : parent,
+                                                "insertions" : insertions,
+                                                "emitEvent" : True},
+                                      undoMethod=self._removeContents,
+                                      undoArgs={"parent" : parent,
+                                                "positions" : [pos for pos,_ in insertions],
+                                                "emitEvent" : True},
+                                      text=self.tr("insert contents"))
+        self.stack.push(command)
+        
+    def insertContentsAuto(self, parent, index, elements):
         """Undoably insert elements into a parent container.
         
         *parent* is the container in which to insert the elements *elements*. The insert index
         (not position) is given by *index*; the position is automatically determined, and
         subsequent elements' positions are shifted if necessary.
         """
-        from . import commands
         self.stack.beginMacro(self.tr("insert"))
         if len(parent.contents) > index:
             #  need to alter positions of subsequent elements
-            firstPos = 1 if index == 0 else parent.contents.positions[index-1]+1
+            firstPos = 1 if index == 0 else parent.contents.positions[index-1] + 1
             lastPosition = firstPos + len(elements) - 1
             shift = lastPosition - parent.contents.positions[index] + 1
             if shift > 0:
-                posCom = commands.ChangePositionsCommand(self, parent,
-                                                         parent.contents.positions[index:],
-                                                         shift)
-                self.stack.push(posCom)
-        insertCom = commands.InsertElementsCommand(self, parent, index, elements)
-        self.stack.push(insertCom)
+                self.shiftPositions(parent, parent.contents.positions[index:], shift)
+        self.insertContents(parent, list(enumerate(elements, start=firstPos)))
         self.stack.endMacro()
-        
-    def removeContents(self, parent, positions=None, indexes=None):
+    
+    def removeContents(self, parent, positions):
+        """Undoably remove children with *positions* from *parent*."""
+        undoInsertions = [(pos, self.get(parent.contents.getId(pos)))
+                          for pos in positions]
+        command = GenericLevelCommand(redoMethod=self._removeContents,
+                                      redoArgs={"parent" : parent,
+                                                "positions" : positions,
+                                                "emitEvent" : True},
+                                      undoMethod=self._insertContents,
+                                      undoArgs={"parent" : parent,
+                                                "insertions" : undoInsertions,
+                                                "emitEvent" : True},
+                                      text=self.tr("remove contents"))
+        self.stack.push(command)
+
+    def removeContentsAuto(self, parent, positions=None, indexes=None):
         """Undoably remove contents under the container *parent*.
         
         The elements to remove may be given either by specifying their *positions* or
         *indexes*.        
-        If there are subsequent elements behind the deleted ones, their positions will be
-        diminished so that no gap results.
+        If there are subsequent elements behind the deleted ones, and the position of the first of
+        those is one more than the position of the last deleted element (i.e., there is no gap),
+        then their positions will be diminished such that there's no gap afterwards, too.
         """
-        from . import commands
         if positions is None:
-            positions = [ parent.contents.positions[i] for i in indexes ]
+            positions = ( parent.contents.positions[i] for i in indexes )
         positions = sorted(positions)
-        
         lastRemovePosition = positions[-1]
         lastRemoveIndex = parent.contents.positions.index(lastRemovePosition)
         shiftPositions = None
@@ -389,11 +440,9 @@ class Level(application.ChangeEventDispatcher):
                 else:
                     break
         self.stack.beginMacro(self.tr("remove"))
-        removeCommand = commands.RemoveElementsCommand(self, parent, positions)
-        self.stack.push(removeCommand)
+        self.removeContents(parent, positions)
         if shiftPositions is not None:
-            posCommand = commands.ChangePositionsCommand(self, parent, shiftPositions, shift)
-            self.stack.push(posCommand)
+            self.shiftPositions(parent, shiftPositions, shift)
         self.stack.endMacro()
     
     def addTagValues(self,tag,valueMap):
@@ -409,22 +458,70 @@ class Level(application.ChangeEventDispatcher):
         changes = {el: tags.TagDifference.singleTagDifference(tag,el.tags[tag],tuple())
                    for el in elements if tag in el.tags}
         self.changeTags(changes)
+
+    def changeTags(self, changes, filesOnly=False):
+        """Change tags of several elements. *changes* maps element to TagDifference object.
         
-    def changeTags(self, changes):
-        from . import commands
-        self.stack.push(commands.ChangeTagsCommand(self, changes))
-    
-    def changeFlags(self, changes):
-        from . import commands
-        self.stack.push(commands.ChangeFlagsCommand(self, changes))
-    
-    def changeData(self, changes):
-        from . import commands
-        self.stack.push(commands.ChangeDataCommand(self, changes))
+        The option *filesOnly* makes sense only on the real level; the effect is that only files
+        on disk are modified, but neither elements nor the database.
+        
+        On real level this method might raise a TagWriteError if writing (some or all) tags to the
+        filesystem fails.
+        """
+        inverseChanges = {elem:diff.inverse() for elem,diff in changes.items()}
+        assert (not filesOnly)  or (self is real)
+        command = GenericLevelCommand(redoMethod=self._changeTags,
+                                      redoArgs={"changes" : changes,
+                                                "filesOnly" : filesOnly,
+                                                "emitEvent" : not filesOnly},
+                                      undoMethod=self._changeTags,
+                                      undoArgs={"changes": inverseChanges,
+                                                "filesOnly" : filesOnly,
+                                                "emitEvent" : not filesOnly},
+                                      text=self.tr("change tags"),
+                                      errorClass=TagWriteError)
+        self.stack.push(command)
+        if command.error:
+            raise command.error
     
     def renameFiles(self, renamings):
-        from . import commands
-        self.stack.push(commands.RenameFilesCommand(self, renamings))
+        """Rename several files. *renamings* maps element to (oldUrl, newUrl) paths.
+        
+        On the real level, this can raise a FileRenameError.
+        """
+        reversed =  {file:(newUrl, oldUrl) for  (file, (oldUrl, newUrl)) in renamings.items()}
+        command = GenericLevelCommand(redoMethod=self._renameFiles,
+                                      redoArgs={"renamings" : renamings,
+                                                "emitEvent" : True},
+                                      undoMethod=self._renameFiles,
+                                      undoArgs={"renamings": reversed},
+                                      text=self.tr("rename files"),
+                                      errorClass=RenameFilesError)
+        self.stack.push(command)
+        if command.error:
+            raise command.error
+    
+    def changeFlags(self, changes):
+        reversed = {elem:diff.inverse() for elem, diff in changes.items()}
+        command = GenericLevelCommand(redoMethod=self._changeFlags,
+                                      redoArgs={"changes" : changes,
+                                                "emitEvent" : True},
+                                      undoMethod=self._changeFlags,
+                                      undoArgs={"changes" : reversed,
+                                                "emitEvent" : True},
+                                      text=self.tr("change flags"))
+        self.stack.push(command)
+    
+    def changeData(self, changes):
+        reversed = {elem:diff.inverse() for elem, diff in changes.items()}
+        command = GenericLevelCommand(redoMethod=self._changeData,
+                                      redoArgs={"changes" : changes,
+                                                "emitEvent" : True},
+                                      undoMethod=self._changeData,
+                                      undoArgs={"changes" : reversed,
+                                                "emitEvent" : True},
+                                      text=self.tr("set major flags"))
+        self.stack.push(command)
         
     def setCovers(self, coverDict):
         """Set the covers for one or more elements.
@@ -441,8 +538,14 @@ class Level(application.ChangeEventDispatcher):
         The action can be undone. *elemToMajor* maps elements to boolean values indicating the
         desired major state.
         """
-        from . import commands
-        self.stack.push(commands.ChangeMajorFlagCommand(self, elemToMajor))
+        reversed = {elem:(not major) for (elem, major) in elemToMajor.items()}
+        command = GenericLevelCommand(redoMethod=self._setMajorFlags,
+                                      redoArgs={"elemToMajor" : elemToMajor,
+                                                "emitEvent" : True},
+                                      undoMethod=self._setMajorFlags,
+                                      undoArgs={"elemToMajor" : reversed,
+                                                "emitEvent" : True})
+        self.stack.push(command)
     
     def commit(self, elements=None):
         """Undoably commit given *ids* (or everything, if not specified) into the parent level.
@@ -513,13 +616,11 @@ class Level(application.ChangeEventDispatcher):
         """
         assert id in self.elements
         assert self.get(id).isFile()
-        from . import commands
+        self.stack.beginMacro(self.tr('reload'))
         for parentId in self.elements[id].parents:
             parent = self.get(parentId)
-            command = commands.RemoveElementsCommand(self,
-                                                     parent,
-                                                     parent.contents.getPositions(id))
-            application.stack.push(command)
+            self.removeContents(parent, parent.contents.getPositions(id))
+        self.stack.endMacro()
         del self.elements[id]
         return self.get(id)
 
@@ -553,10 +654,11 @@ class Level(application.ChangeEventDispatcher):
         if emitEvent:
             self.emitEvent([element.id for element in elements])
     
-    def _changeTags(self, changes):
+    def _changeTags(self, changes, emitEvent=True, filesOnly=False):
         for element, diff in changes.items():
             diff.apply(element.tags)
-        self.emitEvent([elem.id for elem in changes])
+        if emitEvent:
+            self.emitEvent([element.id for element in changes])
     
     def _addFlag(self, flag, elements, emitEvent=True):
         """Add *flag* to the given elements. If *emitEvent* is False, do not emit an event."""
@@ -573,17 +675,21 @@ class Level(application.ChangeEventDispatcher):
         if emitEvent:
             self.emitEvent([element.id for element in elements])
     
-    def _changeFlags(self, changes):
+    def _changeFlags(self, changes, emitEvent=True):
         """Change flags of multiple elements: *changes* maps elements to TagDifference objects."""
         for elem, diff in changes.items():
             for flag in diff.additions:
                 self._addFlag(flag, (elem,), False)
             for flag in diff.removals:
                 self._removeFlag(flag, (elem,), False)
+        if emitEvent:
+            self.emitEvent([element.id for element in changes])
             
-    def _changeData(self, changes):
+    def _changeData(self, changes, emitEvent=True):
         for element, diff in changes.items():
             diff.apply(element.data)
+        if emitEvent:
+            self.emitEvent([elem.id for elem in changes])
 
     def _setData(self,type,elementToData):
         for element,data in elementToData.items():
@@ -595,10 +701,12 @@ class Level(application.ChangeEventDispatcher):
                 del element.data[type]
         self.emitEvent([element.id for element in elementToData])
     
-    def _setMajorFlags(self, elemToMajor):
+    def _setMajorFlags(self, elemToMajor, emitEvent=True):
         """Set major of several elements."""
         for elem, major in elemToMajor.items():
             elem.major = major
+        if emitEvent:
+            self.emitEvent([elem.id for elem in elemToMajor])
     
     def _importElements(self, elements):
         """Create the elements *elements* from a different level into this one."""
@@ -606,7 +714,7 @@ class Level(application.ChangeEventDispatcher):
             self.elements[elem.id] = elem.copy()
             elem.level = self
 
-    def _insertContents(self, parent, insertions):
+    def _insertContents(self, parent, insertions, emitEvent=True):
         """Insert some elements under *parent*.
         
         The insertions are given by an iterable of (position, element) tuples.
@@ -615,8 +723,10 @@ class Level(application.ChangeEventDispatcher):
             parent.contents.insert(pos, element.id)
             if parent.id not in element.parents:
                 element.parents.append(parent.id)
+        if emitEvent:
+            self.emitEvent(contentIds=(parent.id, ))
 
-    def _removeContents(self, parent, positions):
+    def _removeContents(self, parent, positions, emitEvent=True):
         """Remove the children at given *positions* under parent.
         """
         childIds = [parent.contents.getId(position) for position in positions]
@@ -625,6 +735,8 @@ class Level(application.ChangeEventDispatcher):
         for id in childIds:
             if id not in parent.contents.ids:
                 self.get(id).parents.remove(parent.id)
+        if emitEvent:
+            self.emitEvent(contentIds=(parent.id, ))
 
     def _renameFiles(self, renamings, emitEvent=True):
         """Rename files based on *renamings*, a dict from elements to (oldUrl, newUrl) pairs.
@@ -633,351 +745,17 @@ class Level(application.ChangeEventDispatcher):
             element.url = newUrl
         if emitEvent:
             self.emitEvent([elem.id for elem in renamings])
+
+    def _changePositions(self, parent, changes, emitEvent=True):
+        """Change positions of elements."""
+        for i, position in enumerate(parent.contents.positions):
+            if position in changes:
+                parent.contents.positions[i] = changes[position]
+        if emitEvent:
+            self.emitEvent(contentIds=(parent.id, ))
     
     def __str__(self):
         return 'Level({})'.format(self.name)
-
-
-class RealLevel(Level):
-    """The real level, comprising the state of database and filesystem.
-    
-    Changes made here do not only change the element objects but also the database and, if
-    files are affected, the filesystem state.
-    """
-    
-    def __init__(self):
-        super().__init__('REAL', None)
-        # This hack makes the inherited implementations of get and load work with the overwritten
-        # implementation of loadIntoChild
-        self.parent = self
-    
-    def loadIntoChild(self, ids, child):
-        """Loads IDs which are not yet known from database (if positive) or filesystem (else)."""
-        notFound = []
-        for id in ids:
-            if id in self.elements:
-                child.elements[id] = self.elements[id].copy()
-                child.elements[id].level = child
-            else: notFound.append(id)
-        if len(notFound) > 0:
-            positiveIds = [id for id in notFound if id > 0]
-            urls = [ tIdManager(id) for id in notFound if id < 0 ]
-            if len(positiveIds) > 0:
-                self.loadFromDB(positiveIds, child)
-            if len(urls) > 0:
-                self.loadURLs(urls, child)
-            
-    def loadFromDB(self, idList, level):
-        """Load elements specified by *idList* from the database into *level*."""
-        if len(idList) == 0: # queries will fail otherwise
-            return 
-        idList = ','.join(str(id) for id in idList)
-        #  bare elements
-        result = db.query("""
-                SELECT el.id, el.file, el.major, f.url, f.length
-                FROM {0}elements AS el LEFT JOIN {0}files AS f ON el.id = f.element_id
-                WHERE el.id IN ({1})
-                """.format(db.prefix, idList))
-        for (id, file, major, url, length) in result:
-            if file:
-                level.elements[id] = File(level, id,
-                                          url=filebackends.BackendURL.fromString(url),
-                                          length=length)
-            else:
-                level.elements[id] = Container(level, id, major=major)
-        #  contents
-        result = db.query("""
-                SELECT el.id, c.position, c.element_id
-                FROM {0}elements AS el JOIN {0}contents AS c ON el.id = c.container_id
-                WHERE el.id IN ({1})
-                ORDER BY position
-                """.format(db.prefix, idList))
-        for (id, pos, contentId) in result:
-            level.elements[id].contents.insert(pos, contentId)
-        #  parents
-        result = db.query("""
-                SELECT el.id,c.container_id
-                FROM {0}elements AS el JOIN {0}contents AS c ON el.id = c.element_id
-                WHERE el.id IN ({1})
-                """.format(db.prefix, idList))
-        for (id, contentId) in result:
-            level.elements[id].parents.append(contentId)
-        #  tags
-        result = db.query("""
-                SELECT el.id,t.tag_id,t.value_id
-                FROM {0}elements AS el JOIN {0}tags AS t ON el.id = t.element_id
-                WHERE el.id IN ({1})
-                """.format(db.prefix, idList))
-        for (id,tagId,valueId) in result:
-            tag = tags.get(tagId)
-            level.elements[id].tags.add(tag, db.valueFromId(tag, valueId))
-        # flags
-        result = db.query("""
-                SELECT el.id,f.flag_id
-                FROM {0}elements AS el JOIN {0}flags AS f ON el.id = f.element_id
-                WHERE el.id IN ({1})
-                """.format(db.prefix, idList))
-        for (id, flagId) in result:
-            level.elements[id].flags.append(flags.get(flagId))
-        # data
-        result = db.query("""
-                SELECT element_id,type,data
-                FROM {}data
-                WHERE element_id IN ({})
-                ORDER BY element_id,type,sort
-                """.format(db.prefix, idList))
-        # This is a bit complicated because the data should be stored in tuples, not lists
-        # Changing the lists would break undo/redo
-        current = None
-        buffer = []
-        for (id, type, data) in result:
-            if current is None:
-                current = (id, type)
-            elif current != (id, type):
-                level.elements[current[0]].data[current[1]] = tuple(buffer)
-                current = (id,type)
-                buffer = []
-            element = level.elements[id]
-            if element.data is None:
-                element.data = {}
-            buffer.append(data)
-        if current is not None:
-            level.elements[current[0]].data[current[1]] = tuple(buffer)
-            
-    def loadURLs(self, urls, level):
-        """Loads files given by *urls*, into *level*."""
-        for url in urls:
-            backendFile = url.getBackendFile()
-            backendFile.readTags()
-            fTags = backendFile.tags
-            fLength = backendFile.length
-            fPosition = backendFile.position
-            id = db.idFromUrl(url)
-            if id is None:
-                id = tIdManager.tIdFromUrl(url)
-                flags = []
-            else:
-                flags = db.flags(id)
-                # TODO: Load private tags!
-                logger.warning("loadFromURLs called on '{}', which is in DB. Are you "
-                           " sure this is correct?".format(url))
-            elem = File(level, id=id, url=url, length=fLength, tags=fTags, flags=flags)
-            elem.fileTags = fTags.copy()
-            if fPosition is not None:
-                elem.filePosition = fPosition            
-            level.elements[id] = elem
-    
-    def saveTagsToFileSystem(self, elements):
-        """Helper function to store the tags of *elements* on the filesystem."""
-        failedElements = []
-        for element in elements:
-            if not element.isFile():
-                continue
-            try:
-                real = element.url.getBackendFile()
-                real.tags = element.tags.withoutPrivateTags()
-                real.saveTags()
-            except IOError as e:
-                logger.error("Could not save tags of '{}'.".format(element.path))
-                logger.error("Error was: {}".format(e))
-                failedElements.append(elements)
-                continue
-        return failedElements
-    
-    def setFileTagsAndRename(self, files):
-        """Undoably set tags and URLs of the files *elements* as they are in the object.
-        
-        Does not alter the database."""
-        urlChanges = {}
-        for file in files:
-            if file.url != tIdManager(file.id):
-                urlChanges[file] = (tIdManager(file.id), file.url)
-        if len(urlChanges) > 0:
-            self.renameFiles(urlChanges)
-        tagChanges = {}
-        for file in files:
-            #  check if tags are different
-            backendFile = file.url.getBackendFile()
-            backendFile.readTags()
-            diff = tags.TagDifference(backendFile.tags, file.tags)
-            if not diff.onlyPrivateChanges():
-                tagChanges[file] = diff
-        if len(tagChanges) > 0:
-            self.changeTags(tagChanges, filesOnly=True)
-    
-    def changeTags(self, changes, filesOnly=False):
-        """Overridden method: Adds optio to only change file tags (not database or elements).
-        
-        Might raise a TagWriteError if writing (some or all) tags to filesystem fails."""
-        from . import commands
-        command = commands.ChangeTagsCommand(self, changes, filesOnly)
-        self.stack.push(command)
-        if command.error:
-            raise command.error
-    
-    def renameFiles(self, renamings):
-        from . import commands
-        command = commands.RenameFilesCommand(self, renamings)
-        self.stack.push(command)
-        if command.error:
-            raise command.error
-        
-    # =============================================================
-    # Overridden from Level: these methods modify DB and filesystem
-    # =============================================================
-    
-    def _insertContents(self, parent, insertions):
-        db.write.addContents([(parent.id, pos, child.id) for pos, child in insertions])
-        super()._insertContents(parent, insertions)
-        
-    def _removeContents(self, parent, positions):
-        db.write.removeContents([(parent.id, pos) for pos in positions])
-        super()._removeContents(parent, positions)
-    
-    def _addTagValue(self, tag, value, elements, emitEvent=True):
-        super()._addTagValue(tag, value, elements, emitEvent=False)
-        failedElements = self.saveTagsToFileSystem(elements)
-        #TODO: Correct failedElements
-        dbElements = [el.id for el in elements if el.isInDB() and not el in failedElements]
-        if len(dbElements):
-            dbwrite.addTagValues(dbElements, tag, [value])
-        if emitEvent:
-            self.emitEvent([element.id for element in elements])
-            
-    def _removeTagValue(self, tag, value, elements, emitEvent=True):
-        super()._removeTagValue(tag, value, elements, emitEvent=False)
-        failedElements = self.saveTagsToFileSystem(elements)
-        #TODO: Correct failedElements
-        dbElements = [el.id for el in elements if el.isInDB() and not el in failedElements]
-        if len(dbElements) > 0:
-            dbwrite.removeTagValuesById(dbElements, tag, db.idFromValue(tag, value))
-        else: assert all(element.id < 0 for element in elements)
-        if emitEvent:
-            self.emitEvent([element.id for element in elements])
-
-    def _changeTagValue(self, tag, oldValue, newValue, elements, emitEvent=True):
-        super()._changeTagValue(tag, oldValue, newValue, elements, emitEvent=False)
-        failedElements = self.saveTagsToFileSystem(elements)
-        #TODO: Correct failedElements
-        dbElements = [el.id for el in elements if el.isInDB() and not el in failedElements]
-        if len(dbElements):
-            dbwrite.changeTagValueById(dbElements, tag, db.idFromValue(tag, oldValue),
-                                       db.idFromValue(tag, newValue, insert=True))
-        if emitEvent:
-            self.emitEvent([element.id for element in elements])
-    
-    def _changeTags(self, changes, filesOnly=False):
-        """Change tags of elements. Might raise a TagWriteError if files are involved.
-        
-        If an error is raised, any changes made before are undone.
-        The optional *filesOnly* suppresses any changes to the database."""
-        doneFiles = []
-        rollback = False
-        problems = None
-        for element, diff in changes.items():
-            if not element.isFile():
-                continue
-            backendFile = element.url.getBackendFile()
-            if backendFile.readOnly:
-                problemUrl = element.url
-                rollback = True
-                break
-            backendFile.readTags()
-            curBTags = backendFile.tags.copy()
-            diff.apply(backendFile.tags, includePrivate=False)
-            logger.debug('changing tags of {}: {}'.format(element.url, diff))
-            problems = backendFile.saveTags()
-            if len(problems) > 0:
-                problemUrl = element.url
-                backendFile.tags = curBTags
-                backendFile.saveTags()
-                rollback = True
-            else:
-                doneFiles.append(element)
-        if rollback:
-            for elem in doneFiles:
-                backendFile = element.url.getBackendFile()
-                backendFile.readTags()
-                changes[elem].revert(backendFile.tags, includePrivate=False)
-                backendFile.saveTags()
-            raise TagWriteError(problemUrl, problems)
-        if filesOnly:
-            return
-        db.transaction()
-        for element, diff in changes.items():
-            if not element.isInDB():
-                continue
-            for tag, values in diff.additions:
-                if not tag.isInDB():
-                    continue
-                dbwrite.addTagValues(element.id, tag, values)
-            for tag, values in diff.removals:
-                if not tag.isInDB():
-                    continue
-                dbwrite.removeTagValues(element.id, tag, values)
-        db.commit()
-        super()._changeTags(changes)
-
-    def _renameFiles(self, renamings, emitEvent=True):
-        """On the real level, files are renamed both on disk and in DB."""
-        doneFiles = []
-        try:
-            for elem, (oldUrl, newUrl) in renamings.items():
-                oldUrl.getBackendFile().rename(newUrl)
-                doneFiles.append(elem)
-        except OSError as e:
-            # rollback changes and throw error
-            for elem in doneFiles:
-                oldUrl, newUrl = renamings[elem]
-                newUrl.getBackendFile().rename(oldUrl)
-            raise RenameFilesError(oldUrl, newUrl, str(e))
-        db.write.changeUrls([ (element.id, str(newUrl)) for element, (_, newUrl) in renamings.items() ])
-        super()._renameFiles(renamings, emitEvent)
-            
-    def _addFlag(self, flag, elements, emitEvent=True):
-        super()._addFlag(flag, elements, emitEvent=False)
-        ids = [element.id for element in elements]
-        db.write.addFlag(ids, flag)
-        if emitEvent:
-            self.emitEvent(ids)
-            
-    def _removeFlag(self, flag, elements, emitEvent=True):
-        super()._removeFlag(flag, elements, emitEvent=False)
-        ids = [element.id for element in elements]
-        db.write.removeFlag(ids, flag)
-        if emitEvent:
-            self.emitEvent(ids)
-    
-    def _changeData(self, changes):
-        super()._changeData(changes)
-        db.transaction()
-        for element, diff in changes.items():
-            for type, (a, b) in diff.diffs.items():
-                if a is not None:
-                    db.query("DELETE FROM {}data WHERE type=? AND element_id=?"
-                             .format(db.prefix, type, element.id))
-                if b is not None:
-                    db.multiQuery("INSERT INTO {}data (element_id, type, sort, data) VALUES (?,?,?,?"
-                                  .format(db.prefix), [(element.id, type, i, val) for i, val in enumerate(b)])
-        db.commit()
-                
-    def _setData(self, type, elementToData):
-        super()._setData(type, elementToData)
-        values = []
-        for element, data in elementToData.items():
-            if data is not None:
-                values.extend((element.id, type, i, d) for i, d in enumerate(data))
-        db.transaction()
-        db.query("DELETE FROM {}data WHERE type = ? AND element_id IN ({})"
-                 .format(db.prefix,db.csIdList(elementToData.keys())),type)
-        if len(values) > 0:
-            db.multiQuery("INSERT INTO {}data (element_id,type,sort,data) VALUES (?,?,?,?)"
-                          .format(db.prefix),values)
-        db.commit()
-        
-    def _setMajorFlags(self, elemToMajor):
-        super()._setMajorFlags(elemToMajor)
-        db.write.setMajor((el.id,major) for (el, major) in elemToMajor.items() )
 
 
 def idFromUrl(url, create=True):
