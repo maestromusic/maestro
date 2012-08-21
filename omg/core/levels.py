@@ -594,13 +594,11 @@ class Level(QtCore.QObject):
         """
         assert id in self.elements
         assert self.get(id).isFile()
-        from . import commands
+        self.stack.beginMacro(self.tr('reload'))
         for parentId in self.elements[id].parents:
             parent = self.get(parentId)
-            command = commands.RemoveElementsCommand(self,
-                                                     parent,
-                                                     parent.contents.getPositions(id))
-            application.stack.push(command)
+            self.removeContents(parent, parent.contents.getPositions(id))
+        self.stack.endMacro()
         del self.elements[id]
         return self.get(id)
 
@@ -634,11 +632,11 @@ class Level(QtCore.QObject):
         if emitEvent:
             self.emitEvent([element.id for element in elements])
     
-    def _changeTags(self, changes, emitEvent=True):
+    def _changeTags(self, changes, emitEvent=True, filesOnly=False):
         for element, diff in changes.items():
             diff.apply(element.tags)
         if emitEvent:
-            self.emitEvent([element.id] for element in changes)
+            self.emitEvent([element.id for element in changes])
             
     
     def _addFlag(self, flag, elements, emitEvent=True):

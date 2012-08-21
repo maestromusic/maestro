@@ -287,7 +287,7 @@ class RealLevel(levels.Level):
                     continue
                 db.write.removeTagValues(element.id, tag, values)
         db.commit()
-        super()._changeTags(changes, emitEvent)
+        super()._changeTags(changes, emitEvent, filesOnly=False)
 
     def _renameFiles(self, renamings, emitEvent=True):
         """On the real level, files are renamed both on disk and in DB."""

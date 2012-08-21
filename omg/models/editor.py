@@ -153,7 +153,7 @@ class EditorModel(leveltreemodel.LevelTreeModel):
                 return info
         else:
             info = ExternalTagInfo(type,tag,newTag)
-            EditorModel.self.extTagInfos.append(info)
+            self.extTagInfos.append(info)
             return info
     
     @staticmethod
@@ -190,7 +190,7 @@ class EditorModel(leveltreemodel.LevelTreeModel):
         if parent is self.root:
             self._updateExtTagInfos()
         
-    def _handleLevelChanged(self,event):
+    def _handleLevelChanged(self, event):
         super()._handleLevelChanged(event)
         
         if len(event.contentIds) > 0:

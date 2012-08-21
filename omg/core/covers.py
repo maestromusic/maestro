@@ -18,7 +18,7 @@
 
 import os.path, hashlib, re, time
 
-from PyQt4 import QtCore, QtGui
+from PyQt4 import  QtGui, QtCore
 from PyQt4.QtCore import Qt
 
 from .. import config
