@@ -45,25 +45,28 @@ _translators = []
 
 class ChangeEvent:
     """Abstract super class for all changeevents."""
-    pass
+    def merge(self,other):
+        """If possible merge the ChangeEvent *other* and this event, so that this event stores the
+        information of both events. Return whether merging was succesful."""
+        return False
 
 
 class ChangeEventDispatcher(QtCore.QObject):
-    _changes = QtCore.pyqtSignal(ChangeEvent)
+    _signal = QtCore.pyqtSignal(ChangeEvent)
     
     def __init__(self):
         QtCore.QObject.__init__(self)
         
     def emit(self,event):
         if not stack.delayEvents():
-            self._changes.emit(event)
-        else: stack.addEvent(self._changes,event)
+            self._signal.emit(event)
+        else: stack.addEvent(self,event)
     
     def connect(self,handler):
-        self._changes.connect(handler)
+        self._signal.connect(handler)
         
     def disconnect(self,handler):
-        self._changes.disconnect(handler)
+        self._signal.disconnect(handler)
         
 
 dispatcher = None
@@ -180,8 +183,9 @@ def run(cmdConfig=[],type='gui',exitPoint=None):
         return app
     
     # Initialize stack before levels are initialized    
+    from . import undostack
     global stack
-    stack = UndoStack()
+    stack = undostack.UndoStack()
     
     # Load and initialize remaining modules
     from .core import levels
@@ -334,59 +338,6 @@ def init(cmdConfig=[],type='console',exitPoint='noplugins'):
 def runInstaller():
     """Run the graphical installer."""
     os.execl(sys.executable, os.path.basename(sys.executable), "-m", "omg.install")
-    
-    
-class UndoStack(QtGui.QUndoStack):
-    def __init__(self):
-        super().__init__()
-        self._macroDepth = 0
-        self._inUndoRedo = False
-        self._eventQueue = []
-    
-    def delayEvents(self):
-        """Return whether events should be delayed."""
-        return self._macroDepth > 0 or self._inUndoRedo
-    
-    def beginMacro(self,text):
-        assert not self._inUndoRedo
-        super().beginMacro(text)
-        self._macroDepth += 1
-        
-    def push(self,command):
-        assert not self._inUndoRedo
-        super().push(command)
-        
-    def endMacro(self):
-        assert not self._inUndoRedo
-        super().endMacro()
-        self._macroDepth -= 1
-        if self._macroDepth == 0:
-            for signal,event in self._eventQueue:
-                signal.emit(event)
-            self._eventQueue = []
-            
-    def addEvent(self,signal,event):
-        self._eventQueue.append((signal,event))
-    
-    @QtCore.pyqtSlot()
-    def undo(self):
-        assert not self._inUndoRedo and self._macroDepth == 0
-        self._inUndoRedo = True
-        super().undo()
-        for signal,event in self._eventQueue:
-            signal.emit(event)
-        self._eventQueue = []
-        self._inUndoRedo = False
-    
-    @QtCore.pyqtSlot()
-    def redo(self):
-        assert not self._inUndoRedo and self._macroDepth == 0
-        self._inUndoRedo = True
-        super().redo()
-        self._inUndoRedo = False
-        for signal,event in self._eventQueue:
-            signal.emit(event)
-        self._eventQueue = []
             
     
 if __name__ == "__main__":

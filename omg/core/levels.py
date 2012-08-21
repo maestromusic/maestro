@@ -92,9 +92,21 @@ class ElementChangedEvent(application.ChangeEvent):
         if contentIds is None:
             self.contentIds = []
         else: self.contentIds = contentIds
+        
+    def merge(self,other):
+        if isinstance(other,ElementChangedEvent):
+            if self.dataIds is None:
+                self.dataIDs = other.dataIds
+            else: self.dataIds.extend([id for id in other.dataIds if id not in self.dataIds])
+            if self.contentIds is None:
+                self.dataIDs = other.contentIds
+            else: self.contentIds.extend([id for id in other.contentIds if id not in self.contentIds])
+            return True
+        else:
+            return False
 
 
-class Level(QtCore.QObject):
+class Level(application.ChangeEventDispatcher):
     """A collection of elements corresponding to a specific state.
     
     A level consists of a consistent set of elements: All children of an element in a level must
@@ -108,9 +120,6 @@ class Level(QtCore.QObject):
     bare methods not handling undo/redo are marked by a leading underscore.
     If elements change in a level, its signal *changed* is emitted.
     """ 
-
-    """Signal that is emitted if something changes on this level."""
-    changed = QtCore.pyqtSignal(application.ChangeEvent)
 
     def __init__(self, name, parent, stack=None):
         """Create a level named *name* with parent *parent* and an optional undo stack.
@@ -131,9 +140,7 @@ class Level(QtCore.QObject):
         
     def emitEvent(self, dataIds=None, contentIds=None):
         """Simple shortcut to emit an event."""
-        if not application.stack.delayEvents():
-            self.changed.emit(ElementChangedEvent(dataIds,contentIds))
-        else: application.stack.addEvent(self.changed,ElementChangedEvent(dataIds,contentIds))
+        self.emit(ElementChangedEvent(dataIds,contentIds))
     
     @staticmethod  
     def _changeId(old, new):
@@ -549,6 +556,7 @@ class Level(QtCore.QObject):
     def _changeTags(self, changes):
         for element, diff in changes.items():
             diff.apply(element.tags)
+        self.emitEvent([elem.id for elem in changes])
     
     def _addFlag(self, flag, elements, emitEvent=True):
         """Add *flag* to the given elements. If *emitEvent* is False, do not emit an event."""
