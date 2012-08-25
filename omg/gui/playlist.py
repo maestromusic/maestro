@@ -86,25 +86,30 @@ class PlaylistWidget(QtGui.QDockWidget):
         self.backend = None
         self.treeview = PlaylistTreeView()
  
-        widget = QtGui.QWidget()
+        widget = QtGui.QWidget() 
+        self.setWidget(widget)
+        
         layout = QtGui.QVBoxLayout(widget)
-        layout.addWidget(self.treeview)   
+        layout.setSpacing(0)
+        layout.setContentsMargins(0,0,0,0)
         
         # TODO Move stuff into a popup.    
-        bottomLayout = QtGui.QHBoxLayout()
-        layout.addLayout(bottomLayout)
+        buttonLayout = QtGui.QHBoxLayout()
+        # Spacings and margins are inherited. Reset the spacing
+        style = QtGui.QApplication.style()
+        buttonLayout.setSpacing(style.pixelMetric(style.PM_LayoutHorizontalSpacing))
+        layout.addLayout(buttonLayout)
         self.backendChooser = profiles.ProfileComboBox(player.profileConf, default = state)
         self.backendChooser.profileChosen.connect(self.setBackend)
+        buttonLayout.addWidget(self.backendChooser)
         
-        bottomLayout.addWidget(self.backendChooser)
-        
-        bottomLayout.addWidget(QtGui.QLabel(self.tr("Item Display:")))
-        bottomLayout.addWidget(delegateconfig.ConfigurationCombo(
+        buttonLayout.addWidget(QtGui.QLabel(self.tr("Item Display:")))
+        buttonLayout.addWidget(delegateconfig.ConfigurationCombo(
                                                     playlistdelegate.PlaylistDelegate.configurationType,
                                                     [self.treeview]))
-        bottomLayout.addStretch()
+        buttonLayout.addStretch()
         
-        self.setWidget(widget)
+        layout.addWidget(self.treeview)  
         
         self.setBackend(self.backendChooser.currentProfileName())
     

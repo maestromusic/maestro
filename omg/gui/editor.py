@@ -95,7 +95,6 @@ class EditorTreeView(treeview.TreeView):
                 self.expand(child)
 
         
-        
 class EditorWidget(QtGui.QDockWidget):
     """The editor is a dock widget for editing elements and their structure. It provides methods to "guess"
     the album structure of new files that are dropped from the filesystem."""
@@ -104,15 +103,22 @@ class EditorWidget(QtGui.QDockWidget):
         self.setWindowTitle(self.tr('Editor'))
         widget = QtGui.QWidget()
         self.setWidget(widget)
-        vb = QtGui.QVBoxLayout(widget)
+        layout = QtGui.QVBoxLayout(widget)
+        layout.setSpacing(0)
+        layout.setContentsMargins(0,0,0,0)
+        
         try:
             expand,guessProfile = state
         except:
             expand = True
             guessProfile = None
-            
+        
+        buttonLayout = QtGui.QHBoxLayout()
+        # buttonLayout is filled below, when the editor exists 
+        layout.addLayout(buttonLayout)
+        
         self.splitter = QtGui.QSplitter(Qt.Vertical)
-        vb.addWidget(self.splitter)
+        layout.addWidget(self.splitter)
         
         self.editor = EditorTreeView()
         self.editor.autoExpand = expand
@@ -125,21 +131,20 @@ class EditorWidget(QtGui.QDockWidget):
         self.splitter.setStretchFactor(0,0)
         self.splitter.setStretchFactor(1,1)
         
-        hb = QtGui.QHBoxLayout()
-        vb.addLayout(hb)
-        
-        hb.addStretch()
-        self.optionButton = QtGui.QPushButton()
-        self.optionButton.setIcon(utils.getIcon('options.png'))
-        self.optionButton.clicked.connect(self._handleOptionButton)
-        hb.addWidget(self.optionButton)
-        
+        # Fill buttonLayout
         self.toolbar = QtGui.QToolBar(self)
         self.toolbar.addAction(self.editor.treeActions['clearEditor'])
         commitAction = CommitTreeAction(self.editor)
         self.addAction(commitAction)
         self.toolbar.addAction(commitAction)
-        hb.addWidget(self.toolbar)
+        buttonLayout.addWidget(self.toolbar)
+        
+        buttonLayout.addStretch()
+        
+        self.optionButton = QtGui.QPushButton()
+        self.optionButton.setIcon(utils.getIcon('options.png'))
+        self.optionButton.clicked.connect(self._handleOptionButton)
+        buttonLayout.addWidget(self.optionButton)
 
     def _handleOptionButton(self):
         """Open the option dialog."""

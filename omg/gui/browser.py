@@ -124,6 +124,8 @@ class Browser(QtGui.QWidget):
         
         # Layout
         layout = QtGui.QVBoxLayout(self)
+        layout.setSpacing(0)
+        layout.setContentsMargins(0,0,0,0)
         self.setLayout(layout)   
         
         # ControlLine (containing searchBox and optionButton)
