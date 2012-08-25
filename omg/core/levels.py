@@ -345,6 +345,16 @@ class Level(application.ChangeEventDispatcher):
     # The following functions provide undo-aware implementations of level changes
     # ===========================================================================
     
+    def createContainer(self, tags, flags=None, data=None, major=True, contents=None):
+        """Create a new container with the given properties and load it into this level.
+        
+        Can be undone. Returns the new container.
+        """
+        from . import commands
+        command = commands.CreateContainerCommand(self, tags, flags, data, major, contents)
+        self.stack.push(command)
+        return command.container
+    
     def shiftPositions(self, parent, positions, shift):
         """Undoably shift the positions of several children of a parent by the same amount.
         
@@ -532,7 +542,7 @@ class Level(application.ChangeEventDispatcher):
         from . import covers
         self.stack.push(covers.CoverUndoCommand(self, coverDict))
     
-    def setMajorFlags(self, elemToMajor):
+    def setMajorFlags(self, elemToMajor, emitEvent=True):
         """Set the major flags of one or more containers.
         
         The action can be undone. *elemToMajor* maps elements to boolean values indicating the
@@ -541,10 +551,10 @@ class Level(application.ChangeEventDispatcher):
         reversed = {elem:(not major) for (elem, major) in elemToMajor.items()}
         command = GenericLevelCommand(redoMethod=self._setMajorFlags,
                                       redoArgs={"elemToMajor" : elemToMajor,
-                                                "emitEvent" : True},
+                                                "emitEvent" : emitEvent},
                                       undoMethod=self._setMajorFlags,
                                       undoArgs={"elemToMajor" : reversed,
-                                                "emitEvent" : True})
+                                                "emitEvent" : emitEvent})
         self.stack.push(command)
     
     def commit(self, elements=None):
@@ -628,24 +638,30 @@ class Level(application.ChangeEventDispatcher):
     # The following functions implement no undo/redo handling and should be used with care
     # ====================================================================================
     
-    def _createContainer(self, containerTags, major, id=None):
+    def _createContainer(self, tags, flags, data, major, contents, id=None):
         if id is None:
             id = tIdManager.createTId()
-        container = elements.Container(self, id, major, tags=containerTags)
+        container = elements.Container(self, id, major, tags=tags, flags=flags,
+                                       data=data, contents=contents)
         self.elements[id] = container
+        if contents is not None:
+            for childId in contents.ids:
+                self.get(childId).parents.append(id)
         return container
     
     def _addElement(self, element):
         assert element.level is self
         self.elements[element.id] = element
+        for childId in element.contents.ids:
+            self.get(childId).parents.append(element.id)
     
     def _removeElement(self, element):
         """Remove the given element from this level.
-        
-        Don't call this if the element has any parents or children.
         """
         del self.elements[element.id]
-        
+        for childId in element.contents.ids:
+            self.get(childId).parents.remove(element.id)
+
     def _addTagValue(self, tag, value, elements, emitEvent=True):
         """Add a tag of type *tag* and value *value* to the given elements.
         If *emitEvent* is False, do not emit an even."""

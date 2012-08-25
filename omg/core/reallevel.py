@@ -191,24 +191,32 @@ class RealLevel(levels.Level):
         if len(tagChanges) > 0:
             self.changeTags(tagChanges, filesOnly=True)
 
-        
+    
+    def _elementToDBHelper(self, element):
+        db.write.setTags(element.id, element.tags)
+        db.write.setFlags(element.id, element.flags)
+        db.write.setData(element.id, element.data)
+        db.write.setContents(element.id, element.contents)
     # =============================================================
     # Overridden from Level: these methods modify DB and filesystem
     # =============================================================
     
-    def _createContainer(self, containerTags, major):
+    def _createContainer(self, tags, flags, data, major, contents, id=None):
+        if id is not None:
+            raise ValueError("Don't call _createContainer with an ID on real!")
+        db.transaction()
         id = db.write.createElements([ (False, True, 0, major) ])
-        db.write.setTags(id, containerTags)
-        return super()._createContainer(containerTags, major, id)
+        element = super()._createContainer(tags, flags, data, major, contents, id)
+        self._elementToDBHelper(element)
+        db.commit()
+        return element
     
     def _addElement(self, element):
         super()._addElement(element)
         db.transaction()
         db.write.createElementsWithIds([(element.id, element.isFile(), len(element.parents) == 0,
                                           len(element.contents), element.major)])
-        db.write.setTags(element.id, element.tags)
-        db.write.setFlags(element.id, element.flags)
-        db.write.setData(element.id, element.data)
+        self._elementToDBHelper(element)
         db.commit()
         
     def _removeElement(self, element):

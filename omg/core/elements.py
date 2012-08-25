@@ -229,6 +229,17 @@ class ContentList:
         self.positions = []
         self.ids = []
     
+    @staticmethod
+    def fromPairs(arg):
+        """Creates a ContentList from a generator of (position, id) or (position, element) pairs.
+        """
+        positions, ids = (list(zp) for zp in zip(*sorted(arg.items())))
+        ids = [element.id if isinstance(element, Element) else element for element in ids ]
+        ret = ContentList()
+        ret.positions = positions
+        ret.ids = ids
+        return ret
+
     def copy(self):
         """Return a copy of this list."""
         result = ContentList()
@@ -236,7 +247,7 @@ class ContentList:
         result.positions = self.positions[:]
         return result
     
-    def append(self,id):
+    def append(self, id):
         """Append an id to the list choosing a position which is 1 bigger than the last position."""
         self.ids.append(id)
         if len(self.positions) == 0:
