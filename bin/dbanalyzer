@@ -1,4 +1,9 @@
-#!/bin/bash
-cd `dirname $0`
-cd ..
-python3 omg/plugins/dbanalyzer/__init__.py
+#!/usr/bin/python3
+
+import sys
+from pkg_resources import load_entry_point
+
+if __name__ == '__main__':
+    sys.exit(
+        load_entry_point('omg==0.2-currentgit', 'gui_scripts', 'dbanalyzer')()
+    )
