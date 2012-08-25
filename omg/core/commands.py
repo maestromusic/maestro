@@ -76,7 +76,6 @@ class CreateDBElementsCommand(QtGui.QUndoCommand):
             db.write.setData(element.id, element.data)
             if element.isContainer():
                 db.write.setContents(element.id, element.contents)
-                db.write.setMajor([(element.id, element.major)])
         if self.newInLevel:
             levels.real.loadFromDB(self.idMap.values(), levels.real)
         db.commit()
@@ -92,6 +91,29 @@ class CreateDBElementsCommand(QtGui.QUndoCommand):
                 del levels.real.elements[id]
         for level in levels.allLevels:
             level.emitEvent(set(self.idMap.keys()) & set(level.elements.keys()))
+
+
+class CreateContainerCommand(QtGui.QUndoCommand):
+    """Command to create a container with given tags."""
+    
+    def __init__(self, level, tags, major=True):
+        super().__init__()
+        self.setText("create container")
+        self.level = level
+        self.tags = tags
+        self.container = self.containerID = None
+        self.major = major
+    
+    def redo(self):
+        if self.container is None:
+            self.container = self.level._createContainer(self.tags, self.major, self.containerID)
+            self.containerID = self.container.id
+        else:
+            self.level._addElement(self.container)
+    
+    def undo(self):
+        self.level._removeElement(self.container)
+
 
 class CopyElementsCommand(QtGui.QUndoCommand):
     """Copy elements from one level into another, and remove them again on undo()."""

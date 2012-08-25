@@ -149,7 +149,6 @@ class RealLevel(levels.Level):
                 logger.warning("loadFromURLs called on '{}', which is in DB. Are you "
                            " sure this is correct?".format(url))
             elem = elements.File(level, id=id, url=url, length=fLength, tags=fTags, flags=flags)
-            elem.fileTags = fTags.copy()
             if fPosition is not None:
                 elem.filePosition = fPosition            
             level.elements[id] = elem
@@ -197,6 +196,25 @@ class RealLevel(levels.Level):
     # Overridden from Level: these methods modify DB and filesystem
     # =============================================================
     
+    def _createContainer(self, containerTags, major):
+        id = db.write.createElements([ (False, True, 0, major) ])
+        db.write.setTags(id, containerTags)
+        return super()._createContainer(containerTags, major, id)
+    
+    def _addElement(self, element):
+        super()._addElement(element)
+        db.transaction()
+        db.write.createElementsWithIds([(element.id, element.isFile(), len(element.parents) == 0,
+                                          len(element.contents), element.major)])
+        db.write.setTags(element.id, element.tags)
+        db.write.setFlags(element.id, element.flags)
+        db.write.setData(element.id, element.data)
+        db.commit()
+        
+    def _removeElement(self, element):
+        super()._removeElement(element)
+        db.write.deleteElements([element.id])
+        
     def _insertContents(self, parent, insertions, emitEvent=True):
         db.write.addContents([(parent.id, pos, child.id) for pos, child in insertions])
         super()._insertContents(parent, insertions, emitEvent)
