@@ -96,18 +96,21 @@ class CreateDBElementsCommand(QtGui.QUndoCommand):
 class CreateContainerCommand(QtGui.QUndoCommand):
     """Command to create a container with given tags."""
     
-    def __init__(self, level, tags, major=True):
+    def __init__(self, level, tags, flags, data, major, contents):
         super().__init__()
         self.setText("create container")
         self.level = level
         self.tags = tags
-        self.container = self.containerID = None
+        self.flags = flags
+        self.data = data
         self.major = major
+        self.contents = contents
+        self.container = None
     
     def redo(self):
         if self.container is None:
-            self.container = self.level._createContainer(self.tags, self.major, self.containerID)
-            self.containerID = self.container.id
+            self.container = self.level._createContainer(self.tags, self.flags, self.data,
+                                                         self.major, self.contents)
         else:
             self.level._addElement(self.container)
     

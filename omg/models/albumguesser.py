@@ -22,7 +22,8 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from .. import config, logging, profiles
-from ..core import commands, tags
+from ..core import tags
+from ..core.elements import ContentList
 from ..utils import relPath
 
 logger = logging.getLogger(__name__)
@@ -107,16 +108,16 @@ class StandardGuesser(profiles.Profile):
                                 self.tr("position {} appears twice in {}").format(element.tags.position, key))
                         self.errors.append(elements)
                     else:
-                        children[element.filePosition] = element
+                        children[element.filePosition] = element.id
                 firstFreePosition = elementsWithPos[-1].filePosition+1 if len(elementsWithPos) > 0 else 1
                 for i, element in enumerate(elementsWithoutPos, start = firstFreePosition):
-                    children[i] = element
+                    children[i] = element.id
                 albumTags = tags.findCommonTags(elements)
                 albumTags[tags.TITLE] = [key] if pureDirMode else elements[0].tags[self.albumTag]
-                create = commands.CreateContainerCommand(self.level, albumTags, major=True)
-                self.level.stack.push(create)
-                self.level.insertContents(create.container, list(children.items()))
-                self.albums.append(create.container)
+                container = self.level.createContainer(tags=albumTags,
+                                                       major=True,
+                                                       contents=ContentList.fromPairs(children))
+                self.albums.append(container)
             else:
                 self.singles.extend(elements)
                 
@@ -144,11 +145,11 @@ class StandardGuesser(profiles.Profile):
         for key, contents in byKey.items():
             metaTags = tags.findCommonTags(contents.values())
             metaTags[tags.TITLE] = [key[1]]
-            self.level.setMajorFlags({album:False for album in contents.values()})
-            create = commands.CreateContainerCommand(self.level, metaTags, major=True)
-            self.level.stack.push(create)
-            self.level.insertContents(create.container, list(contents.items()))
-            self.albums.append(create.container)
+            self.level.setMajorFlags({album:False for album in contents.values()}, emitEvent=False)
+            container = self.level.createContainer(tags=metaTags,
+                                                   contents=ContentList.fromPairs(contents),
+                                                   major=True)
+            self.albums.append(container)
             for c in contents.values():
                 if c in self.albums:
                     self.albums.remove(c)
