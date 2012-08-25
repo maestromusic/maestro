@@ -87,7 +87,6 @@ class EditorTreeView(treeview.TreeView):
                 event.setDropAction(Qt.CopyAction)
         super().dropEvent(event)
         
-    
     def _expandInsertedRows(self, parent, start, end):
         for row in range(start, end+1):
             child = self.model().index(row, 0, parent)
@@ -102,10 +101,10 @@ class EditorTreeView(treeview.TreeView):
             except TypeError:
                 pass # was not connected
         
+        
 class EditorWidget(QtGui.QDockWidget):
     """The editor is a dock widget for editing elements and their structure. It provides methods to "guess"
     the album structure of new files that are dropped from the filesystem."""
-    
     def __init__(self, parent = None, state = None, location = None):
         super().__init__(parent)
         self.setWindowTitle(self.tr('Editor'))
@@ -187,6 +186,8 @@ class EditorWidget(QtGui.QDockWidget):
 
 
 class ExternalTagsWidget(QtGui.QScrollArea):
+    """This widget displays information about external tags in the editor (including automatically performed
+    tag processing)."""
     def __init__(self,editor):
         super().__init__()
         self.editor = editor
@@ -202,42 +203,43 @@ class ExternalTagsWidget(QtGui.QScrollArea):
         
         self.updateText()
     
-    def _createButton(self,index,action,text):
+    def _createLink(self,index,action,text):
+        """Create an HTML-link."""
         return '<a href="{}:{}" style="text-decoration:none">[{}]</a>'.format(action,index,text)
     
     def updateText(self):
         lines = []
         
         for i,info in enumerate(self.editor.model().extTagInfos):
-            if info.type == 'delete':
-                lines.append(self.tr("Tag '{}' was deleted from %n element(s) {} {}",'',
-                                                                info.elementCount())
+            if info.type == 'deleted':
+                lines.append(self.tr("Tag '{}' was deleted from %n element(s) {} {}",'',len(info.elements))
                                 .format(info.tag.name,
-                                        self._createButton(i,'select',self.tr('Select')),
-                                        self._createButton(i,'undo',self.tr('Undo'))
+                                        self._createLink(i,'select',self.tr('Select')),
+                                        self._createLink(i,'undo',self.tr('Undo'))
                                 ))
-            elif info.type == 'replace':
+            elif info.type == 'replaced':
                 lines.append(self.tr("Tag '{}' was replaced by '{}' in %n element(s) {} {}",'',
-                                                                info.elementCount())
+                                                               len(info.elements))
                                 .format(info.tag.name,
                                         info.newTag.name,
-                                        self._createButton(i,'select',self.tr('Select')),
-                                        self._createButton(i,'undo',self.tr('Undo'))
+                                        self._createLink(i,'select',self.tr('Select')),
+                                        self._createLink(i,'undo',self.tr('Undo'))
                                 ))
         
-            elif info.type == 'unknown':
-                lines.append(self.tr("Unknown tag '{}' found in %n element(s) {} {} {}",'',
-                                                                info.elementCount())
+            elif info.type == 'external':
+                lines.append(self.tr("External tag '{}' found in %n element(s) {} {} {}",'',
+                                                                len(info.elements))
                                 .format(info.tag.name,
-                                        self._createButton(i,'select',self.tr('Select')),
-                                        self._createButton(i,'add',self.tr('Add to database')),
-                                        self._createButton(i,'delete',self.tr('Delete'))
+                                        self._createLink(i,'select',self.tr('Select')),
+                                        self._createLink(i,'add',self.tr('Add to database')),
+                                        self._createLink(i,'delete',self.tr('Delete'))
                                 ))
             
         self.label.setText('<br>'.join(lines))
         self.setHidden(len(lines) == 0)
         
     def _handleLink(self,link):
+        """Handle a link in the text."""
         action, index = link.split(':',1)
         index = int(index)
         info = self.editor.model().extTagInfos[index]
@@ -245,29 +247,18 @@ class ExternalTagsWidget(QtGui.QScrollArea):
         if action == 'add':
             tagwidgets.AddTagTypeDialog.addTagType(info.tag)
         elif action == 'delete':
-            levels.editor.removeTag(info.tag,info.elements())
+            levels.editor.removeTag(info.tag,info.elements)
         elif action == 'undo':
-            if info.type == 'delete':
-                levels.editor.addTagValues(info.tag,info.valueMap)
-            elif info.type == 'replace':
-                changes = {}
-                for element in info.valueMap.keys():
-                    diff = tags.TagDifference(None,None)
-                    diff.additions = [(info.tag,info.valueMap[element])]
-                    diff.removals = [(info.newTag,info.newValueMap[element])]
-                    changes[element] = diff
-                levels.editor.changeTags(changes)
-            else: assert False
+            self.editor.model().undoExtTagInfo(info)
         elif action == 'select':
             # Construct a QItemSelection storing the whole selection and add it to the model at once.
             # Otherwise a selectionChanged signal would be emitted after each selected wrapper. 
             itemSelection = QtGui.QItemSelection()
-            elements = info.elements()
             for wrapper in self.editor.model().root.getAllNodes(skipSelf=True):
-                if wrapper.element in elements:
+                if wrapper.element in info.elements:
                     index = self.editor.model().getIndex(wrapper)
                     itemSelection.select(index,index)
-            self.editor.selectionModel().select(itemSelection,QtGui.QItemSelectionModel.ClearAndSelect)
+            self.editor.selectionModel().select(itemSelection,QtGui.QItemSelectionModel.ClearAndSelect)       
 
 
 # register this widget in the main application

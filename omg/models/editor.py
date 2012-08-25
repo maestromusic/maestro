@@ -27,170 +27,106 @@ from .. import application, config, constants, logging
 
 logger = logging.getLogger(__name__)
 
-autoDeleteTags = None
-autoReplaceTags = None
+_processor = None # the single instance of AutoTagProcessor used by all EditorModels
 
 
+class ProcessingInfo:
+    """Stores information about auto tag processing that was performed on an element. *type* may be one
+    of 'deleted' or 'replaced'. *newTag* and *newValue* are only used for type 'replaced'."""
+    def __init__(self,type,tag,values,newTag=None,newValues=None):
+        assert isinstance(tag,tags.Tag) and (newTag is None or isinstance(newTag,tags.Tag))
+        self.type = type
+        self.tag = tag
+        self.values = values
+        self.newTag = newTag
+        self.newValues = newValues
+        
+        
 class ExternalTagInfo:
+    """Stores information about external tags in an EditorModel. *type* may be one of:
+    
+        - 'deleted': *tag* was deleted from self.elements,
+        - 'replaced': *tag* was replaced by *newTag* in self.elements,
+        - 'external': self.elements contain the external tag *tag* (thus no commit is possible)
+    """
     def __init__(self,type,tag,newTag=None):
         self.type = type
         self.tag = tag
-        if type == 'unknown':
-            self._elements = []
-        else:
-            self.valueMap = {}
-            if type == 'replace':
-                self.newValueMap = {}
-        
         self.newTag = newTag
-        
-    def elementCount(self):
-        return len(self._elements) if self.type == 'unknown' else len(self.valueMap)
-    
-    def addElement(self,element,values=None):
-        if self.type == 'unknown':
-            assert element not in self._elements
-            self._elements.append(element)
-        else:
-            assert element not in self.valueMap
-            assert values is not None
-            self.valueMap[element] = values
-            
-    def removeElement(self,element):
-        if self.type == 'unknown':
-            self._elements.remove(element)
-        else: del self.valueMap[element]
-    
-    def elements(self):
-        if self.type == 'unknown':
-            return self._elements
-        else: return self.valueMap.keys()
-        
-    def reduce(self,elementIds):
-        if all(element.id in elementIds for element in self.elements()):
-            return self
-        else:
-            copy = ExternalTagInfo(self.type,self.tag,self.newTag)
-            if self.type == 'unknown':
-                copy._elements = [element for element in self._elements if element.id in elementIds]
-            else:
-                copy.valueMap = {el: values for el,values in self.valueMap if el.id in elementIds}
-            return copy 
+        self.elements = []
         
 
 class EditorModel(leveltreemodel.LevelTreeModel):
+    """Model for the editor. Additional to LevelTreeModel this class handles
     
-    instances = weakref.WeakSet()
-    extTagInfosChanged = QtCore.pyqtSignal()
-    
-    _globalExtTagInfos = []
+        - auto tag processing: When external elements are loaded into the editor, tags may be automatically
+          deleted or replaced according to the config options tags.auto_delete and tags.auto_replace
+        - information about external tags: the model manages a list of ExternalTagInfo-instances which are
+          used by the editor's ExternalTagsWidget.
+        - reloading elements: When an element is loaded into the editor that does exist on the editor
+          level but is not visible in any EditorModel, it will be reset to its state on real level.
+          This is necessary, when an element is dropped, changed, removed and dropped again.
+    """
+    instances = weakref.WeakSet() # all existing editor models
+    extTagInfosChanged = QtCore.pyqtSignal() # will be emitted when the list of ExternalTagInfos changed
     
     def __init__(self, level=levels.editor, ids=None):
         super().__init__(level, ids)
         EditorModel.instances.add(self)
         application.dispatcher.connect(self._handleDispatcher)
         self.extTagInfos = []
+        global _processor
+        if _processor is None:
+            _processor = AutoTagProcessor()
     
     def loadFile(self, url):
         if url not in self.level:
             element = self.level.get(url)
         else:
+            # if the element is present on editor level, check whether it is visible in any EditorModel
+            # otherwise reload it (=reset to its state on real level)
             id = levels.idFromUrl(url)
             for model in self.instances:
                 if id in model:
-                    # skip autoDelete and autoReplace if the element is loaded from another editor
+                    # skip auto tag processing if the element is loaded from another editor
                     return self.level.get(url)
-            element = self.level.get(url)
-            # Delete outdated infos before auto tag processing
-            EditorModel._removeFromGlobalExtTagInfos(element)
             element = self.level.reload(id)
         
-        EditorModel.performAutoTagProcessing(element)
+        _processor.perform(element)
         return element
-    
-    @staticmethod
-    def performAutoTagProcessing(element):
-        _initAutoTagProcessing()
-        changed = False
-        for tag in list(element.tags.keys()): # copy because dict will be modified
-            if tag.isInDB():
-                # do not auto process internal tags even if the config file says so
-                continue
-        
-            if tag in autoDeleteTags:
-                type = 'delete'
-                newTag = None
-            elif tag in autoReplaceTags:
-                type = 'replace'
-                newTag = autoReplaceTags[tag]
-            else: continue
-            
-            info = EditorModel._getGlobalExtTagInfo(type,tag,newTag)
-            info.addElement(element,element.tags[tag])
-            changed = True
-            
-            if type == 'delete':
-                del element.tags[tag]
-            elif type == 'replace':
-                newValues = []
-                for string in element.tags[tag]:
-                    try:
-                        value = newTag.convertValue(string,crop=True)
-                    except ValueError:
-                        logger.error("Invalid value for tag '{}' (replacing '{}') found: {}"
-                                     .format(newTag.name,tag.name,string))
-                    else:
-                        if newTag not in element.tags or value not in element.tags[newTag]:
-                            newValues.append(value)
-                            element.tags.add(newTag,value)
-                info.newValueMap[element] = newValues
-                del element.tags[tag]
-            
-    @staticmethod
-    def _getGlobalExtTagInfo(type,tag,newTag=None):
-        for info in EditorModel._globalExtTagInfos:
-            if info.type == type and info.tag == tag and newTag == newTag:
-                return info
-        else:
-            info = ExternalTagInfo(type,tag,newTag)
-            EditorModel._globalExtTagInfos.append(info)
-            return info
-        
-    def _getExtTagInfo(self,type,tag,newTag=None):
+
+    def _addToExtTagInfo(self,type,tag,newTag,element):
+        """Add *element* to the ExternalTagInfo specified by *type*, *tag* and *newTag*. Create such an
+        object if it does not yet exist."""
         for info in self.extTagInfos:
-            if info.type == type and info.tag == tag and newTag == newTag:
-                return info
+            if info.type == type and info.tag == tag and info.newTag == newTag:
+                if element not in info.elements:
+                    info.elements.append(element)
+                    return True
+                else: return False
         else:
             info = ExternalTagInfo(type,tag,newTag)
+            info.elements = [element]
             self.extTagInfos.append(info)
-            return info
-    
-    @staticmethod
-    def _removeFromGlobalExtTagInfos(element):
-        for info in EditorModel._globalExtTagInfos[:]:
-            if element in info.elements():
-                if len(info.elements()) == 1:
-                    EditorModel._globalExtTagInfos.remove(info)
-                else: info.removeElement(element)
+            return True
 
     def _updateExtTagInfos(self):
-        elementIds = set(wrapper.element.id for wrapper in self.root.getAllNodes(skipSelf=True))
+        """Rebuild the list of ExternalTagInfos from scratch."""
         self.extTagInfos = []
-        for info in EditorModel._globalExtTagInfos:
-            if any(element.id in elementIds for element in info.elements()):
-                self.extTagInfos.append(info.reduce(elementIds))
-            
-        unknownInfos = {}
         for wrapper in self.root.getAllNodes(skipSelf=True):
             element = wrapper.element
+            
+            # Get infos of type 'deleted' and 'replaced' from the processor
+            if element in _processor.processed:
+                for info in _processor.processed[element]:
+                    # newTag is None for type 'deleted'
+                    self._addToExtTagInfo(info.type,info.tag,info.newTag,element)
+                        
+            # Compute infos of type 'external'
             for tag in element.tags:
                 if not tag.isInDB():
-                    if tag not in unknownInfos:
-                        unknownInfos[tag] = ExternalTagInfo('unknown',tag)
-                    info = unknownInfos[tag]
-                    info.addElement(element)
-                    
-        self.extTagInfos.extend(unknownInfos.values())
+                    self._addToExtTagInfo('external',tag,None,element)
+
         self.extTagInfosChanged.emit()
     
     def _changeContents(self,index,new):
@@ -206,21 +142,19 @@ class EditorModel(leveltreemodel.LevelTreeModel):
             # Rebuild infos from scratch
             self._updateExtTagInfos()
         else:
+            # Only update infos of type 'external'
             changed = False
-            # Only update infos of type 'unknown'
             for id in event.dataIds:
                 element = self.level.get(id)
                 for tag in element.tags:
                     if not tag.isInDB():
-                        info = self._getExtTagInfo('unknown',tag)
-                        if element not in info.elements():
-                            info.addElement(element)
+                        if self._addToExtTagInfo('external',tag,None,element):
                             changed = True
                             
                 for info in self.extTagInfos[:]:
-                    if info.type == 'unknown' and info.tag not in element.tags and element in info.elements():
-                        info.removeElement(element)
-                        if len(info.elements()) == 0:
+                    if info.type == 'external' and info.tag not in element.tags and element in info.elements:
+                        info.elements.remove(element)
+                        if len(info.elements) == 0:
                             self.extTagInfos.remove(info)
                         changed = True
                         
@@ -230,45 +164,115 @@ class EditorModel(leveltreemodel.LevelTreeModel):
     def _handleDispatcher(self,event):
         if isinstance(event,tags.TagTypeChangedEvent) and event.action != constants.CHANGED:
             self._updateExtTagInfos()
-            
-
-def _initAutoTagProcessing():
-    global autoDeleteTags, autoReplaceTags
-    if autoDeleteTags is not None:
-        return # this method has already been called
-    autoDeleteTags = []
-    for tagName in config.options.tags.auto_delete:
-        if not tags.isValidTagName(tagName):
-            logger.error("Found an invalid tagname '{}' in config option tags.auto_delete."
-                         .format(tagName))
-        else: autoDeleteTags.append(tags.get(tagName))
+          
+    def undoExtTagInfo(self,info):
+        """Undo the given ExternalTagInfo which must be of type 'deleted' or 'replaced'. This will not
+        undo an UndoCommand, but add a ChangeTagsCommand to the stack that will cancel the effect of the
+        auto tag processing.
+        """ 
+        self.extTagInfos.remove(info)
+        self.extTagInfosChanged.emit()
         
-    autoReplaceTags = {}
-    try:
-        pairs = _parseAutoReplace()
-    except ValueError:
-        logger.error("Invalid syntax in config option tags.auto_replace.")
-    else:
-        for oldName,newName in pairs:
-            for tagName in [oldName,newName]:
-                if not tags.isValidTagName(tagName):
-                    logger.error("Found an invalid tagname '{}' in config option tags.auto_replace."
-                                 .format(tagName))
-            if tags.get(oldName) in autoReplaceTags:
-                logger.error("Tag '{}' appears twice in config option tags.auto_replace.".format(oldName))
-            else: autoReplaceTags[tags.get(oldName)] = tags.get(newName)
-
-
-def _parseAutoReplace():
-    string = config.options.tags.auto_replace.replace(' ','')
-    if len(string) == 0:
-        return []
-    if string[0] != '(' or string[-1] != ')':
-        raise ValueError()
-    string = string[1:-1]
+        changes = {}
+        for element in info.elements:
+            for procInfo in _processor.processed[element]:
+                if procInfo.type == info.type and procInfo.tag == info.tag and procInfo.newTag == info.newTag:
+                    if info.type == 'deleted':
+                        changes[element] = procInfo.values
+                    elif info.type == 'replaced':
+                        diff = tags.TagDifference(None,None)
+                        diff.additions = [(procInfo.tag,procInfo.values)]
+                        diff.removals = [(procInfo.newTag,procInfo.newValues)]
+                        changes[element] = diff
+                    break
+        
+        if info.type == 'deleted':
+            levels.editor.addTagValues(info.tag,changes)
+        elif info.type == 'replaced':
+            levels.editor.changeTags(changes)
+            
+              
+class AutoTagProcessor:
+    """This class performs automatic tag processing in elements. What has been changed is stored in the
+    attribute 'processed' which maps elements to lists of ProcessingInfos."""
+    def __init__(self):
+        # Read the config file options
+        self.autoDeleteTags = []
+        for tagName in config.options.tags.auto_delete:
+            if not tags.isValidTagName(tagName):
+                logger.error("Found an invalid tagname '{}' in config option tags.auto_delete."
+                             .format(tagName))
+            else: self.autoDeleteTags.append(tags.get(tagName))
+            
+        self.autoReplaceTags = {}
+        try:
+            pairs = self._parseAutoReplace()
+        except ValueError:
+            logger.error("Invalid syntax in config option tags.auto_replace.")
+        else:
+            for oldName,newName in pairs:
+                for tagName in [oldName,newName]:
+                    if not tags.isValidTagName(tagName):
+                        logger.error("Found an invalid tagname '{}' in config option tags.auto_replace."
+                                     .format(tagName))
+                if tags.get(oldName) in self.autoReplaceTags:
+                    logger.error("Tag '{}' appears twice in config option tags.auto_replace.".format(oldName))
+                else: self.autoReplaceTags[tags.get(oldName)] = tags.get(newName)
+                
+        self.processed = {}
     
-    result = []
-    for pair in string.split('),('):
-        oldName,newName = pair.split(',') # may raise ValueError
-        result.append((oldName,newName))
-    return result
+    def _parseAutoReplace(self):
+        """Parse the config option tags.auto_replace and return a list of tuples (oldname,newname) specifying
+        the tags that should be replaced. This does not check whether the tag names are valid."""
+        string = config.options.tags.auto_replace.replace(' ','')
+        if len(string) == 0:
+            return []
+        if string[0] != '(' or string[-1] != ')':
+            raise ValueError()
+        string = string[1:-1]
+        
+        result = []
+        for pair in string.split('),('):
+            oldName,newName = pair.split(',') # may raise ValueError
+            result.append((oldName,newName))
+        return result
+
+    def perform(self,element):
+        """Change tags of *element* according to the config options tags.auto_delete and tags.auto_replace.
+        Store information about the performed operations in self.processed."""
+        changed = False
+        if element in self.processed:
+            # element is being reload
+            del self.processed[element]
+            changed = True
+            
+        for tag in list(element.tags.keys()): # copy because dict will be modified
+            if tag.isInDB():
+                # do not auto process internal tags even if the config file says so
+                continue
+        
+            if tag in self.autoDeleteTags:
+                if element not in self.processed:
+                    self.processed[element] = []
+                self.processed[element].append(ProcessingInfo('deleted',tag,list(element.tags[tag])))
+                del element.tags[tag]
+            elif tag in self.autoReplaceTags:
+                newTag = self.autoReplaceTags[tag]
+                newValues = []
+                for string in element.tags[tag]:
+                    try:
+                        value = newTag.convertValue(string,crop=True)
+                    except tags.TagValueError:
+                        logger.error("Invalid value for tag '{}' (replacing '{}') found: {}"
+                                     .format(newTag.name,tag.name,string))
+                    else:
+                        if newTag not in element.tags or value not in element.tags[newTag]:
+                            newValues.append(value)
+                            element.tags.add(newTag,value)
+                if element not in self.processed:
+                    self.processed[element] = []
+                self.processed[element].append(
+                                    ProcessingInfo('replaced',tag,list(element.tags[tag]),newTag,newValues))
+                del element.tags[tag]
+            else: pass
+            
