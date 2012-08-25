@@ -23,7 +23,7 @@ from omg import database,config
 if input("Really? (y,n)") != "y":
     quit()
 
-config.init({})    
+config.init()    
 database.connect()
 print("Resetting database...")
 database.resetDatabase()
