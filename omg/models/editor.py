@@ -191,6 +191,18 @@ class EditorModel(leveltreemodel.LevelTreeModel):
         elif info.type == 'replaced':
             levels.editor.changeTags(changes)
             
+    def containsExternalTags(self):
+        """Return whether the editor contains any external tags. While this is the case, a commit is not
+        possible."""
+        return any(info.type == 'external' for info in self.extTagInfos)
+    
+    def commit(self):
+        """Commit the contents of this editor."""
+        _processor.removeElements(wrapper.element for wrapper in self.root.getAllNodes(skipSelf=True))
+        levels.editor.commit([wrapper.element for wrapper in self.root.contents])
+        for editorModel in EditorModel.instances:
+            editorModel._updateExtTagInfos()
+            
               
 class AutoTagProcessor:
     """This class performs automatic tag processing in elements. What has been changed is stored in the
@@ -275,4 +287,10 @@ class AutoTagProcessor:
                                     ProcessingInfo('replaced',tag,list(element.tags[tag]),newTag,newValues))
                 del element.tags[tag]
             else: pass
+            
+    def removeElements(self,elements):
+        """Forget the auto tag processing information about the given elements."""
+        for element in elements:
+            if element in self.processed:
+                del self.processed[element]
             

@@ -24,7 +24,8 @@ from ..constants import DB, DISK, CONTENTS
 from ..core import levels, tags, commands
 from ..core.nodes import RootNode, Wrapper
 from ..models import leveltreemodel
-from omg.models.browser import BrowserModel
+from ..models.browser import BrowserModel
+from . import dialogs
 
 translate = QtGui.QApplication.translate
 
@@ -203,8 +204,9 @@ class ClearTreeAction(TreeAction):
         model = self.parent().model()
         application.stack.push(leveltreemodel.ChangeRootCommand(model, [], self.tr('clear')))
 
+
 class CommitTreeAction(TreeAction):
-    
+    #TODO comment
     def __init__(self, parent):
         super().__init__(parent, shortcut = "Shift+Enter")
         self.setIcon(QtGui.qApp.style().standardIcon(QtGui.QStyle.SP_DialogSaveButton))
@@ -215,10 +217,15 @@ class CommitTreeAction(TreeAction):
         
     def doAction(self):
         model = self.parent().model()
-        try:
-            self.level().commit([node.element for node in self.parent().model().root.contents])
-        except levels.TagWriteError as e:
-            e.displayMessage()
+        if not model.containsExternalTags():
+            try:
+                model.commit()
+            except levels.TagWriteError as e:
+                e.displayMessage()
+        else:
+            dialogs.warning(self.tr("No commit possible"),
+                            self.tr("While the editor contains external tags, no commit is possible. "
+                                    "Delete those tags or add their tagtype to the database."))
 
         
 class FlattenAction(TreeAction):
@@ -235,10 +242,8 @@ class FlattenAction(TreeAction):
         from ..gui.dialogs import FlattenDialog
         dialog = FlattenDialog(parent = self.parent())
         if dialog.exec_() == QtGui.QDialog.Accepted:
-            flatten(self.parent().level,
-                                         self.parent().nodeSelection.wrappers(),
-                                         dialog.recursive()
-                                         )
+            flatten(self.parent().level, self.parent().nodeSelection.wrappers(), dialog.recursive())
+            
 
 class ChangePositionAction(TreeAction):
     
