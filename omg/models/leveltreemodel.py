@@ -20,18 +20,22 @@ from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
 from .. import application, config, database as db, logging, utils
-from ..core import elements, levels, tags
-from ..core.nodes import Wrapper
+from ..core import elements, levels, nodes, tags
 from ..models import rootedtreemodel, albumguesser
 
+
 logger = logging.getLogger(__name__)
-        
+
+
 class LevelTreeModel(rootedtreemodel.RootedTreeModel):
-    """Model class for the editors where users can edit elements before they are commited into
-    the database."""
+    """A tree model for the elements of a level.
+    
+    The root may contain arbitrary level elements, but those elements are always in correspondence
+    to the level: containers contain the same children (in the same order) as in the level, etc.
+    """
     
     def __init__(self, level, elements=None):
-        """Initializes the model. A new RootNode will be set as root.
+        """Initializes the model for *level*. A new RootNode will be set as root.
         
         If *elements* is given, these elements will be initially loaded under the root node.
         """
@@ -45,6 +49,7 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
         return Qt.CopyAction | Qt.MoveAction
 
     def flags(self,index):
+        """Overridden method; returns defaultFlags plus ItemIsDropEnabled."""
         defaultFlags = super().flags(index)
         if index.isValid():
             return defaultFlags | Qt.ItemIsDropEnabled | Qt.ItemIsDragEnabled
@@ -53,31 +58,27 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
     def dropMimeData(self, mimeData, action, row, column, parentIndex):
         """Drop stuff into a leveltreemodel. Handles OMG mime and text/uri-list.
         
-        If URLs are dropped, they are loaded into the level. If there is an album
-        guesser specified, it is run on the URLs before they are inserted.
-        
-        Elements dropped on the top layer are just inserted under the RootNode. Otherwise,
-        the level is modified accordingly."""
-        
+        If URLs are dropped, they are loaded into the level. If there is an album guesser
+        specified, it is run on the URLs before they are inserted.
+        Elements dropped on the top layer are just inserted under the RootNode. Otherwise, the
+        level is modified accordingly.
+        """
         if action == Qt.IgnoreAction:
             return True
-        if action == Qt.TargetMoveAction:
-            raise ValueError()
         parent = self.data(parentIndex, Qt.EditRole)
-        # if something is dropped on a file, make it a sibling instead of a child of that file
+        # if the drop is on a file, make it a sibling instead of a child of that file
         if parent is not self.root and parent.element.isFile():
             parent = parent.parent
             row = parentIndex.row() + 1
-        # if something is dropped on no item, append it to the end of the parent
+        # drop onto no specific item --> append at the end of the parent
         if row == -1:
             row = parent.getContentsCount()
-        if parent is not self.root:
-            if row == 0:
-                insertPosition = 1
-            else:
-                insertPosition = parent.contents[row-1].position + 1
-        else:
+        if parent is self.root:
             insertPosition = None
+        elif row == 0:
+            insertPosition = 1
+        else:
+            insertPosition = parent.contents[row-1].position + 1
         application.stack.beginMacro(self.tr("drop"))
         if mimeData.hasFormat(config.options.gui.mime):
             elements = [ node.element for node in mimeData.wrappers() ]
@@ -85,16 +86,16 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
                 levelRemovals = {}
                 modelRemovals = {}
                 for node in mimeData.wrappers():
-                    if isinstance(node.parent, Wrapper):
-                        a, b = node.parent.element, node.position
+                    if isinstance(node.parent, nodes.Wrapper):
+                        elem, pos = node.parent.element, node.position
                         dct = levelRemovals
                     else:
-                        a, b = node.parent, node.parent.contents.index(node)
+                        elem, pos = node.parent, node.parent.contents.index(node)
                         dct = modelRemovals
-                    if a not in dct:
-                        dct[a] = [b]
+                    if elem not in dct:
+                        dct[elem] = [pos]
                     else:
-                        dct[a].append(b)
+                        dct[elem].append(pos)
                 for rparent, positions in levelRemovals.items():
                     self.level.removeContentsAuto(rparent, positions=positions)
                     if rparent is parent:
@@ -102,46 +103,46 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
                         row -= len([pos for pos in positions if pos < insertPosition])
                 for rparent, rows in modelRemovals.items():
                     rparent.model.removeElements(rparent, rows)
-                
-        else: # text/uri-list
+        else:  # text/uri-list
             elements = self.prepareURLs(mimeData.urls(), parent)
-        logger.debug("drop mime data: {}".format(elements))
-        ret = len(elements) != 0        
+        ret = len(elements) != 0
         self.insertElements(parent, row, elements)
         application.stack.endMacro()
         return ret   
     
     def removeRows(self, row, count, parent):
-        """Qt should not handle removals."""
+        """Qt should not handle removals: DropMimeData does this for us."""
         return True
         
     def insertElements(self, parent, row, elements):
         """Undoably insert *elements* (a list of Elements) under *parent*, which is a wrapper.
         
-        This convenience function either fires a ChangeRootCommand, if *parent* is this model's
-        root, or updates the level otherwise. In the latter case, a list of positions for the
-        new elements may be given; if not, they are canonically inferred.
+        This convenience function either pushes a ChangeRootCommand, if *parent* is this model's
+        root, or updates the level otherwise.
         """
-        
         if parent is self.root:
-            oldContents = [ node.element for node in self.root.contents ]
-            newContents = oldContents[:row] + elements + oldContents[row:]
-            application.stack.push(ChangeRootCommand(self, newContents))
+            contents = [ node.element for node in self.root.contents ]
+            contents[row:row] = elements
+            application.stack.push(ChangeRootCommand(self, contents))
         else:
             self.level.insertContentsAuto(parent.element, row, elements)
     
     def removeElements(self, parent, rows):
-        """Undoably remove elements in *rows* under *parent* (a wrapper)."""
+        """Undoably remove elements in *rows* under *parent* (a wrapper).
+        
+        This convenience function either alters the RootNode, if parent is self.root, or updates
+        the level.
+        """
         if parent is self.root:
             newContents = [ self.root.contents[i].element
-                           for i in range(len(self.root.contents))
-                           if i not in rows]
+                            for i in range(len(self.root.contents))
+                            if i not in rows ]
             application.stack.push(ChangeRootCommand(self, newContents))
         else:
             self.level.removeContentsAuto(parent.element, indexes=rows)
     
     def loadFile(self, path):
-        """Load a file into this model. The default implementations calls level.get()."""
+        """Load a file into this model. The default implementation calls level.get()."""
         return self.level.get(path)
     
     def prepareURLs(self, urls, parent):
@@ -165,16 +166,13 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
                     element = self.loadFile(file)
                     filesByFolder[folder].append(element)
                     elements.append(element)
-                    
             progress.close()
-            # call album guesser
             if self.guessProfile is None:
                 return elements
             else:
                 profile = albumguesser.profileConfig[self.guessProfile]
                 profile.guessAlbums(self.level, filesByFolder)
                 return profile.albums + profile.singles
-
         except levels.ElementGetError as e:
             print(e)
             return []
@@ -192,10 +190,11 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
         return super().__contains__(arg)
     
     def _handleLevelChanged(self, event):
+        """Update elements if the state of the level has changed."""
         dataIds = event.dataIds
         contentIds = event.contentIds
         for node, contents in self.walk(self.root):
-            if isinstance(node, Wrapper):
+            if isinstance(node, nodes.Wrapper):
                 if node.element.id in dataIds:
                     self.dataChanged.emit(self.getIndex(node), self.getIndex(node))
                 if node.element.id in contentIds:
@@ -248,7 +247,7 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
         
     def _insertContents(self, index, row, ids, positions=None):
         self.beginInsertRows(index, row, row + len(ids) - 1)
-        wrappers = [Wrapper(self.level.get(id)) for id in ids]
+        wrappers = [nodes.Wrapper(self.level.get(id)) for id in ids]
         if positions:
             for pos, wrap in zip(positions, wrappers):
                 wrap.position = pos
@@ -301,7 +300,7 @@ class MergeCommand(QtGui.QUndoCommand):
                 tagCopy = element.tags.copy()
                 tagCopy[tags.TITLE] = [ t.replace(removeString, '') for t in tagCopy[tags.TITLE]]
                 self.tagChanges[id] = tags.TagDifference(element.tags, tagCopy)
-        if isinstance(parent, Wrapper):
+        if isinstance(parent, nodes.Wrapper):
             self.elementParent = True
             self.insertPosition = parent.element.contents.positions[self.insertIndex]
             self.parentID = parent.element.id

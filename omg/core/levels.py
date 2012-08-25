@@ -21,9 +21,9 @@ import collections, numbers, weakref
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from . import data, tags, flags
+from . import data, elements, tags, flags
 from .nodes import Wrapper
-from .. import application, filebackends, database as db, config, logging
+from .. import application, filebackends, database as db, logging
 
 
 allLevels = weakref.WeakSet()
@@ -83,23 +83,29 @@ class ConsistencyError(RuntimeError):
 
 class ElementChangedEvent(application.ChangeEvent):
     #TODO comment
-    def __init__(self,dataIds=None,contentIds=None):
+    def __init__(self, dataIds=None, contentIds=None):
         super().__init__()
         if dataIds is None:
-            self.dataIds = []
-        else: self.dataIds = dataIds
+            dataIds = []
+        elif type(dataIds) is not list:
+            dataIds = list(dataIds)
+        self.dataIds = dataIds
         if contentIds is None:
-            self.contentIds = []
-        else: self.contentIds = contentIds
+            contentIds = []
+        elif type(contentIds) is not list:
+            contentIds = list(contentIds)
+        self.contentIds = contentIds
         
     def merge(self,other):
         if isinstance(other,ElementChangedEvent):
             if self.dataIds is None:
                 self.dataIDs = other.dataIds
-            else: self.dataIds.extend([id for id in other.dataIds if id not in self.dataIds])
+            else:
+                self.dataIds.extend([id for id in other.dataIds if id not in self.dataIds])
             if self.contentIds is None:
                 self.dataIDs = other.contentIds
-            else: self.contentIds.extend([id for id in other.contentIds if id not in self.contentIds])
+            else:
+                self.contentIds.extend([id for id in other.contentIds if id not in self.contentIds])
             return True
         else:
             return False
@@ -622,6 +628,24 @@ class Level(application.ChangeEventDispatcher):
     # The following functions implement no undo/redo handling and should be used with care
     # ====================================================================================
     
+    def _createContainer(self, containerTags, major, id=None):
+        if id is None:
+            id = tIdManager.createTId()
+        container = elements.Container(self, id, major, tags=containerTags)
+        self.elements[id] = container
+        return container
+    
+    def _addElement(self, element):
+        assert element.level is self
+        self.elements[element.id] = element
+    
+    def _removeElement(self, element):
+        """Remove the given element from this level.
+        
+        Don't call this if the element has any parents or children.
+        """
+        del self.elements[element.id]
+        
     def _addTagValue(self, tag, value, elements, emitEvent=True):
         """Add a tag of type *tag* and value *value* to the given elements.
         If *emitEvent* is False, do not emit an even."""

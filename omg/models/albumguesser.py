@@ -21,48 +21,13 @@ import os, re, itertools
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from .. import application, config, logging, profiles
-from ..core import tags, levels
-from ..core.elements import Container
+from .. import config, logging, profiles
+from ..core import commands, tags
 from ..utils import relPath
 
 logger = logging.getLogger(__name__)
 translate = QtCore.QCoreApplication.translate
 
-class AlbumGuessCommand(QtGui.QUndoCommand):
-    
-    def __init__(self, level, containerTags, children, meta = False):
-        super().__init__()
-        self.level = level
-        self.ids = list(children.values())
-        self.containerTags = containerTags
-        self.container = self.containerID = None
-        self.children = children
-        self.meta = meta
-    
-    def redo(self):
-        if self.container is None:
-            self.containerID = levels.tIdManager.createTId()
-            self.ids.append(self.containerID)
-            self.contents = [self.containerID]
-        album = Container(self.level, self.containerID, major=True)
-        album.tags = self.containerTags
-        self.level.elements[self.containerID] = album
-        self.container = album
-        for position, childID in self.children.items():
-            child = self.level.get(childID)
-            child.parents.append(self.containerID)
-            album.contents.insert(position, childID)
-            if self.meta and child.isContainer():
-                child.major = False
-    
-    def undo(self):
-        del self.level.elements[self.containerID]
-        for childID in self.children.values():
-            child = self.level.get(childID)
-            child.parents.remove(self.containerID)
-            if self.meta and child.isContainer():
-                child.major = True
                 
 class StandardGuesser(profiles.Profile):
     """The default album guesser. Albums are recognized by files having a certain set of tags in common,
@@ -72,10 +37,11 @@ class StandardGuesser(profiles.Profile):
     
     className = "standardGuesser"
     
-    def __init__(self, name, albumGroupers = ["album"],
-                  directoryMode = False,
-                  metaRegex = r" ?[([]?(?:cd|disc|part|teil|disk|vol)\.? ?([iI0-9]+)[)\]]?"):
-        """Initialize a guesser profile with the given *name*. *albumGroupers* is the list of grouper tags;
+    def __init__(self, name, albumGroupers=["album"], directoryMode=False,
+                  metaRegex=r" ?[([]?(?:cd|disc|part|teil|disk|vol)\.? ?([iI0-9]+)[)\]]?"):
+        """Initialize a guesser profile with the given *name*.
+        
+        *albumGroupers* is the list of grouper tags;
         the elements may be anything accepted by tags.get. The first grouper tag determines the title
         of the album container.
         If *directoryMode* is True, an additional condition for albums is that all files are in the
@@ -101,7 +67,7 @@ class StandardGuesser(profiles.Profile):
             # no grouping -> concatenate filesByFolder
             self.singles = list(itertools.chain(*files.values()))
         else:
-            application.stack.beginMacro(self.tr('Guess Albums'))
+            self.level.stack.beginMacro(self.tr('guess albums'))
             if self.directoryMode:
                 for _, v in sorted(files.items()):
                     self._guessHelper(v)
@@ -110,7 +76,7 @@ class StandardGuesser(profiles.Profile):
             
             if self.metaRegex is not None:
                 self.guessMetaContainers()    
-            application.stack.endMacro()
+            self.level.stack.endMacro()
 
     def _guessHelper(self, files):
         byKey = {}
@@ -141,15 +107,16 @@ class StandardGuesser(profiles.Profile):
                                 self.tr("position {} appears twice in {}").format(element.tags.position, key))
                         self.errors.append(elements)
                     else:
-                        children[element.filePosition] = element.id
+                        children[element.filePosition] = element
                 firstFreePosition = elementsWithPos[-1].filePosition+1 if len(elementsWithPos) > 0 else 1
                 for i, element in enumerate(elementsWithoutPos, start = firstFreePosition):
-                    children[i] = element.id
+                    children[i] = element
                 albumTags = tags.findCommonTags(elements)
                 albumTags[tags.TITLE] = [key] if pureDirMode else elements[0].tags[self.albumTag]
-                command = AlbumGuessCommand(self.level, albumTags, children)
-                application.stack.push(command)
-                self.albums.append(command.container)
+                create = commands.CreateContainerCommand(self.level, albumTags, major=True)
+                self.level.stack.push(create)
+                self.level.insertContents(create.container, list(children.items()))
+                self.albums.append(create.container)
             else:
                 self.singles.extend(elements)
                 
@@ -177,9 +144,11 @@ class StandardGuesser(profiles.Profile):
         for key, contents in byKey.items():
             metaTags = tags.findCommonTags(contents.values())
             metaTags[tags.TITLE] = [key[1]]
-            command = AlbumGuessCommand(self.level, metaTags, {pos:album.id for pos,album in contents.items()}, meta = True)
-            application.stack.push(command)
-            self.albums.append(command.container)
+            self.level.setMajorFlags({album:False for album in contents.values()})
+            create = commands.CreateContainerCommand(self.level, metaTags, major=True)
+            self.level.stack.push(create)
+            self.level.insertContents(create.container, list(contents.items()))
+            self.albums.append(create.container)
             for c in contents.values():
                 if c in self.albums:
                     self.albums.remove(c)

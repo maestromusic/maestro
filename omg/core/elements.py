@@ -202,8 +202,6 @@ class File(Element):
                     tags=self.tags.copy(),
                     flags=self.flags[:],
                     data=self.data.copy())
-        if hasattr(self, "fileTags"):
-            ret.fileTags = self.fileTags.copy()
         if hasattr(self, "filePosition"):
             ret.filePosition = self.filePosition
         return ret
