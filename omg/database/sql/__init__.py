@@ -137,13 +137,15 @@ class AbstractSql:
         """
         
     def multiQuery(self,queryString,args):
-        """Perform a query several times with changing parameter sets.  Raise a DBException if the query
+        """Perform a query several times with changing parameter sets. Raise a DBException if the query
         fails.
 
         Equivalent to::
         
+            self.transaction()
             for parameters in args:
                 self.query(queryString,*parameters)
+            self.commit()
 
         In some drivers :func:`multiQuery` may be faster than this loop because the query has to be sent to
         the server and parsed only once.
@@ -153,8 +155,10 @@ class AbstractSql:
             SQL.multiQuery("INSERT INTO persons VALUES (?,?)",(("Peter","Germany"),("Julie","France")))
 
     \ """
+        self.transaction()
         for parameters in args:
             self.query(queryString,*parameters)
+        self.commit()
 
     def transaction(self):
         """Start a transaction. Transactions can be nested. Only when the outermost transaction is committed,

@@ -169,8 +169,8 @@ def createTables():
         table.create()
 
 
-# Standard methods which are redirected to this thread's connection object
-#=========================================================================
+# Standard methods which are redirected to this thread's connection object (see sql.AbstractSql)
+#===============================================================================================
 def query(*params):
     try:
         return connections[threading.current_thread().ident].query(*params)
