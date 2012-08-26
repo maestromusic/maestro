@@ -44,21 +44,6 @@ class ElementGetError(RuntimeError):
     """Error indicating that an element failed to be loaded by some level."""
     pass
 
-class TagWriteError(RuntimeError):
-    """An error that is raised when writing tags to disk fails."""
-    
-    def __init__(self, url, problems=None):
-        super().__init__("Error writing tags of {}".format(url))
-        self.url = url
-        self.problems = problems
-        
-    def displayMessage(self):
-        from ..gui import dialogs
-        title = translate(__name__, "Error saving tags")
-        msg1 = translate(__name__, "Could not write tags of file {}:\n").format(self.url)
-        msgReadonly = translate(__name__, "File is readonly")
-        msgProblem = translate(__name__, "Tags '{}' not supported by format").format(self.problems)
-        dialogs.warning(title, msg1 + (msgReadonly if self.problems is None else msgProblem))
 
 class RenameFilesError(RuntimeError):
     """An error that is raised when renaming files fails."""
@@ -473,7 +458,7 @@ class Level(application.ChangeEventDispatcher):
             raise command.error
         
     def changeTags(self, changes):
-        """Change tags of several elements. *changes* maps element to TagDifference object.
+        """Change tags of elements. *changes* maps elements to tags.TagDifference objects.
         On real level this method might raise a TagWriteError if writing (some or all) tags to the
         filesystem fails.
         """
@@ -483,12 +468,13 @@ class Level(application.ChangeEventDispatcher):
                                       undoMethod=self._changeTags,
                                       undoArgs={"changes": inverseChanges},
                                       text=self.tr("change tags"),
-                                      errorClass=TagWriteError)
+                                      errorClass=filebackends.TagWriteError)
         self.stack.push(command)
         if command.error:
             raise command.error
         
     def changeFlags(self, changes):
+        """Change flags of elements. *changes* maps elements to flags.FlagDifference objects."""
         reversed = {elem:diff.inverse() for elem, diff in changes.items()}
         command = GenericLevelCommand(redoMethod=self._changeFlags,
                                       redoArgs={"changes" : changes,
@@ -560,7 +546,7 @@ class Level(application.ChangeEventDispatcher):
                 if len(newElements) > 0:
                     self.stack.push(commands.CreateDBElementsCommand(newElements, newInLevel=True))
                 db.transaction()
-            except (TagWriteError, OSError) as e:
+            except (filebackends.TagWriteError, OSError) as e:
                 self.stack.endMacro()
                 self.stack.undo()
                 raise e
@@ -640,13 +626,14 @@ class Level(application.ChangeEventDispatcher):
             self.get(childId).parents.remove(element.id)
     
     def _changeTags(self, changes, emitEvent=True):
+        """Like changeTags, but not undoable."""
         for element, diff in changes.items():
             diff.apply(element)
         if emitEvent:
             self.emitEvent([element.id for element in changes])
     
     def _changeFlags(self, changes, emitEvent=True):
-        """Change flags of multiple elements: *changes* maps elements to FlagDifference objects."""
+        """Like changeFlags, but not undoable."""
         for element, diff in changes.items():
             diff.apply(element)
         if emitEvent:

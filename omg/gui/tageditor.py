@@ -21,7 +21,7 @@ import os.path
 from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
-from .. import strutils, utils, config, logging, application
+from .. import strutils, utils, config, logging, application, filebackends
 from ..core import tags, levels, commands
 from ..models import tageditor as tageditormodel, simplelistmodel, flageditor as flageditormodel
 from ..gui import singletageditor, tagwidgets, treeactions, mainwindow, flageditor, dialogs
@@ -168,7 +168,7 @@ class TagEditorDialog(QtGui.QDialog):
         try:
             self.level.commit(self.tagedit.model.getElements())
             self.accept()
-        except levels.TagWriteError as e:
+        except filebackends.TagWriteError as e:
             e.displayMessage()
         
         

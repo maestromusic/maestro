@@ -19,7 +19,7 @@
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from .. import application, database as db, utils
+from .. import application, database as db, utils, filebackends
 from ..constants import DB, DISK, CONTENTS
 from ..core import levels, tags, commands
 from ..core.nodes import RootNode, Wrapper
@@ -220,7 +220,7 @@ class CommitTreeAction(TreeAction):
         if not model.containsExternalTags():
             try:
                 model.commit()
-            except levels.TagWriteError as e:
+            except filebackends.TagWriteError as e:
                 e.displayMessage()
         else:
             dialogs.warning(self.tr("No commit possible"),

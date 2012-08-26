@@ -137,7 +137,23 @@ class BackendFile:
     position = None
     length = -1
     
-
+    
+class TagWriteError(RuntimeError):
+    """An error that is raised when writing tags to disk fails."""
+    
+    def __init__(self, url, problems=None):
+        super().__init__("Error writing tags of {}".format(url))
+        self.url = url
+        self.problems = problems
+        
+    def displayMessage(self):
+        from ..gui import dialogs
+        title = translate(__name__, "Error saving tags")
+        msg1 = translate(__name__, "Could not write tags of file {}:\n").format(self.url)
+        msgReadonly = translate(__name__, "File is readonly")
+        msgProblem = translate(__name__, "Tags '{}' not supported by format").format(self.problems)
+        dialogs.warning(title, msg1 + (msgReadonly if self.problems is None else msgProblem))
+        
 def changeTags(changes):
     """Change tags of files. If an error occurs, all changes are undone and a TagWriteError is raised.
     *changes* is a dict mapping elements or BackendFiles to TagDifferences. If the dict contains elements
@@ -179,4 +195,4 @@ def changeTags(changes):
         for backendFile,diff in doneFiles:
             diff.revert(backendFile.tags)
             backendFile.saveTags()
-        raise levels.TagWriteError(problemUrl, problems)
+        raise TagWriteError(problemUrl, problems)

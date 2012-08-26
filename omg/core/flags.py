@@ -268,36 +268,46 @@ class FlagTypeChangedEvent(ChangeEvent):
 
 
 class FlagDifference:
-    """See tags.TagDifference"""
+    """Stores changes to flag lists and provides methods to apply them. When this difference is applied to
+    an element the flags in *removals* will be removed from the elements flags and the flags in *additions*
+    will be added.
+    """
     def __init__(self, additions=None, removals=None):
-        self.additions = additions
-        self.removals = removals
+        self._additions = additions
+        self._removals = removals
         
     def apply(self, element):
-        if self.removals is not None:
-            for flag in self.removals:
+        """Change the flags of *element* according to this difference object."""
+        if self._removals is not None:
+            for flag in self._removals:
                 element.flags.remove(flag)
-        if self.additions is not None:
-            element.flags.extend(self.additions)
+        if self._additions is not None:
+            element.flags.extend(self._additions)
 
     def revert(self, element):
-        if self.additions is not None:
-            for flag in self.additions:
+        """Undo the changes of this difference object to the flags of *element*."""
+        if self._additions is not None:
+            for flag in self._additions:
                 element.flags.remove(flag)
-        if self.removals is not None:
-            element.flags.extend(self.removals)
+        if self._removals is not None:
+            element.flags.extend(self._removals)
             
     def getAdditions(self):
-        return self.additions if self.additions is not None else []
+        """Return the list of flags which are added by this difference."""
+        return self._additions if self._additions is not None else []
         
     def getRemovals(self):
-        return self.removals if self.removals is not None else []
+        """Return the list of flags which are removed by this difference."""
+        return self._removals if self._removals is not None else []
         
     def inverse(self):
+        """Return the inverse difference."""
         return utils.InverseDifference(self)
             
 
 class FlagListDifference(FlagDifference):
+    """Subclass of FlagDifference that simply takes two lists of flags (old and new) and figures out
+    additions/removals by itself."""
     def __init__(self,oldFlags,newFlags):
         self.oldFlags = oldFlags
         self.newFlags = newFlags

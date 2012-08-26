@@ -184,7 +184,7 @@ class RealLevel(levels.Level):
                                           undoMethod=filebackends.changeTags,
                                           undoArgs={"changes": inverseChanges},
                                           text=self.tr("change tags"),
-                                          errorClass=TagWriteError)
+                                          errorClass=filebackends.TagWriteError)
             self.stack.push(command)
             if command.error:
                 raise command.error
@@ -249,9 +249,6 @@ class RealLevel(levels.Level):
         db.write.changePositions(parent.id, list(changes.items()))
     
     def _changeTags(self, changes, emitEvent=True):
-        """Change tags of elements. Might raise a TagWriteError if files are involved. If an error is raised,
-        any changes made before are undone.
-        """
         filebackends.changeTags(changes) # might raise TagWriteError
         
         db.transaction()

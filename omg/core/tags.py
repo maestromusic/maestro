@@ -808,6 +808,8 @@ class Storage(dict):
         else: dict.__setitem__(self,key,TagValueList(self,value))
     
     def _removeList(self,list):
+        """Remove the given list from the values of this dict. This is called by the lists itself, when
+        they become empty (see TagValueList)."""
         for key,value in self.items():
             if value == list:
                 del self[key]
@@ -889,18 +891,20 @@ class Storage(dict):
 
 
 class TagDifference:
-    """A class storing the difference between two Storage() objects, for use in UndoCommands."""
+    """Stores changes to tag-storages and provides methods to apply them.
+    
+        - *additions* is a list of (tag,value) pairs
+        - *removals* is a list of (tag,value) pairs
+        - *replacements* is a list of (tag,oldValue,newValue) tuples. This is used to replace
+          values keeping the order.
+    """
     def __init__(self, additions=None, removals=None, replacements=None):
         self.additions = additions
         self.removals = removals
         self.replacements = replacements
-        # BUGTEST
-        print("TAGDIFF")
-        print(self.additions)
-        print(self.removals)
-        print(self.replacements)
         
     def apply(self,element):
+        """Change the tags of *element* according to this difference object."""
         if self.removals is not None:
             for tag,value in self.removals:
                 element.tags[tag].remove(value)
@@ -915,6 +919,7 @@ class TagDifference:
                 element.tags.add(tag,value)
             
     def revert(self,element):
+        """Undo the changes of this difference object to the tags of *element*."""
         if self.additions is not None:
             for tag,value in self.additions:
                 element.tags[tag].remove(value)
@@ -929,6 +934,8 @@ class TagDifference:
                 element.tags.add(tag,value)
             
     def getAdditions(self):
+        """Return the list of (tag,value) pairs that are added by this TagDifference. This includes new
+        values from the 'replacement' constructor parameter."""
         if self.replacements is not None:
             result = [(tag,newValue) for tag,oldValue,newValue in self.replacements]
             if self.additions is not None:
@@ -939,6 +946,8 @@ class TagDifference:
         else: return []
         
     def getRemovals(self):
+        """Return the list of (tag,value) pairs that are removed by this TagDifference. This includes old
+        values from the 'replacement' constructor parameter."""
         if self.replacements is not None:
             result = [(tag,oldValue) for tag,oldValue,newValue in self.replacements]
             if self.removals is not None:
@@ -949,6 +958,7 @@ class TagDifference:
         else: return []
         
     def inverse(self):
+        """Return the inverse difference."""
         return utils.InverseDifference(self)
         
     def __str__(self):
@@ -956,7 +966,9 @@ class TagDifference:
 
 
 class SingleTagDifference(TagDifference):
-    """A class storing the difference between two Storage() objects, for use in UndoCommands."""
+    """Convenience class that stores changes to a single tagtype. *additions* and *removals* are simply
+    lists of values, *replacements* is a list of (oldValue,newValue) pairs.
+    """
     def __init__(self, tagType, additions=None, removals=None, replacements=None):
         if additions is not None:
             additions = [(tagType,value) for value in additions]
@@ -968,6 +980,8 @@ class SingleTagDifference(TagDifference):
                          
                          
 class TagStorageDifference(TagDifference):
+    """Subclass of TagDifference that simply takes two Storage-instances (old and new) and figures out
+    additions/removals by itself."""
     def __init__(self,oldTags,newTags):
         # both arguments may be None
         self.oldTags = oldTags
@@ -1005,8 +1019,7 @@ class TagStorageDifference(TagDifference):
     
     
 def findCommonTags(elements):
-    """Returns a Storage object containing all tags that are equal in all of the elements.
-    """
+    """Returns a Storage object containing all tags that are equal in all of the elements."""
     commonTags = set(reduce(lambda x,y: x & y, [set(elem.tags.keys()) for elem in elements ]))
     commonTagValues = {}
     differentTags=set()
