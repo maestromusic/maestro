@@ -178,18 +178,15 @@ class EditorModel(leveltreemodel.LevelTreeModel):
             for procInfo in _processor.processed[element]:
                 if procInfo.type == info.type and procInfo.tag == info.tag and procInfo.newTag == info.newTag:
                     if info.type == 'deleted':
-                        changes[element] = procInfo.values
+                        changes[element] = tags.SingleTagDifference(info.tag,additions=procInfo.values)
                     elif info.type == 'replaced':
-                        diff = tags.TagDifference(None,None)
-                        diff.additions = [(procInfo.tag,procInfo.values)]
-                        diff.removals = [(procInfo.newTag,procInfo.newValues)]
-                        changes[element] = diff
+                        changes[element] = tags.TagDifference(
+                                            additions=[(info.tag,value) for value in procInfo.values],
+                                            removals=[(info.newTag,value) for value in procInfo.newValues]
+                                            )
                     break
-        
-        if info.type == 'deleted':
-            levels.editor.addTagValues(info.tag,changes)
-        elif info.type == 'replaced':
-            levels.editor.changeTags(changes)
+                
+        levels.editor.changeTags(changes)
             
     def containsExternalTags(self):
         """Return whether the editor contains any external tags. While this is the case, a commit is not

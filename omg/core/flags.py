@@ -18,7 +18,7 @@
 
 from PyQt4 import QtGui
 
-from .. import application, constants, database as db, logging
+from .. import application, constants, database as db, logging, utils
 from ..constants import ADDED, DELETED, CHANGED, ADD, DELETE, CHANGE
 from ..application import ChangeEvent
 
@@ -269,27 +269,48 @@ class FlagTypeChangedEvent(ChangeEvent):
 
 class FlagDifference:
     """See tags.TagDifference"""
-    def __init__(self, flagsA, flagsB):
-        if flagsA is None:
-            flagsA = ()
-        if flagsB is None:
-            flagsB = ()
-        self.removals = set(flagsA) - set(flagsB)
-        self.additions = set(flagsB) - set(flagsA)
+    def __init__(self, additions=None, removals=None):
+        self.additions = additions
+        self.removals = removals
         
-    def apply(self, flagsA):
-        for flag in self.removals:
-            flagsA.remove(flag)
-        flagsA.extend(self.additions)
+    def apply(self, element):
+        if self.removals is not None:
+            for flag in self.removals:
+                element.flags.remove(flag)
+        if self.additions is not None:
+            element.flags.extend(self.additions)
+
+    def revert(self, element):
+        if self.additions is not None:
+            for flag in self.additions:
+                element.flags.remove(flag)
+        if self.removals is not None:
+            element.flags.extend(self.removals)
+            
+    def getAdditions(self):
+        return self.additions if self.additions is not None else []
         
-    def revert(self, flagsB):
-        for flag in self.additions:
-            flagsB.remove(flag)
-        flagsB.extend(self.removals)
+    def getRemovals(self):
+        return self.removals if self.removals is not None else []
         
     def inverse(self):
-        ret = FlagDifference(None, None)
-        ret.removals = self.additions.copy()
-        ret.additions = self.removals.copy()
-        return ret
+        return utils.InverseDifference(self)
+            
+
+class FlagListDifference(FlagDifference):
+    def __init__(self,oldFlags,newFlags):
+        self.oldFlags = oldFlags
+        self.newFlags = newFlags
+                
+    def apply(self, element):
+        element.flags = self.newFlags[:]
+        
+    def revert(self, element):
+        element.flags = self.oldFlags[:]
+        
+    def getAdditions(self):
+        return [flag for flag in self.newFlags if not flag in self.oldFlags]
+    
+    def getRemovals(self):
+        return [flag for flag in self.oldFlags if not flag in self.newFlags]
         

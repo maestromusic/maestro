@@ -48,7 +48,7 @@ class RealLevel(levels.Level):
             else: notFound.append(id)
         if len(notFound) > 0:
             positiveIds = [id for id in notFound if id > 0]
-            urls = [ levels.tIdManager(id) for id in notFound if id < 0 ]
+            urls = [levels.tIdManager(id) for id in notFound if id < 0]
             if len(positiveIds) > 0:
                 self.loadFromDB(positiveIds, child)
             if len(urls) > 0:
@@ -58,8 +58,9 @@ class RealLevel(levels.Level):
         """Load elements specified by *idList* from the database into *level*."""
         if len(idList) == 0: # queries will fail otherwise
             return 
-        idList = ','.join(str(id) for id in idList)
-        #  bare elements
+        idList = db.csList(idList)
+        
+        # bare elements
         result = db.query("""
                 SELECT el.id, el.file, el.major, f.url, f.length
                 FROM {0}elements AS el LEFT JOIN {0}files AS f ON el.id = f.element_id
@@ -68,11 +69,12 @@ class RealLevel(levels.Level):
         for (id, file, major, url, length) in result:
             if file:
                 level.elements[id] = elements.File(level, id,
-                                          url=filebackends.BackendURL.fromString(url),
-                                          length=length)
+                                                   url=filebackends.BackendURL.fromString(url),
+                                                   length=length)
             else:
                 level.elements[id] = elements.Container(level, id, major=major)
-        #  contents
+                
+        # contents
         result = db.query("""
                 SELECT el.id, c.position, c.element_id
                 FROM {0}elements AS el JOIN {0}contents AS c ON el.id = c.container_id
@@ -81,7 +83,8 @@ class RealLevel(levels.Level):
                 """.format(db.prefix, idList))
         for (id, pos, contentId) in result:
             level.elements[id].contents.insert(pos, contentId)
-        #  parents
+            
+        # parents
         result = db.query("""
                 SELECT el.id,c.container_id
                 FROM {0}elements AS el JOIN {0}contents AS c ON el.id = c.element_id
@@ -89,7 +92,8 @@ class RealLevel(levels.Level):
                 """.format(db.prefix, idList))
         for (id, contentId) in result:
             level.elements[id].parents.append(contentId)
-        #  tags
+            
+        # tags
         result = db.query("""
                 SELECT el.id,t.tag_id,t.value_id
                 FROM {0}elements AS el JOIN {0}tags AS t ON el.id = t.element_id
@@ -98,6 +102,7 @@ class RealLevel(levels.Level):
         for (id,tagId,valueId) in result:
             tag = tags.get(tagId)
             level.elements[id].tags.add(tag, db.valueFromId(tag, valueId))
+            
         # flags
         result = db.query("""
                 SELECT el.id,f.flag_id
@@ -106,6 +111,7 @@ class RealLevel(levels.Level):
                 """.format(db.prefix, idList))
         for (id, flagId) in result:
             level.elements[id].flags.append(flags.get(flagId))
+            
         # data
         result = db.query("""
                 SELECT element_id,type,data
@@ -153,27 +159,9 @@ class RealLevel(levels.Level):
                 elem.filePosition = fPosition            
             level.elements[id] = elem
     
-    def saveTagsToFileSystem(self, elements):
-        """Helper function to store the tags of *elements* on the filesystem."""
-        failedElements = []
-        for element in elements:
-            if not element.isFile():
-                continue
-            try:
-                real = element.url.getBackendFile()
-                real.tags = element.tags.withoutPrivateTags()
-                real.saveTags()
-            except IOError as e:
-                logger.error("Could not save tags of '{}'.".format(element.path))
-                logger.error("Error was: {}".format(e))
-                failedElements.append(elements)
-                continue
-        return failedElements
-    
     def setFileTagsAndRename(self, files):
-        """Undoably set tags and URLs of the files *elements* as they are in the object.
-        
-        Does not alter the database."""
+        """Undoably set tags and URLs of the given files as they are in the object. Do not alter the
+        database."""
         urlChanges = {}
         for file in files:
             if file.url != levels.tIdManager(file.id):
@@ -185,22 +173,31 @@ class RealLevel(levels.Level):
             #  check if tags are different
             backendFile = file.url.getBackendFile()
             backendFile.readTags()
-            diff = tags.TagDifference(backendFile.tags, file.tags)
-            if not diff.onlyPrivateChanges():
+            publicTags = file.tags.withoutPrivateTags()
+            if len(publicTags) > 0:
+                diff = tags.TagStorageDifference(backendFile.tags, publicTags)
                 tagChanges[file] = diff
         if len(tagChanges) > 0:
-            self.changeTags(tagChanges, filesOnly=True)
-
-    
+            inverseChanges = {elem:diff.inverse() for elem,diff in tagChanges.items()}
+            command = levels.GenericLevelCommand(redoMethod=filebackends.changeTags,
+                                          redoArgs={"changes" : tagChanges},
+                                          undoMethod=filebackends.changeTags,
+                                          undoArgs={"changes": inverseChanges},
+                                          text=self.tr("change tags"),
+                                          errorClass=TagWriteError)
+            self.stack.push(command)
+            if command.error:
+                raise command.error
+            
+    # =============================================================
+    # Overridden from Level: these methods modify DB and filesystem
+    # =============================================================
     def _elementToDBHelper(self, element):
         db.write.setTags(element.id, element.tags)
         db.write.setFlags(element.id, element.flags)
         db.write.setData(element.id, element.data)
         db.write.setContents(element.id, element.contents)
-    # =============================================================
-    # Overridden from Level: these methods modify DB and filesystem
-    # =============================================================
-    
+        
     def _createContainer(self, tags, flags, data, major, contents, id=None):
         if id is not None:
             raise ValueError("Don't call _createContainer with an ID on real!")
@@ -230,91 +227,7 @@ class RealLevel(levels.Level):
     def _removeContents(self, parent, positions, emitEvent=True):
         db.write.removeContents([(parent.id, pos) for pos in positions])
         super()._removeContents(parent, positions, emitEvent)
-    
-    def _addTagValue(self, tag, value, elements, emitEvent=True):
-        super()._addTagValue(tag, value, elements, emitEvent=False)
-        failedElements = self.saveTagsToFileSystem(elements)
-        #TODO: Correct failedElements
-        dbElements = [el.id for el in elements if el.isInDB() and not el in failedElements]
-        if len(dbElements):
-            db.write.addTagValues(dbElements, tag, [value])
-        if emitEvent:
-            self.emitEvent([element.id for element in elements])
-            
-    def _removeTagValue(self, tag, value, elements, emitEvent=True):
-        super()._removeTagValue(tag, value, elements, emitEvent=False)
-        failedElements = self.saveTagsToFileSystem(elements)
-        #TODO: Correct failedElements
-        dbElements = [el.id for el in elements if el.isInDB() and not el in failedElements]
-        if len(dbElements) > 0:
-            db.write.removeTagValuesById(dbElements, tag, db.idFromValue(tag, value))
-        else: assert all(element.id < 0 for element in elements)
-        if emitEvent:
-            self.emitEvent([element.id for element in elements])
-
-    def _changeTagValue(self, tag, oldValue, newValue, elements, emitEvent=True):
-        super()._changeTagValue(tag, oldValue, newValue, elements, emitEvent=False)
-        failedElements = self.saveTagsToFileSystem(elements)
-        #TODO: Correct failedElements
-        dbElements = [el.id for el in elements if el.isInDB() and not el in failedElements]
-        if len(dbElements):
-            db.write.changeTagValueById(dbElements, tag, db.idFromValue(tag, oldValue),
-                                       db.idFromValue(tag, newValue, insert=True))
-        if emitEvent:
-            self.emitEvent([element.id for element in elements])
-    
-    def _changeTags(self, changes, emitEvent=True, filesOnly=False):
-        """CHange tags of elements. Might raise a TagWriteError if files are involved.
-        
-        If an error is raised, any changes made before are undone.
-        The optional *filesOnly* suppresses any changes to the database."""
-        doneFiles = []
-        rollback = False
-        problems = None
-        for element, diff in changes.items():
-            if not element.isFile():
-                continue
-            backendFile = element.url.getBackendFile()
-            if backendFile.readOnly:
-                problemUrl = element.url
-                rollback = True
-                break
-            backendFile.readTags()
-            curBTags = backendFile.tags.copy()
-            diff.apply(backendFile.tags, includePrivate=False)
-            logger.debug('changing tags of {}: {}'.format(element.url, diff))
-            problems = backendFile.saveTags()
-            if len(problems) > 0:
-                problemUrl = element.url
-                backendFile.tags = curBTags
-                backendFile.saveTags()
-                rollback = True
-            else:
-                doneFiles.append(element)
-        if rollback:
-            for elem in doneFiles:
-                backendFile = element.url.getBackendFile()
-                backendFile.readTags()
-                changes[elem].revert(backendFile.tags, includePrivate=False)
-                backendFile.saveTags()
-            raise levels.TagWriteError(problemUrl, problems)
-        if filesOnly:
-            return
-        db.transaction()
-        for element, diff in changes.items():
-            if not element.isInDB():
-                continue
-            for tag, values in diff.additions:
-                if not tag.isInDB():
-                    continue
-                db.write.addTagValues(element.id, tag, values)
-            for tag, values in diff.removals:
-                if not tag.isInDB():
-                    continue
-                db.write.removeTagValues(element.id, tag, values)
-        db.commit()
-        super()._changeTags(changes, emitEvent, filesOnly=False)
-
+       
     def _renameFiles(self, renamings, emitEvent=True):
         """On the real level, files are renamed both on disk and in DB."""
         doneFiles = []
@@ -335,20 +248,40 @@ class RealLevel(levels.Level):
         super()._changePositions(parent, changes, emitEvent)
         db.write.changePositions(parent.id, list(changes.items()))
     
-    def _addFlag(self, flag, elements, emitEvent=True):
-        super()._addFlag(flag, elements, emitEvent=False)
-        ids = [element.id for element in elements]
-        db.write.addFlag(ids, flag)
-        if emitEvent:
-            self.emitEvent(ids)
+    def _changeTags(self, changes, emitEvent=True):
+        """Change tags of elements. Might raise a TagWriteError if files are involved. If an error is raised,
+        any changes made before are undone.
+        """
+        filebackends.changeTags(changes) # might raise TagWriteError
+        
+        db.transaction()
+        dbRemovals = [(el.id,tag.id,db.idFromValue(tag,value))
+                      for el,diff in changes.items() for tag,value in diff.getRemovals() if tag.isInDB()]
+        if len(dbRemovals):
+            db.multiQuery("DELETE FROM {}tags WHERE element_id=? AND tag_id=? AND value_id=?"
+                          .format(db.prefix),dbRemovals)
             
-    def _removeFlag(self, flag, elements, emitEvent=True):
-        super()._removeFlag(flag, elements, emitEvent=False)
-        ids = [element.id for element in elements]
-        db.write.removeFlag(ids, flag)
-        if emitEvent:
-            self.emitEvent(ids)
-    
+        dbAdditions = [(el.id,tag.id,db.idFromValue(tag,value,insert=True))
+                       for el,diff in changes.items() for tag,value in diff.getAdditions() if tag.isInDB()]
+        if len(dbAdditions):
+            db.multiQuery("INSERT INTO {}tags (element_id,tag_id,value_id) VALUES (?,?,?)"
+                          .format(db.prefix),dbAdditions)
+        db.commit()
+        super()._changeTags(changes, emitEvent)
+        
+    def _changeFlags(self, changes, emitEvent=True):
+        db.transaction()
+        dbRemovals = [(el.id,flag.id) for el,diff in changes.items() for flag in diff.getRemovals()]
+        if len(dbRemovals):
+            db.multiQuery("DELETE FROM {}flags WHERE element_id = ? AND flag_id = ?".format(db.prefix),
+                          dbRemovals)
+        dbAdditions = [(el.id,flag.id) for el,diff in changes.items() for flag in diff.getAdditions()]
+        if len(dbAdditions):
+            db.multiQuery("INSERT INTO {}flags (element_id,flag_id) VALUES(?,?)".format(db.prefix),
+                          dbAdditions)
+        db.commit()
+        super()._changeFlags(changes, emitEvent)
+            
     def _changeData(self, changes, emitEvent):
         super()._changeData(changes, emitEvent)
         db.transaction()
@@ -379,3 +312,4 @@ class RealLevel(levels.Level):
     def _setMajorFlags(self, elemToMajor, emitEvent=True):
         super()._setMajorFlags(elemToMajor, emitEvent)
         db.write.setMajor((el.id,major) for (el, major) in elemToMajor.items() )
+        

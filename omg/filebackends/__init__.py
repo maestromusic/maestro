@@ -19,6 +19,9 @@
 from urllib.parse import urlparse
 import os.path
 
+from .. import logging
+logger = logging.getLogger(__name__)
+
 urlTypes = {}
 """Maps protocol to implementing BackendURL subclass, e.g. "file"->RealFile."""
 
@@ -134,4 +137,46 @@ class BackendFile:
     position = None
     length = -1
     
-    
+
+def changeTags(changes):
+    """Change tags of files. If an error occurs, all changes are undone and a TagWriteError is raised.
+    *changes* is a dict mapping elements or BackendFiles to TagDifferences. If the dict contains elements
+    only the corresponding BackendFiles will be changed! This method does not touch the element instances
+    or the database. Containers will be skipped.
+    All BackendFiles contained in the dict must already have loaded their tags.
+    """
+    from ..core import elements
+    doneFiles = []
+    rollback = False
+    problems = None
+    for elementOrFile, diff in changes.items():
+        if isinstance(elementOrFile,elements.Element):
+            if not elementOrFile.isFile():
+                continue
+            backendFile = elementOrFile.url.getBackendFile()
+            backendFile.readTags()
+        else:
+            backendFile = elementOrFile
+            
+        if backendFile.readOnly:
+            problemUrl = backendFile.url
+            rollback = True
+            break
+        
+        currentFileTags = backendFile.tags.copy()
+        diff.apply(backendFile)
+        logger.debug('changing tags of {}: {}'.format(backendFile.url, diff))
+        problems = backendFile.saveTags()
+        if len(problems) > 0:
+            problemUrl = element.url
+            backendFile.tags = currentFileTags
+            backendFile.saveTags()
+            rollback = True
+        else:
+            doneFiles.append((backendFile,diff))
+            
+    if rollback:
+        for backendFile,diff in doneFiles:
+            diff.revert(backendFile.tags)
+            backendFile.saveTags()
+        raise levels.TagWriteError(problemUrl, problems)

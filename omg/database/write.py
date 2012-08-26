@@ -197,73 +197,6 @@ def makeValueIDs(data):
                 db._valueToId[tags.get(tagId)][value] = id
 
 
-def addTagValuesById(elids, tag, valueIds):
-    """Add tag values given by their valueIDs to some elements.
-    
-    *elids* is either a single id or a list of ids, *tag* is the affected tag and *valueIds* is a
-    list of values-ids for *tag*.
-    
-    This method does not check for duplicates!
-    """
-    if not hasattr(elids,'__iter__'):
-        elids = [elids]
-    db.multiQuery("INSERT INTO {}tags (element_id,tag_id,value_id) VALUES (?,{},?)"
-                   .format(db.prefix,tag.id),
-                   itertools.product(elids,valueIds))
-
-
-def addTagValues(elids, tag, values):
-    """Add tag values to some elements.
-    
-    *elids* is either a single id or a list of ids, *tag* is the affected tag and *values* is a
-    list of values. If a value does not already exist in the database, it will be inserted.
-    
-    This method does not check for duplicates!
-    """
-    addTagValuesById(elids,tag,[db.idFromValue(tag,value,insert=True) for value in values])
-    
-    
-def removeTagValuesById(elids, tag, valueIds):
-    """Remove some values of one tag from some elements.
-    
-    *elids* is either a single id or a list of ids,
-    *tag* is the affected tag, *valueIds* is a list of value-ids of *tag*.
-    """
-    db.query("DELETE FROM {}tags WHERE element_id IN ({}) AND tag_id = {} AND value_id IN ({})"
-                .format(db.prefix,db.csList(elids),tag.id,db.csList(valueIds)))
-
-
-def removeTagValues(elids, tag, values):
-    """Remove tag values from some elements.
-    
-    *elids* is either a single id or a list of ids, *tag* is the affected tag and *values* is a
-    list of values.
-    """
-    removeTagValuesById(elids,tag,[db.idFromValue(tag,value) for value in values])
-   
-
-def changeTagValueById(elids, tag, oldId, newId):
-    """Change a tag value in some elements.
-    
-    *elids* is either a single id or a list of ids, *tag* is the affected tag, *oldId* and *newId*
-    are the ids of the old and new value, respectively.
-    """
-    db.query("UPDATE {}tags SET value_id = ? WHERE element_id IN ({}) AND tag_id = ? AND value_id = ?"
-               .format(db.prefix,db.csList(elids)),newId,tag.id,oldId)
-
-
-def changeTagValue(elids, tag, oldValue, newValue):
-    """Change a tag value in some elements.
-    
-    *elids* is either a single id or a list of ids, *tag* is the affected tag, *oldValue* and
-    *newValue* are the old and new value, respectively. If the new value does not already exist
-    in the database, it will be created.
-    """
-    oldId = db.idFromValue(tag,oldValue)
-    newId = db.idFromValue(tag,newValue,insert=True)
-    changeTagValueById(elids,tag,oldId,newId)
-
-
 def setTags(elid,tags):
     """Set the tags of the element with it *elid* to the tags.Storage-instance *tags*.
     
@@ -286,36 +219,7 @@ def setHidden(tagSpec, valueId, state):
     db.query("UPDATE {}values_{} SET hide = ? WHERE tag_id = ? AND id = ?".format(db.prefix, tag.type),
              state, tag.id, valueId) 
 
-
-def addFlag(elids,flag):
-    """Add the given flag to the elements with the given ids.
-    
-    Ignores elements that already have the flag set.
-    """
-    values = ','.join('({},{})'.format(elid,flag.id) for elid in elids)
-    db.query("REPLACE INTO {}flags (element_id,flag_id) VALUES {}".format(db.prefix,values))
-    
-    
-def removeFlag(elids,flag):
-    """Remove a flag from the elements with the specified ids.
-    
-    Ignores elements that do not have the flag.
-    """
-    db.query("DELETE FROM {}flags WHERE flag_id = {} AND element_id IN ({})"
-                .format(db.prefix,flag.id,db.csList(elids)))
-
-
-def addFlags(data):
-    """Add entries to the flags table.  *data* is a list of (elementid, flagid) tuples."""
-    db.multiQuery("INSERT INTO {}flags (element_id,flag_id) VALUES (?,?)".format(db.prefix), data)
-    
-    
-def removeFlags(data):
-    """Remove entries from the flags table. *data* is a list of (elementid, flagid) tuples."""
-    db.multiQuery("DELETE FROM {}flags WHERE flag_id = ? AND element_id = ?"
-                .format(db.prefix), data)
-    
-
+# Used in CreateDBElementsCommand
 def setFlags(elid,flags):
     """Give the element with the given id exactly the flags in the list *flags*."""
     db.query("DELETE FROM {}flags WHERE element_id = ?".format(db.prefix),elid)

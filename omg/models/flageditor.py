@@ -122,24 +122,35 @@ class FlagEditorUndoCommand(tageditor.TagFlagEditorUndoCommand):
     def modifyLevel(self,method,params):
         if method.__name__ == 'insertRecord':
             pos,record = params
-            self.model.level._addFlag(record.flag,record.elementsWithFlag,emitEvent=False)
+            diff = flags.FlagDifference(additions=[record.flag])
+            self.model.level._changeFlags({element: diff for element in record.elementsWithFlag},
+                                          emitEvent=False)
         elif method.__name__ == 'removeRecord':
             record = params[0] # 'record, = params' would work, too.
-            self.model.level._removeFlag(record.flag,record.elementsWithFlag,emitEvent=False)
+            diff = flags.FlagDifference(removals=[record.flag])
+            self.model.level._changeFlags({element: diff for element in record.elementsWithFlag},
+                                          emitEvent=False)
         elif method.__name__ == 'changeRecord':
             oldRecord,newRecord = params
+            oldElements = set(oldRecord.elementsWithFlag)
+            newElements = set(newRecord.elementsWithFlag)
+            removeList = list(oldElements - newElements)
+            addList = list(newElements - oldElements)
+            if len(removeList):
+                diff = flags.FlagDifference(removals=[oldRecord.flag])
+                self.model.level._changeFlags({element: diff for element in removeList},
+                                              emitEvent=False)
+            if len(addList):
+                diff = flags.FlagDifference(additions=[newRecord.flag])
+                self.model.level._changeFlags({element: diff for element in addList},
+                                              emitEvent=False)
+                
             if oldRecord.flag != newRecord.flag:
-                self.model.level._removeFlag(oldRecord.flag,oldRecord.elementsWithFlag,emitEvent=False)
-                self.model.level._addFlag(newRecord.flag,newRecord.elementsWithFlag,emitEvent=False)
-            else:
-                oldElements = set(oldRecord.elementsWithFlag)
-                newElements = set(newRecord.elementsWithFlag)
-                removeList = list(oldElements - newElements)
-                addList = list(newElements - oldElements)
-                if len(removeList):
-                    self.model.level._removeFlag(oldRecord.flag,removeList,emitEvent=False)
-                if len(addList):
-                    self.model.level._addFlag(newRecord.flag,addList,emitEvent=False)
+                changeList = list(oldElements.intersection(newElements))
+                if len(changeList) > 0:
+                    diff = flags.FlagDifference(additions=[newRecord.flag],removals=[oldRecord.flag])
+                    self.model.level._changeFlags({element: diff for element in changeList},
+                                                  emitEvent=False)
                      
         
 class FlagEditorModel(QtCore.QObject):

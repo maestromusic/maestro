@@ -323,33 +323,41 @@ class TagEditorUndoCommand(TagFlagEditorUndoCommand):
     def modifyLevel(self,method,params):
         if method.__name__ == 'insertRecord':
             pos,record = params
-            self.model.level._addTagValue(record.tag,record.value,record.elementsWithValue,emitEvent=False)
+            diff = tags.TagDifference(additions=[(record.tag,record.value)])
+            self.model.level._changeTags({element: diff for element in record.elementsWithValue},
+                                         emitEvent=False)
         elif method.__name__ == 'removeRecord':
             record = params[0] # 'record, = params' would work, too.
-            self.model.level._removeTagValue(record.tag,record.value,record.elementsWithValue,emitEvent=False)
+            diff = tags.TagDifference(removals=[(record.tag,record.value)])
+            self.model.level._changeTags({element: diff for element in record.elementsWithValue},
+                                         emitEvent=False)
         elif method.__name__ == 'changeRecord':
             tag,oldRecord,newRecord = params
             
-            if oldRecord.tag != newRecord.tag:
-                self.model.level._removeTagValue(oldRecord.tag,oldRecord.value,
-                                                oldRecord.elementsWithValue,emitEvent=False)
-                self.model.level._addTagValue(newRecord.tag,newRecord.value,
-                                             newRecord.elementsWithValue,emitEvent=False)
-            else:
-                oldElements = set(oldRecord.elementsWithValue)
-                newElements = set(newRecord.elementsWithValue)
-                removeList = list(oldElements - newElements)
-                addList = list(newElements - oldElements)
-                if len(removeList):
-                    self.model.level._removeTagValue(oldRecord.tag,oldRecord.value,removeList,emitEvent=False)
-                if len(addList):
-                    self.model.level._addTagValue(newRecord.tag,newRecord.value,addList,emitEvent=False)
-                    
-                if oldRecord.value != newRecord.value:
-                    changeList = list(newElements.intersection(oldElements))
-                    if len(changeList):
-                        self.model.level._changeTagValue(tag,oldRecord.value,newRecord.value,
-                                                        changeList,emitEvent=False)
+            oldElements = set(oldRecord.elementsWithValue)
+            newElements = set(newRecord.elementsWithValue)
+            removeList = list(oldElements - newElements)
+            addList = list(newElements - oldElements)
+            if len(removeList):
+                diff = tags.TagDifference(removals=[(oldRecord.tag,oldRecord.value)])
+                self.model.level._changeTags({element: diff for element in removeList},
+                                             emitEvent=False)
+            if len(addList):
+                diff = tags.TagDifference(additions=[(newRecord.tag,newRecord.value)])
+                self.model.level._changeTags({element: diff for element in addList},
+                                             emitEvent=False)
+                
+            if oldRecord.tag != newRecord.tag or oldRecord.value != newRecord.value:
+                changeList = list(newElements.intersection(oldElements))
+                if len(changeList):
+                    if oldRecord.tag != newRecord.tag:
+                        diff = tags.TagDifference(additions=[(newRecord.tag,newRecord.value)],
+                                                  removals=[(oldRecord.tag,oldRecord.value)])
+                    else:
+                        diff = tags.TagDifference(replacements=[(oldRecord.tag,oldRecord.value,
+                                                                 newRecord.value)])
+                    self.model.level._changeTags({element: diff for element in changeList},
+                                                 emitEvent=False)
                         
                         
 class TagEditorModel(QtCore.QObject):

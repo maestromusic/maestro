@@ -117,10 +117,10 @@ class RealFile(BackendFile):
             self._taglibFile.tags[tag.name.upper()] = values
         unsuccessful = self._taglibFile.save()
         del self._taglibFile
-        ret = tags.Storage()
-        for key, values in unsuccessful.items():
-            ret[key.upper()] = values
-        return ret
+        #TODO: unsuccessful is a bool ??
+        #ret = {key.upper(): values for key,values in unsuccessful.items()}
+        #return ret
+        return {}
 
 
 class FileURL(BackendURL):

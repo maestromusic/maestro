@@ -297,9 +297,11 @@ class MergeCommand(QtGui.QUndoCommand):
         self.positionChanges = {}
         def recordTagChanges(element):
             if tags.TITLE in element.tags:
-                tagCopy = element.tags.copy()
-                tagCopy[tags.TITLE] = [ t.replace(removeString, '') for t in tagCopy[tags.TITLE]]
-                self.tagChanges[id] = tags.TagDifference(element.tags, tagCopy)
+                titles = element.tags[tags.TITLE]
+                self.tagChanges[id]  = tags.SingleTagDifference(
+                                                tagType=tags.TITLE,
+                                                additions=[t.replace(removeString, '') for t in titles],
+                                                removals=titles)
         if isinstance(parent, nodes.Wrapper):
             self.elementParent = True
             self.insertPosition = parent.element.contents.positions[self.insertIndex]
@@ -357,7 +359,7 @@ class MergeCommand(QtGui.QUndoCommand):
         if self.level is levels.real:
             db.transaction()
             modify.real.changeTags(self.tagChanges)
-            modify.real.changeTags({self.containerID: tags.TagDifference(None, container.tags)})
+            modify.real.changeTags({self.containerID: tags.TagStorageDifference(None, container.tags)})
             db.write.addContents([(self.containerID, newPos, id) for (id, (oldPos,newPos)) in self.parentChanges.items()])
             if self.elementParent:
                 db.write.removeAllContents([self.parentID])

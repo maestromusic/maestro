@@ -632,12 +632,11 @@ def _convertTagTypeOnLevels(tagType, valueType):
         diffs = {}
         for element in level.elements.values(): # only external elements possible => won't take too long
             if tagType in element.tags:
-                if valueType is not None:
-                    newValues = [valueType.convertValue(value) for value in element.tags[tagType]]
-                else: newValues = [str(value) for value in element.tags[tagType]]
-                diff = TagDifference.singleTagDifference(tagType,element.tags[tagType],newValues)
-                if diff is not None:
-                    diffs[element] = diff
+                oldValues = element.tags[tagType]
+                newValues = list(map(valueType.convertValue if valueType is not None else str,oldValues))
+                if oldValues != newValues:
+                    diffs[element] = SingleTagDifference(tagType,replacements=list(zip(oldValues,newValues)))
+                    
         if len(diffs) > 0:
             level.changeTags(diffs)
     # Only start changing levels if all tag value conversions have been successful.
@@ -891,71 +890,120 @@ class Storage(dict):
 
 class TagDifference:
     """A class storing the difference between two Storage() objects, for use in UndoCommands."""
-    def __init__(self, tagsA, tagsB):
-        self.removals = []
-        self.additions = []
-        if tagsA is None:
-            tagsA = {}
-        if tagsB is None:
-            tagsB = {}
-        for tag, valuesA in tagsA.items():
-            if tag not in tagsB:
-                self.removals.append((tag, valuesA[:]))
-            else:
-                valuesB = tagsB[tag]
-                removedValues = [v for v in valuesA if v not in valuesB]
-                if len(removedValues) > 0:
-                    self.removals.append((tag, removedValues))
-                newValues = [v for v in valuesB if v not in valuesA]
-                if len(newValues) > 0:
-                    self.additions.append((tag, newValues))
-        for tag, valuesB in tagsB.items():
-            if tag not in tagsA:
-                self.additions.append((tag, valuesB[:]))
-
+    def __init__(self, additions=None, removals=None, replacements=None):
+        self.additions = additions
+        self.removals = removals
+        self.replacements = replacements
+        # BUGTEST
+        print("TAGDIFF")
+        print(self.additions)
+        print(self.removals)
+        print(self.replacements)
+        
+    def apply(self,element):
+        if self.removals is not None:
+            for tag,value in self.removals:
+                element.tags[tag].remove(value)
+        
+        if self.replacements is not None:
+            for tag,value,newValue in self.replacements:
+                index = element.tags[tag].index(value)
+                element.tags[tag][index] = newValue
+        
+        if self.additions is not None:
+            for tag,value in self.additions:
+                element.tags.add(tag,value)
+            
+    def revert(self,element):
+        if self.additions is not None:
+            for tag,value in self.additions:
+                element.tags[tag].remove(value)
+        
+        if self.replacements is not None:
+            for tag,value,newValue in self.replacements:
+                index = element.tags[tag].index(newValue)
+                element.tags[tag][index] = value
+        
+        if self.removals is not None:
+            for tag,value in self.removals:
+                element.tags.add(tag,value)
+            
+    def getAdditions(self):
+        if self.replacements is not None:
+            result = [(tag,newValue) for tag,oldValue,newValue in self.replacements]
+            if self.additions is not None:
+                result.extend(self.additions)
+            return result
+        elif self.additions is not None:
+            return self.additions
+        else: return []
+        
+    def getRemovals(self):
+        if self.replacements is not None:
+            result = [(tag,oldValue) for tag,oldValue,newValue in self.replacements]
+            if self.removals is not None:
+                result.extend(self.removals)
+            return result
+        elif self.removals is not None:
+            return self.removals
+        else: return []
+        
     def inverse(self):
-        """Return the "inverse" difference object with additions and removals exchanged."""
-        ret = TagDifference(None, None)
-        ret.additions = self.removals[:]
-        ret.removals = self.additions[:]
-        return ret
-    
+        return utils.InverseDifference(self)
+        
     def __str__(self):
         return "{}(additions={}, removals={})".format(str(type(self)), self.additions, self.removals)
+
+
+class SingleTagDifference(TagDifference):
+    """A class storing the difference between two Storage() objects, for use in UndoCommands."""
+    def __init__(self, tagType, additions=None, removals=None, replacements=None):
+        if additions is not None:
+            additions = [(tagType,value) for value in additions]
+        if removals is not None:
+            removals = [(tagType,value) for value in removals]
+        if replacements is not None:
+            replacements = [(tagType,oldValue,newValue) for oldValue,newValue in replacements]
+        super().__init__(additions,removals,replacements)
+                         
+                         
+class TagStorageDifference(TagDifference):
+    def __init__(self,oldTags,newTags):
+        # both arguments may be None
+        self.oldTags = oldTags
+        self.newTags = newTags
+        
+    def apply(self,element):
+        # element may also be a FileBackend
+        element.tags = self.newTags.copy() if self.newTags is not None else tags.Storage()
+        
+    def revert(self,element):
+        element.tags = self.oldTags.copy() if self.oldTags is not None else tags.Storage()
+        
+    def getAdditions(self):
+        if self.newTags is None:
+            return []
+        if self.oldTags is None:
+            return [(tag,value) for tag,values in self.newTags.items() for value in values]
+            pass
+        result = []
+        for newTag, newValues in self.newTags.items():
+            oldValues = self.oldTags[newTag] if newTag in self.oldTags else []
+            result.extend((newTag,value) for value in newValues if value not in oldValues)
+        return result
     
-    def onlyPrivateChanges(self):
-        return all(tag.private for (tag, _) in self.additions) and \
-               all(tag.private for (tag, _) in self.removals)
-               
-    def apply(self, tagsA, includePrivate=True):
-        """Apply the changes to *tagsA*, transforming them into *tagsB* given to the constructor."""
-        for tag, values in self.removals:
-            if includePrivate or not tag.private:
-                tagsA.remove(tag, *values)
-        for tag, values in self.additions:
-            if includePrivate or not tag.private:
-                tagsA.add(tag, *values)
-            
-    def revert(self, tagsB, includePrivate=True):
-        """Revert the changes from *tagsB*, transforming them into *tagsA* as given to the constructor."""
-        for tag, values in self.additions:
-            if includePrivate or not tag.private:
-                tagsB.remove(tag, *values)
-        for tag, values in self.removals:
-            if includePrivate or not tag.private:
-                tagsB.add(tag, *values)
-
-    @staticmethod
-    def singleTagDifference(tagType,oldValues,newValues):
-        result = TagDifference(None,None)
-        result.additions = [(tagType,[value for value in newValues if value not in oldValues])]
-        result.removals = [(tagType,[value for value in oldValues if value not in newValues])]
-        
-        if len(result.additions) > 0 or len(result.removals) > 0:
-            return result
-        else: return None
-        
-
+    def getRemovals(self):
+        if self.oldTags is None:
+            return []
+        if self.newTags is None:
+            return [(tag,value) for tag,values in self.oldTags.items() for value in values]
+        result = []
+        for oldTag, oldValues in self.oldTags.items():
+            newValues = self.newTags[oldTag] if oldTag in self.newTags else []
+            result.extend((oldTag,value) for value in oldValues if value not in newValues)
+        return result
+    
+    
 def findCommonTags(elements):
     """Returns a Storage object containing all tags that are equal in all of the elements.
     """
@@ -999,4 +1047,3 @@ class TagDict(dict):
     
     def __iter__(self):
         return self.keys()
-         

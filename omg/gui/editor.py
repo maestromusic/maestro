@@ -263,7 +263,8 @@ class ExternalTagsWidget(QtGui.QScrollArea):
         if action == 'add':
             tagwidgets.AddTagTypeDialog.addTagType(info.tag)
         elif action == 'delete':
-            levels.editor.removeTag(info.tag,info.elements)
+            levels.editor.changeTags({el: tags.SingleTagDifference(info.tag,removals=el.tags[info.tag])
+                                      for el in info.elements})
         elif action == 'undo':
             self.editor.model().undoExtTagInfo(info)
         elif action == 'select':

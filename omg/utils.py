@@ -94,6 +94,24 @@ def collectFiles(paths):
     return filePaths
 
 
+class InverseDifference:
+    """Wrapper around a diff object (e.g. TagDifference) that acts like the inverse diff object."""
+    def __init__(self,difference):
+        self._diff = difference
+        
+    def apply(self,element):
+        self._diff.revert(element)
+        
+    def revert(self,element):
+        self._diff.apply(element)
+        
+    def getAdditions(self):
+        return self._diff.getRemovals()
+
+    def getRemovals(self):
+        return self._diff.getAdditions()
+    
+    
 def getIcon(name):
     """Return a QIcon for the icon with the given name."""
     return QtGui.QIcon(":omg/icons/" + name)

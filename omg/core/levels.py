@@ -455,45 +455,6 @@ class Level(application.ChangeEventDispatcher):
             self.shiftPositions(parent, shiftPositions, shift)
         self.stack.endMacro()
     
-    def addTagValues(self,tag,valueMap):
-        changes = {}
-        for element,values in valueMap.items():
-            diff = tags.TagDifference(None,None)
-            diff.additions = [(tag,values)]
-            changes[element] = diff
-        self.changeTags(changes)
-        
-    def removeTag(self,tag,elements):
-        # Small optimization: tuple() will always use the same object
-        changes = {el: tags.TagDifference.singleTagDifference(tag,el.tags[tag],tuple())
-                   for el in elements if tag in el.tags}
-        self.changeTags(changes)
-
-    def changeTags(self, changes, filesOnly=False):
-        """Change tags of several elements. *changes* maps element to TagDifference object.
-        
-        The option *filesOnly* makes sense only on the real level; the effect is that only files
-        on disk are modified, but neither elements nor the database.
-        
-        On real level this method might raise a TagWriteError if writing (some or all) tags to the
-        filesystem fails.
-        """
-        inverseChanges = {elem:diff.inverse() for elem,diff in changes.items()}
-        assert (not filesOnly)  or (self is real)
-        command = GenericLevelCommand(redoMethod=self._changeTags,
-                                      redoArgs={"changes" : changes,
-                                                "filesOnly" : filesOnly,
-                                                "emitEvent" : not filesOnly},
-                                      undoMethod=self._changeTags,
-                                      undoArgs={"changes": inverseChanges,
-                                                "filesOnly" : filesOnly,
-                                                "emitEvent" : not filesOnly},
-                                      text=self.tr("change tags"),
-                                      errorClass=TagWriteError)
-        self.stack.push(command)
-        if command.error:
-            raise command.error
-    
     def renameFiles(self, renamings):
         """Rename several files. *renamings* maps element to (oldUrl, newUrl) paths.
         
@@ -510,7 +471,23 @@ class Level(application.ChangeEventDispatcher):
         self.stack.push(command)
         if command.error:
             raise command.error
-    
+        
+    def changeTags(self, changes):
+        """Change tags of several elements. *changes* maps element to TagDifference object.
+        On real level this method might raise a TagWriteError if writing (some or all) tags to the
+        filesystem fails.
+        """
+        inverseChanges = {elem:diff.inverse() for elem,diff in changes.items()}
+        command = GenericLevelCommand(redoMethod=self._changeTags,
+                                      redoArgs={"changes" : changes},
+                                      undoMethod=self._changeTags,
+                                      undoArgs={"changes": inverseChanges},
+                                      text=self.tr("change tags"),
+                                      errorClass=TagWriteError)
+        self.stack.push(command)
+        if command.error:
+            raise command.error
+        
     def changeFlags(self, changes):
         reversed = {elem:diff.inverse() for elem, diff in changes.items()}
         command = GenericLevelCommand(redoMethod=self._changeFlags,
@@ -578,6 +555,7 @@ class Level(application.ChangeEventDispatcher):
                 if len(tempFilesInReal) > 0:
                     self.stack.push(commands.CreateDBElementsCommand(tempFilesInReal, newInLevel=False))
                 if len(newFiles) > 0:
+                    #TODO: Doesn't this forget the tempFilesInReal?
                     real.setFileTagsAndRename(newFiles)
                 if len(newElements) > 0:
                     self.stack.push(commands.CreateDBElementsCommand(newElements, newInLevel=True))
@@ -594,10 +572,9 @@ class Level(application.ChangeEventDispatcher):
         for oldEl in oldElements:
             inParent = self.parent.get(oldEl.id)
             if oldEl.flags != inParent.flags:
-                self.parent.changeFlags({inParent : flags.FlagDifference(inParent.flags, oldEl.flags)})
+                self.parent.changeFlags({inParent : flags.FlagListDifference(inParent.flags, oldEl.flags)})
             if oldEl.tags != inParent.tags:
-                #self.parent.changeTags({inParent : tags.TagDifference(inParent.tags, oldEl.tags)})
-                tagChanges[inParent] = tags.TagDifference(inParent.tags, oldEl.tags)
+                tagChanges[inParent] = tags.TagStorageDifference(inParent.tags, oldEl.tags)
             if oldEl.data != inParent.data:
                 self.parent.changeData({inParent : data.DataDifference(inParent.data, oldEl.data)})
             if oldEl.isContainer():
@@ -661,59 +638,17 @@ class Level(application.ChangeEventDispatcher):
         del self.elements[element.id]
         for childId in element.contents.ids:
             self.get(childId).parents.remove(element.id)
-
-    def _addTagValue(self, tag, value, elements, emitEvent=True):
-        """Add a tag of type *tag* and value *value* to the given elements.
-        If *emitEvent* is False, do not emit an even."""
-        for element in elements:
-            element.tags.add(tag, value)
-        if emitEvent:
-            self.emitEvent([element.id for element in elements])
-            
-    def _removeTagValue(self, tag, value, elements, emitEvent=True):
-        """Remove a tag of type *tag* and *value* value from the given elements.
-        If *emitEvent* is False, do not emit an even."""
-        for element in elements:
-            element.tags.remove(tag, value)
-        if emitEvent:
-            self.emitEvent([element.id for element in elements])
-            
-    def _changeTagValue(self, tag, oldValue, newValue, elements, emitEvent=True):
-        """Change a tag of type *tag* in the given elements changing the value from *oldValue* to *newValue*.
-        If *emitEvent* is False, do not emit an event."""
-        for element in elements:
-            element.tags.replace(tag,oldValue,newValue)
-        if emitEvent:
-            self.emitEvent([element.id for element in elements])
     
-    def _changeTags(self, changes, emitEvent=True, filesOnly=False):
+    def _changeTags(self, changes, emitEvent=True):
         for element, diff in changes.items():
-            diff.apply(element.tags)
+            diff.apply(element)
         if emitEvent:
             self.emitEvent([element.id for element in changes])
     
-    def _addFlag(self, flag, elements, emitEvent=True):
-        """Add *flag* to the given elements. If *emitEvent* is False, do not emit an event."""
-        for element in elements:
-            if flag not in element.flags:
-                element.flags.append(flag)
-        if emitEvent:
-            self.emitEvent([element.id for element in elements])
-            
-    def _removeFlag(self, flag, elements, emitEvent=True):
-        """Remove *flag* from the given elements. If *emitEvent* is False, do not emit an event."""
-        for element in elements:
-            element.flags.remove(flag)
-        if emitEvent:
-            self.emitEvent([element.id for element in elements])
-    
     def _changeFlags(self, changes, emitEvent=True):
-        """Change flags of multiple elements: *changes* maps elements to TagDifference objects."""
-        for elem, diff in changes.items():
-            for flag in diff.additions:
-                self._addFlag(flag, (elem,), False)
-            for flag in diff.removals:
-                self._removeFlag(flag, (elem,), False)
+        """Change flags of multiple elements: *changes* maps elements to FlagDifference objects."""
+        for element, diff in changes.items():
+            diff.apply(element)
         if emitEvent:
             self.emitEvent([element.id for element in changes])
             
