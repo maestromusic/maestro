@@ -93,6 +93,8 @@ def get(path,size=None):
     if not os.path.isabs(path):
         path = os.path.join(COVER_DIR,path)
     pixmap = QtGui.QPixmap(path)
+    if pixmap.isNull():
+        return None
     if size is not None and (pixmap.width() != size or pixmap.height() != size):
         pixmap = pixmap.scaled(size,size,transformMode=Qt.SmoothTransformation)
         

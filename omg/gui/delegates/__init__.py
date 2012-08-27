@@ -79,8 +79,9 @@ class StandardDelegate(AbstractDelegate):
                 self.newRow()
             
         # Cover
-        if element.hasCover():
-            coverSize = self.config.options['coverSize'].value
+        coverSize = self.config.options['coverSize'].value
+        cover = element.getCover(coverSize)
+        if cover is not None:
             self.addLeft(ImageItem(element.getCover(coverSize)))
             availableWidth -= coverSize + self.hSpace
         

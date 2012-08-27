@@ -80,6 +80,8 @@ class Element:
             else: return None
             
     def hasCover(self):
+        # Warning: hasCover returns True if a cover path is stored in the database.
+        # This does not mean that the file exists and is readable etc.
         return self.getData('COVER') is not None
     
     def getCover(self,size=None):
