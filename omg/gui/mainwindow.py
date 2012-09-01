@@ -186,10 +186,8 @@ class MainWindow(QtGui.QMainWindow):
         loaded."""
         self.menus = {}
         self.menus['edit'] = self.menuBar().addMenu(self.tr("&Edit"))
-        undoAction = application.stack.createUndoAction(self, prefix='')
-        redoAction = application.stack.createRedoAction(self, prefix='')
-        undoAction.setShortcut(self.tr('Ctrl+Z'))
-        redoAction.setShortcut(self.tr('Ctrl+Y'))
+        undoAction = application.stack.createUndoAction()
+        redoAction = application.stack.createRedoAction()
         self.menus['edit'].addAction(undoAction)
         self.menus['edit'].addAction(redoAction)
         self.menus['view'] = self.menuBar().addMenu(self.tr("&View"))

@@ -462,8 +462,7 @@ def addTagType(tagType,type,**data):
     try:
         _convertTagTypeOnLevels(tagType,type)
     except TagValueError as error:
-        application.stack.endMacro()
-        #TODO: remove macro from stack
+        application.stack.abortMacro()
         raise error
 
     data['type'] = type
@@ -521,8 +520,7 @@ def removeTagType(tagType):
     try:
         _convertTagTypeOnLevels(tagType, None)
     except TagValueError as error:
-        application.stack.endMacro()
-        #TODO: remove macro from stack
+        application.stack.abortMacro()
         raise error
     application.stack.push(TagTypeUndoCommand(REMOVE,tagType))
     application.stack.endMacro()
@@ -566,8 +564,7 @@ def changeTagType(tagType,**data):
         try:
             _convertTagTypeOnLevels(tagType,data['type'])
         except TagValueError as error:
-            application.stack.endMacro()
-            #TODO: remove macro from stack
+            application.stack.abortMacro()
             raise error
         
     application.stack.push(TagTypeUndoCommand(CHANGE,tagType,**data))

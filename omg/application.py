@@ -65,7 +65,7 @@ class ChangeEventDispatcher(QtCore.QObject):
         
     def emit(self,event):
         """Emit an event."""
-        if not stack.delayEvents():
+        if not stack.shouldDelayEvents():
             self._signal.emit(event)
         else: stack.addEvent(self,event)
     

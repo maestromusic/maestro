@@ -257,9 +257,7 @@ class TagManagerTableWidget(QtGui.QTableWidget):
                                 self.tr("The new tag name already appears in some elements with values that"
                                         " cannot be converted to the type of this tag."),
                                 self)
-                application.stack.endMacro()
-                application.stack.undo() # undo removeTagType
-                #TODO: remove macro from stack (redo won't work) 
+                application.stack.abortMacro()
                 return
             application.stack.endMacro()
         
