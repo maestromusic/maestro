@@ -23,7 +23,7 @@ from .. import logging
 logger = logging.getLogger(__name__)
 
 urlTypes = {}
-"""Maps protocol to implementing BackendURL subclass, e.g. "file"->RealFile."""
+"""Maps scheme to implementing BackendURL subclass, e.g. "file"->RealFile."""
 
 
 def getFile(urlString):
@@ -51,7 +51,7 @@ class BackendURL:
         self.parsedUrl = urlparse(urlString)
     
     @property
-    def proto(self):
+    def scheme(self):
         return self.parsedUrl.scheme
     
     def getBackendFile(self):
@@ -74,9 +74,12 @@ class BackendURL:
         return None
     
     def renamed(self, newPath):
-        """Return a new URL object with path h*newPath*, while all other attributes are unchanged.
-        """
+        """Return a new URL object with path h*newPath*, while all other attributes are unchanged."""
         raise NotImplementedError()
+    
+    def toQUrl(self):
+        """Return a QUrl from this URL. Return None if that is not possible (e.g. weird scheme)."""
+        return None
 
     def __hash__(self):
         return hash(str(self))

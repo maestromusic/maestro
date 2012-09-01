@@ -138,7 +138,7 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
                 wrappers = [wrapper.copy() for wrapper in mimeData.wrappers()]
             else:
                 # Note that files might be loaded into the real level via their TID. 
-                wrappers = [levels.real.get(id) for id in mimeData.files()]   
+                wrappers = [levels.real.get(wrapper.element.id) for wrapper in mimeData.fileWrappers()]   
         else:
             urls = itertools.chain.from_iterable(
                                     utils.collectFiles(u.path() for u in mimeData.urls()).values())

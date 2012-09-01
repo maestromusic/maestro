@@ -21,6 +21,8 @@
 import os.path
 import re
 
+from PyQt4 import QtCore
+
 import taglib
 
 from . import BackendFile, BackendURL, urlTypes
@@ -35,14 +37,13 @@ class RealFile(BackendFile):
     
     @staticmethod
     def tryLoad(url):
-        """Returns a RealFile instance if the url protocol fits and the file exists.
-        """
-        if url.proto == 'file' and os.path.exists(url.absPath):
+        """Returns a RealFile instance if the url scheme fits and the file exists."""
+        if url.scheme == 'file' and os.path.exists(url.absPath):
             return RealFile(url)
         return None
     
     def __init__(self, url):
-        assert url.proto == "file"
+        assert url.scheme == "file"
         super().__init__(url)
                 
     def readTags(self):
@@ -142,7 +143,11 @@ class FileURL(BackendURL):
     def renamed(self, newPath):
         """Return a new FileURL with the given *newPath* as path."""
         return FileURL("file:///" + newPath)
+    
+    def toQUrl(self):
+        """Return a QUrl from this URL. Return None if that is not possible (e.g. weird scheme)."""
+        return QtCore.QUrl('file://'+self.absPath)
 
 
-# register the file:// URL protocol
+# register the file:// URL scheme
 urlTypes["file"] = FileURL

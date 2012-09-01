@@ -16,6 +16,10 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+from PyQt4 import QtCore
+translate = QtCore.QCoreApplication.translate
+
+
 class Node:
     """(Abstract) base class for elements in a RootedTreeModel...that is almost everything in playlists,
     browser etc.. Node implements the methods required by RootedTreeModel as well as many tree-structure 
@@ -359,9 +363,10 @@ class Wrapper(Node):
             parts.append('\n'.join('{}: {}'.format(tag.title,', '.join(map(str,values)))
                                     for tag,values in self.element.tags.items()))
         if self.element.flags is not None and len(self.element.flags) > 0:
-            parts.append('Flags: ' + ', '.join(flag.name for flag in self.element.flags))
+            parts.append(translate('Wrapper','Flags: {}').format(
+                                                        ', '.join(flag.name for flag in self.element.flags)))
         if self.element.isFile():
-            parts.append('Protocol: ' + self.element.url.proto)
+            parts.append(translate('Wrapper','URL: {}').format(self.element.url))
         if len(parts) > 0:
             return '\n'.join(parts)
         else: return str(self)

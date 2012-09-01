@@ -67,9 +67,9 @@ class MimeData(QtCore.QMimeData):
         """Return the list of nodes stored in this MimeData instance."""
         return self._selection.nodes()
     
-    def files(self):
+    def fileWrappers(self):
         """Return all wrappers storing files in this MimeData instance."""
-        return self._selection.files(recursive=True)
+        return self._selection.fileWrappers(recursive=True)
     
     def wrappers(self):
         """Search the tree for the toplevel wrappers and return them. This differs from the result of
@@ -78,12 +78,13 @@ class MimeData(QtCore.QMimeData):
         """
         return self._selection.toplevelWrappers()
         
-    def paths(self):
-        """Return a list of absolute paths to all files contained in this MimeData-instance."""
-        return [absPath(file.element.path) for file in self.files()]
+    def backendUrls(self):
+        """Return a list of BackendUrls of all files contained in this MimeData-instance."""
+        return [wrapper.element.url for wrapper in self.fileWrappers()]
         
-    def urls(self):
-        return [QtCore.QUrl("file://"+path) for path in self.paths()]
+    def urls(self): # inherited
+        """Return a list of QUrls of all files contained in this MimeData-instance."""
+        return [url.toQUrl() for url in self.backendUrls()]
     
     @staticmethod
     def fromIndexes(model,indexList,sortNodes = True):

@@ -504,7 +504,7 @@ class MPDConfigWidget(profiles.ConfigurationWidget):
 
 class MPDURL(filebackends.BackendURL):
     
-    protocol = "mpd"
+    scheme = "mpd"
     CAN_RENAME = False
     IMPLEMENTATIONS = []
     
@@ -515,7 +515,10 @@ class MPDURL(filebackends.BackendURL):
         
     def asLocalFile(self):
         return fsFileBackend.FileURL("file:///" + self.path)
-
+        
+    def toQUrl(self):
+        return self.asLocalFile().toQUrl()
+    
 class MPDFile(filebackends.BackendFile):
 
     readOnly = True
@@ -528,7 +531,7 @@ class MPDFile(filebackends.BackendFile):
         return MPDFile(url)
         
     def __init__(self, url):
-        assert url.proto == "mpd"
+        assert url.scheme == "mpd"
         super().__init__(url)
         
     def readTags(self):

@@ -151,25 +151,26 @@ class NodeSelection:
         """True iff at least one container is selected."""
         return any(w.isContainer() for w in self._wrappers)
 
-    def hasFiles(self, recursive=False, protocols=None):
+    def hasFiles(self, recursive=False, schemes=None):
         """True iff at least one file is selected.
         
-        The parameters *recursive* and *protocols* behave like in files()."""
-        iter = self.fileWrappers(recursive, protocols)
+        The parameters *recursive* and *schemes* behave like in fileWrappers().
+        """
+        iter = self.fileWrappers(recursive, schemes)
         try:
             next(iter)
             return True
         except StopIteration:
             return False
     
-    def fileWrappers(self, recursive=False, protocols=None):
+    def fileWrappers(self, recursive=False, schemes=None):
         """Return a generator of all file wrappers that are selected.
         
         If *recursive* is True, also return files of which at least one parent is selected. If
-        *protocols* is specified it must be a list of file backend protocols; then only files
-        with that protocols will be returned."""
-        if protocols is None:
+        *schemes* is specified it must be a list of file backend schemes; then only files
+        with that schemes will be returned."""
+        if schemes is None:
             return (w for w in self.wrappers(recursive) if w.isFile())
         return (w for w in self.wrappers(recursive)
-                  if w.isFile() and w.url.split("://", 1)[0] in protocols)
+                  if w.isFile() and w.element.url.scheme in schemes)
         

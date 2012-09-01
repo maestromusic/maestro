@@ -89,11 +89,9 @@ class StandardDelegate(AbstractDelegate):
         preTitleItem = self.getPreTitleItem(wrapper)
         if preTitleItem is not None:
             self.addCenter(preTitleItem)
-        if element.isFile() and element.url.proto != "file":
-            stl = DelegateStyle(bold=True, color=Qt.red)
-            urlWarning = TextItem(element.url.proto, stl)
-        else:
-            urlWarning = None
+        if element.isFile() and element.url.scheme != "file":
+            urlWarning = TextItem(element.url.scheme, DelegateStyle(bold=True, color=Qt.red))
+        else: urlWarning = None
         titleItem = TextItem(wrapper.getTitle(prependPosition=self.config.options['showPositions'].value,
                                            usePath=False),
                              BOLD_STYLE if element.isContainer() else STD_STYLE,
