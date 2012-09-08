@@ -116,7 +116,7 @@ class StandardGuesser(profiles.Profile):
                 albumTags[tags.TITLE] = [key] if pureDirMode else elements[0].tags[self.albumTag]
                 container = self.level.createContainer(tags=albumTags,
                                                        major=True,
-                                                       contents=ContentList.fromPairs(children))
+                                                       contents=ContentList.fromPairs(children.items()))
                 self.albums.append(container)
             else:
                 self.singles.extend(elements)
@@ -147,7 +147,7 @@ class StandardGuesser(profiles.Profile):
             metaTags[tags.TITLE] = [key[1]]
             self.level.setMajorFlags({album:False for album in contents.values()}, emitEvent=False)
             container = self.level.createContainer(tags=metaTags,
-                                                   contents=ContentList.fromPairs(contents),
+                                                   contents=ContentList.fromPairs(contents.items()),
                                                    major=True)
             self.albums.append(container)
             for c in contents.values():

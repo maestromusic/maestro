@@ -386,9 +386,9 @@ class Level(application.ChangeEventDispatcher):
         subsequent elements' positions are shifted if necessary.
         """
         self.stack.beginMacro(self.tr("insert"))
+        firstPos = 1 if index == 0 else parent.contents.positions[index-1] + 1
         if len(parent.contents) > index:
             #  need to alter positions of subsequent elements
-            firstPos = 1 if index == 0 else parent.contents.positions[index-1] + 1
             lastPosition = firstPos + len(elements) - 1
             shift = lastPosition - parent.contents.positions[index] + 1
             if shift > 0:
