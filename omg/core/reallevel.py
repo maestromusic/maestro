@@ -174,7 +174,7 @@ class RealLevel(levels.Level):
             backendFile = file.url.getBackendFile()
             backendFile.readTags()
             publicTags = file.tags.withoutPrivateTags()
-            if len(publicTags) > 0:
+            if len(publicTags) > 0 and backendFile.tags != publicTags:
                 diff = tags.TagStorageDifference(backendFile.tags, publicTags)
                 tagChanges[file] = diff
         if len(tagChanges) > 0:
