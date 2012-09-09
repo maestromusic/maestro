@@ -20,11 +20,13 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
-from . import treeview, mainwindow, tagwidgets, dialogs
-from .. import profiles, application
-from ..models import editor as editormodel, albumguesser
-from .treeactions import *
-from .delegates import editor as editordelegate, configuration as delegateconfig
+from . import treeactions, treeview, mainwindow, tagwidgets, dialogs
+from .. import profiles, utils
+from ..core import levels, tags
+from ..models import albumguesser
+from ..models.editor import EditorModel
+from .delegates.editor import EditorDelegate
+from .delegates.configuration import ConfigurationCombo
 
         
 class EditorTreeView(treeview.TreeView):
@@ -32,26 +34,27 @@ class EditorTreeView(treeview.TreeView):
 
     actionConfig = treeview.TreeActionConfiguration()
     sect = translate(__name__, "elements")
-    actionConfig.addActionDefinition(((sect, 'editTags'),), EditTagsAction, recursive = False)
-    actionConfig.addActionDefinition(((sect, 'editTagsR'),), EditTagsAction, recursive = True)
-    actionConfig.addActionDefinition(((sect, 'remove'),), DeleteAction, mode = CONTENTS, shortcut = "Del")
-    actionConfig.addActionDefinition(((sect, 'merge'),), MergeAction)
-    actionConfig.addActionDefinition(((sect, 'major?'),), ToggleMajorAction)
-    actionConfig.addActionDefinition(((sect, 'position+'),), ChangePositionAction, mode = "+1")
-    actionConfig.addActionDefinition(((sect, 'position-'),), ChangePositionAction, mode = "-1")
+    actionConfig.addActionDefinition(((sect, 'editTags'),), treeactions.EditTagsAction, recursive=False)
+    actionConfig.addActionDefinition(((sect, 'editTagsR'),), treeactions.EditTagsAction, recursive=True)
+    actionConfig.addActionDefinition(((sect, 'remove'),), treeactions.RemoveFromParentAction)
+    actionConfig.addActionDefinition(((sect, 'merge'),), treeactions.MergeAction)
+    actionConfig.addActionDefinition(((sect, 'major?'),), treeactions.ToggleMajorAction)
+    actionConfig.addActionDefinition(((sect, 'position+'),), treeactions.ChangePositionAction, mode="+1")
+    actionConfig.addActionDefinition(((sect, 'position-'),), treeactions.ChangePositionAction, mode="-1")
     sect = translate(__name__, "editor")
     
-    actionConfig.addActionDefinition(((sect, 'clearEditor'),), ClearTreeAction)
+    actionConfig.addActionDefinition(((sect, 'clearEditor'),), treeactions.ClearTreeAction)
+    actionConfig.addActionDefinition(((sect, 'commit'),), treeactions.CommitTreeAction)
 
-    def __init__(self, parent = None):
-        super().__init__(levels.editor,parent)
+    def __init__(self, parent=None):
+        super().__init__(levels.editor, parent)
         self.setSelectionMode(self.ExtendedSelection)
         self.setDragEnabled(True)
         self.setAcceptDrops(True)
         self.setDefaultDropAction(Qt.MoveAction)
         self.setDropIndicatorShown(True)
-        self.setModel(editormodel.EditorModel())
-        self.setItemDelegate(editordelegate.EditorDelegate(self))
+        self.setModel(EditorModel())
+        self.setItemDelegate(EditorDelegate(self))
         self.viewport().setMouseTracking(True)
         self.autoExpand = True
         self.model().rowsInserted.connect(self._expandInsertedRows)
@@ -94,11 +97,11 @@ class EditorTreeView(treeview.TreeView):
                 child = self.model().index(row, 0, parent)
                 self.expand(child)
 
-        
+    
 class EditorWidget(QtGui.QDockWidget):
     """The editor is a dock widget for editing elements and their structure. It provides methods to "guess"
     the album structure of new files that are dropped from the filesystem."""
-    def __init__(self, parent = None, state = None, location = None):
+    def __init__(self, parent=None, state=None, location=None):
         super().__init__(parent)
         self.setWindowTitle(self.tr('Editor'))
         widget = QtGui.QWidget()
@@ -134,9 +137,8 @@ class EditorWidget(QtGui.QDockWidget):
         # Fill buttonLayout
         self.toolbar = QtGui.QToolBar(self)
         self.toolbar.addAction(self.editor.treeActions['clearEditor'])
-        commitAction = CommitTreeAction(self.editor)
-        self.addAction(commitAction)
-        self.toolbar.addAction(commitAction)
+        
+        self.toolbar.addAction(self.editor.treeActions["commit"])
         buttonLayout.addWidget(self.toolbar)
         
         buttonLayout.addStretch()
@@ -184,8 +186,7 @@ class OptionDialog(dialogs.FancyPopup):
         albumGuessLayout.addWidget(self.albumGuessComboBox,1)
         layout.addRow(self.tr("Guess albums"),albumGuessLayout)
         
-        itemDisplayCombo = delegateconfig.ConfigurationCombo(editordelegate.EditorDelegate.configurationType,
-                                                             [self.editor])
+        itemDisplayCombo = ConfigurationCombo(EditorDelegate.configurationType, [self.editor])
         layout.addRow(self.tr("Item display"),itemDisplayCombo)
         
     def _handleAutoExpandBox(self,state):

@@ -49,8 +49,8 @@ class CoverAction(treeactions.TreeAction):
         super().__init__(parent)
         self.setText(self.tr("Edit covers..."))
     
-    def initialize(self):
-        self.setEnabled(self.parent().nodeSelection.hasWrappers())
+    def initialize(self, selection):
+        self.setEnabled(selection.hasWrappers())
     
     def doAction(self):
         CoverDialog(self.parent(), self.level(),

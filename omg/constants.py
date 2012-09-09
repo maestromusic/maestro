@@ -24,8 +24,6 @@ HOME    = os.path.expanduser("~")
 
 YES_ANSWERS = ["y", "Y", ""]
 
-DISK, DB, CONTENTS = range(3) # modes for removing elements
-
 # Type of a change
 ADDED,CHANGED,DELETED = 1,2,3
 # Use remove if an item is removed from a list, selection etc., but does still exist.

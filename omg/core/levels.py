@@ -597,6 +597,7 @@ class Level(application.ChangeEventDispatcher):
         del self.elements[id]
         return self.get(id)
 
+
     # ====================================================================================
     # The following functions implement no undo/redo handling and should be used with care
     # ====================================================================================
