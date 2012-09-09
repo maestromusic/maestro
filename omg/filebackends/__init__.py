@@ -48,6 +48,8 @@ class BackendURL:
     
     Note that individual files may still be readOnly although CAN_RENAME is True.
     """
+    CAN_DELETE = False
+    """Class constant indicating whether this URL type supports deleting files."""
     
     def __init__(self, urlString):
         #  constructor should only be used from subclasses
@@ -132,6 +134,9 @@ class BackendFile:
         raise NotImplementedError()
     
     def rename(self, newPath):
+        raise NotImplementedError()
+    
+    def delete(self):
         raise NotImplementedError()
     
     def computeHash(self):

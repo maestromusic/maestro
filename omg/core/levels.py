@@ -597,7 +597,24 @@ class Level(application.ChangeEventDispatcher):
         del self.elements[id]
         return self.get(id)
 
-
+    def deleteElements(self, elements):
+        elements = list(elements)
+        self.stack.beginMacro("delete")
+        # 1st step: isolate the elements (remove contents & parents)
+        for element in elements:
+            if element.isContainer() and len(element.contents) > 0:
+                self.removeContents(element, element.contents.positions)
+            if len(element.parents) > 0:
+                for parentId in element.parents:
+                    parent = self.get(parentId)
+                    self.removeContents(parent, parent.contents.getPositions(id=element.id))
+        command = GenericLevelCommand(redoMethod=self._removeElements,
+                                      redoArgs={"elements" : elements},
+                                      undoMethod=self._addElements,
+                                      undoArgs={"elements" : elements})
+        self.stack.push(command)
+        self.stack.endMacro()
+                
     # ====================================================================================
     # The following functions implement no undo/redo handling and should be used with care
     # ====================================================================================
@@ -613,18 +630,22 @@ class Level(application.ChangeEventDispatcher):
                 self.get(childId).parents.append(id)
         return container
     
-    def _addElement(self, element):
-        assert element.level is self
-        self.elements[element.id] = element
-        for childId in element.contents.ids:
-            self.get(childId).parents.append(element.id)
+    def _addElements(self, elements):
+        for element in elements:
+            assert element.level is self
+            self.elements[element.id] = element
+            if element.isContainer():
+                for childId in element.contents.ids:
+                    self.get(childId).parents.append(element.id)
     
-    def _removeElement(self, element):
+    def _removeElements(self, elements):
         """Remove the given element from this level.
         """
-        del self.elements[element.id]
-        for childId in element.contents.ids:
-            self.get(childId).parents.remove(element.id)
+        for element in elements:
+            del self.elements[element.id]
+            if element.isContainer():
+                for childId in element.contents.ids:
+                    self.get(childId).parents.remove(element.id)
     
     def _changeTags(self, changes, emitEvent=True):
         """Like changeTags, but not undoable."""
@@ -685,7 +706,7 @@ class Level(application.ChangeEventDispatcher):
         """Remove the children at given *positions* under parent.
         """
         childIds = [parent.contents.getId(position) for position in positions]
-        for pos in positions:
+        for pos in positions[:]:
             parent.contents.remove(pos=pos)
         for id in childIds:
             if id not in parent.contents.ids:

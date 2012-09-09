@@ -125,10 +125,27 @@ class DeleteAction(TreeAction):
         if self.level() is levels.real:
             self.setEnabled(selection.hasElements())
         else:
-            self.setEnabled(selection.hasFiles())
+            self.setEnabled(selection.hasFiles() and all(wrap.element.url.CAN_DELETE for wrap in selection.fileWrappers()))
     
     def doAction(self):
-        pass
+        selection = self.parent().nodeSelection
+        files = [wrap.element for wrap in selection.fileWrappers()]
+        self.level().deleteElements(self.parent().nodeSelection.elements())
+        if len(files) > 0:
+            if self.level() is levels.real:
+                message = self.tr("You have deleted the following files from OMG:\n{}\n"
+                                  "Do you want them deleted completely (<b>can not be reversed!!</b>)")
+            else:
+                message = self.tr("Are you sure to <b>irrevocably</b> delete the following files?\n{}")
+            ans = dialogs.question(
+                      self.tr("delete files?"),
+                      message.format("\n".join(str(file.url) for file in files)),
+                      self.parent())
+            if ans:
+                for file in files:
+                    file.url.getBackendFile().delete()
+                application.stack.clear()
+            
 
 class MergeAction(TreeAction):
     """Action to merge selected elements into a new container."""

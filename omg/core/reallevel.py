@@ -196,7 +196,10 @@ class RealLevel(levels.Level):
         db.write.setTags(element.id, element.tags)
         db.write.setFlags(element.id, element.flags)
         db.write.setData(element.id, element.data)
-        db.write.setContents(element.id, element.contents)
+        if element.isContainer():
+            db.write.setContents(element.id, element.contents)
+        else:
+            db.write.addFiles([(element.id, str(element.url), 0, element.length)])
         
     def _createContainer(self, tags, flags, data, major, contents, id=None):
         if id is not None:
@@ -208,17 +211,20 @@ class RealLevel(levels.Level):
         db.commit()
         return element
     
-    def _addElement(self, element):
-        super()._addElement(element)
+    def _addElements(self, elements):
+        super()._addElements(elements)
         db.transaction()
-        db.write.createElementsWithIds([(element.id, element.isFile(), len(element.parents) == 0,
-                                          len(element.contents), element.major)])
-        self._elementToDBHelper(element)
+        db.write.createElementsWithIds([(elem.id, elem.isFile(), len(elem.parents) == 0,
+                                          len(elem.contents) if elem.isContainer() else 0,
+                                          elem.major if elem.isContainer() else False)
+                                        for elem in elements])
+        for element in elements:
+            self._elementToDBHelper(element)
         db.commit()
         
-    def _removeElement(self, element):
-        super()._removeElement(element)
-        db.write.deleteElements([element.id])
+    def _removeElements(self, elements):
+        super()._removeElements(elements)
+        db.write.deleteElements([elem.id for elem in elements])
         
     def _insertContents(self, parent, insertions, emitEvent=True):
         db.write.addContents([(parent.id, pos, child.id) for pos, child in insertions])
