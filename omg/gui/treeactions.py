@@ -16,10 +16,10 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from PyQt4 import QtCore, QtGui
+from PyQt4 import QtGui
 from PyQt4.QtCore import Qt
 
-from .. import application, database as db, utils, filebackends
+from .. import application, utils, filebackends
 from ..constants import DB, DISK, CONTENTS
 from ..core import levels, tags, commands
 from ..core.nodes import RootNode, Wrapper
@@ -170,7 +170,8 @@ class ClearTreeAction(TreeAction):
 
 
 class CommitTreeAction(TreeAction):
-    #TODO comment
+    """Commit the contents of a LevelTreeModel."""
+    
     def __init__(self, parent):
         super().__init__(parent, shortcut = "Shift+Enter")
         self.setIcon(QtGui.qApp.style().standardIcon(QtGui.QStyle.SP_DialogSaveButton))

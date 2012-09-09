@@ -20,20 +20,11 @@
 
 from PyQt4 import QtCore
 
-import datetime, re
-from difflib import SequenceMatcher
+import re
 
 from . import constants
 
 translate = QtCore.QCoreApplication.translate
-
-
-def longestSubstring(a, b):
-    """Return the longest common substring of *a* and *b*."""
-    sm = SequenceMatcher(None, a, b)
-    result = sm.find_longest_match(0, len(a), 0, len(b))
-    return a[result[0]:result[0]+result[2]]
-
 
 def replace(text,dict):
     """Replace multiple pairs at a single blow. To be exact: The keys of *dict* are replaced by the

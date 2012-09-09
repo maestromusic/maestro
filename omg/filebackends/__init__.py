@@ -19,8 +19,12 @@
 from urllib.parse import urlparse
 import os.path
 
+from PyQt4 import QtCore
+
 from .. import logging
+
 logger = logging.getLogger(__name__)
+translate = QtCore.QCoreApplication.translate
 
 urlTypes = {}
 """Maps scheme to implementing BackendURL subclass, e.g. "file"->RealFile."""
@@ -100,7 +104,7 @@ class BackendURL:
     def fromString(urlString):
         """Create an URL object for the given string. The type is derived from the scheme part."""
         try:
-            scheme,url = urlString.split("://", 1)
+            scheme = urlString.split("://", 1)[0]
         except ValueError:
             raise ValueError("Invalid URL (no scheme?): {}".format(urlString)) 
         else:

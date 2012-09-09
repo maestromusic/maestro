@@ -19,8 +19,8 @@
 from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
-from .. import application, config, database as db, logging, utils
-from ..core import elements, levels, nodes, tags
+from .. import application, config, logging, utils
+from ..core import elements, levels, nodes
 from ..models import rootedtreemodel, albumguesser
 
 
@@ -241,11 +241,13 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
             self._removeContents(index, i, i + len(old) - 1)
     
     def _removeContents(self, index, first, last):
+        """Remove nodes from the tree without any undo/redo/event handling."""
         self.beginRemoveRows(index, first, last)
         del self.data(index, Qt.EditRole).contents[first:last+1]
         self.endRemoveRows()
         
     def _insertContents(self, index, row, ids, positions=None):
+        """Insert wrappers into the tree without any undo/redo/event handling."""
         self.beginInsertRows(index, row, row + len(ids) - 1)
         wrappers = [nodes.Wrapper(self.level.get(id)) for id in ids]
         if positions:
@@ -258,6 +260,8 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
 
 
 class ChangeRootCommand(QtGui.QUndoCommand):
+    """Command to change the root node's contents in a LevelTreeModel.
+    """
     
     def __init__(self, model, newContents, text="<change root>"):
         super().__init__()
@@ -267,9 +271,7 @@ class ChangeRootCommand(QtGui.QUndoCommand):
         self.setText(text)
     
     def redo(self):
-        logger.debug("change root: {} --> {}".format(self.old, self.new))
         self.model._changeContents(QtCore.QModelIndex(), self.new )
         
     def undo(self):
-        logger.debug("change root: {} --> {}".format(self.new, self.old))
         self.model._changeContents(QtCore.QModelIndex(), self.old )

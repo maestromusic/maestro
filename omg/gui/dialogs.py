@@ -163,10 +163,27 @@ class FancyTabbedPopup(FancyPopup):
         
 
 class MergeDialog(QtGui.QDialog):
-    """This dialog is shown if the user requests to merge some children into a new
-    intermediate container."""
+    """A dialog for merging several children of the same parent into a new subcontainer.
+    
+    Merging is a convenient way to add structural information to otherwise flat containers, e.g.
+    pieces split up into several tracks.
+    The procedure works as follows:
+      1. the selected child elements are removed from the parent.
+      2. a new container is created
+      3. the selected elements are inserted into the new container
+      4. the new container is inserted into the parent (at the position of the first child removed)
+    The dialog allows to set a single tag for the new container (usually the title). Optionally,
+      - a common prefix of the selected tag can be removed from the children
+      - the container can be assigned the common tags of all children
+      - positions of subsequent elements can be lowered accordinlgy.
+    """ 
     
     def __init__(self, model, wrappers, parent=None):
+        """Set up the dialog for *wrappers* (all with the same parent) in *model*.
+        
+        *parent* refers to the Qt parent object.
+        """
+        
         super().__init__(parent)
         self.setWindowTitle(self.tr("Merge elements"))
         self.model = model
@@ -174,6 +191,7 @@ class MergeDialog(QtGui.QDialog):
         self.elements = [wrapper.element for wrapper in wrappers]
         self.level = self.elements[0].level
         self.parentNode = wrappers[0].parent
+        
         layout = QtGui.QGridLayout()
         self.tagChooser = tagwidgets.TagTypeBox(defaultTag=tags.TITLE, editable=False)
         self.tagChooser.tagChanged.connect(self.updateHints)
@@ -188,7 +206,6 @@ class MergeDialog(QtGui.QDialog):
         self.removeEdit = QtGui.QLineEdit()
         layout.addWidget(self.removeEdit, 1, 2)
         self.removePrefixBox.toggled.connect(self.removeEdit.setEnabled)
-        
         self.commonTagsBox = QtGui.QCheckBox(self.tr("Assign common tags"))
         self.commonTagsBox.setChecked(True)
         layout.addWidget(self.commonTagsBox, 2, 0, 1, 3)
@@ -204,8 +221,12 @@ class MergeDialog(QtGui.QDialog):
         self.setLayout(layout)
         
     def updateHints(self, tag):
-        from functools import reduce
-        from ..strutils import longestSubstring
+        """Update the hints for new tag value and remove prefix after a tag type is selected.
+        
+        The prefix hint is the longest common prefix of all children that have a tag of type *tag*.
+        The value hint is the prefix with punctuation and whitespaces stripped.
+        """
+        from .. import strutils
         import string
         self.removePrefixBox.setText(self.tr("Remove prefixes from children's {}:").format(tag))
         noHint = all(tag not in element.tags for element in self.elements)
@@ -214,23 +235,23 @@ class MergeDialog(QtGui.QDialog):
             self.valueEdit.setText("")
             self.removeEdit.setText("")
         else:
-            hintRemove = reduce(longestSubstring,
-                       (", ".join(map(str, element.tags[tag]))
-                            for element in self.elements
-                            if tag in element.tags))
+            hintRemove = strutils.commonPrefix(str(element.tags[tag][0])
+                            for element in self.elements if tag in element.tags)
             self.removeEdit.setText(hintRemove)
             hintValue = hintRemove.strip(string.punctuation + string.whitespace)
             self.valueEdit.setText(hintValue)
     
     def performMerge(self):
+        """The actual merge operation.
+        """
         self.level.stack.beginMacro(self.tr("merge"))
         if self.level is levels.real:
             db.transaction()
-        mergeTag = self.tagChooser.getTag()
         if self.commonTagsBox.isChecked():
             containerTags = tags.findCommonTags(self.elements)
         else:
             containerTags = tags.Storage()
+        mergeTag = self.tagChooser.getTag()
         containerTags[mergeTag] = [ self.valueEdit.text() ]
         contents = elements.ContentList.fromPairs(enumerate(self.elements, start=1))
         container = self.level.createContainer(tags=containerTags, major=False, contents=contents)
@@ -238,14 +259,24 @@ class MergeDialog(QtGui.QDialog):
             childChanges = {}
             prefix = self.removeEdit.text()
             for elem in self.elements:
-                if mergeTag in elem.tags:
-                    replacements = [(val, val[len(prefix):])
-                                        for val in elem.tags[mergeTag]
-                                        if val.startswith(prefix)]
-                    if len(replacements) > 0:
-                        childChanges[elem] = tags.SingleTagDifference(mergeTag, replacements=replacements)
+                if mergeTag not in elem.tags:
+                    continue
+                replacements = [(val, val[len(prefix):]) for val in elem.tags[mergeTag]
+                                                         if val.startswith(prefix)]
+                if len(replacements) > 0:
+                    childChanges[elem] = tags.SingleTagDifference(mergeTag,
+                                                                  replacements=replacements)
             if len(childChanges) > 0:
-                self.level.changeTags(childChanges)
+                from ..filebackends import TagWriteError
+                try:
+                    self.level.changeTags(childChanges)
+                except TagWriteError as e:
+                    e.displayMessage()
+                    self.level.stack.abortMacro()
+                    if self.level is levels.real:
+                        db.commit()
+                    self.reject()
+                    return
         if isinstance(self.parentNode, nodes.Wrapper):
             parent = self.parentNode.element
             insertPosition = self.wrappers[0].position
