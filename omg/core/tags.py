@@ -986,10 +986,10 @@ class TagStorageDifference(TagDifference):
         
     def apply(self,element):
         # element may also be a FileBackend
-        element.tags = self.newTags.copy() if self.newTags is not None else tags.Storage()
+        element.tags = self.newTags.copy() if self.newTags is not None else Storage()
         
     def revert(self,element):
-        element.tags = self.oldTags.copy() if self.oldTags is not None else tags.Storage()
+        element.tags = self.oldTags.copy() if self.oldTags is not None else Storage()
         
     def getAdditions(self):
         if self.newTags is None:
@@ -1013,6 +1013,9 @@ class TagStorageDifference(TagDifference):
             newValues = self.newTags[oldTag] if oldTag in self.newTags else []
             result.extend((oldTag,value) for value in oldValues if value not in newValues)
         return result
+    
+    def __str__(self):
+        return "TagStorageDifference(old={},new={})".format(self.oldTags, self.newTags)
     
     
 def findCommonTags(elements):

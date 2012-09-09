@@ -174,7 +174,7 @@ class RealLevel(levels.Level):
             backendFile = file.url.getBackendFile()
             backendFile.readTags()
             publicTags = file.tags.withoutPrivateTags()
-            if len(publicTags) > 0:
+            if len(publicTags) > 0 and backendFile.tags != publicTags:
                 diff = tags.TagStorageDifference(backendFile.tags, publicTags)
                 tagChanges[file] = diff
         if len(tagChanges) > 0:
@@ -202,7 +202,7 @@ class RealLevel(levels.Level):
         if id is not None:
             raise ValueError("Don't call _createContainer with an ID on real!")
         db.transaction()
-        id = db.write.createElements([ (False, True, 0, major) ])
+        id = db.write.createElements([ (False, True, 0, major) ])[0]
         element = super()._createContainer(tags, flags, data, major, contents, id)
         self._elementToDBHelper(element)
         db.commit()

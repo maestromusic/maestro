@@ -19,7 +19,9 @@
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
-from .. import utils
+from .. import database as db, utils
+from ..core import elements, levels, nodes, tags
+from . import tagwidgets
 
 
 def question(title,text,parent=None):
@@ -164,48 +166,106 @@ class MergeDialog(QtGui.QDialog):
     """This dialog is shown if the user requests to merge some children into a new
     intermediate container."""
     
-    def __init__(self, hintTitle, hintRemove, askForPositionAdjusting, parent = None):
+    def __init__(self, model, wrappers, parent=None):
         super().__init__(parent)
+        self.setWindowTitle(self.tr("Merge elements"))
+        self.model = model
+        self.wrappers = wrappers
+        self.elements = [wrapper.element for wrapper in wrappers]
+        self.level = self.elements[0].level
+        self.parentNode = wrappers[0].parent
         layout = QtGui.QGridLayout()
-        label = QtGui.QLabel(self.tr('Title of new container:'))
-        layout.addWidget(label, 0, 0)
-        self.titleEdit = QtGui.QLineEdit(hintTitle)
-        layout.addWidget(self.titleEdit, 0, 1)
-        self.checkBox = QtGui.QCheckBox(self.tr('Remove from titles:'))
-        self.checkBox.setChecked(True)
-        layout.addWidget(self.checkBox, 1, 0)
-        self.removeEdit = QtGui.QLineEdit(hintRemove)
-        layout.addWidget(self.removeEdit, 1, 1)
-        self.checkBox.toggled.connect(self.removeEdit.setEnabled)
+        self.tagChooser = tagwidgets.TagTypeBox(defaultTag=tags.TITLE, editable=False)
+        self.tagChooser.tagChanged.connect(self.updateHints)
+        layout.addWidget(self.tagChooser, 0, 0)
+        label = QtGui.QLabel(self.tr('of new container:'))
+        layout.addWidget(label, 0, 1)
+        self.valueEdit = QtGui.QLineEdit()
+        layout.addWidget(self.valueEdit, 0, 2)
+        self.removePrefixBox = QtGui.QCheckBox()
+        self.removePrefixBox.setChecked(True)
+        layout.addWidget(self.removePrefixBox, 1, 0, 1, 2)
+        self.removeEdit = QtGui.QLineEdit()
+        layout.addWidget(self.removeEdit, 1, 2)
+        self.removePrefixBox.toggled.connect(self.removeEdit.setEnabled)
         
-        if askForPositionAdjusting:
+        self.commonTagsBox = QtGui.QCheckBox(self.tr("Assign common tags"))
+        self.commonTagsBox.setChecked(True)
+        layout.addWidget(self.commonTagsBox, 2, 0, 1, 3)
+        if isinstance(self.parentNode, nodes.Wrapper):
             self.positionCheckBox = QtGui.QCheckBox(self.tr('Auto-adjust positions'))
             self.positionCheckBox.setChecked(True)
-            layout.addWidget(self.positionCheckBox, 2, 0, 1, 2)
-        hLayout = QtGui.QHBoxLayout()
-        self.cancelButton = QtGui.QPushButton(self.tr('Cancel'))
-        self.okButton = QtGui.QPushButton(self.tr('OK'))
-        self.cancelButton.clicked.connect(self.reject)
-        self.okButton.clicked.connect(self.accept)
-        self.okButton.setDefault(True)
-        hLayout.addStretch()
-        hLayout.addWidget(self.cancelButton)
-        hLayout.addWidget(self.okButton)
-        layout.addLayout(hLayout, 3 if askForPositionAdjusting else 2, 0, 1, 2)
-        layout.setColumnStretch(1, 1)
+            layout.addWidget(self.positionCheckBox, 3, 0, 1, 3)
+        buttons = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Cancel | QtGui.QDialogButtonBox.Ok)
+        buttons.accepted.connect(self.performMerge)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons, layout.rowCount(), 0, 1, 3)
+        self.updateHints(tags.TITLE)
         self.setLayout(layout)
         
-    def newTitle(self):
-        return self.titleEdit.text()
-    
-    def removeString(self):
-        return self.removeEdit.text() if self.checkBox.isChecked() else ''
-    
-    def adjustPositions(self):
-        if hasattr(self, 'positionCheckBox'):
-            return self.positionCheckBox.isChecked()
+    def updateHints(self, tag):
+        from functools import reduce
+        from ..strutils import longestSubstring
+        import string
+        self.removePrefixBox.setText(self.tr("Remove prefixes from children's {}:").format(tag))
+        noHint = all(tag not in element.tags for element in self.elements)
+        self.removeEdit.setDisabled(noHint)
+        if noHint:
+            self.valueEdit.setText("")
+            self.removeEdit.setText("")
         else:
-            return False
+            hintRemove = reduce(longestSubstring,
+                       (", ".join(map(str, element.tags[tag]))
+                            for element in self.elements
+                            if tag in element.tags))
+            self.removeEdit.setText(hintRemove)
+            hintValue = hintRemove.strip(string.punctuation + string.whitespace)
+            self.valueEdit.setText(hintValue)
+    
+    def performMerge(self):
+        self.level.stack.beginMacro(self.tr("merge"))
+        if self.level is levels.real:
+            db.transaction()
+        mergeTag = self.tagChooser.getTag()
+        if self.commonTagsBox.isChecked():
+            containerTags = tags.findCommonTags(self.elements)
+        else:
+            containerTags = tags.Storage()
+        containerTags[mergeTag] = [ self.valueEdit.text() ]
+        contents = elements.ContentList.fromPairs(enumerate(self.elements, start=1))
+        container = self.level.createContainer(tags=containerTags, major=False, contents=contents)
+        if self.removePrefixBox.isChecked():
+            childChanges = {}
+            prefix = self.removeEdit.text()
+            for elem in self.elements:
+                if mergeTag in elem.tags:
+                    replacements = [(val, val[len(prefix):])
+                                        for val in elem.tags[mergeTag]
+                                        if val.startswith(prefix)]
+                    if len(replacements) > 0:
+                        childChanges[elem] = tags.SingleTagDifference(mergeTag, replacements=replacements)
+            if len(childChanges) > 0:
+                self.level.changeTags(childChanges)
+        if isinstance(self.parentNode, nodes.Wrapper):
+            parent = self.parentNode.element
+            insertPosition = self.wrappers[0].position
+            insertIndex = parent.contents.positions.index(insertPosition)
+            if self.positionCheckBox.isChecked():
+                self.level.removeContentsAuto(parent, [wrapper.position for wrapper in self.wrappers])
+                self.level.insertContentsAuto(parent, insertIndex, [ container ])
+            else:
+                self.level.removeContents(parent, [wrapper.position for wrapper in self.wrappers])
+                self.level.insertContents(parent, [(insertPosition, container)] )
+        else:
+            rows = [self.parentNode.contents.index(wrapper) for wrapper in self.wrappers]
+            insertIndex = rows[0]
+            self.model.removeElements(self.parentNode, rows)
+            self.model.insertElements(self.parentNode, insertIndex, [ container ])
+        if self.level is levels.real:
+            db.commit()
+        self.level.stack.endMacro()
+        self.accept()
+        
 
 class FlattenDialog(QtGui.QDialog):
     """A dialog for the "flatten" operation."""

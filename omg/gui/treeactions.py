@@ -144,50 +144,14 @@ class MergeAction(TreeAction):
     
     def initialize(self):
         self.setEnabled(self.parent().nodeSelection.singleParent())
-    
-    @staticmethod    
-    def createMergeHint(elements):
-        from functools import reduce
-        from ..strutils import longestSubstring
-        import string
-        
-        hintRemove = reduce(longestSubstring,
-                   ( ", ".join(elem.tags[tags.TITLE]) for elem in elements )
-                 )
-        return hintRemove.strip(string.punctuation + string.whitespace), hintRemove
-    
+
     def doAction(self):
         selection = self.parent().nodeSelection
         from ..gui.dialogs import MergeDialog
-        elements = selection.wrappers()
-        hintTitle, hintRemove = self.createMergeHint([wrap.element for wrap in elements])
-        mergeIndices = sorted(elem.parent.index(elem) for elem in elements)
-        numSiblings = len(elements[0].parent.contents)
-        belowRoot = isinstance(elements[0].parent, RootNode)
-        dialog = MergeDialog(hintTitle, hintRemove, len(mergeIndices) < numSiblings and not belowRoot,
-                             self.parent())
-        if dialog.exec_() == QtGui.QDialog.Accepted:
-            from ..models import rootedtreemodel
-            command = leveltreemodel.MergeCommand(self.parent().model().level,
-                         elements[0].parent,
-                         mergeIndices,
-                         dialog.newTitle(),
-                         dialog.removeString(),
-                         dialog.adjustPositions())
-            if command.elementParent:
-                application.stack.push(command)
-            else:
-                application.stack.beginMacro(self.tr("merge elements"))
-                application.stack.push(command)
-                oldContents = [node.element.id for node in self.parent().model().root.contents ]
-                newContents = oldContents[:]
-                mergedIndexes = [ v[0] for v in command.parentChanges.values() ]
-                for idx in sorted(mergedIndexes, reverse = True):
-                    del newContents[idx]
-                newContents[command.insertIndex:command.insertIndex] = [command.containerID]
-                rootChangeCom = leveltreemodel.ChangeRootCommand(self.parent().model(), oldContents, newContents)
-                application.stack.push(rootChangeCom)
-                application.stack.endMacro()
+        nodes = sorted(selection.wrappers(), key=lambda wrap: wrap.parent.contents.index(wrap))
+        dialog = MergeDialog(self.parent().model(), nodes, self.parent())
+        dialog.exec_()
+
 
 class ClearTreeAction(TreeAction):
     """This action clears a tree model using a simple ChangeRootCommand."""

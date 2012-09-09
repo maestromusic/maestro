@@ -235,7 +235,7 @@ class ContentList:
     def fromPairs(arg):
         """Creates a ContentList from a generator of (position, id) or (position, element) pairs.
         """
-        positions, ids = (list(zp) for zp in zip(*sorted(arg.items())))
+        positions, ids = (list(zp) for zp in zip(*sorted(arg)))
         ids = [element.id if isinstance(element, Element) else element for element in ids ]
         ret = ContentList()
         ret.positions = positions
@@ -258,10 +258,6 @@ class ContentList:
         
     def __len__(self):
         return len(self.ids)
-    
-    def __getitem__(self, i):
-        raise RuntimeError("don't use this function, it is ambiguous and thus dangerous")
-        return self.ids[i], self.positions[i]
     
     def __delitem__(self, i):
         del self.ids[i]
