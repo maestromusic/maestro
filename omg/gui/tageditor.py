@@ -118,8 +118,8 @@ class TagEditorDialog(QtGui.QDialog):
         QtGui.QDialog.__init__(self,parent)
         self.setWindowTitle(self.tr("Edit tags"))
         self.resize(600,450) #TODO: make this cleverer
-        self.stack = QtGui.QUndoStack()
-        self.level = levels.Level("TagEditor",level)
+        self.stack = application.stack.beginSubstack()
+        self.level = levels.Level("TagEditor",level,stack=self.stack)
         elements = self.level.getFromIds([element.id for element in elements])
         
         self.setLayout(QtGui.QVBoxLayout())
@@ -150,26 +150,33 @@ class TagEditorDialog(QtGui.QDialog):
         cancelButton.clicked.connect(self.reject)
         commitButton = QtGui.QPushButton(style.standardIcon(QtGui.QStyle.SP_DialogSaveButton),
                                          self.tr("OK"))
-        commitButton.clicked.connect(self._handleCommit)
+        commitButton.clicked.connect(self.accept)
         buttonLayout.addWidget(resetButton)
         buttonLayout.addStretch()
         buttonLayout.addWidget(cancelButton)
         buttonLayout.addWidget(commitButton)
     
+    def reject(self):
+        self.stack.endSubstack()
+        super().reject()
+        
+    def accept(self):
+        try:
+            # make sure that this command is added via application.stack
+            self.level.stack = application.stack
+            self.level.commit(self.tagedit.model.getElements())
+            self.stack.endSubstack()
+            super().accept()
+        except filebackends.TagWriteError as e:
+            e.displayMessage()
+            self.level.stack = self.stack
+    
     def _handleReset(self):
         """Handle clicks on the reset button: Reload all elements and clear the stack."""
-        self.stack.clear()
+        self.stack.clearSubstack()
         self.level.elements = {}
         elements = self.level.getFromIds([element.id for element in self.tagedit.model.getElements()])
         self.tagedit.setElements(self.level,elements)
-    
-    def _handleCommit(self):
-        """Handle a click on the commit button: Commit the level and close the dialog."""
-        try:
-            self.level.commit(self.tagedit.model.getElements())
-            self.accept()
-        except filebackends.TagWriteError as e:
-            e.displayMessage()
         
         
 class TagEditorWidget(QtGui.QWidget):

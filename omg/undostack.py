@@ -59,6 +59,16 @@ class UndoStack(QtCore.QObject):
         self._substack = None      # the current substack
         self._undoAction = UndoRedoAction(self,redo=False)
         self._redoAction = UndoRedoAction(self,redo=True)
+    
+    def index(self):
+        """Return the current position of the stack. stack.command(stack.index()) is the command that will
+        be redone next."""
+        return self._index
+    
+    def command(self,index):
+        """Return the UndoCommand at the given index. stack.command(stack.index()) is the command that will
+        be redone next."""
+        return self._commands[index]
         
     def beginMacro(self,text):
         """Begin a macro. The macro will contain all commands that are pushed until endMacro is called.
@@ -75,7 +85,7 @@ class UndoStack(QtCore.QObject):
         
     def push(self,command):
         """Add a command to the stack. This calls the command's redo-method."""
-        if not isinstance(command,QtGui.QUndoCommand):
+        if not isinstance(command,(QtGui.QUndoCommand,SubstackCommand)):
             raise TypeError("I push QUndoCommands, not {}: {}".format(type(command),command))
         if self._inUndoRedo:
             raise UndoStackError("Cannot push a command during undo/redo.")
@@ -115,6 +125,15 @@ class UndoStack(QtCore.QObject):
         self._currentMacro.undo()
         self._currentMacro = None
         self._macroDepth = 0
+
+    def clear(self):
+        """Delete all commands on the stack."""
+        if self._inUndoRedo or self._currentMacro is not None:
+            raise UndoStackError("Cannot clear the stack during undo/redo or while a macro is built.")
+        self._commands = []
+        self._index = 0
+        self._stackRest = None
+        self._emitSignals()
         
     def canUndo(self):
         """Returns whether there is a command that can be undone."""
@@ -201,8 +220,8 @@ class UndoStack(QtCore.QObject):
                     return # event was merged
         else: self._eventQueue.append((dispatcher,event))
     
-    def startSubstack(self):
-        """Start a substack and return it. There may be only a single substack at any time."""
+    def beginSubstack(self):
+        """Begin a substack and return it. There may be only a single substack at any time."""
         if self._substack is not None:
             raise UndoStackError("Cannot start a substack while another one is active.")
         if self._inUndoRedo or self._macroDepth > 0:
@@ -210,7 +229,7 @@ class UndoStack(QtCore.QObject):
         self._stackRest = self._commands[self._index:]
         del self._commands[self._index:]
         self._emitSignals()
-        self._substack = Substack(self)
+        self._substack = Substack(self,self._index)
         return self._substack
     
     def endSubstack(self):
@@ -223,13 +242,24 @@ class UndoStack(QtCore.QObject):
             raise UndoStackError("Cannot end a substack during undo/redo or while a macro is built.""")
         
         self._index = _filterSubstackCommands(self._commands,self._substack.startIndex,self._index)
-        if self._index == self._substack.startIndex:
+        if self._index == self._substack.startIndex and self._stackRest is not None:
             # recover stack rest 
             self._commands[self._substack.startIndex:] = self._stackRest
         
         self._stackRest = None
         self._substack._main = None # deactivate. Should not be necessary
         self._substack = None
+        self._emitSignals()
+        
+    def clearSubstack(self):
+        """Remove all commands that were added via the substack from the stack. Do not close the substack.
+        """
+        if self._substack is None:
+            raise UndoStackError("Cannot clear a substack when none is active.")
+        if self._inUndoRedo or self._macroDepth > 0:
+            raise UndoStackError("Cannot clear a substack during undo/redo or while a macro is built.""")
+        
+        self._index = _filterSubstackCommands(self._commands,self._substack.startIndex,self._index)
         self._emitSignals()
         
         
@@ -303,13 +333,15 @@ def _filterSubstackCommands(commands,startIndex=0,index=0):
             del commands[i]
             if index > i:
                 index -= 1
+            continue
         elif isinstance(command,Macro):
             _filterSubstackCommands(command.commands)
             if len(command.commands) == 0:
                 del commands[i]
                 if index > i:
                     index -= 1
-        else: i += 1
+                continue
+        i += 1
     return index
             
         
@@ -329,6 +361,7 @@ class UndoRedoAction(QtGui.QAction):
             stack.canUndoChanged.connect(self.setEnabled)
             stack.undoTextChanged.connect(self.setText)
             self.triggered.connect(stack.undo)
+        self.setText('')
             
     def setText(self,text):
         if text is not None and len(text) > 0:

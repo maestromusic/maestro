@@ -547,8 +547,7 @@ class Level(application.ChangeEventDispatcher):
                     self.stack.push(commands.CreateDBElementsCommand(newElements, newInLevel=True))
                 db.transaction()
             except (filebackends.TagWriteError, OSError) as e:
-                self.stack.endMacro()
-                self.stack.undo()
+                self.stack.abortMacro()
                 raise e
         else:
             newElements = [elem for elem in elements if elem.id not in self.parent.elements ]
