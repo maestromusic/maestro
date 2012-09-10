@@ -156,10 +156,6 @@ class UndoStack(QtCore.QObject):
         according to the stack's index."""
         return self._undoAction
     
-    def clear(self):
-        """Delete all commands on the stack."""
-        logger.debug("**** MADDIN, TU WAS ****\n" * 10)
-    
     def undo(self):
         """Undo the last command/macro."""
         if self._inUndoRedo or self._macroDepth > 0:
