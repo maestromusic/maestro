@@ -112,10 +112,10 @@ class CreateContainerCommand(QtGui.QUndoCommand):
             self.container = self.level._createContainer(self.tags, self.flags, self.data,
                                                          self.major, self.contents)
         else:
-            self.level._addElement(self.container)
+            self.level._addElements([self.container])
     
     def undo(self):
-        self.level._removeElement(self.container)
+        self.level._removeElements([self.container])
 
 
 class CopyElementsCommand(QtGui.QUndoCommand):

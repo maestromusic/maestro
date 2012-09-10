@@ -103,12 +103,18 @@ class RealFile(BackendFile):
         # TODO: handle open taglib file references
         os.renames(self.url.absPath, newUrl.absPath)
         self.url = newUrl
+    
+    def delete(self):
+        os.remove(self.url.absPath)
         
     def saveTags(self):
         """Save what's in self.tags to the file.
         
         In addition to the tags in self.tags, any ignored tags (TRACKNUMBER etc.) that were read
         using readTags() will be stored in to the file such that they aren't lost.
+        
+        If some tags cannot be saved due to restrictions of the underlying metadata format, those
+        tags/values that remain unsaved will be returned.
         """
         self._taglibFile.tags = dict()
         for tag, values in self.ignoredTags.items():
@@ -118,10 +124,8 @@ class RealFile(BackendFile):
             self._taglibFile.tags[tag.name.upper()] = values
         unsuccessful = self._taglibFile.save()
         del self._taglibFile
-        #TODO: unsuccessful is a bool ??
-        #ret = {key.upper(): values for key,values in unsuccessful.items()}
-        #return ret
-        return {}
+        ret = {key.upper(): values for key,values in unsuccessful.items()}
+        return ret
 
 
 class FileURL(BackendURL):
@@ -131,6 +135,7 @@ class FileURL(BackendURL):
     """
     
     CAN_RENAME = True
+    CAN_DELETE = True
     IMPLEMENTATIONS = [ RealFile ]
     
     def __init__(self, urlString):

@@ -16,11 +16,10 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from PyQt4 import QtCore, QtGui
+from PyQt4 import QtGui
 from PyQt4.QtCore import Qt
 
-from .. import application, database as db, utils, filebackends
-from ..constants import DB, DISK, CONTENTS
+from .. import application, utils, filebackends
 from ..core import levels, tags, commands
 from ..core.nodes import RootNode, Wrapper
 from ..models import leveltreemodel
@@ -43,7 +42,7 @@ class TreeAction(QtGui.QAction):
         self.triggered.connect(self.doAction)
         self.setShortcutContext(Qt.WidgetShortcut)
     
-    def initialize(self):
+    def initialize(self, selection):
         pass
     
     def doAction(self):
@@ -64,8 +63,8 @@ class EditTagsAction(TreeAction):
                          else self.tr('edit tags'))
         self.recursive = recursive
     
-    def initialize(self):
-        self.setEnabled(self.parent().nodeSelection.hasWrappers())
+    def initialize(self, selection):
+        self.setEnabled(selection.hasWrappers())
     
     def doAction(self):
         """Open a dialog to edit the tags of the currently selected elements (and the children, if
@@ -78,62 +77,75 @@ class EditTagsAction(TreeAction):
         dialog.exec_()
    
    
-class DeleteAction(TreeAction):
-    """Action to remove selected elements. Works for editor and browser.
+class RemoveFromParentAction(TreeAction):
+    """Action to remove selected elements from the parent container or rootnode.
+    """
     
-    The deletion mode (CONTENTS, DB, or DISK) has to be passed to the constructor. The
-    behavior is as follows:
-    - CONTENTS: remove elements from their parents. If the parent is an element, the level
-                gets updated. If the parent is the RootNode, the element is removed there,
-                leaving the level untouched.
-    - DB (only in 'real' level): remove selected elements from the database
-    - DISK: remove selected files from disk. If the files are contained in the DB, they
-            are also removed from there."""
-    modeText = { DB: translate( __name__, 'delete (from database)' ),
-                 CONTENTS: translate( __name__, 'delete (from parent)'),
-                 DISK: translate( __name__, 'delete (from disk)')}
+    def __init__(self, parent):
+        """Initialize action."""
+        super().__init__(parent, shortcut="Del")
+        self.setText(self.tr("remove"))
     
-    def __init__(self, parent, mode, *args, **kwargs):
-        """Initialize action with the given *mode* which must be one of DISK, DB, CONTENTS."""
-        super().__init__(parent, *args, **kwargs)
-        self.setText(self.modeText[mode])
-        self.mode = mode
-    
-    def initialize(self):
-        selection = self.parent().nodeSelection
-        if self.mode == CONTENTS:
-            self.setEnabled(not selection.empty() and all(isinstance(w.parent, Wrapper) \
-                                    or isinstance(w.parent, RootNode)
+    def initialize(self, selection):
+        self.setEnabled(not selection.empty() \
+                        and all(isinstance(w.parent, Wrapper) or isinstance(w.parent, RootNode)
                                 for w in selection.wrappers()))
-        elif self.mode == DB:
-            self.setEnabled(self.parent().level is levels.real and selection.hasWrappers())
-        elif self.mode == DISK:
-            self.setEnabled(self.parent().level is levels.real and selection.hasFiles())
         
     def doAction(self):
         model = self.parent().model()
-        if self.mode == CONTENTS:
-            byParent = {}
-            for wrapper in self.parent().nodeSelection.wrappers():
-                parent = wrapper.parent
-                if parent not in byParent:
-                    byParent[parent] = []
-                byParent[parent].append(parent.contents.index(wrapper))
+        byParent = {}
+        for wrapper in self.parent().nodeSelection.wrappers():
+            parent = wrapper.parent
+            if parent not in byParent:
+                byParent[parent] = []
+            byParent[parent].append(parent.contents.index(wrapper))
+        for parent, indexes in byParent.items():
+            byParent[parent] = sorted(set(indexes))
+        
+        application.stack.beginMacro("remove")
+        if isinstance(model, leveltreemodel.LevelTreeModel):
             for parent, indexes in byParent.items():
-                byParent[parent] = sorted(set(indexes))
-            
-            application.stack.beginMacro("remove")
-            if isinstance(model, leveltreemodel.LevelTreeModel):
-                for parent, indexes in byParent.items():
-                    model.removeElements(parent, indexes)
-            elif isinstance(model, BrowserModel):
-                for parent, indexes in byParent.items():
-                    self.level().removeContentsAuto(parent.element, indexes=indexes)
-            
-            application.stack.endMacro()
+                model.removeElements(parent, indexes)
+        elif isinstance(model, BrowserModel):
+            for parent, indexes in byParent.items():
+                self.level().removeContentsAuto(parent.element, indexes=indexes)
         else:
             raise NotImplementedError()
-        
+        application.stack.endMacro()
+
+class DeleteAction(TreeAction):
+    """Action to delete elements from the database and/or filesystem."""
+    
+    def __init__(self, parent, text):
+        """Initialize the action."""
+        super().__init__(parent)
+        self.setText(text)
+            
+    def initialize(self, selection):
+        if self.level() is levels.real:
+            self.setEnabled(selection.hasElements())
+        else:
+            self.setEnabled(selection.hasFiles() and all(wrap.element.url.CAN_DELETE for wrap in selection.fileWrappers()))
+    
+    def doAction(self):
+        selection = self.parent().nodeSelection
+        files = [wrap.element for wrap in selection.fileWrappers()]
+        self.level().deleteElements(self.parent().nodeSelection.elements())
+        if len(files) > 0:
+            if self.level() is levels.real:
+                message = self.tr("You have deleted the following files from OMG:\n{}\n"
+                                  "Do you want them deleted completely (<b>can not be reversed!!</b>)")
+            else:
+                message = self.tr("Are you sure to <b>irrevocably</b> delete the following files?\n{}")
+            ans = dialogs.question(
+                      self.tr("delete files?"),
+                      message.format("\n".join(str(file.url) for file in files)),
+                      self.parent())
+            if ans:
+                for file in files:
+                    file.url.getBackendFile().delete()
+                application.stack.clear()
+            
 
 class MergeAction(TreeAction):
     """Action to merge selected elements into a new container."""
@@ -142,8 +154,8 @@ class MergeAction(TreeAction):
         super().__init__(parent)
         self.setText(self.tr("merge..."))
     
-    def initialize(self):
-        self.setEnabled(self.parent().nodeSelection.singleParent())
+    def initialize(self, selection):
+        self.setEnabled(selection.singleParent())
 
     def doAction(self):
         selection = self.parent().nodeSelection
@@ -161,7 +173,7 @@ class ClearTreeAction(TreeAction):
         self.setIcon(utils.getIcon("clear_playlist.png"))
         self.setText(self.tr('clear'))
     
-    def initialize(self):
+    def initialize(self, selection):
         self.setEnabled(self.parent().model().root.getContentsCount() > 0)
     
     def doAction(self):
@@ -170,13 +182,14 @@ class ClearTreeAction(TreeAction):
 
 
 class CommitTreeAction(TreeAction):
-    #TODO comment
+    """Commit the contents of a LevelTreeModel."""
+    
     def __init__(self, parent):
-        super().__init__(parent, shortcut = "Shift+Enter")
+        super().__init__(parent, shortcut="Shift+Enter")
         self.setIcon(QtGui.qApp.style().standardIcon(QtGui.QStyle.SP_DialogSaveButton))
         self.setText(self.tr('commit this tree'))
         
-    def initialize(self):
+    def initialize(self, selection):
         self.setEnabled(len(self.parent().model().root.contents) > 0)
         
     def doAction(self):
@@ -199,8 +212,8 @@ class FlattenAction(TreeAction):
         super().__init__(parent)
         self.setText(self.tr("flatten..."))
         
-    def initialize(self):
-        self.setEnabled(self.parent().nodeSelection.hasContainers())
+    def initialize(self, selection):
+        self.setEnabled(selection.hasContainers())
         
     def doAction(self):
         from ..gui.dialogs import FlattenDialog
@@ -223,8 +236,7 @@ class ChangePositionAction(TreeAction):
         else:
             raise ValueError("{0} is not a valid ChangePositionAction mode".format(mode))
     
-    def initialize(self):
-        selection = self.parent().nodeSelection
+    def initialize(self, selection):
         if self.mode == "free":
             self.setEnabled(False)
         else:
@@ -234,13 +246,12 @@ class ChangePositionAction(TreeAction):
         from ..gui.dialogs import warning
         selection = self.parent().nodeSelection
         positions = [wrap.position for wrap in selection.wrappers()]
-        parentId = selection.wrappers()[0].parent.element.id
+        parent = selection.wrappers()[0].parent.element
         try:
-            application.stack.push(commands.ChangePositionsCommand(self.parent().model().level,
-                                                                   parentId, positions,
-                                                                   1 if self.mode == "+1" else -1))
+            self.level().shiftPositions(parent, positions, 1 if self.mode == "+1" else -1)
         except levels.ConsistencyError as e:
             warning(self.tr('error'), str(e))
+
 
 class MatchTagsFromFilenamesAction(TreeAction):
     """An action to trigger a dialog that matches tags from file names. Will be enabled only if at least
@@ -250,8 +261,8 @@ class MatchTagsFromFilenamesAction(TreeAction):
         super().__init__(parent)
         self.setText(self.tr('match tags from filename'))
     
-    def initialize(self):
-        self.setEnabled(self.parent().nodeSelection.hasFiles())
+    def initialize(self, selection):
+        self.setEnabled(selection.hasFiles())
         
     def doAction(self):
         """Open a TagMatchDialog for the selected elements."""
@@ -269,18 +280,18 @@ class ToggleMajorAction(TreeAction):
         self.setText(self.tr('major?'))
         self.setCheckable(True)
         
-    def initialize(self):
-        selection = self.parent().nodeSelection
-        self.setEnabled(selection.hasWrappers())
-        self.setChecked(all(w.isContainer() and w.element.major for w in selection.wrappers()))
+    def initialize(self, selection):
+        self.setEnabled(selection.hasContainers())
+        self.setChecked(all(elem.major for elem in selection.elements() if elem.isContainer()))
         self.state = self.isChecked()
         self.selection = selection
         
     def doAction(self):
-        changes = {el:(not self.state) for el in self.selection.elements() if el.major == self.state}
-        application.stack.push(commands.ChangeMajorFlagCommand(self.level(), changes))
+        changes = {el:(not self.state) for el in self.selection.elements()
+                                       if el.isContainer() and el.major == self.state}
+        self.level().setMajorFlags(changes)
         self.toggle()
-                
+
 
 class RemoveFromPlaylistAction(TreeAction):
     """This action removes selected elements from a playlist."""
@@ -289,20 +300,21 @@ class RemoveFromPlaylistAction(TreeAction):
         super().__init__(parent, shortcut = "Del")
         self.setText(self.tr('remove from playlist'))
     
-    def initialize(self):
-        self.setDisabled(self.parent().nodeSelection.empty())
+    def initialize(self, selection):
+        self.setDisabled(selection.empty())
     
     def doAction(self):
         self.parent().removeSelected()
-        
+
+
 class ClearPlaylistAction(TreeAction):
     """This action clears a playlist."""
     
     def __init__(self, parent):
-        super().__init__(parent, shortcut = "Shift+Del")
+        super().__init__(parent, shortcut="Shift+Del")
         self.setText(self.tr('clear playlist'))
         
-    def initialize(self):
+    def initialize(self, selection):
         self.setEnabled(self.parent().model().root.hasContents() > 0)
         
     def doAction(self):
@@ -313,7 +325,7 @@ class TagValueAction(TreeAction):
     """This action triggers a dialog to edit the tag value (set sort value, hidden flag, and rename
     the value in all occurences)."""
     
-    def initialize(self):
+    def initialize(self, selection):
         node = self.parent().currentNode()
         from ..models.browser import ValueNode
         if not isinstance(node, ValueNode):

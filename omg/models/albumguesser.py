@@ -105,7 +105,7 @@ class StandardGuesser(profiles.Profile):
                     if element.filePosition in children:
                         from ..gui.dialogs import warning
                         warning(self.tr("Error guessing albums"),
-                                self.tr("position {} appears twice in {}").format(element.tags.position, key))
+                                self.tr("position {} appears twice in {}").format(element.filePosition, key))
                         self.errors.append(elements)
                     else:
                         children[element.filePosition] = element.id

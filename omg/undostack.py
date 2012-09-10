@@ -21,6 +21,9 @@
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
+from . import logging
+logger = logging.getLogger(__name__)
+
 
 class UndoStackError(RuntimeError):
     """This error is raised when methods of UndoStack are improperly used (e.g. call endMacro when no macro
@@ -152,6 +155,10 @@ class UndoStack(QtCore.QObject):
         """Return a QAction that will trigger the undo-method and changes its state (enabled, name...)
         according to the stack's index."""
         return self._undoAction
+    
+    def clear(self):
+        """Delete all commands on the stack."""
+        logger.debug("**** MADDIN, TU WAS ****\n" * 10)
     
     def undo(self):
         """Undo the last command/macro."""

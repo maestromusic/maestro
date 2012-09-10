@@ -33,8 +33,8 @@ class RenameFilesAction(treeactions.TreeAction):
         super().__init__(parent)
         self.setText(self.tr('rename files'))
     
-    def initialize(self):
-        for fileW in self.parent().nodeSelection.fileWrappers(True):
+    def initialize(self, selection):
+        for fileW in selection.fileWrappers(True):
             if fileW.element.url.CAN_RENAME:
                 self.setEnabled(True)
                 return
@@ -55,7 +55,7 @@ class RenameFilesAction(treeactions.TreeAction):
                 dialog.sublevel.commit()
             except RenameFilesError as e:
                 e.displayMessage()
-            
+
 
 class PathDelegate(delegates.StandardDelegate):
     """Delegate for the rename preview; shows old and new path color-coded.

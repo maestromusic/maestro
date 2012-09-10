@@ -188,7 +188,7 @@ class TreeView(QtGui.QTreeView):
         self.nodeSelection = NodeSelection(self.level,self.selectionModel())
         for action in self.treeActions.values():
             if isinstance(action, treeactions.TreeAction):
-                action.initialize()
+                action.initialize(self.nodeSelection)
         
     def contextMenuEvent(self, event):
         menu = self.actionConfig.createMenu(self, self.treeActions)

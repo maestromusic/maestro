@@ -318,13 +318,15 @@ class BrowserTreeView(treeview.TreeView):
     sect = translate(__name__, "browser")
     actionConfig.addActionDefinition(((sect, 'value'),), treeactions.TagValueAction)
     sect = translate(__name__, "elements")
-    actionConfig.addActionDefinition(((sect, 'editTags'),), treeactions.EditTagsAction, recursive = False)
-    actionConfig.addActionDefinition(((sect, 'editTagsR'),), treeactions.EditTagsAction, recursive = True)
-    actionConfig.addActionDefinition(((sect, 'removeContents'),), treeactions.DeleteAction, mode = constants.CONTENTS, shortcut = "Del")
+    actionConfig.addActionDefinition(((sect, 'editTags'),), treeactions.EditTagsAction, recursive=False)
+    actionConfig.addActionDefinition(((sect, 'editTagsR'),), treeactions.EditTagsAction, recursive=True)
+    actionConfig.addActionDefinition(((sect, 'remove'),), treeactions.RemoveFromParentAction)
+    actionConfig.addActionDefinition(((sect, 'delete'),), treeactions.DeleteAction,
+                                     text=translate(__name__, "delete from OMG"))
     actionConfig.addActionDefinition(((sect, 'merge'),), treeactions.MergeAction)
     actionConfig.addActionDefinition(((sect, 'major?'),), treeactions.ToggleMajorAction)
-    actionConfig.addActionDefinition(((sect, 'position+'),), treeactions.ChangePositionAction, mode = "+1")
-    actionConfig.addActionDefinition(((sect, 'position-'),), treeactions.ChangePositionAction, mode = "-1") 
+    actionConfig.addActionDefinition(((sect, 'position+'),), treeactions.ChangePositionAction, mode="+1")
+    actionConfig.addActionDefinition(((sect, 'position-'),), treeactions.ChangePositionAction, mode="-1") 
     
     def __init__(self,parent,layers,sortTags,delegateConfig):
         super().__init__(levels.real,parent)
