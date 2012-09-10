@@ -77,13 +77,8 @@ class TagManager(QtGui.QWidget):
 
     def _checkUndoRedoButtons(self):
         """Enable or disable the undo and redo buttons depending on stack state."""
-        print(application.stack.canUndo(),type(application.stack.command(application.stack.index()-1)))
-        self.undoButton.setEnabled(application.stack.canUndo()
-                            and isinstance(application.stack.command(application.stack.index()-1),
-                                           (tags.TagTypeUndoCommand,tags.TagTypeOrderUndoCommand)))
-        self.redoButton.setEnabled(application.stack.canRedo()
-                            and isinstance(application.stack.command(application.stack.index()),
-                                           (tags.TagTypeUndoCommand,tags.TagTypeOrderUndoCommand)))
+        self.undoButton.setEnabled(application.stack.canUndo())
+        self.redoButton.setEnabled(application.stack.canRedo())
     
 
 class TagManagerTableWidget(QtGui.QTableWidget):
