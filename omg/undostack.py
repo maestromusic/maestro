@@ -191,7 +191,16 @@ class UndoStack(QtCore.QObject):
             if not minIndex <= index <= len(self._commands):
                 raise ValueError("Invalid index {} (there are {} commands on the stack)."
                                  .format(index,len(self._commands)))
+            self._inUndoRedo = True
+            if index < self._index:
+                for command in reversed(self._commands[index:self._index]):
+                    command.undo()
+            else:
+                for command in self._commands[self._index:index]:
+                    command.redo()
             self._index = index
+            self._emitQueuedEvents()
+            self._inUndoRedo = False
             self._emitSignals()
     
     def _emitSignals(self):
