@@ -27,6 +27,7 @@ from ... import utils
 
 class Sql(AbstractSql):
     def __init__(self):
+        super().__init__()
         self._db = QtSql.QSqlDatabase("QMYSQL")
                 
     def connect(self,username,password,database,host="localhost",port=3306,**kwargs):
