@@ -45,8 +45,6 @@ class FileSystemBrowserModel(QtGui.QFileSystemModel):
     def __init__(self, parent = None):
         QtGui.QFileSystemModel.__init__(self, parent)
         self.setFilter(QtCore.QDir.AllEntries | QtCore.QDir.NoDotAndDotDot)
-        if filesystem.syncThread is not None:
-            filesystem.syncThread.folderStateChanged.connect(self.handleStateChange)
 
     def columnCount(self, index):
         return 1
@@ -67,14 +65,14 @@ class FileSystemBrowserModel(QtGui.QFileSystemModel):
                 if dir == '..':
                     return super().data(index, role)
                 try:
-                    status = filesystem.folderStatus(dir)
-                except KeyError as e:
+                    status = filesystem.folderStates[dir]
+                except KeyError:
                     status = 'nomusic'
                 return self.icons[status]
         return super().data(index, role) 
     
 class FileSystemBrowser(QtGui.QTreeView):
-    def __init__(self, rootDirectory = config.options.main.collection, parent = None):
+    def __init__(self, rootDirectory=config.options.main.collection, parent=None):
         QtGui.QTreeView.__init__(self, parent)
         self.setAlternatingRowColors(True)
         self.setModel(FileSystemBrowserModel())

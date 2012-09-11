@@ -336,7 +336,7 @@ CREATE TABLE {0}flags (
 _addMySQL("""
 CREATE TABLE {}folders (
     path         VARCHAR(511)    NOT NULL,
-    state        ENUM('unknown','nomusic','ok','unsynced')    NOT NULL DEFAULT 'unknown'
+    state        ENUM('unknown','ok','unsynced')    NOT NULL DEFAULT 'unknown'
 ) ENGINE InnoDB, CHARACTER SET 'utf8'
 """.format(db.prefix))
 _addSQLite("""
@@ -351,7 +351,7 @@ CREATE TABLE {}folders (
 #----------#
 _addMySQL("""
 CREATE TABLE {}newfiles (
-    path       VARCHAR(511)       NOT NULL,
+    url        VARCHAR(511)       NOT NULL,
     hash       VARCHAR(63),
     verified   TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX path_idx(path(333)),
@@ -360,7 +360,7 @@ CREATE TABLE {}newfiles (
 """.format(db.prefix))
 _addSQLite("""
 CREATE TABLE {}newfiles (
-    path       VARCHAR(511)       NOT NULL,
+    url        VARCHAR(511)       NOT NULL,
     hash       VARCHAR(63),
     verified   INTEGER DEFAULT CURRENT_TIMESTAMP
 )

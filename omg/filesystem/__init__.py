@@ -16,8 +16,6 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-"""The sync module is responsible for the synchronization of the database with the file system."""
-
 import os.path, subprocess, hashlib, datetime, threading, queue, time
 
 from PyQt4 import QtGui, QtCore
@@ -28,52 +26,38 @@ from ..core import levels
 
 logger = logging.getLogger(__name__)
 
-syncThread = None
+synchronizer = None
 enabled = False
+folderStates = None
 
 def init():
-    global syncThread, notifier, null, enabled
+    global synchronizer, notifier, null, enabled, folderStates
+    import _strptime
     if config.options.filesystem.disable:
         return
-    return # DISABLE MODULE DOES NOT WORK ATM
-    syncThread = FileSystemSynchronizer()
+    synchronizer = FileSystemSynchronizer()
     null = open(os.devnull)
-    levels.real.connect(syncThread.handleEvent, Qt.QueuedConnection)
-    notifier = Notifier()
-    syncThread.missingFilesDetected.connect(notifier.notifyAboutMissingFiles)
-    syncThread.modifiedTagsDetected.connect(notifier.changeModifiedTags)
-    syncThread.start()
+    synchronizer.eventThread.start()
+    folderStates = synchronizer.knownFolders
     enabled = True
-    logger.debug("Filesystem module initialized")
+    logger.debug("Filesystem module initialized in thread {}".format(QtCore.QThread.currentThread()))
     
 def shutdown():
     """Terminates this module; waits for all threads to complete."""
-    global syncThread, enabled
-    if config.options.filesystem.disable or syncThread is None:
+    global synchronizer, enabled
+    if config.options.filesystem.disable or synchronizer is None:
         return
     enabled = False
     logger.debug("Filesystem module: received shutdown() command")
-    syncThread.should_stop.set()
-    syncThread.dialogFinished.set()
-    syncThread.exit()
-    syncThread.wait()
-    syncThread = None
+    synchronizer.should_stop.set()
+    synchronizer.eventThread.exit()
+    synchronizer.eventThread.wait()
+    synchronizer = None
     null.close()
     logger.debug("Filesystem module: shutdown complete")
 
-def folderStatus(dir):
-    if not enabled:
-        return 'unknown'
-    else:
-        return syncThread.knownFolders[dir]
 
-def fileHash(path):
-    if enabled:
-        if path in syncThread.knownNewFiles:
-            return syncThread.knownNewFiles[path][0]
-    return None
-
-def computeHash(path):
+def computeHash(url):
     """Compute the audio hash of a single file. This method uses
     the "ffmpeg" binary ot extract the first 15 seconds in raw
     PCM format and then creates the MD5 hash of that data. It would
@@ -81,10 +65,9 @@ def computeHash(path):
     methods, or even better use something like
     https://github.com/sampsyo/audioread/tree/master/audioread
     that determines an available backend automatically."""
-    logger.debug('computing hash for {}'.format(path))
     if config.options.filesystem.dump_method == "ffmpeg":
         proc = subprocess.Popen(
-            ['ffmpeg', '-i', utils.absPath(path),
+            ['ffmpeg', '-i', url.absPath,
              '-v', 'quiet',
              '-f', 's16le',
              '-t', '15',
@@ -99,124 +82,126 @@ def computeHash(path):
     assert hash is not None and len(hash) > 10
     return hash
 
-class Notifier(QtCore.QObject):
-    """This class is responsible for user interaction regarding the filesystem module. Since the
-    filesystem operations run in a distinct thread, we need an asynchronous dialog system."""
-    
-    @QtCore.pyqtSlot(list)
-    def notifyAboutMissingFiles(self, paths):
-        from . import dialogs
-        dialogs.MissingFilesDialog(paths)
-        syncThread.dialogFinished.set()
-    
-    @QtCore.pyqtSlot(object)
-    def changeModifiedTags(self, changes):
-        from ..core import tags
-        for id, (dbTags, fileTags) in changes.items():
-            
-            for tag, values in dbTags.items(): # preserve private tags
-                if tag.private:
-                    fileTags[tag] = values
-            db.write.setTags(id, fileTags)
-        QtGui.QMessageBox.information(None, self.tr('detected tag changes'),
-                                      self.tr('The tags of the files with ids {} were '
-                                              'changed from outside OMG. The database'
-                                              'has now been updated accordingly.').format(list(changes.keys())))
-            
-        
-def mTimeStamp(path):
+def mTimeStamp(url):
     """Returns a datetime.datetime object representing the modification timestamp
-    of the file given by the (relative) path *path*."""
-    return datetime.datetime.fromtimestamp(os.path.getmtime(utils.absPath(path)), tz = datetime.timezone.utc)
+    of the file given by *url*."""
+    return datetime.datetime.fromtimestamp(os.path.getmtime(url.absPath), tz = datetime.timezone.utc)
      
-                        
-class FileSystemSynchronizer(QtCore.QThread):
+
+class EventThread(QtCore.QThread):
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.timer = QtCore.QTimer(self)
+        
+    def run(self):
+        self.timer.start(1000)
+        self.exec_()
+        db.close()
+        print('db clossed')               
+
+class FileInformation:
+    
+    def __init__(self, url, hash, verified, id=None):
+        self.url = url
+        self.hash = hash
+        self.verified = verified
+        self.id = id
+
+class FileSystemSynchronizer(QtCore.QObject):
     
     folderStateChanged = QtCore.pyqtSignal(str, str)
-    missingFilesDetected = QtCore.pyqtSignal(list)
-    modifiedTagsDetected = QtCore.pyqtSignal(object)
-    
+
     def __init__(self):
-        super().__init__(None)
-        
+        super().__init__()
         self.should_stop = threading.Event()
-        self.dialogFinished = threading.Event()
-        self.timer = QtCore.QTimer(self)
-        self.moveToThread(self)
-        self.timer.moveToThread(self)
-        self.timer.timeout.connect(self.pollJobs)
+        self.eventThread = EventThread(self)
+        self.moveToThread(self.eventThread)
+        self.eventThread.timer.timeout.connect(self.pollJobs)
+        self.eventThread.started.connect(self.init)
         self.hashJobs = queue.Queue()
-        self.lastScan = 0
+        self.dbFiles = {}
+        self.lostFiles = set()
+        self.missingFiles = {}
+        self.modifiedTags = {}
+        self.knownNewFiles = {}
         self.knownFolders = {}
     
-    def compareTagsWithDB(self, id, path):
+    def init(self):
+        db.connect()
+        #  initialize self.dbFiles
+        for id, url, hash, verified \
+                in db.query("SELECT element_id,url,hash,verified FROM {}files".format(db.prefix)):
+            url = filebackends.BackendURL.fromString(url)
+            if isinstance(url, filebackends.filesystem.BackendURL):
+                self.dbFiles[url] = FileInformation(url=url, verified=db.getDate(verified),
+                                                    hash=hash, id=id)
+            if db.isNull(hash) or hash == "":
+                self.hashJobs.put(url)
+        
+        #  initialize self.knownNewFiles 
+        for url, hash, timestamp in \
+                db.query('SELECT url, hash, verified FROM {}newfiles'.format(db.prefix)):
+            url = filebackends.BackendURL.fromString(url)
+            timestamp = db.getDate(timestamp)
+            self.knownNewFiles[url] = FileInformation(url=url, hash=hash, verified=timestamp)
+        
+        #  initialize self.knownFolders
+        for folder, state in db.query('SELECT path,state FROM {}folders'.format(db.prefix)):
+            self.knownFolders[folder] = state
+        self.lastScan = 0
+        
+    def compareTagsWithDB(self, id, url):
         """Checks if the tags inside the file at *path* with id *id* equals those stored in the
         database. Otherwise, *self.modifiedTags[id]* will be set to a tuple (dbTags, fileTags)."""
-        
-        dbTags = db.tags(id)
-        rfile = realfiles.get(path)
-        if dbTags.withoutPrivateTags() != rfile.tags:
-            logger.debug('Detected modification on file "{}": tags differ'.format(path))
-            self.modifiedTags[id] = (dbTags, rfile.tags)
+        if id in levels.real:
+            dbTags = levels.real.get(id).tags
+        else:
+            dbTags = db.tags(id)
+        backendFile = url.getBackendFile()
+        backendFile.readTags()
+        if dbTags.withoutPrivateTags() != backendFile.tags:
+            logger.debug('Detected modification on file "{}": tags differ'.format(url.path))
+            self.modifiedTags[id] = (dbTags, backendFile.tags)
     
-    def checkFilesTable(self):
-        """go through the files table, compute missing hashes and find modified files"""
-        
-        for id, path, hash, verified in \
-                db.query("SELECT element_id,path,hash,verified FROM {}files".format(db.prefix)):
-            if self.should_stop.is_set():
-                return
-            absPath = utils.absPath(path)
-            verified = db.getDate(verified)
-            if not os.path.exists(absPath):
-                if db.isNull(hash) or hash == "":
-                    self.lostFiles.append(id) # file without hash deleted -> no chance to find somewhere else
+    def checkDBFiles(self):
+        """Find modified and lost DB files."""
+        for url, info in self.dbFiles.items():
+            if not os.path.exists(url.absPath):
+                if db.isNull(info.hash) or info.hash == "":
+                    # file without hash deleted -> no chance to find somewhere else
+                    self.lostFiles.append(info.id)
                 else:
-                    logger.info('file {} (hash: {}) is missing'.format(path, hash))
-                    self.missingFiles[hash] = (path,id)
+                    self.missingFiles[hash] = info
                 continue
-            self.dbFiles.append(path)
-            if db.isNull(hash) or hash == "":
-                self.hashJobs.put(path)
-                logger.debug('Put hash computation of "{}" on job queue'.format(path))
-            elif verified < mTimeStamp(path):
-                self.compareTagsWithDB(id, path)
-                newHash = computeHash(path)
+            elif info.verified < mTimeStamp(url):
+                self.compareTagsWithDB(id, url)
+                newHash = computeHash(url)
                 if newHash != hash:
-                    logger.debug('Detected modification of audio data on "{}"'.format(path))
-                    db.setHash(id, newHash)
-                db.query('UPDATE {}files SET verified=CURRENT_TIMESTAMP '
-                         'WHERE element_id=?'.format(db.prefix),id)
+                    logger.debug('Detected modification of audio data on "{}"'.format(url))
+                    db.query('UPDATE {}files SET hash=? WHERE element_id=?'.format(db.prefix),
+                             newHash, id)
+                else:
+                    db.query('UPDATE {}files SET verified=CURRENT_TIMESTAMP '
+                             'WHERE element_id=?'.format(db.prefix),id)
     
     def checkNewFiles(self):
         """Go through the newfiles table and remove entries of files which are deleted on disk."""
-        goneNewFiles = []
-        for path, hash, timestamp in \
-                db.query('SELECT path, hash, verified FROM {}newfiles'.format(db.prefix)):
-            if self.should_stop.is_set():
-                return
-            timestamp = db.getDate(timestamp)
-            if os.path.exists(utils.absPath(path)):
-                
-                self.knownNewFiles[path] = (hash, timestamp)
-            else:
-                goneNewFiles.append((path,))
-        if len(goneNewFiles) > 0:
-            db.multiQuery('DELETE FROM {}newfiles WHERE PATH=?'.format(db.prefix), goneNewFiles)
+        gone = []
+        for url in self.knownNewFiles:
+            if not os.path.exists(url.absPath):
+                gone.append((url,))
+        if len(gone) > 0:
+            db.multiQuery('DELETE FROM {}newfiles WHERE PATH=?'.format(db.prefix), gone)
     
     def checkFolders(self):
         """Go through the folders table, remove entries of folders which were deleted on disk."""
-        goneFolders = []
-        
-        for folder, state in db.query('SELECT path,state FROM {}folders'.format(db.prefix)):
-            if self.should_stop.is_set():
-                return
-            if os.path.exists(utils.absPath(folder)):
-                self.knownFolders[folder] = state
-            else:
-                goneFolders.append((folder,))
-        if len(goneFolders) > 0:
-            db.multiQuery('DELETE FROM {}folders WHERE path=?'.format(db.prefix), goneFolders)
+        gone = []
+        for folder in self.knownFolders:
+            if not os.path.exists(utils.absPath(folder)):
+                gone.append((folder,))
+        if len(gone) > 0:
+            db.multiQuery('DELETE FROM {}folders WHERE path=?'.format(db.prefix), gone)
         
     def checkFileSystem(self):
         """Walks through the collection, updating folders and searching for new files.
@@ -226,63 +211,63 @@ class FileSystemSynchronizer(QtCore.QThread):
         - compute hashes of files which are not yet in the database
         - doing the latter, moved files can be detected
         """
-        for root, dirs, files in os.walk(config.options.main.collection, topdown = False):
-            folderState = 'nomusic'
+        for root, dirs, files in os.walk(config.options.main.collection, topdown=False):
+            folderState = None
             for file in files:
                 if self.should_stop.is_set():
                     return
                 absPath = os.path.join(root, file)
-                relPath = utils.relPath(absPath)
-                if not utils.hasKnownExtension(file):
+                url = filebackends.filesystem.FileURL(absPath)
+                if not utils.hasKnownExtension(url.path):
                     continue # skip non-music files
-                if relPath not in self.dbFiles:
-                    if relPath in self.knownNewFiles:
+                if url not in self.dbFiles:
+                    if url in self.knownNewFiles:
                         # case 1: file was found in a previous scan
                         folderState = 'unsynced'
-                        knownHash, knownStamp = self.knownNewFiles[relPath]
+                        info = self.knownNewFiles[url]
                         # check if the file's modification time is newer than the DB timestamp
                         # -> recompute hash
-                        if mTimeStamp(relPath) > knownStamp:
-                            newHash = computeHash(relPath)
+                        if mTimeStamp(url) > info.verified:
+                            newHash = computeHash(url)
                             db.query('UPDATE {}newfiles SET hash=?, verified=CURRENT_TIMESTAMP '
-                                     'WHERE path = ?'.format(db.prefix), newHash, relPath)
+                                     'WHERE url=?'.format(db.prefix), newHash, str(url))
+                            info.hash = newHash
                     else:
                         # case 2: file is completely new
-                        logger.debug('hashing newfile {}'.format(relPath))
-                        hash = computeHash(relPath)
+                        logger.debug('hashing newfile {}'.format(url))
+                        hash = computeHash(url)
                         if hash in self.missingFiles:
+                            info = self.missingFiles[hash]
                             # found a file that was missing -> detected move!
-                            if folderState == 'nomusic':
+                            if folderState is None:
                                 folderState = 'ok'
-                            logger.info('detected a move: {} -> {}'.format(self.missingFiles[hash][0],
-                                                                              relPath))
-                            db.query('UPDATE {}files SET path=? WHERE element_id=?'.format(db.prefix),
-                                     relPath,
-                                     self.missingFiles[hash][1])
-                            
+                            logger.info('detected a move: {} -> {}'.format(info.url, url))
+                            db.query('UPDATE {}files SET url=? WHERE element_id=?'.format(db.prefix),
+                                     str(url), info.id)
                             # check if tags were also changed
-                            self.compareTagsWithDB(self.missingFiles[hash][1], relPath)
+                            self.compareTagsWithDB(info.id, url)
                             del self.missingFiles[hash]
-                            
                         else:
                             folderState = 'unsynced'
-                            db.query('INSERT INTO {}newfiles (hash,path) VALUES (?,?)'.format(db.prefix),
-                                     hash, relPath)
-                elif folderState == 'nomusic':
+                            db.query('INSERT INTO {}newfiles (hash,url) VALUES (?,?)'.format(db.prefix),
+                                     hash, str(url))
+                            self.knownNewFiles[url] = FileInformation(url, hash, datetime.datetime.now(datetime.timezone.utc))
+                elif folderState is None:
                     folderState = 'ok'
             if folderState != 'unsynced':
                 folderState = self.updateStateFromSubfolders(root, folderState, dirs)
-                
             relRoot = utils.relPath(root)
             # now update folders table and emit events for FileSystemBrowser
-            if relRoot not in self.knownFolders or folderState != self.knownFolders[relRoot]:
-                self.updateFolderState(relRoot, folderState)        
+            if (folderState is None and relRoot in self.knownFolders) or \
+                    (relRoot not in self.knownFolders) or \
+                    (folderState != self.knownFolders[relRoot]):
+                self.updateFolderStatus(relRoot, folderState)        
     
-    def updateFolderState(self, path, state, recurse = False):
+    def updateFolderState(self, path, state, recurse=False):
         if path not in self.knownFolders:
-            db.addFolder(path, state)
+            db.query("INSERT INTO {}folders (path, state) VALUES (?,?)".format(db.prefix), path, state)
         else:
-            db.updateFolder(path, state)
+            db.query("UPDATE {}folders SET state=? WHERE path=?".format(db.prefix), state, path)
         self.folderStateChanged.emit(path, state)
         self.knownFolders[path] = state
         if recurse and path not in ('', '.'):
@@ -295,7 +280,7 @@ class FileSystemSynchronizer(QtCore.QThread):
                 self.updateFolderState(path, newState, True)
             
         
-    def updateStateFromSubfolders(self, root, folderState, dirs = None, files = False):
+    def updateStateFromSubfolders(self, root, folderState, dirs=None, files=False):
         """Returns the updated folderState of abspath *root* when the states
         of the subdirectories are considered. E.g. if root is 'ok' and a subdir
         is 'unsynced', return 'unsynced'. The optional *dirs* parameter is
@@ -315,9 +300,11 @@ class FileSystemSynchronizer(QtCore.QThread):
                         folderState = 'ok'
         for dir in dirs:
             path = utils.relPath(os.path.join(root, dir))
-            if self.knownFolders[path] == 'unsynced':
+            if path not in self.knownFolders:
+                continue
+            elif self.knownFolders[path] == 'unsynced':
                 return 'unsynced'
-            elif self.knownFolders[path] == 'ok' and folderState == 'nomusic':
+            elif self.knownFolders[path] == 'ok' and folderState is None:
                 folderState = 'ok'
         return folderState
     
@@ -326,12 +313,7 @@ class FileSystemSynchronizer(QtCore.QThread):
         - If a hash is missing, it is recomputed.
         - If a hash is outdated, tags are checked and the user is notified.
         """
-        self.missingFiles = {} # maps hash to missing files (i.e. files moved away or deleted)
-        self.lostFiles = [] # list of files without hash that are gone
-        self.modifiedTags = {}
-        self.dbFiles = []
-        self.checkFilesTable()
-        self.knownNewFiles = {}
+        self.checkDBFiles()
         self.checkNewFiles()
         self.checkFolders()
         self.checkFileSystem()
@@ -348,67 +330,7 @@ class FileSystemSynchronizer(QtCore.QThread):
             #self.missingFilesDetected.emit(missingIDs)
             #self.dialogFinished.wait()
             
-        logger.debug('rescanned collection')    
-        
-    @QtCore.pyqtSlot(list)
-    def handleEvent(self, event):
-        if isinstance(event, levels.FileCreateDeleteEvent):
-            db.transaction()
-            if len(event.created) > 0:
-                # files added to DB -> check if folders have changed
-                for path in event.created:
-                    self.hashJobs.put(path)
-                filesByFolder = utils.groupFilePaths(event.created)
-                for folder, files in filesByFolder.items():
-                    dirContent = os.listdir(utils.absPath(folder))
-                    folderStillUnsynced = False
-                    for elem in dirContent:
-                        relElemPath = os.path.join(folder, elem)
-                        if elem in files:
-                            files.remove(elem)
-                        elif os.path.isdir(utils.absPath(relElemPath)):
-                            if relElemPath in self.knownFolders \
-                                    and self.knownFolders[relElemPath] == 'unsynced':
-                                folderStillUnsynced = True
-                                break
-                            continue
-                        elif not utils.hasKnownExtension(elem):
-                            continue
-                        elif elem not in self.dbFiles:
-                            folderStillUnsynced = True
-                            break
-                    if not folderStillUnsynced:
-                        logger.debug('previously unsynced folder now ok: {}'.format(folder))
-                        self.updateFolderState(folder, 'ok', True)
-                    
-            if len(event.deleted) > 0:
-                byFolder = utils.groupFilePaths(event.deleted)
-                for folder, files in byFolder.items():
-                    if event.disk:
-                        stillMusicThere = False
-                        for thing in os.listdir(utils.absPath(folder)):
-                            if os.path.isfile(utils.absPath(os.path.join(folder, thing))):
-                                if utils.hasKnownExtension(thing):
-                                    stillMusicThere = True
-                                    break
-                        if not stillMusicThere:
-                            self.updateFolderState(folder, 'nomusic', True)
-                            
-                    else:
-                        self.updateFolderState(folder, 'unsynced', True)
-            db.commit()
-        elif isinstance(event, levels.FileRenameEvent):
-            db.transaction()
-            for old, new in event.renamings:
-                if old in self.knownNewFiles:
-                    self.knewnNewFiles[new] = self.knownNewFiles[old]
-                    del self.knownNewFiles[old]
-                    db.query("UPDATE {}newfiles SET path=? WHERE path=?".format(db.prefix), new, old)
-                elif old in self.dbFiles:
-                    self.dbFiles.remove(old)
-                    self.dbFiles.append(new)
-            db.commit()
-                    
+        logger.debug('rescanned collection')
         
     def computeAndStoreHash(self, path):
         """Compute the hash of the file at *path* (or fetch it from self.knownNewFiles
@@ -426,12 +348,13 @@ class FileSystemSynchronizer(QtCore.QThread):
         db.commit()
         
     def pollJobs(self):
-        """Called periodically by self.timer, this method checks if "compute hash" jobs
+        """Called periodically by a timer, this method checks if "compute hash" jobs
         are available, and executes them.
         If the scan interval has passed, a complete filesystem rescan is performed."""
         try:
             while True:
                 self.computeAndStoreHash(self.hashJobs.get_nowait())
+                QtGui.QApplication.processEvents()
         except queue.Empty:
             pass
         if config.options.filesystem.scan_interval > 0 and \
@@ -439,12 +362,4 @@ class FileSystemSynchronizer(QtCore.QThread):
             self.rescanCollection()
             self.lastScan = time.time()
            
-    def run(self):
-        logger.debug('Filesystem connecting with thread {}'.format(QtCore.QThread.currentThreadId()))
-        db.connect(isolation_level = None)
-        # initially fill self.knownFolders so that the FilesystemBrowser displays folder icons
-        for folder, state in db.query('SELECT path,state FROM {}folders'.format(db.prefix)):
-            self.knownFolders[folder] = state
-        self.timer.start(100)
-        self.exec_()
-        db.close()
+    
