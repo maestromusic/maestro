@@ -16,11 +16,11 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+from PyQt4 import QtCore
+
 from . import elements, levels, tags, flags
-from .. import database as db
+from .. import database as db, filebackends, logging
 from ..database import write
-from .. import filebackends
-from .. import logging
 
 logger = logging.getLogger(__name__)
 
@@ -233,7 +233,8 @@ class RealLevel(levels.Level):
     def _removeContents(self, parent, positions, emitEvent=True):
         db.write.removeContents([(parent.id, pos) for pos in positions])
         super()._removeContents(parent, positions, emitEvent)
-       
+    
+    filesRenamed = QtCore.pyqtSignal(object)
     def _renameFiles(self, renamings, emitEvent=True):
         """On the real level, files are renamed both on disk and in DB."""
         doneFiles = []
@@ -248,6 +249,7 @@ class RealLevel(levels.Level):
                 newUrl.getBackendFile().rename(oldUrl)
             raise levels.RenameFilesError(oldUrl, newUrl, str(e))
         db.write.changeUrls([ (element.id, str(newUrl)) for element, (_, newUrl) in renamings.items() ])
+        self.filesRenamed.emit(renamings)
         super()._renameFiles(renamings, emitEvent)
     
     def _changePositions(self, parent, changes, emitEvent=True):

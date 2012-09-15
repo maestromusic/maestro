@@ -39,8 +39,14 @@ class FileSystemBrowserModel(QtGui.QFileSystemModel):
     icons = {
         'unsynced' : getIcon("folder_unsynced.svg"),
         'ok'       : getIcon("folder_ok.svg"),
-        'nomusic'  : getIcon("folder.svg"),
+        None       : getIcon("folder.svg"),
         'unknown'  : getIcon("folder_unknown.svg") }
+    
+    descriptions = {
+        'unsynced' : translate(__name__, "contains music which is not in OMG's database"),
+        'ok'       : translate(__name__, "in sync with OMG's database"),
+        None       : translate(__name__, "does not contain music"),
+        'unknown'  : translate(__name__, "unknown folder status") }
     
     def __init__(self, parent = None):
         QtGui.QFileSystemModel.__init__(self, parent)
@@ -57,18 +63,18 @@ class FileSystemBrowserModel(QtGui.QFileSystemModel):
             index = index.parent()
             self.dataChanged.emit(index, index)    
     
-    def data(self, index, role = Qt.DisplayRole):
-        if role == Qt.DecorationRole:
+    def data(self, index, role=Qt.DisplayRole):
+        if role == Qt.DecorationRole or role == Qt.ToolTipRole:
             info = self.fileInfo(index)
             if os.path.isdir(info.absoluteFilePath()):
                 dir = relPath(info.absoluteFilePath())
                 if dir == '..':
                     return super().data(index, role)
-                try:
-                    status = filesystem.folderStates[dir]
-                except KeyError:
-                    status = 'nomusic'
-                return self.icons[status]
+                status = filesystem.getFolderState(dir)
+                if role == Qt.DecorationRole:
+                    return self.icons[status]
+                else:
+                    return self.descriptions[status]
         return super().data(index, role) 
     
 class FileSystemBrowser(QtGui.QTreeView):
@@ -78,6 +84,10 @@ class FileSystemBrowser(QtGui.QTreeView):
         self.setModel(FileSystemBrowserModel())
         musikindex = self.model().setRootPath(rootDirectory)
         self.setRootIndex(musikindex)
+        if filesystem.enabled:
+            filesystem.synchronizer.folderStateChanged.connect(self.model().handleStateChange)
+            filesystem.synchronizer.initializationComplete.connect(self.model().layoutChanged)
+        
         self.setSelectionMode(self.ExtendedSelection)
         self.setDragDropMode(QtGui.QAbstractItemView.DragOnly)
         

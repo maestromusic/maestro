@@ -28,17 +28,16 @@ logger = logging.getLogger(__name__)
 
 synchronizer = None
 enabled = False
-folderStates = None
 
 def init():
-    global synchronizer, notifier, null, enabled, folderStates
+    global synchronizer, notifier, null, enabled
     import _strptime
     if config.options.filesystem.disable:
         return
     synchronizer = FileSystemSynchronizer()
-    null = open(os.devnull)
     synchronizer.eventThread.start()
-    folderStates = synchronizer.knownFolders
+    levels.real.filesRenamed.connect(synchronizer.handleRename)
+    null = open(os.devnull)
     enabled = True
     logger.debug("Filesystem module initialized in thread {}".format(QtCore.QThread.currentThread()))
     
@@ -56,6 +55,13 @@ def shutdown():
     null.close()
     logger.debug("Filesystem module: shutdown complete")
 
+def getFolderState(path):
+    if not enabled or not synchronizer.initialized.is_set():
+        return 'unknown'
+    try:
+        return synchronizer.knownFolders[path]
+    except KeyError:
+        return None
 
 def computeHash(url):
     """Compute the audio hash of a single file. This method uses
@@ -111,10 +117,12 @@ class FileInformation:
 class FileSystemSynchronizer(QtCore.QObject):
     
     folderStateChanged = QtCore.pyqtSignal(str, str)
+    initializationComplete = QtCore.pyqtSignal()
 
     def __init__(self):
         super().__init__()
         self.should_stop = threading.Event()
+        self.initialized = threading.Event()
         self.eventThread = EventThread(self)
         self.moveToThread(self.eventThread)
         self.eventThread.timer.timeout.connect(self.pollJobs)
@@ -150,6 +158,8 @@ class FileSystemSynchronizer(QtCore.QObject):
         for folder, state in db.query('SELECT path,state FROM {}folders'.format(db.prefix)):
             self.knownFolders[folder] = state
         self.lastScan = 0
+        self.initializationComplete.emit()
+        self.initialized.set()
         
     def compareTagsWithDB(self, id, url):
         """Checks if the tags inside the file at *path* with id *id* equals those stored in the
@@ -168,31 +178,33 @@ class FileSystemSynchronizer(QtCore.QObject):
         """Find modified and lost DB files."""
         for url, info in self.dbFiles.items():
             if not os.path.exists(url.absPath):
-                if db.isNull(info.hash) or info.hash == "":
+                if db.isNull(info.hash) or info.hash in ["0", ""]:
                     # file without hash deleted -> no chance to find somewhere else
-                    self.lostFiles.append(info.id)
+                    self.lostFiles.add(info.id)
                 else:
-                    self.missingFiles[hash] = info
+                    self.missingFiles[info.hash] = info
+                    print('missing {}'.format(info.hash))
                 continue
             elif info.verified < mTimeStamp(url):
-                self.compareTagsWithDB(id, url)
+                self.compareTagsWithDB(info.id, url)
                 newHash = computeHash(url)
-                if newHash != hash:
-                    logger.debug('Detected modification of audio data on "{}"'.format(url))
+                if newHash != info.hash:
+                    logger.debug('Detected modification of audio data on "{}: {}->{}"'.format(url, hash, newHash))
                     db.query('UPDATE {}files SET hash=? WHERE element_id=?'.format(db.prefix),
-                             newHash, id)
+                             newHash, info.id)
                 else:
+                    logger.debug("update timestamp")
                     db.query('UPDATE {}files SET verified=CURRENT_TIMESTAMP '
-                             'WHERE element_id=?'.format(db.prefix),id)
+                             'WHERE element_id=?'.format(db.prefix), info.id)
     
     def checkNewFiles(self):
         """Go through the newfiles table and remove entries of files which are deleted on disk."""
         gone = []
         for url in self.knownNewFiles:
             if not os.path.exists(url.absPath):
-                gone.append((url,))
+                gone.append((str(url),))
         if len(gone) > 0:
-            db.multiQuery('DELETE FROM {}newfiles WHERE PATH=?'.format(db.prefix), gone)
+            db.multiQuery('DELETE FROM {}newfiles WHERE url=?'.format(db.prefix), gone)
     
     def checkFolders(self):
         """Go through the folders table, remove entries of folders which were deleted on disk."""
@@ -237,8 +249,8 @@ class FileSystemSynchronizer(QtCore.QObject):
                         logger.debug('hashing newfile {}'.format(url))
                         hash = computeHash(url)
                         if hash in self.missingFiles:
-                            info = self.missingFiles[hash]
                             # found a file that was missing -> detected move!
+                            info = self.missingFiles[hash]
                             if folderState is None:
                                 folderState = 'ok'
                             logger.info('detected a move: {} -> {}'.format(info.url, url))
@@ -261,10 +273,12 @@ class FileSystemSynchronizer(QtCore.QObject):
             if (folderState is None and relRoot in self.knownFolders) or \
                     (relRoot not in self.knownFolders) or \
                     (folderState != self.knownFolders[relRoot]):
-                self.updateFolderStatus(relRoot, folderState)        
+                self.updateFolderState(relRoot, folderState)        
     
     def updateFolderState(self, path, state, recurse=False):
-        if path not in self.knownFolders:
+        if state is None:
+            db.query("DELETE FROM {}folders WHERE path=?".format(db.prefix), path)
+        elif path not in self.knownFolders:
             db.query("INSERT INTO {}folders (path, state) VALUES (?,?)".format(db.prefix), path, state)
         else:
             db.query("UPDATE {}folders SET state=? WHERE path=?".format(db.prefix), state, path)
@@ -275,7 +289,7 @@ class FileSystemSynchronizer(QtCore.QObject):
             if path == '':
                 path = '.'
             state = self.knownFolders[path]
-            newState = self.updateStateFromSubfolders(utils.absPath(path), 'nomusic', files = True)
+            newState = self.updateStateFromSubfolders(utils.absPath(path), None, files=True)
             if newState != state:
                 self.updateFolderState(path, newState, True)
             
@@ -323,28 +337,29 @@ class FileSystemSynchronizer(QtCore.QObject):
             self.modifiedTagsDetected.emit(self.modifiedTags)
         
         if len(self.lostFiles) + len(self.missingFiles) > 0:
-            missingIDs = self.lostFiles[:]
+            missingIDs = list(self.lostFiles)
             if len(self.missingFiles) > 0:
-                missingIDs.extend(list(zip(*self.missingFiles.values()))[1])
+                missingIDs.extend(info.id for info in self.missingFiles.values())
+            print('missing ids: {}'.format(missingIDs))
             #self.dialogFinished.clear()
             #self.missingFilesDetected.emit(missingIDs)
             #self.dialogFinished.wait()
             
         logger.debug('rescanned collection')
         
-    def computeAndStoreHash(self, path):
+    def computeAndStoreHash(self, url):
         """Compute the hash of the file at *path* (or fetch it from self.knownNewFiles
         if available) and set it in the database."""
         db.transaction()
-        logger.debug("computing hash of {}".format(path))
-        if path in self.knownNewFiles:
-            hash = self.knownNewFiles[path][0]
-            del self.knownNewFiles[path]
+        logger.debug("computing hash of {}".format(url))
+        if url in self.knownNewFiles:
+            hash = self.knownNewFiles[url].hash
+            del self.knownNewFiles[url]
         else:
-            hash = computeHash(path)
-        db.setHash(path, hash)
-        self.dbFiles.append(path)
-        db.query('DELETE FROM {}newfiles WHERE path = ?'.format(db.prefix), path)
+            hash = computeHash(url)
+        db.query("UPDATE {}files SET hash=? WHERE url=?".format(db.prefix), hash, str(url))
+        self.dbFiles.append([a])
+        db.query('DELETE FROM {}newfiles WHERE url=?'.format(db.prefix), url)
         db.commit()
         
     def pollJobs(self):
@@ -361,5 +376,12 @@ class FileSystemSynchronizer(QtCore.QObject):
             time.time() - self.lastScan > config.options.filesystem.scan_interval:
             self.rescanCollection()
             self.lastScan = time.time()
-           
+    
+    @QtCore.pyqtSlot(object)
+    def handleRename(self, renamings):
+        for id, (oldUrl, newUrl) in renamings.items():
+            if oldUrl.scheme != "file":
+                continue
+            print('rename in filesystem module!! omg')
+            self.eventThread.sleep(100)
     
