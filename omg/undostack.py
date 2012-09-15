@@ -156,10 +156,6 @@ class UndoStack(QtCore.QObject):
         according to the stack's index."""
         return self._undoAction
     
-    def clear(self):
-        """Delete all commands on the stack."""
-        logger.debug("**** MADDIN, TU WAS ****\n" * 10)
-    
     def undo(self):
         """Undo the last command/macro."""
         if self._inUndoRedo or self._macroDepth > 0:
@@ -201,8 +197,8 @@ class UndoStack(QtCore.QObject):
     def _emitSignals(self):
         """Emit signals after self._index changed."""
         self.indexChanged.emit(self._index)
-        self.canRedoChanged.emit(self._index < len(self._commands))
-        self.canUndoChanged.emit(self._index > 0)
+        self.canRedoChanged.emit(self.canRedo())
+        self.canUndoChanged.emit(self.canUndo())
         self.redoTextChanged.emit(self._commands[self._index].text() if self._index < len(self._commands)
                                                                      else '')
         self.undoTextChanged.emit(self._commands[self._index-1].text() if self._index > 0 else '')

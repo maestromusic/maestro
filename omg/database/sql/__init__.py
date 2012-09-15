@@ -52,8 +52,8 @@ every driver.
 import datetime
 
 from ... import logging
+transactionLogger = logging.getLogger("transaction")
 
-logger = logging.getLogger(__name__)
 
 # When a driver is loaded _modules[driverIdentifier] will contain the driver's module.
 _modules = {}
@@ -167,25 +167,23 @@ class AbstractSql:
         """
         self._transactionDepth += 1
         if self._transactionDepth == 1:
-            logger.debug("transaction OPEN")
+            transactionLogger.debug("OPEN")
         return self._transactionDepth == 1
         
     def commit(self):
         """Commit a transaction. Return True if changes have really been written to the database (and False
         if just a nested transaction was closed)."""
-        if self._transactionDepth == 1:
-            if self._transactionDepth == 1:
-                logger.debug("transaction CLOSE")
-            return True
-        else:
-            self._transactionDepth -= 1
-            return False
+        self._transactionDepth -= 1
+        if self._transactionDepth == 0:
+            transactionLogger.debug("CLOSE")
+        return self._transactionDepth == 0
         
     def rollback(self):
         """Rollback a transaction. Nested transactions cannot be rolled back."""
         if self._transactionDepth > 1:
             raise RuntimeError("Cannot rollback nested transactions")
-            
+        transactionLogger.debug("ROLLBACK")
+        self._transactionDepth = 0
 
     def isNull(self,value):
         """Return whether *value* represents a NULL value from a MySQL table (how null values are
