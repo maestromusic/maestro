@@ -196,7 +196,7 @@ def changeTags(changes):
         logger.debug('changing tags of {}: {}'.format(backendFile.url, diff))
         problems = backendFile.saveTags()
         if len(problems) > 0:
-            problemUrl = element.url
+            problemUrl = backendFile.url
             backendFile.tags = currentFileTags
             backendFile.saveTags()
             rollback = True

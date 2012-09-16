@@ -22,6 +22,8 @@ from . import elements, levels, tags, flags
 from .. import database as db, filebackends, logging
 from ..database import write
 
+import datetime
+
 logger = logging.getLogger(__name__)
 
 
@@ -31,6 +33,9 @@ class RealLevel(levels.Level):
     Changes made here do not only change the element objects but also the database and, if
     files are affected, the filesystem state.
     """
+    
+    filesRenamed = QtCore.pyqtSignal(object)
+    filesAdded = QtCore.pyqtSignal(list)
     
     def __init__(self):
         super().__init__('REAL', None)
@@ -234,7 +239,6 @@ class RealLevel(levels.Level):
         db.write.removeContents([(parent.id, pos) for pos in positions])
         super()._removeContents(parent, positions, emitEvent)
     
-    filesRenamed = QtCore.pyqtSignal(object)
     def _renameFiles(self, renamings, emitEvent=True):
         """On the real level, files are renamed both on disk and in DB."""
         doneFiles = []
@@ -271,6 +275,11 @@ class RealLevel(levels.Level):
         if len(dbAdditions):
             db.multiQuery("INSERT INTO {}tags (element_id,tag_id,value_id) VALUES (?,?,?)"
                           .format(db.prefix),dbAdditions)
+        files = [ elem.id for elem in changes if elem.isFile() ]
+        if len(files) > 0:
+            now = datetime.datetime.now(datetime.timezone.utc)
+            db.multiQuery("UPDATE {}files SET verified=? WHERE element_id=?".format(db.prefix),
+                          [ (now, id) for id in files ])
         db.commit()
         super()._changeTags(changes, emitEvent)
         
