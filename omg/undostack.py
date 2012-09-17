@@ -127,6 +127,7 @@ class UndoStack(QtCore.QObject):
             raise UndoStackError("Cannot end a macro during undo/redo.")
         self._currentMacro.undo()
         self._currentMacro = None
+        self._eventQueue = None
         self._macroDepth = 0
 
     def clear(self):
