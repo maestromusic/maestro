@@ -275,11 +275,10 @@ class RealLevel(levels.Level):
         if len(dbAdditions):
             db.multiQuery("INSERT INTO {}tags (element_id,tag_id,value_id) VALUES (?,?,?)"
                           .format(db.prefix),dbAdditions)
-        files = [ elem.id for elem in changes if elem.isFile() ]
+        files = [ (elem.id, ) for elem in changes if elem.isFile() ]
         if len(files) > 0:
-            now = datetime.datetime.now(datetime.timezone.utc)
-            db.multiQuery("UPDATE {}files SET verified=? WHERE element_id=?".format(db.prefix),
-                          [ (now, id) for id in files ])
+            db.multiQuery("UPDATE {}files SET verified=CURRENT_TIMESTAMP WHERE element_id=?".format(db.prefix),
+                          files)
         db.commit()
         super()._changeTags(changes, emitEvent)
         

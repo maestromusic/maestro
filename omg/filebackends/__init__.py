@@ -193,7 +193,7 @@ def changeTags(changes):
         
         currentFileTags = backendFile.tags.copy()
         diff.apply(backendFile)
-        logger.debug('changing tags of {}: {}'.format(backendFile.url, diff))
+        #logger.debug('changing tags of {}: {}'.format(backendFile.url, diff))
         problems = backendFile.saveTags()
         if len(problems) > 0:
             problemUrl = backendFile.url

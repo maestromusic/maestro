@@ -131,10 +131,9 @@ class EventThread(QtCore.QThread):
         self.timer = QtCore.QTimer(self)
         
     def run(self):
-        self.timer.start(config.options.filesystem.scan_interval)
+        self.timer.start(config.options.filesystem.scan_interval*1000)
         self.exec_()
-        db.close()
-        print('db clossed')               
+        db.close()               
 
 class FileInformation:
     
@@ -161,6 +160,7 @@ class FileSystemSynchronizer(QtCore.QObject):
         self.eventThread = EventThread(self)
         self.moveToThread(self.eventThread)
         self.eventThread.started.connect(self.init)
+        self.eventThread.timer.timeout.connect(self.rescanCollection)
         self.hashesComputed.connect(self.helper.addFileHashes)
         self.moveDetected.connect(self.helper.changeURL)
         self.dbFiles = {}
@@ -215,8 +215,8 @@ class FileSystemSynchronizer(QtCore.QObject):
     
     def checkDBFiles(self):
         """Find modified and lost DB files."""
-        for url, info in self.dbFiles.items():
-            if not os.path.exists(url.absPath):
+        for id, info in self.dbFiles.items():
+            if not os.path.exists(info.url.absPath):
                 if db.isNull(info.hash) or info.hash in ["0", ""]:
                     # file without hash deleted -> no chance to find somewhere else
                     self.lostFiles.add(info.id)
@@ -224,11 +224,11 @@ class FileSystemSynchronizer(QtCore.QObject):
                     self.missingFiles[info.hash] = info
                     print('missing {}'.format(info.hash))
                 continue
-            elif info.verified + EPSILON_TIME < mTimeStamp(url):
-                if not self.compareTagsWithDB(info.id, url):
-                    newHash = computeHash(url)
+            elif info.verified + EPSILON_TIME < mTimeStamp(info.url):
+                if not self.compareTagsWithDB(info.id, info.url):
+                    newHash = computeHash(info.url)
                     if newHash != info.hash:
-                        logger.debug('Detected modification of audio data on "{}: {}->{}"'.format(url, info.hash, newHash))
+                        logger.debug('Detected modification of audio data on "{}: {}->{}"'.format(info.url, info.hash, newHash))
                         db.query('UPDATE {}files SET hash=? WHERE element_id=?'.format(db.prefix),
                                  newHash, info.id)
                     else:
@@ -390,18 +390,39 @@ class FileSystemSynchronizer(QtCore.QObject):
     
     @QtCore.pyqtSlot(object)
     def handleRename(self, renamings):
+        dirsRemovedFrom = set()
+        dirsAddedTo = set()
         for id, (oldUrl, newUrl) in renamings.items():
             if oldUrl.scheme != "file":
                 continue
-            print('rename in filesystem module!! omg')
+            self.dbFiles[id].url = newUrl
+            oldDir = os.path.dirname(oldUrl.absPath)
+            newDir = os.path.dirname(newUrl.absPath)
+            if oldDir != newDir:
+                dirsRemovedFrom.add(oldDir)
+                dirsAddedTo.add(newDir)
+        
             
     @QtCore.pyqtSlot(list)
     def handleAdd(self, newFiles):
-        needHash = []
+        removedNewFiles = []
+        newHashes = []
         for file in newFiles:
-            if file.url not in self.knownNewFiles or db.isNull(self.knownNewFiles[file.url].hash):
-                needHash.append(file)
-        newHashes = [ (file.id, computeHash(file.url)) for file in needHash ]
+            if file.url in self.knownNewFiles:
+                info = self.knownNewFiles[file.url]
+                del self.knownNewFiles[file.url]
+                info.id = file.id
+                removedNewFiles.append(file.url)
+            else:
+                info = FileInformation(file.url, None, datetime.datetime.now(datetime.timezone.utc), id=file.id)
+            if info.hash is None:
+                info.hash = computeHash(info.url)
+                newHashes.append( (info.id, info.hash) )
+            self.dbFiles[file.id] = info
+        if len(removedNewFiles) > 0:
+            db.multiQuery("DELETE FROM {}newfiles WHERE url=?".format(db.prefix),
+                          [ (str(url), ) for url in removedNewFiles])
+        
         if len(newHashes) > 0:
             self.hashesComputed.emit(newHashes)
             
