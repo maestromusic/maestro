@@ -28,7 +28,11 @@ logger = logging.getLogger(__name__)
 
 synchronizer = None
 enabled = False
-EPSILON_TIME = datetime.timedelta(seconds=3)
+
+NO_MUSIC = 0
+HAS_FILES = 1
+HAS_NEW_FILES = 2
+PROBLEM = 4
 
 def init():
     global synchronizer, notifier, null, enabled
@@ -60,24 +64,27 @@ def shutdown():
 def getFolderState(path):
     """Return the state of a given folder, or 'unknown' if it can't be obtained.
     """
-    if not enabled or not synchronizer.initialized.is_set():
-        return 'unknown'
-    try:
-        return synchronizer.knownFolders[path]
-    except KeyError:
-        return None
+    if enabled and synchronizer.initialized.is_set():
+        try:
+            state = synchronizer.directories[path].state
+            if state & PROBLEM:
+                return 'problem'
+            elif state & HAS_NEW_FILES:
+                return 'unsynced'
+            elif state & HAS_FILES:
+                return 'ok'
+            else:
+                return 'nomusic'
+        except KeyError:
+            pass
+    return 'unknown'
 
 def getNewfileHash(url):
     """Return the hash of a file specified by *url* which is not yet in the database.
     
     If the hash is not known, returns None.
     """
-    if not enabled or not synchronizer.initialized.is_set():
-        return None
-    try:
-        return synchronizer.knownNewFiles[url].hash
-    except KeyError:
-        return None
+    return None
 
 def computeHash(url):
     """Compute the audio hash of a single file. This method uses
@@ -105,10 +112,61 @@ def computeHash(url):
     return hash
 
 def mTimeStamp(url):
-    """Returns a datetime.datetime object representing the modification timestamp
-    of the file given by *url*."""
+    """Get the modification timestamp of a file given by *url*.
+    
+    Returns a datetime.datetime object with timezone UTC.
+    """
     return datetime.datetime.fromtimestamp(os.path.getmtime(url.absPath), tz=datetime.timezone.utc)
 
+class Track:
+    def __init__(self, url):
+        self.url = url
+        self.directory = None
+        self.id = self.lastChecked = self.hash = None
+        self.problem = False
+    
+    def __str__(self):
+        if self.id is not None:
+            return "DB Track[{}](url={})".format(self.id, self.url)
+        return ("New Track(url={})".format(self.url))
+
+class Directory:
+
+    def __init__(self, path, parent):
+        self.parent = parent
+        self.path = path
+        self.tracks = []
+        self.subdirs = []
+        self.state = NO_MUSIC
+        if parent is not None:
+            parent.subdirs.append(self)
+    
+    @property    
+    def absPath(self):
+        return utils.absPath(self.path)
+    
+    def updateState(self, considerTracks=True, considerSubdirs=True, recurse=False):
+        ownState = NO_MUSIC
+        if considerTracks:
+            for track in self.tracks:
+                ownState |= HAS_FILES
+                if track.id is None:
+                    ownState |= HAS_NEW_FILES
+                if track.problem:
+                    ownState |= PROBLEM
+                    break
+        if considerSubdirs:
+            for dir in self.subdirs:
+                ownState |= dir.state
+        if ownState != self.state:
+            self.state = ownState
+            ret = [self]
+            if recurse and self.parent is not None:
+                ret += self.parent.updateState(False, True, True)
+            return ret
+        return []
+            
+        
 class SynchronizeHelper(QtCore.QObject):
     """Class running in the main event thread to change database and display GUIs."""
     
@@ -135,17 +193,9 @@ class EventThread(QtCore.QThread):
         self.exec_()
         db.close()               
 
-class FileInformation:
-    
-    def __init__(self, url, hash, verified, id=None):
-        self.url = url
-        self.hash = hash
-        self.verified = verified
-        self.id = id
-
 class FileSystemSynchronizer(QtCore.QObject):
     
-    folderStateChanged = QtCore.pyqtSignal(str, str)
+    folderStateChanged = QtCore.pyqtSignal(object)
     initializationComplete = QtCore.pyqtSignal()
     
     hashesComputed = QtCore.pyqtSignal(object)
@@ -161,99 +211,130 @@ class FileSystemSynchronizer(QtCore.QObject):
         self.moveToThread(self.eventThread)
         self.eventThread.started.connect(self.init)
         self.eventThread.timer.timeout.connect(self.rescanCollection)
-        self.hashesComputed.connect(self.helper.addFileHashes)
-        self.moveDetected.connect(self.helper.changeURL)
-        self.dbFiles = {}
-        self.lostFiles = set()
-        self.missingFiles = {}
-        self.modifiedTags = {}
-        self.knownNewFiles = {}
-        self.knownFolders = {}
-    
+
     def init(self):
         db.connect()
-        #  initialize self.dbFiles
-        newHashes = []
-        for id, url, hash, verified \
-                in db.query("SELECT element_id,url,hash,verified FROM {}files".format(db.prefix)):
-            url = filebackends.BackendURL.fromString(url)
-            if isinstance(url, filebackends.filesystem.BackendURL):
-                self.dbFiles[url] = FileInformation(url=url, verified=db.getDate(verified),
-                                                    hash=hash, id=id)
-            if db.isNull(hash):
-                newHashes.append((id, computeHash(url)))
-        if len(newHashes) > 0:
-            self.hashesComputed.emit(newHashes)
+        self.dbTracks = {}
+        self.dbDirectories = set()
+        self.directories = {}
         
-        #  initialize self.knownNewFiles 
-        for url, hash, timestamp in \
-                db.query('SELECT url, hash, verified FROM {}newfiles'.format(db.prefix)):
-            url = filebackends.BackendURL.fromString(url)
-            timestamp = db.getDate(timestamp)
-            self.knownNewFiles[url] = FileInformation(url=url, hash=hash, verified=timestamp)
+        for path, state in db.query(
+                    "SELECT path, state FROM {}folders ORDER BY LENGTH(path)".format(db.prefix)):
+            parent, basename = os.path.split(path)
+            if parent == '' and basename == '':
+                dir = Directory(path='', parent=None)                    
+            else:
+                parent = self.directories[parent]
+                dir = Directory(path, parent)
+            dir.state = state
+            self.directories[dir.path] = dir
+            self.dbDirectories.add(dir.path)
         
-        #  initialize self.knownFolders
-        for folder, state in db.query('SELECT path,state FROM {}folders'.format(db.prefix)):
-            self.knownFolders[folder] = state
+        newDirectories = []
+        for elid, urlstring, elhash, verified in db.query(
+                       "SELECT element_id, url, hash, verified FROM {}files".format(db.prefix)):
+            url = filebackends.BackendURL.fromString(urlstring)
+            if url.scheme != "file":
+                continue
+            track = Track(url)
+            track.id = elid
+            if not db.isNull(elhash):
+                track.hash = elhash
+            track.verified = db.getDate(verified)
+            self.dbTracks[track.url] = track
+            dir, newDirs = self.getDirectory(os.path.dirname(track.url.path))
+            newDirectories += newDirs
+            dir.tracks.append(track)
+        if len(newDirectories) > 0:
+            db.multiQuery("INSERT INTO {}folders (path, state) VALUES (?,?)".format(db.prefix),
+                          [(dir.path, dir.state) for dir in newDirectories])
+        
+        deleteFromNewFiles = []
+        for urlstring, elhash, verified in db.query(
+                       "SELECT url, hash, verified FROM {}newfiles".format(db.prefix)):
+            track = Track(filebackends.BackendURL.fromString(urlstring))
+            if track.url in self.dbTracks:
+                logger.warning("url {} in both files and newfiles ... ?".format(urlstring))
+                deleteFromNewFiles.append((urlstring,))
+                continue
+            track.hash = elhash
+            track.verified = db.getDate(verified)
+            self.dbTracks[track.url] = track
+            self.directories[os.path.dirname(track.url.path)].tracks.append(track)
+        if len(deleteFromNewFiles) > 0:
+            db.multiQuery("DELETE FROM {}newfiles WHERE url=?".format(db.prefix),
+                          deleteFromNewFiles)
+        
         self.initializationComplete.emit()
         self.initialized.set()
-        self.rescanCollection()
-        
-    def compareTagsWithDB(self, id, url):
-        """Checks if the tags inside the file at *path* with id *id* equals those stored in the
-        database. Otherwise, *self.modifiedTags[id]* will be set to a tuple (dbTags, fileTags)."""
-        if id in levels.real:
-            dbTags = levels.real.get(id).tags
-        else:
-            dbTags = db.tags(id)
-        backendFile = url.getBackendFile()
-        backendFile.readTags()
-        if dbTags.withoutPrivateTags() != backendFile.tags:
-            logger.debug('Detected modification on file "{}": tags differ'.format(url.path))
-            self.modifiedTags[id] = (dbTags, backendFile.tags)
-            return False
+        self.checkFileSystem()
     
-    def checkDBFiles(self):
-        """Find modified and lost DB files."""
-        for id, info in self.dbFiles.items():
-            if not os.path.exists(info.url.absPath):
-                if db.isNull(info.hash) or info.hash in ["0", ""]:
-                    # file without hash deleted -> no chance to find somewhere else
-                    self.lostFiles.add(info.id)
+    def getDirectory(self, path):
+        if path is None:
+            return None, []
+        if path in self.directories:
+            return self.directories[path], []
+        parentPath = None if path == "" else os.path.split(path)[0]
+        parent, new = self.getDirectory(parentPath)
+        dir = Directory(path, parent)
+        self.directories[path] = dir
+        return dir, new + [dir]
+        
+    def checkTrack(self, dir, track):
+        modified = mTimeStamp(track.url)
+        if modified > track.verified:
+            logger.debug('found modified track {}'.format(track.url))
+            if track.id is None:
+                logger.debug("just updating hash")
+                track.hash = computeHash(track.url)
+                track.verified = modified
+            else:
+                if id in levels.real:
+                    dbTags = levels.real.get(id).tags
                 else:
-                    self.missingFiles[info.hash] = info
-                    print('missing {}'.format(info.hash))
-                continue
-            elif info.verified + EPSILON_TIME < mTimeStamp(info.url):
-                if not self.compareTagsWithDB(info.id, info.url):
-                    newHash = computeHash(info.url)
-                    if newHash != info.hash:
-                        logger.debug('Detected modification of audio data on "{}: {}->{}"'.format(info.url, info.hash, newHash))
-                        db.query('UPDATE {}files SET hash=? WHERE element_id=?'.format(db.prefix),
-                                 newHash, info.id)
-                    else:
-                        logger.debug("update timestamp")
-                        db.query('UPDATE {}files SET verified=CURRENT_TIMESTAMP '
-                                 'WHERE element_id=?'.format(db.prefix), info.id)
+                    dbTags = db.tags(id)
+                backendFile = track.url.getBackendFile()
+                backendFile.readTags()
+                if dbTags.withoutPrivateTags() != backendFile.tags:
+                    logger.debug('Detected modification on file "{}": tags differ'.format(track.url))
+                    self.modifiedTags[id] = (dbTags, backendFile.tags)
+                    track.problem = True
+                else:
+                    filehash = computeHash(track.url)
+                    if filehash != track.hash:
+                        logger.debug("audio data modified!")
+                        track.hash = filehash
+                        track.verified = modified 
     
-    def checkNewFiles(self):
-        """Go through the newfiles table and remove entries of files which are deleted on disk."""
-        gone = []
-        for url in self.knownNewFiles:
-            if not os.path.exists(url.absPath):
-                gone.append((str(url),))
-        if len(gone) > 0:
-            db.multiQuery('DELETE FROM {}newfiles WHERE url=?'.format(db.prefix), gone)
+    def addTrack(self, dir, url):
+        filehash = computeHash(url)
+        track = Track(url)
+        track.directory = dir
+        track.hash = filehash
+        track.verified = mTimeStamp(url)
+        return track
     
-    def checkFolders(self):
-        """Go through the folders table, remove entries of folders which were deleted on disk."""
-        gone = []
-        for folder in self.knownFolders:
-            if not os.path.exists(utils.absPath(folder)):
-                gone.append((folder,))
-        if len(gone) > 0:
-            db.multiQuery('DELETE FROM {}folders WHERE path=?'.format(db.prefix), gone)
-        
+    def storeDirectories(self, directories):
+        if len(directories) > 0:
+            logger.debug("Storing {} new directories into folders table".format(len(directories)))
+            db.multiQuery("INSERT INTO {}folders (path, state) VALUES(?,?)".format(db.prefix),
+                          [ (dir.path, dir.state) for dir in directories])
+    
+    def updateDirectories(self, directories):
+        if len(directories) > 0:
+            logger.debug("Updating state of {} directories in folders table".format(len(directories)))
+            db.multiQuery("UPDATE {}folders SET state=? WHERE path=?".format(db.prefix),
+                          [ (dir.state, dir.path) for dir in directories])
+    
+    def storeNewTracks(self, tracks):
+        if len(tracks) > 0:
+            logger.debug("Storing {} new tracks into newfiles table".format(len(tracks)))
+            db.multiQuery("INSERT INTO {}newfiles (url, hash, verified) VALUES (?,?,?)"
+                          .format(db.prefix),
+                          [(str(track.url), track.hash,
+                            track.verified.strftime("%Y-%m-%d %H:%M:%S"))
+                           for track in tracks])
+    
     def checkFileSystem(self):
         """Walks through the collection, updating folders and searching for new files.
         
@@ -262,103 +343,62 @@ class FileSystemSynchronizer(QtCore.QObject):
         - compute hashes of files which are not yet in the database
         - doing the latter, moved files can be detected
         """
-        for root, dirs, files in os.walk(config.options.main.collection, topdown=False):
-            folderState = None
+        newDirectories = set()
+        modifiedDirectories = set()
+        newTracks = set()
+        THRESHOLD = 250
+        for root, dirs, files in os.walk(config.options.main.collection, topdown=True):
+            dirs.sort()
+            newTracksInDir = 0
+            relPath = utils.relPath(root)
+            if relPath == ".":
+                relPath = ""
+            if relPath in self.dbDirectories:
+                self.dbDirectories.remove(relPath)
+            dir, newDirs = self.getDirectory(relPath)
+            newDirectories.update(newDirs)
+            if self.should_stop.is_set():
+                break
             for file in files:
-                if self.should_stop.is_set():
-                    return
-                url = filebackends.filesystem.FileURL(os.path.join(root, file))
-                if not utils.hasKnownExtension(url.path):
-                    continue # skip non-music files
-                if url not in self.dbFiles:
-                    if url in self.knownNewFiles:
-                        # case 1: file was found in a previous scan
-                        folderState = 'unsynced'
-                        info = self.knownNewFiles[url]
-                        # check if the file's modification time is newer than the DB timestamp
-                        # -> recompute hash
-                        if mTimeStamp(url) > info.verified:
-                            newHash = computeHash(url)
-                            db.query('UPDATE {}newfiles SET hash=?, verified=CURRENT_TIMESTAMP '
-                                     'WHERE url=?'.format(db.prefix), newHash, str(url))
-                            info.hash = newHash
-                    else:
-                        # case 2: file is completely new
-                        logger.debug('hashing newfile {}'.format(url))
-                        hash = computeHash(url)
-                        if hash in self.missingFiles:
-                            # found a file that was missing -> detected move!
-                            info = self.missingFiles[hash]
-                            if folderState is None:
-                                folderState = 'ok'
-                            logger.info('detected a move: {} -> {}'.format(info.url, url))
-                            self.moveDetected.emit(info.id, url)
-                            info.url = url
-                            # check if tags were also changed
-                            self.compareTagsWithDB(info.id, url)
-                            del self.missingFiles[hash]
-                        else:
-                            folderState = 'unsynced'
-                            db.query('INSERT INTO {}newfiles (hash,url) VALUES (?,?)'.format(db.prefix),
-                                     hash, str(url))
-                            self.knownNewFiles[url] = FileInformation(url, hash, datetime.datetime.now(datetime.timezone.utc))
-                elif folderState is None:
-                    folderState = 'ok'
-            if folderState != 'unsynced':
-                folderState = self.updateStateFromSubfolders(root, folderState, dirs)
-            relRoot = utils.relPath(root)
-            # now update folders table and emit events for FileSystemBrowser
-            if (folderState is None and relRoot in self.knownFolders) or \
-                    (relRoot not in self.knownFolders) or \
-                    (folderState != self.knownFolders[relRoot]):
-                self.updateFolderState(relRoot, folderState)        
-    
-    def updateFolderState(self, path, state, recurse=False):
-        if state is None:
-            db.query("DELETE FROM {}folders WHERE path=?".format(db.prefix), path)
-        elif path not in self.knownFolders:
-            db.query("INSERT INTO {}folders (path, state) VALUES (?,?)".format(db.prefix), path, state)
-        else:
-            db.query("UPDATE {}folders SET state=? WHERE path=?".format(db.prefix), state, path)
-        self.folderStateChanged.emit(path, state)
-        self.knownFolders[path] = state
-        if recurse and path not in ('', '.'):
-            path = os.path.dirname(path)
-            if path == '':
-                path = '.'
-            state = self.knownFolders[path]
-            newState = self.updateStateFromSubfolders(utils.absPath(path), None, files=True)
-            if newState != state:
-                self.updateFolderState(path, newState, True)
+                if not utils.hasKnownExtension(file):
+                    continue
+                url = filebackends.filesystem.FileURL(os.path.join(relPath, file))
+                if url in self.dbTracks:
+                    track = self.dbTracks[url]
+                    self.checkTrack(dir, track)
+                    del self.dbTracks[url]
+                else:
+                    track = self.addTrack(dir, url)
+                    dir.tracks.append(track)
+                    newTracks.add(track)
+                    newTracksInDir += 1
+            for modifiedDir in dir.updateState(True, True, True):
+                self.folderStateChanged.emit(modifiedDir)
+                logger.debug('state of {} updated'.format(modifiedDir.path))
+                if modifiedDir not in newDirectories:
+                    modifiedDirectories.add(modifiedDir)
+            if newTracksInDir > 0:
+                logger.debug("Found {} new tracks in {}".format(newTracksInDir, relPath))
+            if len(newTracks) + len(newDirectories) + len(modifiedDirectories) > THRESHOLD:
+                db.transaction()
+                self.storeDirectories(newDirectories)
+                self.updateDirectories(modifiedDirectories)
+                self.storeNewTracks(newTracks)
+                db.commit()
+                newTracks = set()
+                newDirectories = set()
+                modifiedDirectories = set()
             
-        
-    def updateStateFromSubfolders(self, root, folderState, dirs=None, files=False):
-        """Returns the updated folderState of abspath *root* when the states
-        of the subdirectories are considered. E.g. if root is 'ok' and a subdir
-        is 'unsynced', return 'unsynced'. The optional *dirs* parameter is
-        a list of given subdirectories; if not specified, they are computed first."""
-        if dirs == None:
-            dirs = []
-            for elem in os.listdir(root):
-                if os.path.isdir(os.path.join(root, elem)):
-                    # tuning: stop directory testing as soon as an unsynced dir is found
-                    if self.knownFolders[utils.relPath(os.path.join(root, elem))] == 'unsynced':
-                        return 'unsynced'
-                    dirs.append(elem)
-                elif files and utils.hasKnownExtension(elem):
-                    if utils.relPath(os.path.join(root, elem)) not in self.dbFiles:
-                        return 'unsynced'
-                    else:
-                        folderState = 'ok'
-        for dir in dirs:
-            path = utils.relPath(os.path.join(root, dir))
-            if path not in self.knownFolders:
-                continue
-            elif self.knownFolders[path] == 'unsynced':
-                return 'unsynced'
-            elif self.knownFolders[path] == 'ok' and folderState is None:
-                folderState = 'ok'
-        return folderState
+        db.transaction()
+        self.storeDirectories(newDirectories)
+        self.updateDirectories(modifiedDirectories)
+        self.storeNewTracks(newTracks)
+        db.commit()
+        if self.should_stop.is_set():
+            return
+        if len(self.dbTracks) > 0:
+            print('missing tracks: {}'.format("\n".join(str(track) for track in self.dbTracks.values())))
+        logger.debug("filesystem scan complete")
     
     @QtCore.pyqtSlot()
     def rescanCollection(self):

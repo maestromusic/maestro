@@ -39,13 +39,13 @@ class FileSystemBrowserModel(QtGui.QFileSystemModel):
     icons = {
         'unsynced' : getIcon("folder_unsynced.svg"),
         'ok'       : getIcon("folder_ok.svg"),
-        None       : getIcon("folder.svg"),
+        'nomusic'  : getIcon("folder.svg"),
         'unknown'  : getIcon("folder_unknown.svg") }
     
     descriptions = {
         'unsynced' : translate(__name__, "contains music which is not in OMG's database"),
         'ok'       : translate(__name__, "in sync with OMG's database"),
-        None       : translate(__name__, "does not contain music"),
+        'nomusic'  : translate(__name__, "does not contain music"),
         'unknown'  : translate(__name__, "unknown folder status") }
     
     def __init__(self, parent = None):
@@ -55,13 +55,10 @@ class FileSystemBrowserModel(QtGui.QFileSystemModel):
     def columnCount(self, index):
         return 1
     
-    @QtCore.pyqtSlot(str, str)
-    def handleStateChange(self, folder, state):
-        index = self.index(absPath(folder))
-        self.dataChanged.emit(index, index)
-        while(index.parent().isValid()):
-            index = index.parent()
-            self.dataChanged.emit(index, index)    
+    @QtCore.pyqtSlot(object)
+    def handleStateChange(self, dir):
+        index = self.index(dir.absPath)
+        self.dataChanged.emit(index, index)    
     
     def data(self, index, role=Qt.DisplayRole):
         if role == Qt.DecorationRole or role == Qt.ToolTipRole:

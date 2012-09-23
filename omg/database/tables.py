@@ -336,13 +336,13 @@ CREATE TABLE {0}flags (
 _addMySQL("""
 CREATE TABLE {}folders (
     path         VARCHAR(511)    NOT NULL,
-    state        ENUM('unknown','ok','unsynced')    NOT NULL DEFAULT 'unknown'
+    state        TINYINT NOT NULL DEFAULT 0
 ) ENGINE InnoDB, CHARACTER SET 'utf8'
 """.format(db.prefix))
 _addSQLite("""
 CREATE TABLE {}folders (
     path         VARCHAR(511)    NOT NULL,
-    state        VARCHAR(8)      NOT NULL DEFAULT 'unknown'
+    state        INTEGER NOT NULL DEFAULT 0
 )
 """.format(db.prefix))
 
