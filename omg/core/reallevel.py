@@ -22,8 +22,6 @@ from . import elements, levels, tags, flags
 from .. import database as db, filebackends, logging
 from ..database import write
 
-import datetime
-
 logger = logging.getLogger(__name__)
 
 
@@ -36,6 +34,7 @@ class RealLevel(levels.Level):
     
     filesRenamed = QtCore.pyqtSignal(object)
     filesAdded = QtCore.pyqtSignal(list)
+    filesRemoved = QtCore.pyqtSignal(list)
     
     def __init__(self):
         super().__init__('REAL', None)
@@ -229,6 +228,8 @@ class RealLevel(levels.Level):
         
     def _removeElements(self, elements):
         super()._removeElements(elements)
+        if any (elem.isFile() for elem in elements):
+            self.filesRemoved.emit([elem for elem in elements if elem.isFile()])
         db.write.deleteElements([elem.id for elem in elements])
         
     def _insertContents(self, parent, insertions, emitEvent=True):
@@ -252,7 +253,7 @@ class RealLevel(levels.Level):
                 oldUrl, newUrl = renamings[elem]
                 newUrl.getBackendFile().rename(oldUrl)
             raise levels.RenameFilesError(oldUrl, newUrl, str(e))
-        db.write.changeUrls([ (element.id, str(newUrl)) for element, (_, newUrl) in renamings.items() ])
+        db.write.changeUrls([ (str(newUrl), element.id) for element, (_, newUrl) in renamings.items() ])
         self.filesRenamed.emit(renamings)
         super()._renameFiles(renamings, emitEvent)
     

@@ -21,12 +21,75 @@ import itertools
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
-from .. import application, constants, database as db, utils
-from ..core import commands, levels, elements
-from .. import models
-from ..models.rootedtreemodel import RootedTreeModel, RootNode
-from ..gui import mainwindow, treeview
-from ..gui.delegates.editor import EditorDelegate
+from .. import application
+from ..core import levels
+from ..models.leveltreemodel import LevelTreeModel
+from ..gui import delegates, treeactions, treeview
+from ..gui.delegates import abstractdelegate, configuration
+
+import os.path
+
+translate = QtCore.QCoreApplication.translate
+
+
+class LostFilesDelegate(delegates.StandardDelegate):
+    
+    configurationType, defaultConfiguration = configuration.createConfigType(
+                'lostfiles',
+                translate("Delegates","LostFiles"),
+                delegates.StandardDelegate.options,
+                [],
+                [],
+                {"showPaths": True, 'showMajor': False, 
+                 'appendRemainingTags': False, 'showAllAncestors': True,
+                 'showFlagIcons' : True}
+    )
+    
+    def __init__(self, view): 
+        super().__init__(view) 
+        self.goodPathStyle = abstractdelegate.DelegateStyle(1, False, True, Qt.darkGreen)
+        self.badPathStyle = abstractdelegate.DelegateStyle(1, False, True, Qt.red)
+        
+    def addPath(self, element):
+        if element.isFile():
+            if os.path.exists(element.url.absPath):
+                style = self.goodPathStyle
+            else:
+                style = self.badPathStyle
+            self.addCenter(delegates.TextItem(element.url.path, style))
+
+class SetPathAction(treeactions.TreeAction):
+    """Action to rename (or move) a file."""
+    
+    def __init__(self, parent, text=None, shortcut=None):
+        super().__init__(parent, shortcut)
+        if text is None:
+            self.setText(self.tr('choose path'))
+        else:
+            self.setText(text)
+    
+    def initialize(self, selection):
+        self.setEnabled(selection.singleWrapper() and \
+                        selection.hasFiles() and \
+                        not os.path.exists(next(selection.fileWrappers()).element.url.absPath))
+    
+    def doAction(self):
+        """Open a dialog to edit the tags of the currently selected elements (and the children, if
+        *recursive* is True). This is called by the edit tags actions in the contextmenu.
+        """
+        from ..filebackends.filesystem import FileURL
+        elem = next(self.parent().nodeSelection.fileWrappers()).element
+        path = QtGui.QFileDialog.getOpenFileName(application.mainWindow,
+                                                 self.tr("Select new file location"),
+                                                 os.path.dirname(elem.url.absPath))
+        if path != "":
+            newUrl = FileURL(path)
+            from .. import database as db
+            from ..database import write
+            print('changing url: {}->{}'.format(elem.url, newUrl))
+            db.write.changeUrls([ (str(newUrl), elem.id) ])
+            elem.url = newUrl
+            levels.real.emitEvent([elem.id])
 
 
 class MissingFilesDialog(QtGui.QDialog):
@@ -40,82 +103,38 @@ class MissingFilesDialog(QtGui.QDialog):
     """
     def __init__(self, ids):
         """Open the dialog for the files given by *ids*, a list of file IDs."""
-        super().__init__(mainwindow.mainWindow)
+        super().__init__(application.mainWindow)
         self.setModal(True)
-        self.setWindowTitle(self.tr('Detected Missing Files'))
+        self.setWindowTitle(self.tr('Missing Files Detected'))
         layout = QtGui.QVBoxLayout()
-        label = QtGui.QLabel(self.tr("The following files were removed from the filesystem with another program. "
-                             "Please select those that should also be removed from OMG's database, and "
-                             "provide a new path for the others."))
+        label = QtGui.QLabel(self.tr(
+                    "The following files were removed from the filesystem by another program. "
+                    "Please select those that should also be removed from OMG's database, and "
+                    "provide a new path for the others."))
         label.setWordWrap(True)
         layout.addWidget(label)
-        self.filemodel = RootedTreeModel(levels.real)
         
-        elements = [ levels.real.get(id) for id in sorted(ids)]
-        self.candidateContainers = []
-        for pid in set(itertools.chain(*(element.parents for element in elements))):
-            container = levels.real.get(pid)
-            if all (cid in ids for cid in container.contents.ids):
-                self.candidateContainers.append(container)
-        self.filemodel.root.setContents(elements)
         
-        self.fileview = treeview.TreeView()        
-        self.fileview.setModel(self.filemodel)
-        self.fileview.setItemDelegate(EditorDelegate(self.fileview, EditorDelegate.defaultConfiguration))
-        self.fileview.selectionModel().selectionChanged.connect(self.updateEmptyContainers)
-        self.fileview.doubleClicked.connect(self.startFileSelection)
-        layout.addWidget(self.fileview)
+        files = [ levels.real.get(id) for id in ids ]
+        containers = []
+        for pid in set(itertools.chain(*(file.parents for file in files))):
+            containers.append(levels.real.get(pid))
+        self.model = LevelTreeModel(levels.real, containers)
         
-        label = QtGui.QLabel(self.tr("After deleting those files, the following containers will be empty. "
-                                     "Please select which of them are also to be deleted."))
-        label.setWordWrap(True)
-        layout.addWidget(label)
-        self.containermodel = RootedTreeModel(levels.real)
-        self.containerview = treeview.TreeView()
-        self.containerview.setModel(self.containermodel)
-        self.containerview.setItemDelegate(EditorDelegate(self.fileview, EditorDelegate.defaultConfiguration))
-        layout.addWidget(self.containerview)
-        buttonLayout = QtGui.QHBoxLayout()
+        self.view = treeview.TreeView(levels.real, affectGlobalSelection=False)        
+        self.view.setModel(self.model)
+        self.view.setItemDelegate(LostFilesDelegate(self.view))
+        self.view.expandAll()
         
-        self.cancelButton = QtGui.QPushButton(self.tr('Cancel'))
-        self.deleteButton = QtGui.QPushButton(self.tr('Delete selected'))
-        buttonLayout.addStretch()
-        buttonLayout.addWidget(self.cancelButton)
-        buttonLayout.addWidget(self.deleteButton)
+        self.view.actionConfig.addActionDefinition(
+              ((('losttracks', 'setpath')),), SetPathAction)
+        self.view.actionConfig.addActionDefinition(
+              ((('losttracks', 'delete')),), treeactions.DeleteAction, text=self.tr("delete"), shortcut="Del", allowDisk=False)
+        layout.addWidget(self.view)
         
-        self.cancelButton.clicked.connect(self.reject)
-        self.deleteButton.clicked.connect(self.deleteElements)
-        layout.addLayout(buttonLayout)
+        buttonBox = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Ok)
+        buttonBox.accepted.connect(self.accept)
+        layout.addWidget(buttonBox)
+        
         self.setLayout(layout)
-        self.resize(400,600)
-        self.exec_()
-        
-    def deleteElements(self):
-        files = self.fileview.nodeSelection.elements()
-        containers = self.containerview.nodeSelection.elements()
-        application.push(commands.RemoveElementsCommand(constants.REAL, files + containers, constants.DB,
-                                                        self.tr('remove deleted files from DB')))
-        self.accept()
-        
-    def startFileSelection(self, index):
-        import os
-        file = index.internalPointer()
-        newPath = utils.relPath(QtGui.QFileDialog.getOpenFileName(self, self.tr("Select new file location"),
-                                                    utils.absPath(os.path.dirname(file.path))))
-        if newPath != "":
-            db.write.changeFilePath(file.id, newPath)
-            self.filemodel.remove(self.filemodel.root, [file.iPosition()])
-            
-
-    def updateEmptyContainers(self, *args):
-        selectedFileIds = [elem.id for elem in self.fileview.nodeSelection.elements()]
-        root = self.containermodel.root
-        for container in self.candidateContainers:
-            empty = all( id in selectedFileIds for id in container.check_ids)
-            index = root.find(container, True)
-            if empty and index == -1:
-                self.containermodel.insert(root,  [(len(root.contents), container)])
-            elif (not empty) and index >= 0:
-                self.containermodel.remove(root, [index] )
-                
-            
+        self.resize(800,400)

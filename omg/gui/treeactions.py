@@ -75,7 +75,32 @@ class EditTagsAction(TreeAction):
                                            self.parent().nodeSelection.elements(self.recursive),
                                            self.parent())
         dialog.exec_()
-   
+
+class RenameAction(TreeAction):
+    """Action to rename (or move) a file."""
+    
+    def __init__(self, parent, text=None, shortcut=None):
+        super().__init__(parent, shortcut)
+        if text is None:
+            self.setText(self.tr('rename'))
+        else:
+            self.setText(text)
+    
+    def initialize(self, selection):
+        self.setEnabled(selection.singleWrapper() and selection.hasFiles())
+    
+    def doAction(self):
+        """Open a dialog to edit the tags of the currently selected elements (and the children, if
+        *recursive* is True). This is called by the edit tags actions in the contextmenu.
+        """
+        import os.path
+        from ..filebackends.filesystem import FileURL
+        elem = next(self.parent().nodeSelection.fileWrappers()).element
+        path = QtGui.QFileDialog.getOpenFileName(self, self.tr("Select new file location"),
+                                                 (os.path.dirname(elem.url.path)))
+        if path != "":
+            newUrl = FileURL(path)
+            self.level().renameFiles( {elem: (elem.url, newUrl) })
    
 class RemoveFromParentAction(TreeAction):
     """Action to remove selected elements from the parent container or rootnode.
@@ -116,22 +141,24 @@ class RemoveFromParentAction(TreeAction):
 class DeleteAction(TreeAction):
     """Action to delete elements from the database and/or filesystem."""
     
-    def __init__(self, parent, text):
+    def __init__(self, parent, text, allowDisk=True, shortcut=None):
         """Initialize the action."""
-        super().__init__(parent)
+        super().__init__(parent, shortcut)
         self.setText(text)
+        self.allowDisk = allowDisk
             
     def initialize(self, selection):
         if self.level() is levels.real:
             self.setEnabled(selection.hasElements())
         else:
-            self.setEnabled(selection.hasFiles() and all(wrap.element.url.CAN_DELETE for wrap in selection.fileWrappers()))
+            self.setEnabled(selection.hasFiles() and \
+                            all(wrap.element.url.CAN_DELETE for wrap in selection.fileWrappers()))
     
     def doAction(self):
         selection = self.parent().nodeSelection
         files = [wrap.element for wrap in selection.fileWrappers()]
         self.level().deleteElements(self.parent().nodeSelection.elements())
-        if len(files) > 0:
+        if self.allowDisk and len(files) > 0:
             if self.level() is levels.real:
                 message = self.tr("You have deleted the following files from OMG:\n{}\n"
                                   "Do you want them deleted completely (<b>can not be reversed!!</b>)")

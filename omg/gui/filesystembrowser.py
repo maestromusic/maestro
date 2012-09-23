@@ -23,7 +23,7 @@ from PyQt4.QtCore import Qt
 
 from . import mainwindow, selection
 from .. import filebackends, filesystem, config
-from ..utils import relPath, absPath, getIcon
+from ..utils import relPath, getIcon
 from ..core import levels
 
 
@@ -40,13 +40,15 @@ class FileSystemBrowserModel(QtGui.QFileSystemModel):
         'unsynced' : getIcon("folder_unsynced.svg"),
         'ok'       : getIcon("folder_ok.svg"),
         'nomusic'  : getIcon("folder.svg"),
-        'unknown'  : getIcon("folder_unknown.svg") }
+        'unknown'  : getIcon("folder_unknown.svg"),
+        'problem'  : getIcon("folder_problem.svg") }
     
     descriptions = {
         'unsynced' : translate(__name__, "contains music which is not in OMG's database"),
         'ok'       : translate(__name__, "in sync with OMG's database"),
         'nomusic'  : translate(__name__, "does not contain music"),
-        'unknown'  : translate(__name__, "unknown folder status") }
+        'unknown'  : translate(__name__, "unknown folder status"),
+        'problem'  : translate(__name__, "conflict with database") }
     
     def __init__(self, parent = None):
         QtGui.QFileSystemModel.__init__(self, parent)

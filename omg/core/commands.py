@@ -93,6 +93,8 @@ class CreateDBElementsCommand(QtGui.QUndoCommand):
         
     def undo(self):
         db.write.deleteElements(list(self.idMap.values()))
+        if any(elem.isFile() for elem in self.elements):
+            levels.real.filesRemoved.emit([elem for elem in self.elements if elem.isFile()])
         for oldId, newId in self.idMap.items():
             levels.Level._changeId(newId, oldId)
         if self.newInLevel:

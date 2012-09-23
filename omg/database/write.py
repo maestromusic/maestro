@@ -166,8 +166,8 @@ def updateToplevelFlags(elids=None):
 
 
 def changeUrls(data):
-    """Change the urls of files by the (id, urlString) list *data*."""
-    db.multiQuery("UPDATE {}files SET url = ? WHERE element_id = ?".format(db.prefix), data)
+    """Change the urls of files by the (urlString, id) list *data*."""
+    db.multiQuery("UPDATE {}files SET url=? WHERE element_id=?".format(db.prefix), data)
 
 
 def makeValueIDs(data):
