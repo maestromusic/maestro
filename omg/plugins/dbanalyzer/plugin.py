@@ -284,6 +284,12 @@ class DBAnalyzerDialog(QtGui.QDialog):
                         .format(db.prefix)).getSingle()),
             (self.tr("Tag relations"),db.query(
                     "SELECT COUNT(*) FROM {}tags"
+                        .format(db.prefix)).getSingle()),
+            (self.tr("Tracked new files"),db.query(
+                    "SELECT COUNT(*) FROM {}newfiles"
+                        .format(db.prefix)).getSingle()),
+            (self.tr("Tracked folders"),db.query(
+                    "SELECT COUNT(*) FROM {}folders"
                         .format(db.prefix)).getSingle())
             ]
 
