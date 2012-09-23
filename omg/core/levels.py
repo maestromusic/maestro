@@ -191,7 +191,7 @@ class Level(application.ChangeEventDispatcher):
         
         *param* may be either the id or, in case of files, the path.
         """
-        if not isinstance(param,int):
+        if not isinstance(param, int):
             if not isinstance(param, filebackends.BackendURL):
                 print('what is this? {}'.format(param))
             param = idFromUrl(param)

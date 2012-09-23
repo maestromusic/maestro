@@ -23,7 +23,7 @@ from PyQt4.QtCore import Qt
 
 from . import mainwindow, selection
 from .. import filebackends, filesystem, config
-from ..utils import relPath, getIcon
+from ..utils import relPath, getIcon, hasKnownExtension
 from ..core import levels
 
 
@@ -94,7 +94,7 @@ class FileSystemBrowser(QtGui.QTreeView):
         super().selectionChanged(selected, deselected)
         paths = [relPath(self.model().filePath(index)) for index in self.selectedIndexes()
                         if not self.model().isDir(index)] # TODO: remove this restriction
-        s = FileSystemSelection(paths)
+        s = FileSystemSelection([p for p in paths if hasKnownExtension(p)])
         if s.hasFiles():
             selection.setGlobalSelection(s) 
 

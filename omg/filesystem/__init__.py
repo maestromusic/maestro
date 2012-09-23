@@ -336,15 +336,15 @@ class FileSystemSynchronizer(QtCore.QObject):
                 track.hash = computeHash(track.url)
                 track.verified = modified
             else:
-                if id in levels.real:
-                    dbTags = levels.real.get(id).tags
+                if track.id in levels.real:
+                    dbTags = levels.real.get(track.id).tags
                 else:
-                    dbTags = db.tags(id)
+                    dbTags = db.tags(track.id)
                 backendFile = track.url.getBackendFile()
                 backendFile.readTags()
                 if dbTags.withoutPrivateTags() != backendFile.tags:
                     logger.debug('Detected modification on file "{}": tags differ'.format(track.url))
-                    self.modifiedTags[id] = (dbTags, backendFile.tags)
+                    self.modifiedTags[track.id] = (dbTags, backendFile.tags)
                     track.problem = True
                 else:
                     filehash = computeHash(track.url)
@@ -458,7 +458,7 @@ class FileSystemSynchronizer(QtCore.QObject):
                     # case 2: file from files table is gone, but its hash is known
                     missingHashes[track.hash] = track
             if len(goneNewFiles) > 0:
-                db.multiQuery("DELETE FROM {}newfiles WHERE PATH=?".format(db.prefix),
+                db.multiQuery("DELETE FROM {}newfiles WHERE url=?".format(db.prefix),
                               [ (str(track.url),) for track in goneNewFiles])
                 for track in goneNewFiles:
                     self.dbTracks.remove(track.url)
@@ -492,6 +492,7 @@ class FileSystemSynchronizer(QtCore.QObject):
                 dir = self.directories[dirPath]
                 assert len(dir.tracks) == 0
                 dir.parent.subdirs.remove(dir)
+            self.dbDirectories = set()
     
     def moveTrack(self, track, newUrl):
         newDir = self.getDirectory(os.path.dirname(newUrl.path))[0]

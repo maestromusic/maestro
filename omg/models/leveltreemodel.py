@@ -23,6 +23,7 @@ from .. import application, config, logging, utils
 from ..core import elements, levels, nodes
 from ..models import rootedtreemodel, albumguesser
 
+from collections import OrderedDict
 
 logger = logging.getLogger(__name__)
 
@@ -155,7 +156,7 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
         progress.setRange(0, numFiles)
         progress.setMinimumDuration(200)
         progress.setWindowModality(Qt.WindowModal)
-        filesByFolder = {}
+        filesByFolder = OrderedDict()
         elements = []
         try:
             # load files into editor level
