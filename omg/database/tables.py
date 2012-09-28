@@ -354,7 +354,7 @@ CREATE TABLE {}newfiles (
     url        VARCHAR(511)       NOT NULL,
     hash       VARCHAR(63),
     verified   TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX path_idx(path(333)),
+    INDEX url_idx(url(333)),
     INDEX hash_idx(hash)
 ) ENGINE InnoDB, CHARACTER SET 'utf8'
 """.format(db.prefix))
@@ -365,12 +365,12 @@ CREATE TABLE {}newfiles (
     verified   INTEGER DEFAULT CURRENT_TIMESTAMP
 )
 """.format(db.prefix),
-"CREATE INDEX newfiles_path_idx ON {}newfiles (path)".format(db.prefix),
+"CREATE INDEX newfiles_url_idx ON {}newfiles (url)".format(db.prefix),
 "CREATE INDEX newfiles_hash_idx ON {}newfiles (hash)".format(db.prefix),
 """
 CREATE TRIGGER newfiles_timestamp_trg AFTER UPDATE ON {0}newfiles
 BEGIN
-UPDATE {0}newfiles SET verified = CURRENT_TIMESTAMP WHERE path = new.path;
+UPDATE {0}newfiles SET verified = CURRENT_TIMESTAMP WHERE url = new.url;
 END
 """.format(db.prefix)
 )

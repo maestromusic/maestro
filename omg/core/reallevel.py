@@ -233,11 +233,20 @@ class RealLevel(levels.Level):
         db.write.deleteElements([elem.id for elem in elements])
         
     def _insertContents(self, parent, insertions, emitEvent=True):
-        db.write.addContents([(parent.id, pos, child.id) for pos, child in insertions])
+        db.transaction()
+        db.multiQuery("INSERT INTO {}contents (container_id, position, element_id) "
+                      "       VALUES (?, ?, ?)".format(db.prefix),
+                      [(parent.id, pos, child.id) for pos, child in insertions])
+        db.write.updateElementsCounter((parent.id,))
+        db.commit()
         super()._insertContents(parent, insertions, emitEvent)
         
     def _removeContents(self, parent, positions, emitEvent=True):
-        db.write.removeContents([(parent.id, pos) for pos in positions])
+        db.transaction()
+        db.multiQuery("DELETE FROM {}contents WHERE container_id=? AND position=?"
+                   .format(db.prefix), [(parent.id, pos) for pos in positions])
+        db.write.updateElementsCounter((parent.id,))
+        db.commit()
         super()._removeContents(parent, positions, emitEvent)
     
     def _renameFiles(self, renamings, emitEvent=True):
