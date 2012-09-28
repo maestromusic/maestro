@@ -542,6 +542,7 @@ class Level(application.ChangeEventDispatcher):
                     self.stack.push(commands.CreateDBElementsCommand(tempFilesInReal, newInLevel=False))
                 if len(newFiles) > 0:
                     #TODO: Doesn't this forget the tempFilesInReal?
+                    # no - they can't have tags different from the filesystem
                     real.setFileTagsAndRename(newFiles)
                 if len(newElements) > 0:
                     self.stack.push(commands.CreateDBElementsCommand(newElements, newInLevel=True))

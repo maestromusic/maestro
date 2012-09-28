@@ -78,6 +78,8 @@ class CreateDBElementsCommand(QtGui.QUndoCommand):
             newFiles.append(file)
         if len(addFileData) > 0:
             db.write.addFiles(addFileData)
+            db.multiQuery("UPDATE {}files SET verified=CURRENT_TIMESTAMP WHERE element_id=?"
+                          .format(db.prefix), [(f.id,) for f in newFiles])
             levels.real.filesAdded.emit(newFiles)
         for element in self.elements:
             db.write.setTags(element.id, element.tags)

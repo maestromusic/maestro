@@ -46,7 +46,6 @@ def init():
     levels.real.filesRemoved.connect(synchronizer.handleRemove)
     null = open(os.devnull)
     enabled = True
-    logger.debug("Filesystem module initialized in thread {}".format(QtCore.QThread.currentThread()))
     
 def shutdown():
     """Terminates this module; waits for all threads to complete."""
@@ -54,7 +53,6 @@ def shutdown():
     if config.options.filesystem.disable or synchronizer is None:
         return
     enabled = False
-    logger.debug("Filesystem module: received shutdown() command")
     levels.real.filesRenamed.disconnect(synchronizer.handleRename)
     levels.real.filesAdded.disconnect(synchronizer.handleAdd)
     levels.real.filesRemoved.disconnect(synchronizer.handleRemove)
@@ -335,6 +333,10 @@ class FileSystemSynchronizer(QtCore.QObject):
                 logger.debug("just updating hash")
                 track.hash = computeHash(track.url)
                 track.verified = modified
+                db.query("UPDATE {}newfiles "
+                         "  SET hash=?, verified=CURRENT_TIMESTAMP "
+                         "  WHERE url=?".format(db.prefix),
+                         track.hash, str(track.url))
             else:
                 if track.id in levels.real:
                     dbTags = levels.real.get(track.id).tags
@@ -537,6 +539,7 @@ class FileSystemSynchronizer(QtCore.QObject):
             newDirectories.update(newDirs)
             if file.url in self.tracks:
                 track = self.tracks[file.url]
+                track.verified = datetime.datetime.now(datetime.timezone.utc)
             else:
                 track = self.addTrack(dir, file.url)
                 newHashes.append(track)
