@@ -74,7 +74,7 @@ class DelegatesPanel(QtGui.QWidget):
         if startConfig is None:
             self.showConfig(configuration.getConfiguration(self.delegateBox.itemText(0)))
         else: self.showConfig(startConfig)
-        configuration.dispatcher.connect(self._handleDispatcher)
+        configuration.dispatcher.changes.connect(self._handleDispatcher)
         
     def _populateDelegateBox(self):
         """Fill the delegate configuration combo box with a list of all configurations.""" 

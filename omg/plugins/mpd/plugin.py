@@ -400,8 +400,8 @@ class MPDPlayerBackend(player.PlayerBackend):
             print("Change from MPD: remove")
             print(how)
             self.playlist.removeByOffset(how[0][0],len(how),updateBackend=False)
-            for pos, path in reversed(how):
-                del self.paths[pos]
+            for pos, url in reversed(how):
+                del self.urls[pos]
         
         elif what == 'insert':
             print("Change from MPD: insert")
