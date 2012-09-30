@@ -125,7 +125,7 @@ class RecordModel(QtCore.QObject):
         del self._records[key]
 
     def keys(self):
-        # Note that we use a utils.OrderedDict and therefore keys will return a list and no view
+        # Note that we use utils.OrderedDict and therefore keys will return a list and no view
         return self._records.keys()
     
     # Simply a more descriptive name
@@ -152,8 +152,9 @@ class RecordModel(QtCore.QObject):
         return copy
 
     def insertRecord(self,pos,record):
-        """Insert *record* at position *pos* into the list of records with tag ''record.tag''. This list must
+        """Insert *record* at position *pos* into the list of records with tag record.tag. This list must
         exist before you call this method, so you may need to call insertTag first. *pos* may also be -1."""
+        assert record.tag in self._records
         if pos == -1:
             pos = len(self._records[record.tag])
         self._records[record.tag].insert(pos,record)
@@ -191,12 +192,28 @@ class RecordModel(QtCore.QObject):
         """Change the tag *oldTag* into *newTag*. This method won't touch any records, so you may have to
         change the tags in the records by calling changeRecord. *newTag* must not already be contained in
         the model."""
+        assert oldTag in self._records and newTag not in self._records
         self._records.changeKey(oldTag,newTag)
         self.tagChanged.emit(oldTag,newTag)
     
     
 class TagEditorChangeEvent(application.ChangeEvent):
     # Do not inherit ElementChangedEvent, so that these events are not affected by ElementChangedEvent.merge.
+    """A special change event for the tageditor. It can be used as usual ElementChangeEvent (contentIds and
+    dataIds) but stores additional information for the tageditor.
+    
+    Arguments are
+        
+        - the model in which the change was originally done,
+        - the statusNumber of the model when the change was originally done,
+        - a method from ['insertRecord','removeRecord','changeRecord','insertTag','removeTag','changeTag'],
+        - a dict with key-word arguments to that method.
+    
+    Only the TagEditorModel stored inside a TagEditorChangeEvent will react in a special way and it will do
+    so only if the statusNumbers match.
+    
+    TagEditorChangeEvents may be merged and will contain several methods and arguments dicts then.
+    """
     def __init__(self,model,statusNumber,method,args):
         self.model = model
         self.statusNumber = statusNumber
@@ -237,6 +254,15 @@ class TagEditorChangeEvent(application.ChangeEvent):
 
 
 class TagEditorUndoCommand(QtGui.QUndoCommand):
+    """Special UndoCommand for the TagEditor. After changing the level it emits a TagEditorChangeEvent
+    instead of a usual ElementChangeEvent.
+    
+    Arguments are
+        
+        - the model in which the change is done,
+        - a method from ['insertRecord','removeRecord','changeRecord','insertTag','removeTag','changeTag'],
+        - a dict with key-word arguments to that method.
+    """
     def __init__(self,model,method,args):
         self.model = model
         self.level = model.level
@@ -254,6 +280,8 @@ class TagEditorUndoCommand(QtGui.QUndoCommand):
         self.level.emit(TagEditorChangeEvent(self.model,self.statusNumber,self.undoMethod,self.undoArgs))
     
     def _computeUndoMethod(self,method,args):
+        """Given a method and a dict of arguments, return the appropriate method and arguments to the first
+        method."""
         recordModel = self.model.records
         if method == 'insertRecord':
             undoMethod = 'removeRecord'
@@ -278,6 +306,7 @@ class TagEditorUndoCommand(QtGui.QUndoCommand):
         return undoMethod,undoArgs
         
     def _modifyLevel(self,method,args):
+        """Modify self.level according to *method* and *args*."""
         if method == 'insertRecord':
             record = args['record']
             diff = tags.TagDifference(additions=[(record.tag,record.value)])
@@ -314,35 +343,39 @@ class TagEditorUndoCommand(QtGui.QUndoCommand):
                          
                         
 class TagEditorModel(QtCore.QObject):
-    #TODO update comment
     """A model built for the Record-based GUI of the tageditor. It stores
     
         - a list of elements that are currently edited.
         - a RecordModel storing the records built from the tags of these elements
-        
-    Due to this different data structure, TagEditorModel cannot simply redo/undo actions appropriately by
-    reacting to general ElementChangedEvents. Therefore it uses a somewhat complicated system:
     
-    When a record-changing method is called, an TagEditorUndoCommand is created and pushed onto the stack.
-    Then a series of methods of the RecordModel is added to the command and directly executed, changing the
-    records as well as the underlying level (but without emitting an event). When the command is finished, a
-    single ElementChangedEvent is emitted.
+    The fundamental problem with the TagEditorModel is that it contains data that is not stored in the level:
+    the order of the records in each tag and the order of tags. This order is important for a convenient
+    GUI (otherwise new or changed records would always be appended at the end, records might jump around...).
     
-    When a record-changing method is called, an TagEditorUndoCommand is created. Then a series of methods of
-    the RecordModel is added to the command and directly executed, changing the records but not yet the level.
-    It is important to change the record directly because the next method added to the command might depend
-    on the effect of the previous one. When the command is finally composed, it is pushed onto the stack and
-    the level is changed according to the stored methods. A single ElementChangedEvent is emitted.
+    Due to this different data structure, TagEditorModel uses its own ChangeEvents which also store the
+    additional data.
     
-    On later redos all methods of the command are executed changing records and level and an event is emitted.
-    On undos an appropriate list of undo methods computed by the command is executed and an event is emitted.
-    In both cases the command only changes the RecordModel if its status is still the same, i.e. the list of
-    records has not been changed by an external source (e.g. by selecting different elements).
+    This is a "flow diagram" of changing tags:
+    Change by the user in GUI -> method of TagEditorModel (e.g. addRecord) -> TagEditorUndoCommand is
+    pushed onto the stack -> level is modified
+    At the end of the macro: TagEditorChangeEvent is emitted -> TagEditorModel reacts to it changing its
+                                                                internal data
     
-    Nethertheless a TagEditorModel must react to ChangeEvents sent from the level because tags may have
-    changed by an external source or by an TagEditorUndoCommand that is too old to change records directly
-    (see the discussion of _statusNumber in the docstring of TagFlagEditorUndoCommand).
-    
+    The additional information carried by TagEditorChangeEvents is valid only for the model where the change
+    was originally done and only if that model did not change its elements in the meantime. Otherwise the
+    records stored in the event simply don't exist in the model. In all other cases a model reacts to
+    TagEditorChangeEvents as if it were a normal ChangeEvent.
+                                                          
+    Some remarks:
+        - The internal records are only changed when the event is received and not by methods like addRecord.
+          This is important because when the command is later redone, it will only emit an event and
+          addRecord etc. won't be called. A second reason is that changing the level might fail due to a
+          TagWriteError.
+        - It is much easier to implement complicated actions (e.g. changeTag, splitMany) when the changes
+          are performed immediately. As this is not possible with the real records as explained above, such
+          methods use a copy (usually called recordCopy) and perform the changes there (see self._command).
+          After the action is done, the copy is deleted. 
+          
     Model parameters are:
     
         - level: the level that contains the elements
@@ -429,7 +462,10 @@ class TagEditorModel(QtCore.QObject):
         return result
 
     def _command(self,method,recordCopy,**args):
-        print(method,args) #TODO
+        """Helper function: Push a TagEditorUndoCommand with *method* and *args* onto the stack. If not
+        None, modify *recordCopy* accordingly. Remember that the real records are not modified until a
+        (TagEditor)ChangeEvent is received.
+        """
         self.stack.push(TagEditorUndoCommand(self,method,args))
         if recordCopy is not None:
             getattr(recordCopy,method)(**args)
@@ -442,6 +478,13 @@ class TagEditorModel(QtCore.QObject):
         self.stack.endMacro()
 
     def _insertRecord(self,pos,record,recordCopy=None):
+        """Helper function for inserting: Push commands to the stack that will insert *record* at *pos*
+        into the list of records of tag record.tag. *pos* may be -1.
+        Take care that the tag is created if it does not exist and that the record is merged with an existing
+        one with the same tag and value.
+        If *recordCopy* is not None, modify it according to the created commands.
+        This method must be called from within a macro.
+        """
         records = recordCopy if recordCopy is not None else self.records
         if record.tag not in records.tags():
             self._command('insertTag', recordCopy, pos=-1, tag=record.tag)
@@ -471,7 +514,10 @@ class TagEditorModel(QtCore.QObject):
             self.stack.endMacro()
 
     def _removeRecord(self,record,recordCopy=None):
-        """Add commands to the stack that will remove *record*.""" #TODO
+        """Helper method for removing: Push commands to the stack that will remove *record* and its tag
+        if it is empty. If *recordCopy* is not None, modify it according to the created commands.
+        This method must be called from within a macro.
+        """
         records = recordCopy if recordCopy is not None else self.records
         removeTag = len(records[record.tag]) == 1
         self._command('removeRecord', recordCopy, record=record)
@@ -494,6 +540,12 @@ class TagEditorModel(QtCore.QObject):
         self.stack.endMacro()
         
     def _changeRecord(self,oldRecord,newRecord,recordCopy=None):
+        """Helper function for changing: Push commands to the stack that will change *oldRecord* into
+        *newRecord*. Both records must have the same value. Handle the case that there exists already a
+        record whose value equals newRecord.value.
+        If *recordCopy* is not None, modify it according to the created commands.
+        This method must be called from within a macro.
+        """
         assert oldRecord.tag == newRecord.tag
         records = recordCopy[oldRecord.tag] if recordCopy is not None else self.records[oldRecord.tag]
         for existingRecord in records:
@@ -556,11 +608,9 @@ class TagEditorModel(QtCore.QObject):
         return True
         
     def split(self,record,separator):
-        """Split the given record using the separator *separator*. If ''record.value'' is for example
-        ''Artist 1/Artist 2'' and ''separator=='/''', this method will change the value of record to
-        ''Artist 1'' and insert a new record with value ''Artist 2'' after it.
-        
-        This method will return true if the split was successful.
+        """Split the given record using the given separator. If record.value is for example
+        'Artist 1/Artist 2' and separator is '/', this method will replace *record* by two records of
+        values 'Artist 1' and 'Artist 2'.
         """
         self.stack.beginMacro(self.tr("Split"))
         result = self._split(record,separator)
@@ -577,7 +627,10 @@ class TagEditorModel(QtCore.QObject):
         
     def _split(self,record,separator,recordCopy=None):    
         """Helper function for split and splitMany: Add commands to the stack that will split *record* at the
-        given separator.""" #TODO
+        given separator. Handle special cases correctly (',',  'a,a', etc.).
+        If *recordCopy* is not None, modify it according to the created commands.
+        This method must be called from within a macro.
+        """ #TODO
         assert record.tag.type in (tags.TYPE_VARCHAR,tags.TYPE_TEXT)
         # The type restriction implies that the empty string is the only possible invalid value
         splittedValues = [value for value in record.value.split(separator) if len(value) > 0]
@@ -611,7 +664,7 @@ class TagEditorModel(QtCore.QObject):
             self.stack.endMacro()
 
     def extendRecords(self,records):
-        """Make the given records common, i.e. set 'record.elementsWithValue' to all elements."""
+        """Make the given records common, i.e. set record.elementsWithValue to all elements."""
         if len(records) > 0:
             self.stack.beginMacro(self.tr("Extend %n record(s)",'',len(records)))
 
@@ -642,10 +695,14 @@ class TagEditorModel(QtCore.QObject):
         """React to change events of the underlying level."""
         if isinstance(event,TagEditorChangeEvent) \
                 and event.model is self and event.statusNumber == self._statusNumber:
+            # Yeah, the event carries special information that tells us how to react to it.
             for method,args in zip(event.methods,event.args):
                 theMethod = getattr(self.records,method)
                 theMethod(**args)
             return
+        
+        # No special information...this might lead to jumping records in the GUI (changes in the value are 
+        # detected as removal of one record and addition of another one).
         
         currentIds = [el.id for el in self.elements]
         if all(id not in currentIds for id in event.dataIds):
