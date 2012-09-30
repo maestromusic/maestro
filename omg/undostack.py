@@ -227,7 +227,7 @@ class UndoStack(QtCore.QObject):
         """Add *event* to the queue. *dispatcher* is the ChangeEventDispatcher that should eventually emit
         the event. Try to merge the event with existing events (of the same dispatcher, of course).
         """ 
-        for d,e in self._eventQueue:
+        for d,e in reversed(self._eventQueue):
             if d is dispatcher:
                 if e.merge(event):
                     return # event was merged

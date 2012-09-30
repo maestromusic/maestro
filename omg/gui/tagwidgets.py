@@ -243,8 +243,8 @@ class TagTypeBox(QtGui.QStackedWidget):
                 self.box.insertSeparator(self.box.count())
                 self.box.addItem(self.tr("Add tag to DB..."))
             elif not self._tag.isInDB() and tag.isInDB():
-                self.box.removeItem(self.box.count())
-                self.box.removeItem(self.box.count())
+                self.box.removeItem(self.box.count()-1) # Remove "Add tag to DB" 
+                self.box.removeItem(self.box.count()-1) # and separator
             self._tag = tag
             self.tagChanged.emit(tag)
     

@@ -19,9 +19,9 @@
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from . import tagwidgets
+from . import tagwidgets, dialogs
 from .misc import listview, widgetlist
-from .. import utils
+from .. import utils, filebackends
 from ..core import tags
 from ..models import simplelistmodel
 
@@ -151,7 +151,7 @@ class SingleTagEditor(QtGui.QWidget):
         for widgetList in (self.commonList,self.uncommonList):
             if not widgetList.isVisible():
                 continue
-            pos = widgetList.mapTo(self,contextMenuEvent.pos())
+            pos = widgetList.mapFrom(self,contextMenuEvent.pos())
             for widget in widgetList:
                 if widget.geometry().contains(pos):
                     self.tagEditor.contextMenuEvent(contextMenuEvent,widget.getRecord())
@@ -258,12 +258,21 @@ class RecordEditor(QtGui.QWidget):
         if self.record.value != value:
             newRecord = self.record.copy()
             newRecord.value = value
-            self.model.changeRecord(self.record,newRecord)
+            try:
+                self.model.changeRecord(self.record,newRecord)
+            except filebackends.TagWriteError as e:
+                self.valueEditor.setValue(self.record.value)
+                self._handleError(e)
 
     def _handleRecordChanged(self,tag,oldRecord,newRecord):
         """Handle recordChanged signals from the model."""
         if oldRecord is self.record:
             self.setRecord(newRecord)
+    
+    def _handleError(self,error):
+        dialogs.warning(self.tr("Tag write error"),
+                        self.tr("An error ocurred: {}").format(error),
+                        parent=self)
 
 
 class ExpandLine(QtGui.QLabel):

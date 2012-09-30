@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import os.path
+import os.path, functools
 
 from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
@@ -276,7 +276,7 @@ class TagEditorWidget(QtGui.QWidget):
             for button in ['addButton','removeButton']:
                 getattr(self,button).setText('')
         else:
-            self.addButton.setText(self.tr("Add tag"))
+            self.addButton.setText(self.tr("Add tag value"))
             self.removeButton.setText(self.tr("Remove selected"))
         
         self.horizontalFlagEditor.setVisible(self.flagEditorInTitleLine and not vertical)
@@ -333,17 +333,28 @@ class TagEditorWidget(QtGui.QWidget):
         self.removeButton.setEnabled(count > 0)
         self.horizontalFlagEditor.setEnabled(count > 0)
         self.verticalFlagEditor.setEnabled(count > 0)
+    
+    def _handleError(self,error):
+        dialogs.warning(self.tr("Tag write error"),
+                        self.tr("An error ocurred: {}").format(error),
+                        parent=self)
         
     def _handleAddRecord(self,tag=None):
         dialog = RecordDialog(self,self.model.getElements(),defaultTag=tag)
         if dialog.exec_() == QtGui.QDialog.Accepted:
-            self.model.addRecord(dialog.getRecord())
+            try:
+                self.model.addRecord(dialog.getRecord())
+            except filebackends.TagWriteError as e:
+                self._handleError(e)
 
     def _handleRemoveSelected(self):
         records = self._getSelectedRecords()
         if len(records) > 0:
-            self.model.removeRecords(records)
-            
+            try:
+                self.model.removeRecords(records)
+            except filebackends.TagWriteError as e:
+                self._handleError(e)
+        
     # Note that the following _handle-functions only add new SingleTagEditors or remove SingleTagEditors
     # which have become empty. Unless they are newly created or removed, the editors are updated in their
     # own _handle-functions.
@@ -390,15 +401,24 @@ class TagEditorWidget(QtGui.QWidget):
             if newTag is None: # user aborted the dialog
                 tagBox.setTag(oldTag)
                 return
-                
-        # If changeTag fails, then reset the box
-        if not self.model.changeTag(oldTag,newTag):
+        
+        # First reset the box, because a number of things might go wrong. Also, if oldTag is finally
+        # removed (because there is already a SingleTagEditor for newTag) the box is searched via oldTag.     
+        tagBox.setTag(oldTag)
+        
+        try:
+            result = self.model.changeTag(oldTag,newTag)
+        except filebackends.TagWriteError as e:
+            self._handleError(e)
+            
+        if result:
+            tagBox.setTag(newTag)
+        else:
+            # This means that changeTag failed because some values could not be converted to the new tag.
+            # Reset the box
             QtGui.QMessageBox.warning(self,self.tr("Invalid value"),
                                       self.tr("At least one value is invalid for the new type."))
-            tagBox.setTag(oldTag)
-        else:
-            # This is important if the user changed newTag within the AddTagTypeDialog 
-            tagBox.setTag(newTag)
+        self._ignoreHandleTagChangedByUser = False
                 
     def contextMenuEvent(self,contextMenuEvent,record=None):
         menu = QtGui.QMenu(self)
@@ -407,7 +427,7 @@ class TagEditorWidget(QtGui.QWidget):
         menu.addAction(self.model.stack.createRedoAction())
         menu.addSeparator()
         
-        addRecordAction = QtGui.QAction(self.tr("Add tag..."),self)
+        addRecordAction = QtGui.QAction(self.tr("Add record..."),self)
         tag = record.tag if record is not None else None
         addRecordAction.triggered.connect(lambda: self._handleAddRecord(tag))
         menu.addAction(addRecordAction)
@@ -421,15 +441,15 @@ class TagEditorWidget(QtGui.QWidget):
             editRecordAction.triggered.connect(lambda: self._handleEditRecord(record))
             menu.addAction(editRecordAction)
             
+        selectedRecords = self._getSelectedRecords()
+        action = menu.addAction(self.tr("Extend to all elements"))
+        action.setEnabled(not all(record.isCommon() for record in selectedRecords))
+        action.triggered.connect(functools.partial(self._extendRecords,selectedRecords))
+            
         # Fancy stuff
         fancyMenu = menu.addMenu(self.tr("Fancy stuff"))
-        selectedRecords = self._getSelectedRecords()
 
         if len(selectedRecords) > 0:
-            if not all(record.isCommon() for record in selectedRecords):
-                action = fancyMenu.addAction(self.tr("Extend to all elements"))
-                action.triggered.connect(lambda: self.model.extendRecords(selectedRecords))
-            
             if len(selectedRecords) > 1 and all(r.tag.type == tags.TYPE_VARCHAR for r in selectedRecords):
                 commonPrefix = strutils.commonPrefix(record.value for record in selectedRecords)
                 
@@ -445,30 +465,57 @@ class TagEditorWidget(QtGui.QWidget):
                     else: prefixLength = len(commonPrefix)
                     rests = [str(record.value)[prefixLength:] for record in selectedRecords]
                     if any(strutils.numberFromPrefix(rest)[0] is not None for rest in rests):
-                        action = fancyMenu.addAction(self.tr("Remove common start (including numbers)"))
                         newValues = []
                         for record,rest in zip(selectedRecords,rests):
                             number,prefix = strutils.numberFromPrefix(rest)
                             if number is not None:
                                 newValues.append(record.value[prefixLength+len(prefix):])
                             else: newValues.append(record.value[prefixLength:])
-                        action.triggered.connect(lambda: self.model.editMany(selectedRecords,newValues))
+                        if all(record.tag.isValid(value) for record,value in zip(selectedRecords,newValues)):
+                            action = fancyMenu.addAction(self.tr("Remove common start (including numbers)"))
+                            action.triggered.connect(functools.partial(self._editMany,
+                                                                       selectedRecords,newValues))
                     else:
-                        action = fancyMenu.addAction(self.tr("Remove common start"))
                         newValues = [record.value[len(commonPrefix):] for record in selectedRecords]
-                        action.triggered.connect(lambda: self.model.editMany(selectedRecords,newValues))
+                        if all(record.tag.isValid(value) for record,value in zip(selectedRecords,newValues)):
+                            action = fancyMenu.addAction(self.tr("Remove common start"))
+                            action.triggered.connect(functools.partial(self._editMany,
+                                                                       selectedRecords,newValues))
                 else:
                     if any(strutils.numberFromPrefix(r.value)[0] is not None for r in selectedRecords):
-                        action = fancyMenu.addAction(self.tr("Remove numbers from beginning"))
                         # Remove the prefix returned in the second tuple part
                         newValues = [r.value[len(strutils.numberFromPrefix(r.value)[1]):]
                                         for r in selectedRecords]
-                        action.triggered.connect(lambda: self.model.editMany(selectedRecords,newValues))
+                        if all(record.tag.isValid(value) for record,value in zip(selectedRecords,newValues)):
+                            action = fancyMenu.addAction(self.tr("Remove numbers from beginning"))
+                            action.triggered.connect(functools.partial(self._editMany,
+                                                                       selectedRecords,newValues))
             for separator in self.model.getPossibleSeparators(selectedRecords):
+                # getPossibleSeparators returns nothing if a date record is selected
                 action = fancyMenu.addAction(self.tr("Separate at '{}'").format(separator))
-                action.triggered.connect(lambda: self.model.splitMany(selectedRecords,separator))
+                action.triggered.connect(functools.partial(self._splitMany,selectedRecords,separator))
 
+        fancyMenu.setEnabled(len(fancyMenu.actions()) > 0)
+        
         menu.popup(contextMenuEvent.globalPos())
+        
+    def _extendRecords(self,records):
+        try:
+            self.model.extendRecords(records)
+        except filebackends.TagWriteError as e:
+            self._handleError(e)
+            
+    def _editMany(self,records,newValues):
+        try:
+            self.model.editMany(records,newValues)
+        except filebackends.TagWriteError as e:
+            self._handleError(e)
+            
+    def _splitMany(self,records,separator):
+        try:
+            self.model.splitMany(records,separator)
+        except filebackends.TagWriteError as e:
+            self._handleError(e)
 
     def _editCommonStart(self):
         selectedRecords = [editor.getRecord() for editor in self.selectionManager.getSelectedWidgets()]
@@ -478,12 +525,17 @@ class TagEditorWidget(QtGui.QWidget):
                          text=commonStart)
         if ok:
             newValues = [text+record.value[len(commonStart):] for record in selectedRecords]
-            self.model.editMany(selectedRecords,newValues)
+            if all(record.tag.isValid(value) for record,value in zip(selectedRecords,newValues)):
+                self._editMany(selectedRecords,newValues)
+            else: dialogs.warning(self.tr("Invalid value"),self.tr("One or more values are invalid."))
     
     def _handleEditRecord(self,record):
         dialog = RecordDialog(self,self.model.getElements(),record=record)
         if dialog.exec_() == QtGui.QDialog.Accepted:
-            self.model.changeRecord(record,dialog.getRecord())
+            try:
+                self.model.changeRecord(record,dialog.getRecord())
+            except filebackends.TagWriteError as e:
+                self._handleError(e)
         
     def _getSelectedRecords(self):
         """Return all records that are selected and visible (i.e. not hidden by a collapsed ExpandLine."""
@@ -588,8 +640,8 @@ class RecordDialog(QtGui.QDialog):
     def _getSelectedElements(self):
         """Return the elements selected for the record."""
         allElements = self.elementsBox.model().getItems()
-        return [allElements[i] for i in range(len(allElements))
-                                if self.elementsBox.selectionModel().isRowSelected(i,QtCore.QModelIndex())]
+        return tuple(allElements[i] for i in range(len(allElements))
+                                 if self.elementsBox.selectionModel().isRowSelected(i,QtCore.QModelIndex()))
         
     def _handleTagChanged(self,tag):
         """Change the tag of the ValueEditor."""
@@ -771,5 +823,4 @@ class TagEditorLayout(QtGui.QLayout):
                 currentHeight =  height
             
         return columns
-     
         
