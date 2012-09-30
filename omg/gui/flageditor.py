@@ -294,7 +294,8 @@ class FlagWidget(QtGui.QWidget):
             painter.drawPixmap(borderWidth + smallHSpace,(height - iconSize) // 2,pixmap)
 
         if self._showRemoveButton:
-            painter.drawPixmap(width - borderWidth - smallHSpace - iconSize,(height - iconSize) // 2,self.clearPixmap)
+            painter.drawPixmap(width - borderWidth - smallHSpace - iconSize,
+                               (height - iconSize) // 2,self.clearPixmap)
 
     def sizeHint(self):
         fm,borderWidth,textWidth,iconSize,smallHSpace,bigHSpace,vSpace,width,height = self._sizes()
@@ -303,7 +304,8 @@ class FlagWidget(QtGui.QWidget):
     def mouseReleaseEvent(self,event):
         if self._removeButtonEnabled and event.button() == Qt.LeftButton:
             fm,borderWidth,textWidth,iconSize,smallHSpace,bigHSpace,vSpace,width,height = self._sizes()
-            rect = QtCore.QRect(width - borderWidth - smallHSpace - iconSize,(height - iconSize) // 2,iconSize,iconSize)
+            rect = QtCore.QRect(width - borderWidth - smallHSpace - iconSize,
+                                (height - iconSize) // 2,iconSize,iconSize)
             if rect.contains(event.pos()):
                 self.model.removeFlag(self.record.flag)
             event.accept()
@@ -330,8 +332,8 @@ class FlagWidget(QtGui.QWidget):
     def contextMenuEvent(self,contextMenuEvent,record=None):
         menu = QtGui.QMenu(self)
 
-        menu.addAction(self.model.stack.createUndoAction())
-        menu.addAction(self.model.stack.createRedoAction())
+        menu.addAction(self.model.level.stack.createUndoAction())
+        menu.addAction(self.model.level.stack.createRedoAction())
         menu.addSeparator()
 
         if not self.record.isCommon():
@@ -358,7 +360,7 @@ class FlagWidget(QtGui.QWidget):
             selectedElements = dialog.getSelectedElements()
             if selectedElements != self.record.elementsWithFlag:
                 newRecord = flageditormodel.Record(self.record.flag,self.record.allElements,
-                                                   selectedElements)
+                                                   tuple(selectedElements))
                 self.model.changeRecord(self.record,newRecord)
 
 

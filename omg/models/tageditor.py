@@ -427,15 +427,6 @@ class TagEditorModel(QtCore.QObject):
                 else: elementsWithValue = tuple(elementsWithValue)
                 result[tag].append(Record(tag,value,self.elements,elementsWithValue))
         return result
-    
-    def getTagsOfElement(self,element):
-        """Return the tags of the given element as stored in the records."""
-        result = tags.Storage()
-        for tag,records in self.records.items():
-            for record in records:
-                if element in record.elementsWithValue:
-                    result.add(tag,record.value)
-        return result
 
     def _command(self,method,recordCopy,**args):
         print(method,args) #TODO

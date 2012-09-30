@@ -199,7 +199,7 @@ class TagEditorWidget(QtGui.QWidget):
         self.model.tagChanged.connect(self._handleTagChanged)
         self.model.resetted.connect(self._handleReset)
 
-        self.flagModel = flageditormodel.FlagEditorModel(stack=stack)
+        self.flagModel = flageditormodel.FlagEditorModel()
 
         self.selectionManager = widgetlist.SelectionManager()
         # Do not allow the user to select ExpandLines
