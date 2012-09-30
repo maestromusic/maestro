@@ -23,7 +23,7 @@ from PyQt4.QtCore import Qt
 
 from . import mainwindow, selection
 from .. import filebackends, filesystem, config
-from ..utils import relPath, absPath, getIcon
+from ..utils import relPath, getIcon, hasKnownExtension
 from ..core import levels
 
 
@@ -40,46 +40,53 @@ class FileSystemBrowserModel(QtGui.QFileSystemModel):
         'unsynced' : getIcon("folder_unsynced.svg"),
         'ok'       : getIcon("folder_ok.svg"),
         'nomusic'  : getIcon("folder.svg"),
-        'unknown'  : getIcon("folder_unknown.svg") }
+        'unknown'  : getIcon("folder_unknown.svg"),
+        'problem'  : getIcon("folder_problem.svg") }
+    
+    descriptions = {
+        'unsynced' : translate(__name__, "contains music which is not in OMG's database"),
+        'ok'       : translate(__name__, "in sync with OMG's database"),
+        'nomusic'  : translate(__name__, "does not contain music"),
+        'unknown'  : translate(__name__, "unknown folder status"),
+        'problem'  : translate(__name__, "conflict with database") }
     
     def __init__(self, parent = None):
         QtGui.QFileSystemModel.__init__(self, parent)
         self.setFilter(QtCore.QDir.AllEntries | QtCore.QDir.NoDotAndDotDot)
-        if filesystem.syncThread is not None:
-            filesystem.syncThread.folderStateChanged.connect(self.handleStateChange)
 
     def columnCount(self, index):
         return 1
     
-    @QtCore.pyqtSlot(str, str)
-    def handleStateChange(self, folder, state):
-        index = self.index(absPath(folder))
-        self.dataChanged.emit(index, index)
-        while(index.parent().isValid()):
-            index = index.parent()
-            self.dataChanged.emit(index, index)    
+    @QtCore.pyqtSlot(object)
+    def handleStateChange(self, dir):
+        index = self.index(dir.absPath)
+        self.dataChanged.emit(index, index)    
     
-    def data(self, index, role = Qt.DisplayRole):
-        if role == Qt.DecorationRole:
+    def data(self, index, role=Qt.DisplayRole):
+        if role == Qt.DecorationRole or role == Qt.ToolTipRole:
             info = self.fileInfo(index)
             if os.path.isdir(info.absoluteFilePath()):
                 dir = relPath(info.absoluteFilePath())
                 if dir == '..':
                     return super().data(index, role)
-                try:
-                    status = filesystem.folderStatus(dir)
-                except KeyError as e:
-                    status = 'nomusic'
-                return self.icons[status]
+                status = filesystem.getFolderState(dir)
+                if role == Qt.DecorationRole:
+                    return self.icons[status]
+                else:
+                    return self.descriptions[status]
         return super().data(index, role) 
     
 class FileSystemBrowser(QtGui.QTreeView):
-    def __init__(self, rootDirectory = config.options.main.collection, parent = None):
+    def __init__(self, rootDirectory=config.options.main.collection, parent=None):
         QtGui.QTreeView.__init__(self, parent)
         self.setAlternatingRowColors(True)
         self.setModel(FileSystemBrowserModel())
         musikindex = self.model().setRootPath(rootDirectory)
         self.setRootIndex(musikindex)
+        if filesystem.enabled:
+            filesystem.synchronizer.folderStateChanged.connect(self.model().handleStateChange)
+            filesystem.synchronizer.initializationComplete.connect(self.model().layoutChanged)
+        
         self.setSelectionMode(self.ExtendedSelection)
         self.setDragDropMode(QtGui.QAbstractItemView.DragOnly)
         
@@ -87,7 +94,7 @@ class FileSystemBrowser(QtGui.QTreeView):
         super().selectionChanged(selected, deselected)
         paths = [relPath(self.model().filePath(index)) for index in self.selectedIndexes()
                         if not self.model().isDir(index)] # TODO: remove this restriction
-        s = FileSystemSelection(paths)
+        s = FileSystemSelection([p for p in paths if hasKnownExtension(p)])
         if s.hasFiles():
             selection.setGlobalSelection(s) 
 

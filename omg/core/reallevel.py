@@ -16,11 +16,11 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+from PyQt4 import QtCore
+
 from . import elements, levels, tags, flags
-from .. import database as db
+from .. import database as db, filebackends, logging
 from ..database import write
-from .. import filebackends
-from .. import logging
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +31,10 @@ class RealLevel(levels.Level):
     Changes made here do not only change the element objects but also the database and, if
     files are affected, the filesystem state.
     """
+    
+    filesRenamed = QtCore.pyqtSignal(object)
+    filesAdded = QtCore.pyqtSignal(list)
+    filesRemoved = QtCore.pyqtSignal(list)
     
     def __init__(self):
         super().__init__('REAL', None)
@@ -224,16 +228,27 @@ class RealLevel(levels.Level):
         
     def _removeElements(self, elements):
         super()._removeElements(elements)
+        if any (elem.isFile() for elem in elements):
+            self.filesRemoved.emit([elem for elem in elements if elem.isFile()])
         db.write.deleteElements([elem.id for elem in elements])
         
     def _insertContents(self, parent, insertions, emitEvent=True):
-        db.write.addContents([(parent.id, pos, child.id) for pos, child in insertions])
+        db.transaction()
+        db.multiQuery("INSERT INTO {}contents (container_id, position, element_id) "
+                      "       VALUES (?, ?, ?)".format(db.prefix),
+                      [(parent.id, pos, child.id) for pos, child in insertions])
+        db.write.updateElementsCounter((parent.id,))
+        db.commit()
         super()._insertContents(parent, insertions, emitEvent)
         
     def _removeContents(self, parent, positions, emitEvent=True):
-        db.write.removeContents([(parent.id, pos) for pos in positions])
+        db.transaction()
+        db.multiQuery("DELETE FROM {}contents WHERE container_id=? AND position=?"
+                   .format(db.prefix), [(parent.id, pos) for pos in positions])
+        db.write.updateElementsCounter((parent.id,))
+        db.commit()
         super()._removeContents(parent, positions, emitEvent)
-       
+    
     def _renameFiles(self, renamings, emitEvent=True):
         """On the real level, files are renamed both on disk and in DB."""
         doneFiles = []
@@ -247,7 +262,8 @@ class RealLevel(levels.Level):
                 oldUrl, newUrl = renamings[elem]
                 newUrl.getBackendFile().rename(oldUrl)
             raise levels.RenameFilesError(oldUrl, newUrl, str(e))
-        db.write.changeUrls([ (element.id, str(newUrl)) for element, (_, newUrl) in renamings.items() ])
+        db.write.changeUrls([ (str(newUrl), element.id) for element, (_, newUrl) in renamings.items() ])
+        self.filesRenamed.emit(renamings)
         super()._renameFiles(renamings, emitEvent)
     
     def _changePositions(self, parent, changes, emitEvent=True):
@@ -269,6 +285,10 @@ class RealLevel(levels.Level):
         if len(dbAdditions):
             db.multiQuery("INSERT INTO {}tags (element_id,tag_id,value_id) VALUES (?,?,?)"
                           .format(db.prefix),dbAdditions)
+        files = [ (elem.id, ) for elem in changes if elem.isFile() ]
+        if len(files) > 0:
+            db.multiQuery("UPDATE {}files SET verified=CURRENT_TIMESTAMP WHERE element_id=?".format(db.prefix),
+                          files)
         db.commit()
         super()._changeTags(changes, emitEvent)
         

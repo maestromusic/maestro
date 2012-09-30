@@ -142,9 +142,15 @@ class FileURL(BackendURL):
         if "://" not in urlString:
             urlString = "file:///" + utils.relPath(urlString)
         super().__init__(urlString)
-        self.path = self.parsedUrl.path[1:]
-        self.absPath = utils.absPath(self.path)
-        
+    
+    @property
+    def path(self):
+        return self.parsedUrl.path[1:]
+    
+    @property
+    def absPath(self):
+        return utils.absPath(self.path)
+       
     def renamed(self, newPath):
         """Return a new FileURL with the given *newPath* as path."""
         return FileURL("file:///" + newPath)

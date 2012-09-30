@@ -16,7 +16,6 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from urllib.parse import urlparse
 import os.path
 
 from PyQt4 import QtCore
@@ -29,6 +28,17 @@ translate = QtCore.QCoreApplication.translate
 urlTypes = {}
 """Maps scheme to implementing BackendURL subclass, e.g. "file"->RealFile."""
 
+class ParsedUrl:
+    def __init__(self, urlString):
+        self.scheme, rest = urlString.split("://", 1)
+        self.netloc, rpath = rest.split("/", 1)
+        self.path = "/" + rpath
+
+    def geturl(self):
+        return self.scheme + "://" + self.netloc + self.path
+
+    def __str__(self):
+        return self.geturl()
 
 def getFile(urlString):
     """Convenience method: first creates an URL and then the according backend file object."""
@@ -54,7 +64,7 @@ class BackendURL:
     def __init__(self, urlString):
         #  constructor should only be used from subclasses
         assert type(self) is not BackendURL
-        self.parsedUrl = urlparse(urlString)
+        self.parsedUrl = ParsedUrl(urlString)
     
     @property
     def scheme(self):
@@ -194,10 +204,10 @@ def changeTags(changes):
         
         currentFileTags = backendFile.tags.copy()
         diff.apply(backendFile)
-        logger.debug('changing tags of {}: {}'.format(backendFile.url, diff))
+        #logger.debug('changing tags of {}: {}'.format(backendFile.url, diff))
         problems = backendFile.saveTags()
         if len(problems) > 0:
-            problemUrl = element.url
+            problemUrl = backendFile.url
             backendFile.tags = currentFileTags
             backendFile.saveTags()
             rollback = True

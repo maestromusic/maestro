@@ -75,7 +75,7 @@ def collectFiles(paths):
     
     Return them as dict mapping directory to list of FileURLs within."""
     from .filebackends.filesystem import FileURL
-    filePaths ={}
+    filePaths = OrderedDict()
     def add(file, parent=None):
         if not hasKnownExtension(file):
             return

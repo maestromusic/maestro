@@ -16,11 +16,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import itertools
-
 from .. import database as db
 from ..core import tags
-
 
 def createElements(data):
     """Creates elements in the database and returns their IDs.
@@ -76,38 +73,11 @@ def deleteElements(ids):
     updateElementsCounter(parentIds)
     updateToplevelFlags(contentsIds)
 
-
-def addContents(data):
-    """Add content relations to the database without touching existing ones.
-    
-    The *data* arguments is a list of
-        (parentID, position, elementID)
-    tuples.
-    """
-    if len(data) > 0:
-        db.multiQuery("INSERT INTO {}contents (container_id, position, element_id) VALUES (?,?,?)"
-                      .format(db.prefix), data)
-
 def setContents(elid, contents):
     """Set contents of element with id *elid* to *contents* (instance of elements.ContentList)."""
     db.query("DELETE FROM {}contents WHERE container_id = ?".format(db.prefix), elid)
     db.multiQuery("INSERT INTO {}contents (container_id, position, element_id) VALUES(?,?,?)"
              .format(db.prefix), [(elid, pos, id) for (pos, id) in contents.items() ]) 
-
-def removeContents(data):
-    """Remove content relations from  elements.
-    
-    The argument is a list of
-        (parentID, position)
-    tuples.
-    """
-    db.multiQuery("DELETE FROM {}contents WHERE container_id = ? AND position = ?"
-                   .format(db.prefix), data)
-
-
-def removeAllContents(ids):
-    """Remove *all* content relations of parents specidiefd by *ids*."""
-    db.multiQuery("DELETE FROM {}contents WHERE container_id = ?".format(db.prefix), [(id,) for id in ids])
 
 
 def changePositions(parentID, changes):
@@ -166,8 +136,8 @@ def updateToplevelFlags(elids=None):
 
 
 def changeUrls(data):
-    """Change the urls of files by the (id, urlString) list *data*."""
-    db.multiQuery("UPDATE {}files SET url = ? WHERE element_id = ?".format(db.prefix), data)
+    """Change the urls of files by the (urlString, id) list *data*."""
+    db.multiQuery("UPDATE {}files SET url=? WHERE element_id=?".format(db.prefix), data)
 
 
 def makeValueIDs(data):

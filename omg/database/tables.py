@@ -336,13 +336,13 @@ CREATE TABLE {0}flags (
 _addMySQL("""
 CREATE TABLE {}folders (
     path         VARCHAR(511)    NOT NULL,
-    state        ENUM('unknown','nomusic','ok','unsynced')    NOT NULL DEFAULT 'unknown'
+    state        TINYINT NOT NULL DEFAULT 0
 ) ENGINE InnoDB, CHARACTER SET 'utf8'
 """.format(db.prefix))
 _addSQLite("""
 CREATE TABLE {}folders (
     path         VARCHAR(511)    NOT NULL,
-    state        VARCHAR(8)      NOT NULL DEFAULT 'unknown'
+    state        INTEGER NOT NULL DEFAULT 0
 )
 """.format(db.prefix))
 
@@ -351,26 +351,26 @@ CREATE TABLE {}folders (
 #----------#
 _addMySQL("""
 CREATE TABLE {}newfiles (
-    path       VARCHAR(511)       NOT NULL,
+    url        VARCHAR(511)       NOT NULL,
     hash       VARCHAR(63),
     verified   TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX path_idx(path(333)),
+    INDEX url_idx(url(333)),
     INDEX hash_idx(hash)
 ) ENGINE InnoDB, CHARACTER SET 'utf8'
 """.format(db.prefix))
 _addSQLite("""
 CREATE TABLE {}newfiles (
-    path       VARCHAR(511)       NOT NULL,
+    url        VARCHAR(511)       NOT NULL,
     hash       VARCHAR(63),
     verified   INTEGER DEFAULT CURRENT_TIMESTAMP
 )
 """.format(db.prefix),
-"CREATE INDEX newfiles_path_idx ON {}newfiles (path)".format(db.prefix),
+"CREATE INDEX newfiles_url_idx ON {}newfiles (url)".format(db.prefix),
 "CREATE INDEX newfiles_hash_idx ON {}newfiles (hash)".format(db.prefix),
 """
 CREATE TRIGGER newfiles_timestamp_trg AFTER UPDATE ON {0}newfiles
 BEGIN
-UPDATE {0}newfiles SET verified = CURRENT_TIMESTAMP WHERE path = new.path;
+UPDATE {0}newfiles SET verified = CURRENT_TIMESTAMP WHERE url = new.url;
 END
 """.format(db.prefix)
 )

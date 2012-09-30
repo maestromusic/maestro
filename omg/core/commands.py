@@ -21,7 +21,7 @@
 from PyQt4 import QtCore, QtGui
 
 from . import levels
-from .. import database as db, logging
+from .. import database as db, filesystem, logging
 from ..database import write
 
 translate = QtCore.QCoreApplication.translate
@@ -68,8 +68,19 @@ class CreateDBElementsCommand(QtGui.QUndoCommand):
             db.write.createElementsWithIds(specs)
         for oldId, newId in self.idMap.items():
             levels.Level._changeId(oldId, newId)
-        db.write.addFiles([ (file.id, str(file.url), 0, file.length) # TODO: replace "0" by hash
-                           for file in self.elements if file.isFile()])
+        addFileData = []
+        newFiles = []
+        for file in self.elements:
+            if not file.isFile():
+                continue
+            hash = filesystem.getNewfileHash(file.url)
+            addFileData.append( (file.id, str(file.url), hash, file.length) )
+            newFiles.append(file)
+        if len(addFileData) > 0:
+            db.write.addFiles(addFileData)
+            db.multiQuery("UPDATE {}files SET verified=CURRENT_TIMESTAMP WHERE element_id=?"
+                          .format(db.prefix), [(f.id,) for f in newFiles])
+            levels.real.filesAdded.emit(newFiles)
         for element in self.elements:
             db.write.setTags(element.id, element.tags)
             db.write.setFlags(element.id, element.flags)
@@ -84,6 +95,8 @@ class CreateDBElementsCommand(QtGui.QUndoCommand):
         
     def undo(self):
         db.write.deleteElements(list(self.idMap.values()))
+        if any(elem.isFile() for elem in self.elements):
+            levels.real.filesRemoved.emit([elem for elem in self.elements if elem.isFile()])
         for oldId, newId in self.idMap.items():
             levels.Level._changeId(newId, oldId)
         if self.newInLevel:
