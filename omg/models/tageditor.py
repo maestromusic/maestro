@@ -630,7 +630,7 @@ class TagEditorModel(QtCore.QObject):
         given separator. Handle special cases correctly (',',  'a,a', etc.).
         If *recordCopy* is not None, modify it according to the created commands.
         This method must be called from within a macro.
-        """ #TODO
+        """
         assert record.tag.type in (tags.TYPE_VARCHAR,tags.TYPE_TEXT)
         # The type restriction implies that the empty string is the only possible invalid value
         splittedValues = [value for value in record.value.split(separator) if len(value) > 0]

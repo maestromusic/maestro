@@ -180,8 +180,11 @@ class TagEditorDialog(QtGui.QDialog):
         
         
 class TagEditorWidget(QtGui.QWidget):
-    #TODO: comment
-    
+    """A TagEditorWidget contains of a row of buttons, a TagEditorLayout forming the actual tageditor and
+    a flageditor. The TagEditorLayout displays pairs of a TagTypeBox and a SingleTagEditor - one for each
+    tag present in the tageditor. The displays the tagtype while the SingleTagEditor shows all records for
+    this tag.
+    """
     # This hack is necessary to ignore changes in the tagboxes while changing the tag programmatically
     # confer _handleTagChanged and _handleTagChangedByUser.
     _ignoreHandleTagChangedByUser = False
