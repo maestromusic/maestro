@@ -330,8 +330,8 @@ class FlagWidget(QtGui.QWidget):
     def contextMenuEvent(self,contextMenuEvent,record=None):
         menu = QtGui.QMenu(self)
 
-        menu.addAction(self.model.stack.createUndoAction(self,self.tr("Undo")))
-        menu.addAction(self.model.stack.createRedoAction(self,self.tr("Redo")))
+        menu.addAction(self.model.stack.createUndoAction())
+        menu.addAction(self.model.stack.createRedoAction())
         menu.addSeparator()
 
         if not self.record.isCommon():
