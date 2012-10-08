@@ -16,7 +16,9 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from PyQt4 import QtCore
+import collections
+
+from PyQt4 import QtCore, QtGui
 
 from . import tageditor
 from .. import application
@@ -28,33 +30,18 @@ class Record:
     elements among those that have the flag."""
     def __init__(self,flag,allElements,elementsWithFlag):
         self.flag = flag
+        assert isinstance(elementsWithFlag,tuple)
         self.allElements = allElements
         self.elementsWithFlag = elementsWithFlag
         
     def isCommon(self):
         """Return whether all edited elements have this record's flag."""
         return len(self.allElements) == len(self.elementsWithFlag)
-    
-    def merge(self,other):
-        """Return a copy of this record which contains the union of the elementsWithFlag of this records and
-        the record *other*."""
-        elements = list(self.elementsWithFlag)
-        elements.extend(el for el in other.elementsWithFlag if el not in elements)
-        return Record(self.flag,self.allElements,elements)
 
 
 class RecordModel(QtCore.QObject):
     """A RecordModel is basically the data-structure used by the flageditor. It simply stores a list of
     records and provides methods to change this list which emit signals when doing so.
-    
-    The list of Records can be accessed via item access.
-    
-    Intentionally the commands of RecordModel are very basic, so that each command can be undone easily.
-    In contrast to the FlagEditorModel, the RecordModel does not do any Undo/Redo-stuff. Instead,
-    FlagEditorModel splits its complicated actions into several calls of the methods of RecordModel which are
-    assembled into an FlagEditorUndoCommand.
-    
-    Another advantage of having only basic commands is that the GUI has only to react to basic signals.
     """
     recordInserted = QtCore.pyqtSignal(int,Record)
     recordRemoved = QtCore.pyqtSignal(Record)
@@ -65,10 +52,6 @@ class RecordModel(QtCore.QObject):
     
     def __iter__(self):
         return self._records.__iter__()
-    
-    def index(self,record):
-        """Return the position of *record* in the model."""
-        return self._records.index(record)
     
     def setRecords(self,records):
         """Set the list of records."""
@@ -91,90 +74,24 @@ class RecordModel(QtCore.QObject):
         self._records[pos] = newRecord
         self.recordChanged.emit(oldRecord,newRecord)
     
-    
-class FlagEditorUndoCommand(tageditor.TagFlagEditorUndoCommand):
-    """UndoCommands used by the FlagEditor. See TagFlagEditorUndoCommand."""
-    def _computeUndoMethod(self,method,params):
-        if method.__name__ == 'insertRecord':
-            pos,record = params
-            undoMethod = self.model.records.removeRecord
-            undoParams = (record,)
-            self._updateIds(record)
-        elif method.__name__ == 'removeRecord':
-            record = params[0] # 'record, = params' would work, too.
-            pos = self.model.records.index(record)
-            undoMethod = self.model.records.insertRecord
-            undoParams = (pos,record)
-            self._updateIds(record)
-        elif method.__name__ == 'changeRecord':
-            oldRecord,newRecord = params
-            undoMethod = self.model.records.changeRecord
-            undoParams = (newRecord,oldRecord)
-            self._updateIds(oldRecord)
-            self._updateIds(newRecord)
-        return undoMethod,undoParams
-    
-    def _updateIds(self,record):
-        """Add the ids of all elements of *record* to the ids of this command. Use this in _computeUndoMethod
-        to update the list of changed ids."""
-        self.ids.extend(element.id for element in record.elementsWithFlag if element.id not in self.ids)
-        
-    def modifyLevel(self,method,params):
-        if method.__name__ == 'insertRecord':
-            pos,record = params
-            diff = flags.FlagDifference(additions=[record.flag])
-            self.model.level._changeFlags({element: diff for element in record.elementsWithFlag},
-                                          emitEvent=False)
-        elif method.__name__ == 'removeRecord':
-            record = params[0] # 'record, = params' would work, too.
-            diff = flags.FlagDifference(removals=[record.flag])
-            self.model.level._changeFlags({element: diff for element in record.elementsWithFlag},
-                                          emitEvent=False)
-        elif method.__name__ == 'changeRecord':
-            oldRecord,newRecord = params
-            oldElements = set(oldRecord.elementsWithFlag)
-            newElements = set(newRecord.elementsWithFlag)
-            removeList = list(oldElements - newElements)
-            addList = list(newElements - oldElements)
-            if len(removeList):
-                diff = flags.FlagDifference(removals=[oldRecord.flag])
-                self.model.level._changeFlags({element: diff for element in removeList},
-                                              emitEvent=False)
-            if len(addList):
-                diff = flags.FlagDifference(additions=[newRecord.flag])
-                self.model.level._changeFlags({element: diff for element in addList},
-                                              emitEvent=False)
-                
-            if oldRecord.flag != newRecord.flag:
-                changeList = list(oldElements.intersection(newElements))
-                if len(changeList) > 0:
-                    diff = flags.FlagDifference(additions=[newRecord.flag],removals=[oldRecord.flag])
-                    self.model.level._changeFlags({element: diff for element in changeList},
-                                                  emitEvent=False)
-                     
         
 class FlagEditorModel(QtCore.QObject):
     """The model of the FlagEditor. Internally it stores
     
         - a list of elements that are currently edited.
-        - a list of records storing the flags as used by the model: Each record contains a flag and the
+        - a RecordModel storing the flags as used by the model: Each record contains a flag and the
         sublist of elements that have this flag.
-    
-    Internally FlagEditorModel works very similar to TagEditorModel, so see the latter's docstring.
     
     Model parameters are:
     
         - level: the level that contains the elements
         - elements: a list of elements whose flags will be displayed and edited by this model.
-        - stack: An undo stack or None, in which case the global stack will be used (only use your own stacks
-          in modal dialogs)
+        
     """
     resetted = QtCore.pyqtSignal()
     
-    def __init__(self,level=None,elements=None,stack=None):
+    def __init__(self,level=None,elements=None):
         super().__init__()
-        
-        self._statusNumber = 0
         
         self.records = RecordModel()
         self.recordInserted = self.records.recordInserted
@@ -185,34 +102,29 @@ class FlagEditorModel(QtCore.QObject):
         if elements is None:
             elements = []
         self.setElements(level,elements)
-
-        if stack is None:
-            self.stack = application.stack
-        else: self.stack = stack
         
     def setElements(self,level,elements):
         """Reset the model to display and edit the tags of *elements*."""
-        self._statusNumber += 1
         if self.level != level:
             if self.level is not None:
                 self.level.disconnect(self._handleLevelChanged)
             if level is not None:
                 level.connect(self._handleLevelChanged)
         self.level = level
-        self.elements = elements
+        self.elements = tuple(elements)
         self.records.setRecords(self._createRecords().values())
         self.resetted.emit()
                 
     def _createRecords(self):
         """Create records from the flags of self.elements and return them as dict mapping flagtype to record.
         """
-        records = {}
+        records = collections.defaultdict(list)
         for element in self.elements:
             for flag in element.flags:
-                if flag in records:
-                    records[flag].elementsWithFlag.append(element)
-                else: records[flag] = Record(flag,self.elements,[element])
-        return records
+                records[flag].append(element)
+                if len(records[flag]) == len(self.elements):
+                    records[flag] = self.elements # save memory
+        return {flag: Record(flag,self.elements,tuple(elementList)) for flag,elementList in records.items()}
         
     def getRecord(self,flag):
         """Get the record for the given flag or None if there is no record for this flag."""
@@ -222,85 +134,63 @@ class FlagEditorModel(QtCore.QObject):
         return None 
         
     def isEmpty(self):
-        """Return whether there is at least one record/flag in one of the elements governed by this model."""
+        """Return whether there is at least one record/flag in one of the elements controlled by this model.
+        """
         return len(self.records) == 0
     
     def addFlag(self,flag,elementsWithFlag = None):
         """Add a flag to the elements contained in *elementsWithFlag* or all elements if this parameter is
-        None. If there is already a record for this flag, it will be replaced by a record containing the
-        union of the *elementsWithFlag* of both records.
+        None.
         """
         if elementsWithFlag is None:
             elementsWithFlag = self.elements
-        command = FlagEditorUndoCommand(self,self.tr("Add flag"))
-
-        record = self.getRecord(flag)
-        if record is not None:
-            newElements = [el for el in elementsWithFlag if el not in record.elementsWithFlag]
-            if len(newElements) > 0:
-                newRecord = Record(flag,self.elements,record.elementsWithFlag + newElements)
-                command.addMethod(self.records.changeRecord,record,newRecord)
-        else:
-            record = Record(flag,self.elements,elementsWithFlag)
-            command.addMethod(self.records.insertRecord,len(self.records),record)
-            
-        self.stack.push(command)
+        diff = flags.FlagDifference(additions=[flag])
+        differences = {element: diff for element in elementsWithFlag if flag not in element.flags}
+        self.level.changeFlags(differences)
         
     def removeFlag(self,flag):
         """Remove a flag from all elements."""
-        record = self.getRecord(flag)
-        command = FlagEditorUndoCommand(self,self.tr("Remove flag"))
-        command.addMethod(self.records.removeRecord,record)
-        self.stack.push(command)
+        diff = flags.FlagDifference(removals=[flag])
+        differences = {element: diff for element in self.elements if flag in element.flags}
+        self.level.changeFlags(differences)
         
     def changeRecord(self,oldRecord,newRecord):
-        """Change *oldRecord* into *newRecord*. Make sure, that both records have self.elements as list of
-        elements and a nonempty sublist thereof as list of elements with flag."""
+        """Change *oldRecord* into *newRecord*. Both records must have the same flag and their list of
+        elementsWithFlag must not be empty.
+        """
         if len(newRecord.elementsWithFlag) == 0:
             raise ValueError("newRecord must contain at least one element; otherwise use removeFlag.")
-        command = FlagEditorUndoCommand(self,self.tr("Change flag record"))
-        if oldRecord.flag != newRecord.flag and self.getRecord(newRecord.flag) is not None:
-            command.addMethod(self.records.removeRecord,oldRecord)
-            existingRecord = self.getRecord(newRecord.flag)
-            copy = existingRecord.merge(newRecord)
-            if copy.elementsWithFlag != existingRecord.elementsWithFlag:
-                command.addMethod(self.records.changeRecord,existingRecord,copy)
-        else: 
-            command.addMethod(self.records.changeRecord,oldRecord,newRecord)
-        self.stack.push(command)
-
-    def getFlagsOfElement(self,element):
-        """Return all flags of a specific element."""
-        return [record.flag for record in self.records if element in record.elementsWithFlag]
+        assert oldRecord.flag == newRecord.flag # only this is supported by the GUI
     
+        removeElements = [el for el in oldRecord.elementsWithFlag if el not in newRecord.elementsWithFlag]
+        addElements = [el for el in newRecord.elementsWithFlag if el not in oldRecord.elementsWithFlag]
+        
+        removeDiff = flags.FlagDifference(removals=[oldRecord.flag])
+        addDiff = flags.FlagDifference(additions=[newRecord.flag])
+        differences = {el: removeDiff for el in removeElements}
+        differences.update({el: addDiff for el in addElements})
+        if len(differences) > 0:
+            self.level.changeFlags(differences)
+
     def _handleLevelChanged(self,event):
-        """React to change events fo the underlying level."""
+        """React to change events of the underlying level."""
         currentIds = [el.id for el in self.elements]
         if all(id not in currentIds for id in event.dataIds):
             return # not our problem
         
-        changed = False
         actualRecords = self._createRecords()
         
         for myRecord in list(self.records):
             if myRecord.flag not in actualRecords:
                 self.records.removeRecord(myRecord)
-                changed = True
             else:
                 actualRecord = actualRecords[myRecord.flag]
                 del actualRecords[myRecord.flag]
                 if actualRecord.elementsWithFlag != myRecord.elementsWithFlag:
                     self.records.changeRecord(myRecord,actualRecord)
-                    changed = True
                 #else: unchanged => nothing to do
                 
         # Add the remaining records
         for actualRecord in actualRecords.values():
             self.records.insertRecord(len(self.records),actualRecord)
-            changed = True
-
-        if changed:                        
-            # After a single change to the records that is not stored in FlagEditorUndoCommands, we must not
-            # allow existing FlagEditorUndoCommands to change the records directly.
-            self._statusNumber += 1
           

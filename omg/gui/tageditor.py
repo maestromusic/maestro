@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import os.path
+import os.path, functools
 
 from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
@@ -180,8 +180,11 @@ class TagEditorDialog(QtGui.QDialog):
         
         
 class TagEditorWidget(QtGui.QWidget):
-    #TODO: comment
-    
+    """A TagEditorWidget contains of a row of buttons, a TagEditorLayout forming the actual tageditor and
+    a flageditor. The TagEditorLayout displays pairs of a TagTypeBox and a SingleTagEditor - one for each
+    tag present in the tageditor. The displays the tagtype while the SingleTagEditor shows all records for
+    this tag.
+    """
     # This hack is necessary to ignore changes in the tagboxes while changing the tag programmatically
     # confer _handleTagChanged and _handleTagChangedByUser.
     _ignoreHandleTagChangedByUser = False
@@ -199,7 +202,7 @@ class TagEditorWidget(QtGui.QWidget):
         self.model.tagChanged.connect(self._handleTagChanged)
         self.model.resetted.connect(self._handleReset)
 
-        self.flagModel = flageditormodel.FlagEditorModel(stack=stack)
+        self.flagModel = flageditormodel.FlagEditorModel()
 
         self.selectionManager = widgetlist.SelectionManager()
         # Do not allow the user to select ExpandLines
@@ -276,7 +279,7 @@ class TagEditorWidget(QtGui.QWidget):
             for button in ['addButton','removeButton']:
                 getattr(self,button).setText('')
         else:
-            self.addButton.setText(self.tr("Add tag"))
+            self.addButton.setText(self.tr("Add tag value"))
             self.removeButton.setText(self.tr("Remove selected"))
         
         self.horizontalFlagEditor.setVisible(self.flagEditorInTitleLine and not vertical)
@@ -295,6 +298,7 @@ class TagEditorWidget(QtGui.QWidget):
         self.flagModel.setElements(level,elements)
         
     def _insertSingleTagEditor(self,row,tag):
+        """Insert a TagTypeBox and a SingleTagEditor for *tag* at the given row."""
         # Create the tagbox
         self.tagBoxes[tag] = SmallTagTypeBox(tag,self.vertical)
         self.tagBoxes[tag].tagChanged.connect(self._handleTagChangedByUser)
@@ -304,9 +308,10 @@ class TagEditorWidget(QtGui.QWidget):
         self.singleTagEditors[tag].commonList.setSelectionManager(self.selectionManager)
         self.singleTagEditors[tag].uncommonList.setSelectionManager(self.selectionManager)
         
-        self.tagEditorLayout.insertPair(row,tag,self.tagBoxes[tag],self.singleTagEditors[tag])
+        self.tagEditorLayout.insertPair(row,self.tagBoxes[tag],self.singleTagEditors[tag])
 
     def _removeSingleTagEditor(self,tag):
+        """Remove the TagTypeBox and SingleTagEditor for the given tag."""
         self.tagEditorLayout.removePair(tag)
 
         # Tidy up
@@ -322,6 +327,7 @@ class TagEditorWidget(QtGui.QWidget):
         del self.singleTagEditors[tag]
 
     def _handleReset(self):
+        """Handle the resetted-signal of the model."""
         for tag in list(self.singleTagEditors.keys()): # dict will change
             self._removeSingleTagEditor(tag)
         for tag in self.model.getTags():
@@ -333,27 +339,45 @@ class TagEditorWidget(QtGui.QWidget):
         self.removeButton.setEnabled(count > 0)
         self.horizontalFlagEditor.setEnabled(count > 0)
         self.verticalFlagEditor.setEnabled(count > 0)
+    
+    def _handleError(self,error):
+        """Handle TagWriteErrors raised in methods of the model."""
+        dialogs.warning(self.tr("Tag write error"),
+                        self.tr("An error ocurred: {}").format(error),
+                        parent=self)
         
     def _handleAddRecord(self,tag=None):
+        """Handle the add record button and context menu entry: Open a RecordDialog. If *tag* is given it
+        will be selected by default in this dialog."""
         dialog = RecordDialog(self,self.model.getElements(),defaultTag=tag)
         if dialog.exec_() == QtGui.QDialog.Accepted:
-            self.model.addRecord(dialog.getRecord())
+            try:
+                self.model.addRecord(dialog.getRecord())
+            except filebackends.TagWriteError as e:
+                self._handleError(e)
 
     def _handleRemoveSelected(self):
+        """Handle the remove selected button and context menu entry."""
         records = self._getSelectedRecords()
         if len(records) > 0:
-            self.model.removeRecords(records)
-            
+            try:
+                self.model.removeRecords(records)
+            except filebackends.TagWriteError as e:
+                self._handleError(e)
+        
     # Note that the following _handle-functions only add new SingleTagEditors or remove SingleTagEditors
     # which have become empty. Unless they are newly created or removed, the editors are updated in their
     # own _handle-functions.
     def _handleTagInserted(self,pos,tag):
+        """Handle tagInserted-signal from the model."""
         self._insertSingleTagEditor(pos,tag)
         
     def _handleTagRemoved(self,tag):
+        """Handle tagRemoved-signal from the model."""
         self._removeSingleTagEditor(tag)
 
     def _handleTagChanged(self,oldTag,newTag):
+        """Handle tagChanged-signal from the model."""
         for adict in (self.tagBoxes,self.singleTagEditors):
             # Change key from oldTag to newTag
             widget = adict[oldTag]
@@ -365,10 +389,12 @@ class TagEditorWidget(QtGui.QWidget):
             self._ignoreHandleTagChangedByUser = False
     
     def _handleTagChangedByUser(self,changedTag):
+        """Handle changes to the TagTypeBoxes by the user."""
+        # This method is also called when the box' tag is changed programmatically (e.g. when we reset the
+        # tagBox inside this event handler to the old tag).
+        # To avoid changing the model in such cases we use this flag.
         if self._ignoreHandleTagChangedByUser:
             return
-        # Sometimes we want to ignore this event handler (e.g. when we reset the tagBox inside this event
-        # handler to the old tag)
         self._ignoreHandleTagChangedByUser = True
         
         # First we have to get the tagBox responsible for this event and its tag
@@ -390,15 +416,24 @@ class TagEditorWidget(QtGui.QWidget):
             if newTag is None: # user aborted the dialog
                 tagBox.setTag(oldTag)
                 return
-                
-        # If changeTag fails, then reset the box
-        if not self.model.changeTag(oldTag,newTag):
+        
+        # First reset the box, because a number of things might go wrong. Also, if oldTag is finally
+        # removed (because there is already a SingleTagEditor for newTag) the box is searched via oldTag.     
+        tagBox.setTag(oldTag)
+        
+        try:
+            result = self.model.changeTag(oldTag,newTag)
+        except filebackends.TagWriteError as e:
+            self._handleError(e)
+            
+        if result:
+            tagBox.setTag(newTag)
+        else:
+            # This means that changeTag failed because some values could not be converted to the new tag.
+            # Reset the box
             QtGui.QMessageBox.warning(self,self.tr("Invalid value"),
                                       self.tr("At least one value is invalid for the new type."))
-            tagBox.setTag(oldTag)
-        else:
-            # This is important if the user changed newTag within the AddTagTypeDialog 
-            tagBox.setTag(newTag)
+        self._ignoreHandleTagChangedByUser = False
                 
     def contextMenuEvent(self,contextMenuEvent,record=None):
         menu = QtGui.QMenu(self)
@@ -407,7 +442,7 @@ class TagEditorWidget(QtGui.QWidget):
         menu.addAction(self.model.stack.createRedoAction())
         menu.addSeparator()
         
-        addRecordAction = QtGui.QAction(self.tr("Add tag..."),self)
+        addRecordAction = QtGui.QAction(self.tr("Add record..."),self)
         tag = record.tag if record is not None else None
         addRecordAction.triggered.connect(lambda: self._handleAddRecord(tag))
         menu.addAction(addRecordAction)
@@ -421,15 +456,15 @@ class TagEditorWidget(QtGui.QWidget):
             editRecordAction.triggered.connect(lambda: self._handleEditRecord(record))
             menu.addAction(editRecordAction)
             
+        selectedRecords = self._getSelectedRecords()
+        action = menu.addAction(self.tr("Extend to all elements"))
+        action.setEnabled(not all(record.isCommon() for record in selectedRecords))
+        action.triggered.connect(functools.partial(self._extendRecords,selectedRecords))
+            
         # Fancy stuff
         fancyMenu = menu.addMenu(self.tr("Fancy stuff"))
-        selectedRecords = self._getSelectedRecords()
 
         if len(selectedRecords) > 0:
-            if not all(record.isCommon() for record in selectedRecords):
-                action = fancyMenu.addAction(self.tr("Extend to all elements"))
-                action.triggered.connect(lambda: self.model.extendRecords(selectedRecords))
-            
             if len(selectedRecords) > 1 and all(r.tag.type == tags.TYPE_VARCHAR for r in selectedRecords):
                 commonPrefix = strutils.commonPrefix(record.value for record in selectedRecords)
                 
@@ -445,32 +480,63 @@ class TagEditorWidget(QtGui.QWidget):
                     else: prefixLength = len(commonPrefix)
                     rests = [str(record.value)[prefixLength:] for record in selectedRecords]
                     if any(strutils.numberFromPrefix(rest)[0] is not None for rest in rests):
-                        action = fancyMenu.addAction(self.tr("Remove common start (including numbers)"))
                         newValues = []
                         for record,rest in zip(selectedRecords,rests):
                             number,prefix = strutils.numberFromPrefix(rest)
                             if number is not None:
                                 newValues.append(record.value[prefixLength+len(prefix):])
                             else: newValues.append(record.value[prefixLength:])
-                        action.triggered.connect(lambda: self.model.editMany(selectedRecords,newValues))
+                        if all(record.tag.isValid(value) for record,value in zip(selectedRecords,newValues)):
+                            action = fancyMenu.addAction(self.tr("Remove common start (including numbers)"))
+                            action.triggered.connect(functools.partial(self._editMany,
+                                                                       selectedRecords,newValues))
                     else:
-                        action = fancyMenu.addAction(self.tr("Remove common start"))
                         newValues = [record.value[len(commonPrefix):] for record in selectedRecords]
-                        action.triggered.connect(lambda: self.model.editMany(selectedRecords,newValues))
+                        if all(record.tag.isValid(value) for record,value in zip(selectedRecords,newValues)):
+                            action = fancyMenu.addAction(self.tr("Remove common start"))
+                            action.triggered.connect(functools.partial(self._editMany,
+                                                                       selectedRecords,newValues))
                 else:
                     if any(strutils.numberFromPrefix(r.value)[0] is not None for r in selectedRecords):
-                        action = fancyMenu.addAction(self.tr("Remove numbers from beginning"))
                         # Remove the prefix returned in the second tuple part
                         newValues = [r.value[len(strutils.numberFromPrefix(r.value)[1]):]
                                         for r in selectedRecords]
-                        action.triggered.connect(lambda: self.model.editMany(selectedRecords,newValues))
+                        if all(record.tag.isValid(value) for record,value in zip(selectedRecords,newValues)):
+                            action = fancyMenu.addAction(self.tr("Remove numbers from beginning"))
+                            action.triggered.connect(functools.partial(self._editMany,
+                                                                       selectedRecords,newValues))
             for separator in self.model.getPossibleSeparators(selectedRecords):
+                # getPossibleSeparators returns nothing if a date record is selected
                 action = fancyMenu.addAction(self.tr("Separate at '{}'").format(separator))
-                action.triggered.connect(lambda: self.model.splitMany(selectedRecords,separator))
+                action.triggered.connect(functools.partial(self._splitMany,selectedRecords,separator))
 
+        fancyMenu.setEnabled(len(fancyMenu.actions()) > 0)
+        
         menu.popup(contextMenuEvent.globalPos())
+        
+    def _extendRecords(self,records):
+        """Handle 'extend records' action from context menu."""
+        try:
+            self.model.extendRecords(records)
+        except filebackends.TagWriteError as e:
+            self._handleError(e)
+            
+    def _editMany(self,records,newValues):
+        """Handle 'edit many' action from context menu."""
+        try:
+            self.model.editMany(records,newValues)
+        except filebackends.TagWriteError as e:
+            self._handleError(e)
+            
+    def _splitMany(self,records,separator):
+        """Handle 'split' action from context menu."""
+        try:
+            self.model.splitMany(records,separator)
+        except filebackends.TagWriteError as e:
+            self._handleError(e)
 
     def _editCommonStart(self):
+        """Handle 'edit common start' action from context menu."""
         selectedRecords = [editor.getRecord() for editor in self.selectionManager.getSelectedWidgets()]
         commonStart = strutils.commonPrefix(str(record.value) for record in selectedRecords)
         text,ok = QtGui.QInputDialog.getText(self,self.tr("Edit common start"),
@@ -478,12 +544,18 @@ class TagEditorWidget(QtGui.QWidget):
                          text=commonStart)
         if ok:
             newValues = [text+record.value[len(commonStart):] for record in selectedRecords]
-            self.model.editMany(selectedRecords,newValues)
+            if all(record.tag.isValid(value) for record,value in zip(selectedRecords,newValues)):
+                self._editMany(selectedRecords,newValues)
+            else: dialogs.warning(self.tr("Invalid value"),self.tr("One or more values are invalid."))
     
     def _handleEditRecord(self,record):
+        """Handle 'edit record' action from context menu."""
         dialog = RecordDialog(self,self.model.getElements(),record=record)
         if dialog.exec_() == QtGui.QDialog.Accepted:
-            self.model.changeRecord(record,dialog.getRecord())
+            try:
+                self.model.changeRecord(record,dialog.getRecord())
+            except filebackends.TagWriteError as e:
+                self._handleError(e)
         
     def _getSelectedRecords(self):
         """Return all records that are selected and visible (i.e. not hidden by a collapsed ExpandLine."""
@@ -588,8 +660,8 @@ class RecordDialog(QtGui.QDialog):
     def _getSelectedElements(self):
         """Return the elements selected for the record."""
         allElements = self.elementsBox.model().getItems()
-        return [allElements[i] for i in range(len(allElements))
-                                if self.elementsBox.selectionModel().isRowSelected(i,QtCore.QModelIndex())]
+        return tuple(allElements[i] for i in range(len(allElements))
+                                 if self.elementsBox.selectionModel().isRowSelected(i,QtCore.QModelIndex()))
         
     def _handleTagChanged(self,tag):
         """Change the tag of the ValueEditor."""
@@ -639,6 +711,11 @@ class OptionDialog(dialogs.FancyPopup):
         
 
 class TagEditorLayout(QtGui.QLayout):
+    """Layout for the TagEditor. It may contain several columns each of which contain several pairs
+    consisting of a TagTypeBox (left) and a SingleTagEditor (right).
+    
+    Currently TagEditorLayout always uses only one column.
+    """
     innerHSpace = 5
     columnSpacing = 10
     rowSpacing = 1
@@ -662,7 +739,8 @@ class TagEditorLayout(QtGui.QLayout):
             return None
         else: return self._items[index // 2][index % 2]
     
-    def insertPair(self,row,tag,tagBox,singleTagEditor):
+    def insertPair(self,row,tagBox,singleTagEditor):
+        """Insert pair of *tagBox* and *singleTagEditor* into the layout at the given row."""
         self.addChildWidget(tagBox)
         self.addChildWidget(singleTagEditor)
         self._pairs.insert(row,(tagBox,singleTagEditor))
@@ -670,6 +748,7 @@ class TagEditorLayout(QtGui.QLayout):
         self.invalidate() # this is also called by for example QBoxLayout::addItem
         
     def removePair(self,tag):
+        """Remove the pair the (currently) belongs to tag *tag* from the layout."""
         for i,pair in enumerate(self._pairs):
             tagBox,singleTagEditor = pair
             if tagBox.getTag() == tag:
@@ -689,6 +768,9 @@ class TagEditorLayout(QtGui.QLayout):
         self.doLayout(really=True,outerRect=rect)
         
     def doLayout(self,really,outerRect=None):
+        """Helper function for sizeHint and setGeometry: Layout all contents to *outerRect* and return the
+        width and height that is used in the end. If *really* is False the layout is only computed but
+        not performed (for sizeHint)."""
         contentsMargins = self.getContentsMargins()
         if len(self._pairs) == 0:
             return contentsMargins[0] + contentsMargins[2], contentsMargins[1] + contentsMargins[3]
@@ -754,6 +836,8 @@ class TagEditorLayout(QtGui.QLayout):
         return x,max(columnHeights) + contentsMargins[3]
             
     def _computeColumns(self,columnCount,heights):
+        """Given the number of columns and a list of heights of the pairs that should be distributed to the
+        columns, return a list storing how many pairs should be put in each column."""
         if len(heights) == 0:
             return []
         
@@ -763,7 +847,8 @@ class TagEditorLayout(QtGui.QLayout):
         
         currentHeight = 0
         for height in heights:
-            if columns[-1] == 0 or len(columns) == columnCount or currentHeight + self.rowSpacing + 0.5 * height <= perColumn:
+            if columns[-1] == 0 or len(columns) == columnCount \
+                    or currentHeight + self.rowSpacing + 0.5 * height <= perColumn:
                 columns[-1] += 1
                 currentHeight += self.rowSpacing + height
             else:
@@ -771,5 +856,4 @@ class TagEditorLayout(QtGui.QLayout):
                 currentHeight =  height
             
         return columns
-     
         

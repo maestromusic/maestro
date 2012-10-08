@@ -122,10 +122,8 @@ class WriteTest(BaseTest):
 
     def runTest(self):
         self.file.tags = TAGS_TO_WRITE
-        self.file.position = 2
         self.file.saveTags()
         self.file.readTags()
-        self.assertEqual(self.file.position,2)
         self.assertEqual(self.file.tags,TAGS_TO_WRITE)
         
     def tearDown(self):
@@ -143,6 +141,7 @@ def load_tests(loader=None, standard_tests=None, pattern=None):
         suite.addTest(WriteTest(ext))
     suite.addTest(InvalidTagsTest('ogg')) # invalid tag handling is independent of file format
     return suite
+
 
 if __name__ == "__main__":
     print("To run this test use: python setup.py test --test-suite=test.realfiles")

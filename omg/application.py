@@ -47,7 +47,8 @@ class ChangeEvent:
     """Abstract super class for all changeevents."""
     def merge(self,other):
         """If possible merge the ChangeEvent *other* and this event, so that this event stores the
-        information of both events. Return whether merging was succesful."""
+        information of both events. Return whether merging was succesful. This event will always have been
+        emitted earlier than *other*."""
         return False
 
 

@@ -127,6 +127,7 @@ class UndoStack(QtCore.QObject):
             raise UndoStackError("Cannot end a macro during undo/redo.")
         self._currentMacro.undo()
         self._currentMacro = None
+        self._eventQueue = None
         self._macroDepth = 0
 
     def clear(self):
@@ -191,7 +192,16 @@ class UndoStack(QtCore.QObject):
             if not minIndex <= index <= len(self._commands):
                 raise ValueError("Invalid index {} (there are {} commands on the stack)."
                                  .format(index,len(self._commands)))
+            self._inUndoRedo = True
+            if index < self._index:
+                for command in reversed(self._commands[index:self._index]):
+                    command.undo()
+            else:
+                for command in self._commands[self._index:index]:
+                    command.redo()
             self._index = index
+            self._emitQueuedEvents()
+            self._inUndoRedo = False
             self._emitSignals()
     
     def _emitSignals(self):
@@ -217,7 +227,7 @@ class UndoStack(QtCore.QObject):
         """Add *event* to the queue. *dispatcher* is the ChangeEventDispatcher that should eventually emit
         the event. Try to merge the event with existing events (of the same dispatcher, of course).
         """ 
-        for d,e in self._eventQueue:
+        for d,e in reversed(self._eventQueue):
             if d is dispatcher:
                 if e.merge(event):
                     return # event was merged

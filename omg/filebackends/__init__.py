@@ -175,7 +175,8 @@ class TagWriteError(RuntimeError):
         msgReadonly = translate(__name__, "File is readonly")
         msgProblem = translate(__name__, "Tags '{}' not supported by format").format(self.problems)
         dialogs.warning(title, msg1 + (msgReadonly if self.problems is None else msgProblem))
-        
+
+
 def changeTags(changes):
     """Change tags of files. If an error occurs, all changes are undone and a TagWriteError is raised.
     *changes* is a dict mapping elements or BackendFiles to TagDifferences. If the dict contains elements

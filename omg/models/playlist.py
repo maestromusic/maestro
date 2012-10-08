@@ -141,7 +141,7 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
                 wrappers = [levels.real.get(wrapper.element.id) for wrapper in mimeData.fileWrappers()]   
         else:
             urls = itertools.chain.from_iterable(
-                                    utils.collectFiles(u.path() for u in mimeData.urls()).values())
+                                    utils.collectFiles(url.path() for url in mimeData.urls()).values())
             wrappers = [Wrapper(element) for element in self.level.getFromUrls(urls)]
                
         self.insert(parent,position,wrappers)
@@ -387,8 +387,8 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         used to store the playlist tree structure persistently.
         """
         def _strFunc(wrapper):
-            """This is used as strFunc-argument for Node.wrapperString. It returns external files as url-encoded
-            paths because these don't contain the characters ',[]'."""
+            """This is used as strFunc-argument for Node.wrapperString. It returns external files as
+            url-encoded paths because these don't contain the characters ',[]'."""
             if wrapper.element.id > 0:
                 return str(wrapper.element.id)
             else:
@@ -472,8 +472,8 @@ class PlaylistChangeCommand(wrappertreemodel.ChangeCommand):
     def redo(self):
         super().redo()
         if self._updateBackend:
-            paths = list(f.element.path for f in self.model.root.getAllFiles())
-            self.model.backend.setPlaylist(paths)
+            urls = list(f.element.url for f in self.model.root.getAllFiles())
+            self.model.backend.setPlaylist(urls)
         else: self._updateBackend = True
         self.model._updateCurrentlyPlayingNodes()
         
@@ -537,4 +537,5 @@ class ConditionalCommand(QtGui.QUndoCommand):
             
     def undo(self):
         if not self.onRedo:
-            self.method()   
+            self.method()
+            
