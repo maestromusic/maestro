@@ -109,7 +109,7 @@ class PlaylistWidget(QtGui.QDockWidget):
         buttonLayout.addStretch()
         layout.addWidget(self.treeview)
         self.errorLabel = QtGui.QLabel()
-        self.errorLabel.setAlignment(Qt.AlignTop | Qt.AlignHCenter)
+        self.errorLabel.setAlignment(Qt.AlignVCenter | Qt.AlignHCenter)
         self.mainLayout = layout
         self.mainWidgetIndex = layout.indexOf(self.treeview)
         self.setBackend(self.backendChooser.currentProfileName())

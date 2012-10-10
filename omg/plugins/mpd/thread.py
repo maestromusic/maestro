@@ -18,8 +18,6 @@
 from omg.core import tags
 from omg import logging, player
 
-import threading
-
 from PyQt4 import QtCore, QtGui
 
 import mpd
@@ -27,7 +25,6 @@ logger = logging.getLogger(__name__)
 
 MPD_STATES = { 'play': player.PLAY, 'stop': player.STOP, 'pause': player.PAUSE}
 CONNECTION_TIMEOUT = 10 # time in seconds before an initial connection to MPD is given up
-POLLING_INTERVAL = 200 # milliseconds between two MPD polls
 
 
 class MPDThread(QtCore.QThread):
@@ -41,19 +38,15 @@ class MPDThread(QtCore.QThread):
     
     def __init__(self, backend, host, port, password):
         super().__init__(None)
-        self.timer = QtCore.QTimer(self)
-        self.moveToThread(self)
-        self.timer.moveToThread(self)
-        self.timer.timeout.connect(self.poll)
         self.backend = backend
         self.host, self.port, self.password = host, port, password
         self.playlistVersion = self.state  = None
         self.current = self.elapsed = None
         self.currentLength = self.volume = None
-        self.doPolling = threading.Event()
-        self.syncCallEvent = threading.Event()
         self.seekRequest = None
         self.connected = False
+        self.idler = mpd.MPDClient()
+        self.commander = mpd.MPDClient()
     
     def _seek(self):
         """Helper function to seek to a specific point of a song. We use a timer,
@@ -79,27 +72,7 @@ class MPDThread(QtCore.QThread):
         elif what == "setElapsed":
             self.seekRequest = how
             self.seekTimer.start(20)
-        
-        elif what == "setVolume":
-            self.client.setvol(how)
-            
-        elif what == "setState":
-            if how == player.PLAY:
-                self.client.play()
-            elif how == player.PAUSE:
-                self.client.pause(1)
-            elif how == player.STOP:
-                self.client.stop()
-        
-        elif what == "setCurrent":
-            self.client.play(how if how is not None else -1)
-        
-        elif what == "nextSong":
-            self.client.next()
-            
-        elif what == "previousSong":
-            self.client.previous()
-        
+
         elif what == "_move":
             fromOffset,toOffset = how
             if fromOffset != toOffset:
@@ -160,11 +133,11 @@ class MPDThread(QtCore.QThread):
         
         if oldVersion is None:
             # this happens only on initialization. Here we don't create an UndoCommand
-            self.mpd_playlist = [x["file"] for x in self.client.playlistinfo()]
+            self.mpd_playlist = [x["file"] for x in self.idler.playlistinfo()]
             self.playlistVersion = newVersion
             return
         
-        changes = [(int(a["pos"]),a["file"]) for a in self.client.plchanges(oldVersion)]
+        changes = [(int(a["pos"]),a["file"]) for a in self.idler.plchanges(oldVersion)]
         self.playlistVersion = newVersion
         newLength = int(self.mpd_status["playlistlength"])
         # first special case: find out if only consecutive songs were removed 
@@ -204,25 +177,14 @@ class MPDThread(QtCore.QThread):
             else:
                 self.mpd_playlist.append(file)
         self.changeFromMPD.emit('playlist', self.mpd_playlist[:])
-        
-    def _updateAttributes(self, emit = True, emitCurrent=False):
-        """Get current status from MPD, update attributes of this object and emit
-        messages if something has changed."""
-         
-        # fetch information from MPD
-        self.mpd_status = self.client.status()
-        
-        # check for volume change
+    
+    def updateMixer(self, emit=True):
         volume = int(self.mpd_status['volume'])
         if volume != self.volume:
-            self.changeFromMPD.emit('volume', volume)
             self.volume = volume
-            
-        # check for a playlist change
-        playlistVersion = int(self.mpd_status["playlist"])
-        if playlistVersion != self.playlistVersion:
-            self._handleExternalPlaylistChange(playlistVersion)
-            
+            self.changeFromMPD.emit('volume', volume)
+    
+    def updatePlayer(self, emit=True, emitCurrent=False):
         # check if current song has changed. If so, update length of current song
         if "song" in self.mpd_status:
             current = int(self.mpd_status["song"])
@@ -230,7 +192,7 @@ class MPDThread(QtCore.QThread):
         if current != self.current or emitCurrent:
             self.current = current
             if current != None:
-                self.mpd_current = self.client.currentsong()
+                self.mpd_current = self.idler.currentsong()
                 self.currentLength = int(self.mpd_current["time"])
             else:
                 self.currentLength = 0 # no current song
@@ -248,58 +210,66 @@ class MPDThread(QtCore.QThread):
                 if emit:
                     self.changeFromMPD.emit('current', (None, 0))
         self.state = state
-        
-        # check if elapsed time has changed
-        if state != player.STOP:
-            elapsed = float(self.mpd_status['elapsed'])
-            if emit and elapsed != self.elapsed:
-                self.changeFromMPD.emit('elapsed', elapsed)
-            self.elapsed = elapsed
+    
+    def updatePlaylist(self, emit=True, emitCurrent=False):
+        """Get current status from MPD, update attributes of this object and emit
+        messages if something has changed."""
+        playlistVersion = int(self.mpd_status["playlist"])
+        if playlistVersion != self.playlistVersion:
+            self._handleExternalPlaylistChange(playlistVersion)
     
     def connect(self):
         import socket
+        print('mpd connecting {}'.format(self.host))
         try:
-            self.client.connect(host = self.host,
-                        port = self.port,
-                        timeout = CONNECTION_TIMEOUT)
-            self._updateAttributes(emit=False)
-            self.changeFromMPD.emit('init_done',
-                                    (self.mpd_playlist[:],
-                                     self.current,
-                                     self.currentLength,
-                                     self.elapsed,
-                                     self.state))
+            self.idler.connect(self.host, self.port, CONNECTION_TIMEOUT)
+            self.mpd_status = self.idler.status()
+            self.updateMixer(False)
+            self.updatePlaylist(False)
+            self.updatePlayer(False)    
+            self.changeFromMPD.emit('connect', (self.mpd_playlist[:], self.current,
+                                                self.currentLength, self.elapsed,
+                                                self.state))
             self.connected = True
-            self.changeFromMPD.emit('connect', None)
             return True
         except socket.error:
+            logger.debug("connection to {} unsuccessful".format(self.host))
             self.connected = False
             return False       
+    
+    def disconnect(self):
+        if not self.connected:
+            return
+        self.idler.disconnect()
+        self.connected = False
+        self.changeFromMPD.emit('disconnect', None)
         
     def run(self):
-        # connect to MPD
-        self.client = mpd.MPDClient()
-        self.timer.start(POLLING_INTERVAL)
+        self.connect()        
+        self.watchMPDStatus()
         
-        self.seekTimer = QtCore.QTimer(self)
-        self.seekTimer.setSingleShot(True)
-        self.seekTimer.timeout.connect(self._seek)
-        self.exec_()
-        
-    def poll(self):
-        self.doPolling.wait() # do nothing as long as no frontends are registered
-        while not (self.connected or self.connect()):
-            self.sleep(2)
-        try:
-            self._updateAttributes()
-        except mpd.ConnectionError as e:
-            logger.warning(e)
-            try:
-                self.client.disconnect()
-            except mpd.ConnectionError:
-                pass
-            self.connected = False
-            self.changeFromMPD.emit('disconnect', None)
+    
+    def quit(self):
+        self.disconnect()
+        super().quit()
+    
+    def watchMPDStatus(self):
+        while True:
+            self.idler.send_idle()
+            changed = self.idler.fetch_idle()
+            self.mpd_status = self.idler.status()
+            if 'mixer' in changed:
+                self.updateMixer()
+                changed.remove('mixer')
+            if 'playlist' in changed:
+                self.updatePlaylist()
+                changed.remove('playlist')
+            if 'player' in changed:
+                self.updatePlayer()
+                changed.remove('player')
+            if len(changed) > 0:
+                logger.warning('unhandled MPD changes: {}'.format(changed))
+            
             
     def updateDB(self):
         if self.connected:
