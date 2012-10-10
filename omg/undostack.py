@@ -73,10 +73,14 @@ class UndoStack(QtCore.QObject):
         be redone next."""
         return self._commands[index]
         
-    def beginMacro(self,text):
+    def beginMacro(self,text,finalMethod=None):
         """Begin a macro. The macro will contain all commands that are pushed until endMacro is called.
         *text* will be used as command description in e.g. menu commands for undo/redo. Macros may be nested,
         the outermost macro will be redone/undone at once.
+        
+        If *finalMethod* is given it will be called at the end of the macro. Usually this method updates
+        some model/view after the changes in the macro. *finalMethod* may only be used together with the
+        outermost macro.
         """ 
         # Note that nested calls to beginMacro will not create more than one instance of Macro
         if self._inUndoRedo:
@@ -84,7 +88,10 @@ class UndoStack(QtCore.QObject):
         self._macroDepth += 1
         if self._macroDepth == 1:
             assert self._currentMacro is None
-            self._currentMacro = Macro(text)
+            self._currentMacro = Macro(text,finalMethod)
+        elif finalMethod is not None:
+            raise ValueError("finalMethod may only be used with the outermost macro.")
+        
         
     def push(self,command):
         """Add a command to the stack. This calls the command's redo-method."""
@@ -277,18 +284,26 @@ class UndoStack(QtCore.QObject):
         
         
 class Macro:
-    """A macro stores a list of undocommands and acts like a command that executes all of them together."""
-    def __init__(self,text):
+    """A macro stores a list of undocommands and acts like a command that executes all of them together.
+    If *finalMethod* is not None, it will be called after all commands have been performed (no matter
+    whether the commands have been redone or undone.
+    """
+    def __init__(self,text,finalMethod=None):
         self._text = text
         self.commands = []
+        self.finalMethod = finalMethod
     
     def redo(self):
         for command in self.commands:
             command.redo()
+        if self.finalMethod is not None:
+            self.finalMethod()
     
     def undo(self):
         for command in reversed(self.commands):
             command.undo()
+        if self.finalMethod is not None:
+            self.finalMethod()
             
     def text(self):
         # this is a function so that macros behave like QUndoCommands
