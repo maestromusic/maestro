@@ -16,26 +16,42 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from PyQt4.phonon import Phonon as phonon
 import urllib.parse
 
-from ... import player, config, profiles, utils, strutils
+from PyQt4 import QtCore
+from PyQt4.phonon import Phonon as phonon
+
+from ... import player, config, profiles2, utils, strutils
 from ...models import playlist
-            
-            
-class PhononPlayerBackend(player.PlayerBackend):
-    className = "Phonon"
+        
+translate = QtCore.QCoreApplication.translate
+
+
+def enable():
+    player.profileCategory.addType(profiles2.ProfileType('phonon',
+                                                         translate('PhononPlayerBackend','Phonon'),
+                                                         PhononPlayerBackend))
+
+def disable():
+    player.profileCategory.removeType('phonon')
     
-    def __init__(self, name, config=None):
-        super().__init__(name)
+def defaultStorage():
+    return {"SECTION:phonon": {
+            "current": None,
+            "playlist": ""
+        }}
+    
+
+class PhononPlayerBackend(player.PlayerBackend):
+    def __init__(self, name, category, type, config):
+        super().__init__(name,category,type)
         
         # The list of paths in the playlist and the current song are stored directly in the model's tree
         self.playlist = playlist.PlaylistModel(self)
-        if config is not None:
-            if 'playlist' in config:
-                self.playlist.initFromWrapperString(config['playlist'])
-                if 'current' in config:
-                    self.playlist.setCurrent(config['current'])
+        if 'playlist' in config:
+            self.playlist.initFromWrapperString(config['playlist'])
+            if 'current' in config:
+                self.playlist.setCurrent(config['current'])
 
         self._nextSource = None # used in self._handleSourceChanged
         
@@ -140,26 +156,10 @@ class PhononPlayerBackend(player.PlayerBackend):
         #TODO: do something if element.url is not a FileURL
         return utils.absPath(self.playlist.root.fileAtOffset(offset).element.url.path)
     
-    def config(self):
-        return []
-    
-    @classmethod
-    def configurationWidget(cls, profile = None):
-        return profiles.ConfigurationWidget()
+    def save(self):
+        return {'playlist': self.playlist.wrapperString(),
+                'current': self.playlist.current
+                }
         
     def __str__(self):
         return "PhononAudioBackend({})".format(self.name)
-
-    
-def enable():
-    player.profileConf.addClass(PhononPlayerBackend)
-
-def disable():
-    player.profileConf.removeClass(PhononPlayerBackend)
-    
-    
-def defaultStorage():
-    return {"SECTION:phonon": {
-            "current": None,
-            "playlist": ""
-        }}

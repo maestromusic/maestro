@@ -253,6 +253,9 @@ class Section:
 
     def __str__(self):
         return self.name
+    
+    def __getattr__(self,name):
+        return self.members[name]
 
     def getOptions(self):
         """Return all members which are options."""

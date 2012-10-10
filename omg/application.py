@@ -196,13 +196,13 @@ def run(cmdConfig=[],type='gui',exitPoint=None):
     # Load and initialize remaining modules
     from .core import levels
     levels.init()
-    from . import resources, search
+    from . import resources, search, profiles2
     from .core import covers
     search.init()
     covers.init()
     
     from . import filebackends
-    from .filebackends import filesystem as fsBackend
+    from .filebackends import filesystem as fsBackend #TODO: necessary?
     
     global network
     network = QtNetwork.QNetworkAccessManager()
@@ -245,6 +245,7 @@ def run(cmdConfig=[],type='gui',exitPoint=None):
     delegateconfiguration.save()
     plugins.shutdown()
     covers.shutdown()
+    profiles2.manager.save()
     config.shutdown()
     logging.shutdown()
     sys.exit(returnValue)

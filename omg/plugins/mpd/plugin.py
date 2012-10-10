@@ -23,11 +23,12 @@ import mpd
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from omg import player, logging, profiles, filebackends
+from omg import player, logging, profiles2, filebackends
 from omg.core import tags
 from omg.filebackends import filesystem as fsFileBackend
 from omg.models import playlist
 
+translate = QtCore.QCoreApplication.translate
 logger = logging.getLogger(__name__)
 
 
@@ -35,12 +36,17 @@ CONNECTION_TIMEOUT = 10 # time in seconds before an initial connection to MPD is
 POLLING_INTERVAL = 200 # milliseconds between two MPD polls
 MPD_STATES = { 'play': player.PLAY, 'stop': player.STOP, 'pause': player.PAUSE}
 
+  
 def enable():
-    player.profileConf.addClass(MPDPlayerBackend)
+    player.profileCategory.addType(profiles2.ProfileType('mpd',
+                                                         translate('MPDPlayerBackend','MPD'),
+                                                         MPDPlayerBackend))
     filebackends.urlTypes["mpd"] = MPDURL
 
 def disable():
-    player.profileConf.removeClass(MPDPlayerBackend)
+    player.profileCategory.removeType('mpd')
+    
+    
 
 class MPDThread(QtCore.QThread):
     """Helper class for the MPD player backend. An MPDThread communicates with
@@ -313,14 +319,16 @@ class MPDThread(QtCore.QThread):
             
             
 class MPDPlayerBackend(player.PlayerBackend):
-    
-    className = "MPD"
     changeFromMain = QtCore.pyqtSignal(str, object)
     
-    def __init__(self, name, host='localhost', port='6600', password=None):
-        super().__init__(name)
+    def __init__(self, name, category, type, config):#host='localhost', port='6600', password=None):
+        super().__init__(name,category,type)
         self.playlist = playlist.PlaylistModel(self)
         self.urls = []
+        host = config['host'] if 'host' in config else 'localhost'
+        port = config['port'] if 'port' in config else 6600
+        password = config['password'] if 'password' in config else ''
+            
         self.mpdthread = MPDThread(self, host, port, password)
         self.mpdthread.changeFromMPD.connect(self._handleMPDChange, Qt.QueuedConnection)
         self.changeFromMain.connect(self.mpdthread._handleMainChange)
@@ -345,8 +353,15 @@ class MPDPlayerBackend(player.PlayerBackend):
                 "previousSong", "setVolume", "_move"):
             setattr(self, what, functools.partial(_emitChange, what))
     
-    def config(self):
-        return self.mpdthread.host, self.mpdthread.port, self.mpdthread.password
+    def setConnectionParameters(self,host,port,password):
+        #TODO reconnect
+        self.category.profileChanged.emit(self)
+        
+    def save(self):
+        return {'host': self.mpdthread.host,
+                'port': self.mpdthread.port,
+                'password': self.mpdthread.password
+                }
     
     def state(self):
         return self._state
@@ -467,25 +482,30 @@ class MPDPlayerBackend(player.PlayerBackend):
     def __str__(self):
         return "MPDPlayerBackend({})".format(self.name)
 
-class MPDConfigWidget(profiles.ConfigurationWidget):
+class MPDConfigWidget(QtGui.QWidget):
     
-    def __init__(self, profile = None):
+    def __init__(self, profile=None):
         super().__init__()
-        layout = QtGui.QGridLayout(self)
-        layout.addWidget(QtGui.QLabel(self.tr("Host:"), self), 0, 0, Qt.AlignRight)
-        self.hostEdit = QtGui.QLineEdit(self)
-        layout.addWidget(self.hostEdit, 0, 1)
+        layout = QtGui.QFormLayout(self)
         
-        layout.addWidget(QtGui.QLabel(self.tr("Port:"), self), 1, 0, Qt.AlignRight)
-        self.portEdit = QtGui.QLineEdit(self)
+        self.hostEdit = QtGui.QLineEdit()
+        layout.addRow(self.tr("Host:"),self.hostEdit)
+        
+        self.portEdit = QtGui.QLineEdit()
         self.portEdit.setValidator(QtGui.QIntValidator(0, 65535, self))
-        layout.addWidget(self.portEdit, 1, 1)
+        layout.addRow(self.tr("Port:"),self.portEdit)
         
-        layout.addWidget(QtGui.QLabel(self.tr("Password:"), self), 2, 0, Qt.AlignRight)
-        self.passwordEdit = QtGui.QLineEdit(self)
-        layout.addWidget(self.passwordEdit, 2, 1)
+        self.passwordEdit = QtGui.QLineEdit()
+        layout.addRow(self.tr("Password:"),self.passwordEdit)
+        
+        self.passwordVisibleBox = QtGui.QCheckBox()
+        self.passwordVisibleBox.toggled.connect(self._handlePasswordVisibleBox)
+        layout.addRow(self.tr("Password visible?"),self.passwordVisibleBox)
         
         self.setProfile(profile)
+        
+        saveButton = QtGui.QPushButton(self.tr("Save"))
+        saveButton.clicked.connect(self._handleSave)
     
     def setProfile(self, profile):
         if profile is None:
@@ -495,12 +515,17 @@ class MPDConfigWidget(profiles.ConfigurationWidget):
         self.hostEdit.setText(host)
         self.portEdit.setText(str(port))
         self.passwordEdit.setText(password)
+        self.passwordVisibleBox.setChecked(len(password) == 0)
     
-    def currentConfig(self):
+    def _handleSave(self):
         host = self.hostEdit.text()
         port = int(self.portEdit.text())
         password = self.passwordEdit.text()
-        return (host, port, password)
+        self.profile.setConnectionParameters(host,port,password)
+    
+    def _handlePasswordVisibleBox(self,checked):
+        self.passwordEdit.setEchoMode(QtGui.QLineEdit.Normal if checked else QtGui.QLineEdit.Password)
+
 
 class MPDURL(filebackends.BackendURL):
     
@@ -535,7 +560,7 @@ class MPDFile(filebackends.BackendFile):
         super().__init__(url)
         
     def readTags(self):
-        mpdProfile = player.profileConf[self.url.profile]
+        mpdProfile = player.profileCategory.get(self.url.profile)
         self.tags, self.length = mpdProfile.getInfo(self.url.path)
         
 MPDURL.IMPLEMENTATIONS = [MPDFile]

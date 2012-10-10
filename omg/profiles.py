@@ -41,6 +41,8 @@ class ProfileConfiguration(QtCore.QObject):
     classRemoved = QtCore.pyqtSignal(str)
     
     def __init__(self, name, configSection, profileClasses = None):
+        #TODO unique name, section of the storage file that stores the profiles,
+        #profile classes (will often added later by plugins)
         super().__init__()
         self.name = name
         self.classes = {}
@@ -55,7 +57,8 @@ class ProfileConfiguration(QtCore.QObject):
             if clsName in self.classes:
                 self.profiles[name] = self.classes[clsName](name, *config)                
             else:
-                logger.warning("could not load {} profile {}: class {} not found".format(self.name, name, clsName))
+                logger.warning("Could not load {} profile '{}': Class {} not found"
+                               .format(self.name, name, clsName))
     
     def saveConfig(self):
         configContents = []
