@@ -21,7 +21,7 @@ import urllib.parse
 from PyQt4 import QtCore
 from PyQt4.phonon import Phonon as phonon
 
-from ... import player, config, profiles2, utils, strutils
+from ... import player, profiles2, utils, strutils
 from ...models import playlist
         
 translate = QtCore.QCoreApplication.translate
@@ -43,15 +43,15 @@ def defaultStorage():
     
 
 class PhononPlayerBackend(player.PlayerBackend):
-    def __init__(self, name, category, type, config):
-        super().__init__(name,category,type)
+    def __init__(self, name, type, state):
+        super().__init__(name, type, state)
         
         # The list of paths in the playlist and the current song are stored directly in the model's tree
         self.playlist = playlist.PlaylistModel(self)
-        if 'playlist' in config:
-            self.playlist.initFromWrapperString(config['playlist'])
-            if 'current' in config:
-                self.playlist.setCurrent(config['current'])
+        if 'playlist' in state:
+            self.playlist.initFromWrapperString(state['playlist'])
+            if 'current' in state:
+                self.playlist.setCurrent(state['current'])
 
         self._nextSource = None # used in self._handleSourceChanged
         

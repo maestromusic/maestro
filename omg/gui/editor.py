@@ -20,13 +20,12 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
-from . import treeactions, treeview, mainwindow, tagwidgets, dialogs
+from . import treeactions, treeview, mainwindow, tagwidgets, dialogs, profiles as profilesgui
 from .. import profiles, utils
 from ..core import levels, tags
 from ..models import albumguesser
 from ..models.editor import EditorModel
-from .delegates.editor import EditorDelegate
-from .delegates.configuration import ConfigurationCombo
+from .delegates import editor as editordelegate
 
         
 class EditorTreeView(treeview.TreeView):
@@ -55,7 +54,7 @@ class EditorTreeView(treeview.TreeView):
         self.setDefaultDropAction(Qt.MoveAction)
         self.setDropIndicatorShown(True)
         self.setModel(EditorModel())
-        self.setItemDelegate(EditorDelegate(self))
+        self.setItemDelegate(editordelegate.EditorDelegate(self,editordelegate.profileType.default()))
         self.viewport().setMouseTracking(True)
         self.autoExpand = True
         self.model().rowsInserted.connect(self._expandInsertedRows)
@@ -187,8 +186,11 @@ class OptionDialog(dialogs.FancyPopup):
         albumGuessLayout.addWidget(self.albumGuessComboBox,1)
         layout.addRow(self.tr("Guess albums"),albumGuessLayout)
         
-        itemDisplayCombo = ConfigurationCombo(EditorDelegate.configurationType, [self.editor])
-        layout.addRow(self.tr("Item display"),itemDisplayCombo)
+        profileChooser = profilesgui.ProfileComboBox(delegates.profileCategory,
+                                                     restrictToType=editordelegate.profileType,
+                                                     default=self.editor.itemDelegate().profile)
+        profileChooser.profileChosen.connect(self.editor.itemDelegate().setProfile)
+        layout.addRow(self.tr("Item display"),profileChooser)
         
     def _handleAutoExpandBox(self,state):
         """Handle toggling the auto expand checkbox."""

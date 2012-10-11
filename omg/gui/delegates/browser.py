@@ -20,38 +20,39 @@ from PyQt4 import QtCore
 
 from ...core import tags, covers
 from ...core.nodes import Wrapper
-from . import StandardDelegate, configuration, TextItem, ITALIC_STYLE
+from . import profiles, StandardDelegate, TextItem, ITALIC_STYLE
 from ...models import browser as browsermodel
 
 translate = QtCore.QCoreApplication.translate
+
+
+
+profileType = profiles.createProfileType(
+                name       = 'browser',
+                title      = translate("Delegates","Browser"),
+                leftData   = ['t:composer','t:artist','t:performer'],
+                rightData  = ['t:date','t:conductor'],
+                overwrite  = {"fitInTitleRowData": profiles.DataPiece(tags.get("date"))
+                                             if tags.isInDB("date") else None},
+                addOptions = {"showSortValues": profiles.DelegateOption("showSortValues",
+                             translate("Delegates","Display sort values instead of real values"),"bool",False)}
+)
 
 
 class BrowserDelegate(StandardDelegate):
     """Delegate used in the Browser. Does some effort to put flag icons at the optimal place using free space
     in the title row and trying not to increase the overall number of rows.
     """
-    configurationType, defaultConfiguration = configuration.createConfigType(
-                    'browser',
-                    translate("Delegate","Browser"),
-                    StandardDelegate.options,
-                    ['t:composer','t:artist','t:performer'],
-                    ['t:date','t:conductor'],
-                    overwrite={"fitInTitleRowData": configuration.DataPiece(tags.get("date"))
-                                            if tags.isInDB("date") else None},
-                    addOptions={"showSortValues": configuration.DelegateOption("showSortValues",
-                            translate("Delegates","Display sort values instead of real values"),"bool",False)}
-    )
-    
-    def __init__(self,view,config=None):
-        super().__init__(view,config)
+    def __init__(self,view,profile):
+        super().__init__(view,profile)
         # Don't worry, addCacheSize won't add sizes twice
-        covers.addCacheSize(self.config.options['coverSize'].value)
+        covers.addCacheSize(self.profile.options['coverSize'])
     
     def layout(self,index,availableWidth):
         node = self.model.data(index)
         
         if isinstance(node,browsermodel.ValueNode):
-            valueList = node.sortValues if self.config.options['showSortValues'].value else node.values
+            valueList = node.sortValues if self.profile.options['showSortValues'] else node.values
             for value in valueList:
                 self.addCenter(TextItem(value))
                 self.newRow()
@@ -64,8 +65,8 @@ class BrowserDelegate(StandardDelegate):
         elif isinstance(node,Wrapper):
             super().layout(index,availableWidth)
     
-    def _handleDispatcher(self,event):
+    def _handleProfileChanged(self,profile):
         """React to the configuration dispatcher."""
-        super()._handleDispatcher(event)
-        if event.config == self.config and event.type == configuration.CHANGED:
-            covers.addCacheSize(self.config.options['coverSize'].value)
+        if profile == self.profile:
+            covers.addCacheSize(profile.options['coverSize'])
+            

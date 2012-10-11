@@ -48,8 +48,8 @@ class PlayerBackend(profiles2.Profile):
     elapsedChanged = QtCore.pyqtSignal(float)
     connectionStateChanged = QtCore.pyqtSignal(int)
     
-    def __init__(self, name, category, type):
-        super().__init__(name,category,type)
+    def __init__(self, name, type, state):
+        super().__init__(name, type, state)
         self.connectionState = DISCONNECTED
     
     def state(self):

@@ -30,16 +30,10 @@ logger = logging.getLogger(__name__)
 
 #TODO: make sure names are unique
 class Profile(QtCore.QObject): # to allow subclasses to have signals
-    name = None
-    type = None
-    builtin = False
-    hidden = False # for default profiles
-    readOnly = False # necessary?
-    
-    def __init__(self,name,category,type=None):
+    builtIn = False
+    def __init__(self,name,type,state=None):
         super().__init__()
         self.name = name
-        self.category = category
         self.type = type
     
     def save(self):
@@ -54,7 +48,9 @@ class ProfileType:
         self.name = name
         self.title = title
         self.profileClass = profileClass if profileClass is not None else Profile
-        self.defaultProfile = None
+        
+    def load(self,category):
+        pass
 
         
 class ProfileCategory(QtCore.QObject):
@@ -88,23 +84,25 @@ class ProfileCategory(QtCore.QObject):
         if type not in self.types:
             self.types.append(type)
             self.typeAdded.emit(type)
-            self.loadProfiles(type)
+            self.loadProfiles(restrictToType=type)
             
     def removeType(self,type):
         for profile in self.profiles:
             if profile.type == type:
+                profile.builtIn = False # delete built-in profiles, too
                 self.deleteProfile(profile)
         self.types.remove(types)
         self.typeRemoved.emit(types)
     
-    def addProfile(self,name,type=None,config=None):
+    def addProfile(self,name,type=None,state=None):
         profileClass = type.profileClass if type is not None else self.profileClass
-        profile = profileClass(name,self,type,config if config is not None else {})
+        profile = profileClass(name,type,state)
         self.profiles.append(profile)
         self.profileAdded.emit(profile)
         return profile
     
     def deleteProfile(self,profile):
+        assert not profile.builtIn
         # TODO: comment this lines
         for i,data in enumerate(self.storageOption.getValue()):
             if data[0] == profile.name:
@@ -114,33 +112,24 @@ class ProfileCategory(QtCore.QObject):
         self.profileRemoved.emit(profile)
         
     def renameProfile(self,profile,newName):
+        assert not profile.builtIn
         if newName != profile.name:
             profile.name = newName
             self.profileRenamed.emit(profile)
     
     def loadProfiles(self,restrictToType=None):
-        """Load all profiles from the config file that have not been loaded yet and whose type is 
-        *restrictToType*. If the latter is None, load profiles of all known types (i.e. those that have
-        been added using addType.
-        """
         for data in self.storageOption.getValue():
             if len(data) != 3: # broken storage option; should not happen
                 continue
-            name,typeName,config = data
-            if restrictToType is not None:
-                if typeName != restrictToType.name:
-                    continue
-                loadType = restrictToType
-            elif typeName is None:
-                loadType = None
-            else:
-                for type in self.types:
-                    if type.name == typeName:
-                        loadType = type
-                        break
-                else: continue # do not load this type
-                
-            self.addProfile(name,loadType,config)
+            name,typeName,state = data
+            if restrictToType is None:
+                if typeName is None:
+                    self.addProfile(name,None,state)
+                # skip profiles with types
+            elif typeName == restrictToType.name:
+                self.addProfile(name,restrictToType,state)
+        if restrictToType is not None:
+            restrictToType.load(self)
             
     def save(self):
         self.storageOption.setValue([[profile.name,
@@ -166,7 +155,6 @@ class ProfileManager(QtCore.QObject):
             self.categories.append(category)
             self.categoryAdded.emit(category)
             category.loadProfiles()
-            
             
     def removeCategory(self,category):
         category.save()

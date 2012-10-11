@@ -147,8 +147,7 @@ storage = OrderedDict((
     'central_widgets': [],
     'dock_widgets': [],
     'central_tab_index': -1,
-    # List of all delegate configurations. Built-in configurations will be added regardless of this list.
-    'delegate_configurations': [],
+    'delegates': [],
 }),
 ("SECTION:browser", {
     'views': [[['composer','artist','performer']],[['genre'],['composer','artist','performer']]],

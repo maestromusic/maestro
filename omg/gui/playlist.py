@@ -19,8 +19,8 @@
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from . import treeview, mainwindow, playerwidgets, profiles as profilesgui
-from .delegates import playlist as playlistdelegate, configuration as delegateconfig
+from . import treeview, mainwindow, playerwidgets, profiles as profilesgui, delegates
+from .delegates import playlist as playlistdelegate
 from .treeactions import *
 from .. import player
 
@@ -50,7 +50,7 @@ class PlaylistTreeView(treeview.TreeView):
         self.setDropIndicatorShown(True)
         self.viewport().setMouseTracking(True)
         self.doubleClicked.connect(self._handleDoubleClick)
-        self.setItemDelegate(playlistdelegate.PlaylistDelegate(self))
+        self.setItemDelegate(playlistdelegate.PlaylistDelegate(self,playlistdelegate.profileType.default()))
 
     def setBackend(self, backend):
         if self.backend is not None:
@@ -105,9 +105,11 @@ class PlaylistWidget(QtGui.QDockWidget):
         buttonLayout.addWidget(self.backendChooser)
         
         buttonLayout.addWidget(QtGui.QLabel(self.tr("Item Display:")))
-        buttonLayout.addWidget(delegateconfig.ConfigurationCombo(
-                                                    playlistdelegate.PlaylistDelegate.configurationType,
-                                                    [self.treeview]))
+        profileChooser = profilesgui.ProfileComboBox(delegates.profiles.category,
+                                                     restrictToType=playlistdelegate.profileType,
+                                                     default=self.treeview.itemDelegate().profile)
+        profileChooser.profileChosen.connect(self.treeview.itemDelegate().setProfile)
+        buttonLayout.addWidget(profileChooser)
         buttonLayout.addStretch()
         
         layout.addWidget(self.treeview)  

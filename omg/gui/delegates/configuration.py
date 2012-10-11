@@ -16,107 +16,53 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+assert False
+
 import copy
 
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from ... import utils, config, logging
+from ... import utils, config, logging, profiles2 as profiles
 from ...core import tags
 
 translate = QtCore.QCoreApplication.translate
-logger = logging.getLogger(__name__)
-
-# Registered DelegateConfigurationTypes and registered DelegateConfigurations
-_types = []
-_configs = []
-
-# Type of a change
-ADDED,CHANGED,DELETED = 1,2,3
 
 
-class DelegateConfigurationType:
-    """Delegate configurations have a specific type (e.g. Browser, Playlist, ...) and usually each treeview
-    can only use delegate configurations of one type. Types are identified by an id and have a title that is
-    displayed to the user.
-    """
-    def __init__(self,id,title):
-        self.id = id
-        self.title = title
-        self.default = None
-        
-    @staticmethod
-    def fromId(id):
-        """Return the type with the given id."""
-        for type in _types:
-            if type.id == id:
-                return type
-        raise ValueError("Unknown delegate configuration type '{}'.format(id)")
+
+category = profiles.ProfileCategory("delegates",translate("Delegates","Item display"),
+                                           config.storageObject.gui.delegates)
+profiles.manager.addCategory(profileCategory)
 
 
-def addType(type):
-    """Register a DelegateConfigurationType."""
-    _types.append(type)
-
-
-def removeType(type):
-    """Unregister a DelegateConfigurationType."""
-    del _types[type]
-    
-    
-def getTypes():
-    """Return a list of all registered DelegateConfigurationTypes."""
-    return _types
-    
-    
-def createConfigType(id,title,options,leftData,rightData,overwrite={},addOptions={}):
-    """Create a DelegateConfigurationType, a DelegateConfigurationType storing the default values for this
+def createConfigType(typeName,title,*,options=None,leftData=None,rightData=None,overwrite={},addOptions={}):
+    #TODO comment
+    """Create a , a DelegateConfigurationType storing the default values for this
     type and a default DelegateConfiguration for this type. The first configuration's values are used
     whenever a configuration using this type is resetted. In particular the first configuration must not be
     changed. The second configuration (the type's default configuration) is used as initial configuration
     whenever a widget using configurations of this type is created. It may be changed, but not deleted, by
     the user (it is a built-in configuration).
-    """ 
-    type = DelegateConfigurationType(id,title)
-    type.default = DelegateConfiguration(title,type,builtin=True,setDefaults=False)
-    type.default.options = copyOptions(options)
-    for k,v in overwrite.items():
-        type.default.options[k].value = v
-    for k,v in addOptions.items():
-        type.default.options[k] = v
-    type.default.leftData = []
-    for string in leftData:
-        try:
-            type.default.leftData.append(DataPiece.fromString(string))
-        except ValueError: pass # This happens if the default configuration contains non-existent tags
-    type.default.rightData = []
-    for string in rightData:
-        try:
-            type.default.rightData.append(DataPiece.fromString(string))
-        except ValueError: pass # This happens if the default configuration contains non-existent tags
-    addType(type)
+    """
+    type = profiles.ProfileType(typeName,title)
+    if options is None:
+        options = defaultOptions # defined below
+    type.options = utils.OrderedDict.fromItems([(k,copy.copy(option)) for k,option in options.items()])
+    for name, value in overwrite.items():
+        type.options[name].value = value
+    type.options.extend(utils.OrderedDict.fromItems([(k,DelegateOption(*data))
+                                                     for k,data in addOptions.items()]))
+    category
     
-    config = DelegateConfiguration(title,type,True,setDefaults=True)
-    addDelegateConfiguration(config)
-    
-    return type,config
+    profile = DelegateProfile(title,type,builtIn=True)
+    profile.leftData = leftData
+    profile.rightData = rightData
+    type.default = profile
     
     
-class DelegateConfigurationEvent:
-    """A event for the delegate configuration dispatcher. It simply stores a configuration and a type from
-    ADDED,CHANGED,DELETED."""
-    def __init__(self,config,type=CHANGED):
-        self.config = config
-        self.type = type
-        
+    
+    return type,profile
 
-class Dispatcher(QtCore.QObject):
-    """Delegate configuration dispatcher that emits events whenever a configuration is added, changed or
-    deleted."""
-    changes = QtCore.pyqtSignal(DelegateConfigurationEvent)
- 
-dispatcher = Dispatcher()
- 
  
 class DataPiece:
     """Datapieces are used to configure which information a delegate should display. Each datapiece stores
@@ -242,6 +188,59 @@ class DelegateOption:
                     logger.warning("Invalid datapiece in delegate configuration in storage file.")
                     return None
                         
+
+class DelegateProfile(profiles.Profile):
+    def __init__(self,name,type,config,builtIn=False):
+        super().__init__(name,profileCategory,type)
+        self.builtIn = builtIn
+            
+        if 'options' in config:
+            for title,option in self.options.items():
+                if title in config['options']:
+                    option.fromString(config['options'][title])
+        for column in ['left','right']:
+            if column in config:
+                aList = []
+                for string in data[column]:
+                    try:
+                        aList.append(DataPiece.fromString(string))
+                    except ValueError as e:
+                        logger.exception(e)
+                        # continue anyway
+                setattr(self,'leftData' if column == 'left' else 'rightData',aList)
+    
+    def save(self):
+        """Return a dict storing this configuration."""
+        # Order does not play a role
+        optionDict = {title:option.export() for title,option in self.options.items() }
+        left = [dataPiece.export() for dataPiece in self.leftData]
+        right = [dataPiece.export() for dataPiece in self.rightData]
+        return {
+            'title': self.title,
+            'options': optionDict,
+            'left': left,
+            'right': right,
+            'type': self.type.id
+        }
+        
+# List of available options for this delegate. This list in particular defines the default values.
+# See the configuration module.
+defaultOptions = utils.OrderedDict.fromItems([(data[0],DelegateOption(*data)) for data in [                                            
+        ("fontSize",translate("Delegates","Fontsize"),"int",8),
+        ("showMajorAncestors",translate("Delegates","Display major parent containers which are not in the tree."),"bool",False),
+        ("showAllAncestors",translate("Delegates","Display all parent containers which are not in the tree."),"bool",False),
+        ("showMajor",translate("Delegates","Display major flag"),"bool",False),
+        ("showPositions",translate("Delegates","Display position numbers"),"bool",True),
+        ("showPaths",translate("Delegates","Display paths"),"bool",False),
+        ("showFlagIcons",translate("Delegates","Display flag icons"),"bool",True),
+        ("removeParentFlags",translate("Delegates","Remove flags which appear in ancestor elements"),"bool",True),
+        ("fitInTitleRowData",translate("Delegates","This datapiece will be displayed next to the title if it fits"),"datapiece",None),
+        ("appendRemainingTags",translate("Delegates","Append all tags that are not listed above"),"bool",False),
+        #("hideParentFlags",translate("Delegates","Hide flags that appear in parent elements"),"bool",True),
+        #("maxRowsTag",translate("Delegates","Maximal number of rows per tag"),"int",4),
+        #("maxRowsElement",translate("Delegates","Maximal number of rows per element"),"int",50),
+        ("coverSize",translate("Delegates","Size of covers"),"int",40)
+    ]])
         
 class DelegateConfiguration:
     """A delegate configuration stores
@@ -378,159 +377,159 @@ class DelegateConfiguration:
     def __hash__(self):
         return hash(self.title)
         
-
-def getConfigurations(type=None):
-    """Return a list of all configurations. If *type* is not None, only configurations of that type will
-    be returned."""
-    if type is None:
-        return _configs
-    else: return [c for c in _configs if c.type == type]
-    
-    
-def getConfiguration(title,type=None):
-    """Get the configuration identified by *title*. Raise a ValueError if it cannot be found. If *type* is
-    not None, ensure that the configuration has the given type and raise a ValueError else."""
-    for config in _configs:
-        if config.title == title:
-            if type is not None and config.type != type:
-                raise ValueError("Delegate configuration with title '{}' is not of type '{}'"
-                                 .format(config.title,type.id))
-            return config
-    raise ValueError("There is no delegate configuration with title '{}'".format(title))
-        
-
-def exists(title):
-    """Return whether a configuration with title *title* is registered."""
-    return any(c.title == title for c in _configs)
-
-
-def createDelegateConfiguration(type):
-    """Create a delegate configuration of the given DelegateConfigurationType and register it. Initialize
-    it with the default datapieces and options for this type."""
-    i = 0
-    title = 'New {}'.format(type.title)
-    while exists(title):
-        i += 1
-        title = 'New {} ({})'.format(type.title,i)    
-    addDelegateConfiguration(DelegateConfiguration(title,type))
-    
-    
-def addDelegateConfiguration(config):
-    """Register a DelegateConfiguration."""
-    insertDelegateConfiguration(len(_configs),config)
-    
-    
-def insertDelegateConfiguration(pos,config):
-    """Insert a DelegateConfiguration at the given position into the list of all configurations."""
-    _configs.insert(pos,config)
-    dispatcher.changes.emit(DelegateConfigurationEvent(config,ADDED))
-
-
-def removeDelegateConfiguration(config):
-    """Unregister the given configuration."""
-    if not config.builtin:
-        _configs.remove(config)
-        dispatcher.changes.emit(DelegateConfigurationEvent(config,DELETED))
-
-
-def save():
-    """Save all registered configurations to the storage file."""
-    config.storage.gui.delegate_configurations = [config.save() for config in _configs]
-
-
-def load():
-    """Load configurations from the storage file."""
-    for data in config.storage.gui.delegate_configurations:
-        if 'title' not in data or 'type' not in data:
-            continue
-        title = data['title']
-        # Use an existing (builtin) configuration or create one for this title. 
-        try:
-            theConfig = getConfiguration(title)
-            if theConfig.type.id != data['type']:
-                logger.warning("Delegate configuration type mismatch: '{}' != '{}'"
-                               .format(theConfig.type.id,data['type']))
-        except ValueError:
-            try:
-                type = DelegateConfigurationType.fromId(data['type'])
-            except ValueError as e:
-                logger.warning(str(e))
-                continue
-            theConfig = DelegateConfiguration(title,type)
-            _configs.append(theConfig)
-        theConfig.restore(data)
-            
-    
-def copyOptions(options):
-    """Take an instance of utils.OrderedDict containing DelegateOptions and return a copy of the dict
-    containing copies of the options."""
-    return utils.OrderedDict.fromItems([(k,copy.copy(option)) for k,option in options.items()])
-
-
-class ConfigurationCombo(QtGui.QComboBox):
-    """Combobox which allows to choose a configuration from all configurations of a type *type*. Whenever
-    the user chooses a delegate configuration, the delegates of each view in *views* will be updated to use
-    this configuration.
-    
-    Additionally the box contains an entry "Configure..." which opens the delegates panel in the preferences
-    dialog.
-    """
-    def __init__(self,type,views=[]):
-        super().__init__()
-        self.type = type
-        self.views = views
-        self.setSizeAdjustPolicy(QtGui.QComboBox.AdjustToContents)
-        dispatcher.changes.connect(self._handleDispatcher)
-        self._update()
-        config = views[0].itemDelegate().config
-        for i in range(self.count()):
-            if self.itemData(i) == config:
-                self.setCurrentIndex(i)
-                break
-        # Necessary to reset the index after the user has chosen the "Configure..." entry.
-        self._lastIndex = self.currentIndex() 
-        self.currentIndexChanged.connect(self._handleCurrentIndexChanged)
-    
-    def _update(self):
-        """Update the entries of the box based on the registered delegate configurations."""
-        self.clear()
-        for config in getConfigurations(self.type):
-            self.addItem(config.title,config)
-            
-        self.insertSeparator(self.count())
-        self.addItem(self.tr("Configure..."))
-            
-    def _handleDispatcher(self,event):
-        """Handle the delegate configuration dispatcher."""
-        if event.config.type != self.type:
-            return
-        if event.type != CHANGED:
-            self.currentIndexChanged.disconnect(self._handleCurrentIndexChanged)
-            current = self.itemData(self.currentIndex())
-            self._update()
-            for i in range(self.count()):
-                if self.itemData(i) == current:
-                    self.setCurrentIndex(i)
-                    break
-            self.currentIndexChanged.connect(self._handleCurrentIndexChanged)
-        else:
-            # Update the title
-            for i in range(self.count()):
-                if self.itemData(i) == event.config:
-                    self.setItemText(i,event.config.title)
-                    break
-    
-    def _handleCurrentIndexChanged(self,index):
-        """Change the configuration of each delegate of the views in self.views or open the preferences if
-        the user selected the "Configure..." entry."""
-        if index == self.count()-1:
-            from .. import preferences
-            preferences.show(startPanel="main/delegates",
-                             startConfig=self.itemData(self._lastIndex))
-            self.setCurrentIndex(self._lastIndex)
-        elif index != self._lastIndex: # this is not true when resetting in the line above
-            config = self.itemData(index)
-            for view in self.views:
-                view.itemDelegate().setConfiguration(config)
-            self._lastIndex = index
+#
+#def getConfigurations(type=None):
+#    """Return a list of all configurations. If *type* is not None, only configurations of that type will
+#    be returned."""
+#    if type is None:
+#        return _configs
+#    else: return [c for c in _configs if c.type == type]
+#    
+#    
+#def getConfiguration(title,type=None):
+#    """Get the configuration identified by *title*. Raise a ValueError if it cannot be found. If *type* is
+#    not None, ensure that the configuration has the given type and raise a ValueError else."""
+#    for config in _configs:
+#        if config.title == title:
+#            if type is not None and config.type != type:
+#                raise ValueError("Delegate configuration with title '{}' is not of type '{}'"
+#                                 .format(config.title,type.id))
+#            return config
+#    raise ValueError("There is no delegate configuration with title '{}'".format(title))
+#        
+#
+#def exists(title):
+#    """Return whether a configuration with title *title* is registered."""
+#    return any(c.title == title for c in _configs)
+#
+#
+#def createDelegateConfiguration(type):
+#    """Create a delegate configuration of the given DelegateConfigurationType and register it. Initialize
+#    it with the default datapieces and options for this type."""
+#    i = 0
+#    title = 'New {}'.format(type.title)
+#    while exists(title):
+#        i += 1
+#        title = 'New {} ({})'.format(type.title,i)    
+#    addDelegateConfiguration(DelegateConfiguration(title,type))
+#    
+#    
+#def addDelegateConfiguration(config):
+#    """Register a DelegateConfiguration."""
+#    insertDelegateConfiguration(len(_configs),config)
+#    
+#    
+#def insertDelegateConfiguration(pos,config):
+#    """Insert a DelegateConfiguration at the given position into the list of all configurations."""
+#    _configs.insert(pos,config)
+#    dispatcher.changes.emit(DelegateConfigurationEvent(config,ADDED))
+#
+#
+#def removeDelegateConfiguration(config):
+#    """Unregister the given configuration."""
+#    if not config.builtin:
+#        _configs.remove(config)
+#        dispatcher.changes.emit(DelegateConfigurationEvent(config,DELETED))
+#
+#
+#def save():
+#    """Save all registered configurations to the storage file."""
+#    config.storage.gui.delegate_configurations = [config.save() for config in _configs]
+#
+#
+#def load():
+#    """Load configurations from the storage file."""
+#    for data in config.storage.gui.delegate_configurations:
+#        if 'title' not in data or 'type' not in data:
+#            continue
+#        title = data['title']
+#        # Use an existing (builtin) configuration or create one for this title. 
+#        try:
+#            theConfig = getConfiguration(title)
+#            if theConfig.type.id != data['type']:
+#                logger.warning("Delegate configuration type mismatch: '{}' != '{}'"
+#                               .format(theConfig.type.id,data['type']))
+#        except ValueError:
+#            try:
+#                type = DelegateConfigurationType.fromId(data['type'])
+#            except ValueError as e:
+#                logger.warning(str(e))
+#                continue
+#            theConfig = DelegateConfiguration(title,type)
+#            _configs.append(theConfig)
+#        theConfig.restore(data)
+#            
+#    
+#def copyOptions(options):
+#    """Take an instance of utils.OrderedDict containing DelegateOptions and return a copy of the dict
+#    containing copies of the options."""
+#    return utils.OrderedDict.fromItems([(k,copy.copy(option)) for k,option in options.items()])
+#
+#
+#class ConfigurationCombo(QtGui.QComboBox):
+#    """Combobox which allows to choose a configuration from all configurations of a type *type*. Whenever
+#    the user chooses a delegate configuration, the delegates of each view in *views* will be updated to use
+#    this configuration.
+#    
+#    Additionally the box contains an entry "Configure..." which opens the delegates panel in the preferences
+#    dialog.
+#    """
+#    def __init__(self,type,views=[]):
+#        super().__init__()
+#        self.type = type
+#        self.views = views
+#        self.setSizeAdjustPolicy(QtGui.QComboBox.AdjustToContents)
+#        dispatcher.changes.connect(self._handleDispatcher)
+#        self._update()
+#        config = views[0].itemDelegate().config
+#        for i in range(self.count()):
+#            if self.itemData(i) == config:
+#                self.setCurrentIndex(i)
+#                break
+#        # Necessary to reset the index after the user has chosen the "Configure..." entry.
+#        self._lastIndex = self.currentIndex() 
+#        self.currentIndexChanged.connect(self._handleCurrentIndexChanged)
+#    
+#    def _update(self):
+#        """Update the entries of the box based on the registered delegate configurations."""
+#        self.clear()
+#        for config in getConfigurations(self.type):
+#            self.addItem(config.title,config)
+#            
+#        self.insertSeparator(self.count())
+#        self.addItem(self.tr("Configure..."))
+#            
+#    def _handleDispatcher(self,event):
+#        """Handle the delegate configuration dispatcher."""
+#        if event.config.type != self.type:
+#            return
+#        if event.type != CHANGED:
+#            self.currentIndexChanged.disconnect(self._handleCurrentIndexChanged)
+#            current = self.itemData(self.currentIndex())
+#            self._update()
+#            for i in range(self.count()):
+#                if self.itemData(i) == current:
+#                    self.setCurrentIndex(i)
+#                    break
+#            self.currentIndexChanged.connect(self._handleCurrentIndexChanged)
+#        else:
+#            # Update the title
+#            for i in range(self.count()):
+#                if self.itemData(i) == event.config:
+#                    self.setItemText(i,event.config.title)
+#                    break
+#    
+#    def _handleCurrentIndexChanged(self,index):
+#        """Change the configuration of each delegate of the views in self.views or open the preferences if
+#        the user selected the "Configure..." entry."""
+#        if index == self.count()-1:
+#            from .. import preferences
+#            preferences.show(startPanel="main/delegates",
+#                             startConfig=self.itemData(self._lastIndex))
+#            self.setCurrentIndex(self._lastIndex)
+#        elif index != self._lastIndex: # this is not true when resetting in the line above
+#            config = self.itemData(index)
+#            for view in self.views:
+#                view.itemDelegate().setConfiguration(config)
+#            self._lastIndex = index
         

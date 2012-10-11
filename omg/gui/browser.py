@@ -26,8 +26,8 @@ from ..core import tags, flags, levels
 from ..core.elements import Element, Container
 from ..core.nodes import Wrapper
 from ..search import searchbox, criteria as criteriaModule
-from . import mainwindow, treeview, browserdialog
-from .delegates import browser as browserdelegate, configuration as delegateconfiguration
+from . import mainwindow, treeview, browserdialog, delegates
+from .delegates import browser as browserdelegate
 from ..models import browser as browsermodel
 from . import treeactions
 
@@ -146,7 +146,7 @@ class Browser(QtGui.QWidget):
         
         # Restore state
         viewsToRestore = config.storage.browser.views
-        self.delegateConfig = None # will load default delegate
+        self.delegateProfile = browserdelegate.profileType.default()
         self.sortTags = {}
         if state is not None and isinstance(state,dict):
             if 'instant' in state:
@@ -160,12 +160,7 @@ class Browser(QtGui.QWidget):
                 if len(flagList) > 0:
                     self.criterionFilter.append(criteriaModule.FlagsCriterion(flagList))
             if 'delegate' in state:
-                try:
-                    from .preferences import delegates as delegatePreferences
-                    self.delegateConfig = delegateconfiguration.getConfiguration(
-                                        state['delegate'],browserdelegate.BrowserDelegate.configurationType)
-                except ValueError:
-                    pass # Use default delegate (see above)
+                self.delegateProfile = delegates.profiles.category.get(state['delegate']) # may be None
             if 'sortTags' in state:
                 for tagName,tagList in state['sortTags'].items():
                     if tags.exists(tagName):
@@ -198,8 +193,8 @@ class Browser(QtGui.QWidget):
             'flags': [flagType.name for flagType in flags],
             'sortTags': {tag.name: [t.name for t in sortTags] for tag,sortTags in self.sortTags.items()}
         }
-        if self.delegateConfig is not None:
-            state['delegate'] = self.delegateConfig.title
+        if self.delegateProfile is not None:
+            state['delegate'] = self.delegateProfile.name
         return state
     
     def load(self,restoreExpanded=False):
@@ -244,7 +239,7 @@ class Browser(QtGui.QWidget):
             view.setParent(None)
         self.views = []
         for layers in layersList:
-            newView = BrowserTreeView(self,layers,self.sortTags,self.delegateConfig)
+            newView = BrowserTreeView(self,layers,self.sortTags,self.delegateProfile)
             self.views.append(newView)
             newView.selectionModel().selectionChanged.connect(
                                     functools.partial(self.selectionChanged.emit,newView.selectionModel()))
@@ -329,11 +324,11 @@ class BrowserTreeView(treeview.TreeView):
     actionConfig.addActionDefinition(((sect, 'position+'),), treeactions.ChangePositionAction, mode="+1")
     actionConfig.addActionDefinition(((sect, 'position-'),), treeactions.ChangePositionAction, mode="-1") 
     
-    def __init__(self,parent,layers,sortTags,delegateConfig):
+    def __init__(self,parent,layers,sortTags,delegateProfile):
         super().__init__(levels.real,parent)
         self.setModel(browsermodel.BrowserModel(layers,sortTags))
         self.header().sectionResized.connect(self.model().layoutChanged)
-        self.setItemDelegate(browserdelegate.BrowserDelegate(self,delegateConfig))
+        self.setItemDelegate(browserdelegate.BrowserDelegate(self,delegateProfile))
         self._optimizers = []
         #self.doubleClicked.connect(self._handleDoubleClicked)
     

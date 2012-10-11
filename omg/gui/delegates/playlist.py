@@ -19,39 +19,37 @@
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from . import StandardDelegate, configuration, abstractdelegate
+from . import abstractdelegate, StandardDelegate, profiles
 from ...core import covers
 
 translate = QtCore.QCoreApplication.translate
 
 
+profileType = profiles.createProfileType(
+                name      = 'playlist',
+                title     = translate("Delegates","Playlist"),
+                leftData  = ['t:composer','t:artist','t:performer'],
+                rightData = ['t:date','t:genre','t:conductor'],
+                overwrite = {"fitInTitleRowData": profiles.DataPiece("filecount+length"),
+                             "showMajorAncestors": True
+                            }
+)
+
+
 class PlaylistDelegate(StandardDelegate):
     """Delegate for the playlist."""
-    
-    configurationType, defaultConfiguration = configuration.createConfigType(
-                'playlist',
-                translate("Delegates","Playlist"),
-                StandardDelegate.options,
-                ['t:composer','t:artist','t:performer'],
-                ['t:date','t:genre','t:conductor'],
-                {"fitInTitleRowData": configuration.DataPiece("filecount+length"),
-                 "showMajorAncestors": True
-                 }
-    )
-    
-    def __init__(self,view,config=None):
-        super().__init__(view,config)
+    def __init__(self,view,profile):
+        super().__init__(view,profile)
         # Don't worry, addCacheSize won't add sizes twice
-        covers.addCacheSize(self.config.options['coverSize'].value)
+        covers.addCacheSize(self.profile.options['coverSize'])
     
     def getPreTitleItem(self,wrapper):
         if wrapper in self.model.currentlyPlayingNodes:
             return abstractdelegate.PlayTriangleItem(QtGui.QColor(20,200,20),9)
-        return None
+        else: return None
     
-    def _handleDispatcher(self,event):
+    def _handleProfileChanged(self,profile):
         """React to the configuration dispatcher."""
-        super()._handleDispatcher(event)
-        if event.config == self.config and event.type == configuration.CHANGED:
-            covers.addCacheSize(self.config.options['coverSize'].value)
+        if profile == self.profile:
+            covers.addCacheSize(profile.options['coverSize'])
     

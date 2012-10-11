@@ -16,42 +16,23 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import math
+import math, copy
 
 from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
-from . import configuration
 from .abstractdelegate import *
-from ... import models, strutils, database as db, utils
+from ... import config, strutils, database as db, utils
 from ...core import tags
 from ...core.nodes import RootNode, Wrapper
 from ...models import browser as browsermodel
-
-translate = QtCore.QCoreApplication.translate
+from . import profiles
 
 
 class StandardDelegate(AbstractDelegate):
     """While still abstract, this class implements almost all of the features used by the usual delegates in
     OMG. In fact, subclasses like BrowserDelegate and EditorDelegate mainly provide different default values
     for these options."""
-    options = configuration.copyOptions(AbstractDelegate.options)
-    options.extend(utils.OrderedDict.fromItems([(data[0],configuration.DelegateOption(*data)) for data in [
-        ("showMajorAncestors",translate("Delegates","Display major parent containers which are not in the tree."),"bool",False),
-        ("showAllAncestors",translate("Delegates","Display all parent containers which are not in the tree."),"bool",False),
-        ("showMajor",translate("Delegates","Display major flag"),"bool",False),
-        ("showPositions",translate("Delegates","Display position numbers"),"bool",True),
-        ("showPaths",translate("Delegates","Display paths"),"bool",False),
-        ("showFlagIcons",translate("Delegates","Display flag icons"),"bool",True),
-        ("removeParentFlags",translate("Delegates","Remove flags which appear in ancestor elements"),"bool",True),
-        ("fitInTitleRowData",translate("Delegates","This datapiece will be displayed next to the title if it fits"),"datapiece",None),
-        ("appendRemainingTags",translate("Delegates","Append all tags that are not listed above"),"bool",False),
-        #("hideParentFlags",translate("Delegates","Hide flags that appear in parent elements"),"bool",True),
-        #("maxRowsTag",translate("Delegates","Maximal number of rows per tag"),"int",4),
-        #("maxRowsElement",translate("Delegates","Maximal number of rows per element"),"int",50),
-        ("coverSize",translate("Delegates","Size of covers"),"int",40)
-    ]]))
-        
     def layout(self,index,availableWidth):
         wrapper = self.model.data(index)
         element = wrapper.element
@@ -63,12 +44,12 @@ class StandardDelegate(AbstractDelegate):
         flagIcons = self.prepareFlags(wrapper)[0]
                 
         # Ancestors
-        if self.config.options['showAllAncestors'].value or self.config.options['showMajorAncestors'].value:
+        if self.profile.options['showAllAncestors'] or self.profile.options['showMajorAncestors']:
             ancestorsInTree = [w.element.id for w in wrapper.getParents() if isinstance(w,Wrapper)]
             ancestors = []
             ancestorIds = []
             self.appendAncestors(element, ancestors, ancestorIds, ancestorsInTree,
-                                 onlyMajor=not self.config.options['showAllAncestors'].value)
+                                 onlyMajor=not self.profile.options['showAllAncestors'])
             
             for ancestor in reversed(ancestors):
                 if element.id in ancestor.contents: # direct parent
@@ -79,7 +60,7 @@ class StandardDelegate(AbstractDelegate):
                 self.newRow()
             
         # Cover
-        coverSize = self.config.options['coverSize'].value
+        coverSize = self.profile.options['coverSize']
         cover = element.getCover(coverSize)
         if cover is not None:
             self.addLeft(ImageItem(element.getCover(coverSize)))
@@ -92,19 +73,19 @@ class StandardDelegate(AbstractDelegate):
         if element.isFile() and element.url.scheme != "file":
             urlWarning = TextItem(element.url.scheme, DelegateStyle(bold=True, color=Qt.red))
         else: urlWarning = None
-        titleItem = TextItem(wrapper.getTitle(prependPosition=self.config.options['showPositions'].value,
+        titleItem = TextItem(wrapper.getTitle(prependPosition=self.profile.options['showPositions'],
                                            usePath=False),
                              BOLD_STYLE if element.isContainer() else STD_STYLE,
                              minHeight=IconBarItem.iconSize if len(flagIcons) > 0 else 0)
         
-        if self.config.options['showMajor'].value and element.isContainer() and element.major:
+        if self.profile.options['showMajor'] and element.isContainer() and element.major:
             self.addCenter(ColorBarItem(QtGui.QColor(255,0,0),5,titleItem.sizeHint(self)[1]))
         if urlWarning is not None:
             self.addCenter(urlWarning)
         self.addCenter(titleItem)
         
         # showInTitleRow
-        fitInTitleRowData = self.config.options['fitInTitleRowData'].value
+        fitInTitleRowData = self.profile.options['fitInTitleRowData']
         if fitInTitleRowData is not None:
             fitInTitleRowText = self.getData(fitInTitleRowData,wrapper)
         else: fitInTitleRowText = None
@@ -113,7 +94,7 @@ class StandardDelegate(AbstractDelegate):
         # Flags
         # Here starts the mess...depending on the available space we want to put flags and if possible
         # even the fitInTitleRowTag into the title row.
-        if len(flagIcons) > 0 and self.config.options['showFlagIcons'].value:
+        if len(flagIcons) > 0 and self.profile.options['showFlagIcons']:
             flagIconsItem = IconBarItem(flagIcons)
             titleLength = sum(item.sizeHint(self)[0] for item,align in self.center[0])
             maxFlagsInTitleRow = flagIconsItem.maxColumnsIn(availableWidth - titleLength - self.hSpace)
@@ -194,7 +175,7 @@ class StandardDelegate(AbstractDelegate):
     def addPath(self,element):
         """Add the path of *element* to the DelegateItems. Subclasses may overwrite this method to use e.g.
         two items for an old and a new path.""" 
-        if self.config.options['showPaths'].value and element.isFile():
+        if self.profile.options['showPaths'] and element.isFile():
             self.newRow()
             self.addCenter(TextItem(element.url.path, ITALIC_STYLE))
         
@@ -222,10 +203,10 @@ class StandardDelegate(AbstractDelegate):
         contained in *exclude* (this is used if a datapiece is displayed in the title row)."""
         leftTexts = []
         rightTexts = []
-        appendRemainingTags = self.config.options['appendRemainingTags'].value
+        appendRemainingTags = self.profile.options['appendRemainingTags']
         if appendRemainingTags:
             seenTags = [tags.TITLE]
-        for texts,dataPieces in ((leftTexts,self.config.leftData),(rightTexts,self.config.rightData)):
+        for texts,dataPieces in ((leftTexts,self.profile.leftData),(rightTexts,self.profile.rightData)):
             if appendRemainingTags:
                 seenTags.extend(data.tag for data in dataPieces if data.tag is not None)
             for data in dataPieces:
@@ -312,7 +293,7 @@ class StandardDelegate(AbstractDelegate):
         
         If the ''removeParentFlags'' option is True, flags that are set in an ancestor are removed.
         """
-        if self.config.options['removeParentFlags'].value:
+        if self.profile.options['removeParentFlags']:
             flags = list(wrapper.element.flags) # copy!
             parent = wrapper.parent
             while parent is not None:

@@ -321,13 +321,13 @@ class MPDThread(QtCore.QThread):
 class MPDPlayerBackend(player.PlayerBackend):
     changeFromMain = QtCore.pyqtSignal(str, object)
     
-    def __init__(self, name, category, type, config):#host='localhost', port='6600', password=None):
-        super().__init__(name,category,type)
+    def __init__(self, name, type, state):
+        super().__init__(name, type, state)
         self.playlist = playlist.PlaylistModel(self)
         self.urls = []
-        host = config['host'] if 'host' in config else 'localhost'
-        port = config['port'] if 'port' in config else 6600
-        password = config['password'] if 'password' in config else ''
+        host = state['host'] if 'host' in state else 'localhost'
+        port = state['port'] if 'port' in state else 6600
+        password = state['password'] if 'password' in state else ''
             
         self.mpdthread = MPDThread(self, host, port, password)
         self.mpdthread.changeFromMPD.connect(self._handleMPDChange, Qt.QueuedConnection)

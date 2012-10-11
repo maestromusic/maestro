@@ -225,11 +225,7 @@ def run(cmdConfig=[],type='gui',exitPoint=None):
     # First import all modules that want to add WidgetData
     from .gui import filesystembrowser, editor, browser, tageditor, mainwindow, playback, playlist
     
-    from .gui.delegates import configuration as delegateconfiguration
     global mainWindow
-    
-    delegateconfiguration.load()
-    
     mainWindow = mainwindow.MainWindow()
     plugins.mainWindowInit()
     
@@ -242,7 +238,6 @@ def run(cmdConfig=[],type='gui',exitPoint=None):
     filesystem.shutdown()
     search.shutdown()
     mainWindow.saveLayout()
-    delegateconfiguration.save()
     plugins.shutdown()
     covers.shutdown()
     profiles2.manager.save()
