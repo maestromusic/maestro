@@ -24,6 +24,7 @@ from ..profiles import Profile
 
 
 class ProfileDialog(QtGui.QDialog):
+    """A dialog that contains a ProfileConfigurationWidget."""
     def __init__(self,category,profile=None):
         super().__init__()
         layout = QtGui.QVBoxLayout(self)
@@ -41,7 +42,12 @@ class ProfileDialog(QtGui.QDialog):
         
         
 class ProfileConfigurationWidget(QtGui.QWidget):
-    def __init__(self,category,profile):
+    """A widget that allows to configure all profiles of a given category. It contains some buttons
+    to add/rename/delete profiles and the widget returned by the current profile's configurationWidget
+    method.
+    *profile* is the profile that is selected at the beginning.
+    """
+    def __init__(self,category,profile=None):
         super().__init__()
         self.category = category
         category.profileRenamed.connect(self._handleProfileRenamed)
@@ -84,29 +90,50 @@ class ProfileConfigurationWidget(QtGui.QWidget):
         self.deleteButton = QtGui.QPushButton(self.tr("Delete"))
         self.deleteButton.clicked.connect(self._handleDeleteButton)
         configLayout.addWidget(self.deleteButton)
+        self.builtInLabel = QtGui.QLabel(self.tr("(built-in profile)"))
+        configLayout.addWidget(self.builtInLabel)
         configLayout.addStretch()
+        
+        layout.addStretch()
         
         self.profileWidget = None # Will be created in setProfile
         
+        if profile is None and len(category.profiles) > 0:
+            profile = category.profiles[0]
         self.setProfile(profile)
         
     def getProfile(self):
-        return self.profileChooser.currentProfile()
+        """Return current profile."""
+        # once this returned self.profileChooser.currentProfile(). But this created problems when a profile
+        # was deleted and the contents of the profileChooser and the current profile changed at the same
+        # time.
+        return self.profile
             
     def setProfile(self,profile):
-        self.profileChooser.setCurrentProfile(profile)
-        self._updateTitleLabel()
-        self.renameButton.setEnabled(profile is not None)
-        self.deleteButton.setEnabled(profile is not None)
-        self._createProfileWidget()
+        """Set current profile."""
+        if not hasattr(self,'profile') or profile != self.profile:
+            self.profile = profile
+            self.profileChooser.setCurrentProfile(profile)
+            self._updateTitleLabel()
+            self.titleLabel.setVisible(profile is not None)
+            enable = profile is not None and not profile.builtIn
+            self.renameButton.setVisible(profile is not None)
+            self.renameButton.setEnabled(enable)
+            self.deleteButton.setVisible(profile is not None)
+            self.deleteButton.setEnabled(enable)
+            self.builtInLabel.setVisible(profile is not None and not enable)
+            self._createProfileWidget()
         
     def _updateTitleLabel(self):
+        """Update the label below the profileChooser."""
         profile = self.getProfile()
         if profile is not None:
             self.titleLabel.setText(self.tr("Configure {}").format(profile.name))
         else: self.titleLabel.setText(self.tr("Configure"))
         
     def _createProfileWidget(self):
+        """Create a widget that allows to configure the current profile and insert it into the layout.
+        Remove any old profile widget first."""
         if self.profileWidget is not None:
             self.layout().removeWidget(self.profileWidget)
             self.profileWidget.setParent(None)
@@ -116,10 +143,12 @@ class ProfileConfigurationWidget(QtGui.QWidget):
                 self.layout().insertWidget(4,self.profileWidget,stretch=1)
                 
     def _handleProfileRenamed(self,profile):
+        """React to profileRenamed signals from the profile category."""
         if profile == self.getProfile():
             self._updateTitleLabel()
         
     def _handleAddButton(self):
+        """Handle the add button (which is visible only if the category does not use profile types)."""
         text,ok = QtGui.QInputDialog.getText(self,self.tr("Profile name"),self.tr("Choose a profile name"))
         if ok and len(text) > 0:
             if self.category.get(text) is not None:
@@ -129,6 +158,7 @@ class ProfileConfigurationWidget(QtGui.QWidget):
                 self.setProfile(profile)
                 
     def _handleAddBox(self,index):
+        """Handle the add button combobox (which is visible only if the category uses profile types)."""
         if index <= 0:
             return # first line does not contain a type
         self.addBox.setCurrentIndex(0) # reset
@@ -142,6 +172,7 @@ class ProfileConfigurationWidget(QtGui.QWidget):
                 self.setProfile(profile)
         
     def _handleRenameButton(self):
+        """Ask the user for a new name of the current profile and change names."""
         text,ok = QtGui.QInputDialog.getText(self,self.tr("Profile name"),
                                              self.tr("Choose a new name"),
                                              text=self.getProfile().name)
@@ -155,6 +186,7 @@ class ProfileConfigurationWidget(QtGui.QWidget):
                 self.category.renameProfile(self.getProfile(),text)
                 
     def _handleDeleteButton(self):
+        """Ask the user again and delete the current profile."""
         profile = self.getProfile()
         if dialogs.question(self.tr("Delete profile"),
                             self.tr("Should the profile '{}' really be deleted?").format(profile.name)):
@@ -167,13 +199,21 @@ class ProfileConfigurationWidget(QtGui.QWidget):
 
 
 class ProfileComboBox(QtGui.QComboBox):
-    """This class provides a combo box that lets the user choose a profile."""
+    """This class provides a combo box that lets the user choose a profile. Parameters are
     
+        - *profileCategory*: The category where the profiles are taken from,
+        - *restrictToType*: if this is not None, the user may only choose profiles of this profile type,
+        - *default*: the profile that is selected at the beginning,
+        - *includeConfigure*: Add an entry 'Configure...' to the box that will open a ProfileDialog,
+        - *showType*: use not only the profile name but also the name of the profile's type to display
+          profiles in the box.
+    
+    """
     profileChosen = QtCore.pyqtSignal(Profile)
 
     def __init__(self, profileCategory, restrictToType=None, default=None,
-                 includeConfigure=True, showTypes=False, parent=None):
-        super().__init__(parent)
+                 includeConfigure=True, showTypes=False):
+        super().__init__()
         self.profileCategory = profileCategory
         self.restrictToType = restrictToType
         self.includeConfigure = includeConfigure
@@ -190,11 +230,14 @@ class ProfileComboBox(QtGui.QComboBox):
         else: self._storedProfile = self.currentProfile() # the first one or None
     
     def profiles(self):
+        """List of profiles available in the box. If self.restrictToType is not None, this may differ from
+        the profiles of the underlying category."""
         if self.restrictToType is None:
             return self.profileCategory.profiles
         else: return [p for p in self.profileCategory.profiles if p.type == self.restrictToType]
     
     def _fillBox(self):
+        """Fill the combobox."""
         self._reactToIndexChanges = False
         self.clear()
         for i,profile in enumerate(self.profiles()):
@@ -214,8 +257,12 @@ class ProfileComboBox(QtGui.QComboBox):
             self.addItem(self.tr("Configure..."))
             
     def _handleProfileRemoved(self,profile):
+        """Remove the given profile from the box. If it is the current one, select any other profile."""
         if profile == self._storedProfile:
-            self.setCurrentProfile(None)
+            if len(self.profiles()) > 0:
+                self.setCurrentProfile(self.profiles()[0])
+            else:
+                self.setCurrentProfile(None)
         self._fillBox()
         
     def currentProfile(self):
@@ -227,6 +274,7 @@ class ProfileComboBox(QtGui.QComboBox):
         else: return None
     
     def setCurrentProfile(self, profile):
+        """Set the current profile and emit the profileChosen-signal."""
         if profile is not None:
             for i in range(self.count()):
                 if self.itemText(i) == profile.name:
@@ -238,6 +286,7 @@ class ProfileComboBox(QtGui.QComboBox):
             self.profileChosen.emit(profile)
                    
     def _handleIndexChanged(self, i):
+        """Handle the currentIndexChanged event of this combobox."""
         if not self._reactToIndexChanges:
             return
         if 0 <= i < len(self.profiles()):
@@ -249,6 +298,8 @@ class ProfileComboBox(QtGui.QComboBox):
             self.profileCategory.openConfigDialog(self._storedProfile)
             
     def mousePressEvent(self, event):
+        """If this box contains only the entry 'Configure...', a mouse press on it must open the dialog, 
+        because it is obviously not possible to trigger currentIndexChanged."""
         if self.includeConfigure and self.count() == 1 and event.button() == Qt.LeftButton:
             self.profileCategory.openConfigDialog(None)
             event.accept()

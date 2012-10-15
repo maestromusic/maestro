@@ -25,19 +25,19 @@ from ...core import covers
 translate = QtCore.QCoreApplication.translate
 
 
-profileType = profiles.createProfileType(
-                name      = 'playlist',
-                title     = translate("Delegates","Playlist"),
-                leftData  = ['t:composer','t:artist','t:performer'],
-                rightData = ['t:date','t:genre','t:conductor'],
-                overwrite = {"fitInTitleRowData": profiles.DataPiece("filecount+length"),
-                             "showMajorAncestors": True
-                            }
-)
-
-
 class PlaylistDelegate(StandardDelegate):
     """Delegate for the playlist."""
+    
+    profileType = profiles.createProfileType(
+            name      = 'playlist',
+            title     = translate("Delegates","Playlist"),
+            leftData  = ['t:composer','t:artist','t:performer'],
+            rightData = ['t:date','t:genre','t:conductor'],
+            overwrite = {"fitInTitleRowData": profiles.DataPiece("filecount+length"),
+                         "showMajorAncestors": True
+                        }
+    )
+    
     def __init__(self,view,profile):
         super().__init__(view,profile)
         # Don't worry, addCacheSize won't add sizes twice
@@ -50,6 +50,7 @@ class PlaylistDelegate(StandardDelegate):
     
     def _handleProfileChanged(self,profile):
         """React to the configuration dispatcher."""
+        super()._handleProfileChanged(profile)
         if profile == self.profile:
             covers.addCacheSize(profile.options['coverSize'])
     

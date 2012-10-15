@@ -20,7 +20,7 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
-from . import treeactions, treeview, mainwindow, tagwidgets, dialogs, profiles as profilesgui
+from . import treeactions, treeview, mainwindow, tagwidgets, dialogs, profiles as profilesgui, delegates
 from .. import profiles, utils
 from ..core import levels, tags
 from ..models import albumguesser
@@ -46,15 +46,15 @@ class EditorTreeView(treeview.TreeView):
     actionConfig.addActionDefinition(((sect, 'clearEditor'),), treeactions.ClearTreeAction)
     actionConfig.addActionDefinition(((sect, 'commit'),), treeactions.CommitTreeAction)
 
-    def __init__(self, parent=None):
-        super().__init__(levels.editor, parent)
+    def __init__(self, delegateProfile):
+        super().__init__(levels.editor)
         self.setSelectionMode(self.ExtendedSelection)
         self.setDragEnabled(True)
         self.setAcceptDrops(True)
         self.setDefaultDropAction(Qt.MoveAction)
         self.setDropIndicatorShown(True)
         self.setModel(EditorModel())
-        self.setItemDelegate(editordelegate.EditorDelegate(self,editordelegate.profileType.default()))
+        self.setItemDelegate(editordelegate.EditorDelegate(self,delegateProfile))
         self.viewport().setMouseTracking(True)
         self.autoExpand = True
         self.model().rowsInserted.connect(self._expandInsertedRows)
@@ -110,11 +110,14 @@ class EditorWidget(QtGui.QDockWidget):
         layout.setSpacing(0)
         layout.setContentsMargins(0,0,0,0)
         
-        try:
-            expand,guessProfile = state
-        except:
-            expand = True
-            guessProfile = None
+        expand = 'expand' not in state or state['expand'] # by default expand
+        guessProfile = state['guessProfile'] if 'guessProfile' in state else None
+        profileType = editordelegate.EditorDelegate.profileType
+        delegateProfile = None
+        if 'delegate' in state:
+            delegateProfile = delegates.profiles.category.get(state['delegate'])
+        if delegateProfile is None or delegateProfile.type != profileType:
+            delegateProfile = profileType.default()
         
         buttonLayout = QtGui.QHBoxLayout()
         # buttonLayout is filled below, when the editor exists 
@@ -123,7 +126,7 @@ class EditorWidget(QtGui.QDockWidget):
         self.splitter = QtGui.QSplitter(Qt.Vertical)
         layout.addWidget(self.splitter)
         
-        self.editor = EditorTreeView()
+        self.editor = EditorTreeView(delegateProfile)
         self.editor.autoExpand = expand
         self.editor.model().guessProfile = guessProfile
         
@@ -154,7 +157,10 @@ class EditorWidget(QtGui.QDockWidget):
         dialog.show()
         
     def saveState(self):
-        return (self.editor.autoExpand, self.editor.model().guessProfile)
+        return {'expand': self.editor.autoExpand,
+                'guessProfile': self.editor.model().guessProfile,
+                'delegate': self.editor.itemDelegate().profile.name
+                }
 
 
 class OptionDialog(dialogs.FancyPopup):
@@ -186,8 +192,9 @@ class OptionDialog(dialogs.FancyPopup):
         albumGuessLayout.addWidget(self.albumGuessComboBox,1)
         layout.addRow(self.tr("Guess albums"),albumGuessLayout)
         
-        profileChooser = profilesgui.ProfileComboBox(delegates.profileCategory,
-                                                     restrictToType=editordelegate.profileType,
+        profileType = editordelegate.EditorDelegate.profileType
+        profileChooser = profilesgui.ProfileComboBox(delegates.profiles.category,
+                                                     restrictToType=profileType,
                                                      default=self.editor.itemDelegate().profile)
         profileChooser.profileChosen.connect(self.editor.itemDelegate().setProfile)
         layout.addRow(self.tr("Item display"),profileChooser)

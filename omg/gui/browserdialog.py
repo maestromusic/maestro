@@ -71,8 +71,9 @@ class BrowserDialog(dialogs.FancyTabbedPopup):
         lineLayout = QtGui.QHBoxLayout()
         optionLayout.addLayout(lineLayout)
         lineLayout.addWidget(QtGui.QLabel(self.tr("Item Display:")))
+        profileType = browserdelegate.BrowserDelegate.profileType
         profileChooser = profilesgui.ProfileComboBox(delegates.profiles.category,
-                                                     restrictToType=browserdelegate.profileType,
+                                                     restrictToType=profileType,
                                                      default=self.browser.delegateProfile)
         profileChooser.profileChosen.connect(self._handleProfileChosen)
 

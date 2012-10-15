@@ -246,8 +246,8 @@ class StandardDelegate(AbstractDelegate):
                 else: return translate("AbstractDelegate","%n piece(s)","",QtCore.QCoreApplication.CodecForTr,
                                        wrapper.fileCount())
             elif dataPiece.data == "filecount+length":
-                fileCount = self.getData(configuration.DataPiece("filecount"),wrapper)
-                length = self.getData(configuration.DataPiece("length"),wrapper)
+                fileCount = self.getData(profiles.DataPiece("filecount"),wrapper)
+                length = self.getData(profiles.DataPiece("length"),wrapper)
                 return _join(', ',[fileCount,length])
 
     def getFormattedTagValues(self,tagType,wrapper):

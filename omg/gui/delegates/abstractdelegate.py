@@ -22,6 +22,7 @@ from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
 from ... import utils
+from . import profiles
 
 translate = QtCore.QCoreApplication.translate
 
@@ -101,6 +102,8 @@ class AbstractDelegate(QtGui.QStyledItemDelegate):
     
     def setProfile(self,profile):
         """Set the profile and redraw the whole view."""
+        if profile is None:
+            raise ValueError("Profile must not be None")
         self.profile = profile
         self.view.scheduleDelayedItemsLayout()
     
@@ -132,7 +135,7 @@ class AbstractDelegate(QtGui.QStyledItemDelegate):
 
     def _handleProfileRemoved(self,profile):
         if profile == self.profile:
-            self.setProfile(self.profileType.default) # default profiles are never removed
+            self.setProfile(self.profileType.default())
             
     def _handleProfileChanged(self,profile):
         if profile == self.profile:

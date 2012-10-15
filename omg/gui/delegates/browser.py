@@ -26,23 +26,22 @@ from ...models import browser as browsermodel
 translate = QtCore.QCoreApplication.translate
 
 
-
-profileType = profiles.createProfileType(
-                name       = 'browser',
-                title      = translate("Delegates","Browser"),
-                leftData   = ['t:composer','t:artist','t:performer'],
-                rightData  = ['t:date','t:conductor'],
-                overwrite  = {"fitInTitleRowData": profiles.DataPiece(tags.get("date"))
-                                             if tags.isInDB("date") else None},
-                addOptions = {"showSortValues": profiles.DelegateOption("showSortValues",
-                             translate("Delegates","Display sort values instead of real values"),"bool",False)}
-)
-
-
 class BrowserDelegate(StandardDelegate):
     """Delegate used in the Browser. Does some effort to put flag icons at the optimal place using free space
     in the title row and trying not to increase the overall number of rows.
     """
+
+    profileType = profiles.createProfileType(
+            name       = 'browser',
+            title      = translate("Delegates","Browser"),
+            leftData   = ['t:composer','t:artist','t:performer'],
+            rightData  = ['t:date','t:conductor'],
+            overwrite  = {"fitInTitleRowData": profiles.DataPiece(tags.get("date"))
+                                         if tags.isInDB("date") else None},
+            addOptions = [profiles.DelegateOption("showSortValues",
+                         translate("Delegates","Display sort values instead of real values"),"bool",False)]
+    )
+    
     def __init__(self,view,profile):
         super().__init__(view,profile)
         # Don't worry, addCacheSize won't add sizes twice
@@ -67,6 +66,7 @@ class BrowserDelegate(StandardDelegate):
     
     def _handleProfileChanged(self,profile):
         """React to the configuration dispatcher."""
+        super()._handleProfileChanged(profile)
         if profile == self.profile:
             covers.addCacheSize(profile.options['coverSize'])
             

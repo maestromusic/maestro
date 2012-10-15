@@ -146,7 +146,7 @@ class Browser(QtGui.QWidget):
         
         # Restore state
         viewsToRestore = config.storage.browser.views
-        self.delegateProfile = browserdelegate.profileType.default()
+        self.delegateProfile = browserdelegate.BrowserDelegate.profileType.default()
         self.sortTags = {}
         if state is not None and isinstance(state,dict):
             if 'instant' in state:

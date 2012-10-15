@@ -23,14 +23,16 @@ from . import profiles, StandardDelegate
 translate = QtCore.QCoreApplication.translate
 
 
-profileType = profiles.createProfileType(
-                name      = 'editor',
-                title     = translate("Delegates","Editor"),
-                leftData  = ['t:album','t:composer','t:artist','t:performer'],
-                rightData = ['t:date','t:genre','t:conductor'],
-                overwrite = {"showPaths": True, 'showMajor': True, 'appendRemainingTags': True, 'showAllAncestors': True}
-)
-
 class EditorDelegate(StandardDelegate):
     """Delegate for the editor."""
-    pass
+
+    profileType = profiles.createProfileType(
+            name      = 'editor',
+            title     = translate("Delegates","Editor"),
+            leftData  = ['t:album','t:composer','t:artist','t:performer'],
+            rightData = ['t:date','t:genre','t:conductor'],
+            overwrite = {'showPaths': True,
+                         'showMajor': True,
+                         'appendRemainingTags': True,
+                         'showAllAncestors': True}
+    )
