@@ -19,7 +19,8 @@
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from . import treeview, mainwindow, playerwidgets, profiles as profilesgui, delegates
+from . import treeview, mainwindow, treeactions, playerwidgets, profiles as profilesgui, delegates
+from ..core import levels
 from .delegates import playlist as playlistdelegate
 from .treeactions import *
 from .. import player
@@ -33,12 +34,12 @@ class PlaylistTreeView(treeview.TreeView):
     
     actionConfig = treeview.TreeActionConfiguration()
     sect = translate(__name__, "tags")
-    actionConfig.addActionDefinition(((sect, 'edittagsS'),), EditTagsAction, recursive=False)
-    actionConfig.addActionDefinition(((sect, 'edittagsR'),), EditTagsAction, recursive=True)
+    actionConfig.addActionDefinition(((sect, 'edittagsS'),), treeactions.EditTagsAction, recursive=False)
+    actionConfig.addActionDefinition(((sect, 'edittagsR'),), treeactions.EditTagsAction, recursive=True)
     
     sect = translate(__name__, "playlist")
-    actionConfig.addActionDefinition(((sect, 'removeFromPL'),), RemoveFromPlaylistAction)
-    actionConfig.addActionDefinition(((sect, 'clearPL'),), ClearPlaylistAction)
+    actionConfig.addActionDefinition(((sect, 'removeFromPL'),), treeactions.RemoveFromPlaylistAction)
+    actionConfig.addActionDefinition(((sect, 'clearPL'),), treeactions.ClearPlaylistAction)
     
     def __init__(self, delegateProfile):
         super().__init__(levels.real)
@@ -56,7 +57,6 @@ class PlaylistTreeView(treeview.TreeView):
         if self.backend is not None:
             self.model().modelReset.disconnect(self.expandAll)
         self.backend = backend
-        self.setDisabled(backend is None)
         if backend is not None:
             model = backend.playlist
             self.setModel(model)
@@ -79,7 +79,7 @@ class PlaylistTreeView(treeview.TreeView):
 
 
 class PlaylistWidget(QtGui.QDockWidget):
-    def __init__(self, parent = None, state=None, location=None):
+    def __init__(self, parent=None, state=None, location=None):
         super().__init__(parent)
         self.setWindowTitle(self.tr('Playlist'))
         
@@ -121,9 +121,12 @@ class PlaylistWidget(QtGui.QDockWidget):
         profileChooser.profileChosen.connect(self.treeview.itemDelegate().setProfile)
         buttonLayout.addWidget(profileChooser)
         buttonLayout.addStretch()
-        
-        layout.addWidget(self.treeview)  
-        
+
+        layout.addWidget(self.treeview)
+        self.errorLabel = QtGui.QLabel()
+        self.errorLabel.setAlignment(Qt.AlignTop | Qt.AlignHCenter)
+        self.mainLayout = layout
+        self.mainWidgetIndex = layout.indexOf(self.treeview)
         self.setBackend(self.backendChooser.currentProfile())
     
     def saveState(self):
@@ -134,19 +137,32 @@ class PlaylistWidget(QtGui.QDockWidget):
     def setBackend(self, backend):
         if self.backend is not None:
             self.backend.unregisterFrontend(self)
+            self.backend.connectionStateChanged.disconnect(self.setActiveWidgetByState)
+            
         if backend is not None:
             backend.registerFrontend(self)
-        else: backend = None
+            self.setActiveWidgetByState(backend.connectionState)
+            backend.connectionStateChanged.connect(self.setActiveWidgetByState)
+        else:
+            self.errorLabel.setText(self.tr("no backend selected"))
+
         self.backend = backend
         self.treeview.setBackend(self.backend)
+    
+    def setActiveWidgetByState(self, state):
+        current = self.mainLayout.itemAt(self.mainWidgetIndex).widget()
+        self.mainLayout.removeWidget(current)
+        current.hide()
+        if state is player.CONNECTED:
+            self.mainLayout.insertWidget(self.mainWidgetIndex, self.treeview)
+            self.treeview.show()
+        else:
+            self.mainLayout.insertWidget(self.mainWidgetIndex, self.errorLabel)
+            self.errorLabel.show()
         
         
-data = mainwindow.WidgetData(id = "playlist",
-                             name = translate("Playlist","playlist"),
-                             theClass = PlaylistWidget,
-                             central = True,
-                             dock = True,
-                             default = True,
-                             unique = False,
-                             preferredDockArea = Qt.RightDockWidgetArea)
-mainwindow.addWidgetData(data)
+mainwindow.addWidgetData(mainwindow.WidgetData(
+                    id="playlist", name=translate("Playlist", "playlist"),
+                    theClass=PlaylistWidget,
+                    central=True, dock=True, default=True, unique=False,
+                    preferredDockArea=Qt.RightDockWidgetArea))

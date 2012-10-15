@@ -1,0 +1,60 @@
+# -*- coding: utf-8 -*-
+# OMG Music Manager  -  http://omg.mathematik.uni-kl.de
+# Copyright (C) 2012 Martin Altmayer, Michael Helmling
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+from omg import filebackends, player
+from omg.filebackends import filesystem
+
+
+class MPDURL(filebackends.BackendURL):
+    
+    scheme = "mpd"
+    CAN_RENAME = False
+    IMPLEMENTATIONS = []
+    
+    def __init__(self, urlString):
+        super().__init__(urlString)
+        self.profile = self.parsedUrl.netloc
+        self.path = self.parsedUrl.path[1:]
+        
+    def asLocalFile(self):
+        return filesystem.FileURL("file:///" + self.path)
+        
+    def toQUrl(self):
+        return self.asLocalFile().toQUrl()
+
+
+class MPDFile(filebackends.BackendFile):
+
+    readOnly = True
+    
+    @staticmethod
+    def tryLoad(url):
+        rf = filesystem.RealFile.tryLoad(url.asLocalFile())
+        if rf is not None:
+            return rf
+        return MPDFile(url)
+        
+    def __init__(self, url):
+        assert url.scheme == "mpd"
+        super().__init__(url)
+        
+    def readTags(self):
+        mpdProfile = player.profileCategory.get(self.url.profile)
+        self.tags, self.length = mpdProfile.getInfo(self.url.path)
+        
+MPDURL.IMPLEMENTATIONS = [MPDFile]
