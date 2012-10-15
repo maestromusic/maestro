@@ -19,7 +19,7 @@
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from . import config, logging, profiles2
+from . import config, logging, profiles
 
 translate = QtCore.QCoreApplication.translate
 logger = logging.getLogger(__name__)
@@ -29,13 +29,13 @@ DISCONNECTED, CONNECTING, CONNECTED = range(3)
 
 _runningBackends = {}
 
-profileCategory = profiles2.ProfileCategory('playback',
-                                            translate('PlayerBackend','Playback'),
-                                            config.storageObject.player.profiles)
-profiles2.manager.addCategory(profileCategory)
+profileCategory = profiles.ProfileCategory('playback',
+                                           translate('PlayerBackend','Playback'),
+                                           config.storageObject.player.profiles)
+profiles.manager.addCategory(profileCategory)
 
 
-class PlayerBackend(profiles2.Profile):
+class PlayerBackend(profiles.Profile):
     """This is the base class for modules that implement connection to a backend
     providing audio playback and playlist management.
     

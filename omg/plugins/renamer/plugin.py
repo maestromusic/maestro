@@ -20,7 +20,7 @@ from PyQt4 import QtCore, QtGui
 translate = QtCore.QCoreApplication.translate
 
 from omg.core import tags, levels
-from omg import logging, config, profiles2 as profiles
+from omg import logging, config, profiles
 from calendar import format
 
 logger = logging.getLogger(__name__)

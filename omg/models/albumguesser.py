@@ -21,7 +21,7 @@ import os, re, itertools
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from .. import config, logging, profiles2 as profiles
+from .. import config, logging, profiles
 from ..core import tags
 from ..core.elements import ContentList
 from ..utils import relPath

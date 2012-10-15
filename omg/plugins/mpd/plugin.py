@@ -23,7 +23,7 @@ import mpd
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from omg import player, logging, profiles2, filebackends
+from omg import player, logging, profiles, filebackends
 from omg.core import tags
 from omg.filebackends import filesystem as fsFileBackend
 from omg.models import playlist
@@ -38,9 +38,9 @@ MPD_STATES = { 'play': player.PLAY, 'stop': player.STOP, 'pause': player.PAUSE}
 
   
 def enable():
-    player.profileCategory.addType(profiles2.ProfileType('mpd',
-                                                         translate('MPDPlayerBackend','MPD'),
-                                                         MPDPlayerBackend))
+    player.profileCategory.addType(profiles.ProfileType('mpd',
+                                                        translate('MPDPlayerBackend','MPD'),
+                                                        MPDPlayerBackend))
     filebackends.urlTypes["mpd"] = MPDURL
 
 def disable():

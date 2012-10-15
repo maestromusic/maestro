@@ -21,16 +21,16 @@ import urllib.parse
 from PyQt4 import QtCore
 from PyQt4.phonon import Phonon as phonon
 
-from ... import player, profiles2, utils, strutils
+from ... import player, profiles, utils, strutils
 from ...models import playlist
         
 translate = QtCore.QCoreApplication.translate
 
 
 def enable():
-    player.profileCategory.addType(profiles2.ProfileType('phonon',
-                                                         translate('PhononPlayerBackend','Phonon'),
-                                                         PhononPlayerBackend))
+    player.profileCategory.addType(profiles.ProfileType('phonon',
+                                                        translate('PhononPlayerBackend','Phonon'),
+                                                        PhononPlayerBackend))
 
 def disable():
     player.profileCategory.removeType('phonon')

@@ -21,7 +21,7 @@ import copy, collections
 from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
-from ... import config, profiles2 as profiles, logging
+from ... import config, profiles, logging
 from ...core import tags
 
 translate = QtCore.QCoreApplication.translate

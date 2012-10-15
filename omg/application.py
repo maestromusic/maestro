@@ -196,7 +196,7 @@ def run(cmdConfig=[],type='gui',exitPoint=None):
     # Load and initialize remaining modules
     from .core import levels
     levels.init()
-    from . import resources, search, profiles2
+    from . import resources, search, profiles
     from .core import covers
     search.init()
     covers.init()
@@ -240,7 +240,7 @@ def run(cmdConfig=[],type='gui',exitPoint=None):
     mainWindow.saveLayout()
     plugins.shutdown()
     covers.shutdown()
-    profiles2.manager.save()
+    profiles.manager.save()
     config.shutdown()
     logging.shutdown()
     sys.exit(returnValue)
