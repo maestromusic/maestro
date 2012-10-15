@@ -42,7 +42,7 @@ class Profile(QtCore.QObject): # to allow subclasses to have signals
     """
     builtIn = False # built-in profiles cannot be renamed or deleted
     
-    def __init__(self,name,type,state=None):
+    def __init__(self,name,type=None,state=None):
         super().__init__()
         self.name = name
         self.type = type
@@ -105,7 +105,7 @@ class ProfileCategory(QtCore.QObject):
     # This is overwritten by the profileClass of the profile's type (if there is a type) 
     profileClass = Profile
     
-    def __init__(self,name,title,storageOption):
+    def __init__(self,name,title,storageOption,profileClass=None):
         super().__init__()
         self.name = name
         self.title = title
@@ -113,6 +113,8 @@ class ProfileCategory(QtCore.QObject):
         self.storageOption = storageOption
         if not isinstance(self.storageOption.getValue(),list):
             self.storageOption.setValue([])
+        if profileClass is not None:
+            self.profileClass = profileClass
         self.types = []
         self.profiles = []
     

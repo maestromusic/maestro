@@ -325,6 +325,8 @@ class MPDPlayerBackend(player.PlayerBackend):
         super().__init__(name, type, state)
         self.playlist = playlist.PlaylistModel(self)
         self.urls = []
+        if state is None:
+            state = {}
         host = state['host'] if 'host' in state else 'localhost'
         port = state['port'] if 'port' in state else 6600
         password = state['password'] if 'password' in state else ''

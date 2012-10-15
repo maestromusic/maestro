@@ -47,12 +47,15 @@ class ProfileConfigurationWidget(QtGui.QWidget):
     method.
     *profile* is the profile that is selected at the beginning.
     """
+    profileChosen = QtCore.pyqtSignal(Profile)
+    
     def __init__(self,category,profile=None):
         super().__init__()
         self.category = category
         category.profileRenamed.connect(self._handleProfileRenamed)
         self.setWindowTitle(self.tr("Profile Configuration: {}").format(category.title))
         layout = QtGui.QVBoxLayout(self)
+        layout.setContentsMargins(0,0,0,0)
         
         self.topLayout = QtGui.QHBoxLayout()
         layout.addLayout(self.topLayout)
@@ -61,6 +64,7 @@ class ProfileConfigurationWidget(QtGui.QWidget):
                                               default=profile,
                                               includeConfigure=False)
         self.profileChooser.profileChosen.connect(self.setProfile)
+        self.profileChooser.profileChosen.connect(self.profileChosen)
         self.topLayout.addWidget(self.profileChooser)
         if len(self.category.types) == 0:
             self.addButton = QtGui.QPushButton(self.tr("Add new profile"))
@@ -76,9 +80,9 @@ class ProfileConfigurationWidget(QtGui.QWidget):
         
         self.topLayout.addStretch()
         
-        frame = QtGui.QFrame()
-        frame.setFrameShape(QtGui.QFrame.HLine)
-        layout.addWidget(frame)
+        self.frame = QtGui.QFrame()
+        self.frame.setFrameShape(QtGui.QFrame.HLine)
+        layout.addWidget(self.frame)
         self.titleLabel = QtGui.QLabel() # title will be set in setProfile
         layout.addWidget(self.titleLabel)
         
@@ -114,6 +118,7 @@ class ProfileConfigurationWidget(QtGui.QWidget):
         if not hasattr(self,'profile') or profile != self.profile:
             self.profile = profile
             self.profileChooser.setCurrentProfile(profile)
+            self.frame.setVisible(profile is not None)
             self._updateTitleLabel()
             self.titleLabel.setVisible(profile is not None)
             enable = profile is not None and not profile.builtIn
@@ -141,6 +146,7 @@ class ProfileConfigurationWidget(QtGui.QWidget):
             self.profileWidget = self.getProfile().configurationWidget()
             if self.profileWidget is not None:
                 self.layout().insertWidget(4,self.profileWidget,stretch=1)
+                self.adjustSize()
                 
     def _handleProfileRenamed(self,profile):
         """React to profileRenamed signals from the profile category."""

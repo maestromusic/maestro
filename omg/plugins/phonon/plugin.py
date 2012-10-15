@@ -48,6 +48,8 @@ class PhononPlayerBackend(player.PlayerBackend):
         
         # The list of paths in the playlist and the current song are stored directly in the model's tree
         self.playlist = playlist.PlaylistModel(self)
+        if state is None:
+            state = {}
         if 'playlist' in state:
             self.playlist.initFromWrapperString(state['playlist'])
             if 'current' in state:

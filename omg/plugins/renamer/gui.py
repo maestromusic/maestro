@@ -18,8 +18,8 @@
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from omg.gui import treeview, treeactions, delegates
-from omg.gui.delegates import configuration, abstractdelegate
+from omg.gui import treeview, treeactions, delegates, profiles as profilesgui
+from omg.gui.delegates import abstractdelegate
 from omg.models import leveltreemodel
 from omg.core.levels import RenameFilesError
 from . import plugin
@@ -60,24 +60,13 @@ class RenameFilesAction(treeactions.TreeAction):
 class PathDelegate(delegates.StandardDelegate):
     """Delegate for the rename preview; shows old and new path color-coded.
     """
-    
-    configurationType, defaultConfiguration = configuration.createConfigType(
-                'path',
-                translate("Delegates","PathRename"),
-                delegates.StandardDelegate.options,
-                [],
-                [],
-                {"showPaths": True, 'showMajor': False, 
-                 'appendRemainingTags': False, 'showAllAncestors': False,
-                 'showFlagIcons' : False}
-    )
-    
     def __init__(self, view): 
-        super().__init__(view) 
+        self.profile = delegates.profiles.DelegateProfile("renamer")
+        super().__init__(view, self.profile) 
         self.newPathStyleNew = abstractdelegate.DelegateStyle(1, False, True, Qt.darkGreen)
         self.newPathStyleOld = abstractdelegate.DelegateStyle(1, False, True, Qt.red)
         self.unchangedStyle = abstractdelegate.DelegateStyle(1, False, True, Qt.gray)
-        self.result = {} 
+        self.result = {}
         
     def addPath(self, element):
         if element.isFile():
@@ -111,10 +100,10 @@ class RenameDialog(QtGui.QDialog):
         self.setWindowTitle(self.tr("Rename {} containers").format(len(elements)))
         mainLayout = QtGui.QVBoxLayout()
         
-        configDisplay = plugin.profileConfig.configurationDisplay()
-        mainLayout.addWidget(configDisplay,1)
-        configDisplay.temporaryModified.connect(self._handleTempChange)
-        configDisplay.profileChanged.connect(self._handleProfileChange)
+        self.configDisplay = profilesgui.ProfileConfigurationWidget(plugin.profileCategory)
+        mainLayout.addWidget(self.configDisplay,1)
+        self.configDisplay.profileChosen.connect(self._handleProfileChange)
+        plugin.profileCategory.profileChanged.connect(self._handleProfileChange)
         self.statusLabel = QtGui.QLabel()
         self.statusLabel.setVisible(False)
         f = self.statusLabel.font()
@@ -139,41 +128,38 @@ class RenameDialog(QtGui.QDialog):
         self.bb.accepted.connect(self.accept)
         self.bb.rejected.connect(self.reject)
         
-        if configDisplay.currentProfileName() != '':
-            self._handleProfileChange(configDisplay.currentProfileName())
+        if self.configDisplay.getProfile() is not None:
+            self._handleProfileChange(self.configDisplay.getProfile())
         mainLayout.addWidget(self.tree, 100)
         mainLayout.addWidget(self.statusLabel,1)
         mainLayout.addWidget(self.bb)
         
         self.setLayout(mainLayout)
         self.resize(800,700)
-    
-    def _handleProfileChange(self, name):
-        profile = plugin.profileConfig[name]
-        self._handleTempChange(profile)
         
-    def _handleTempChange(self, renamer):
+    def _handleProfileChange(self, profile):
         """handle changes to the format text edit box"""
-        try:
-            totalResult = dict()
-            for element in self.elementsParent:
-                result = renamer.renameContainer(self.level, element)
-                totalResult.update(result)
-            for elem, newPath in totalResult.items():
-                if elem.id in self.sublevel:
-                    subelem = self.sublevel.get(elem.id)
-                    subelem.url = subelem.url.renamed(newPath)
-            if len(set(totalResult.values())) != len(totalResult): # duplicate paths!
-                self.bb.button(QtGui.QDialogButtonBox.Ok).setEnabled(False)
-                self.statusLabel.setText(self.tr("New paths are not unique! Please fix"))
+        if profile == self.configDisplay.getProfile():
+            try:
+                totalResult = dict()
+                for element in self.elementsParent:
+                    result = profile.renameContainer(self.level, element)
+                    totalResult.update(result)
+                for elem, newPath in totalResult.items():
+                    if elem.id in self.sublevel:
+                        subelem = self.sublevel.get(elem.id)
+                        subelem.url = subelem.url.renamed(newPath)
+                if len(set(totalResult.values())) != len(totalResult): # duplicate paths!
+                    self.bb.button(QtGui.QDialogButtonBox.Ok).setEnabled(False)
+                    self.statusLabel.setText(self.tr("New paths are not unique! Please fix"))
+                    self.statusLabel.show()
+                else:
+                    self.statusLabel.hide()
+                    self.bb.button(QtGui.QDialogButtonBox.Ok).setEnabled(True)
+            except plugin.FormatSyntaxError:
+                self.statusLabel.setText(self.tr("Syntax error in format string"))
                 self.statusLabel.show()
-            else:
-                self.statusLabel.hide()
-                self.bb.button(QtGui.QDialogButtonBox.Ok).setEnabled(True)
-        except plugin.FormatSyntaxError:
-            self.statusLabel.setText(self.tr("Syntax error in format string"))
-            self.statusLabel.show()
-            self.bb.button(QtGui.QDialogButtonBox.Ok).setEnabled(False)
-        self.model.modelReset.emit()
-        self.tree.expandAll()
+                self.bb.button(QtGui.QDialogButtonBox.Ok).setEnabled(False)
+            self.model.modelReset.emit()
+            self.tree.expandAll()
         

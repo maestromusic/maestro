@@ -21,7 +21,7 @@ from PyQt4.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
 from . import treeactions, treeview, mainwindow, tagwidgets, dialogs, profiles as profilesgui, delegates
-from .. import profiles, utils
+from .. import utils
 from ..core import levels, tags
 from ..models import albumguesser
 from ..models.editor import EditorModel
@@ -110,8 +110,12 @@ class EditorWidget(QtGui.QDockWidget):
         layout.setSpacing(0)
         layout.setContentsMargins(0,0,0,0)
         
+        if state is None:
+            state = {}
         expand = 'expand' not in state or state['expand'] # by default expand
-        guessProfile = state['guessProfile'] if 'guessProfile' in state else None
+        if 'guessProfile' in state:
+            guessProfile = albumguesser.profileCategory.get(state['guessProfile'])
+        else: guessProfile = None
         profileType = editordelegate.EditorDelegate.profileType
         delegateProfile = None
         if 'delegate' in state:
@@ -157,9 +161,10 @@ class EditorWidget(QtGui.QDockWidget):
         dialog.show()
         
     def saveState(self):
+        guessProfile = self.editor.model().guessProfile
         return {'expand': self.editor.autoExpand,
-                'guessProfile': self.editor.model().guessProfile,
-                'delegate': self.editor.itemDelegate().profile.name
+                'guessProfile': guessProfile.name if guessProfile is not None else None, 
+                'delegate': self.editor.itemDelegate().profile.name # a delegate's profile is never None
                 }
 
 
@@ -183,8 +188,8 @@ class OptionDialog(dialogs.FancyPopup):
         # the checkbox will also be connected to control the combobox' visibility 
         albumGuessLayout.addWidget(albumGuessCheckBox)
         
-        self.albumGuessComboBox = profiles.ProfileComboBox(albumguesser.profileConfig,
-                                                           self.editor.model().guessProfile)
+        self.albumGuessComboBox = profilesgui.ProfileComboBox(albumguesser.profileCategory,
+                                                              default=self.editor.model().guessProfile)
         self.albumGuessComboBox.setToolTip(self.tr("Select album guessing profile"))
         self.albumGuessComboBox.setDisabled(self.editor.model().guessProfile is None)
         albumGuessCheckBox.toggled.connect(self.albumGuessComboBox.setEnabled)
@@ -205,11 +210,11 @@ class OptionDialog(dialogs.FancyPopup):
         
     def _handleAlbumGuessCheckBox(self,checked):
         """Handle toggling of the guess checkbox."""
-        self.editor.model().guessProfile = self.albumGuessComboBox.currentProfileName() if checked else None
+        self.editor.model().guessProfile = self.albumGuessComboBox.currentProfile() if checked else None
         
-    def _handleAlbumGuessComboBox(self,name):
+    def _handleAlbumGuessComboBox(self,profile):
         """Handles changes of the current name of the guess profile combobox."""
-        self.editor.model().guessProfile = name
+        self.editor.model().guessProfile = profile
     
 
 class ExternalTagsWidget(QtGui.QScrollArea):

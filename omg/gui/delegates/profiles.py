@@ -16,12 +16,12 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-import copy
+import copy, collections
 
 from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
-from ... import config, profiles2 as profiles, logging, utils
+from ... import config, profiles2 as profiles, logging
 from ...core import tags
 
 translate = QtCore.QCoreApplication.translate
@@ -82,7 +82,7 @@ class ProfileType(profiles.ProfileType):
             profile = category.addProfile(self.title,self)
         profile.builtIn = True
         
-        
+
 def createProfileType(name,title,*,options=None,leftData=None,rightData=None,overwrite={},addOptions=[]):
     """Create a profile type and an associated default profile and add them to the delegate profile category.
     This should be called once inside the class definition of each treeview-subclass that needs its own
@@ -103,7 +103,8 @@ def createProfileType(name,title,*,options=None,leftData=None,rightData=None,ove
     """
     if options is None:
         options = defaultOptions # defined below
-    options = utils.OrderedDict.fromItems([(option.name,copy.copy(option)) for option in options])
+    
+    options = collections.OrderedDict([(option.name,copy.copy(option)) for option in options])
     for optionName, value in overwrite.items():
         options[optionName].default = value
     for option in addOptions:
@@ -119,7 +120,9 @@ def createProfileType(name,title,*,options=None,leftData=None,rightData=None,ove
     
 class DelegateProfile(profiles.Profile):
     """Profile to configure a delegate. See profiles.Profile."""
-    def __init__(self,name,type,state=None):
+    def __init__(self,name,type=None,state=None):
+        if type is None:
+            type = defaultProfileType
         super().__init__(name,type,state)
         
         self.options = {option.name: option.default for option in type.options.values()}
@@ -358,3 +361,11 @@ defaultOptions = [DelegateOption(*data) for data in [
         #("maxRowsElement",translate("Delegates","Maximal number of rows per element"),"int",50),
         ("coverSize",translate("Delegates","Size of covers"),"int",40)
     ]]
+
+# This type is useful to create profiles which are not configurable
+defaultProfileType = ProfileType('default',
+                                 translate("Delegates","Standard"),
+                                 collections.OrderedDict([(option.name,option)
+                                                          for option in defaultOptions]),
+                                 [],
+                                 [])
