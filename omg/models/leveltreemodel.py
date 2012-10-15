@@ -171,9 +171,8 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
             if self.guessProfile is None:
                 return elements
             else:
-                profile = albumguesser.profileConfig[self.guessProfile]
-                profile.guessAlbums(self.level, filesByFolder)
-                return profile.albums + profile.singles
+                self.guessProfile.guessAlbums(self.level, filesByFolder)
+                return self.guessProfile.albums + self.guessProfile.singles
         except levels.ElementGetError as e:
             print(e)
             return []
