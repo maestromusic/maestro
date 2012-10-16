@@ -183,6 +183,7 @@ class GuessProfileConfigWidget(QtGui.QWidget):
     that is enabled, only albums within the same directory on the filesystem will be grouped together."""
     def __init__(self, profile=None):
         super().__init__()
+        self.setSizePolicy(QtGui.QSizePolicy.MinimumExpanding,QtGui.QSizePolicy.MinimumExpanding)
         mainLayout = QtGui.QVBoxLayout(self)
         descriptionLabel = QtGui.QLabel(self.tr(
 """Configuration of the "album guessing" profiles. These profiles determine how the editor tries to \

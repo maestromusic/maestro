@@ -141,7 +141,7 @@ storage = OrderedDict((
 }),
 ("SECTION:editor", {
     'format_string' : "%{artist}/%{date} - %{album}/%{tracknumber} - %{title}.%{*}",
-    'albumguesser_profiles' : [],
+    'albumguesser_profiles': [],
 }),
 ("SECTION:gui", {
     'central_widgets': [],

@@ -113,6 +113,7 @@ class EditorWidget(QtGui.QDockWidget):
         if state is None:
             state = {}
         expand = 'expand' not in state or state['expand'] # by default expand
+        guessingEnabled = 'guessingEnabled' not in state or state['guessingEnabled'] # by default guess 
         if 'guessProfile' in state:
             guessProfile = albumguesser.profileCategory.get(state['guessProfile'])
         else: guessProfile = None
@@ -132,6 +133,7 @@ class EditorWidget(QtGui.QDockWidget):
         
         self.editor = EditorTreeView(delegateProfile)
         self.editor.autoExpand = expand
+        self.editor.model().guessingEnabled = guessingEnabled
         self.editor.model().guessProfile = guessProfile
         
         self.externalTagsWidget = ExternalTagsWidget(self.editor)
@@ -163,6 +165,7 @@ class EditorWidget(QtGui.QDockWidget):
     def saveState(self):
         guessProfile = self.editor.model().guessProfile
         return {'expand': self.editor.autoExpand,
+                'guessingEnabled': self.editor.model().guessingEnabled,
                 'guessProfile': guessProfile.name if guessProfile is not None else None, 
                 'delegate': self.editor.itemDelegate().profile.name # a delegate's profile is never None
                 }
@@ -182,17 +185,15 @@ class OptionDialog(dialogs.FancyPopup):
         
         albumGuessLayout = QtGui.QHBoxLayout()
         albumGuessCheckBox = QtGui.QCheckBox()
-        albumGuessCheckBox.setChecked(self.editor.model().guessProfile is not None)
+        albumGuessCheckBox.setChecked(self.editor.model().guessingEnabled)
         albumGuessCheckBox.setToolTip(self.tr("Auto expand dropped containers"))
         albumGuessCheckBox.toggled.connect(self._handleAlbumGuessCheckBox)
-        # the checkbox will also be connected to control the combobox' visibility 
         albumGuessLayout.addWidget(albumGuessCheckBox)
         
         self.albumGuessComboBox = profilesgui.ProfileComboBox(albumguesser.profileCategory,
                                                               default=self.editor.model().guessProfile)
         self.albumGuessComboBox.setToolTip(self.tr("Select album guessing profile"))
-        self.albumGuessComboBox.setDisabled(self.editor.model().guessProfile is None)
-        albumGuessCheckBox.toggled.connect(self.albumGuessComboBox.setEnabled)
+        self._handleAlbumGuessCheckBox(albumGuessCheckBox.isChecked()) # initialize enabled/disabled
         self.albumGuessComboBox.profileChosen.connect(self._handleAlbumGuessComboBox)
         albumGuessLayout.addWidget(self.albumGuessComboBox,1)
         layout.addRow(self.tr("Guess albums"),albumGuessLayout)
@@ -210,7 +211,10 @@ class OptionDialog(dialogs.FancyPopup):
         
     def _handleAlbumGuessCheckBox(self,checked):
         """Handle toggling of the guess checkbox."""
-        self.editor.model().guessProfile = self.albumGuessComboBox.currentProfile() if checked else None
+        self.editor.model().guessingEnabled = checked
+        if len(albumguesser.profileCategory.profiles) > 0:
+            self.albumGuessComboBox.setEnabled(checked)
+        else: self.albumGuessComboBox.setEnabled(True) # the box contains only 'Configure...'
         
     def _handleAlbumGuessComboBox(self,profile):
         """Handles changes of the current name of the guess profile combobox."""

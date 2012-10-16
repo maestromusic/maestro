@@ -139,6 +139,7 @@ class ProfileConfigurationWidget(QtGui.QWidget):
     def _createProfileWidget(self):
         """Create a widget that allows to configure the current profile and insert it into the layout.
         Remove any old profile widget first."""
+        print("CREATE PROFILE WIDGET")
         if self.profileWidget is not None:
             self.layout().removeWidget(self.profileWidget)
             self.profileWidget.setParent(None)
@@ -146,7 +147,6 @@ class ProfileConfigurationWidget(QtGui.QWidget):
             self.profileWidget = self.getProfile().configurationWidget()
             if self.profileWidget is not None:
                 self.layout().insertWidget(4,self.profileWidget,stretch=1)
-                self.adjustSize()
                 
     def _handleProfileRenamed(self,profile):
         """React to profileRenamed signals from the profile category."""
@@ -155,7 +155,9 @@ class ProfileConfigurationWidget(QtGui.QWidget):
         
     def _handleAddButton(self):
         """Handle the add button (which is visible only if the category does not use profile types)."""
-        text,ok = QtGui.QInputDialog.getText(self,self.tr("Profile name"),self.tr("Choose a profile name"))
+        text,ok = QtGui.QInputDialog.getText(self,
+                                             self.tr("Add new profile"),
+                                             self.tr("Choose a profile name"))
         if ok and len(text) > 0:
             if self.category.get(text) is not None:
                 dialogs.warning(self.tr("Invalid name"),self.tr("There is already a profile of this name."))

@@ -21,7 +21,7 @@ from PyQt4.QtCore import Qt
 
 from .. import application, config, logging, utils
 from ..core import elements, levels, nodes
-from ..models import rootedtreemodel, albumguesser
+from ..models import rootedtreemodel
 
 from collections import OrderedDict
 
@@ -168,7 +168,7 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
                     filesByFolder[folder].append(element)
                     elements.append(element)
             progress.close()
-            if self.guessProfile is None:
+            if not self.guessingEnabled or self.guessProfile is None:
                 return elements
             else:
                 self.guessProfile.guessAlbums(self.level, filesByFolder)
