@@ -139,10 +139,10 @@ class ProfileConfigurationWidget(QtGui.QWidget):
     def _createProfileWidget(self):
         """Create a widget that allows to configure the current profile and insert it into the layout.
         Remove any old profile widget first."""
-        print("CREATE PROFILE WIDGET")
         if self.profileWidget is not None:
             self.layout().removeWidget(self.profileWidget)
             self.profileWidget.setParent(None)
+            self.profileWidget = None
         if self.getProfile() is not None:
             self.profileWidget = self.getProfile().configurationWidget()
             if self.profileWidget is not None:
@@ -222,11 +222,11 @@ class ProfileComboBox(QtGui.QComboBox):
     def __init__(self, profileCategory, restrictToType=None, default=None,
                  includeConfigure=True, showTypes=False):
         super().__init__()
+        self._profile = None
         self.profileCategory = profileCategory
         self.restrictToType = restrictToType
         self.includeConfigure = includeConfigure
         self.showTypes = showTypes
-        self._storedProfile = None
         self._fillBox()
         profileCategory.profileAdded.connect(self._fillBox)
         profileCategory.profileRenamed.connect(self._fillBox)
@@ -235,7 +235,7 @@ class ProfileComboBox(QtGui.QComboBox):
         
         if default is not None: 
             self.setCurrentProfile(default)
-        else: self._storedProfile = self.currentProfile() # the first one or None
+        else: self._profile = self.currentProfile() # the first one or None
     
     def profiles(self):
         """List of profiles available in the box. If self.restrictToType is not None, this may differ from
@@ -254,7 +254,7 @@ class ProfileComboBox(QtGui.QComboBox):
             else: self.addItem(profile.name)
         self._reactToIndexChanges = True
         for i,profile in enumerate(self.profiles()):
-            if profile == self._storedProfile:
+            if profile == self._profile:
                 self.setCurrentIndex(i)
                 break
         else: self.setCurrentIndex(-1)
@@ -262,11 +262,12 @@ class ProfileComboBox(QtGui.QComboBox):
         if self.includeConfigure:
             if self.count() > 0: # only use a separator when it is necessary
                 self.insertSeparator(self.count())
+            # Note that if the box is empty so far, Qt will automatically select the 'Configure...' entry.    
             self.addItem(self.tr("Configure..."))
             
     def _handleProfileRemoved(self,profile):
         """Remove the given profile from the box. If it is the current one, select any other profile."""
-        if profile == self._storedProfile:
+        if profile == self._profile:
             if len(self.profiles()) > 0:
                 self.setCurrentProfile(self.profiles()[0])
             else:
@@ -277,22 +278,24 @@ class ProfileComboBox(QtGui.QComboBox):
         """Returns the name of the currently selected profile, or *None* if none is selected.
         The latter happens especially in the case that no profile is configured.
         """
-        if -1 < self.currentIndex() < len(self.profiles()):
-            return self.profiles()[self.currentIndex()]
-        else: return None
+        self._profile
     
     def setCurrentProfile(self, profile):
         """Set the current profile and emit the profileChosen-signal."""
+        if profile != self._profile:
+            self._profile = profile
+            self._selectProfile(profile)
+            self.profileChosen.emit(profile)
+            
+    def _selectProfile(self, profile):
+        """Select the given profile in the combobox."""
         if profile is not None:
-            for i in range(self.count()):
+            for i in range(len(self.profiles())):
                 if self.itemText(i) == profile.name:
                     self.setCurrentIndex(i)
                     break
-        else: self.setCurrentIndex(-1)  
-        if profile != self._storedProfile:
-            self._storedProfile = profile
-            self.profileChosen.emit(profile)
-                   
+        else: self.setCurrentIndex(-1) 
+        
     def _handleIndexChanged(self, i):
         """Handle the currentIndexChanged event of this combobox."""
         if not self._reactToIndexChanges:
@@ -301,9 +304,12 @@ class ProfileComboBox(QtGui.QComboBox):
             self.setCurrentProfile(self.profiles()[i])
         elif i == -1:
             self.setCurrentProfile(None)
-        else:
-            self.setCurrentProfile(self._storedProfile) # to reset the current index
-            self.profileCategory.openConfigDialog(self._storedProfile)
+        elif self.includeConfigure and i == self.count()-1 and i > 0:
+            # The restriction i > 0 is necessary when the last profile is removed and the remaining
+            # 'Configure...' entry is selected automatically (see above).
+            # If there are no profiles, the dialog is opened in mousePressEvent instead.
+            self._selectProfile(self._profile) # to reset the current index
+            self.profileCategory.openConfigDialog(self._profile)
             
     def mousePressEvent(self, event):
         """If this box contains only the entry 'Configure...', a mouse press on it must open the dialog, 
