@@ -39,10 +39,15 @@ class PlaybackWidget(QtGui.QDockWidget):
         self.setWindowTitle(self.tr('playback controls'))
         widget = QtGui.QWidget()
         self.setWidget(widget)
-        self.backend = None
+
+        if state is not None:
+            backend = player.profileCategory.get(state) # may be None
+        elif len(player.profileCategory.profiles) > 0:
+            backend = player.profileCategory.profiles[0]
+        else: backend = None
         topLayout = QtGui.QHBoxLayout()
         self.backendChooser = profilesgui.ProfileComboBox(player.profileCategory,
-                                                          default=player.profileCategory.get(state))
+                                                          default=backend)
         topLayout.addWidget(self.backendChooser)
         
         policy = QtGui.QSizePolicy()
@@ -87,7 +92,9 @@ class PlaybackWidget(QtGui.QDockWidget):
         mainLayout.addLayout(bottomLayout)
         self.backendChooser.profileChosen.connect(self.setBackend)
         self.seekSlider.sliderMoved.connect(self.updateSeekLabel)
-        self.setBackend(self.backendChooser.currentProfile())
+        
+        self.backend = None
+        self.setBackend(backend)
     
     def updateSeekLabel(self, value):
         self.seekLabel.setText("{}-{}".format(formatTime(value), formatTime(self.seekSlider.maximum())))

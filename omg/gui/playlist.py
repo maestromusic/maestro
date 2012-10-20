@@ -84,8 +84,10 @@ class PlaylistWidget(QtGui.QDockWidget):
         self.setWindowTitle(self.tr('Playlist'))
         
         # Read state
-        if 'backend' in state:
+        if 'backend' in state and state['backend'] is not None:
             backend = player.profileCategory.get(state['backend']) # may be None
+        elif len(player.profileCategory.profiles) > 0:
+            backend = player.profileCategory.profiles[0]
         else: backend = None
         profileType = playlistdelegate.PlaylistDelegate.profileType
         delegateProfile = None
