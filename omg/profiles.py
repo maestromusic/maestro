@@ -84,7 +84,7 @@ class ProfileType:
         
 class ProfileCategory(QtCore.QObject):
     """A category of profiles defines a realm which can be configured via profiles (e.g. delegates,
-    playback). A category manages a list of ProfileTypes and a list of Profiles.
+    playback) and manages the list of profiles.
     
     Constructor arguments:
     
@@ -94,8 +94,6 @@ class ProfileCategory(QtCore.QObject):
           into this option.
           
     """
-    typeAdded = QtCore.pyqtSignal(ProfileType)
-    typeRemoved = QtCore.pyqtSignal(ProfileType)
     profileAdded = QtCore.pyqtSignal(Profile)
     profileRemoved = QtCore.pyqtSignal(Profile)
     profileChanged = QtCore.pyqtSignal(Profile)
@@ -115,7 +113,6 @@ class ProfileCategory(QtCore.QObject):
             self.storageOption.setValue([])
         if profileClass is not None:
             self.profileClass = profileClass
-        self.types = []
         self.profiles = []
     
     def get(self,name):
@@ -124,29 +121,14 @@ class ProfileCategory(QtCore.QObject):
             if profile.name == name:
                 return profile
         return None
-        
-    def addType(self,type):
-        """Add a type to the category. Load all profiles of this type from the storage file and add them
-        to the category."""
-        if type not in self.types:
-            self.types.append(type)
-            self.typeAdded.emit(type)
-            self.loadProfiles(restrictToType=type)
-            
-    def removeType(self,type):
-        """Remove a type and all profiles of this type from the storage file."""
-        for profile in self.profiles:
-            if profile.type == type:
-                profile.builtIn = False # delete built-in profiles, too
-                self.deleteProfile(profile)
-        self.types.remove(types)
-        self.typeRemoved.emit(types)
     
     def addProfile(self,name,type=None,state=None):
         """Add a profile to the category. The arguments will be passed to the constructor of the correct
-        subclass of Profile."""
-        profileClass = type.profileClass if type is not None else self.profileClass
-        profile = profileClass(name,type,state)
+        subclass of Profile.
+        
+        The argument *type* is ignored and only available to be compatible with TypedCategory.
+        """
+        profile = self.profileClass(name,type,state)
         self.profiles.append(profile)
         self.profileAdded.emit(profile)
         return profile
@@ -168,6 +150,68 @@ class ProfileCategory(QtCore.QObject):
         if newName != profile.name:
             profile.name = newName
             self.profileRenamed.emit(profile)
+    
+    def loadProfiles(self):
+        """Load all profiles of known types from the storage file. If *restrictToType* is not None,
+        only load profiles of this profile type."""
+        for data in self.storageOption.getValue():
+            if len(data) != 2: # broken storage option; should not happen
+                continue
+            name,state = data
+            self.addProfile(name,state)
+            
+    def save(self):
+        """Save the profiles of this category to the storage options specified in the constructor."""
+        self.storageOption.setValue([[profile.name,
+                                      profile.save()]
+                                      for profile in self.profiles])
+    
+    def openConfigDialog(self, currentProfile=None):
+        """Open a dialog that allows to configure profiles of this category. If *currentProfile* is not None,
+        select that profile first."""
+        from .gui import profiles
+        dialog = profiles.ProfileDialog(self, currentProfile)
+        dialog.exec_()
+        
+        
+        
+class TypedProfileCategory(ProfileCategory):
+    """A subclass of ProfileCategory which uses typed profiles: Each profile in this category must be of
+    one of the ProfileTypes that have been added to the category.
+    """ 
+    typeAdded = QtCore.pyqtSignal(ProfileType)
+    typeRemoved = QtCore.pyqtSignal(ProfileType)
+    
+    def __init__(self,name,title,storageOption,profileClass=None):
+        super().__init__(name,title,storageOption,profileClass)
+        self.types = []
+        
+    def addType(self,type):
+        """Add a type to the category. Load all profiles of this type from the storage file and add them
+        to the category."""
+        if type not in self.types:
+            self.types.append(type)
+            self.typeAdded.emit(type)
+            self.loadProfiles(restrictToType=type)
+            
+    def removeType(self,type):
+        """Remove a type and all profiles of this type from the storage file."""
+        for profile in self.profiles:
+            if profile.type == type:
+                profile.builtIn = False # delete built-in profiles, too
+                self.deleteProfile(profile)
+        self.types.remove(types)
+        self.typeRemoved.emit(types)
+    
+    def addProfile(self,name,type,state=None):
+        """Add a profile to the category. The arguments will be passed to the constructor of the correct
+        subclass of Profile."""
+        assert type is not None
+        profileClass = type.profileClass if type.profileClass is not None else self.profileClass
+        profile = profileClass(name,type,state)
+        self.profiles.append(profile)
+        self.profileAdded.emit(profile)
+        return profile
     
     def loadProfiles(self,restrictToType=None):
         """Load all profiles of known types from the storage file. If *restrictToType* is not None,
@@ -192,13 +236,6 @@ class ProfileCategory(QtCore.QObject):
                                       profile.save()]
                                       for profile in self.profiles])
     
-    def openConfigDialog(self, currentProfile=None):
-        """Open a dialog that allows to configure profiles of this category. If *currentProfile* is not None,
-        select that profile first."""
-        from .gui import profiles
-        dialog = profiles.ProfileDialog(self, currentProfile)
-        dialog.exec_()
-            
 
 class ProfileManager(QtCore.QObject):
     """The single instance of this class manages profile categories."""

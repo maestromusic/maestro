@@ -27,8 +27,9 @@ from ...core import tags
 translate = QtCore.QCoreApplication.translate
 logger = logging.getLogger(__name__)
 
-category = profiles.ProfileCategory("delegates",translate("Delegates","Item display"),
-                                           config.storageObject.gui.delegates)
+category = profiles.TypedProfileCategory("delegates",
+                                         translate("Delegates","Item display"),
+                                         config.storageObject.gui.delegates)
 profiles.manager.addCategory(category)
 
 

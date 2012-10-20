@@ -20,7 +20,7 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from . import dialogs 
-from ..profiles import Profile
+from .. import profiles
 
 
 class ProfileDialog(QtGui.QDialog):
@@ -52,7 +52,7 @@ class ProfileConfigurationWidget(QtGui.QStackedWidget):
           
     *profile* is the profile that is selected at the beginning.
     """
-    profileChosen = QtCore.pyqtSignal(Profile)
+    profileChosen = QtCore.pyqtSignal(profiles.Profile)
     
     def __init__(self,category,profile=None):
         super().__init__()
@@ -114,7 +114,7 @@ class NoProfileYetWidget(QtGui.QWidget):
         hLayout.addStretch(1)
         self.nameLineEdit = QtGui.QLineEdit()
         formLayout.addRow(self.tr("Name:"),self.nameLineEdit)
-        if len(self.category.types) > 0:
+        if isinstance(self.category,profiles.TypedProfileCategory):
             self.typeBox = QtGui.QComboBox()
             self.typeBox.addItems([type.title for type in self.category.types])
             formLayout.addRow(self.tr("Type:"),self.typeBox)
@@ -129,7 +129,7 @@ class NoProfileYetWidget(QtGui.QWidget):
     def _handleAddButton(self):
         """Check the data in the input fields and add a new profile."""
         name = self.nameLineEdit.text()
-        if len(self.category.types) > 0:
+        if isinstance(self.category,profiles.TypedProfileCategory):
             type = self.category.types[self.typeBox.currentIndex()]
         else: type = None
         
@@ -142,7 +142,7 @@ class NoProfileYetWidget(QtGui.QWidget):
             profile = self.category.addProfile(name,type)
             # reset the fields for the next time this widget is shown)
             self.nameLineEdit.setText('')
-            if len(self.category.types) > 0:
+            if isinstance(self.category,profiles.TypedProfileCategory):
                 self.typeBox.setCurrentIndex(0)
                 
 
@@ -167,17 +167,17 @@ class ChooseAndConfigureProfileWidget(QtGui.QWidget):
         self.profileChooser.profileChosen.connect(self.setProfile)
         self.profileChooser.profileChosen.connect(parent.profileChosen)
         topLayout.addWidget(self.profileChooser)
-        if len(self.category.types) == 0:
-            self.addButton = QtGui.QPushButton(self.tr("Add new profile"))
-            self.addButton.clicked.connect(self._handleAddButton)
-            topLayout.addWidget(self.addButton)
-        else:
+        if isinstance(self.category,profiles.TypedProfileCategory):
             self.addBox = QtGui.QComboBox()
             self.addBox.addItem(self.tr("Add new profile"))
             for type in self.category.types:
                 self.addBox.addItem(self.tr("...of type {}").format(type.title))
             self.addBox.currentIndexChanged.connect(self._handleAddBox)
             topLayout.addWidget(self.addBox)
+        else:
+            self.addButton = QtGui.QPushButton(self.tr("Add new profile"))
+            self.addButton.clicked.connect(self._handleAddButton)
+            topLayout.addWidget(self.addButton)
         
         topLayout.addStretch()
         
@@ -300,7 +300,7 @@ class ChooseAndConfigureProfileWidget(QtGui.QWidget):
 class ProfileComboBox(QtGui.QComboBox):
     """This class provides a combo box that lets the user choose a profile. Parameters are
     
-        - *profileCategory*: The category where the profiles are taken from,
+        - *category*: The category where the profiles are taken from,
         - *restrictToType*: if this is not None, the user may only choose profiles of this profile type,
         - *default*: the profile that is selected at the beginning,
         - *includeConfigure*: Add an entry 'Configure...' to the box that will open a ProfileDialog,
@@ -308,20 +308,20 @@ class ProfileComboBox(QtGui.QComboBox):
           profiles in the box.
     
     """
-    profileChosen = QtCore.pyqtSignal(Profile)
+    profileChosen = QtCore.pyqtSignal(profiles.Profile)
 
-    def __init__(self, profileCategory, restrictToType=None, default=None,
+    def __init__(self, category, restrictToType=None, default=None,
                  includeConfigure=True, showTypes=False):
         super().__init__()
         self._profile = None
-        self.profileCategory = profileCategory
+        self.category = category
         self.restrictToType = restrictToType
         self.includeConfigure = includeConfigure
         self.showTypes = showTypes
         self._fillBox()
-        profileCategory.profileAdded.connect(self._fillBox)
-        profileCategory.profileRenamed.connect(self._fillBox)
-        profileCategory.profileRemoved.connect(self._handleProfileRemoved)
+        category.profileAdded.connect(self._fillBox)
+        category.profileRenamed.connect(self._fillBox)
+        category.profileRemoved.connect(self._handleProfileRemoved)
         self.currentIndexChanged.connect(self._handleIndexChanged)
         
         if default is not None: 
@@ -331,9 +331,9 @@ class ProfileComboBox(QtGui.QComboBox):
     def profiles(self):
         """List of profiles available in the box. If self.restrictToType is not None, this may differ from
         the profiles of the underlying category."""
-        if self.restrictToType is None:
-            return self.profileCategory.profiles
-        else: return [p for p in self.profileCategory.profiles if p.type == self.restrictToType]
+        if self.restrictToType is None or not isinstance(self.category,profiles.TypedProfileCategory):
+            return self.category.profiles
+        else: return [p for p in self.category.profiles if p.type == self.restrictToType]
     
     def _fillBox(self):
         """Fill the combobox."""
@@ -400,13 +400,13 @@ class ProfileComboBox(QtGui.QComboBox):
             # 'Configure...' entry is selected automatically (see above).
             # If there are no profiles, the dialog is opened in mousePressEvent instead.
             self._selectProfile(self._profile) # to reset the current index
-            self.profileCategory.openConfigDialog(self._profile)
+            self.category.openConfigDialog(self._profile)
             
     def mousePressEvent(self, event):
         """If this box contains only the entry 'Configure...', a mouse press on it must open the dialog, 
         because it is obviously not possible to trigger currentIndexChanged."""
         if self.includeConfigure and self.count() == 1 and event.button() == Qt.LeftButton:
-            self.profileCategory.openConfigDialog(None)
+            self.category.openConfigDialog(None)
             event.accept()
         else:
             return super().mousePressEvent(event)

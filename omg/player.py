@@ -29,9 +29,9 @@ DISCONNECTED, CONNECTING, CONNECTED = range(3)
 
 _runningBackends = {}
 
-profileCategory = profiles.ProfileCategory('playback',
-                                           translate('PlayerBackend','Playback'),
-                                           config.storageObject.player.profiles)
+profileCategory = profiles.TypedProfileCategory('playback',
+                                                translate('PlayerBackend','Playback'),
+                                                config.storageObject.player.profiles)
 profiles.manager.addCategory(profileCategory)
 
 
