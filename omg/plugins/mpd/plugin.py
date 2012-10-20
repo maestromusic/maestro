@@ -196,10 +196,9 @@ class MPDPlayerBackend(player.PlayerBackend):
     def move(self,fromOffset,toOffset):
         self._move((fromOffset,toOffset))
     
-    @classmethod
-    def configurationWidget(cls, profile=None):
+    def configurationWidget(self):
         """Return a config widget, initialized with the data of the given *profile*."""
-        return MPDConfigWidget(profile)
+        return MPDConfigWidget(self)
     
     def getInfo(self, path):
         """Query MPD to get tags & length of the file at *path* (relative to this MPD instance).
@@ -220,46 +219,61 @@ class MPDPlayerBackend(player.PlayerBackend):
     def __str__(self):
         return "MPDPlayerBackend({})".format(self.name)
 
+
 class MPDConfigWidget(QtGui.QWidget):
-    
+    """Widget to configure playback profiles of type MPD."""    
     def __init__(self, profile=None):
         super().__init__()
-        layout = QtGui.QFormLayout(self)
+        layout = QtGui.QVBoxLayout(self)
+        formLayout = QtGui.QFormLayout()
+        layout.addLayout(formLayout,1)
         
         self.hostEdit = QtGui.QLineEdit()
-        layout.addRow(self.tr("Host:"),self.hostEdit)
+        formLayout.addRow(self.tr("Host:"),self.hostEdit)
         
         self.portEdit = QtGui.QLineEdit()
         self.portEdit.setValidator(QtGui.QIntValidator(0, 65535, self))
-        layout.addRow(self.tr("Port:"),self.portEdit)
+        formLayout.addRow(self.tr("Port:"),self.portEdit)
         
         self.passwordEdit = QtGui.QLineEdit()
-        layout.addRow(self.tr("Password:"),self.passwordEdit)
+        formLayout.addRow(self.tr("Password:"),self.passwordEdit)
         
         self.passwordVisibleBox = QtGui.QCheckBox()
         self.passwordVisibleBox.toggled.connect(self._handlePasswordVisibleBox)
-        layout.addRow(self.tr("Password visible?"),self.passwordVisibleBox)
+        formLayout.addRow(self.tr("Password visible?"),self.passwordVisibleBox)
         
-        self.setProfile(profile)
-        
+        buttonLayout = QtGui.QHBoxLayout()
+        layout.addLayout(buttonLayout)
         saveButton = QtGui.QPushButton(self.tr("Save"))
         saveButton.clicked.connect(self._handleSave)
+        buttonLayout.addWidget(saveButton)
+        resetButton = QtGui.QPushButton(self.tr("Reset"))
+        resetButton.clicked.connect(self._handleReset)
+        buttonLayout.addWidget(resetButton)
+        buttonLayout.addStretch(1)
+        
+        self.setProfile(profile)
     
     def setProfile(self, profile):
-        if profile is None:
-            host, port, password = 'localhost', 6600, ''
-        else:
-            host, port, password = player.profileConf[profile].config()
-        self.hostEdit.setText(host)
-        self.portEdit.setText(str(port))
-        self.passwordEdit.setText(password)
-        self.passwordVisibleBox.setChecked(len(password) == 0)
+        """Change the profile whose data is displayed."""
+        assert profile is not None
+        self.profile = profile
+        self.hostEdit.setText(profile.mpdthread.host)
+        self.portEdit.setText(str(profile.mpdthread.port))
+        self.passwordEdit.setText(profile.mpdthread.password)
+        self.passwordVisibleBox.setChecked(len(profile.mpdthread.password) == 0)
     
     def _handleSave(self):
+        """Really change the profile."""
         host = self.hostEdit.text()
         port = int(self.portEdit.text())
         password = self.passwordEdit.text()
         self.profile.setConnectionParameters(host,port,password)
+        
+    def _handleReset(self):
+        """Reset the form to the stored values."""
+        self.setProfile(self.profile)
     
     def _handlePasswordVisibleBox(self,checked):
+        """Change whether the password is visible in self.passwordEdit."""
         self.passwordEdit.setEchoMode(QtGui.QLineEdit.Normal if checked else QtGui.QLineEdit.Password)
