@@ -167,10 +167,19 @@ class StandardGuesser(profiles.Profile):
         return GuessProfileConfigWidget(self)
 
 
-profileCategory = profiles.ProfileCategory("albumguesser",
-                                           translate("Albumguesser","Album guesser"),
-                                           config.storageObject.editor.albumguesser_profiles,
-                                           profileClass=StandardGuesser)
+class ProfileCategory(profiles.ProfileCategory):
+    """Subclass of ProfileCategory that loads a default profile if no profile was loaded from the storage
+    file."""
+    def loadProfiles(self):
+        super().loadProfiles()
+        if len(self.profiles) == 0:
+            self.addProfile(translate("Albumguesser","Default"))
+
+
+profileCategory = ProfileCategory("albumguesser",
+                                  translate("Albumguesser","Album guesser"),
+                                  config.storageObject.editor.albumguesser_profiles,
+                                  profileClass=StandardGuesser)
 profiles.manager.addCategory(profileCategory)
 
 

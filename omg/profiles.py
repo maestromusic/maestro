@@ -128,6 +128,7 @@ class ProfileCategory(QtCore.QObject):
         
         The argument *type* is ignored and only available to be compatible with TypedCategory.
         """
+        assert isinstance(name,str)
         profile = self.profileClass(name,type,state)
         self.profiles.append(profile)
         self.profileAdded.emit(profile)
