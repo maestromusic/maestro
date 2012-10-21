@@ -160,7 +160,9 @@ class Browser(QtGui.QWidget):
                 if len(flagList) > 0:
                     self.criterionFilter.append(criteriaModule.FlagsCriterion(flagList))
             if 'delegate' in state:
-                self.delegateProfile = delegates.profiles.category.get(state['delegate']) # may be None
+                self.delegateProfile = delegates.profiles.category.getFromStorage(
+                                                            state.get('delegate'),
+                                                            browserdelegate.BrowserDelegate.profileType)
             if 'sortTags' in state:
                 for tagName,tagList in state['sortTags'].items():
                     if tags.exists(tagName):

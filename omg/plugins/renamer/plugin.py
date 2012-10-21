@@ -15,22 +15,27 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from PyQt4 import QtCore, QtGui
-
-translate = QtCore.QCoreApplication.translate
-
-from omg.core import tags, levels
-from omg import logging, config, profiles
 from calendar import format
-
-logger = logging.getLogger(__name__)
 
 import pyparsing
 from pyparsing import Forward, Literal, OneOrMore, Optional, Word, alphas, alphanums, nums
+
+from PyQt4 import QtCore, QtGui
+from PyQt4.QtCore import Qt
+
+from ...core import tags, levels
+from ... import logging, config, profiles
+from ...gui import profiles as profilesgui
+
+
+translate = QtCore.QCoreApplication.translate
+
     
 def defaultStorage():
-    return {"SECTION:renamer": {'profiles': []}}
-            #TODO {'profiles': [["default", None, ["GrammarRenamer", "<artist>"]]] } }
+    return {"SECTION:renamer": {'profiles': [],
+                                'current_profile': None
+                                }
+            }
 
 def defaultConfig():
     return {"renamer": {
@@ -167,6 +172,13 @@ class GrammarRenamer(profiles.Profile):
         expression << OneOrMore(condition | staticText)
         self.expression = expression
     
+    def save(self):
+        return {'formatString': self.formatString,
+                'replaceChars': self.replaceChars,
+                'replaceBy': self.replaceBy,
+                'removeChars': self.removeChars
+                }
+    
     def computeNewPath(self):
         """Computes the new path for the element defined by *self.currentElem* and *self.currentParents*."""
         extension = self.currentElem.getExtension()
@@ -189,51 +201,7 @@ class GrammarRenamer(profiles.Profile):
         self.level = level
         self.traverse(element)
         return self.result
-
-    def config(self):
-        return (self.formatString,self.replaceChars, self.replaceBy, self.removeChars)
     
     def configurationWidget(self):
-        widget = GrammarConfigurationWidget(self)
-        return widget
-
-
-class GrammarConfigurationWidget(QtGui.QWidget):
-        def __init__(self, profile = None):
-            super().__init__()
-            self.profile = profile
-            self.edit = QtGui.QTextEdit()
-            self.replaceCharsEdit = QtGui.QLineEdit()
-            self.replaceByEdit = QtGui.QLineEdit()
-            self.removeCharsEdit = QtGui.QLineEdit()
-            hlay = QtGui.QHBoxLayout()
-            hlay.addWidget(QtGui.QLabel(self.tr("Replace:")))
-            hlay.addWidget(self.replaceCharsEdit)
-            hlay.addWidget(QtGui.QLabel(self.tr("By:")))
-            hlay.addWidget(self.replaceByEdit)
-            hlay.addWidget(QtGui.QLabel("And remove:"))
-            hlay.addWidget(self.removeCharsEdit)
-            layout = QtGui.QVBoxLayout()
-            layout.addWidget(self.edit)
-            layout.addLayout(hlay)
-            self.setLayout(layout)
-            if profile:
-                self.edit.setText(profile.formatString)
-                self.replaceCharsEdit.setText(profile.replaceChars)
-                self.replaceByEdit.setText(profile.replaceBy)
-                self.removeCharsEdit.setText(profile.removeChars)
-            self.edit.textChanged.connect(self.handleChange)
-            for edit in self.replaceCharsEdit, self.replaceByEdit, self.removeCharsEdit:
-                edit.textEdited.connect(self.handleChange)
-        
-        def handleChange(self):
-            self.profile.formatString = self.edit.toPlainText()
-            self.profile.replaceChars = self.replaceCharsEdit.text()
-            self.profile.replaceBy = self.replaceByEdit.text()
-            self.profile.removeChars = self.removeCharsEdit.text()
-            profileCategory.profileChanged.emit(self.profile)
-            
-        def currentConfig(self):
-            return (self.edit.toPlainText(), self.replaceCharsEdit.text(),
-                    self.replaceByEdit.text(), self.removeCharsEdit.text())
-
+        from . import gui
+        return gui.GrammarConfigurationWidget(temporary=False, profile=self)

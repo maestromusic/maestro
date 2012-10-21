@@ -114,17 +114,10 @@ class EditorWidget(QtGui.QDockWidget):
             state = {}
         expand = 'expand' not in state or state['expand'] # by default expand
         guessingEnabled = 'guessingEnabled' not in state or state['guessingEnabled'] # by default guess 
-        if 'guessProfile' in state and state['guessProfile'] is not None:
-            guessProfile = albumguesser.profileCategory.get(state['guessProfile'])
-        elif len(albumguesser.profileCategory.profiles) > 0:
-            guessProfile = albumguesser.profileCategory.profiles[0]
-        else: guessProfile = None
-        profileType = editordelegate.EditorDelegate.profileType
-        delegateProfile = None
-        if 'delegate' in state:
-            delegateProfile = delegates.profiles.category.get(state['delegate'])
-        if delegateProfile is None or delegateProfile.type != profileType:
-            delegateProfile = profileType.default()
+        guessProfile = albumguesser.profileCategory.getFromStorage(state.get('guessProfile'))
+        delegateProfile = delegates.profiles.category.getFromStorage(
+                                                    state.get('delegate'),
+                                                    editordelegate.EditorDelegate.profileType)
         
         buttonLayout = QtGui.QHBoxLayout()
         # buttonLayout is filled below, when the editor exists 

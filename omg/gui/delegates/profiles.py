@@ -27,9 +27,19 @@ from ...core import tags
 translate = QtCore.QCoreApplication.translate
 logger = logging.getLogger(__name__)
 
-category = profiles.TypedProfileCategory("delegates",
-                                         translate("Delegates","Item display"),
-                                         config.storageObject.gui.delegates)
+
+class DelegateProfileCategory(profiles.TypedProfileCategory):
+    """The delegates' profile category prefers the default delegates of each type."""
+    def getFromStorage(self,name,restrictToType):
+        if name is not None:
+            profile = self.get(name)
+            if profile is not None and restrictToType is None and profile.type == restrictToType:
+                return profile
+        return restrictToType.default()
+    
+category = DelegateProfileCategory("delegates",
+                                   translate("Delegates","Item display"),
+                                   config.storageObject.gui.delegates)
 profiles.manager.addCategory(category)
 
 

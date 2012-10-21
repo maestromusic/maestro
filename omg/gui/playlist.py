@@ -84,19 +84,10 @@ class PlaylistWidget(QtGui.QDockWidget):
         self.setWindowTitle(self.tr('Playlist'))
         
         # Read state
-        if 'backend' in state and state['backend'] is not None:
-            backend = player.profileCategory.get(state['backend']) # may be None
-        elif len(player.profileCategory.profiles) > 0:
-            backend = player.profileCategory.profiles[0]
-        else: backend = None
         profileType = playlistdelegate.PlaylistDelegate.profileType
-        delegateProfile = None
-        if 'delegate' in state:
-            delegateProfile = delegates.profiles.category.get(state['delegate'])
-        if delegateProfile is None or delegateProfile.type != profileType:
-            delegateProfile = profileType.default()
+        backend = player.profileCategory.getFromStorage(state.get('backend'))
+        delegateProfile = delegates.profiles.category.getFromStorage(state.get('delegate'),profileType)
         
-        self.backend = None
         self.treeview = PlaylistTreeView(delegateProfile)
  
         widget = QtGui.QWidget() 
@@ -129,7 +120,9 @@ class PlaylistWidget(QtGui.QDockWidget):
         self.errorLabel.setAlignment(Qt.AlignTop | Qt.AlignHCenter)
         self.mainLayout = layout
         self.mainWidgetIndex = layout.indexOf(self.treeview)
-        self.setBackend(self.backendChooser.currentProfile())
+        
+        self.backend = None
+        self.setBackend(backend)
     
     def saveState(self):
         return {'backend': self.backend.name if self.backend is not None else None,

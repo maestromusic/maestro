@@ -58,6 +58,10 @@ class Profile(QtCore.QObject): # to allow subclasses to have signals
         """Return a widget that can be used to configure this profile."""
         return None
     
+    def copy(self):
+        """Return a copy of this profile."""
+        return type(self)(self.name, self.type, self.save())
+    
     
 class ProfileType:
     """Optionally profiles may have a type. This is useful to
@@ -69,10 +73,13 @@ class ProfileType:
     *name* is the internal name of the profile. *title* is displayed to the user. *profileClass* is the
     (sub)class of Profile that will be used for profiles of this type.
     """ 
-    def __init__(self,name,title,profileClass=Profile):
+    def __init__(self,name,title,profileClass=Profile,defaultProfileName=None):
         self.name = name
         self.title = title
         self.profileClass = profileClass
+        if defaultProfileName is not None:
+            self.defaultProfileName = defaultProfileName
+        else: self.defaultProfileName = title
         
     def load(self,category):
         """This is called after the type has been added to its ProfileCategory and its profiles have been
@@ -100,20 +107,26 @@ class ProfileCategory(QtCore.QObject):
     profileRenamed = QtCore.pyqtSignal(Profile)
     
     # subclass of Profile that is used for profiles.
-    # This is overwritten by the profileClass of the profile's type (if there is a type) 
+    # For typed profiles this is overwritten by the profileClass of the profile's type 
     profileClass = Profile
     
-    def __init__(self,name,title,storageOption,profileClass=None):
+    def __init__(self,name,title,storageOption,profileClass=None,defaultProfileName=None):
         super().__init__()
         self.name = name
         self.title = title
         assert isinstance(storageOption,config.Option)
+        
         self.storageOption = storageOption
         if not isinstance(self.storageOption.getValue(),list):
             self.storageOption.setValue([])
+            
         if profileClass is not None:
             self.profileClass = profileClass
         self.profiles = []
+        
+        if defaultProfileName is not None:
+            self.defaultProfileName = defaultProfileName
+        else: self.defaultProfileName = title
     
     def get(self,name):
         """Return the profile with the given name or None if no such profile exists."""
@@ -174,7 +187,26 @@ class ProfileCategory(QtCore.QObject):
         dialog = profiles.ProfileDialog(self, currentProfile)
         dialog.exec_()
         
-        
+    def suggestProfileName(self):
+        """Suggest an unused name for a new profile of this category. Use self.defaultProfileName for this.
+        """
+        name = self.defaultProfileName
+        i = 2
+        while self.get(name) is not None:
+            name = "{} {}".format(self.defaultProfileName,i)
+            i += 1
+        return name
+    
+    def getFromStorage(self,name):
+        """Return the profile of the given name if it exists or any other profile else. Use this method
+        to load profiles from states saved in the storage file."""
+        if name is not None:
+            if self.get(name) is not None:
+                return self.get(name)
+        if len(self.profiles) > 0:
+            return self.profiles[0]
+        return None
+    
         
 class TypedProfileCategory(ProfileCategory):
     """A subclass of ProfileCategory which uses typed profiles: Each profile in this category must be of
@@ -236,6 +268,33 @@ class TypedProfileCategory(ProfileCategory):
                                       profile.type.name if profile.type is not None else None,
                                       profile.save()]
                                       for profile in self.profiles])
+        
+    def suggestProfileName(self,type):
+        """Suggest an unused name for a new profile of the given type of this category. Use
+        self.defaultProfileName for this."""
+        name = type.defaultProfileName
+        i = 2
+        while self.get(name) is not None:
+            name = "{} {}".format(type.defaultProfileName,i)
+            i += 1
+        return name
+    
+    def getFromStorage(self,name,restrictToType=None):
+        """Return the profile of the given name if it exists or any other profile else. Use this method
+        to load profiles from states saved in the storage file.
+        
+        If *restrictToType* is not None, return only profiles of this type.
+        """
+        # Return the profile given by name if it exists and its type fits
+        if name is not None:
+            profile = self.get(name)
+            if profile is not None and restrictToType is None and profile.type == restrictToType:
+                return profile
+        # Return the first profile whose type fits
+        for profile in self.profiles:
+            if restrictToType is None or profile.type == profile.type:
+                return profile
+        return None
     
 
 class ProfileManager(QtCore.QObject):

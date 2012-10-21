@@ -66,18 +66,6 @@ class ProfileConfigurationWidget(QtGui.QStackedWidget):
         self.addWidget(ChooseAndConfigureProfileWidget(self,profile))
         if len(category.profiles) > 0:
             self.setCurrentIndex(1)
-  
-    def getProfile(self):
-        """Return current profile."""
-        return self.profile
-            
-    def setProfile(self,profile):
-        """Set current profile."""
-        if profile is None:
-            self.setCurrentIndex(0)
-        else:
-            self.widget(1).setProfile(profile)
-            self.setCurrentIndex(1)
         
     def _handleProfileAdded(self,profile):
         """Handle profileAdded-signal of the profile category."""
@@ -99,11 +87,10 @@ class NoProfileYetWidget(QtGui.QWidget):
         layout = QtGui.QVBoxLayout(self)
         layout.setContentsMargins(0,0,0,0)
          
-        if len(self.category.types) == 0:
-            label = QtGui.QLabel(self.tr("There is no profile yet. To create one, choose a name:"))
-        else:
+        if isinstance(self.category,profiles.TypedProfileCategory):
             label = QtGui.QLabel(
                         self.tr("There is no profile yet. To create one, choose a name and a type:"))
+        else: label = QtGui.QLabel(self.tr("There is no profile yet. To create one, choose a name:"))
         label.setWordWrap(True)
         layout.addWidget(label)
         hLayout = QtGui.QHBoxLayout() # hLayout prevents the form widgets to stretch over the whole width
@@ -113,6 +100,8 @@ class NoProfileYetWidget(QtGui.QWidget):
         hLayout.addLayout(formLayout)
         hLayout.addStretch(1)
         self.nameLineEdit = QtGui.QLineEdit()
+        if not isinstance(self.category,profiles.TypedProfileCategory):
+            self.nameLineEdit.setText(self.category.suggestProfileName())
         formLayout.addRow(self.tr("Name:"),self.nameLineEdit)
         if isinstance(self.category,profiles.TypedProfileCategory):
             self.typeBox = QtGui.QComboBox()
@@ -141,9 +130,11 @@ class NoProfileYetWidget(QtGui.QWidget):
         else:
             profile = self.category.addProfile(name,type)
             # reset the fields for the next time this widget is shown)
-            self.nameLineEdit.setText('')
             if isinstance(self.category,profiles.TypedProfileCategory):
+                self.nameLineEdit.setText('')
                 self.typeBox.setCurrentIndex(0)
+            else:
+                self.nameLineEdit.setText(self.category.suggestProfileName())
                 
 
 class ChooseAndConfigureProfileWidget(QtGui.QWidget):
@@ -248,7 +239,9 @@ class ChooseAndConfigureProfileWidget(QtGui.QWidget):
         """Handle the add button (which is visible only if the category does not use profile types)."""
         text,ok = QtGui.QInputDialog.getText(self,
                                              self.tr("Add new profile"),
-                                             self.tr("Choose a profile name"))
+                                             self.tr("Choose a profile name"),
+                                             QtGui.QLineEdit.Normal,
+                                             self.category.suggestProfileName())
         if ok and len(text) > 0:
             self._tryAddProfile(text,None)
                 
@@ -258,7 +251,11 @@ class ChooseAndConfigureProfileWidget(QtGui.QWidget):
             return # first line does not contain a type
         self.addBox.setCurrentIndex(0) # reset
         type = self.category.types[index-1]
-        text,ok = QtGui.QInputDialog.getText(self,self.tr("Profile name"),self.tr("Choose a profile name"))
+        text,ok = QtGui.QInputDialog.getText(self,
+                                             self.tr("Profile name"),
+                                             self.tr("Choose a profile name"),
+                                             QtGui.QLineEdit.Normal,
+                                             self.category.suggestProfileName(type))
         if ok and len(text) > 0:
             self._tryAddProfile(text, type)
             
@@ -306,20 +303,23 @@ class ProfileComboBox(QtGui.QComboBox):
         - *includeConfigure*: Add an entry 'Configure...' to the box that will open a ProfileDialog,
         - *showType*: use not only the profile name but also the name of the profile's type to display
           profiles in the box.
+        - *selectFirstProfile*: When a profile is created after the category did not contain any profiles,
+          select this profile.
     
     """
     profileChosen = QtCore.pyqtSignal(profiles.Profile)
 
     def __init__(self, category, restrictToType=None, default=None,
-                 includeConfigure=True, showTypes=False):
+                 includeConfigure=True, showTypes=False, selectFirstProfile=True):
         super().__init__()
         self._profile = None
         self.category = category
         self.restrictToType = restrictToType
         self.includeConfigure = includeConfigure
         self.showTypes = showTypes
+        self.selectFirstProfile = selectFirstProfile
         self._fillBox()
-        category.profileAdded.connect(self._fillBox)
+        category.profileAdded.connect(self._handleProfileAdded)
         category.profileRenamed.connect(self._fillBox)
         category.profileRemoved.connect(self._handleProfileRemoved)
         self.currentIndexChanged.connect(self._handleIndexChanged)
@@ -355,7 +355,15 @@ class ProfileComboBox(QtGui.QComboBox):
                 self.insertSeparator(self.count())
             # Note that if the box is empty so far, Qt will automatically select the 'Configure...' entry.    
             self.addItem(self.tr("Configure..."))
-            
+    
+    def _handleProfileAdded(self,profile):
+        """Add the profile and take care of self.selectFirstProfile."""
+        self._fillBox()
+        # Note that if self.restrictToType is not None, len(self.profiles) might still be None after the
+        # profile has been added to the category.
+        if self.selectFirstProfile and len(self.profiles()) == 1 and profile == self.profiles()[0]:
+            self.setCurrentProfile(profile)
+                
     def _handleProfileRemoved(self,profile):
         """Remove the given profile from the box. If it is the current one, select any other profile."""
         if profile == self._profile:
