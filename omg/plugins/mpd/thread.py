@@ -15,12 +15,15 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
+
+import socket, threading
+
+import mpd
+from PyQt4 import QtCore, QtGui
+
 from omg.core import tags
 from omg import logging, player
 
-from PyQt4 import QtCore, QtGui
-
-import mpd
 logger = logging.getLogger(__name__)
 
 MPD_STATES = { 'play': player.PLAY, 'stop': player.STOP, 'pause': player.PAUSE}
@@ -45,6 +48,7 @@ class MPDThread(QtCore.QThread):
         self.currentLength = self.volume = None
         self.seekRequest = None
         self.connected = False
+        self.shouldConnect = threading.Event()
         self.idler = mpd.MPDClient()
         self.commander = mpd.MPDClient()
     
@@ -219,23 +223,15 @@ class MPDThread(QtCore.QThread):
             self._handleExternalPlaylistChange(playlistVersion)
     
     def connect(self):
-        import socket
-        print('mpd connecting {}'.format(self.host))
-        try:
-            self.idler.connect(self.host, self.port, CONNECTION_TIMEOUT)
-            self.mpd_status = self.idler.status()
-            self.updateMixer(False)
-            self.updatePlaylist(False)
-            self.updatePlayer(False)    
-            self.changeFromMPD.emit('connect', (self.mpd_playlist[:], self.current,
-                                                self.currentLength, self.elapsed,
-                                                self.state))
-            self.connected = True
-            return True
-        except socket.error:
-            logger.debug("connection to {} unsuccessful".format(self.host))
-            self.connected = False
-            return False       
+        self.idler.connect(self.host, self.port, CONNECTION_TIMEOUT)
+        self.mpd_status = self.idler.status()
+        self.updateMixer(False)
+        self.updatePlaylist(False)
+        self.updatePlayer(False)    
+        self.changeFromMPD.emit('connect', (self.mpd_playlist[:], self.current,
+                                            self.currentLength, self.elapsed,
+                                            self.state))
+        self.connected = True  
     
     def disconnect(self):
         if not self.connected:
@@ -245,8 +241,19 @@ class MPDThread(QtCore.QThread):
         self.changeFromMPD.emit('disconnect', None)
         
     def run(self):
-        self.connect()        
-        self.watchMPDStatus()
+        while True:
+            if not self.shouldConnect.is_set():
+                return
+            try:
+                if not self.connected:
+                    self.connect()
+                self.watchMPDStatus()
+            except mpd.ConnectionError:
+                logger.debug('MPD {} could not connect'.format(self.host))
+                self.sleep(5)
+            except socket.error:
+                logger.debug('Connection to MPD {} failed'.format(self.host))
+                self.sleep(5)
         
     
     def quit(self):

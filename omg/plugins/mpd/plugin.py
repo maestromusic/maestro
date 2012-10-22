@@ -175,12 +175,14 @@ class MPDPlayerBackend(player.PlayerBackend):
     def registerFrontend(self, obj):
         self._numFrontends += 1
         if self._numFrontends == 1:
+            self.mpdthread.shouldConnect.set()
             self.mpdthread.start()
     
     def unregisterFrontend(self, obj):
         self._numFrontends -= 1
         if self._numFrontends == 0:
-            self.mpdthread.quit()
+            self.mpdthread.shouldConnect.clear()
+            self.mpdthread.disconnect()
             if self.commanderConnected:
                 self.commander.disconnect()
                 self.commanderConnected = False
