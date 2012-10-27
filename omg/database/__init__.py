@@ -112,18 +112,18 @@ def connect(**kwargs):
         path = config.options.database.sqlite_path.strip()
         if path.startswith('config:'):
             path = os.path.join(config.CONFDIR,path[len('config:'):])
-        connection = _connect(['sqlite'],[path], **kwargs)
+        contextManager = _connect(['sqlite'],[path], **kwargs)
     else: 
         authValues = [config.options.database["mysql_"+key] for key in sql.AUTH_OPTIONS]
-        connection = _connect(config.options.database.mysql_drivers,authValues)
+        contextManager = _connect(config.options.database.mysql_drivers,authValues)
     
     # Initialize nextId-stuff when the first connection is created
     with _nextIdLock:
         global _nextId
         if _nextId is None:
-            _nextId = 1 + connection.query("SELECT MAX(id) FROM {}elements".format(db.prefix)).getSingle()
+            _nextId = 1 + query("SELECT MAX(id) FROM {}elements".format(prefix)).getSingle()
         
-    return connection
+    return contextManager
 
 
 def _connect(drivers,authValues, **kwargs):
