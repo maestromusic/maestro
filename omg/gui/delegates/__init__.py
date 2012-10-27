@@ -53,7 +53,7 @@ class StandardDelegate(AbstractDelegate):
             
             for ancestor in reversed(ancestors):
                 if element.id in ancestor.contents: # direct parent
-                    pos = ancestor.contents.getPosition(element.id)
+                    pos = ancestor.contents.positionOf(element.id)
                     text = translate("Delegates","#{} in {}").format(pos,ancestor.getTitle())
                 else: text = translate("Delegates","In {}").format(ancestor.getTitle())
                 self.addCenter(TextItem(text,ITALIC_STYLE))

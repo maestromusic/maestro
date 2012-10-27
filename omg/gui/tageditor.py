@@ -408,8 +408,8 @@ class TagEditorWidget(QtGui.QWidget):
         newTag = tagBox.getTag()
 
         # Do not allow external tags in internal elements
-        if not newTag.isInDB() and any(element.id > 0 for record in self.model.getRecords(oldTag)
-                                                      for element in record.elementsWithValue):
+        if not newTag.isInDB() and any(element.inDB for record in self.model.getRecords(oldTag)
+                                                    for element in record.elementsWithValue):
             text = self.tr("You must add tagtypes to the database before adding such tags to elements "
                            "within the database.")
             newTag = tagwidgets.AddTagTypeDialog.addTagType(newTag,text)
@@ -634,7 +634,7 @@ class RecordDialog(QtGui.QDialog):
         
         # Do not allow external tags in internal elements
         tagType = self.typeEditor.getTag()
-        if not tagType.isInDB() and any(element.id > 0 for element in self._getSelectedElements()):
+        if not tagType.isInDB() and any(element.inDB for element in self._getSelectedElements()):
             text = self.tr("You must add tagtypes to the database before adding such tags to elements "
                            "within the database.")
             newTag = tagwidgets.AddTagTypeDialog.addTagType(tagType,text)

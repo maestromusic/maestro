@@ -386,7 +386,7 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         def _strFunc(wrapper):
             """This is used as strFunc-argument for Node.wrapperString. It returns external files as
             url-encoded paths because these don't contain the characters ',[]'."""
-            if wrapper.element.id > 0:
+            if wrapper.element.inDB:
                 return str(wrapper.element.id)
             else:
                 # only exception are external files in the playlist
@@ -482,16 +482,19 @@ class PlaylistChangeCommand(wrappertreemodel.ChangeCommand):
         
 
 class PlaylistMoveInBackendCommand(QtGui.QUndoCommand):
-    """This command moves songs in the backend. It does not change the PlaylistModel. It will assume that
-    *wrappers* should be inserted at *position* into *parent*. Based on this a series of moves (i.e. calls
-    of Player.move is computed, that updates the backend accordingly."""
+    """This command moves songs in the backend. It does not change the PlaylistModel but assumes that the 
+    model is changed accordingly using PlaylistInsertCommand and PlaylistRemoveCommands. The advantage of
+    PlaylistMoveInBackendCommand is that it really uses Player.move instead of removing and inserting. Thus,
+    if the current song is moved, playback will not stop.
+    *wrappers* are to be moved into *parent* at *position*.
+    """
     def __init__(self,model,wrappers,parent,position):
         super().__init__()
         self.model = model
         self.moves = []
         insertOffset = parent.offset() + sum(w.fileCount() for w in parent.contents[:position])
         
-        # Compute a series of moves that will move 
+        # Compute a series of moves
         # Since we do not really move files yet, we have to correct positions:
         # - Whenever we move a file before the insert position, the index of all such files decreases by 1.
         #   Note that the insert position remains unchanged.

@@ -56,6 +56,8 @@ class Node:
         be copied and the parents will be set to this node."""
         for node in nodes:
             node.parent = self
+        if self.contents is None:
+            print(self)
         self.contents[index:index] = nodes
     
     def isFile(self):

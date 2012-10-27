@@ -209,7 +209,7 @@ def buildTree(level,wrappers,parent=None,preWrapper=None,postWrapper=None):
     if parent is not None:
         while not isinstance(parent,RootNode):
             if parent.element.id in seqs and seqs.contains(parent.element.id,Sequence(0,len(wrappers)-1)):
-                toplevelIds = parent.element.contents.ids
+                toplevelIds = parent.element.contents
                 break
             parent = parent.parent
         
@@ -249,7 +249,7 @@ def _buildTree(wrappers,seqs,boundingSeq,toplevelIds):
             if wrapper.isContainer():
                 # For containers recursively create the tree below. Bound the tree creation to longestSeq.
                 # Choose only roots which are contents of element.
-                childContents = _buildTree(wrappers,seqs,longestSeq,element.contents.ids)
+                childContents = _buildTree(wrappers,seqs,longestSeq,element.contents)
                 wrapper.setContents(childContents)
                 findPositions(wrapper,wrapper.contents)
         
@@ -276,8 +276,8 @@ def findPositions(parent,wrappers):
         wrapper.position = None
         for i in range(counter[wrapper.element.id]):
             try:
-                wrapper.position = parent.element.contents.getPosition(wrapper.element.id,
-                                                                       start=wrapper.position)
+                wrapper.position = parent.element.contents.positionOf(wrapper.element.id,
+                                                                      start=wrapper.position)
             except ValueError:
                 # The element appears more often in wrappers than in parent.element.contents
                 # Use the last number

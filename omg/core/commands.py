@@ -50,6 +50,10 @@ class CreateDBElementsCommand(QtGui.QUndoCommand):
         self.newInLevel = newInLevel
     
     def redo(self):
+        for element in self.elements:
+            print(element)
+            print(element.tags)
+        assert False
         db.transaction()
         def dataRow(el):
             row = (el.isFile(),
@@ -67,7 +71,7 @@ class CreateDBElementsCommand(QtGui.QUndoCommand):
         else:
             db.write.createElementsWithIds(specs)
         for oldId, newId in self.idMap.items():
-            levels.Level._changeId(oldId, newId)
+            levels.Level._changeId(oldId, newId) #TODO change inDB attribute instead
         addFileData = []
         newFiles = []
         for file in self.elements:
@@ -98,7 +102,7 @@ class CreateDBElementsCommand(QtGui.QUndoCommand):
         if any(elem.isFile() for elem in self.elements):
             levels.real.filesRemoved.emit([elem for elem in self.elements if elem.isFile()])
         for oldId, newId in self.idMap.items():
-            levels.Level._changeId(newId, oldId)
+            levels.Level._changeId(newId, oldId) #TODO change inDB attribute instead
         if self.newInLevel:
             for id in self.idMap:
                 del levels.real.elements[id]

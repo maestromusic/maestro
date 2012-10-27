@@ -52,7 +52,7 @@ class RealLevel(levels.Level):
             else: notFound.append(id)
         if len(notFound) > 0:
             positiveIds = [id for id in notFound if id > 0]
-            urls = [levels.tIdManager(id) for id in notFound if id < 0]
+            urls = [levels.urlFromId(id) for id in notFound if id < 0]
             if len(positiveIds) > 0:
                 self.loadFromDB(positiveIds, child)
             if len(urls) > 0:
@@ -72,11 +72,11 @@ class RealLevel(levels.Level):
                 """.format(db.prefix, idList))
         for (id, file, major, url, length) in result:
             if file:
-                level.elements[id] = elements.File(level, id,
+                level.elements[id] = elements.File(level, id, inDB=True,
                                                    url=filebackends.BackendURL.fromString(url),
                                                    length=length)
             else:
-                level.elements[id] = elements.Container(level, id, major=major)
+                level.elements[id] = elements.Container(level, id, inDB=True, major=major)
                 
         # contents
         result = db.query("""
@@ -151,14 +151,16 @@ class RealLevel(levels.Level):
             fPosition = backendFile.position
             id = db.idFromUrl(url)
             if id is None:
-                id = levels.tIdManager.tIdFromUrl(url)
+                id = levels.idFromUrl(url)
+                inDB = False
                 flags = []
             else:
                 flags = db.flags(id)
                 # TODO: Load private tags!
+                inDB = True
                 logger.warning("loadFromURLs called on '{}', which is in DB. Are you "
                            " sure this is correct?".format(url))
-            elem = elements.File(level, id=id, url=url, length=fLength, tags=fTags, flags=flags)
+            elem = elements.File(level, id=id, inDB=inDB, url=url, length=fLength, tags=fTags, flags=flags)
             if fPosition is not None:
                 elem.filePosition = fPosition            
             level.elements[id] = elem
@@ -168,8 +170,8 @@ class RealLevel(levels.Level):
         database."""
         urlChanges = {}
         for file in files:
-            if file.url != levels.tIdManager(file.id):
-                urlChanges[file] = (levels.tIdManager(file.id), file.url)
+            if file.url != levels.urlFromId(file.id):
+                urlChanges[file] = (urlFromId(file.id), file.url)
         if len(urlChanges) > 0:
             self.renameFiles(urlChanges)
         tagChanges = {}
@@ -190,8 +192,6 @@ class RealLevel(levels.Level):
                                           text=self.tr("change tags"),
                                           errorClass=filebackends.TagWriteError)
             self.stack.push(command)
-            if command.error:
-                raise command.error
             
     # =============================================================
     # Overridden from Level: these methods modify DB and filesystem
@@ -211,6 +211,7 @@ class RealLevel(levels.Level):
         db.transaction()
         id = db.write.createElements([ (False, True, 0, major) ])[0]
         element = super()._createContainer(tags, flags, data, major, contents, id)
+        element.inDB = True
         self._elementToDBHelper(element)
         db.commit()
         return element
@@ -287,10 +288,10 @@ class RealLevel(levels.Level):
                           .format(db.prefix),dbAdditions)
         files = [ (elem.id, ) for elem in changes if elem.isFile() ]
         if len(files) > 0:
-            db.multiQuery("UPDATE {}files SET verified=CURRENT_TIMESTAMP WHERE element_id=?".format(db.prefix),
-                          files)
+            db.multiQuery("UPDATE {}files SET verified=CURRENT_TIMESTAMP WHERE element_id=?"
+                          .format(db.prefix),files)
         db.commit()
-        super()._changeTags(changes, emitEvent)
+        super()._applyDiffs(changes, emitEvent)
         
     def _changeFlags(self, changes, emitEvent=True):
         db.transaction()
@@ -303,10 +304,10 @@ class RealLevel(levels.Level):
             db.multiQuery("INSERT INTO {}flags (element_id,flag_id) VALUES(?,?)".format(db.prefix),
                           dbAdditions)
         db.commit()
-        super()._changeFlags(changes, emitEvent)
+        super()._applyDiffs(changes, emitEvent)
             
     def _changeData(self, changes, emitEvent):
-        super()._changeData(changes, emitEvent)
+        super()._applyDiffs(changes, emitEvent)
         db.transaction()
         for element, diff in changes.items():
             for type, (a, b) in diff.diffs.items():
@@ -315,7 +316,8 @@ class RealLevel(levels.Level):
                              .format(db.prefix), type, element.id)
                 if b is not None:
                     db.multiQuery("INSERT INTO {}data (element_id, type, sort, data) VALUES (?,?,?,?)"
-                                  .format(db.prefix), [(element.id, type, i, val) for i, val in enumerate(b)])
+                                  .format(db.prefix),
+                                  [(element.id, type, i, val) for i, val in enumerate(b)])
         db.commit()
                 
     def _setData(self, type, elementToData):

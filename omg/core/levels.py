@@ -25,12 +25,15 @@ from . import data, elements, tags, flags
 from .nodes import Wrapper
 from .. import application, filebackends, database as db, logging
 
-
-allLevels = weakref.WeakSet()
-real = None
-editor = None
 translate = QtCore.QCoreApplication.translate
 logger = logging.getLogger(__name__)
+
+
+allLevels = weakref.WeakSet() # List of all levels
+
+# The two special levels
+real = None
+editor = None
 
 
 def init():
@@ -40,6 +43,7 @@ def init():
     editor = Level("EDITOR", parent=real)
     
 
+#TODO is not used currently
 class ElementGetError(RuntimeError):
     """Error indicating that an element failed to be loaded by some level."""
     pass
@@ -65,6 +69,7 @@ class RenameFilesError(RuntimeError):
 class ConsistencyError(RuntimeError):
     """Error signaling a consistency violation of element data."""
     pass
+
 
 class ElementChangedEvent(application.ChangeEvent):
     #TODO comment
@@ -97,34 +102,18 @@ class ElementChangedEvent(application.ChangeEvent):
 
 
 class GenericLevelCommand(QtGui.QUndoCommand):
-    
-    def __init__(self,
-                 redoMethod, redoArgs,
-                 undoMethod, undoArgs,
-                 text=None, errorClass=None):
+    #TODO comment
+    def __init__(self, redoMethod, redoArgs, undoMethod, undoArgs, text=None):
         super().__init__()
         if text is not None:
             self.setText(text)
         self.redoMethod, self.redoArgs = redoMethod, redoArgs
         self.undoMethod, self.undoArgs = undoMethod, undoArgs
-        self.errorClass = errorClass
-        if errorClass is not None:
-            self.error = None
             
     def redo(self):
-        if self.errorClass is not None:
-            if self.error is not None:
-                return
-            try:
-                self.redoMethod(**self.redoArgs)
-            except self.errorClass as e:
-                self.error = e
-        else:
-            self.redoMethod(**self.redoArgs)
+        self.redoMethod(**self.redoArgs)
             
     def undo(self):
-        if self.errorClass is not None and self.error is not None:
-            return
         self.undoMethod(**self.undoArgs)
         
 
@@ -141,13 +130,16 @@ class Level(application.ChangeEventDispatcher):
     A level offers undo-aware methods to alter elements as well as content relations. The according
     bare methods not handling undo/redo are marked by a leading underscore.
     If elements change in a level, its signal *changed* is emitted.
+    
+    Constructor arguments:
+    
+        - *name*: each level has a name for debugging purposes,
+        - *parent*: the parent level,
+        - *stack*: the undostack which will be used by methods of this level (e.g. changeTags).
+          Only levels which are only used in a modal dialog may use their own stack.
+          
     """ 
-
     def __init__(self, name, parent, stack=None):
-        """Create a level named *name* with parent *parent* and an optional undo stack.
-        
-        If no undo stack is given, the main application.stack will be used.
-        """
         super().__init__()
         allLevels.add(self)
         self.name = name
@@ -159,41 +151,15 @@ class Level(application.ChangeEventDispatcher):
         """Simple shortcut to emit an event."""
         self.emit(ElementChangedEvent(dataIds,contentIds))
     
-    @staticmethod  
-    def _changeId(old, new):
-        """Change the id of some element from *old* to *new* in ALL levels.
-        
-        This should only be called from within appropriate UndoCommands, and only if "old in self"
-        is True. Takes care of contents and parents, too.
-        """
-        for level in allLevels:
-            if old not in level:
-                continue
-            elem = level.elements[old]
-            del level.elements[old]
-            elem.id = new
-            level.elements[new] = elem
-            for parentID in elem.parents:
-                parentContents = level.elements[parentID].contents
-                parentContents.ids[:] = [ new if id == old else id for id in parentContents.ids ]
-            if elem.isContainer():
-                for childID in elem.contents.ids:
-                    if childID in level.elements:
-                        level.elements[childID].parents = [ new if id == old else old
-                                                          for id in level.elements[childID].parents ]
-        if old in tIdManager.tIdToUrl:
-            url = tIdManager.tIdToUrl[new] = tIdManager.tIdToUrl[old]
-            del tIdManager.tIdToUrl[old]
-            tIdManager.urlToTId[url] = new
-    
     def get(self, param):
         """Return the element determined by *param*. Load it if necessary.
         
-        *param* may be either the id or, in case of files, the path.
+        *param* may be either the id or, in case of files, the url.
         """
         if not isinstance(param, int):
             if not isinstance(param, filebackends.BackendURL):
-                print('what is this? {}'.format(param))
+                raise ValueError("param must be either ID or URL, not {} of type {}"
+                                    .format(param,type(param)))
             param = idFromUrl(param)
         if param not in self.elements:
             self.parent.loadIntoChild([param],self)
@@ -205,7 +171,8 @@ class Level(application.ChangeEventDispatcher):
         for id in ids:
             if id not in self.elements:
                 notFound.append(id)
-        self.parent.loadIntoChild(notFound, self)
+        if len(notFound) > 0:
+            self.parent.loadIntoChild(notFound, self)
         return [self.elements[id] for id in ids]
                 
     def getFromUrls(self, urls):
@@ -217,7 +184,7 @@ class Level(application.ChangeEventDispatcher):
         """Load all elements given by the list of ids *ids* into the level *child*.
         
         This method does not check whether elements are already loaded in the child. Note that
-        elements are *not* loaded into the *self* level if they were not contained there before.
+        elements are *not* loaded into the *self* level.
         """
         notFound = []
         for id in ids:
@@ -225,21 +192,25 @@ class Level(application.ChangeEventDispatcher):
                 child.elements[id] = self.elements[id].copy()
                 child.elements[id].level = child
             else: notFound.append(id)
-        self.parent.loadIntoChild(notFound, self)
+        if len(notFound) > 0:
+            self.parent.loadIntoChild(notFound, self)
         
-    def __contains__(self, arg):
+    def __contains__(self, param):
         """Returns if the given element is loaded in this level.
         
-        *arg* may be either an ID or a path. Note that if the element could be loaded from the
+        *param* may be either an ID or a URL. Note that if the element could be loaded from the
         parent but is not contained in this level, then *False* is returned.
         """
         if not isinstance(arg, int):
+            if not isinstance(param, filebackends.BackendURL):
+                raise ValueError("param must be either ID or URL, not {} of type {}"
+                                    .format(param,type(param)))
             try:
-                arg = idFromUrl(arg, create=False)
+                param = idFromUrl(param, create=False)
             except KeyError:
                 #  no id for that path -> element can not be contained
                 return False
-        return (arg in self.elements)
+        return (param in self.elements)
     
     def children(self, spec):
         """Returns a set of (recursively) all children of one or more elements.
@@ -250,6 +221,7 @@ class Level(application.ChangeEventDispatcher):
             spec = list(spec)
             if len(spec) == 0:
                 return set()
+            #TODO: Why numbers.Integral?
             if isinstance(spec[0], numbers.Integral):
                 spec = [self.get(id) for id in spec]
             return set.union(*(self.children(element) for element in spec))
@@ -259,7 +231,7 @@ class Level(application.ChangeEventDispatcher):
             return set( (spec, ) )
         else:
             return set.union(set( (spec, ) ),
-                             *(self.children(childId) for childId in spec.contents.ids))
+                             *(self.children(childId) for childId in spec.contents))
     
     def files(self):
         """Return a generator of all files in this level."""
@@ -270,67 +242,16 @@ class Level(application.ChangeEventDispatcher):
         named *name*.
         """
         level = Level(name, self)
+        #TODO: Why load all children, too? Storing the ids in element.contents makes it possible to refer
+        # to children which are not loaded
         level.getFromIds([elem.id for elem in self.children(elements)])
         return level
-    
-    def createWrappers(self, wrapperString, createFunc=None):
-        """Create a wrapper tree containing elements of this level and return its root node.
-        
-        *wrapperString* must be a string like   "X[A[A1,A2],B[B1,B2]],Z"
-        where the identifiers must be names of existing elements of this level. This method does not check
-        whether the given structure is valid.
-        
-        Often it is necessary to have references to some of the wrappers in the tree. For this reason
-        this method accepts names of wrappers as optional arguments. It will then return a tuple consisting
-        of the usual result (as above) and the wrappers with the given names (do not use this if there is
-        more than one wrapper with the same name).
-        """  
-        roots = []
-        currentWrapper = None
-        currentList = roots
-        
-        def _getTokens(s):
-            """Helper: Yield each token of *s*."""
-            # s should be a string like "A,B[B1,B2],C[C1[C11,C12],C2],D"
-            last = 0
-            i = 0
-            while i < len(s):
-                if s[i] in (',','[',']'):
-                    if last != i:
-                        yield s[last:i]
-                    last = i+1
-                    yield s[i]
-                i += 1
-            if last != i:
-                yield s[last:i]
-
-        for token in _getTokens(wrapperString):
-            if token == ',':
-                continue
-            if token == '[':
-                currentWrapper = currentList[-1]
-                currentList = currentWrapper.contents
-            elif token == ']':
-                currentWrapper = currentWrapper.parent
-                if currentWrapper is None:
-                    currentList = roots
-                else: currentList = currentWrapper.contents
-            else:
-                if createFunc is None:
-                    element = self.get(int(token))
-                    wrapper = Wrapper(element)
-                    if currentWrapper is not None:
-                        assert currentWrapper.element.id in wrapper.element.parents
-                        wrapper.parent = currentWrapper
-                else: wrapper = createFunc(currentWrapper,token)
-                currentList.append(wrapper)
-        return roots
 
     # ===========================================================================
     # The following functions provide undo-aware implementations of level changes
     # ===========================================================================
     
-    def createContainer(self, tags, flags=None, data=None, major=True, contents=None):
+    def createContainer(self, tags=None, flags=None, data=None, major=True, contents=None):
         """Create a new container with the given properties and load it into this level.
         
         Can be undone. Returns the new container.
@@ -339,27 +260,57 @@ class Level(application.ChangeEventDispatcher):
         command = commands.CreateContainerCommand(self, tags, flags, data, major, contents)
         self.stack.push(command)
         return command.container
-    
-    def shiftPositions(self, parent, positions, shift):
-        """Undoably shift the positions of several children of a parent by the same amount.
         
-        If this can not be done without conflicts, a ConsistencyError is raised.
+    def changeTags(self, changes):
+        """Change tags of elements. *changes* maps elements to tags.TagDifference objects.
+        On real level this method might raise a TagWriteError if writing (some or all) tags to the
+        filesystem fails.
         """
-        untouched = set(parent.contents.positions) - set(positions)
-        changes = {pos:pos+shift for pos in positions}
-        if any(i <= 0 for i in changes.values()):
-            raise ConsistencyError('Positions may not drop below one')
-        if any(pos in untouched for pos in changes.values()):
-            raise ConsistencyError('Position conflict: cannot perform change')
-        command = GenericLevelCommand(redoMethod=self._changePositions,
-                                      redoArgs={"parent" : parent,
-                                                "changes" : changes,
-                                                "emitEvent" : True},
-                                      undoMethod=self._changePositions,
-                                      undoArgs={"parent" : parent,
-                                                "changes" : {b:a for a,b in changes.items()},
-                                                "emitEvent" : True},
-                                      text=self.tr("change positions"))
+        self._changeSomething(changes,self.tr("change tags"))
+        
+    def changeFlags(self, changes):
+        """Change flags of elements. *changes* maps elements to flags.FlagDifference objects."""
+        self._changeSomething(changes,self.tr("change flags"))
+    
+    def changeData(self, changes):
+        """Change flags of elements. *changes* maps elements to data.DataDifference objects."""
+        self._changeSomething(changes,self.tr("change data"))
+    
+    def _changeSomething(self,changes,text):
+        """Helper for changeTags, changeFlags and similar methods which only need to undoably call
+        _applyDiffs. *text* is used as text for the created undocommand."""
+        inverseChanges = {elem:diff.inverse() for elem,diff in changes.items()}
+        command = GenericLevelCommand(redoMethod=self._applyDiffs,
+                                      redoArgs={"changes" : changes},
+                                      undoMethod=self._applyDiffs,
+                                      undoArgs={"changes": inverseChanges},
+                                      text=text,
+                                      errorClass=filebackends.TagWriteError)
+        self.stack.push(command)
+        
+    def setCovers(self, coverDict):
+        """Set the covers for one or more elements.
+        
+        The action can be undone. *coverDict* must be a dict mapping elements to either
+        a cover path or a QPixmap or None.
+        """
+        from . import covers
+        self.stack.push(covers.CoverUndoCommand(self, coverDict))
+    
+    def setMajorFlags(self, elemToMajor, emitEvent=True):
+        """Set the major flags of one or more containers.
+        
+        The action can be undone. *elemToMajor* maps elements to boolean values indicating the
+        desired major state.
+        """
+        reversed = {elem:(not major) for (elem, major) in elemToMajor.items()}
+        command = GenericLevelCommand(redoMethod=self._setMajorFlags,
+                                      redoArgs={"elemToMajor" : elemToMajor,
+                                                "emitEvent" : emitEvent},
+                                      undoMethod=self._setMajorFlags,
+                                      undoArgs={"elemToMajor" : reversed,
+                                                "emitEvent" : emitEvent},
+                                      text=self.tr("change major property"))
         self.stack.push(command)
     
     def insertContents(self, parent, insertions):
@@ -385,7 +336,7 @@ class Level(application.ChangeEventDispatcher):
         (not position) is given by *index*; the position is automatically determined, and
         subsequent elements' positions are shifted if necessary.
         """
-        self.stack.beginMacro(self.tr("insert"))
+        self.stack.beginMacro(self.tr("insert contents"))
         firstPos = 1 if index == 0 else parent.contents.positions[index-1] + 1
         if len(parent.contents) > index:
             #  need to alter positions of subsequent elements
@@ -398,8 +349,7 @@ class Level(application.ChangeEventDispatcher):
     
     def removeContents(self, parent, positions):
         """Undoably remove children with *positions* from *parent*."""
-        undoInsertions = [(pos, self.get(parent.contents.getId(pos)))
-                          for pos in positions]
+        undoInsertions = [(pos, self.get(parent.contents.at(pos))) for pos in positions]
         command = GenericLevelCommand(redoMethod=self._removeContents,
                                       redoArgs={"parent" : parent,
                                                 "positions" : positions,
@@ -434,11 +384,35 @@ class Level(application.ChangeEventDispatcher):
                     shift = -i
                 else:
                     break
-        self.stack.beginMacro(self.tr("remove"))
-        self.removeContents(parent, positions)
+        self.stack.beginMacro(self.tr("remove contents"))
+        self.removeContents(parent, positions) 
+        #TODO: when the positions are not connected, using several different shifts might be more
+        # appropriate
         if shiftPositions is not None:
             self.shiftPositions(parent, shiftPositions, shift)
         self.stack.endMacro()
+    
+    def shiftPositions(self, parent, positions, shift):
+        """Undoably shift the positions of several children of a parent by the same amount.
+        
+        If this can not be done without conflicts, a ConsistencyError is raised.
+        """
+        untouched = set(parent.contents.positions) - set(positions)
+        changes = {pos:pos+shift for pos in positions}
+        if any(i <= 0 for i in changes.values()):
+            raise ConsistencyError('Positions may not drop below one')
+        if any(pos in untouched for pos in changes.values()):
+            raise ConsistencyError('Position conflict: cannot perform change')
+        command = GenericLevelCommand(redoMethod=self._changePositions,
+                                      redoArgs={"parent" : parent,
+                                                "changes" : changes,
+                                                "emitEvent" : True},
+                                      undoMethod=self._changePositions,
+                                      undoArgs={"parent" : parent,
+                                                "changes" : {b:a for a,b in changes.items()},
+                                                "emitEvent" : True},
+                                      text=self.tr("change positions"))
+        self.stack.push(command)
     
     def renameFiles(self, renamings):
         """Rename several files. *renamings* maps element to (oldUrl, newUrl) paths.
@@ -454,74 +428,9 @@ class Level(application.ChangeEventDispatcher):
                                       text=self.tr("rename files"),
                                       errorClass=RenameFilesError)
         self.stack.push(command)
-        if command.error:
-            raise command.error
-        
-    def changeTags(self, changes):
-        """Change tags of elements. *changes* maps elements to tags.TagDifference objects.
-        On real level this method might raise a TagWriteError if writing (some or all) tags to the
-        filesystem fails.
-        """
-        inverseChanges = {elem:diff.inverse() for elem,diff in changes.items()}
-        command = GenericLevelCommand(redoMethod=self._changeTags,
-                                      redoArgs={"changes" : changes},
-                                      undoMethod=self._changeTags,
-                                      undoArgs={"changes": inverseChanges},
-                                      text=self.tr("change tags"),
-                                      errorClass=filebackends.TagWriteError)
-        self.stack.push(command)
-        if command.error:
-            raise command.error
-        
-    def changeFlags(self, changes):
-        """Change flags of elements. *changes* maps elements to flags.FlagDifference objects."""
-        reversed = {elem:diff.inverse() for elem, diff in changes.items()}
-        command = GenericLevelCommand(redoMethod=self._changeFlags,
-                                      redoArgs={"changes" : changes,
-                                                "emitEvent" : True},
-                                      undoMethod=self._changeFlags,
-                                      undoArgs={"changes" : reversed,
-                                                "emitEvent" : True},
-                                      text=self.tr("change flags"))
-        self.stack.push(command)
-    
-    def changeData(self, changes):
-        reversed = {elem:diff.inverse() for elem, diff in changes.items()}
-        command = GenericLevelCommand(redoMethod=self._changeData,
-                                      redoArgs={"changes" : changes,
-                                                "emitEvent" : True},
-                                      undoMethod=self._changeData,
-                                      undoArgs={"changes" : reversed,
-                                                "emitEvent" : True},
-                                      text=self.tr("set major flags"))
-        self.stack.push(command)
-        
-    def setCovers(self, coverDict):
-        """Set the covers for one or more elements.
-        
-        The action can be undone. *coverDict* must be a dict mapping elements to either
-        a cover path or a QPixmap or None.
-        """
-        from . import covers
-        self.stack.push(covers.CoverUndoCommand(self, coverDict))
-    
-    def setMajorFlags(self, elemToMajor, emitEvent=True):
-        """Set the major flags of one or more containers.
-        
-        The action can be undone. *elemToMajor* maps elements to boolean values indicating the
-        desired major state.
-        """
-        reversed = {elem:(not major) for (elem, major) in elemToMajor.items()}
-        command = GenericLevelCommand(redoMethod=self._setMajorFlags,
-                                      redoArgs={"elemToMajor" : elemToMajor,
-                                                "emitEvent" : emitEvent},
-                                      undoMethod=self._setMajorFlags,
-                                      undoArgs={"elemToMajor" : reversed,
-                                                "emitEvent" : emitEvent})
-        self.stack.push(command)
     
     def commit(self, elements=None):
-        """Undoably commit given *ids* (or everything, if not specified) into the parent level.
+        """Undoably commit given *elements* (or everything, if not specified) into the parent level.
         """
         from . import commands
         self.stack.beginMacro('commit')
@@ -552,7 +461,7 @@ class Level(application.ChangeEventDispatcher):
                 raise e
         else:
             newElements = [elem for elem in elements if elem.id not in self.parent.elements ]
-            oldElements = [elem for elem in elements if elem not in newElements]
+            oldElements = [elem for elem in elements if elem.id in self.parent.elements ]
             self.parent.copyElements(newElements)
         tagChanges = {}
         for oldEl in oldElements:
@@ -579,27 +488,10 @@ class Level(application.ChangeEventDispatcher):
         """Copy and load *elements* into self. Supports undo/redo."""
         from . import commands
         self.stack.push(commands.CopyElementsCommand(self, elements))
-         
-    def reload(self, id):
-        """Reload the file with *id* from the parent level and return the new version.
-        
-        This will (by means of an undo command) detach the file from all potential parents;
-        afterwards it is reloaded from the parent level (or filesystem, if it is not found
-        there).
-        """
-        assert id in self.elements
-        assert self.get(id).isFile()
-        self.stack.beginMacro(self.tr('reload'))
-        for parentId in self.elements[id].parents:
-            parent = self.get(parentId)
-            self.removeContents(parent, parent.contents.getPositions(id))
-        self.stack.endMacro()
-        del self.elements[id]
-        return self.get(id)
 
     def deleteElements(self, elements):
         elements = list(elements)
-        self.stack.beginMacro("delete")
+        self.stack.beginMacro("delete elements")
         # 1st step: isolate the elements (remove contents & parents)
         for element in elements:
             if element.isContainer() and len(element.contents) > 0:
@@ -607,65 +499,43 @@ class Level(application.ChangeEventDispatcher):
             if len(element.parents) > 0:
                 for parentId in element.parents:
                     parent = self.get(parentId)
-                    self.removeContents(parent, parent.contents.getPositions(id=element.id))
+                    self.removeContents(parent, parent.contents.positionsOf(id=element.id))
         command = GenericLevelCommand(redoMethod=self._removeElements,
                                       redoArgs={"elements" : elements},
                                       undoMethod=self._addElements,
                                       undoArgs={"elements" : elements})
         self.stack.push(command)
         self.stack.endMacro()
-                
+    
     # ====================================================================================
     # The following functions implement no undo/redo handling and should be used with care
     # ====================================================================================
     
     def _createContainer(self, tags, flags, data, major, contents, id=None):
         if id is None:
-            id = tIdManager.createTId()
-        container = elements.Container(self, id, major, tags=tags, flags=flags,
-                                       data=data, contents=contents)
+            id = db.nextId()
+        container = elements.Container(self, id,
+                                       inDB=False, # inDB is corrected in reallevel's reimplementation
+                                       major=major,
+                                       tags=tags,
+                                       flags=flags,
+                                       data=data,
+                                       contents=contents)
         self.elements[id] = container
         if contents is not None:
-            for childId in contents.ids:
+            for childId in contents:
                 self.get(childId).parents.append(id)
+            self.emitEvent(dataIds=contents)
         return container
     
-    def _addElements(self, elements):
-        for element in elements:
-            assert element.level is self
-            self.elements[element.id] = element
-            if element.isContainer():
-                for childId in element.contents.ids:
-                    self.get(childId).parents.append(element.id)
-    
-    def _removeElements(self, elements):
-        """Remove the given element from this level.
+    def _applyDiffs(self, changes, emitEvent=True):
+        """Given the dict *changes* mapping elements to Difference objects (e.g. tags.TagDifference, apply
+        these differences to the elements. Do not emit an ElementChangedEvent if *emitEvent* is False.
         """
-        for element in elements:
-            del self.elements[element.id]
-            if element.isContainer():
-                for childId in element.contents.ids:
-                    self.get(childId).parents.remove(element.id)
-    
-    def _changeTags(self, changes, emitEvent=True):
-        """Like changeTags, but not undoable."""
         for element, diff in changes.items():
             diff.apply(element)
         if emitEvent:
             self.emitEvent([element.id for element in changes])
-    
-    def _changeFlags(self, changes, emitEvent=True):
-        """Like changeFlags, but not undoable."""
-        for element, diff in changes.items():
-            diff.apply(element)
-        if emitEvent:
-            self.emitEvent([element.id for element in changes])
-            
-    def _changeData(self, changes, emitEvent=True):
-        for element, diff in changes.items():
-            diff.apply(element.data)
-        if emitEvent:
-            self.emitEvent([elem.id for elem in changes])
 
     def _setData(self,type,elementToData):
         for element,data in elementToData.items():
@@ -684,6 +554,23 @@ class Level(application.ChangeEventDispatcher):
         if emitEvent:
             self.emitEvent([elem.id for elem in elemToMajor])
     
+    def _addElements(self, elements):
+        for element in elements:
+            assert element.level is self
+            self.elements[element.id] = element
+            if element.isContainer():
+                for childId in element.contents:
+                    self.get(childId).parents.append(element.id)
+    
+    def _removeElements(self, elements):
+        """Remove the given element from this level.
+        """
+        for element in elements:
+            del self.elements[element.id]
+            if element.isContainer():
+                for childId in element.contents:
+                    self.get(childId).parents.remove(element.id)
+    
     def _importElements(self, elements):
         """Create the elements *elements* from a different level into this one."""
         for elem in elements:
@@ -691,28 +578,32 @@ class Level(application.ChangeEventDispatcher):
             elem.level = self
 
     def _insertContents(self, parent, insertions, emitEvent=True):
-        """Insert some elements under *parent*.
-        
-        The insertions are given by an iterable of (position, element) tuples.
+        """Insert some elements under *parent*. The insertions must be given as an iterable of
+        (position, element) tuples.
         """
+        dataIds = []
         for pos, element in insertions:
             parent.contents.insert(pos, element.id)
             if parent.id not in element.parents:
                 element.parents.append(parent.id)
+                dataIds.append(element.id)
         if emitEvent:
-            self.emitEvent(contentIds=(parent.id, ))
+            self.emitEvent(dataIds=dataIds, contentIds=(parent.id, ))
 
     def _removeContents(self, parent, positions, emitEvent=True):
         """Remove the children at given *positions* under parent.
         """
-        childIds = [parent.contents.getId(position) for position in positions]
-        for pos in positions[:]:
+        positions = list(positions) # copy because the list will change
+        childIds = [parent.contents.at(position) for position in positions]
+        dataIds = []
+        for pos in positions:
             parent.contents.remove(pos=pos)
         for id in childIds:
-            if id not in parent.contents.ids:
+            if id not in parent.contents:
                 self.get(id).parents.remove(parent.id)
+                dataIds.append(id)
         if emitEvent:
-            self.emitEvent(contentIds=(parent.id, ))
+            self.emitEvent(dataIds=dataIds, contentIds=(parent.id, ))
 
     def _renameFiles(self, renamings, emitEvent=True):
         """Rename files based on *renamings*, a dict from elements to (oldUrl, newUrl) pairs.
@@ -730,66 +621,114 @@ class Level(application.ChangeEventDispatcher):
         if emitEvent:
             self.emitEvent(contentIds=(parent.id, ))
     
+    # ====================================================================================
+    # Special stuff
+    # ====================================================================================
+         
+    def reload(self, id):
+        """Reload the file with *id* from the parent level and return the new version.
+        
+        This will (by means of an undo command) detach the file from all potential parents;
+        afterwards it is reloaded from the parent level (or filesystem, if it is not found
+        there).
+        """
+        assert id in self.elements
+        assert self.get(id).isFile()
+        self.stack.beginMacro(self.tr('reload'))
+        for parentId in self.elements[id].parents:
+            parent = self.get(parentId)
+            self.removeContents(parent, parent.contents.positionsOf(id))
+        self.stack.endMacro()
+        del self.elements[id]
+        return self.get(id)
+            
+    def createWrappers(self, wrapperString, createFunc=None):
+        """Create a wrapper tree containing elements of this level and return its root node.
+        
+        *wrapperString* must be a string like   "X[A[A1,A2],B[B1,B2]],Z"
+        where the identifiers must be names of existing elements of this level. This method does not check
+        whether the given structure is valid.
+        
+        If *createFunc* is not None, it will be used to create wrappers (instead of the constructor of
+        Wrapper). It must take the parent wrapper and the name as arguments and return a Wrapper instance.
+        """  
+        roots = []
+        currentWrapper = None
+        currentList = roots
+        
+        def _getTokens(s):
+            """Helper: Yield each token of *s*."""
+            # s should be a string like "A,B[B1,B2],C[C1[C11,C12],C2],D"
+            last = 0
+            i = 0
+            while i < len(s):
+                if s[i] in (',','[',']'):
+                    if last != i:
+                        yield s[last:i]
+                    last = i+1
+                    yield s[i]
+                i += 1
+            if last != i:
+                yield s[last:i]
+                
+        #TODO check consistency
+        for token in _getTokens(wrapperString):
+            if token == ',':
+                continue
+            if token == '[':
+                currentWrapper = currentList[-1]
+                currentList = currentWrapper.contents
+            elif token == ']':
+                currentWrapper = currentWrapper.parent
+                if currentWrapper is None:
+                    currentList = roots
+                else: currentList = currentWrapper.contents
+            else:
+                if createFunc is None:
+                    element = self.get(int(token))
+                    wrapper = Wrapper(element)
+                    if currentWrapper is not None:
+                        assert currentWrapper.element.id in wrapper.element.parents
+                        wrapper.parent = currentWrapper
+                else: wrapper = createFunc(currentWrapper,token)
+                currentList.append(wrapper)
+        return roots
+    
     def __str__(self):
         return 'Level({})'.format(self.name)
 
+
+_idToUrl = {}
+_urlToId = {}
 
 def idFromUrl(url, create=True):
     """Return the id for the given url.
     
     For elements in the database this is a positive number. Otherwise if the url is known
-    under a temporary id, that one is returned. If not and *create* is True, a new temporary
-    id is created and returned. Otherwise a KeyError is raised.
+    under a temporary id, that one is returned. If not and *create* is True, a new id is reserved for this
+    url and returned. Otherwise a KeyError is raised.
     """
-    
-    id = db.idFromUrl(url)
-    if id is not None:
+    if url in _urlToId:
+        return _urlToId[url]
+    else:
+        id = db.idFromUrl(url)
+        if id is None:
+            if create:
+                id = db.nextId()
+            else: raise KeyError("There is no id for url '{}'".format(url))
+        _urlToId[url] = id
+        _idToUrl[id] = url
         return id
-    else: return tIdManager.tIdFromUrl(url, create)
 
 
 def urlFromId(id):
-    if id < 0:
-        return tIdManager(id)
+    if id in _idToUrl:
+        return _idToUrl[id]
     else:
-        return filebackends.BackendURL.fromString(db.url(id))
-
-class TIDManager:
-    """Manages temporary IDs and related URLs.
-    
-    Acts as a bidirectional map tId<->URL where the URL of a file always refers to the REAL level.
-    """
-    
-    def __init__(self):
-        self.tIdToUrl = {}
-        self.urlToTId = {}
-        self.currentTId = 0
+        url = db.url(id)
+        if url is None:
+            raise KeyError("There is not url for id {}".format(id))
+        url = filebackends.BackendURL.fromString(db.url(id))
+        _idToUrl[id] = url
+        _urlToId[url] = id
         
-    def __call__(self, key):
-        if isinstance(key, filebackends.BackendURL):
-            return self.urlToTId[key]
-        return self.tIdToUrl[key]
-    
-    def tIdFromUrl(self, url, create=True):
-        """Return the temporary id for *url*, if it exists.
-        
-        If it does not exist and *create* is True, a new one is inserted and returned.
-        Otherwise, a KeyError is raised.
-        """
-        try:
-            return self.urlToTId[url]
-        except KeyError as e:
-            if create:
-                newId = self.createTId()
-                self.urlToTId[url] = newId
-                self.tIdToUrl[newId] = url
-                return newId
-            else:
-                raise e
-            
-    def createTId(self):
-        """Create a temporary ID without relating a URL to it. Use for temporary containers."""
-        self.currentTId -= 1
-        return self.currentTId         
-
-tIdManager = TIDManager()

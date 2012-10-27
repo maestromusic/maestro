@@ -24,16 +24,11 @@ translate = QtCore.QCoreApplication.translate
 from . import tags as tagsModule
 from .. import config, filebackends
 
+
 class Element:
     """Abstract base class for elements (files or containers)."""   
     def __init__(self):
         raise RuntimeError("Cannot instantiate abstract base class Element.")
-
-    def isInDB(self):
-        """Return whether this element is contained in the database (as opposed to e.g. external files in
-        the playlist or newly created containers in the editor).
-        """
-        return self.id > 0
     
     def isFile(self):
         """Return whether this element is a file."""
@@ -56,7 +51,7 @@ class Element:
         if tagsModule.TITLE in self.tags:
             result += " - ".join(self.tags[tagsModule.TITLE])
         elif usePath and self.isFile():
-            result += self.url
+            result += str(self.url)
         else: result += translate("Element","<No title>")
 
         return result
@@ -66,7 +61,7 @@ class Element:
         if self.isFile():
             yield self
         else:
-            for id in self.contents.ids:
+            for id in self.contents:
                 for file in self.level.get(id).getAllFiles():
                     yield file
     
@@ -109,14 +104,17 @@ class Element:
         else:
             return self.level.parent.get(self.id)
 
+
 class Container(Element):
     """Element-subclass for containers. You must specify the level and id and whether this Container is
     major. Keyword-arguments that are not specified will be set to empty lists/tag.Storage instances.
     Note that *contents* must be a ContentList.
     """
-    def __init__(self, level, id, major,*, contents=None, parents=None, tags=None, flags=None, data=None):
+    def __init__(self, level, id, inDB, major,
+                 *, contents=None, parents=None, tags=None, flags=None, data=None):
         self.level = level
         self.id = id
+        self.inDB = inDB
         self.level = level
         self.major = major
         
@@ -145,6 +143,7 @@ class Container(Element):
         """
         return Container(level = self.level,
                          id = self.id,
+                         inDB = self.inDB,
                          major = self.major,
                          contents = self.contents.copy(),
                          parents = self.parents[:],
@@ -172,12 +171,14 @@ class File(Element):
     """Element-subclass for files. You must specify the level, id, url and length in seconds of the file.
     Keyword-arguments that are not specified will be set to empty lists/tag.Storage instances.
     """
-    def __init__(self, level, id, url, length,*, parents=None, tags=None, flags=None, data=None):
+    def __init__(self, level, id, inDB, url, length,
+                 *, parents=None, tags=None, flags=None, data=None):
         if not isinstance(id,int) or not isinstance(url, filebackends.BackendURL) or not isinstance(length,int):
             raise TypeError("Invalid type (id,url,length): ({},{},{}) of types ({},{},{})"
                             .format(id,url,length,type(id),type(url),type(length)))
         self.level = level
         self.id = id
+        self.inDB = inDB
         self.level = level
         self.url = url
         self.length = length
@@ -198,6 +199,7 @@ class File(Element):
     def copy(self):
         ret = File(level=self.level,
                     id=self.id,
+                    inDB = self.inDB,
                     url=self.url,
                     length=self.length,
                     parents=self.parents[:],
@@ -220,22 +222,21 @@ class File(Element):
         
     def __repr__(self):
         return "<File[{}] {}>".format(self.id, self.url)
-
-
+         
+         
 class ContentList:
     """List that stores a list of ids together with positions (which must be increasing and unique but not
-    necessarily the indexes of the corresponding ids). On item access the list will return tuples containing
-    the id and the position.
+    necessarily the indexes of the corresponding ids). A ContentList can be used like a usual list, except
+    that when writing elements via item access is not possible (use append/insert instead).
     """
     def __init__(self):
         self.positions = []
         self.ids = []
     
-    @staticmethod
-    def fromPairs(arg):
-        """Creates a ContentList from a generator of (position, id) or (position, element) pairs.
-        """
-        positions, ids = (list(zp) for zp in zip(*sorted(arg)))
+    @classmethod
+    def fromPairs(cls,pairs):
+        """Creates a ContentList from a generator of (position, id) or (position, element) pairs."""
+        positions, ids = (list(zp) for zp in zip(*sorted(pairs)))
         ids = [element.id if isinstance(element, Element) else element for element in ids ]
         ret = ContentList()
         ret.positions = positions
@@ -248,6 +249,41 @@ class ContentList:
         result.ids = self.ids[:]
         result.positions = self.positions[:]
         return result
+        
+    def __len__(self):
+        return len(self.ids)
+    
+    def __contains__(self,id):
+        return id in self.ids
+    
+    def __iter__(self):
+        return self.ids.__iter__()
+        
+    def items(self):
+        """Return a generator yielding tuples (position,id) for all ids in the list."""
+        return zip(self.positions, self.ids)
+    
+    def at(self,position):
+        """Return the id at position *position*."""
+        try:
+            return self.ids[self.positions.index(position)]
+        except IndexError:
+            raise ValueError("In this list there is no element with position {}".format(position))
+    
+    def positionOf(self,id,start=None):
+        """Return the (first) position corresponding to *id*. Raise a ValueError, if *id* is not contained
+        in this list. If *start* is given consider only contents with *position* strictly greater than
+        *start*.
+        """
+        if start is None:
+            return self.positions[self.ids.index(id)]
+        else:
+            index = bisect.bisect(self.positions, start)
+            return self.positions[self.ids[index:].index(id)+index]
+    
+    def positionsOf(self, id):
+        """Return a list of all positions in which *id* appears."""
+        return [pos for (pos, i) in self.items() if i==id]
     
     def append(self, id):
         """Append an id to the list choosing a position which is 1 bigger than the last position."""
@@ -256,43 +292,6 @@ class ContentList:
             self.positions.append(1)
         else: self.positions.append(self.positions[-1]+1)
         
-    def __len__(self):
-        return len(self.ids)
-    
-    def __delitem__(self, i):
-        del self.ids[i]
-        del self.positions[i]
-        
-    def __setitem__(self, i, pos, id):
-        if (i > 0 and self.positions[i-1] >= pos) or \
-            (i < len(self.positions)-1 and self.positions[i+1] <= pos):
-            raise ValueError("id/position ({},{}) cannot be inserted at index {} because positions "
-                             " must be strictly monotonically increasing."""
-                             .format(id,pos,i))
-        self.positions[i] = pos
-        self.ids[i] = id
-    
-    def __contains__(self,id):
-        return id in self.ids
-    
-    def getPosition(self,id,start=None):
-        """Return the position corresponding to *id*. Raise a ValueError, if *id* is not contained in this
-        list. If *start* is given consider only contents with *position* strictly greater than *start*.
-        """
-        if start is None:
-            return self.positions[self.ids.index(id)]
-        else:
-            index = bisect.bisect(self.positions, start)
-            return self.positions[self.ids[index:].index(id)+index]
-    
-    def getPositions(self, id):
-        """Return a list of all positions in which *id* appears."""
-        return [ pos for (pos, theId) in self.items() if theId==id ]
-    
-    def getId(self, position):
-        """Return the id at position *position*."""
-        return self.ids[self.positions.index(position)]
-    
     def insert(self, pos, id):
         """Insert an id with a position at the correct index into the list."""
         index = bisect.bisect(self.positions, pos)
@@ -311,17 +310,32 @@ class ContentList:
         del self.ids[index]
         del self.positions[index]
     
-    def items(self):
-        """Return a generator yielding tuples (position,id) for all ids in the list."""
-        return zip(self.positions, self.ids)
-    
     def shift(self, delta):
         """Shift all positions by *delta*"""
         if len(self) == 0:
             return
-        # ensure position doesn't drop below 1 after the shift
-        assert self.positions[0] + delta  > 0
+        if self.positions[0] + delta  <= 0:
+            raise ValueError("Cannot shift positions below 1 (Delta={})".format(delta))
         self.positions = [x+delta for x in self.positions]
+    
+    def __getitem__(self, i):
+        return self.ids[i]
+    
+    def __setitem__(self, i, pair):
+        raise NotImplementedError()
+# This is a possible implementation, but maybe it's best that this method is nowhere used.
+#        pos, id = pair
+#        if (i > 0 and self.positions[i-1] >= pos) or \
+#            (i < len(self.positions)-1 and self.positions[i+1] <= pos):
+#            raise ValueError("id/position ({},{}) cannot be inserted at index {} because positions "
+#                             " must be strictly monotonically increasing."""
+#                             .format(id,pos,i))
+#        self.positions[i] = pos
+#        self.ids[i] = id
+    
+    def __delitem__(self, i):
+        del self.ids[i]
+        del self.positions[i]
     
     def __eq__(self, other):
         return self.ids == other.ids and self.positions == other.positions
@@ -330,6 +344,5 @@ class ContentList:
         return self.ids != other.ids or self.positions != other.positions
     
     def __str__(self):
-        return '[{}]'.format(', '.join('{}: {}'.format(self.positions[i],self.ids[i])
-                                       for i in range(len(self.positions))))
+        return '[{}]'.format(', '.join('{}: {}'.format(*item) for item in self.items()))
          
