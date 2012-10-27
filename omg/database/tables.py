@@ -79,7 +79,7 @@ def _addSQLite(*queries):
 #----------#
 _addMySQL("""
 CREATE TABLE {}elements (
-    id          MEDIUMINT UNSIGNED  NOT NULL AUTO_INCREMENT,
+    id          MEDIUMINT UNSIGNED  NOT NULL,
     file        BOOLEAN             NOT NULL,
     toplevel    BOOLEAN             NOT NULL,
     elements    SMALLINT  UNSIGNED  NOT NULL DEFAULT 0,
@@ -89,7 +89,7 @@ CREATE TABLE {}elements (
 """.format(db.prefix))
 _addSQLite("""
 CREATE TABLE {}elements (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    id          INTEGER PRIMARY KEY,
     file        BOOLEAN             NOT NULL DEFAULT 0,
     toplevel    BOOLEAN             NOT NULL DEFAULT 0,
     elements    SMALLINT  UNSIGNED  NOT NULL DEFAULT 0,

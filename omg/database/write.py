@@ -26,13 +26,11 @@ def createElements(data):
         (file, toplevel, elementcount, major)
     tuples specifying the new elements.
     """
-    queryString = "INSERT INTO {}elements (file, toplevel, elements, major)\
-                          VALUES (?,?,?,?)".format(db.prefix)
-    if len(data) > 1:
-        db.multiQuery(queryString, data[:-1])
-    last = db.query(queryString, *data[-1]).insertId()
-    first = last - len(data) + 1
-    return list(range(first, last+1))
+    if len(data) == 0:
+        return
+    ids = db.nextIds(len(data))
+    createElementsWithIds((id,)+d for id,d in zip(ids,data))
+    return ids
 
 
 def createElementsWithIds(data):
