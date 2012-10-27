@@ -45,6 +45,7 @@ class Profile(QtCore.QObject): # to allow subclasses to have signals
     def __init__(self,name,type=None,state=None):
         super().__init__()
         self.name = name
+        assert type is None or isinstance(type,ProfileType)
         self.type = type
     
     def save(self):
@@ -172,7 +173,7 @@ class ProfileCategory(QtCore.QObject):
             if len(data) != 2: # broken storage option; should not happen
                 continue
             name,state = data
-            self.addProfile(name,state)
+            self.addProfile(name,None,state)
             
     def save(self):
         """Save the profiles of this category to the storage options specified in the constructor."""

@@ -261,9 +261,7 @@ class Tag:
             * iconPath: Path to the tagtype's icon or None if if doesn't have an icon.
             * icon: A QIcon loaded from above path (read-only)
             * private: Whether the tag is private, i.e. stored only in the database and not in files.
-            * isInDB: Whether the tag is contained in the database. Due to undo/redo oddities this is not
-              equivalent to the tag having an id (add a tag to the db, press undo. The id will stay).
-              The constructor assumes that for this moment isInDB and 'id is not None' are equivalent.
+            * isInDB: Whether the tag is contained in the database.
 
         You must use the get-method to get instances of this class. This method will ensure that there is
         always only one instance of a given tag and that this instance is updated automatically on

@@ -128,8 +128,8 @@ class TreeActionConfiguration(QtCore.QObject):
                 else:
                     menu.addAction(treeActions[name])
         return menu
-        
-        
+
+
 class TreeView(QtGui.QTreeView):
     """Base class for tree views that contain mostly wrappers. This class handles mainly the
     ContextMenuProvider system, that allows plugins to insert entries into the context menus of playlist and
@@ -185,10 +185,12 @@ class TreeView(QtGui.QTreeView):
         self.updateNodeSelection()
         
     def updateNodeSelection(self):
-        self.nodeSelection = NodeSelection(self.level,self.selectionModel())
-        for action in self.treeActions.values():
-            if isinstance(action, treeactions.TreeAction):
-                action.initialize(self.nodeSelection)
+        selectionModel = self.selectionModel()
+        if selectionModel is not None: # happens if the view is empty
+            self.nodeSelection = NodeSelection(self.level,selectionModel)
+            for action in self.treeActions.values():
+                if isinstance(action, treeactions.TreeAction):
+                    action.initialize(self.nodeSelection)
         
     def contextMenuEvent(self, event):
         menu = self.actionConfig.createMenu(self, self.treeActions)
@@ -228,3 +230,4 @@ class TreeView(QtGui.QTreeView):
         selection = self.selectionModel().selection()
         return [(self.model().data(itemRange.parent()),itemRange.top(),itemRange.bottom())
                     for itemRange in selection]
+    

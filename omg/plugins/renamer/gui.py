@@ -134,8 +134,6 @@ class RenameDialog(QtGui.QDialog):
         self.bb.accepted.connect(self.accept)
         self.bb.rejected.connect(self.reject)
         
-        #if self.configDisplay.profile is not None:
-       #    self._handleProfileChange(self.configDisplay.profile)
         mainLayout.addWidget(self.tree, 100)
         mainLayout.addWidget(self.statusLabel,1)
         mainLayout.addWidget(self.bb)
