@@ -365,7 +365,7 @@ class Tag:
     def sqlFormat(self,value):
         """Convert *value* into a string that can be inserted into database queries."""
         if self.type is None:
-            raise ValueError("sqlFormat can only be used with internal tags.")
+            raise ValueError("sqlFormat can only be used with internal tags, not for {}".format(self))
         return self.type.sqlFormat(value)
 
     def __repr__(self):
@@ -379,7 +379,11 @@ def isValidTagName(name):
     """Return whether *name* is a valid tag name. OMG uses the restrictions imposed by the
     Vorbis-specification: ASCII 0x20 through 0x7D, 0x3D ('=') excluded.
     Confer http://xiph.org/vorbis/doc/v-comment.html.
+    
+    Some tagnames are explicitly forbidden (tracknumber and discnumber).
     """
+    if name.lower() in ['tracknumber','discnumber']:
+        return False
     try:
         encoded = name.encode('ascii')
         return 0 < len(encoded) < 64 and all(0x20 <= c <= 0x7D and c != 0x3D for c in encoded)
