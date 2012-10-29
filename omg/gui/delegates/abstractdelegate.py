@@ -22,7 +22,7 @@ from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
 from ... import utils
-from . import configuration
+from . import profiles
 
 translate = QtCore.QCoreApplication.translate
 
@@ -80,32 +80,31 @@ class AbstractDelegate(QtGui.QStyledItemDelegate):
     Additionally, subclasses may implement ''background'' to give some nodes a background.
     
     The constructor takes the view that uses this delegate (necessary to compute the available width) and
-    the delegate's configuration.
+    the delegate's profile type and optionally a profile. If it is not given, the type's default will be
+    used.
     """
     hSpace = 3   # horizontal space between DelegateItems
     vSpace = 3   # vertical space between DelegateItems
     hMargin = 1  # horizontal margin at the left and right side of the content
     vMargin = 2  # vertical margin at the top and bottom of the content
     state = None # whether we are processing paint or sizeHint. Used for error detection 
-    
-    # List of available options for this delegate. This list in particular defines the default values.
-    # See the configuration module.
-    options = utils.OrderedDict()
-    options["fontSize"] = configuration.DelegateOption("fontSize",translate("Delegates","Fontsize"),"int",8)
             
-    def __init__(self,view,config=None):
+    def __init__(self,view,profile):
         super().__init__(view)
         self.view = view
         self.model = view.model()
         self.font = QtGui.QFont()
-        if config is not None:
-            self.config = config
-        else: self.config = self.defaultConfiguration
-        configuration.dispatcher.changes.connect(self._handleDispatcher)
+        assert profile is not None
+        self.profile = profile
+        from . import profiles
+        profiles.category.profileRemoved.connect(self._handleProfileRemoved)
+        profiles.category.profileChanged.connect(self._handleProfileChanged)
     
-    def setConfiguration(self,config):
-        """Set the DelegateConfiguration and redraw the whole view."""
-        self.config = config
+    def setProfile(self,profile):
+        """Set the profile and redraw the whole view."""
+        if profile is None:
+            raise ValueError("Profile must not be None")
+        self.profile = profile
         self.view.scheduleDelayedItemsLayout()
     
     def addLeft(self,item):
@@ -134,11 +133,12 @@ class AbstractDelegate(QtGui.QStyledItemDelegate):
             self.newRow()
         self.center[-1].append((item,align))
 
-    def _handleDispatcher(self,event):
-        """React to the configuration dispatcher."""
-        if event.config == self.config:
-            if event.type == configuration.DELETED:
-                self.config = self.defaultConfiguration # default configs are never removed
+    def _handleProfileRemoved(self,profile):
+        if profile == self.profile:
+            self.setProfile(self.profileType.default())
+            
+    def _handleProfileChanged(self,profile):
+        if profile == self.profile:
             self.view.scheduleDelayedItemsLayout()
                     
     def layout(self,index):
@@ -290,7 +290,7 @@ class AbstractDelegate(QtGui.QStyledItemDelegate):
         """Return a QFontMetrics-object for a font with the given style."""
         if style is None:
             style = STD_STYLE
-        self.font.setPointSize(style.relFontSize * self.config.options["fontSize"].value)
+        self.font.setPointSize(style.relFontSize * self.profile.options["fontSize"])
         self.font.setBold(style.bold)
         self.font.setItalic(style.italic)
         return QtGui.QFontMetrics(self.font)
@@ -300,7 +300,7 @@ class AbstractDelegate(QtGui.QStyledItemDelegate):
         methods of DelegateItems."""
         if style is None:
             style = STD_STYLE
-        self.font.setPointSize(style.relFontSize * self.config.options["fontSize"].value)
+        self.font.setPointSize(style.relFontSize * self.profile.options["fontSize"])
         self.font.setBold(style.bold)
         self.font.setItalic(style.italic)
         self.painter.setFont(self.font)

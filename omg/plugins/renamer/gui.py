@@ -18,10 +18,11 @@
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from omg.gui import treeview, treeactions, delegates
-from omg.gui.delegates import configuration, abstractdelegate
-from omg.models import leveltreemodel
-from omg.core.levels import RenameFilesError
+from ... import config
+from ...gui import treeview, treeactions, delegates, profiles as profilesgui
+from ...gui.delegates import abstractdelegate
+from ...models import leveltreemodel
+from ...core.levels import RenameFilesError
 from . import plugin
 
 translate = QtCore.QCoreApplication.translate
@@ -60,24 +61,14 @@ class RenameFilesAction(treeactions.TreeAction):
 class PathDelegate(delegates.StandardDelegate):
     """Delegate for the rename preview; shows old and new path color-coded.
     """
-    
-    configurationType, defaultConfiguration = configuration.createConfigType(
-                'path',
-                translate("Delegates","PathRename"),
-                delegates.StandardDelegate.options,
-                [],
-                [],
-                {"showPaths": True, 'showMajor': False, 
-                 'appendRemainingTags': False, 'showAllAncestors': False,
-                 'showFlagIcons' : False}
-    )
-    
     def __init__(self, view): 
-        super().__init__(view) 
+        # Because it should not be configurable, this profile is not contained in the profile category
+        self.profile = delegates.profiles.DelegateProfile("renamer")
+        super().__init__(view, self.profile) 
         self.newPathStyleNew = abstractdelegate.DelegateStyle(1, False, True, Qt.darkGreen)
         self.newPathStyleOld = abstractdelegate.DelegateStyle(1, False, True, Qt.red)
         self.unchangedStyle = abstractdelegate.DelegateStyle(1, False, True, Qt.gray)
-        self.result = {} 
+        self.result = {}
         
     def addPath(self, element):
         if element.isFile():
@@ -100,7 +91,10 @@ class RenameDialog(QtGui.QDialog):
     Shows a tree view with the selected containers, which acts as a preview for renaming. The
     view uses the PathDelegate so that old and new paths of elements are shown.
     
-    In the top area of the dialog, the configuration widget for renaming profiles is included.
+    In the top area of the dialog, the configuration widget is included that can be used to choose one of
+    the available grammar profiles and to configure a temporary copy of it. This allows the user to have
+    a set of stored profiles and to modify them (their temporary copies actually) without saving as
+    necessary for a concrete renaming.
     """
     
     def __init__(self, parent, level, elements):
@@ -111,10 +105,11 @@ class RenameDialog(QtGui.QDialog):
         self.setWindowTitle(self.tr("Rename {} containers").format(len(elements)))
         mainLayout = QtGui.QVBoxLayout()
         
-        configDisplay = plugin.profileConfig.configurationDisplay()
-        mainLayout.addWidget(configDisplay,1)
-        configDisplay.temporaryModified.connect(self._handleTempChange)
-        configDisplay.profileChanged.connect(self._handleProfileChange)
+        profile = plugin.profileCategory.getFromStorage(config.storage.renamer.current_profile)
+        
+        self.configDisplay = GrammarConfigurationWidget(temporary=True,profile=profile)
+        mainLayout.addWidget(self.configDisplay,1)
+        self.configDisplay.temporaryChanged.connect(self._handleTemporaryChanged)
         self.statusLabel = QtGui.QLabel()
         self.statusLabel.setVisible(False)
         f = self.statusLabel.font()
@@ -139,25 +134,22 @@ class RenameDialog(QtGui.QDialog):
         self.bb.accepted.connect(self.accept)
         self.bb.rejected.connect(self.reject)
         
-        if configDisplay.currentProfileName() != '':
-            self._handleProfileChange(configDisplay.currentProfileName())
+        #if self.configDisplay.profile is not None:
+       #    self._handleProfileChange(self.configDisplay.profile)
         mainLayout.addWidget(self.tree, 100)
         mainLayout.addWidget(self.statusLabel,1)
         mainLayout.addWidget(self.bb)
         
         self.setLayout(mainLayout)
         self.resize(800,700)
-    
-    def _handleProfileChange(self, name):
-        profile = plugin.profileConfig[name]
-        self._handleTempChange(profile)
         
-    def _handleTempChange(self, renamer):
-        """handle changes to the format text edit box"""
+    def _handleTemporaryChanged(self):
+        """Handle changes to the temporary profile of self.configDisplay."""
+        profile = self.configDisplay.tempProfile
         try:
             totalResult = dict()
             for element in self.elementsParent:
-                result = renamer.renameContainer(self.level, element)
+                result = profile.renameContainer(self.level, element)
                 totalResult.update(result)
             for elem, newPath in totalResult.items():
                 if elem.id in self.sublevel:
@@ -176,4 +168,159 @@ class RenameDialog(QtGui.QDialog):
             self.bb.button(QtGui.QDialogButtonBox.Ok).setEnabled(False)
         self.model.modelReset.emit()
         self.tree.expandAll()
+    
+    
+class GrammarConfigurationWidget(QtGui.QWidget):
+    """This widget is used in two places to configure grammar profiles:
+    
+        - as configuration widget of the profiles (and thus used in the standard ProfileDialog),
+        - to configure the temporary profile in the RenameDialog. 
+       
+    Depending on the mode (i.e. the argument *temporary*) the widget looks slightly different: In temporary
+    mode, it contains a profileChooser to choose a profile which can then be (temporarily) modified.
+    Additionally it contains a menu with actions to save the temporary state.
+    If *temporary* is False, the widget will contain two buttons to save or reset the profile.
+    """
+    temporaryChanged = QtCore.pyqtSignal()
+    
+    def __init__(self, temporary, profile=None):
+        super().__init__()
+        self.setMinimumWidth(600)
+        self.temporary = temporary
+        self.profile = profile
+        
+        if temporary:
+            if profile is not None:
+                self.tempProfile = profile.copy()
+            else: self.tempProfile = plugin.GrammarRenamer('temp')
+        else: self.tempProfile = None
+        
+        layout = QtGui.QVBoxLayout(self)
+        
+        if temporary:
+            topLayout = QtGui.QHBoxLayout()
+            layout.addLayout(topLayout)
+            topLayout.addWidget(QtGui.QLabel(self.tr("Choose a profile:")))
+            self.profileChooser = profilesgui.ProfileComboBox(plugin.profileCategory)
+            self.profileChooser.profileChosen.connect(self.setProfile)
+            topLayout.addWidget(self.profileChooser)
+            
+            self.menuButton = QtGui.QPushButton(self.tr("Actions"))
+            self._makeMenu()
+            topLayout.addWidget(self.menuButton)
+            topLayout.addStretch(1)
+            
+        self.edit = QtGui.QTextEdit()
+        self.replaceCharsEdit = QtGui.QLineEdit()
+        self.replaceByEdit = QtGui.QLineEdit()
+        self.removeCharsEdit = QtGui.QLineEdit()
+       
+        p = self.tempProfile if temporary else self.profile
+        if p is not None:
+            self.edit.setText(p.formatString)
+            self.replaceCharsEdit.setText(p.replaceChars)
+            self.replaceByEdit.setText(p.replaceBy)
+            self.removeCharsEdit.setText(p.removeChars)
+        self.edit.textChanged.connect(self._handleChange)
+        for edit in self.replaceCharsEdit, self.replaceByEdit, self.removeCharsEdit:
+            edit.textEdited.connect(self._handleChange)
+        
+        layout.addWidget(self.edit)
+        
+        hLayout = QtGui.QHBoxLayout()
+        layout.addLayout(hLayout)
+        hLayout.addWidget(QtGui.QLabel(self.tr("Replace:")))
+        hLayout.addWidget(self.replaceCharsEdit)
+        hLayout.addWidget(QtGui.QLabel(self.tr("By:")))
+        hLayout.addWidget(self.replaceByEdit)
+        hLayout.addWidget(QtGui.QLabel(self.tr("And remove:")))
+        hLayout.addWidget(self.removeCharsEdit)
+            
+        if not temporary:
+            buttonLayout = QtGui.QHBoxLayout()
+            layout.addLayout(buttonLayout)
+            saveButton = QtGui.QPushButton(self.tr("Save"))
+            saveButton.clicked.connect(self._handleSave)
+            buttonLayout.addWidget(saveButton)
+            resetButton = QtGui.QPushButton(self.tr("Reset"))
+            resetButton.clicked.connect(self._handleReset)
+            buttonLayout.addWidget(resetButton)
+            buttonLayout.addStretch(1)
+    
+    def setProfile(self,profile):
+        """Set the profile that can be modified by this widget."""
+        if profile != self.profile:
+            self._setProfile(profile)
+            
+    def _setProfile(self,profile):
+        """As set profile but works also if profile == self.profile (for reset actions)."""
+        self.profile = profile
+        if self.temporary:
+            self.profileChooser.setCurrentProfile(profile)
+            # In temporary mode save the selected profile for the next time the RenameDialog is opened.
+            config.storage.renamer.current_profile = profile.name
+        self.edit.setPlainText(self.profile.formatString)
+        self.replaceCharsEdit.setText(self.profile.replaceChars)
+        self.replaceByEdit.setText(self.profile.replaceBy)
+        self.removeCharsEdit.setText(self.profile.removeChars) 
+        # Via _handleChange these lines will also change self.tempProfile
+        self._makeMenu()
+    
+    def _makeMenu(self):
+        """Fill the menu (only in temporary mode). This is necessary if the name of the current profile
+        changes."""
+        menu = QtGui.QMenu()
+        if self.profile is not None:
+            saveAction = menu.addAction(self.tr("Save as profile {}").format(self.profile.name))
+            saveAction.triggered.connect(self._handleSave)
+        else:
+            saveAction = menu.addAction(self.tr("Save profile"))
+            saveAction.setEnabled(False)
+        saveAsAction = menu.addAction(self.tr("Save as new profile..."))
+        saveAsAction.triggered.connect(self._handleSaveAs)
+        if self.profile is not None:
+            resetAction = menu.addAction(self.tr("Reset to profile {}").format(self.profile.name))
+            resetAction.triggered.connect(self._handleReset)
+        else:
+            resetAction = menu.addAction(self.tr("Reset profile"))
+            resetAction.setEnabled(False)
+            
+        menu.addSeparator()
+        configureAction = menu.addAction(self.tr("Configure profiles..."))
+        self.menuButton.setMenu(menu)
+        
+    def _handleChange(self):
+        """Change the temporary profile and emit temporaryChanged (only in temporary mode)."""
+        if self.tempProfile is not None:
+            self.tempProfile.formatString = self.edit.toPlainText()
+            self.tempProfile.replaceChars = self.replaceCharsEdit.text()
+            self.tempProfile.replaceBy = self.replaceByEdit.text()
+            self.tempProfile.removeChars = self.removeCharsEdit.text()
+            self.temporaryChanged.emit()
+            
+    def _handleSave(self):
+        """Handle the save button/action: Save the configuration in the text fields as stored profile."""
+        self.profile.formatString = self.edit.toPlainText()
+        self.profile.replaceChars = self.replaceCharsEdit.text()
+        self.profile.replaceBy = self.replaceByEdit.text()
+        self.profile.removeChars = self.removeCharsEdit.text()
+        plugin.profileCategory.profileChanged.emit(self.profile)
+        
+    def _handleSaveAs(self):
+        """Save the temporary profile as a stored profile."""
+        text,ok = QtGui.QInputDialog.getText(self,
+                                     self.tr("Add new profile"),
+                                     self.tr("Choose a profile name"),
+                                     QtGui.QLineEdit.Normal,
+                                     plugin.profileCategory.suggestProfileName())
+        if len(text) > 0 and ok:
+            if plugin.profileCategory.get(text) is None:
+                profile = plugin.profileCategory.addProfile(text,None,self.tempProfile.save())
+                self.setProfile(profile)
+            else:
+                dialogs.warning(self.tr("Invalid name"),self.tr("There is already a profile of this name."))
+    
+    def _handleReset(self):
+        """Reset the text fields to the chosen stored profile."""
+        self._setProfile(self.profile)
         

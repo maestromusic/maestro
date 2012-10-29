@@ -25,18 +25,21 @@ from omg import player, logging, profiles
 from omg.models import playlist
 from . import filebackend as mpdfilebackend
 
+translate = QtCore.QCoreApplication.translate
 logger = logging.getLogger(__name__)
 
 
-def enable():    
+def enable():
+    player.profileCategory.addType(profiles.ProfileType('mpd',
+                                                        translate('MPDPlayerBackend','MPD'),
+                                                        MPDPlayerBackend))
     from omg import filebackends
-    player.profileConf.addClass(MPDPlayerBackend)
     filebackends.urlTypes["mpd"] = mpdfilebackend.MPDURL
 
 
 def disable():
+    player.profileCategory.removeType('mpd')
     from omg import filebackends
-    player.profileConf.removeClass(MPDPlayerBackend)
     del filebackends.urlTypes["mpd"]
 
             
@@ -44,10 +47,17 @@ class MPDPlayerBackend(player.PlayerBackend):
     
     className = "MPD"
     
-    def __init__(self, name, host='localhost', port='6600', password=None):
-        super().__init__(name)
+    def __init__(self, name, type, state):
+        super().__init__(name, type, state)
         self.playlist = playlist.PlaylistModel(self)
         self.urls = []
+
+        if state is None:
+            state = {}
+        host = state['host'] if 'host' in state else 'localhost'
+        port = state['port'] if 'port' in state else 6600
+        password = state['password'] if 'password' in state else ''
+
         from .thread import MPDThread
         self.mpdthread = MPDThread(self, host, port, password)
         self.mpdthread.changeFromMPD.connect(self._handleMPDChange, Qt.QueuedConnection)
@@ -56,15 +66,21 @@ class MPDPlayerBackend(player.PlayerBackend):
         self.commander = mpd.MPDClient()
         self.commanderConnected = False
         
-        # create actions
         self.separator = QtGui.QAction("MPD", self)
         self.separator.setSeparator(True)
         
         self.updateDBAction = QtGui.QAction("Update Database", self)
         self.updateDBAction.triggered.connect(self.mpdthread.updateDB)
     
-    def config(self):
-        return self.mpdthread.host, self.mpdthread.port, self.mpdthread.password
+    def setConnectionParameters(self, host, port, password):
+        #TODO reconnect
+        self.category.profileChanged.emit(self)
+        
+    def save(self):
+        return {'host': self.mpdthread.host,
+                'port': self.mpdthread.port,
+                'password': self.mpdthread.password
+                }
     
     def prepareCommander(self):
         if not self.commanderConnected:
@@ -196,10 +212,9 @@ class MPDPlayerBackend(player.PlayerBackend):
     def move(self,fromOffset,toOffset):
         self._move((fromOffset,toOffset))
     
-    @classmethod
-    def configurationWidget(cls, profile=None):
+    def configurationWidget(self):
         """Return a config widget, initialized with the data of the given *profile*."""
-        return MPDConfigWidget(profile)
+        return MPDConfigWidget(self)
     
     def getInfo(self, path):
         """Query MPD to get tags & length of the file at *path* (relative to this MPD instance).
@@ -220,38 +235,61 @@ class MPDPlayerBackend(player.PlayerBackend):
     def __str__(self):
         return "MPDPlayerBackend({})".format(self.name)
 
-class MPDConfigWidget(profiles.ConfigurationWidget):
-    
-    def __init__(self, profile = None):
+
+class MPDConfigWidget(QtGui.QWidget):
+    """Widget to configure playback profiles of type MPD."""    
+    def __init__(self, profile=None):
         super().__init__()
-        layout = QtGui.QGridLayout(self)
-        layout.addWidget(QtGui.QLabel(self.tr("Host:"), self), 0, 0, Qt.AlignRight)
-        self.hostEdit = QtGui.QLineEdit(self)
-        layout.addWidget(self.hostEdit, 0, 1)
+        layout = QtGui.QVBoxLayout(self)
+        formLayout = QtGui.QFormLayout()
+        layout.addLayout(formLayout,1)
         
-        layout.addWidget(QtGui.QLabel(self.tr("Port:"), self), 1, 0, Qt.AlignRight)
-        self.portEdit = QtGui.QLineEdit(self)
+        self.hostEdit = QtGui.QLineEdit()
+        formLayout.addRow(self.tr("Host:"),self.hostEdit)
+        
+        self.portEdit = QtGui.QLineEdit()
         self.portEdit.setValidator(QtGui.QIntValidator(0, 65535, self))
-        layout.addWidget(self.portEdit, 1, 1)
+        formLayout.addRow(self.tr("Port:"),self.portEdit)
         
-        layout.addWidget(QtGui.QLabel(self.tr("Password:"), self), 2, 0, Qt.AlignRight)
-        self.passwordEdit = QtGui.QLineEdit(self)
-        layout.addWidget(self.passwordEdit, 2, 1)
+        self.passwordEdit = QtGui.QLineEdit()
+        formLayout.addRow(self.tr("Password:"),self.passwordEdit)
+        
+        self.passwordVisibleBox = QtGui.QCheckBox()
+        self.passwordVisibleBox.toggled.connect(self._handlePasswordVisibleBox)
+        formLayout.addRow(self.tr("Password visible?"),self.passwordVisibleBox)
+        
+        buttonLayout = QtGui.QHBoxLayout()
+        layout.addLayout(buttonLayout)
+        saveButton = QtGui.QPushButton(self.tr("Save"))
+        saveButton.clicked.connect(self._handleSave)
+        buttonLayout.addWidget(saveButton)
+        resetButton = QtGui.QPushButton(self.tr("Reset"))
+        resetButton.clicked.connect(self._handleReset)
+        buttonLayout.addWidget(resetButton)
+        buttonLayout.addStretch(1)
         
         self.setProfile(profile)
     
     def setProfile(self, profile):
-        if profile is None:
-            host, port, password = 'localhost', 6600, ''
-        else:
-            host, port, password = player.profileConf[profile].config()
-        self.hostEdit.setText(host)
-        self.portEdit.setText(str(port))
-        self.passwordEdit.setText(password)
+        """Change the profile whose data is displayed."""
+        assert profile is not None
+        self.profile = profile
+        self.hostEdit.setText(profile.mpdthread.host)
+        self.portEdit.setText(str(profile.mpdthread.port))
+        self.passwordEdit.setText(profile.mpdthread.password)
+        self.passwordVisibleBox.setChecked(len(profile.mpdthread.password) == 0)
     
-    def currentConfig(self):
+    def _handleSave(self):
+        """Really change the profile."""
         host = self.hostEdit.text()
         port = int(self.portEdit.text())
         password = self.passwordEdit.text()
-        return (host, port, password)
-
+        self.profile.setConnectionParameters(host, port, password)
+        
+    def _handleReset(self):
+        """Reset the form to the stored values."""
+        self.setProfile(self.profile)
+    
+    def _handlePasswordVisibleBox(self,checked):
+        """Change whether the password is visible in self.passwordEdit."""
+        self.passwordEdit.setEchoMode(QtGui.QLineEdit.Normal if checked else QtGui.QLineEdit.Password)

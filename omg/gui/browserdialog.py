@@ -21,11 +21,11 @@ from functools import partial
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from . import dialogs
+from . import dialogs, profiles as profilesgui, delegates
 from .. import config, utils, database as db
 from ..core import tags, flags
 from ..search import criteria as criteriaModule
-from .delegates import browser as browserdelegate, configuration as delegateconfig
+from .delegates import browser as browserdelegate
 
 
 # Layers that can be selected in BrowserDialog's comboboxes. Each item in the list is a list containing for
@@ -71,10 +71,13 @@ class BrowserDialog(dialogs.FancyTabbedPopup):
         lineLayout = QtGui.QHBoxLayout()
         optionLayout.addLayout(lineLayout)
         lineLayout.addWidget(QtGui.QLabel(self.tr("Item Display:")))
-        configurationCombo = delegateconfig.ConfigurationCombo(
-                                                    browserdelegate.BrowserDelegate.configurationType,
-                                                    self.browser.views)
-        lineLayout.addWidget(configurationCombo)
+        profileType = browserdelegate.BrowserDelegate.profileType
+        profileChooser = profilesgui.ProfileComboBox(delegates.profiles.category,
+                                                     restrictToType=profileType,
+                                                     default=self.browser.delegateProfile)
+        profileChooser.profileChosen.connect(self._handleProfileChosen)
+
+        lineLayout.addWidget(profileChooser)
         
         instantSearchBox = QtGui.QCheckBox(self.tr("Instant search"))
         instantSearchBox.setChecked(self.browser.searchBox.getInstantSearch())
@@ -100,6 +103,10 @@ class BrowserDialog(dialogs.FancyTabbedPopup):
     def close(self):
         self.browser._handleDialogClosed()
         super().close()
+        
+    def _handleProfileChosen(self,profile):
+        for view in self.browser.views:
+            view.itemDelegate().setProfile(profile)
         
     def _handleSelectionChanged(self):
         if len(self.flagView.selectedFlagTypes) > 0:

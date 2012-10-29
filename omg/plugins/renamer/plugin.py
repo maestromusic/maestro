@@ -15,51 +15,60 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from PyQt4 import QtCore, QtGui
-
-from omg.core import tags, levels
-from omg import logging, config, profiles
 from calendar import format
-
-logger = logging.getLogger(__name__)
 
 import pyparsing
 from pyparsing import Forward, Literal, OneOrMore, Optional, Word, alphas, alphanums, nums
+
+from PyQt4 import QtCore, QtGui
+from PyQt4.QtCore import Qt
+
+from ...core import tags, levels
+from ... import logging, config, profiles
+from ...gui import profiles as profilesgui
+
+
+translate = QtCore.QCoreApplication.translate
+
     
 def defaultStorage():
-    return {"SECTION:renamer":
-            {'profiles': [("default", "GrammarRenamer", "<artist>")] } }
+    return {"SECTION:renamer": {'profiles': [],
+                                'current_profile': None
+                                }
+            }
 
 def defaultConfig():
     return {"renamer": {
             "positionDigits": (int,2,"Minimum number of digits to use for positions (filled with zeros).")
         }}
 
-initialized = False
+
+profileCategory = None
+
 
 def enable():
-    if not initialized:
-        init()
+    global profileCategory
+    profileCategory = profiles.ProfileCategory("renamer",
+                                               translate("Renamer","Renamer"),
+                                               config.storageObject.renamer.profiles,
+                                               profileClass=GrammarRenamer)
+    profiles.manager.addCategory(profileCategory)
+    
     from .gui import RenameFilesAction
     from omg.gui import editor, browser
     editor.EditorTreeView.actionConfig.addActionDefinition((("plugins", 'renamer'),), RenameFilesAction)
     browser.BrowserTreeView.actionConfig.addActionDefinition((("plugins", 'renamer'),), RenameFilesAction)
+
 
 def disable():
     from omg.gui import editor, browser
     from .gui import RenameFilesAction
     editor.EditorTreeView.actionConfig.removeActionDefinition((("plugins", 'renamer'),))
     browser.BrowserTreeView.actionConfig.addActionDefinition((("plugins", 'renamer'),), RenameFilesAction)
+    global profileCategory
+    profiles.manager.removeCategory(profileCategory)
+    profileCategory = None
 
-
-profileConfig = None
-def init():
-    global profileConfig
-    profileConfig = profiles.ProfileConfiguration("renamer", config.storage.renamer, [GrammarRenamer])
-    profileConfig.loadConfig()
-    global initialized
-    initialized = True
-    logger.debug("initialized renamer plugin")
 
 class FormatSyntaxError(SyntaxError):
     pass
@@ -110,17 +119,30 @@ class GrammarRenamer(profiles.Profile):
         else: ret = tag.value
         return ret
     
-    def __init__(self, name, formatString = "<artist>/I AM A DEFAULT FORMAT STRING/<1.title>/<#> - <title>",
-                 replaceChars = "\\:/", replaceBy = '_.;', removeChars="?*"):
-        super().__init__(name)
+    def __init__(self, name, type=None, state=None):
+        super().__init__(name,type)
         
         # grammar definition
         self.positionFormat = "{:0>" + str(config.options.renamer.positionDigits) + "}"
-        self.formatString = formatString
-        if len(replaceChars) != len(replaceBy):
+        
+        if state is None:
+            state = {}
+        if 'formatString' in state:
+            self.formatString = state['formatString']
+        else: self.formatString = "<artist>/I AM A DEFAULT FORMAT STRING/<1.title>/<#> - <title>"
+        if 'replaceChars' in state:
+            self.replaceChars = state['replaceChars']
+        else: self.replaceChars = '\\:/'
+        if 'replaceBy' in state:
+            self.replaceBy = state['replaceBy']
+        else: self.replaceBy = '_.;'
+        if 'removeChars' in state:
+            self.removeChars = state['removeChars']
+        else: self.removeChars = '?*'
+        
+        if len(self.replaceChars) != len(self.replaceBy):
             raise ValueError("replaceChars and replaceBy must equal in length")
-        self.replaceChars, self.replaceBy, self.removeChars = replaceChars, replaceBy, removeChars
-        self.translation = str.maketrans(replaceChars, replaceBy, removeChars)
+        self.translation = str.maketrans(self.replaceChars, self.replaceBy, self.removeChars)
             
         pyparsing.ParserElement.setDefaultWhitespaceChars("\t\n")
         #pyparsing.ParserElement.enablePackrat() does not work (buggy)
@@ -150,6 +172,13 @@ class GrammarRenamer(profiles.Profile):
         expression << OneOrMore(condition | staticText)
         self.expression = expression
     
+    def save(self):
+        return {'formatString': self.formatString,
+                'replaceChars': self.replaceChars,
+                'replaceBy': self.replaceBy,
+                'removeChars': self.removeChars
+                }
+    
     def computeNewPath(self):
         """Computes the new path for the element defined by *self.currentElem* and *self.currentParents*."""
         extension = self.currentElem.getExtension()
@@ -172,47 +201,7 @@ class GrammarRenamer(profiles.Profile):
         self.level = level
         self.traverse(element)
         return self.result
-
-    def config(self):
-        return (self.formatString,self.replaceChars, self.replaceBy, self.removeChars)
     
-    @classmethod    
-    def configurationWidget(cls, profile = None, parent = None):
-        widget = GrammarConfigurationWidget(profileConfig[profile], parent)
-        return widget
-
-class GrammarConfigurationWidget(profiles.ConfigurationWidget):
-        def __init__(self, profile = None, parent = None):
-            super().__init__(parent)
-            self.edit = QtGui.QTextEdit()
-            self.replaceCharsEdit = QtGui.QLineEdit()
-            self.replaceByEdit = QtGui.QLineEdit()
-            self.removeCharsEdit = QtGui.QLineEdit()
-            hlay = QtGui.QHBoxLayout()
-            hlay.addWidget(QtGui.QLabel(self.tr("Replace:")))
-            hlay.addWidget(self.replaceCharsEdit)
-            hlay.addWidget(QtGui.QLabel(self.tr("By:")))
-            hlay.addWidget(self.replaceByEdit)
-            hlay.addWidget(QtGui.QLabel("And remove:"))
-            hlay.addWidget(self.removeCharsEdit)
-            layout = QtGui.QVBoxLayout()
-            layout.addWidget(self.edit)
-            layout.addLayout(hlay)
-            self.setLayout(layout)
-            if profile:
-                self.edit.setText(profile.formatString)
-                self.replaceCharsEdit.setText(profile.replaceChars)
-                self.replaceByEdit.setText(profile.replaceBy)
-                self.removeCharsEdit.setText(profile.removeChars)
-            self.edit.textChanged.connect(self.handleChange)
-            for edit in self.replaceCharsEdit, self.replaceByEdit, self.removeCharsEdit:
-                edit.textEdited.connect(self.handleChange)
-        
-        def handleChange(self):
-            renamer = GrammarRenamer("temporary", *self.currentConfig())
-            self.temporaryModified.emit(renamer)
-            
-        def currentConfig(self):
-            return (self.edit.toPlainText(), self.replaceCharsEdit.text(),
-                    self.replaceByEdit.text(), self.removeCharsEdit.text())
-
+    def configurationWidget(self):
+        from . import gui
+        return gui.GrammarConfigurationWidget(temporary=False, profile=self)

@@ -196,13 +196,13 @@ def run(cmdConfig=[],type='gui',exitPoint=None):
     # Load and initialize remaining modules
     from .core import levels
     levels.init()
-    from . import resources, search
+    from . import resources, search, profiles
     from .core import covers
     search.init()
     covers.init()
     
     from . import filebackends
-    from .filebackends import filesystem as fsBackend
+    from .filebackends import filesystem as fsBackend #TODO: necessary?
     
     global network
     network = QtNetwork.QNetworkAccessManager()
@@ -225,11 +225,7 @@ def run(cmdConfig=[],type='gui',exitPoint=None):
     # First import all modules that want to add WidgetData
     from .gui import filesystembrowser, editor, browser, tageditor, mainwindow, playback, playlist
     
-    from .gui.delegates import configuration as delegateconfiguration
     global mainWindow
-    
-    delegateconfiguration.load()
-    
     mainWindow = mainwindow.MainWindow()
     plugins.mainWindowInit()
     
@@ -242,9 +238,9 @@ def run(cmdConfig=[],type='gui',exitPoint=None):
     filesystem.shutdown()
     search.shutdown()
     mainWindow.saveLayout()
-    delegateconfiguration.save()
     plugins.shutdown()
     covers.shutdown()
+    profiles.manager.save()
     config.shutdown()
     logging.shutdown()
     sys.exit(returnValue)

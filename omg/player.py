@@ -21,13 +21,18 @@ from PyQt4.QtCore import Qt
 
 from . import config, logging, profiles
 
+translate = QtCore.QCoreApplication.translate
 logger = logging.getLogger(__name__)
 
 STOP, PLAY, PAUSE = range(3)
 DISCONNECTED, CONNECTING, CONNECTED = range(3)
 
 _runningBackends = {}
-profileConf = profiles.ProfileConfiguration("playback", config.storage.player, [])
+
+profileCategory = profiles.TypedProfileCategory('playback',
+                                                translate('PlayerBackend','Playback'),
+                                                config.storageObject.player.profiles)
+profiles.manager.addCategory(profileCategory)
 
 
 class PlayerBackend(profiles.Profile):
@@ -36,23 +41,15 @@ class PlayerBackend(profiles.Profile):
     
     In addition to the setter functions below, the attributes state, volume, currentSong,
     elapsed should be present in each implementing subclass.
-    
-    For many backends it may be appropriate to run this in its own thread. See the mpd
-    backend plugin for an example of how to do this. Because it is likely that a PlayerBackend
-    lives in a different thread and that (some of) the slots defined here may block for
-    a nontrivial amount of time, every module that uses a PlayerBackend must ensure to
-    _always_ call these slots via a (inter-thread) signal-slot-connection and _not_ directly.
-    Use QMetaObject.ivokeMethod() if you need to directly call a slot method."""
-    #TODO: is the stuff above still valid? Seems to me that even MPDBackend runs in the main thread and uses a different thread internally
-    
-    stateChanged = QtCore.pyqtSignal(int) #Emits on of {PLAY, STOP,PAUSE} if the backend's state has changed
+    """
+    stateChanged = QtCore.pyqtSignal(int) #Emits one of {PLAY, STOP,PAUSE} if the backend's state has changed
     volumeChanged = QtCore.pyqtSignal(int)
     currentChanged = QtCore.pyqtSignal(int)
     elapsedChanged = QtCore.pyqtSignal(float)
     connectionStateChanged = QtCore.pyqtSignal(int)
     
-    def __init__(self, name):
-        super().__init__(name)
+    def __init__(self, name, type, state):
+        super().__init__(name, type, state)
         self.connectionState = DISCONNECTED
     
     def state(self):

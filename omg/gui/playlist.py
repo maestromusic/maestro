@@ -19,10 +19,11 @@
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from . import treeview, mainwindow, treeactions
+from . import treeview, mainwindow, treeactions, playerwidgets, profiles as profilesgui, delegates
 from ..core import levels
-from .delegates import playlist as playlistdelegate, configuration as delegateconfig
-from .. import player, profiles
+from .delegates import playlist as playlistdelegate
+from .treeactions import *
+from .. import player
 
 translate = QtCore.QCoreApplication.translate
 
@@ -40,8 +41,8 @@ class PlaylistTreeView(treeview.TreeView):
     actionConfig.addActionDefinition(((sect, 'removeFromPL'),), treeactions.RemoveFromPlaylistAction)
     actionConfig.addActionDefinition(((sect, 'clearPL'),), treeactions.ClearPlaylistAction)
     
-    def __init__(self, parent=None):
-        super().__init__(levels.real, parent)
+    def __init__(self, delegateProfile):
+        super().__init__(levels.real)
         self.backend = None
         self.setSelectionMode(self.ExtendedSelection)
         self.setDragEnabled(True)
@@ -50,7 +51,7 @@ class PlaylistTreeView(treeview.TreeView):
         self.setDropIndicatorShown(True)
         self.viewport().setMouseTracking(True)
         self.doubleClicked.connect(self._handleDoubleClick)
-        self.setItemDelegate(playlistdelegate.PlaylistDelegate(self))
+        self.setItemDelegate(playlistdelegate.PlaylistDelegate(self,delegateProfile))
 
     def setBackend(self, backend):
         if self.backend is not None:
@@ -82,8 +83,12 @@ class PlaylistWidget(QtGui.QDockWidget):
         super().__init__(parent)
         self.setWindowTitle(self.tr('Playlist'))
         
-        self.backend = None
-        self.treeview = PlaylistTreeView()
+        # Read state
+        profileType = playlistdelegate.PlaylistDelegate.profileType
+        backend = player.profileCategory.getFromStorage(state.get('backend'))
+        delegateProfile = delegates.profiles.category.getFromStorage(state.get('delegate'),profileType)
+        
+        self.treeview = PlaylistTreeView(delegateProfile)
  
         widget = QtGui.QWidget() 
         self.setWidget(widget)
@@ -98,40 +103,46 @@ class PlaylistWidget(QtGui.QDockWidget):
         style = QtGui.QApplication.style()
         buttonLayout.setSpacing(style.pixelMetric(style.PM_LayoutHorizontalSpacing))
         layout.addLayout(buttonLayout)
-        self.backendChooser = profiles.ProfileComboBox(player.profileConf, default=state)
+        self.backendChooser = profilesgui.ProfileComboBox(player.profileCategory, default=backend)
         self.backendChooser.profileChosen.connect(self.setBackend)
         buttonLayout.addWidget(self.backendChooser)
         
         buttonLayout.addWidget(QtGui.QLabel(self.tr("Item Display:")))
-        buttonLayout.addWidget(delegateconfig.ConfigurationCombo(
-                                                    playlistdelegate.PlaylistDelegate.configurationType,
-                                                    [self.treeview]))
+        profileChooser = profilesgui.ProfileComboBox(delegates.profiles.category,
+                                                     restrictToType=profileType,
+                                                     default=delegateProfile)
+        profileChooser.profileChosen.connect(self.treeview.itemDelegate().setProfile)
+        buttonLayout.addWidget(profileChooser)
         buttonLayout.addStretch()
+
         layout.addWidget(self.treeview)
         self.errorLabel = QtGui.QLabel()
         self.errorLabel.setAlignment(Qt.AlignVCenter | Qt.AlignHCenter)
         self.mainLayout = layout
         self.mainWidgetIndex = layout.indexOf(self.treeview)
-        self.setBackend(self.backendChooser.currentProfileName())
+        
+        self.backend = None
+        self.setBackend(backend)
     
     def saveState(self):
-        return self.backendChooser.currentProfileName()
+        return {'backend': self.backend.name if self.backend is not None else None,
+                'delegate': self.treeview.itemDelegate().profile.name
+                }
     
-    def setBackend(self, name):
+    def setBackend(self, backend):
         if self.backend is not None:
             self.backend.unregisterFrontend(self)
             self.backend.connectionStateChanged.disconnect(self.setActiveWidgetByState)
-        if name is not None:
-            backend = player.profileConf[name]
+            
+        if backend is not None:
             backend.registerFrontend(self)
-            self.errorLabel.setText(self.tr("failed to connect to {}".format(name)))
+            self.setActiveWidgetByState(backend.connectionState)
+            backend.connectionStateChanged.connect(self.setActiveWidgetByState)
         else:
-            backend = None
             self.errorLabel.setText(self.tr("no backend selected"))
+
         self.backend = backend
         self.treeview.setBackend(self.backend)
-        self.setActiveWidgetByState(backend.connectionState)
-        self.backend.connectionStateChanged.connect(self.setActiveWidgetByState)
     
     def setActiveWidgetByState(self, state):
         current = self.mainLayout.itemAt(self.mainWidgetIndex).widget()

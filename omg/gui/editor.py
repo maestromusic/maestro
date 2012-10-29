@@ -20,13 +20,12 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
-from . import treeactions, treeview, mainwindow, tagwidgets, dialogs
-from .. import profiles, utils
+from . import treeactions, treeview, mainwindow, tagwidgets, dialogs, profiles as profilesgui, delegates
+from .. import utils
 from ..core import levels, tags
 from ..models import albumguesser
 from ..models.editor import EditorModel
-from .delegates.editor import EditorDelegate
-from .delegates.configuration import ConfigurationCombo
+from .delegates import editor as editordelegate
 
         
 class EditorTreeView(treeview.TreeView):
@@ -47,15 +46,15 @@ class EditorTreeView(treeview.TreeView):
     actionConfig.addActionDefinition(((sect, 'clearEditor'),), treeactions.ClearTreeAction)
     actionConfig.addActionDefinition(((sect, 'commit'),), treeactions.CommitTreeAction)
 
-    def __init__(self, parent=None):
-        super().__init__(levels.editor, parent)
+    def __init__(self, delegateProfile):
+        super().__init__(levels.editor)
         self.setSelectionMode(self.ExtendedSelection)
         self.setDragEnabled(True)
         self.setAcceptDrops(True)
         self.setDefaultDropAction(Qt.MoveAction)
         self.setDropIndicatorShown(True)
         self.setModel(EditorModel())
-        self.setItemDelegate(EditorDelegate(self))
+        self.setItemDelegate(editordelegate.EditorDelegate(self,delegateProfile))
         self.viewport().setMouseTracking(True)
         self.autoExpand = True
         self.model().rowsInserted.connect(self._expandInsertedRows)
@@ -111,11 +110,14 @@ class EditorWidget(QtGui.QDockWidget):
         layout.setSpacing(0)
         layout.setContentsMargins(0,0,0,0)
         
-        try:
-            expand,guessProfile = state
-        except:
-            expand = True
-            guessProfile = None
+        if state is None:
+            state = {}
+        expand = 'expand' not in state or state['expand'] # by default expand
+        guessingEnabled = 'guessingEnabled' not in state or state['guessingEnabled'] # by default guess 
+        guessProfile = albumguesser.profileCategory.getFromStorage(state.get('guessProfile'))
+        delegateProfile = delegates.profiles.category.getFromStorage(
+                                                    state.get('delegate'),
+                                                    editordelegate.EditorDelegate.profileType)
         
         buttonLayout = QtGui.QHBoxLayout()
         # buttonLayout is filled below, when the editor exists 
@@ -124,8 +126,9 @@ class EditorWidget(QtGui.QDockWidget):
         self.splitter = QtGui.QSplitter(Qt.Vertical)
         layout.addWidget(self.splitter)
         
-        self.editor = EditorTreeView()
+        self.editor = EditorTreeView(delegateProfile)
         self.editor.autoExpand = expand
+        self.editor.model().guessingEnabled = guessingEnabled
         self.editor.model().guessProfile = guessProfile
         
         self.externalTagsWidget = ExternalTagsWidget(self.editor)
@@ -155,7 +158,12 @@ class EditorWidget(QtGui.QDockWidget):
         dialog.show()
         
     def saveState(self):
-        return (self.editor.autoExpand, self.editor.model().guessProfile)
+        guessProfile = self.editor.model().guessProfile
+        return {'expand': self.editor.autoExpand,
+                'guessingEnabled': self.editor.model().guessingEnabled,
+                'guessProfile': guessProfile.name if guessProfile is not None else None, 
+                'delegate': self.editor.itemDelegate().profile.name # a delegate's profile is never None
+                }
 
 
 class OptionDialog(dialogs.FancyPopup):
@@ -172,23 +180,25 @@ class OptionDialog(dialogs.FancyPopup):
         
         albumGuessLayout = QtGui.QHBoxLayout()
         albumGuessCheckBox = QtGui.QCheckBox()
-        albumGuessCheckBox.setChecked(self.editor.model().guessProfile is not None)
+        albumGuessCheckBox.setChecked(self.editor.model().guessingEnabled)
         albumGuessCheckBox.setToolTip(self.tr("Auto expand dropped containers"))
         albumGuessCheckBox.toggled.connect(self._handleAlbumGuessCheckBox)
-        # the checkbox will also be connected to control the combobox' visibility 
         albumGuessLayout.addWidget(albumGuessCheckBox)
         
-        self.albumGuessComboBox = profiles.ProfileComboBox(albumguesser.profileConfig,
-                                                           self.editor.model().guessProfile)
+        self.albumGuessComboBox = profilesgui.ProfileComboBox(albumguesser.profileCategory,
+                                                              default=self.editor.model().guessProfile)
         self.albumGuessComboBox.setToolTip(self.tr("Select album guessing profile"))
-        self.albumGuessComboBox.setDisabled(self.editor.model().guessProfile is None)
-        albumGuessCheckBox.toggled.connect(self.albumGuessComboBox.setEnabled)
+        self._handleAlbumGuessCheckBox(albumGuessCheckBox.isChecked()) # initialize enabled/disabled
         self.albumGuessComboBox.profileChosen.connect(self._handleAlbumGuessComboBox)
         albumGuessLayout.addWidget(self.albumGuessComboBox,1)
         layout.addRow(self.tr("Guess albums"),albumGuessLayout)
         
-        itemDisplayCombo = ConfigurationCombo(EditorDelegate.configurationType, [self.editor])
-        layout.addRow(self.tr("Item display"),itemDisplayCombo)
+        profileType = editordelegate.EditorDelegate.profileType
+        profileChooser = profilesgui.ProfileComboBox(delegates.profiles.category,
+                                                     restrictToType=profileType,
+                                                     default=self.editor.itemDelegate().profile)
+        profileChooser.profileChosen.connect(self.editor.itemDelegate().setProfile)
+        layout.addRow(self.tr("Item display"),profileChooser)
         
     def _handleAutoExpandBox(self,state):
         """Handle toggling the auto expand checkbox."""
@@ -196,11 +206,14 @@ class OptionDialog(dialogs.FancyPopup):
         
     def _handleAlbumGuessCheckBox(self,checked):
         """Handle toggling of the guess checkbox."""
-        self.editor.model().guessProfile = self.albumGuessComboBox.currentProfileName() if checked else None
+        self.editor.model().guessingEnabled = checked
+        if len(albumguesser.profileCategory.profiles) > 0:
+            self.albumGuessComboBox.setEnabled(checked)
+        else: self.albumGuessComboBox.setEnabled(True) # the box contains only 'Configure...'
         
-    def _handleAlbumGuessComboBox(self,name):
+    def _handleAlbumGuessComboBox(self,profile):
         """Handles changes of the current name of the guess profile combobox."""
-        self.editor.model().guessProfile = name
+        self.editor.model().guessProfile = profile
     
 
 class ExternalTagsWidget(QtGui.QScrollArea):

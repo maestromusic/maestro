@@ -54,7 +54,7 @@ class MPDFile(filebackends.BackendFile):
         super().__init__(url)
         
     def readTags(self):
-        mpdProfile = player.profileConf[self.url.profile]
+        mpdProfile = player.profileCategory.get(self.url.profile)
         self.tags, self.length = mpdProfile.getInfo(self.url.path)
         
 MPDURL.IMPLEMENTATIONS = [MPDFile]

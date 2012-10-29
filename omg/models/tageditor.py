@@ -489,14 +489,14 @@ class TagEditorModel(QtCore.QObject):
         if record.tag not in records.tags():
             self._command('insertTag', recordCopy, pos=-1, tag=record.tag)
         # First check whether there exists already a record with the same value
-        for existingRecord in records[record.tag]:
-            if existingRecord.value == record.value:
-                newRecord = Record.merge(existingRecord,record)
-                self._command('changeRecord', recordCopy,
-                              tag=existingRecord.tag, oldRecord=existingRecord, newRecord=newRecord)
-                break
-        else:
-            self._command('insertRecord', recordCopy, pos=pos, record=record)
+        if record.tag in records.tags():
+            for existingRecord in records[record.tag]:
+                if existingRecord.value == record.value:
+                    newRecord = Record.merge(existingRecord,record)
+                    self._command('changeRecord', recordCopy,
+                                  tag=existingRecord.tag, oldRecord=existingRecord, newRecord=newRecord)
+                    return
+        self._command('insertRecord', recordCopy, pos=pos, record=record)
             
     def removeRecord(self,record):
         """Remove a record from the model."""

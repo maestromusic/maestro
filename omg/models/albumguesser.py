@@ -38,8 +38,7 @@ class StandardGuesser(profiles.Profile):
     
     className = "standardGuesser"
     
-    def __init__(self, name, albumGroupers=["album"], directoryMode=False,
-                  metaRegex=r" ?[([]?(?:cd|disc|part|teil|disk|vol)\.? ?([iI0-9]+)[)\]]?"):
+    def __init__(self, name, type, state):
         """Initialize a guesser profile with the given *name*.
         
         *albumGroupers* is the list of grouper tags;
@@ -49,14 +48,24 @@ class StandardGuesser(profiles.Profile):
         same directory.
         *metaRegex* is a regular expression that finds meta-container indicators; if it is None, this
         will be skipped."""
-        super().__init__(name)
-        self.groupTags = [tags.get(t) for t in albumGroupers]
-        self.albumTag = self.groupTags[0] if len(self.groupTags) > 0 else None
-        self.directoryMode = directoryMode
-        self.metaRegex = metaRegex
+        super().__init__(name,type,state)
         
-    def config(self):
-        return [tag.name for tag in self.groupTags], self.directoryMode, self.metaRegex
+        if state is None:
+            state = {}
+        if 'groupTags' in state:
+            self.groupTags = [tags.get(t) for t in state['groupTags']]
+        else: self.groupTags = [tags.get("album")]
+        self.albumTag = self.groupTags[0] if len(self.groupTags) > 0 else None
+        self.directoryMode = 'directoryMode' in state and state['directoryMode']
+        if 'metaRegex' in state:
+            self.metaRegex = state['metaRegex']
+        else: self.metaRegex = r" ?[([]?(?:cd|disc|part|teil|disk|vol)\.? ?([iI0-9]+)[)\]]?"
+        
+    def save(self):
+        return {'groupTags': [tag.name for tag in self.groupTags],
+                'directoryMode': self.directoryMode,
+                'metaRegex': self.metaRegex
+                }
     
     def guessAlbums(self, level, files):
         """Perform the album guessing on *level*. *files* is a dictionary mapping
@@ -154,24 +163,36 @@ class StandardGuesser(profiles.Profile):
                 if c in self.albums:
                     self.albums.remove(c)
 
-    @classmethod    
-    def configurationWidget(cls, profile = None, parent = None):
-        widget = GuessProfileConfigWidget(parent, profile)
-        return widget
+    def configurationWidget(self):
+        return GuessProfileConfigWidget(self)
 
 
-profileConfig = profiles.ProfileConfiguration("albumguesser", config.storage.editor.albumguesser, [StandardGuesser])
-profileConfig.loadConfig()
+class ProfileCategory(profiles.ProfileCategory):
+    """Subclass of ProfileCategory that loads a default profile if no profile was loaded from the storage
+    file."""
+    def loadProfiles(self):
+        super().loadProfiles()
+        if len(self.profiles) == 0:
+            self.addProfile(translate("Albumguesser","Default"))
 
-class GuessProfileConfigWidget(profiles.ConfigurationWidget):
+
+profileCategory = ProfileCategory("albumguesser",
+                                  translate("Albumguesser","Album guesser"),
+                                  config.storageObject.editor.albumguesser_profiles,
+                                  profileClass=StandardGuesser)
+profiles.manager.addCategory(profileCategory)
+
+
+class GuessProfileConfigWidget(QtGui.QWidget):
     """A widget to configure the profiles used for "guessing" album structures.
     
     Each profile is determined by its name, and contains a list of tags by which albums are grouped. One
     tag is the "main" grouper tag; this one is used to determine the TITLE-tag of the new album as well as
     for automatic meta-container guessing. Additionally, each profile sets the "directory mode" flag. If 
     that is enabled, only albums within the same directory on the filesystem will be grouped together."""
-    def __init__(self, parent, profile = None):
-        super().__init__(parent)
+    def __init__(self, profile=None):
+        super().__init__()
+        self.setSizePolicy(QtGui.QSizePolicy.MinimumExpanding,QtGui.QSizePolicy.MinimumExpanding)
         mainLayout = QtGui.QVBoxLayout(self)
         descriptionLabel = QtGui.QLabel(self.tr(
 """Configuration of the "album guessing" profiles. These profiles determine how the editor tries to \
@@ -226,12 +247,12 @@ guessing. This is useful in most cases, unless you have albums that are split ac
         
         self.setCurrentProfile(profile)
         
-    def setCurrentProfile(self, name):
-        self.profile = name
-        self.preview.setEnabled(name != None)
+    def setCurrentProfile(self, profile):
+        self.profile = profile
+        self.preview.setEnabled(profile != None)
         self.preview.clear()
-        if name != None:
-            profile = profileConfig[name]
+        
+        if profile != None:
             self.directoryModeButton.setChecked(profile.directoryMode)
             for tag in profile.groupTags:
                 item = QtGui.QListWidgetItem(tag.title)

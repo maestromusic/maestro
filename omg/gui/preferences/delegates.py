@@ -23,19 +23,22 @@ from PyQt4.QtCore import Qt
 
 from ... import application, constants, utils
 from ...core import tags
-from ..delegates import configuration
-from .. import dialogs
+from .. import dialogs, delegates, profiles as profilesgui
 
 
-class DelegatesPanel(QtGui.QWidget):
+class DelegatesPanel(profilesgui.ProfileConfigurationWidget):
+    """This widget is used in the preferences dialog."""
+    def __init__(self,parent):
+        super().__init__(delegates.profiles.category)
+
+
+class DelegatesPanelOld(QtGui.QWidget):
     """Panel widget for the delegates panel in the preferences dialog. The user can choose a delegate
     configuration and then edit its properties. With *startConfig* you can specify which configuration is
     shown at the beginning."""
-    def __init__(self,dialog,startConfig=None):
+    def __init__(self,dialog,profile=None):
         super().__init__()
         self.setLayout(QtGui.QVBoxLayout())
-        self.panels = {}
-        self._currentConfig = startConfig
         
         topLayout = QtGui.QHBoxLayout()
         self.layout().addLayout(topLayout)
@@ -129,9 +132,10 @@ class DelegateOptionsPanel(QtGui.QScrollArea):
     Two DataPiecesEditors to edit the datapieces displayed in the left and those displayed in the right
     column and a list of widgets (checkboxes, comboboxes etc.) to edit the configuration's options.
     """
-    def __init__(self,parent,config):
-        super().__init__(parent)
-        self.config = config
+    def __init__(self,profile):
+        super().__init__()
+        self.profile = profile
+        self.setMinimumSize(600,500) #TODO: make this cleverer
         
         innerWidget = QtGui.QWidget()
         layout = QtGui.QVBoxLayout(innerWidget)
@@ -155,47 +159,49 @@ class DelegateOptionsPanel(QtGui.QScrollArea):
         # Create an editor for each option
         row = 0
         self._editors = {}
-        for id,option in config.options.items():
+        for option in profile.type.options.values():
             grid.addWidget(QtGui.QLabel(option.title),row,1)
-            editor = createEditor(option.type,option.value,option.typeOptions)
+            editor = createEditor(option.type,profile.options[option.name],option.typeOptions)
             editor.valueChanged.connect(functools.partial(self._handleValueChanged,option,editor))
-            self._editors[id] = editor
+            self._editors[option.name] = editor
             grid.addWidget(editor,row,0,Qt.AlignRight)
             row += 1
         grid.setRowStretch(row,1)
         grid.setColumnStretch(1,1)
         
-        configuration.dispatcher.changes.connect(self._handleConfigurationDispatcher)
+        delegates.profiles.category.profileChanged.connect(self._handleProfileChanged)
         
     def _handleValueChanged(self,option,editor):
         """Handle a value change in the editor for the given *option*."""
-        self.config.setOption(option,editor.value)
+        self.profile.setOption(option,editor.value)
     
-    def _handleConfigurationDispatcher(self,event):
+    def _handleProfileChanged(self,profile):
         """Handle an event from the delegate configuration dispatcher."""
-        if event.type == configuration.CHANGED and event.config == self.config:
-            for id,option in self.config.options.items():
-                if option.value != self._editors[id].value:
-                    self._editors[id].value = option.value
+        if profile == self.profile:
+            for name,value in self.profile.options.items():
+                if value != self._editors[name].value:
+                    self._editors[name].value = value
                
 
 class DataPiecesModel(QtCore.QAbstractListModel):
-    def __init__(self,config,left):
+    """Depending on *left*, this model manages the datapieces in the left or right column of *profile*."""
+    def __init__(self,profile,left):
         super().__init__()
-        self.config = config
+        self.profile = profile
         self.left = left
-        configuration.dispatcher.changes.connect(self._handleDispatcher)
+        delegates.profiles.category.profileChanged.connect(self._handleProfileChanged)
     
-    def setConfig(self,config):
-        self.config = config
+    def setProfile(self,profile):
+        """Set the profile whose datapieces are managed by this model."""
+        self.profile = profile
         self.reset()
     
     def rowCount(self,parent):
         if not parent.isValid():
-            return len(self.config.getDataPieces(self.left))
+            return len(self.profile.getDataPieces(self.left))
         
     def data(self,index,role):
-        dataPiece = self.config.getDataPieces(self.left)[index.row()]
+        dataPiece = self.profile.getDataPieces(self.left)[index.row()]
         if role == Qt.DisplayRole:
             return dataPiece.title
         elif role == Qt.DecorationRole:
@@ -217,7 +223,7 @@ class DataPiecesModel(QtCore.QAbstractListModel):
             # Insert rows and return True so that Qt will call removeRows in the source view to conclude
             # the move action.
             self.beginInsertRows(QtCore.QModelIndex(),row,row+len(mimeData.dataPieces)-1)
-            self.config.insertDataPieces(self.left,row,mimeData.dataPieces,emitEvent=False)
+            self.profile.insertDataPieces(self.left,row,mimeData.dataPieces,emitEvent=False)
             self.endInsertRows()
             return True
         return False
@@ -225,7 +231,7 @@ class DataPiecesModel(QtCore.QAbstractListModel):
     def removeRows(self,row,count,parent=None):
         # This is called by Qt when a row was dragged to another place.
         # There is no need to use beginRemoveRows/endRemoveRows as the model is reset via the dispatcher.
-        self.config.removeDataPieces(self.left,row,count)
+        self.profile.removeDataPieces(self.left,row,count)
         return True
         
     def supportedDropActions(self):
@@ -240,12 +246,14 @@ class DataPiecesModel(QtCore.QAbstractListModel):
     def mimeData(self,indexList):
         return MimeData([self.data(index,Qt.EditRole) for index in indexList])
     
-    def _handleDispatcher(self,event):
-        if event.config == self.config and event.type == configuration.CHANGED:
+    def _handleProfileChanged(self,profile):
+        """Handle profile changed events from the profile category."""
+        if profile == self.profile:
             self.reset()
                 
         
 class MimeData(QtCore.QMimeData):
+    """Special mimedata class for the drag&drop of datapieces."""
     def __init__(self,dataPieces):
         super().__init__()
         self.dataPieces = dataPieces
@@ -280,7 +288,7 @@ class DataPiecesEditor(QtGui.QWidget):
         
         topLayout.addStretch()
         
-        self.model = DataPiecesModel(panel.config,left)
+        self.model = DataPiecesModel(panel.profile,left)
         self.listView = QtGui.QListView()
         self.listView.setModel(self.model)
         self.listView.setDragEnabled(True)
@@ -298,7 +306,7 @@ class DataPiecesEditor(QtGui.QWidget):
         self.addDataBox.addItem(utils.getIcon('add.png'),
                         self.tr("Add to left column...") if self.left else self.tr("Add to right column..."))
         separatorInserted = False
-        for data in configuration.availableDataPieces():
+        for data in delegates.profiles.availableDataPieces():
             if data.tag is not None:
                 if data.tag.icon is not None:
                     self.addDataBox.addItem(data.tag.icon,data.title,data)
@@ -315,19 +323,20 @@ class DataPiecesEditor(QtGui.QWidget):
         if index == 0:
             return # 'Add to left column...' was selected
         dataPiece = self.addDataBox.itemData(index)
-        if not self.panel.config.hasDataPiece(dataPiece):
-            self.panel.config.addDataPiece(self.left,dataPiece)
+        if not self.panel.profile.hasDataPiece(dataPiece):
+            self.panel.profile.addDataPiece(self.left,dataPiece)
         self.addDataBox.setCurrentIndex(0)
 
     def _handleRemoveData(self):
         """Handle a click on the remove button."""
-        allData = self.panel.config.getDataPieces(self.left)
+        allData = self.panel.profile.getDataPieces(self.left)
         remainingData = [allData[i] for i in range(len(allData))
                             if not self.listView.selectionModel().isRowSelected(i,QtCore.QModelIndex())]
-        self.panel.config.setDataPieces(self.left,remainingData)
+        self.panel.profile.setDataPieces(self.left,remainingData)
         
         
 class ListWidget(QtGui.QListWidget):
+    """Special list widget with the drag&drop handling necessary for DataPiecesEditor."""
     def __init__(self):
         super().__init__()
         self.setDragEnabled(True)
@@ -458,7 +467,7 @@ class DataPieceEditor(QtGui.QComboBox):
         self.clear()
         self.addItem(self.tr("None"),None)
         self.insertSeparator(1)
-        for dataPiece in configuration.availableDataPieces():
+        for dataPiece in delegates.profiles.availableDataPieces():
             if dataPiece.tag is not None and dataPiece.tag.icon is not None:
                 self.addItem(dataPiece.tag.icon,dataPiece.title,dataPiece)
             else: self.addItem(dataPiece.title,dataPiece)
@@ -466,7 +475,7 @@ class DataPieceEditor(QtGui.QComboBox):
                 self.setCurrentIndex(self.count()-1)
         # Insert a separator after all tags, before stuff like length
         self.insertSeparator(
-                    len([data for data in configuration.availableDataPieces() if data.tag is not None])+2)
+                len([data for data in delegates.profiles.availableDataPieces() if data.tag is not None])+2)
                 
     def getValue(self):
         return self.itemData(self.currentIndex(),Qt.UserRole)

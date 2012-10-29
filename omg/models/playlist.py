@@ -86,8 +86,8 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
 
     def _buildWrappersFromUrls(self, urls):
         """Build wrappers for the given urls and if possible add containers.
-        
-        In other words: convert a flat playlist to a tree playlist."""
+        In other words: convert a flat playlist to a tree playlist.
+        """
         files = [Wrapper(element) for element in self.level.getFromUrls(urls)]
         wrappers = treebuilder.buildTree(self.level, files)
         for i in range(len(wrappers)):
@@ -250,8 +250,7 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         if any(p in wrappers for p in parent.getParents(includeSelf=True)):
             return False
         
-        application.stack.beginMacro(self.tr("Move elements"))
-        application.stack.push(ConditionalCommand(onRedo=False,method=self._updateCurrentlyPlayingNodes))
+        application.stack.beginMacro(self.tr("Move elements"),finalMethod=self._updateCurrentlyPlayingNodes)
         
         # First change the backend
         # We use a special command to really move songs within the backend (contrary to removing and
@@ -279,7 +278,6 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         self._dontGlueAway = None
         self.insert(parent,position,wrappers,updateBackend=False)
                 
-        application.stack.push(ConditionalCommand(onRedo=True,method=self._updateCurrentlyPlayingNodes))
         application.stack.endMacro()
         return True
         
@@ -379,7 +377,6 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         self.__class__ = PlaylistModel.__bases__[0]
         self.split(parent,position)
         self.__class__ = PlaylistModel
-        return
     
     def wrapperString(self):
         """Return a representation of the playlist as wrapperstring (see Node.getWrapperString). External
@@ -479,8 +476,9 @@ class PlaylistChangeCommand(wrappertreemodel.ChangeCommand):
         
     def undo(self):
         super().undo()
-        paths = list(f.element.path for f in self.model.root.getAllFiles())
-        self.model.backend.setPlaylist(paths)
+        urls = list(f.element.url for f in self.model.root.getAllFiles())
+        self.model.backend.setPlaylist(urls)
+        self.model._updateCurrentlyPlayingNodes()
         
 
 class PlaylistMoveInBackendCommand(QtGui.QUndoCommand):
@@ -519,23 +517,3 @@ class PlaylistMoveInBackendCommand(QtGui.QUndoCommand):
     def undo(self):
         for move in reversed(self.moves):
             self.model.backend.move(move[1],move[0])
-            
-
-class ConditionalCommand(QtGui.QUndoCommand):
-    """This UndoCommand executes *method* only on redo or only on undo, depending on *onRedo*. This can be
-    used to create a macro that calls *method* after all commands, irrespective of the direction. Usually
-    *method* will update something based on the changes done in the macro.
-    """
-    def __init__(self,onRedo,method):
-        super().__init__()
-        self.onRedo = onRedo
-        self.method = method
-        
-    def redo(self):
-        if self.onRedo:
-            self.method()
-            
-    def undo(self):
-        if not self.onRedo:
-            self.method()
-            

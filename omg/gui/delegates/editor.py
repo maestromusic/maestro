@@ -18,20 +18,21 @@
 
 from PyQt4 import QtCore
 
-from . import StandardDelegate, configuration
+from . import profiles, StandardDelegate
 
 translate = QtCore.QCoreApplication.translate
 
 
 class EditorDelegate(StandardDelegate):
     """Delegate for the editor."""
-    
-    configurationType, defaultConfiguration = configuration.createConfigType(
-                'editor',
-                translate("Delegates","Editor"),
-                StandardDelegate.options,
-                ['t:album','t:composer','t:artist','t:performer'],
-                ['t:date','t:genre','t:conductor'],
-                {"showPaths": True, 'showMajor': True, 'appendRemainingTags': True, 'showAllAncestors': True}
+
+    profileType = profiles.createProfileType(
+            name      = 'editor',
+            title     = translate("Delegates","Editor"),
+            leftData  = ['t:album','t:composer','t:artist','t:performer'],
+            rightData = ['t:date','t:genre','t:conductor'],
+            overwrite = {'showPaths': True,
+                         'showMajor': True,
+                         'appendRemainingTags': True,
+                         'showAllAncestors': True}
     )
-    
