@@ -34,6 +34,8 @@ profileCategory = profiles.TypedProfileCategory('playback',
                                                 config.storageObject.player.profiles)
 profiles.manager.addCategory(profileCategory)
 
+class BackendError(Exception):
+    pass
 
 class PlayerBackend(profiles.Profile):
     """This is the base class for modules that implement connection to a backend

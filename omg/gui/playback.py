@@ -104,7 +104,6 @@ class PlaybackWidget(QtGui.QDockWidget):
             if self.backend.current() is not None:
                 total = self.backend.current().element.length
             else:
-                assert current == 0
                 total = 0
             if self.seekSlider.maximum() != total:
                 self.seekSlider.setRange(0, int(total))
@@ -131,8 +130,9 @@ class PlaybackWidget(QtGui.QDockWidget):
         self.backend.setState(player.STOP)
     
     def handleConnectionChange(self, state):
-        for item in self.previousButton, self.ppButton, self.stopButton, self.nextButton, self.seekSlider, self.seekLabel:
-            item.setEnabled(state == player.CONNECTED)
+        for item in self.previousButton, self.ppButton, self.stopButton, \
+                    self.nextButton, self.seekSlider, self.seekLabel, self.volumeLabel:
+            item.setEnabled(state is player.CONNECTED)
         if state == player.CONNECTING:
             self.titleLabel.setText(self.tr("connecting..."))
         elif state == player.DISCONNECTED:

@@ -19,13 +19,13 @@
 import itertools, urllib
 
 from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import Qt 
 
 from . import wrappertreemodel, treebuilder
-from .. import application, config, utils
+from .. import application, config, logging, player, utils
 from ..core import levels
 from ..core.nodes import RootNode, Wrapper
 
+logger = logging.getLogger(__name__)
  
 class PlaylistModel(wrappertreemodel.WrapperTreeModel):
     """Model for Playlists of a player backend."""
@@ -220,6 +220,11 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         # Insert
         command = PlaylistInsertCommand(self,parent,position,wrappers,updateBackend)
         application.stack.push(command)
+        if command.error is not None:
+            application.stack.endMacro()
+            logger.warning('INSERT ERROR: {}'.format(command.error))
+            application.stack.clear()
+            return
         
         # Glue at the edges
         self.glue(parent,position+len(wrappers))
@@ -413,19 +418,25 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         
 class PlaylistInsertCommand(wrappertreemodel.InsertCommand):
     """Subclass of InsertCommand that additionally changes the backend."""
-    def __init__(self,model,parent,position,wrappers,updateBackend):
-        super().__init__(model,parent,position,wrappers)
-        #print("This is a PlaylistInsertCommand for {} {} {} ".format(parent,position,wrappers))
+    
+    def __init__(self, model, parent, position, wrappers, updateBackend):
+        super().__init__(model, parent, position, wrappers)
         self._updateBackend = updateBackend
         self._count = sum(w.fileCount() for w in wrappers)
+        self.error = None
     
     def redo(self):
-        super().redo()
         if self._updateBackend:
             offset = self.parent.contents[self.position].offset()
             files = itertools.chain.from_iterable(w.getAllFiles() for w in self.wrappers)
-            self.model.backend.insertIntoPlaylist(offset,(f.element.url for f in files))
-        else: self._updateBackend = True
+            try:
+                self.model.backend.insertIntoPlaylist(offset,(f.element.url for f in files))
+            except player.BackendError as e:
+                self.error = e
+                return
+        else:
+            self._updateBackend = True
+        super().redo()
         
     def undo(self):
         offset = self.parent.contents[self.position].offset()

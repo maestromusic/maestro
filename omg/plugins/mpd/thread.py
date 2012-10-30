@@ -16,6 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+import time
 import socket, threading
 
 import mpd
@@ -104,24 +105,6 @@ class MPDThread(QtCore.QThread):
             # song number does not change this is not sent to OMG. So we force emitting the current song.
             self._updateAttributes(emitCurrent=True)
             self.syncCallEvent.set()
-        
-        elif what == "getTags":
-            info = self.client.listallinfo(how)[0]
-            storage = tags.Storage()
-            length = None
-            for key, values in info.items():
-                if key in ("file", "last-modified", "track"):
-                    #  mpd delivers these but they aren't keys
-                    continue
-                if key == "time":
-                    length = int(values)
-                    continue
-                tag = tags.get(key)
-                if not isinstance(values, list):
-                    values = [ values ]
-                storage[tag] = [ tag.convertValue(value, crop=True) for value in values ]
-            self.getInfoData = (how, storage, length)
-            self.syncCallEvent.set()
         else:
             logger.error('Unknown command: {}'.format(what, how))
     
@@ -169,9 +152,8 @@ class MPDThread(QtCore.QThread):
                 oldSongsThere = self.mpd_playlist[-numShifted:]
             if all (a == b for a,b in zip(newSongsThere, oldSongsThere)):
                 firstInserted = len(self.mpd_playlist) - numShifted
-                insertions = changes[:numInserted]
-                self.mpd_playlist[firstInserted:firstInserted] = insertions
-                self.changeFromMPD.emit('insert', insertions)
+                self.mpd_playlist[firstInserted:firstInserted] = [file for pos, file in changes[:numInserted]]
+                self.changeFromMPD.emit('insert', changes[:numInserted])
                 return
         
         # other cases: update self.mpd_playlist and emit a generic "playlist" change message.
@@ -192,7 +174,14 @@ class MPDThread(QtCore.QThread):
         # check if current song has changed. If so, update length of current song
         if "song" in self.mpd_status:
             current = int(self.mpd_status["song"])
-        else: current = None
+        else:
+            current = None
+        if "elapsed" in self.mpd_status:
+            self.elapsed = float(self.mpd_status["elapsed"])
+            if emit:
+                self.changeFromMPD.emit('elapsed', self.calculateStart(self.elapsed))
+        else:
+            self.elapsed = None
         if current != self.current or emitCurrent:
             self.current = current
             if current != None:
@@ -215,6 +204,11 @@ class MPDThread(QtCore.QThread):
                     self.changeFromMPD.emit('current', (None, 0))
         self.state = state
     
+    def calculateStart(self, elapsed):
+        if elapsed is None:
+            return None
+        return time.time() - elapsed
+
     def updatePlaylist(self, emit=True, emitCurrent=False):
         """Get current status from MPD, update attributes of this object and emit
         messages if something has changed."""
@@ -229,7 +223,7 @@ class MPDThread(QtCore.QThread):
         self.updatePlaylist(False)
         self.updatePlayer(False)    
         self.changeFromMPD.emit('connect', (self.mpd_playlist[:], self.current,
-                                            self.currentLength, self.elapsed,
+                                            self.currentLength, self.calculateStart(self.elapsed),
                                             self.state))
         self.connected = True  
     
@@ -248,14 +242,12 @@ class MPDThread(QtCore.QThread):
                 if not self.connected:
                     self.connect()
                 self.watchMPDStatus()
-            except mpd.ConnectionError:
+            except (mpd.ConnectionError, socket.error) as e:
+                self.disconnect()
                 logger.debug('MPD {} could not connect'.format(self.host))
-                self.sleep(5)
-            except socket.error:
-                logger.debug('Connection to MPD {} failed'.format(self.host))
+                #self.changeFromMPD.emit('disconnect', 'no connection to MPD host')
                 self.sleep(5)
         
-    
     def quit(self):
         self.disconnect()
         super().quit()
@@ -264,18 +256,19 @@ class MPDThread(QtCore.QThread):
         while True:
             self.idler.send_idle()
             changed = self.idler.fetch_idle()
-            self.mpd_status = self.idler.status()
-            if 'mixer' in changed:
-                self.updateMixer()
-                changed.remove('mixer')
-            if 'playlist' in changed:
-                self.updatePlaylist()
-                changed.remove('playlist')
-            if 'player' in changed:
-                self.updatePlayer()
-                changed.remove('player')
-            if len(changed) > 0:
-                logger.warning('unhandled MPD changes: {}'.format(changed))
+            with self.atomicOp:
+                self.mpd_status = self.idler.status()
+                if 'mixer' in changed:
+                    self.updateMixer()
+                    changed.remove('mixer')
+                if 'playlist' in changed:
+                    self.updatePlaylist()
+                    changed.remove('playlist')
+                if 'player' in changed:
+                    self.updatePlayer()
+                    changed.remove('player')
+                if len(changed) > 0:
+                    logger.warning('unhandled MPD changes: {}'.format(changed))
             
             
     def updateDB(self):
