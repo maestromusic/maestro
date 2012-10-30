@@ -53,6 +53,7 @@ import datetime
 
 from ... import logging
 transactionLogger = logging.getLogger("transaction")
+logger = logging.getLogger(__name__)
 
 
 # When a driver is loaded _modules[driverIdentifier] will contain the driver's module.
@@ -95,11 +96,11 @@ def newConnection(drivers):
     for driver in drivers:
         try:
             if driver not in _modules:
-                _modules[driver] = __import__(driver,globals(),locals())
+                import importlib
+                _modules[driver] = importlib.import_module("."+driver, __package__) #__import__(driver,globals(),locals())
             return _modules[driver].Sql()
         except Exception as e:
-            import logging
-            logging.warning("Could not load driver {}: {}".format(driver,e))
+            logger.warning("Could not load driver {}: {}".format(driver,e))
             # Try next driver...
     else: raise DBException("Couldn't load any driver from {}".format(drivers))
     
