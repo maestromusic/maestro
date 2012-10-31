@@ -92,7 +92,6 @@ class UndoStack(QtCore.QObject):
         elif finalMethod is not None:
             raise ValueError("finalMethod may only be used with the outermost macro.")
         
-        
     def push(self,command):
         """Add a command to the stack. This calls the command's redo-method."""
         if not isinstance(command,(QtGui.QUndoCommand,SubstackCommand)):
@@ -134,7 +133,7 @@ class UndoStack(QtCore.QObject):
             raise UndoStackError("Cannot end a macro during undo/redo.")
         self._currentMacro.undo()
         self._currentMacro = None
-        self._eventQueue = None
+        self._eventQueue = []
         self._macroDepth = 0
 
     def clear(self):
