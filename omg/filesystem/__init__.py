@@ -41,9 +41,10 @@ def init():
         return
     synchronizer = FileSystemSynchronizer()
     synchronizer.eventThread.start()
-    levels.real.filesRenamed.connect(synchronizer.handleRename)
-    levels.real.filesAdded.connect(synchronizer.handleAdd)
-    levels.real.filesRemoved.connect(synchronizer.handleRemove)
+    levels.real.filesRenamed.connect(synchronizer.handleRename, Qt.QueuedConnection)
+    levels.real.filesAdded.connect(synchronizer.handleAdd, Qt.QueuedConnection)
+    levels.real.filesRemoved.connect(synchronizer.handleRemove, Qt.QueuedConnection)
+    levels.real.filesModified.connect(synchronizer.handleModify, Qt.QueuedConnection)
     null = open(os.devnull)
     enabled = True
     
@@ -193,7 +194,7 @@ class SynchronizeHelper(QtCore.QObject):
     
     @QtCore.pyqtSlot(object)
     def addFileHashes(self, newHashes):
-        db.multiQuery("UPDATE {}files SET hash=? WHERE element_id=?"
+        db.multiQuery("UPDATE {}files SET hash=?, verified=CURRENT_TIMESTAMP WHERE element_id=?"
                       .format(db.prefix), [ (track.hash, track.id) for track in newHashes ]) 
 
     @QtCore.pyqtSlot(int, object)
@@ -224,7 +225,10 @@ class EventThread(QtCore.QThread):
     def run(self):
         self.timer.start(config.options.filesystem.scan_interval*1000)
         self.exec_()
-        db.close()               
+        db.close()
+        
+    def __str__(self):
+        return "FilesystemThread"  
 
 class FileSystemSynchronizer(QtCore.QObject):
     
@@ -245,12 +249,14 @@ class FileSystemSynchronizer(QtCore.QObject):
         self.moveToThread(self.eventThread)
         self.moveDetected.connect(self.helper.changeURL)
         self.lostTracksDetected.connect(self.helper.showLostTracksDialog)
+        self.hashesComputed.connect(self.helper.addFileHashes)
         self.eventThread.started.connect(self.init)
         self.eventThread.timer.timeout.connect(self.scanFilesystem)
         self.tracks = {}
         self.dbTracks = set()
         self.dbDirectories = set()
         self.directories = {}
+        self.modifiedTags = {}
 
     def loadFolders(self):
         for path, state in db.query(
@@ -517,6 +523,22 @@ class FileSystemSynchronizer(QtCore.QObject):
             stateChanges += oldDir.updateState(True, False, True, self.folderStateChanged)
         self.updateDirectories(stateChanges)
     
+    @QtCore.pyqtSlot(list)
+    def handleModify(self, urls):
+        """Called when files were modified on the disk. Updates hashes & timestamp."""
+        for url in urls:
+            if url not in self.tracks:
+                continue
+            track = self.tracks[url]
+            track.modified = mTimeStamp(url)
+            track.hash = computeHash(track.url)
+            if track.id is None:
+                db.query("UPDATE {}newfiles "
+                         "  SET hash=?, verified=CURRENT_TIMESTAMP WHERE url=?".format(db.prefix),
+                         track.hash, str(track.url))
+            else:
+                self.hashesComputed.emit([track])
+            
     @QtCore.pyqtSlot(object)
     def handleRename(self, renamings):
         db.transaction()

@@ -35,6 +35,7 @@ class RealLevel(levels.Level):
     filesRenamed = QtCore.pyqtSignal(object)
     filesAdded = QtCore.pyqtSignal(list)
     filesRemoved = QtCore.pyqtSignal(list)
+    filesModified = QtCore.pyqtSignal(list)
     
     def __init__(self):
         super().__init__('REAL', None)
@@ -275,21 +276,22 @@ class RealLevel(levels.Level):
         
         db.transaction()
         dbRemovals = [(el.id,tag.id,db.idFromValue(tag,value))
-                      for el,diff in changes.items() for tag,value in diff.getRemovals() if tag.isInDB()]
+                      for el,diff in changes.items() if el.isInDB() \
+                      for tag,value in diff.getRemovals() if tag.isInDB()]
         if len(dbRemovals):
             db.multiQuery("DELETE FROM {}tags WHERE element_id=? AND tag_id=? AND value_id=?"
                           .format(db.prefix),dbRemovals)
             
         dbAdditions = [(el.id,tag.id,db.idFromValue(tag,value,insert=True))
-                       for el,diff in changes.items() for tag,value in diff.getAdditions() if tag.isInDB()]
+                       for el,diff in changes.items() if el.isInDB() \
+                       for tag,value in diff.getAdditions() if tag.isInDB()]
         if len(dbAdditions):
             db.multiQuery("INSERT INTO {}tags (element_id,tag_id,value_id) VALUES (?,?,?)"
                           .format(db.prefix),dbAdditions)
-        files = [ (elem.id, ) for elem in changes if elem.isFile() ]
-        if len(files) > 0:
-            db.multiQuery("UPDATE {}files SET verified=CURRENT_TIMESTAMP WHERE element_id=?".format(db.prefix),
-                          files)
         db.commit()
+        files = [ elem for elem in changes if elem.isFile() ]
+        if len(files) > 0:
+            self.filesModified.emit(files)
         super()._changeTags(changes, emitEvent)
         
     def _changeFlags(self, changes, emitEvent=True):

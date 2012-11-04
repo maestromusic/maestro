@@ -52,6 +52,7 @@ every driver.
 import datetime
 
 from ... import logging
+from PyQt4.QtCore import QThread
 transactionLogger = logging.getLogger("transaction")
 logger = logging.getLogger(__name__)
 
@@ -168,7 +169,7 @@ class AbstractSql:
         """
         self._transactionDepth += 1
         if self._transactionDepth == 1:
-            transactionLogger.debug("OPEN")
+            transactionLogger.debug("OPEN {}".format(QThread.currentThread()))
         return self._transactionDepth == 1
         
     def commit(self):
@@ -176,7 +177,7 @@ class AbstractSql:
         if just a nested transaction was closed)."""
         self._transactionDepth -= 1
         if self._transactionDepth == 0:
-            transactionLogger.debug("CLOSE")
+            transactionLogger.debug("CLOSE {}".format(QThread.currentThread()))
         return self._transactionDepth == 0
         
     def rollback(self):

@@ -80,7 +80,6 @@ class CreateDBElementsCommand(QtGui.QUndoCommand):
             db.write.addFiles(addFileData)
             db.multiQuery("UPDATE {}files SET verified=CURRENT_TIMESTAMP WHERE element_id=?"
                           .format(db.prefix), [(f.id,) for f in newFiles])
-            levels.real.filesAdded.emit(newFiles)
         for element in self.elements:
             db.write.setTags(element.id, element.tags)
             db.write.setFlags(element.id, element.flags)
@@ -90,6 +89,8 @@ class CreateDBElementsCommand(QtGui.QUndoCommand):
         if self.newInLevel:
             levels.real.loadFromDB(self.idMap.values(), levels.real)
         db.commit()
+        if len(addFileData) > 0:
+            levels.real.filesAdded.emit(newFiles)
         for level in levels.allLevels:
             level.emitEvent(set(self.idMap.values()) & set(level.elements.keys()))
         

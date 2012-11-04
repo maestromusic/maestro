@@ -28,11 +28,11 @@ logger = logging.getLogger(__name__)
 class Sql(AbstractSql):
     _inTransaction = False
     
-    def connect(self,path, isolation_level = None):
+    def connect(self,path, isolation_level=None):
         # There doesn't seem to be a real documentation of the isolation_level parameter. 
         # But I like the conclusion of this discussion:
         # http://mail.python.org/pipermail/python-list/2010-March/1239395.html
-        self._db = sqlite3.connect(path, isolation_level = isolation_level)
+        self._db = sqlite3.connect(path, isolation_level=isolation_level)
         # Foreign keys must be enabled in each connection
         self._db.execute("PRAGMA foreign_keys = ON")
 
