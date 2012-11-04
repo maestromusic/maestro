@@ -95,7 +95,7 @@ class MPDPlayerBackend(player.PlayerBackend):
         self.mpdthread.password = password
         if self.commanderConnected:
             self.commander.disconnect()
-            with self.prepareCommander:
+            with self.prepareCommander():
                 pass
             self.mpdthread.shouldConnect.clear()
             self.mpdthread.disconnect()
@@ -126,13 +126,13 @@ class MPDPlayerBackend(player.PlayerBackend):
         return self._state
     
     def setState(self, state):
-        self.prepareCommander()
-        if state is player.PLAY:
-            self.commander.play()
-        elif state is player.PAUSE:
-            self.commander.pause(1)
-        elif state is player.STOP:
-            self.commander.stop()
+        with self.prepareCommander():
+            if state is player.PLAY:
+                self.commander.play()
+            elif state is player.PAUSE:
+                self.commander.pause(1)
+            elif state is player.STOP:
+                self.commander.stop()
     
     def volume(self):
         return self._volume
@@ -145,16 +145,16 @@ class MPDPlayerBackend(player.PlayerBackend):
         return self.playlist.current
 
     def setCurrent(self, index):
-        self.prepareCommander()
-        self.commander.play(index if index is not None else -1)
+        with self.prepareCommander():
+            self.commander.play(index if index is not None else -1)
     
     def nextSong(self):
-        self.prepareCommander()
-        self.commander.next()
+        with self.prepareCommander():
+            self.commander.next()
         
     def previousSong(self):
-        self.prepareCommander()
-        self.commander.previous()
+        with self.prepareCommander():
+            self.commander.previous()
     
     def currentOffset(self):
         if self._current < 0:

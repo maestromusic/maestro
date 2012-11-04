@@ -279,7 +279,7 @@ class TypedProfileCategory(ProfileCategory):
             i += 1
         return name
     
-    def getFromStorage(self,name,restrictToType=None):
+    def getFromStorage(self, name, restrictToType=None):
         """Return the profile of the given name if it exists or any other profile else. Use this method
         to load profiles from states saved in the storage file.
         
@@ -288,7 +288,7 @@ class TypedProfileCategory(ProfileCategory):
         # Return the profile given by name if it exists and its type fits
         if name is not None:
             profile = self.get(name)
-            if profile is not None and restrictToType is None and profile.type == restrictToType:
+            if profile is not None and restrictToType is None or profile.type == restrictToType:
                 return profile
         # Return the first profile whose type fits
         for profile in self.profiles:

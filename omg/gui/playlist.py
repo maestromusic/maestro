@@ -89,7 +89,7 @@ class PlaylistWidget(QtGui.QDockWidget):
             backend = None
             delegateProfile = delegates.profiles.category.get("Playlist")
         else:
-            backend = player.profileCategory.getFromStorage(state.get('backend'))
+            backend = player.profileCategory.getFromStorage(state['backend'])
             delegateProfile = delegates.profiles.category.getFromStorage(state.get('delegate'),profileType)
         
         self.treeview = PlaylistTreeView(delegateProfile)
