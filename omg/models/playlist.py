@@ -427,7 +427,10 @@ class PlaylistInsertCommand(wrappertreemodel.InsertCommand):
     
     def redo(self):
         if self._updateBackend:
-            offset = self.parent.contents[self.position].offset()
+            if len(self.parent.contents) == 0:
+                offset = 0
+            else:
+                offset = self.parent.contents[self.position].offset()
             files = itertools.chain.from_iterable(w.getAllFiles() for w in self.wrappers)
             try:
                 self.model.backend.insertIntoPlaylist(offset,(f.element.url for f in files))

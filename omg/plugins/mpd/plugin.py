@@ -90,6 +90,17 @@ class MPDPlayerBackend(player.PlayerBackend):
     
     def setConnectionParameters(self, host, port, password):
         #TODO reconnect
+        self.mpdthread.host = host
+        self.mpdthread.port = port
+        self.mpdthread.password = password
+        if self.commanderConnected:
+            self.commander.disconnect()
+            with self.prepareCommander:
+                pass
+            self.mpdthread.shouldConnect.clear()
+            self.mpdthread.disconnect()
+            self.mpdthread.shouldConnect.set()
+            
         player.profileCategory.profileChanged.emit(self)
         
     def save(self):
@@ -356,6 +367,7 @@ class MPDConfigWidget(QtGui.QWidget):
         port = int(self.portEdit.text())
         password = self.passwordEdit.text()
         self.profile.setConnectionParameters(host, port, password)
+        player.profileCategory.save()
         
     def _handleReset(self):
         """Reset the form to the stored values."""
