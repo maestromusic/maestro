@@ -22,10 +22,10 @@ from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
 from .. import application
-from ..core import levels
+from ..core import levels, tags
 from ..models.leveltreemodel import LevelTreeModel
 from ..gui import delegates, treeactions, treeview
-from ..gui.delegates import abstractdelegate, configuration
+from ..gui.delegates import abstractdelegate, editor as editordelegate
 
 import os.path
 
@@ -34,19 +34,14 @@ translate = QtCore.QCoreApplication.translate
 
 class LostFilesDelegate(delegates.StandardDelegate):
     
-    configurationType, defaultConfiguration = configuration.createConfigType(
-                'lostfiles',
-                translate("Delegates","LostFiles"),
-                delegates.StandardDelegate.options,
-                [],
-                [],
-                {"showPaths": True, 'showMajor': False, 
-                 'appendRemainingTags': False, 'showAllAncestors': True,
-                 'showFlagIcons' : True}
-    )
-    
-    def __init__(self, view): 
-        super().__init__(view) 
+    def __init__(self, view):
+        self.profile = delegates.profiles.DelegateProfile("lostfiles") 
+        super().__init__(self.profile)
+        self.options['showPaths'] = True
+        self.options['showMajer'] = False
+        self.options['appendRemainingTags'] = False
+        self.options['showAllAncestors'] = True
+        self.options['showFlagIcons'] = True
         self.goodPathStyle = abstractdelegate.DelegateStyle(1, False, True, Qt.darkGreen)
         self.badPathStyle = abstractdelegate.DelegateStyle(1, False, True, Qt.red)
         
@@ -57,6 +52,7 @@ class LostFilesDelegate(delegates.StandardDelegate):
             else:
                 style = self.badPathStyle
             self.addCenter(delegates.TextItem(element.url.path, style))
+
 
 class SetPathAction(treeactions.TreeAction):
     """Action to rename (or move) a file."""
@@ -138,3 +134,62 @@ class MissingFilesDialog(QtGui.QDialog):
         
         self.setLayout(layout)
         self.resize(800,400)
+
+
+class ModifiedTagsDialog(QtGui.QDialog):
+    
+    def __init__(self, track, dbTags, fsTags):
+        super().__init__(application.mainWindow)
+        self.track = track
+        self.dbTags = dbTags
+        self.fsTags = fsTags
+        self.setModal(True)
+        self.setWindowTitle(self.tr('Modified Tags Detected'))
+        layout = QtGui.QGridLayout()
+        layout.addWidget(QtGui.QLabel(self.tr("<b>In Database:</b>")), 0, 0)
+        layout.addWidget(QtGui.QLabel(self.tr("<b>On Disk:</b>")), 0, 1)
+        
+        delegateProfile = delegates.profiles.category.getFromStorage(
+                                None, editordelegate.EditorDelegate.profileType)
+        dbElem = levels.real.get(track.id)
+        
+        dbModel = LevelTreeModel(levels.real, [dbElem])
+        dbTree = treeview.TreeView(levels.real, affectGlobalSelection=False)
+        dbTree.setRootIsDecorated(False)
+        dbTree.setModel(dbModel)
+        dbTree.setItemDelegate(editordelegate.EditorDelegate(dbTree, delegateProfile))
+        fsLevel = levels.real.subLevel([dbElem], 'tmp')
+        fsElem = fsLevel.get(track.id)
+        fsElemTags = fsElem.tags
+        nonPrivateTags = [tag for tag in fsElemTags if not tag.private]
+        for tag in nonPrivateTags:
+            del fsElemTags[tag]
+        for tag, values in fsTags.items():
+            fsElemTags[tag] = values
+        fsModel = LevelTreeModel(fsLevel, [fsLevel.get(track.id)])
+        fsTree = treeview.TreeView(fsLevel, affectGlobalSelection=False)
+        fsTree.setRootIsDecorated(False)
+        fsTree.setModel(fsModel)
+        fsTree.setItemDelegate(editordelegate.EditorDelegate(fsTree, delegateProfile))
+        
+        layout.addWidget(dbTree, 1, 0)
+        layout.addWidget(fsTree, 1, 1)
+        
+        dbButton = QtGui.QPushButton(self.tr("use DB tags"))
+        fsButton = QtGui.QPushButton(self.tr("use disk tags"))
+        
+        layout.addWidget(dbButton, 2, 0)
+        layout.addWidget(fsButton, 2, 1)
+        
+        dbButton.clicked.connect(self.useDBTags)
+        fsButton.clicked.connect(self.useFSTags)
+        
+        self.setLayout(layout)
+        
+    def useDBTags(self):
+        self.choice = 'DB'
+        self.accept()
+    
+    def useFSTags(self):
+        self.choice = 'FS'
+        self.accept()

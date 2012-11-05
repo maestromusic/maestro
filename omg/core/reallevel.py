@@ -271,8 +271,9 @@ class RealLevel(levels.Level):
         super()._changePositions(parent, changes, emitEvent)
         db.write.changePositions(parent.id, list(changes.items()))
     
-    def _changeTags(self, changes, emitEvent=True):
-        filebackends.changeTags(changes) # might raise TagWriteError
+    def _changeTags(self, changes, emitEvent=True, dbOnly=False):
+        if not dbOnly:
+            filebackends.changeTags(changes) # might raise TagWriteError
         
         db.transaction()
         dbRemovals = [(el.id,tag.id,db.idFromValue(tag,value))
@@ -290,7 +291,7 @@ class RealLevel(levels.Level):
                           .format(db.prefix),dbAdditions)
         db.commit()
         files = [ elem for elem in changes if elem.isFile() ]
-        if len(files) > 0:
+        if len(files) > 0 and not dbOnly:
             self.filesModified.emit(files)
         super()._changeTags(changes, emitEvent)
         
