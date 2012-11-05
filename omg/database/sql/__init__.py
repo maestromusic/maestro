@@ -55,6 +55,8 @@ from ... import logging
 from PyQt4.QtCore import QThread
 transactionLogger = logging.getLogger("transaction")
 logger = logging.getLogger(__name__)
+import threading
+transactionLock = threading.RLock()
 
 
 # When a driver is loaded _modules[driverIdentifier] will contain the driver's module.
@@ -167,6 +169,7 @@ class AbstractSql:
         all changes are performed in the database. This method returns True, if the outermost transaction has
         been started.
         """
+        transactionLock.acquire()
         self._transactionDepth += 1
         if self._transactionDepth == 1:
             transactionLogger.debug("OPEN {}".format(QThread.currentThread()))
@@ -178,6 +181,7 @@ class AbstractSql:
         self._transactionDepth -= 1
         if self._transactionDepth == 0:
             transactionLogger.debug("CLOSE {}".format(QThread.currentThread()))
+        transactionLock.release()
         return self._transactionDepth == 0
         
     def rollback(self):
