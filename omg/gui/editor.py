@@ -54,7 +54,7 @@ class EditorTreeView(treeview.TreeView):
         self.setDefaultDropAction(Qt.MoveAction)
         self.setDropIndicatorShown(True)
         self.setModel(EditorModel())
-        self.setItemDelegate(editordelegate.EditorDelegate(self,delegateProfile))
+        self.setItemDelegate(editordelegate.EditorDelegate(self, delegateProfile))
         self.viewport().setMouseTracking(True)
         self.autoExpand = True
         self.model().rowsInserted.connect(self._expandInsertedRows)
