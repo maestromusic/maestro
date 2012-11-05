@@ -353,15 +353,25 @@ class Level(application.ChangeEventDispatcher):
             raise ConsistencyError('Position conflict: cannot perform change')
         command = GenericLevelCommand(redoMethod=self._changePositions,
                                       redoArgs={"parent" : parent,
-                                                "changes" : changes,
-                                                "emitEvent" : True},
+                                                "changes" : changes},
                                       undoMethod=self._changePositions,
                                       undoArgs={"parent" : parent,
-                                                "changes" : {b:a for a,b in changes.items()},
-                                                "emitEvent" : True},
+                                                "changes" : {b:a for a,b in changes.items()}},
                                       text=self.tr("change positions"))
         self.stack.push(command)
     
+    def setContents(self, parent, contents):
+        """Undoably set the contents of *parent*, overwriting any existing content list.
+        """
+        command = GenericLevelCommand(redoMethod=self._setContents,
+                                      redoArgs={"parent" : parent,
+                                                "contents" : contents.copy()},
+                                      undoMethod=self._setContents,
+                                      undoArgs={"parent" : parent,
+                                                "contents" : parent.contents.copy()},
+                                      text=self.tr("set contents"))
+        self.stack.push(command)
+        
     def insertContents(self, parent, insertions):
         """Insert contents with predefined positions into a container.
         
@@ -369,12 +379,10 @@ class Level(application.ChangeEventDispatcher):
         """
         command = GenericLevelCommand(redoMethod=self._insertContents,
                                       redoArgs={"parent" : parent,
-                                                "insertions" : insertions,
-                                                "emitEvent" : True},
+                                                "insertions" : insertions},
                                       undoMethod=self._removeContents,
                                       undoArgs={"parent" : parent,
-                                                "positions" : [pos for pos,_ in insertions],
-                                                "emitEvent" : True},
+                                                "positions" : [pos for pos,_ in insertions]},
                                       text=self.tr("insert contents"))
         self.stack.push(command)
         
@@ -402,12 +410,10 @@ class Level(application.ChangeEventDispatcher):
                           for pos in positions]
         command = GenericLevelCommand(redoMethod=self._removeContents,
                                       redoArgs={"parent" : parent,
-                                                "positions" : positions,
-                                                "emitEvent" : True},
+                                                "positions" : positions},
                                       undoMethod=self._insertContents,
                                       undoArgs={"parent" : parent,
-                                                "insertions" : undoInsertions,
-                                                "emitEvent" : True},
+                                                "insertions" : undoInsertions},
                                       text=self.tr("remove contents"))
         self.stack.push(command)
 
@@ -447,8 +453,7 @@ class Level(application.ChangeEventDispatcher):
         """
         reversed =  {file:(newUrl, oldUrl) for  (file, (oldUrl, newUrl)) in renamings.items()}
         command = GenericLevelCommand(redoMethod=self._renameFiles,
-                                      redoArgs={"renamings" : renamings,
-                                                "emitEvent" : True},
+                                      redoArgs={"renamings" : renamings},
                                       undoMethod=self._renameFiles,
                                       undoArgs={"renamings": reversed},
                                       text=self.tr("rename files"),
@@ -566,6 +571,8 @@ class Level(application.ChangeEventDispatcher):
             if oldEl.isContainer():
                 if oldEl.major != inParent.major:
                     self.parent.setMajorFlags({inParent: oldEl.major})
+                if oldEl.contents != inParent.contents:
+                    self.parent.setContents(inParent, oldEl.contents)
             else:
                 if oldEl.url != inParent.url:
                     self.parent.renameFiles( {inParent:(inParent.url, oldEl.url)} )
@@ -690,6 +697,16 @@ class Level(application.ChangeEventDispatcher):
             self.elements[elem.id] = elem.copy()
             elem.level = self
 
+    def _setContents(self, parent, contents):
+        for id in parent.contents.ids:
+            if id in self and self.get(id).id not in contents:
+                self.get(id).parents.remove(parent.id)
+        parent.contents = contents.copy()
+        for id in contents.ids:
+            if id in self and parent.id not in self.get(id).parents:
+                self.get(id).parents.append(id)
+        self.emitEvent(contentIds=(parent.id,))
+            
     def _insertContents(self, parent, insertions, emitEvent=True):
         """Insert some elements under *parent*.
         

@@ -233,6 +233,15 @@ class RealLevel(levels.Level):
             self.filesRemoved.emit([elem for elem in elements if elem.isFile()])
         db.write.deleteElements([elem.id for elem in elements])
         
+    def _setContents(self, parent, contents):
+        db.transaction()
+        db.query("DELETE FROM {}contents WHERE container_id=?".format(db.prefix), parent.id)
+        db.multiQuery("INSERT INTO {}contents (container_id, position, element_id) "
+                      "       VALUES (?, ?, ?)".format(db.prefix),
+                      [ (parent.id, pos, child) for pos, child in contents.items() ])
+        db.commit()
+        super()._setContents(parent, contents)
+    
     def _insertContents(self, parent, insertions, emitEvent=True):
         db.transaction()
         db.multiQuery("INSERT INTO {}contents (container_id, position, element_id) "
