@@ -99,7 +99,7 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
                         dct[elem].append(pos)
                 for rparent, positions in levelRemovals.items():
                     self.level.removeContentsAuto(rparent, positions=positions)
-                    if rparent is parent.element:
+                    if isinstance(parent, nodes.Wrapper) and rparent is parent.element:
                         #  when elements above insert position are removed, insert row is decreased
                         row -= len([pos for pos in positions if pos < insertPosition])
                 for rparent, rows in modelRemovals.items():
