@@ -39,6 +39,7 @@ def enable():
     browser.BrowserTreeView.actionConfig.addActionDefinition((("plugins", 'covers'),), CoverAction)
         
 def disable():
+    from omg.gui import editor, browser
     editor.EditorTreeView.actionConfig.removeActionDefinition((("plugins", 'covers'),))
     browser.BrowserTreeView.actionConfig.removeActionDefinition((("plugins", 'covers'),))
     
@@ -462,7 +463,7 @@ class CoverDialog(QtGui.QDialog):
     def _handleProviderStatusChanged(self):
         """Enable/disable the buttons for cover providers depending on whether the cover of the provider
         has already started (or even finished) to fetch the current element's cover."""
-        for provider,button in self.providerButtons.items():
+        for button in self.providerButtons.values():
             button.setEnabled(self.model.currentElement not in self.model._fetchedCovers)
     
     def _handleElementSelected(self,current,previous):

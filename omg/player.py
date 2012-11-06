@@ -16,8 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import Qt
+from PyQt4 import QtCore
 
 from . import config, logging, profiles
 
@@ -72,8 +71,8 @@ class PlayerBackend(profiles.Profile):
         self.setState(PAUSE)
         
     def volume(self):
-         """Return the current volume as integer between 0 and 100."""
-         raise NotImplementedError()
+        """Return the current volume as integer between 0 and 100."""
+        raise NotImplementedError()
      
     def setVolume(self, volume):
         """Set the volume of the player. *volume* must be an integer between 0 and 100."""

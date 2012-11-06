@@ -19,7 +19,6 @@
 """Improved QUndoStack."""
 
 from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import Qt
 
 from . import logging, database as db
 logger = logging.getLogger(__name__)

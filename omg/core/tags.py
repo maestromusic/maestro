@@ -414,8 +414,8 @@ def get(identifier,addDialogIfNew=False):
             newTag = Tag(identifier)
             _tagsByName[identifier] = newTag
             if addDialogIfNew:
-                from .gui.tagwidgets import NewTagTypeDialog
-                NewTagTypeDialog.addTagType(newTag)
+                from ..gui.tagwidgets import AddTagTypeDialog
+                AddTagTypeDialog.addTagType(newTag)
             return newTag
     elif isinstance(identifier, Tag):
         return identifier
@@ -949,7 +949,7 @@ class TagDifference:
         """Return the list of (tag,value) pairs that are added by this TagDifference. This includes new
         values from the 'replacement' constructor parameter."""
         if self.replacements is not None:
-            result = [(tag,newValue) for tag,oldValue,newValue in self.replacements]
+            result = [(tag, newValue) for tag, _, newValue in self.replacements]
             if self.additions is not None:
                 result.extend(self.additions)
             return result
@@ -961,7 +961,7 @@ class TagDifference:
         """Return the list of (tag,value) pairs that are removed by this TagDifference. This includes old
         values from the 'replacement' constructor parameter."""
         if self.replacements is not None:
-            result = [(tag,oldValue) for tag,oldValue,newValue in self.replacements]
+            result = [(tag, oldValue) for tag, oldValue, _ in self.replacements]
             if self.removals is not None:
                 result.extend(self.removals)
             return result

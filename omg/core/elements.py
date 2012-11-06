@@ -366,4 +366,3 @@ class ContentList:
     
     def __repr__(self):
         return '[{}]'.format(', '.join('{}: {}'.format(*item) for item in self.items()))
-         

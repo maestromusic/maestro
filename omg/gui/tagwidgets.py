@@ -263,7 +263,7 @@ class TagTypeBox(QtGui.QStackedWidget):
             if text[0] == text[-1] and text[0] in ['"',"'"]: # Don't translate if the text is quoted
                 return tags.get(text[1:-1])
             else: return tags.fromTitle(text)
-        except tags.ValueError: # invalid tagname
+        except tags.TagValueError: # invalid tagname
             return None
         
     def focusInEvent(self,focusEvent):
@@ -680,7 +680,7 @@ class EnhancedComboBox(QtGui.QComboBox):
     def eventFilter(self,object,event):
         if event.type() == QtCore.QEvent.ContextMenu and object == self.lineEdit():
             self._popup = self.lineEdit().createStandardContextMenu()
-            action = self._popup.exec_(event.globalPos())
+            self._popup.exec_(event.globalPos())
             self._popup = None
             return True
         return False # don't stop the event

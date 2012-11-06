@@ -21,7 +21,7 @@ import functools
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from ... import application, config, constants, database as db, utils
+from ... import application, database as db, utils
 from ...core import tags
 from .. import tagwidgets, dialogs, misc
 from ..misc import iconbuttonbar
@@ -236,7 +236,7 @@ class TagManagerTableWidget(QtGui.QTableWidget):
                     (tags.isInDb(newName),self.tr("A tag named '{}' already exists.").format(newName)),
                     (not tags.isValidTagName(newName),self.tr("'{}' is not a valid tagname.").format(newName))
                  ):
-                 if check:
+                if check:
                     dialogs.warning(self.tr("Cannot change tag"),message,self)
                     item.setText(oldName) # Reset
                     return

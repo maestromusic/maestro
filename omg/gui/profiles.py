@@ -128,9 +128,9 @@ class NoProfileYetWidget(QtGui.QWidget):
         if self.category.get(name) is not None:
             dialogs.warning(self.tr("Invalid name"),self.tr("There is already a profile of this name."))
         else:
-            profile = self.category.addProfile(name,type)
+            self.category.addProfile(name,type)
             # reset the fields for the next time this widget is shown)
-            if isinstance(self.category,profiles.TypedProfileCategory):
+            if isinstance(self.category, profiles.TypedProfileCategory):
                 self.nameLineEdit.setText('')
                 self.typeBox.setCurrentIndex(0)
             else:
@@ -264,7 +264,7 @@ class ChooseAndConfigureProfileWidget(QtGui.QWidget):
         if self.category.get(name) is not None:
             dialogs.warning(self.tr("Invalid name"),self.tr("There is already a profile of this name."))
         else:
-            profile = self.category.addProfile(name,type)
+            self.category.addProfile(name,type)
                     
     def _handleRenameButton(self):
         """Ask the user for a new name of the current profile and change names."""

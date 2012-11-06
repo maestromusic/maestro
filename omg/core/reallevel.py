@@ -178,7 +178,6 @@ class RealLevel(levels.Level):
         used for elements which are contained in the database."""
         if level is None:
             level = self
-            
         result = []
         for url in urls:
             backendFile = url.getBackendFile()
@@ -325,7 +324,7 @@ class RealLevel(levels.Level):
                 for parentId in element.parents:
                     parent = self.collect(parentId)
                     self.removeContents(parent, parent.contents.positionsOf(id=element.id))
-        command = GenericLevelCommand(redoMethod=self._removeElements,
+        command = levels.GenericLevelCommand(redoMethod=self._removeElements,
                                       redoArgs={"elements" : elements},
                                       undoMethod=self._addElements,
                                       undoArgs={"elements" : elements})
@@ -431,7 +430,7 @@ class RealLevel(levels.Level):
         super()._setContents(parent, contents)
 
     def _insertContents(self, parent, insertions, emitEvent=True):
-        if not all(element.isInDb() for pos,element in insertions):
+        if not all(element.isInDb() for pos, element in insertions):
             raise levels.ConsistencyError("Elements must be in the DB before being added to a container.")
         db.transaction()
         db.multiQuery("INSERT INTO {}contents (container_id, position, element_id) VALUES (?, ?, ?)"

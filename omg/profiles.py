@@ -21,13 +21,9 @@ categories (e.g. delegates, playback). Profiles of one category may have differe
 Phonon playback). Profiles and types are managed by their category. Categories are managed by the
 ProfileManager.""" 
 
-import collections
+from PyQt4 import QtCore
 
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import Qt
-
-from . import config, logging
-from .gui import dialogs 
+from . import config, logging 
 
 logger = logging.getLogger(__name__)
 
@@ -152,7 +148,7 @@ class ProfileCategory(QtCore.QObject):
         """Delete a profile so that it disappears from the storage file at application end."""
         assert not profile.builtIn
         # TODO: comment this lines
-        for i,data in enumerate(self.storageOption.getValue()):
+        for data in self.storageOption.getValue():
             if data[0] == profile.name:
                 data[2] = profile.save()
                 break
@@ -234,8 +230,8 @@ class TypedProfileCategory(ProfileCategory):
             if profile.type == type:
                 profile.builtIn = False # delete built-in profiles, too
                 self.deleteProfile(profile)
-        self.types.remove(types)
-        self.typeRemoved.emit(types)
+        self.types.remove(type)
+        self.typeRemoved.emit(type)
     
     def addProfile(self,name,type,state=None):
         """Add a profile to the category. The arguments will be passed to the constructor of the correct

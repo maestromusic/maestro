@@ -16,10 +16,9 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import collections, numbers, weakref
+import weakref
 
 from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import Qt
 
 from . import data, elements, tags, flags
 from .nodes import Wrapper
@@ -29,7 +28,7 @@ translate = QtCore.QCoreApplication.translate
 logger = logging.getLogger(__name__)
 
 
-allLevels = weakref.WeakSet() # List of all levels
+allLevels = weakref.WeakSet()
 
 # The two special levels
 real = None
@@ -37,6 +36,7 @@ editor = None
 
 
 def init():
+    """Initialize the level module. Creates the real and editor levels."""
     global real,editor
     from . import reallevel
     real = reallevel.RealLevel()
@@ -173,14 +173,14 @@ class Level(application.ChangeEventDispatcher):
             raise ValueError("param must be either ID or URL, not {} of type {}"
                              .format(param, type(param)))
   
-    def __getitem__(self,key):
-        if isinstance(key,int):
+    def __getitem__(self, key):
+        if isinstance(key, int):
             return self.elements[key]
         elif isinstance(key, filebackends.BackendURL):
             return self.elements[idFromUrl(key)] # __getitem__ and idFromUrl may raise KeyErrors
         else:
             raise ValueError("param must be either ID or URL, not {} of type {}"
-                             .format(param, type(param)))
+                             .format(key, type(key)))
 
     def _ensureLoaded(self, params):
         """Make sure that the elements specified by params (ids and/or urls) are loaded on this level or 
@@ -473,7 +473,6 @@ class Level(application.ChangeEventDispatcher):
     def commit(self, elements=None):
         """Undoably commit given *elements* (or everything, if not specified) into the parent level.
         """
-        from . import reallevel
         if elements is None:
             elements = self.elements.values()
         if len(elements) == 0:
