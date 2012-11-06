@@ -55,7 +55,7 @@ class CoverAction(treeactions.TreeAction):
     def doAction(self):
         CoverDialog(self.parent(),
                     self.level(),
-                    [wrap.elementd for wrap in self.parent().nodeSelection.wrappers()]).exec_()
+                    [wrap.element for wrap in self.parent().nodeSelection.wrappers()]).exec_()
             
             
 class Cover:
