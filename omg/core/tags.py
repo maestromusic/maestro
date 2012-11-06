@@ -994,7 +994,7 @@ class SingleTagDifference(TagDifference):
 class TagStorageDifference(TagDifference):
     """Subclass of TagDifference that simply takes two Storage-instances (old and new) and figures out
     additions/removals by itself."""
-    def __init__(self,oldTags,newTags):
+    def __init__(self, oldTags, newTags):
         # both arguments may be None
         self.oldTags = oldTags
         self.newTags = newTags

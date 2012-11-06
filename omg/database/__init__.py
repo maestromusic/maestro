@@ -56,6 +56,8 @@ each thread and use a ``with`` statement to ensure the connection is finally clo
 
 import os, threading, functools
 
+from PyQt4 import QtCore
+
 from . import sql
 from .. import config, logging, utils, constants
 from ..core import tags as tagsModule
@@ -63,7 +65,6 @@ from ..core import tags as tagsModule
 # Table type and prefix
 type = None
 prefix = None
-transactionLock = threading.Lock()
 
 logger = logging.getLogger(__name__)
 
@@ -102,7 +103,7 @@ def connect(**kwargs):
         logger.warning(
             "database.connect has been called although a connection for this thread was already open.")
         return connections[threadId]
-
+    logger.debug("Thread {} connecting to database".format(QtCore.QThread.currentThread()))
     global type, prefix
     type = config.options.database.type
     prefix = config.options.database.prefix
@@ -146,6 +147,7 @@ def close():
         connection = connections[threadId]
         del connections[threadId]
         connection.close()
+        logger.debug("Thread {} has closed database connection".format(QtCore.QThread.currentThread()))
 
 
 def nextId():
@@ -162,7 +164,7 @@ def nextIds(count):
         result = range(_nextId, _nextId+count)
         _nextId += count
         return result
-    
+
 
 def listTables():
     """Return a list of all table names in the database."""

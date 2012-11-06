@@ -52,7 +52,11 @@ every driver.
 import datetime
 
 from ... import logging
+from PyQt4.QtCore import QThread
 transactionLogger = logging.getLogger("transaction")
+logger = logging.getLogger(__name__)
+import threading
+transactionLock = threading.RLock()
 
 
 # When a driver is loaded _modules[driverIdentifier] will contain the driver's module.
@@ -95,11 +99,11 @@ def newConnection(drivers):
     for driver in drivers:
         try:
             if driver not in _modules:
-                _modules[driver] = __import__(driver,globals(),locals())
+                import importlib
+                _modules[driver] = importlib.import_module("."+driver, __package__) #__import__(driver,globals(),locals())
             return _modules[driver].Sql()
         except Exception as e:
-            import logging
-            logging.warning("Could not load driver {}: {}".format(driver,e))
+            logger.warning("Could not load driver {}: {}".format(driver,e))
             # Try next driver...
     else: raise DBException("Couldn't load any driver from {}".format(drivers))
     
@@ -167,7 +171,8 @@ class AbstractSql:
         """
         self._transactionDepth += 1
         if self._transactionDepth == 1:
-            transactionLogger.debug("OPEN")
+            transactionLogger.debug("OPEN {}".format(QThread.currentThread()))
+            transactionLock.acquire()
         return self._transactionDepth == 1
         
     def commit(self):
@@ -175,7 +180,8 @@ class AbstractSql:
         if just a nested transaction was closed)."""
         self._transactionDepth -= 1
         if self._transactionDepth == 0:
-            transactionLogger.debug("CLOSE")
+            transactionLogger.debug("CLOSE {}".format(QThread.currentThread()))
+            transactionLock.release()
         return self._transactionDepth == 0
         
     def rollback(self):

@@ -293,7 +293,7 @@ class Level(application.ChangeEventDispatcher):
     def changeFlags(self, changes):
         """Change flags of elements. *changes* maps elements to flags.FlagDifference objects."""
         self._changeSomething(self._changeFlags, changes, self.tr("change flags"))
-    
+
     def changeData(self, changes):
         """Change flags of elements. *changes* maps elements to data.DataDifference objects."""
         self._changeSomething(self._changeData, changes, self.tr("change data"))
@@ -367,12 +367,10 @@ class Level(application.ChangeEventDispatcher):
         """
         command = GenericLevelCommand(redoMethod=self._insertContents,
                                       redoArgs={"parent" : parent,
-                                                "insertions" : insertions,
-                                                "emitEvent" : True},
+                                                "insertions" : insertions},
                                       undoMethod=self._removeContents,
                                       undoArgs={"parent" : parent,
-                                                "positions" : [pos for pos,_ in insertions],
-                                                "emitEvent" : True},
+                                                "positions" : [pos for pos,_ in insertions]},
                                       text=self.tr("insert contents"))
         self.stack.push(command)
         
@@ -399,12 +397,10 @@ class Level(application.ChangeEventDispatcher):
         undoInsertions = [(pos, self[parent.contents.at(pos)]) for pos in positions]
         command = GenericLevelCommand(redoMethod=self._removeContents,
                                       redoArgs={"parent" : parent,
-                                                "positions" : positions,
-                                                "emitEvent" : True},
+                                                "positions" : positions},
                                       undoMethod=self._insertContents,
                                       undoArgs={"parent" : parent,
-                                                "insertions" : undoInsertions,
-                                                "emitEvent" : True},
+                                                "insertions" : undoInsertions},
                                       text=self.tr("remove contents"))
         self.stack.push(command)
 
@@ -468,8 +464,7 @@ class Level(application.ChangeEventDispatcher):
         """
         reversed =  {file:(newUrl, oldUrl) for  (file, (oldUrl, newUrl)) in renamings.items()}
         command = GenericLevelCommand(redoMethod=self._renameFiles,
-                                      redoArgs={"renamings" : renamings,
-                                                "emitEvent" : True},
+                                      redoArgs={"renamings" : renamings},
                                       undoMethod=self._renameFiles,
                                       undoArgs={"renamings": reversed},
                                       text=self.tr("rename files"))

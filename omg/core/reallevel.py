@@ -41,6 +41,7 @@ class RealLevel(levels.Level):
     filesRenamed = QtCore.pyqtSignal(object)
     filesAdded = QtCore.pyqtSignal(list)
     filesRemoved = QtCore.pyqtSignal(list)
+    filesModified = QtCore.pyqtSignal(list)
     
     def __init__(self):
         super().__init__('REAL', None)
@@ -331,8 +332,9 @@ class RealLevel(levels.Level):
         self.stack.push(command)
         self.stack.endMacro()
 
-    def _changeTags(self, changes, emitEvent=True):
-        filebackends.changeTags(changes) # might raise TagWriteError
+    def _changeTags(self, changes, emitEvent=True, dbOnly=False):
+        if not dbOnly:
+            filebackends.changeTags(changes) # might raise TagWriteError
         
         dbChanges = {el: diffs for el,diffs in changes.items() if el.isInDb()}
         if len(dbChanges) > 0:
@@ -355,6 +357,8 @@ class RealLevel(levels.Level):
                 db.multiQuery("UPDATE {}files SET verified=CURRENT_TIMESTAMP WHERE element_id=?"
                               .format(db.prefix),files)
             db.commit()
+            if len(files) > 0 and not dbOnly:
+                self.filesModified.emit(files)
         super()._applyDiffs(changes, emitEvent)
         
     def _changeFlags(self, changes, emitEvent=True):
@@ -414,17 +418,18 @@ class RealLevel(levels.Level):
         db.transaction()
         db.query("DELETE FROM {}contents WHERE container_id = ?".format(db.prefix), parent.id)
         #Note: This checks skips elements which are not loaded on real. This should rarely happen and
-        # due to foreign key constraints the following query will fail anyway (but with a DBException).
+        # due to foreign key constraints...
         if not all(self[childId].isInDb() for childId in contents if childId in self):
             raise levels.ConsistencyError("Elements must be in the DB before being added to a container.")
             
+        # ...the following query will fail anyway (but with a DBException)
         # if some contents are not in the database yet.
         db.multiQuery("INSERT INTO {}contents (container_id, position, element_id) VALUES (?, ?, ?)"
                       .format(db.prefix),
                       [(parent.id, pos, childId) for pos, childId in contents.items()])
         db.commit()
         super()._setContents(parent, contents)
-        
+
     def _insertContents(self, parent, insertions, emitEvent=True):
         if not all(element.isInDb() for pos,element in insertions):
             raise levels.ConsistencyError("Elements must be in the DB before being added to a container.")
@@ -464,4 +469,3 @@ class RealLevel(levels.Level):
         db.write.changeUrls([ (str(newUrl), element.id) for element, (_, newUrl) in renamings.items() ])
         self.filesRenamed.emit(renamings)
         super()._renameFiles(renamings, emitEvent)
-    

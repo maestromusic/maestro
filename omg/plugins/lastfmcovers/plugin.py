@@ -30,8 +30,8 @@ from ... import application
 
 translate = QtCore.QCoreApplication.translate
 
-LASTFM_API_KEY = 'b25b959554ed76058ac220b7b2e0a026'
-LASTFM_SIZES = ["small","medium","large","extralarge","mega"]
+LASTFM_API_KEY = '3023e31f526f061c84c8138e5f180969'
+LASTFM_SIZES = ["small", "medium", "large", "extralarge", "mega"]
    
 
 def enable():

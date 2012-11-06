@@ -85,8 +85,12 @@ class PlaylistWidget(QtGui.QDockWidget):
         
         # Read state
         profileType = playlistdelegate.PlaylistDelegate.profileType
-        backend = player.profileCategory.getFromStorage(state.get('backend'))
-        delegateProfile = delegates.profiles.category.getFromStorage(state.get('delegate'),profileType)
+        if state is None:
+            backend = None
+            delegateProfile = delegates.profiles.category.get("Playlist")
+        else:
+            backend = player.profileCategory.getFromStorage(state['backend'])
+            delegateProfile = delegates.profiles.category.getFromStorage(state.get('delegate'),profileType)
         
         self.treeview = PlaylistTreeView(delegateProfile)
  
@@ -117,7 +121,7 @@ class PlaylistWidget(QtGui.QDockWidget):
 
         layout.addWidget(self.treeview)
         self.errorLabel = QtGui.QLabel()
-        self.errorLabel.setAlignment(Qt.AlignTop | Qt.AlignHCenter)
+        self.errorLabel.setAlignment(Qt.AlignVCenter | Qt.AlignHCenter)
         self.mainLayout = layout
         self.mainWidgetIndex = layout.indexOf(self.treeview)
         
@@ -152,6 +156,7 @@ class PlaylistWidget(QtGui.QDockWidget):
             self.mainLayout.insertWidget(self.mainWidgetIndex, self.treeview)
             self.treeview.show()
         else:
+            self.errorLabel.setText(self.tr("no connection"))
             self.mainLayout.insertWidget(self.mainWidgetIndex, self.errorLabel)
             self.errorLabel.show()
         

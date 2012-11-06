@@ -16,17 +16,21 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import functools
+import contextlib
+import socket, threading, time
+import mpd
 
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from omg import player, logging, profiles
+from omg.core import tags
 from omg.models import playlist
 from . import filebackend as mpdfilebackend
 
 translate = QtCore.QCoreApplication.translate
 logger = logging.getLogger(__name__)
+
 
 def enable():
     player.profileCategory.addType(profiles.ProfileType('mpd',
@@ -43,7 +47,8 @@ def disable():
 
             
 class MPDPlayerBackend(player.PlayerBackend):
-    changeFromMain = QtCore.pyqtSignal(str, object)
+    
+    className = "MPD"
     
     def __init__(self, name, type, state):
         super().__init__(name, type, state)
@@ -59,35 +64,44 @@ class MPDPlayerBackend(player.PlayerBackend):
         from .thread import MPDThread
         self.mpdthread = MPDThread(self, host, port, password)
         self.mpdthread.changeFromMPD.connect(self._handleMPDChange, Qt.QueuedConnection)
-        self.changeFromMain.connect(self.mpdthread._handleMainChange)
-        self.mpdthread.start()
         self._numFrontends = 0
         
-        # create actions
+        self.commander = mpd.MPDClient()
+        self.commanderConnected = False
+        
         self.separator = QtGui.QAction("MPD", self)
         self.separator.setSeparator(True)
         
         self.updateDBAction = QtGui.QAction("Update Database", self)
         self.updateDBAction.triggered.connect(self.mpdthread.updateDB)
         
-        # initialize functions that emit signals to the MPD thread on being called
-        def _emitChange(what, arg, synchronized=False):
-            #if what[0]== '_': # those methods call superclass implementation first
-            #    getattr(player.PlayerBackend, what)(self, *args)
-            self.changeFromMain.emit(what, arg)
-            if synchronized:
-                self.mpdthread.syncCallEvent.wait()
-            
-        for what in ("setElapsed", "setState", "setCurrent", "nextSong",
-                "previousSong", "setVolume"):
-            setattr(self, what, functools.partial(_emitChange, what))
+        self.stateChanged.connect(self.checkElapsedTimer)
+        self.elapsedTimer = QtCore.QTimer(self)
+        self.elapsedTimer.setInterval(100)
+        self.elapsedTimer.timeout.connect(self.updateElapsed)
         
-        for what in ("setPlaylist", "_insertIntoPlaylist", "_removeFromPlaylist", "_move"):
-            setattr(self, what, functools.partial(_emitChange, what, synchronized=True))
+        self.seekTimer = QtCore.QTimer(self)
+        self.seekTimer.setSingleShot(True)
+        self.seekTimer.setInterval(25)
+        self.seekTimer.timeout.connect(self._seek)
+        
+        self.atomicOp = threading.Lock()
+        self.mpdthread.atomicOp = self.atomicOp
     
-    def setConnectionParameters(self,host,port,password):
+    def setConnectionParameters(self, host, port, password):
         #TODO reconnect
-        self.category.profileChanged.emit(self)
+        self.mpdthread.host = host
+        self.mpdthread.port = port
+        self.mpdthread.password = password
+        if self.commanderConnected:
+            self.commander.disconnect()
+            with self.prepareCommander():
+                pass
+            self.mpdthread.shouldConnect.clear()
+            self.mpdthread.disconnect()
+            self.mpdthread.shouldConnect.set()
+            
+        player.profileCategory.profileChanged.emit(self)
         
     def save(self):
         return {'host': self.mpdthread.host,
@@ -95,61 +109,120 @@ class MPDPlayerBackend(player.PlayerBackend):
                 'password': self.mpdthread.password
                 }
     
+    @contextlib.contextmanager
+    def prepareCommander(self):
+        if not self.commanderConnected:
+            self.commander.connect(self.mpdthread.host, self.mpdthread.port)
+            self.commanderConnected = True
+        try:
+            yield
+        except (mpd.ConnectionError, socket.error) as e:
+            self.commander.disconnect()
+            self.commander.connect(self.mpdthread.host, self.mpdthread.port)
+            self.commanderConnected = True
+        
+
     def state(self):
         return self._state
+    
+    def setState(self, state):
+        with self.prepareCommander():
+            if state is player.PLAY:
+                self.commander.play()
+            elif state is player.PAUSE:
+                self.commander.pause(1)
+            elif state is player.STOP:
+                self.commander.stop()
     
     def volume(self):
         return self._volume
     
+    def setVolume(self, volume):
+        with self.prepareCommander():
+            self.commander.setvol(volume)
+    
     def current(self):
         return self.playlist.current
 
+    def setCurrent(self, index):
+        with self.prepareCommander():
+            self.commander.play(index if index is not None else -1)
+    
+    def nextSong(self):
+        with self.prepareCommander():
+            self.commander.next()
+        
+    def previousSong(self):
+        with self.prepareCommander():
+            self.commander.previous()
+    
     def currentOffset(self):
         if self._current < 0:
             return None
         else: return self._current
         
     def elapsed(self):
-        return self._elapsed
+        return time.time() - self._currentStart
     
+    def setElapsed(self, elapsed):
+        
+        self.seekRequest = elapsed
+        self.seekTimer.start(20)
+    
+    def _seek(self):
+        if self.seekRequest is not None:
+            self.prepareCommander()
+            self.commander.seek(self._current, self.seekRequest)
+        self.seekRequest = None
+    
+    def updateElapsed(self):
+        self.elapsedChanged.emit(self.elapsed())
+    
+    def checkElapsedTimer(self, newState):
+        if newState is player.PLAY:
+            self.elapsedTimer.start()
+        else:
+            self.elapsedTimer.stop()
+
     def makeUrl(self, path):
         mpdurl = mpdfilebackend.MPDURL("mpd://" + self.name + "/" + path)
         return mpdurl.getBackendFile().url
     
     @QtCore.pyqtSlot(str, object)
     def _handleMPDChange(self, what, how):
-        if what == 'init_done':
-            paths, self._current, self._currentLength, self._elapsed, self._state = how
+        if what == 'connect':
+            paths, self._current, self._currentLength, self._currentStart, self._state = how
             self.urls = [self.makeUrl(path) for path in paths]
             self.playlist.initFromUrls(self.urls)
             self.playlist.setCurrent(self._current)
             self.connectionState = player.CONNECTED
             self.connectionStateChanged.emit(player.CONNECTED)
-        
+            if self._state is not player.STOP:
+                self.stateChanged.emit(self._state)
+        elif what == 'disconnect':
+            self.connectionState = player.DISCONNECTED
+            self._state = player.STOP
+            self.stateChanged.emit(player.STOP)
+            self.connectionStateChanged.emit(player.DISCONNECTED)
         elif what == 'elapsed':
-            self._elapsed = how
-            self.elapsedChanged.emit(how)
-            
+            self._currentStart = how
+            self.elapsedChanged.emit(self.elapsed())    
         elif what == 'state':
             self._state = how
             self.stateChanged.emit(how)
-            
         elif what == 'current':
             self._current, self._currentLength = how
             self.playlist.setCurrent(self._current)
             self.currentChanged.emit(self._current)
-        
         elif what == 'volume':
             self._volume = how
             self.volumeChanged.emit(how)
-            
         elif what == 'remove':
             print("Change from MPD: remove")
             print(how)
             self.playlist.removeByOffset(how[0][0],len(how),updateBackend=False)
             for pos, url in reversed(how):
                 del self.urls[pos]
-        
         elif what == 'insert':
             print("Change from MPD: insert")
             print(how)
@@ -158,18 +231,10 @@ class MPDPlayerBackend(player.PlayerBackend):
             self.playlist.insertUrlsAtOffset(how[0][0], [tup[1] for tup in urlified], updateBackend=False)
             for pos, url in urlified:
                 self.urls[pos:pos] = [ url ]
-            
         elif what == 'playlist':
             print("Change from MPD: playlist")
             print(how)
             self.playlist.resetFromUrls([self.makeUrl(path) for path in how])
-            
-        elif what == 'disconnect':
-            self.connectionState = player.DISCONNECTED
-            self.connectionStateChanged.emit(player.DISCONNECTED)
-        elif what == 'connect':
-            self.connectionState = player.CONNECTED
-            self.connectionStateChanged.emit(player.CONNECTED)
         else:
             print('WHAT? {}'.format(what))
                     
@@ -180,21 +245,49 @@ class MPDPlayerBackend(player.PlayerBackend):
     def registerFrontend(self, obj):
         self._numFrontends += 1
         if self._numFrontends == 1:
-            self.mpdthread.doPolling.set()
+            self.mpdthread.shouldConnect.set()
+            self.mpdthread.start()
     
     def unregisterFrontend(self, obj):
         self._numFrontends -= 1
         if self._numFrontends == 0:
-            self.mpdthread.doPolling.clear()
+            self.mpdthread.shouldConnect.clear()
+            self.mpdthread.disconnect()
+            if self.commanderConnected:
+                self.commander.disconnect()
+                self.commanderConnected = False
     
     def insertIntoPlaylist(self, pos, urls):
-        self._insertIntoPlaylist(list(enumerate(urls, start=pos)))
+        with self.prepareCommander():
+            try:
+                with self.atomicOp:
+                    for position, url in enumerate(urls, start=pos):
+                        self.commander.addid(url.path, position)
+                        self.mpdthread.playlistVersion += 1 if position == len(self.mpdthread.mpd_playlist) else 2
+                        self.mpdthread.mpd_playlist[position:position] = [url.path]
+            except mpd.CommandError as e:
+                raise player.BackendError('Some files could not be inserted: {}'.format(e))
     
     def removeFromPlaylist(self, begin, end):
-        self._removeFromPlaylist([(begin,'') for i in range(end-begin)])
+        with self.prepareCommander():
+            with self.atomicOp:
+                print('atomic op')
+                self.mpdthread.playlistVersion += end-begin
+                del self.mpdthread.mpd_playlist[begin:end]
+                for _ in range(end-begin):
+                    self.commander.delete(begin)
+                print('done')
         
     def move(self,fromOffset,toOffset):
-        self._move((fromOffset,toOffset))
+        
+        if fromOffset == toOffset:
+            return
+        with self.prepareCommander():
+            with self.atomicOp:
+                path = self.mpdthread.mpd_playlist.pop(fromOffset)
+                self.mpdthread.mpd_playlist.insert(toOffset, path)
+                self.commander.move(fromOffset, toOffset)
+                self.mpdthread.playlistVersion += 1
     
     def configurationWidget(self):
         """Return a config widget, initialized with the data of the given *profile*."""
@@ -205,16 +298,22 @@ class MPDPlayerBackend(player.PlayerBackend):
         
         Since MPD connection is delegated to a subthread, this method might be slow.
         """
-        self.mpdthread.syncCallEvent.clear()
-        self.changeFromMain.emit("getTags", path)
-        self.mpdthread.syncCallEvent.wait()
-        
-        getPath, getTags, getLength = self.mpdthread.getInfoData
-        if getPath != path:
-            print(getPath)
-            print(path)
-            raise Exception()
-        return getTags, getLength
+        self.prepareCommander()
+        info = self.commander.listallinfo(path)[0]
+        storage = tags.Storage()
+        length = None
+        for key, values in info.items():
+            if key in ("file", "last-modified", "track"):
+                #  mpd delivers these but they aren't keys
+                continue
+            if key == "time":
+                length = int(values)
+                continue
+            tag = tags.get(key)
+            if not isinstance(values, list):
+                values = [ values ]
+            storage[tag] = [ tag.convertValue(value, crop=True) for value in values ]
+        return storage, length
         
     def __str__(self):
         return "MPDPlayerBackend({})".format(self.name)
@@ -251,7 +350,6 @@ class MPDConfigWidget(QtGui.QWidget):
         resetButton.clicked.connect(self._handleReset)
         buttonLayout.addWidget(resetButton)
         buttonLayout.addStretch(1)
-        
         self.setProfile(profile)
     
     def setProfile(self, profile):
@@ -268,7 +366,8 @@ class MPDConfigWidget(QtGui.QWidget):
         host = self.hostEdit.text()
         port = int(self.portEdit.text())
         password = self.passwordEdit.text()
-        self.profile.setConnectionParameters(host,port,password)
+        self.profile.setConnectionParameters(host, port, password)
+        player.profileCategory.save()
         
     def _handleReset(self):
         """Reset the form to the stored values."""

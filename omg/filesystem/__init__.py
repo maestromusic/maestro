@@ -22,7 +22,7 @@ from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
 from .. import logging, config, utils, database as db, filebackends
-from ..core import levels
+from ..core import levels, tags
 
 logger = logging.getLogger(__name__)
 
@@ -41,9 +41,10 @@ def init():
         return
     synchronizer = FileSystemSynchronizer()
     synchronizer.eventThread.start()
-    levels.real.filesRenamed.connect(synchronizer.handleRename)
-    levels.real.filesAdded.connect(synchronizer.handleAdd)
-    levels.real.filesRemoved.connect(synchronizer.handleRemove)
+    levels.real.filesRenamed.connect(synchronizer.handleRename, Qt.QueuedConnection)
+    levels.real.filesAdded.connect(synchronizer.handleAdd, Qt.QueuedConnection)
+    levels.real.filesRemoved.connect(synchronizer.handleRemove, Qt.QueuedConnection)
+    levels.real.filesModified.connect(synchronizer.handleModify, Qt.QueuedConnection)
     null = open(os.devnull)
     enabled = True
     
@@ -128,6 +129,13 @@ def mTimeStamp(url):
 
 
 class Track:
+    """A track represents a real audio file inside the music collection folder.
+    
+    This class is a pure data class, storing URL, directory, possibly the ID (or None if the track
+    is not in the database), and a *problem* flag if there is a synchronization problem with this
+    track.
+    """
+    
     def __init__(self, url):
         self.url = url
         self.directory = None
@@ -141,7 +149,12 @@ class Track:
 
 
 class Directory:
-
+    """A directory inside the music collection directory.
+    
+    This is used for efficient storing and updating of the folder state. A directory has lists for
+    subdirectories and tracks, a pointer to the parent directory (*None* for the root), and a state
+    flag.
+    """
     def __init__(self, path, parent):
         self.parent = parent
         self.path = path
@@ -156,11 +169,24 @@ class Directory:
         return utils.absPath(self.path)
     
     def addTrack(self, track):
+        """Adds *track* to the list self.tracks and updates track.directory."""
         track.directory = self
         self.tracks.append(track)
     
     def updateState(self, considerTracks=True, considerSubdirs=True, recurse=False,
                      signal=None):
+        """Update the *state* attribute of this directory.
+        
+        The state is determined by the tracks inside the directory and the state of possible
+        subdirectories. For faster updates, consideration of tracks or subdirectories can be
+        turned off using the appropriate parameters.
+        If *recurse* is True, the state of the parent is updated if this method has changed
+        self.state.
+        The *signal* parameter optionally specifies a Qt signal which will be emit, with the
+        directorie's path as single parameter, in case of a state change.
+        
+        This method returns a list of Directory objects whose states have changed.
+        """
         ownState = NO_MUSIC
         if considerTracks:
             for track in self.tracks:
@@ -185,19 +211,23 @@ class Directory:
             
         
 class SynchronizeHelper(QtCore.QObject):
-    """Class running in the main event thread to change database and display GUIs."""
+    """Cdoe running in the main event thread to change the files table and display GUIs."""
     
     def __init__(self):
         super().__init__()
         self.dialogFinished = threading.Event()
     
     @QtCore.pyqtSlot(object)
-    def addFileHashes(self, newHashes):
-        db.multiQuery("UPDATE {}files SET hash=? WHERE element_id=?"
-                      .format(db.prefix), [ (track.hash, track.id) for track in newHashes ]) 
+    def addFileHashes(self, tracks):
+        """Updates the hashes of *tracks* in the files table and also their timestamps.
+        """ 
+        db.multiQuery("UPDATE {}files SET hash=?, verified=CURRENT_TIMESTAMP WHERE element_id=?"
+                      .format(db.prefix), [ (track.hash, track.id) for track in tracks ]) 
 
     @QtCore.pyqtSlot(int, object)
     def changeURL(self, id, newUrl):
+        """To be called when a move / rename was detected. Displays a notice and updates the
+        files table."""
         from ..gui.dialogs import warning
         from .. import application
         warning(self.tr("Move detected"),
@@ -210,21 +240,50 @@ class SynchronizeHelper(QtCore.QObject):
     
     @QtCore.pyqtSlot(list)
     def showLostTracksDialog(self, tracks):
+        """To be called when lost tracks have been detected. Opens a dialog."""
         from . import dialogs
         dialog = dialogs.MissingFilesDialog([track.id for track in tracks])
         dialog.exec_()
         self.dialogFinished.set()
-    
+        
+    @QtCore.pyqtSlot(dict)
+    def showModifiedTagsDialog(self, modifications):
+        from . import dialogs
+        for track, (dbTags, fsTags) in modifications.items():
+            dialog = dialogs.ModifiedTagsDialog(track, dbTags, fsTags)
+            dialog.exec_()
+            if dialog.result() == dialog.Accepted:
+                if dialog.choice == 'DB':
+                    backendFile = track.url.getBackendFile()
+                    backendFile.readTags()
+                    backendFile.tags = dbTags.withoutPrivateTags()
+                else:
+                    from .. import application
+                    application.stack.clear()
+                    diff = tags.TagStorageDifference(dbTags.withoutPrivateTags(), fsTags)
+                    levels.real._changeTags({levels.real.get(track.id) : diff }, dbOnly=True)
+                track.problem = False
+                track.verified = datetime.datetime.now(datetime.timezone.utc)
+                self.addFileHashes([track])
+        synchronizer.modifiedTags = {}
+        self.dialogFinished.set()
+
+
 class EventThread(QtCore.QThread):
+    """The dedicated thread for filesystem access."""
     
     def __init__(self, parent=None):
         super().__init__(parent)
         self.timer = QtCore.QTimer(self)
         
     def run(self):
-        self.timer.start(config.options.filesystem.scan_interval*1000)
+        self.timer.start(config.options.filesystem.scan_interval * 1000)
         self.exec_()
-        db.close()               
+        db.close()
+        
+    def __str__(self):
+        return "FilesystemThread"  
+
 
 class FileSystemSynchronizer(QtCore.QObject):
     
@@ -234,6 +293,7 @@ class FileSystemSynchronizer(QtCore.QObject):
     hashesComputed = QtCore.pyqtSignal(list)
     moveDetected = QtCore.pyqtSignal(int, object)
     lostTracksDetected = QtCore.pyqtSignal(list)
+    modifiedTagsDetected = QtCore.pyqtSignal(dict)
     
     def __init__(self):
         super().__init__()
@@ -245,12 +305,15 @@ class FileSystemSynchronizer(QtCore.QObject):
         self.moveToThread(self.eventThread)
         self.moveDetected.connect(self.helper.changeURL)
         self.lostTracksDetected.connect(self.helper.showLostTracksDialog)
+        self.modifiedTagsDetected.connect(self.helper.showModifiedTagsDialog)
+        self.hashesComputed.connect(self.helper.addFileHashes)
         self.eventThread.started.connect(self.init)
         self.eventThread.timer.timeout.connect(self.scanFilesystem)
         self.tracks = {}
         self.dbTracks = set()
         self.dbDirectories = set()
         self.directories = {}
+        self.modifiedTags = {}
 
     def loadFolders(self):
         for path, state in db.query(
@@ -346,14 +409,17 @@ class FileSystemSynchronizer(QtCore.QObject):
                 backendFile.readTags()
                 if dbTags.withoutPrivateTags() != backendFile.tags:
                     logger.debug('Detected modification on file "{}": tags differ'.format(track.url))
-                    self.modifiedTags[track.id] = (dbTags, backendFile.tags)
+                    track.hash = computeHash(track.url)
+                    self.modifiedTags[track] = (dbTags, backendFile.tags)
                     track.problem = True
                 else:
                     filehash = computeHash(track.url)
                     if filehash != track.hash:
                         logger.debug("audio data modified!")
                         track.hash = filehash
-                        track.verified = modified 
+                        track.verified = modified
+                    else:
+                        logger.error("TODO: update hash & db")
     
     def addTrack(self, dir, url):
         filehash = computeHash(url)
@@ -475,6 +541,11 @@ class FileSystemSynchronizer(QtCore.QObject):
                 for dbTrack, newTrack in detectedMoves:
                     self.moveDetected.emit(dbTrack.id, newTrack.url)
                     self.moveTrack(dbTrack, newTrack.url)
+        if len(self.modifiedTags) > 0:
+            logger.debug("files with modified tags: {}".format(self.modifiedTags))
+            self.helper.dialogFinished.clear()
+            self.modifiedTagsDetected.emit(self.modifiedTags)
+            self.helper.dialogFinished.wait()
         if len(self.dbTracks) > 0:
             logger.debug("files which are lost: {}".format(self.dbTracks))
             self.helper.dialogFinished.clear()
@@ -517,6 +588,22 @@ class FileSystemSynchronizer(QtCore.QObject):
             stateChanges += oldDir.updateState(True, False, True, self.folderStateChanged)
         self.updateDirectories(stateChanges)
     
+    @QtCore.pyqtSlot(list)
+    def handleModify(self, urls):
+        """Called when files were modified on the disk. Updates hashes & timestamp."""
+        for url in urls:
+            if url not in self.tracks:
+                continue
+            track = self.tracks[url]
+            track.modified = mTimeStamp(url)
+            track.hash = computeHash(track.url)
+            if track.id is None:
+                db.query("UPDATE {}newfiles "
+                         "  SET hash=?, verified=CURRENT_TIMESTAMP WHERE url=?".format(db.prefix),
+                         track.hash, str(track.url))
+            else:
+                self.hashesComputed.emit([track])
+            
     @QtCore.pyqtSlot(object)
     def handleRename(self, renamings):
         db.transaction()
