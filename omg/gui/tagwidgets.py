@@ -204,7 +204,7 @@ class TagTypeBox(QtGui.QStackedWidget):
             if tag == self._tag:
                 self.box.setCurrentIndex(self.box.count()-1)
         
-        if not self._tag.isInDB():
+        if not self._tag.isInDb():
             self.box.setEditText(self._tag.name)
                         
             self.box.insertSeparator(self.box.count())
@@ -239,10 +239,10 @@ class TagTypeBox(QtGui.QStackedWidget):
         if tag != self._parseTagFromBox():
             self.box.setEditText(tag.title)
         if tag != self._tag:
-            if self._tag.isInDB() and not tag.isInDB():
+            if self._tag.isInDb() and not tag.isInDb():
                 self.box.insertSeparator(self.box.count())
                 self.box.addItem(self.tr("Add tag to DB..."))
-            elif not self._tag.isInDB() and tag.isInDB():
+            elif not self._tag.isInDb() and tag.isInDb():
                 self.box.removeItem(self.box.count()-1) # Remove "Add tag to DB" 
                 self.box.removeItem(self.box.count()-1) # and separator
             self._tag = tag
@@ -465,7 +465,7 @@ class TagValueEditor(QtGui.QWidget):
         """Return a class of widgets suitable to edit values of the given tag (e.g. QLineEdit)."""
         if tag is None:
             tag = self.tag
-        if not tag.isInDB() or tag.type == tags.TYPE_VARCHAR:
+        if not tag.isInDb() or tag.type == tags.TYPE_VARCHAR:
             return QtGui.QLineEdit
         elif tag.type == tags.TYPE_TEXT:
             return EnhancedTextEdit
@@ -551,7 +551,7 @@ class AddTagTypeDialog(QtGui.QDialog):
         QtGui.QDialog.__init__(self)
         self.setWindowTitle(self.tr("Add tag type"))
         
-        if tagType is not None and tagType.isInDB():
+        if tagType is not None and tagType.isInDb():
             raise ValueError("Cannot open AddTagTypeDialog for an internal tagtype.")
         self.tagType = None # only set this, if the type has been added to the database
                 
@@ -593,7 +593,7 @@ class AddTagTypeDialog(QtGui.QDialog):
     def _handleOk(self):
         """Handle OK button: Check if everything is fine and add the type to the database."""
         tagName = self.lineEdit.text()
-        if tags.isInDB(tagName):
+        if tags.isInDb(tagName):
             QtGui.QMessageBox.warning(self,self.tr("Tag exists already"),
                                       self.tr("There is already a tag named '{}'.").format(tagName))
             return
@@ -754,8 +754,9 @@ class TagValuePropertiesWidget(QtGui.QWidget):
     def commit(self):
         from ..core import tagcommands
         if self.changeValueCheckbox.isChecked() and self.valueEdit.text() != self.orig_value:
-            #TODO: make sure that the new value is not an empty string  
-            command = commands.RenameTagValueCommand(self.tag, self.orig_value, self.valueEdit.text())
+            #TODO: make sure that the new value is not an empty string
+            #TODO command does not exist  
+            command = tagcommands.RenameTagValueCommand(self.tag, self.orig_value, self.valueEdit.text())
             application.stack.push(command)
         if self.sortValueCheckbox.isChecked():
             if self.sortEdit.text() != self.orig_sortValue:

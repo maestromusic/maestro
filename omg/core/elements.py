@@ -38,6 +38,11 @@ class Element:
         """Return whether this element is a container."""
         raise NotImplementedError()
     
+    def isInDb(self):
+        """Return whether this element (or rather its version on real level) is stored in the database."""
+        from . import reallevel
+        return self.id in reallevel._dbIds
+        
     def getTitle(self,usePath=True):
         """Return the title of this element or some dummy title, if the element does not have a title tag.
         If config.options.misc.show_ids is True, the title will be prepended by the element's id.
@@ -62,7 +67,7 @@ class Element:
             yield self
         else:
             for id in self.contents:
-                for file in self.level.get(id).getAllFiles():
+                for file in self.level.fetch(id).getAllFiles():
                     yield file
     
     def getData(self, type):
@@ -101,8 +106,7 @@ class Element:
             return None
         elif self.id not in self.level.parent:
             return None
-        else:
-            return self.level.parent.get(self.id)
+        else: return self.level.parent[self.id]
 
 
 class Container(Element):
@@ -110,11 +114,10 @@ class Container(Element):
     major. Keyword-arguments that are not specified will be set to empty lists/tag.Storage instances.
     Note that *contents* must be a ContentList.
     """
-    def __init__(self, level, id, inDB, major,
+    def __init__(self, level, id, major,
                  *, contents=None, parents=None, tags=None, flags=None, data=None):
         self.level = level
         self.id = id
-        self.inDB = inDB
         self.level = level
         self.major = major
         
@@ -136,14 +139,16 @@ class Container(Element):
             self.data = data
         else: self.data = {}
     
-    def copy(self):
+    def copy(self,level=None):
         """Create a copy of this container. Create copies of all attributes. Because contents are stored as
         ids and do not have parent pointers, it is not necessary to copy contents recursively (contrary to
         Wrapper.copy).
+        
+        If *level* is not None, the copy will have that level as 'level'-attribute.
+        Warning: When copying elements from one level to another you might have to correct the parents list.
         """
-        return Container(level = self.level,
+        return Container(level = self.level if level is None else level,
                          id = self.id,
-                         inDB = self.inDB,
                          major = self.major,
                          contents = self.contents.copy(),
                          parents = self.parents[:],
@@ -161,7 +166,7 @@ class Container(Element):
         """Return a generator yielding the contents of this Container as Element instances (remember that
         self.contents only stores the ids). Elements that have not been loaded yet on this Container's level
         will be loaded."""
-        return (self.level.get(id) for id in self.contents)
+        return (self.level.collect(id) for id in self.contents)
     
     def __repr__(self):
         return "Container[{}] with {} elements".format(self.id, len(self.contents))
@@ -171,14 +176,14 @@ class File(Element):
     """Element-subclass for files. You must specify the level, id, url and length in seconds of the file.
     Keyword-arguments that are not specified will be set to empty lists/tag.Storage instances.
     """
-    def __init__(self, level, id, inDB, url, length,
+    def __init__(self, level, id, url, length,
                  *, parents=None, tags=None, flags=None, data=None):
-        if not isinstance(id,int) or not isinstance(url, filebackends.BackendURL) or not isinstance(length,int):
+        if not isinstance(id,int) or not isinstance(url, filebackends.BackendURL) \
+                or not isinstance(length,int):
             raise TypeError("Invalid type (id,url,length): ({},{},{}) of types ({},{},{})"
                             .format(id,url,length,type(id),type(url),type(length)))
         self.level = level
         self.id = id
-        self.inDB = inDB
         self.level = level
         self.url = url
         self.length = length
@@ -196,19 +201,22 @@ class File(Element):
             self.data = data
         else: self.data = {}
         
-    def copy(self):
-        ret = File(level=self.level,
-                    id=self.id,
-                    inDB = self.inDB,
-                    url=self.url,
-                    length=self.length,
-                    parents=self.parents[:],
-                    tags=self.tags.copy(),
-                    flags=self.flags[:],
-                    data=self.data.copy())
+    def copy(self, level=None):
+        """Create a copy of this file. Create copies of all attributes. If *level* is not None, the copy
+        will have that level as 'level'-attribute.
+        Warning: When copying elements from one level to another you might have to correct the parents list.
+        """
+        copy = File(level = self.level if level is None else level,
+                    id = self.id,
+                    url = self.url,
+                    length = self.length,
+                    parents = self.parents[:],
+                    tags = self.tags.copy(),
+                    flags = self.flags[:],
+                    data = self.data.copy())
         if hasattr(self, "filePosition"):
-            ret.filePosition = self.filePosition
-        return ret
+            copy.filePosition = self.filePosition
+        return copy
     
     def isFile(self):
         return True
@@ -229,26 +237,28 @@ class ContentList:
     necessarily the indexes of the corresponding ids). A ContentList can be used like a usual list, except
     that when writing elements via item access is not possible (use append/insert instead).
     """
-    def __init__(self):
-        self.positions = []
-        self.ids = []
+    def __init__(self, positions=None, ids=None):
+        self.ids = ids if ids is not None else []
+        self.positions = positions if positions is not None else list(range(1,1+len(self.ids)))
     
     @classmethod
     def fromPairs(cls,pairs):
         """Creates a ContentList from a generator of (position, id) or (position, element) pairs."""
         positions, ids = (list(zp) for zp in zip(*sorted(pairs)))
         ids = [element.id if isinstance(element, Element) else element for element in ids ]
-        ret = ContentList()
-        ret.positions = positions
-        ret.ids = ids
-        return ret
+        return ContentList(positions, ids)
+    
+    @classmethod
+    def fromList(cls, elements):
+        """Creates a ContentList from a generator of elements or element ids. The positions will simply
+        enumerate from 1.
+        """
+        ids = [element if isinstance(element, int) else element.id for element in elements]
+        return ContentList(ids=ids)
 
     def copy(self):
         """Return a copy of this list."""
-        result = ContentList()
-        result.ids = self.ids[:]
-        result.positions = self.positions[:]
-        return result
+        return ContentList(self.positions[:], self.ids[:])
         
     def __len__(self):
         return len(self.ids)
@@ -301,7 +311,7 @@ class ContentList:
         self.positions.insert(index, pos)
         self.ids.insert(index, id)
     
-    def remove(self,pos=None,index=None):
+    def remove(self,*,pos=None,index=None):
         """Remove an id and its position from the list. You must specify either the position or its index."""
         if pos is not None:
             index = self.positions.index(pos)
@@ -309,6 +319,17 @@ class ContentList:
             raise ValueError("Either of 'pos' or 'index' must be given to ContentList.remove()")
         del self.ids[index]
         del self.positions[index]
+        
+    def removeAll(self,id):
+        """Remove all occurrences of *id* in this list."""
+        try:
+            index = 0
+            while True:
+                index = self.ids.find(id,index)
+                del self.ids[index]
+                del self.positions[index]
+        except ValueError:
+            pass # all occurrences have been deleted
     
     def shift(self, delta):
         """Shift all positions by *delta*"""
@@ -343,6 +364,6 @@ class ContentList:
     def __ne__(self, other):
         return self.ids != other.ids or self.positions != other.positions
     
-    def __str__(self):
+    def __repr__(self):
         return '[{}]'.format(', '.join('{}: {}'.format(*item) for item in self.items()))
          

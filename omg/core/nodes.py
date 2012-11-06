@@ -316,8 +316,8 @@ class Wrapper(Node):
         If *level* is not None, the copy will use elements from the given level instead of the original
         elements (this is for example necessary when dropping elements from level to another).
         """
-        element = self.element if level is None else level.get(self.element.id)
-        copy = Wrapper(element,contents=None,position=self.position,parent=self.parent)
+        element = self.element if level is None else level.collect(self.element.id)
+        copy = Wrapper(element, contents=None, position=self.position, parent=self.parent)
         if self.isContainer():
             if contents is None:
                 copy.setContents([child.copy(level=level) for child in self.contents])
@@ -343,7 +343,7 @@ class Wrapper(Node):
         """Fill this wrapper with exactly the contents of the underlying element. If *recursive* is True,
         load the contents of all children in the same way."""
         if self.element.isContainer():
-            self.setContents([Wrapper(self.element.level.get(id),position = pos)
+            self.setContents([Wrapper(self.element.level.collect(id), position = pos)
                                     for pos,id in self.element.contents.items()])
             if recursive:
                 for child in self.contents:

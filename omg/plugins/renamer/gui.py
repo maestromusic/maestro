@@ -22,7 +22,7 @@ from ... import config
 from ...gui import treeview, treeactions, delegates, profiles as profilesgui
 from ...gui.delegates import abstractdelegate
 from ...models import leveltreemodel
-from ...core.levels import RenameFilesError
+from ...core import levels
 from . import plugin
 
 translate = QtCore.QCoreApplication.translate
@@ -54,7 +54,7 @@ class RenameFilesAction(treeactions.TreeAction):
         if dialog.result() == dialog.Accepted:
             try:
                 dialog.sublevel.commit()
-            except RenameFilesError as e:
+            except levels.RenameFilesError as e:
                 e.displayMessage()
 
 
@@ -120,11 +120,11 @@ class RenameDialog(QtGui.QDialog):
         self.statusLabel.setAutoFillBackground(True)
         self.statusLabel.setPalette(pal)
         
-        self.sublevel = level.subLevel(elements, "rename")
+        self.sublevel = levels.Level("Rename", self.level, elements)
         self.elementsParent = elements
-        self.elementsSub = [self.sublevel.get(element.id) for element in elements]
+        self.elementsSub = [self.sublevel[element.id] for element in elements]
         self.model = leveltreemodel.LevelTreeModel(self.sublevel, self.elementsSub)
-        self.tree = treeview.TreeView(self.sublevel,affectGlobalSelection=False)
+        self.tree = treeview.TreeView(self.sublevel, affectGlobalSelection=False)
         self.tree.setModel(self.model)
         self.delegate = PathDelegate(self.tree)
         self.tree.setItemDelegate(self.delegate)
@@ -151,7 +151,7 @@ class RenameDialog(QtGui.QDialog):
                 totalResult.update(result)
             for elem, newPath in totalResult.items():
                 if elem.id in self.sublevel:
-                    subelem = self.sublevel.get(elem.id)
+                    subelem = self.sublevel[elem.id]
                     subelem.url = subelem.url.renamed(newPath)
             if len(set(totalResult.values())) != len(totalResult): # duplicate paths!
                 self.bb.button(QtGui.QDialogButtonBox.Ok).setEnabled(False)

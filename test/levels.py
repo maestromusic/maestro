@@ -21,130 +21,224 @@
 import unittest
 
 from omg import application, config, database as db, utils
-
+from omg.core import tags, levels, elements
+from omg.filebackends import BackendFile, BackendURL, urlTypes
+from . import testcase
 from .testlevel import *
 
+class TestFile(BackendFile):
+    @staticmethod
+    def tryLoad(url):
+        assert url.scheme == 'test'
+        return TestFile(url)
+    
+    def readTags(self):
+        self.tags = tags.Storage()
+        artist,title = self.url.parsedUrl.path[1:].split(' - ') # skip leading /
+        self.tags.add(tags.TITLE, title)
+        self.tags.add(tags.get('artist'), artist)
+    
+    def saveTags(self):
+        # writing tags to filesystem is not checked by this unittest
+        return []
+    
+    length = 180
 
-class TestCase(unittest.TestCase):
-    """Base test case for playlist test cases."""
-    def __init__(self,level,playlist=None):
+class TestUrl(BackendURL):
+    CAN_RENAME = False
+    CAN_DELETE = False
+    IMPLEMENTATIONS = [ TestFile ]
+    
+    def __init__(self, urlString):
+        if "://" not in urlString:
+            urlString = "test:///" + utils.relPath(urlString)
+        super().__init__(urlString)
+
+urlTypes["test"] = TestUrl
+ 
+
+class LevelTestCase(testcase.UndoableTestCase):
+    """Base test case for level related test cases."""
+    def __init__(self,level):
         super().__init__()
         
         self.level = level
         self.real = level == levels.real
-        self.checks = []
-        
-        self.F1 = level.get(1)
-        self.F2 = level.get(2)
-        self.F3 = level.get(3)
-        self.C1 = level.get(4)
-        
+    
     def setUp(self):
-        application.stack.clear()
-        
-    def check(self,checkType,values,redo=True):
-        if checkType == 'contents':
-            parent, contents = values
-            self.assertListEqual([c.id for c in contents],parent.contents.ids)
-            if self.real:
-                self.assertListEqual([c.id for c in contents],list(db.query(
-                            "SELECT element_id FROM {}contents WHERE container_id = ? ORDER BY position"
-                            .format(db.prefix),parent.id).getSingleColumn()))
-        
-        if checkType == 'parents':
-            element, parents = values
-            self.assertCountEqual([p.id for p in parents],element.parents)
-            if self.real:
-                self.assertCountEqual([p.id for p in parents],db.query(
-                            "SELECT container_id FROM {}contents WHERE element_id=?"
-                            .format(db.prefix),element.id).getSingleColumn())
-                
-        if redo:
-            self.checks.append((checkType,values,self.level.stack.index()))
-        
-    def checkUndo(self):
-        """Undo all changes to the playlist and do the checks again at the right moments."""
-        for checkType,values,index in reversed(self.checks):
-            self.level.stack.setIndex(index)
-            self.check(checkType,values,redo=False)
-        
-        self.level.stack.setIndex(0)
-        for element in [self.F1,self.F2,self.F3,self.C1]:
-            if element.isContainer():
-                self.assertEqual(element.contents.ids,[])
-            self.assertEqual(element.parents,[])
-            
+        super().setUp()
+        self.level.elements = {}
         if self.real:
-            self.assertEqual(0,db.query("SELECT COUNT(*) FROM {}contents".format(db.prefix)).getSingle())
-           
-    def runTest(self):
-        self.level.insertContentsAuto(self.C1,0,[self.F1,self.F3])
-        self.check('contents',(self.C1,[self.F1,self.F3]))
-        self.check('parents',(self.F1,[self.C1]))
+            db.query("DELETE FROM {}elements".format(db.prefix))
+            from omg.core import reallevel
+            reallevel._dbIds = set()
 
-        self.level.insertContentsAuto(self.C1,1,[self.F2])
-        self.check('contents',(self.C1,[self.F1,self.F2,self.F3]))
-        
-        self.level.removeContentsAuto(self.C1, indexes=(1, 2))
-        self.check('contents',(self.C1, [self.F1]))
-        self.check('parents',(self.F2, []))
-        
-        #container = self.level.merge([self.C1,self.F2,self.F3])
-        
+
+class CreationTestCase(LevelTestCase):
+    def runTest(self):
         if not self.real:
-            self.checkUndo()
+            self.assertEqual(self.level.elements, {}) # this is important on undo
+        self.f1 = self.level.collect(TestUrl('test://band 1 - song'))
+        # due to the fixed url->id mapping, these id is the same on real and editor
+        self.assertEqual(self.f1.id, 1)
+        self.assertIn(self.f1.id, self.level)
+        self.f2 = self.level.collect(TestUrl('test://band 2 - a song'))
+        self.f3 = self.level.collect(TestUrl('test://band 3 - another song'))
+        self.f4 = self.level.collect(TestUrl('test://band 4 - no song'))
+        containerTags = tags.Storage({tags.TITLE: ['Weird album']})
+        if self.real: # On real level createContainer does not work until we added the contents to the db
+            self.assertEqual(0, db.query("SELECT COUNT(*) FROM {}elements".format(db.prefix)).getSingle())
+            from omg.core import reallevel
+            self.assertEqual(reallevel._dbIds,set())
+            self.level.addToDb([self.f1, self.f2, self.f3, self.f4])
+            self.assertEqual(4, db.query("SELECT COUNT(*) FROM {}elements".format(db.prefix)).getSingle())
+            self.assertEqual(reallevel._dbIds,set([1,2,3,4]))
+        
+        # note that this id will be different when this test is run for editor and real level
+        predictedId = db._nextId
+        self.assertNotIn(predictedId, self.level) 
+        self.assertEqual(self.f1.parents, [])
+        self.c = self.level.createContainer(tags=containerTags, contents=[self.f1, self.f2, self.f3])
+        self.assertEqual(self.c.id, predictedId)
+        self.assertIn(predictedId, self.level)
+        self.assertEqual(self.c.contents,
+                         elements.ContentList.fromList([self.f1.id, self.f2.id, self.f3.id]))
+        self.assertEqual(self.f1.parents, [self.c.id])
+        
+        self.checkUndo()
+        self.checkRedo()
+        
+        
+class ContentsTestCase(LevelTestCase):
+    def setUp(self):
+        super().setUp()
+        self.f1 = self.level.collect(TestUrl('test://band 1 - song'))
+        self.f2 = self.level.collect(TestUrl('test://band 2 - a song'))
+        self.f3 = self.level.collect(TestUrl('test://band 3 - another song'))
+        self.f4 = self.level.collect(TestUrl('test://band 4 - no song'))
+        self.fs = [self.f1, self.f2, self.f3, self.f4]
+        containerTags = tags.Storage({tags.TITLE: ['Weird album']})
+        if self.real:
+            # On real level createContainer does not work until we added the contents to the db
+            self.level.addToDb(self.fs)
+        self.c = self.level.createContainer(tags=containerTags, contents=[])
+        
+    def runTest(self):
+        self.assertEqual(self.c.contents, elements.ContentList())
+        self.assertEqual(self.f1.parents, [])
+        
+        # setContents
+        self.level.setContents(self.c, elements.ContentList.fromList(self.fs))
+        self.assertEqual(self.c.contents, elements.ContentList.fromList(self.fs))
+        self.assertEqual(self.f1.parents, [self.c.id])
+        
+        # setContents empty
+        self.level.setContents(self.c, [])
+        self.assertEqual(self.c.contents, elements.ContentList())
+        self.assertEqual(self.f1.parents, [])
+        
+        # insertContents
+        pairs = ((1, self.f1), (4, self.f2), (9, self.f3))
+        self.level.insertContents(self.c, pairs)
+        self.assertEqual(self.c.contents, elements.ContentList.fromPairs(pairs))
+        self.assertEqual(self.f1.parents, [self.c.id])
+        
+        #TODO: Bug: This breaks monotonicity of ContentList
+        #self.level.shiftPositions(self.c, [1,4], 9)
+        #self.assertEqual(self.c.contents,
+        #                 elements.ContentList.fromPairs([(9, self.f3), (10,self.f1), (13, self.f2)]))
+        # If this is fixed, the next two changes have to be adapted
+        self.level.removeContents(self.c, [4,9])
+        self.assertEqual(self.c.contents,
+                         elements.ContentList.fromPairs([(1,self.f1)]))
+        self.assertEqual(self.f2.parents, [])
+        
+        # shiftPositions
+        self.level.shiftPositions(self.c, [1], 9)
+        self.assertEqual(self.c.contents, elements.ContentList.fromPairs([(10, self.f1)]))
+        
+        # insertContentsAuto
+        contents = [self.f2, self.f4]
+        self.level.insertContentsAuto(self.c, 1, contents)
+        self.assertEqual(self.c.contents,
+                         elements.ContentList.fromPairs([(10,self.f1), (11, self.f2), (12, self.f4)]))
+        self.assertEqual(self.f4.parents, [self.c.id])
+        
+        self.level.insertContentsAuto(self.c, 2, [self.f3])
+        self.assertEqual(self.c.contents,
+                elements.ContentList.fromPairs([(10,self.f1), (11, self.f2), (12, self.f3), (13, self.f4)]))
+        
+        # removeContentsAuto
+        self.level.removeContentsAuto(self.c, positions=[11])
+        self.assertEqual(self.c.contents,
+                         elements.ContentList.fromPairs([(10,self.f1), (11, self.f3), (12, self.f4)]))
+        self.assertEqual(self.f2.parents, [])
+        
+        self.level.removeContentsAuto(self.c, indexes=[1])
+        self.assertEqual(self.c.contents,
+                         elements.ContentList.fromPairs([(10,self.f1), (11, self.f4)]))
+        self.assertEqual(self.f3.parents, [])
+        
+        self.checkUndo()
+        self.checkRedo()
+        
+        
+class CommitTestCase(LevelTestCase):
+    def setUp(self):
+        super().setUp()
+        self.subLevel = levels.Level('TEST', self.level)
+        self.f1 = self.subLevel.collect(TestUrl('test://band 1 - song'))
+        self.f2 = self.subLevel.collect(TestUrl('test://band 2 - a song'))
+        self.f3 = self.subLevel.collect(TestUrl('test://band 3 - another song'))
+        self.f4 = self.subLevel.collect(TestUrl('test://band 4 - no song'))
+        self.fs = [self.f1, self.f2, self.f3, self.f4]
+        self.containerTags = tags.Storage({tags.TITLE: ['Weird album']})
+        self.contentList = elements.ContentList.fromPairs([(10,self.f1), (12,self.f2)])
+        self.c = self.subLevel.createContainer(tags=self.containerTags, contents=self.contentList)
+        
+    def runTest(self):
+        if self.real:
+            self.assertEqual(0, db.query("SELECT COUNT(*) FROM {}elements".format(db.prefix)).getSingle())
+            self.assertEqual(set(self.level.elements.keys()), set([el.id for el in self.fs]))
         else:
-            # Store the current state in a new level
-            level = levels.Level('TEST',parent=levels.real)
-            level.getFromIds([1,2,3,4])
-            
-            self.checkUndo()
-            
-            self.checks = []
-            
-            # Restore the state to check whether commit works
-            level.commit()
-            self.check('contents',(self.C1,[self.F1]))
-            self.check('parents',(self.F1,[self.C1]))
-            self.check('parents',(self.F2,[]))
-            self.check('parents',(self.F3,[]))
-            
-            self.checkUndo()
+            self.assertEqual(self.level.elements, {})
+        print("Start commit")
+        self.subLevel.commit()
+        if self.real:
+            self.assertEqual(5, db.query("SELECT COUNT(*) FROM {}elements".format(db.prefix)).getSingle())
+        self.assertEqual(set(self.level.elements.keys()),
+                         set([element.id for element in [self.f1, self.f2, self.f3, self.f4, self.c]]))
+        self.assertEqual(self.level[self.c.id].contents, self.contentList)
+        self.assertIsNot(self.level[self.c.id].contents, self.contentList)
+        self.assertEqual(self.level[self.f3.id].parents, [])
+        self.assertEqual(self.level[self.c.id].tags, self.containerTags)
+        self.assertIsNot(self.level[self.c.id].tags, self.containerTags)
+        
+        # Now change stuff on the sub level and commit again
+        #===================================================
+        self.f5 = self.subLevel.collect(TestUrl('test://band 5 - new song'))
+        contentList = elements.ContentList.fromPairs([(10,self.f5), (12,self.f2)])
+        self.subLevel.changeContents({self.c: contentList})
+        self.subLevel.removeElements([self.f1])
+        self.assertEqual(self.subLevel.elements.keys(),
+                         set([element.id for element in [self.f2, self.f3, self.f4, self.f5, self.c]]))
+        self.subLevel.commit()
+        self.assertEqual(set(self.level.elements.keys()),
+                     set([element.id for element in [self.f1, self.f2, self.f3, self.f4, self.f5, self.c]]))
+        self.assertEqual(self.level[self.c.id].contents, contentList)
+        
+        self.checkUndo()
+        self.checkRedo()
 
         
 def load_tests(loader, standard_tests, pattern):
     # See http://docs.python.org/py3k/library/unittest.html#load-tests-protocol
     suite = unittest.TestSuite()
-    
-    db.transaction()
-    elementCount = 4
-    db.multiQuery('INSERT INTO {}elements (id,file,toplevel,elements,major) VALUES (?,?,?,?,0)'
-                  .format(db.prefix),
-                  [(1,1,0,0,),(2,1,0,0,),(3,1,0,0,),
-                   (4,0,1,3,)
-                  ])
-    # Create fake files which have their id as url and hash
-    db.query("""INSERT INTO {0}files (element_id,url,hash,length)
-                            SELECT id,'file://',id,0 FROM {0}elements WHERE file=1"""
-             .format(db.prefix))
-                  
-    #db.multiQuery('INSERT INTO {}contents (container_id,position,element_id) VALUES(?,?,?)'
-    #              .format(db.prefix),
-    #              [(4,1,1),(4,2,2),(4,3,3)])
-    db.multiQuery('INSERT INTO {}values_varchar (id,tag_id,value,sort_value,hide) VALUES (?,?,?,NULL,0)'
-                  .format(db.prefix),
-                  [(1,tags.TITLE.id,'F1'),(2,tags.TITLE.id,'F2'),(3,tags.TITLE.id,'F3'),
-                   (4,tags.TITLE.id,'C1'),])
-    db.multiQuery('INSERT INTO {}tags (element_id,tag_id,value_id) VALUES (?,?,?)'
-                  .format(db.prefix),
-                  # each title in values_varchar has the same id as the corresponding element
-                  [(i,tags.TITLE.id,i) for i in range(1,elementCount+1)])
-    db.commit()
-
-    levels.editor.getFromIds(list(range(1,elementCount+1))) # load all elements into editor level
-    
-    suite.addTest(TestCase(levels.editor))
-    suite.addTest(TestCase(levels.real))
+    for level in [levels.editor,levels.real]:
+    #for level in [levels.editor]:
+        suite.addTest(CreationTestCase(level))
+        suite.addTest(ContentsTestCase(level))
+        suite.addTest(CommitTestCase(level))
     return suite
     
 if __name__ == "__main__":

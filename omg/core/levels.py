@@ -40,13 +40,15 @@ def init():
     global real,editor
     from . import reallevel
     real = reallevel.RealLevel()
-    editor = Level("EDITOR", parent=real)
+    editor = Level('EDITOR',real)
     
 
-#TODO is not used currently
 class ElementGetError(RuntimeError):
-    """Error indicating that an element failed to be loaded by some level."""
-    pass
+    """Error indicating that some elements failed to be loaded by some level."""
+    def __init__(self, level, elements, text=''):
+        super().__init__(text)
+        self.level = level
+        self.elements = elements
 
 
 class RenameFilesError(RuntimeError):
@@ -120,8 +122,6 @@ class GenericLevelCommand(QtGui.QUndoCommand):
 class Level(application.ChangeEventDispatcher):
     """A collection of elements corresponding to a specific state.
     
-    A level consists of a consistent set of elements: All children of an element in a level must
-    also be contained in the level.
     The "same" element (i.e. element with the same ID) might be present in different levels with
     different states (different tags, flags, contents, ...). Via the concept of a parent level,
     these are connected. The topmost levels is the "real" level reflecting the state of the
@@ -139,154 +139,176 @@ class Level(application.ChangeEventDispatcher):
           Only levels which are only used in a modal dialog may use their own stack.
           
     """ 
-    def __init__(self, name, parent, stack=None):
+    def __init__(self, name, parent, elements=None, stack=None):
         super().__init__()
         allLevels.add(self)
         self.name = name
         self.parent = parent
-        self.elements = {}
+        if elements is None:
+            self.elements = {}
+        else:
+            assert all(element.level is parent for element in elements)
+            self.elements = {element.id: element.copy(level=self) for element in elements}
         self.stack = stack if stack is not None else application.stack
         
     def emitEvent(self, dataIds=None, contentIds=None):
         """Simple shortcut to emit an event."""
         self.emit(ElementChangedEvent(dataIds,contentIds))
     
-    def get(self, param):
-        """Return the element determined by *param*. Load it if necessary.
-        
-        *param* may be either the id or, in case of files, the url.
-        """
-        if not isinstance(param, int):
-            if not isinstance(param, filebackends.BackendURL):
-                raise ValueError("param must be either ID or URL, not {} of type {}"
-                                    .format(param,type(param)))
-            param = idFromUrl(param)
-        if param not in self.elements:
-            self.parent.loadIntoChild([param],self)
-        return self.elements[param]
-    
-    def getFromIds(self, ids):
-        """Load all elements given by the list of ids *ids* into this level and return them."""
-        notFound = []
-        for id in ids:
-            if id not in self.elements:
-                notFound.append(id)
-        if len(notFound) > 0:
-            self.parent.loadIntoChild(notFound, self)
-        return [self.elements[id] for id in ids]
-                
-    def getFromUrls(self, urls):
-        """Convenience method: load elements for the given urls and return them."""
-        ids = [ idFromUrl(url) for url in urls ]
-        return self.getFromIds(ids)
-    
-    def loadIntoChild(self, ids, child):
-        """Load all elements given by the list of ids *ids* into the level *child*.
-        
-        This method does not check whether elements are already loaded in the child. Note that
-        elements are *not* loaded into the *self* level.
-        """
-        notFound = []
-        for id in ids:
-            if id in self.elements:
-                child.elements[id] = self.elements[id].copy()
-                child.elements[id].level = child
-            else: notFound.append(id)
-        if len(notFound) > 0:
-            self.parent.loadIntoChild(notFound, self)
-        
     def __contains__(self, param):
         """Returns if the given element is loaded in this level.
         
         *param* may be either an ID or a URL. Note that if the element could be loaded from the
         parent but is not contained in this level, then *False* is returned.
         """
-        if not isinstance(arg, int):
-            if not isinstance(param, filebackends.BackendURL):
-                raise ValueError("param must be either ID or URL, not {} of type {}"
-                                    .format(param,type(param)))
+        if isinstance(param, int):
+            return param in self.elements
+        elif isinstance(param, filebackends.BackendURL):
             try:
-                param = idFromUrl(param, create=False)
+                id = idFromUrl(param)
             except KeyError:
-                #  no id for that path -> element can not be contained
                 return False
-        return (param in self.elements)
-    
-    def children(self, spec):
-        """Returns a set of (recursively) all children of one or more elements.
-        
-        *spec* may be a single element, a list of elements, a single ID or a list of IDs.
-        """
-        if isinstance(spec, collections.Iterable):
-            spec = list(spec)
-            if len(spec) == 0:
-                return set()
-            #TODO: Why numbers.Integral?
-            if isinstance(spec[0], numbers.Integral):
-                spec = [self.get(id) for id in spec]
-            return set.union(*(self.children(element) for element in spec))
-        if isinstance(spec, numbers.Integral):
-            spec = self.get(spec)
-        if spec.isFile():
-            return set( (spec, ) )
+            return id in self.elements
         else:
-            return set.union(set( (spec, ) ),
-                             *(self.children(childId) for childId in spec.contents))
+            raise ValueError("param must be either ID or URL, not {} of type {}"
+                             .format(param, type(param)))
+  
+    def __getitem__(self,key):
+        if isinstance(key,int):
+            return self.elements[key]
+        elif isinstance(key, filebackends.BackendURL):
+            return self.elements[idFromUrl(key)] # __getitem__ and idFromUrl may raise KeyErrors
+        else:
+            raise ValueError("param must be either ID or URL, not {} of type {}"
+                             .format(param, type(param)))
+
+    def _ensureLoaded(self, params):
+        """Make sure that the elements specified by params (ids and/or urls) are loaded on this level or 
+        any parent level."""
+        missing = [param for param in params if param not in self]
+        if len(missing) > 0:
+            self.parent._ensureLoaded(params)
     
+    #TODO do something about this ugly correct parents stuff
+    def _correctParents(self, element, changeLevel):
+        # This does only work if element comes from a level that is an ancestor or descendant of self,
+        # if element is not contained in any levels in between and not contained in this level.
+        parentsToRemove = [parentId for parentId in element.parents
+                           if parentId in self and element.id not in self[parentId].contents]
+        if len(parentsToRemove) > 0 or changeLevel:
+            # To be consistent with the case where no parents need to be removed, we do not change the
+            # level attribute if not explicitly asked for it.
+            element = element.copy(level=self if changeLevel else None)
+            for parentId in parentsToRemove:
+                element.parents.remove(parentId)
+            
+        return element
+    
+    def fetch(self, param):
+        """Return the element specified by the id or url *param* from this level or the nearest parent level.
+        Do not load the element onto this level. Correct the 'parents' attribute if the element is fetched
+        from a parent level.
+        """
+        if param in self:
+            return self[param]
+        else: return self._correctParents(self.parent._fetch(param), changeLevel=False)
+    
+    def _fetch(self, param):
+        """Like fetch, but do not correct the 'parents' attribute."""
+        if param in self:
+            return self[param]
+        else: return self.parent._fetch(param)
+    
+    def fetchMany(self, params):
+        """Fetch several elements by their id/url and return them."""
+        self._ensureLoaded(params) # without this line all missing elements would be loaded separately.
+        return [self.fetch(param) for param in params]
+        
+    def collect(self, param):
+        """Return the element specified by the id or url *param* from this level. Load the element if it is
+        not loaded yet."""
+        return self.collectMany([param])[0]
+    
+    def collectMany(self, params):
+        """Collect several elements by their id/url and return them."""
+        self._ensureLoaded(params) # without this line all missing elements would be loaded separately.
+        newElements = [self._correctParents(self.parent.fetch(param), changeLevel=True)
+                       for param in params if param not in self]
+        if len(newElements):
+            self.addElements(newElements)
+        return [self[param] for param in params]
+  
     def files(self):
         """Return a generator of all files in this level."""
-        return ( elem for elem in self.elements.values() if elem.isFile() )
- 
-    def subLevel(self, elements, name):
-        """Return a child level of *self* containing copies of the given *elements* and
-        named *name*.
-        """
-        level = Level(name, self)
-        #TODO: Why load all children, too? Storing the ids in element.contents makes it possible to refer
-        # to children which are not loaded
-        level.getFromIds([elem.id for elem in self.children(elements)])
-        return level
-
+        return (element for element in self.elements.values() if element.isFile())
+    
     # ===========================================================================
     # The following functions provide undo-aware implementations of level changes
     # ===========================================================================
-    
+    def addElements(self, elements):
+        """Undoably add elements to this level."""
+        command = GenericLevelCommand(redoMethod=self._addElements,
+                                      redoArgs={"elements": elements},
+                                      undoMethod=self._removeElements,
+                                      undoArgs={"elements": elements},
+                                      text=self.tr("Add elements"))
+        self.stack.push(command)
+        
+    def removeElements(self, elements):
+        """Undoably remove elements from this level."""
+        command = GenericLevelCommand(redoMethod=self._removeElements,
+                                      redoArgs={"elements": elements},
+                                      undoMethod=self._addElements,
+                                      undoArgs={"elements": elements},
+                                      text=self.tr("Remove elements"))
+        self.stack.push(command)
+
     def createContainer(self, tags=None, flags=None, data=None, major=True, contents=None):
         """Create a new container with the given properties and load it into this level.
         
         Can be undone. Returns the new container.
-        """
-        from . import commands
-        command = commands.CreateContainerCommand(self, tags, flags, data, major, contents)
-        self.stack.push(command)
-        return command.container
+        """ 
+        container = elements.Container(level=self,
+                                       id=db.nextId(),
+                                       major=major, 
+                                       tags=tags,
+                                       flags=flags,
+                                       data=data)
+        self.stack.beginMacro(self.tr("Create container"))
+        self.addElements([container])
+        # addElements on real level does not allow for contents
+        # Furthermore this will also update the 'parents' attribute of all contents
+        if contents is not None:
+            self.setContents(container, contents)
+        self.stack.endMacro()
+        return container
         
     def changeTags(self, changes):
         """Change tags of elements. *changes* maps elements to tags.TagDifference objects.
         On real level this method might raise a TagWriteError if writing (some or all) tags to the
         filesystem fails.
         """
-        self._changeSomething(changes,self.tr("change tags"))
+        self._changeSomething(self._changeTags, changes, self.tr("change tags"))
         
     def changeFlags(self, changes):
         """Change flags of elements. *changes* maps elements to flags.FlagDifference objects."""
-        self._changeSomething(changes,self.tr("change flags"))
+        self._changeSomething(self._changeFlags, changes, self.tr("change flags"))
     
     def changeData(self, changes):
         """Change flags of elements. *changes* maps elements to data.DataDifference objects."""
-        self._changeSomething(changes,self.tr("change data"))
+        self._changeSomething(self._changeData, changes, self.tr("change data"))
     
-    def _changeSomething(self,changes,text):
+    def _changeSomething(self,method,changes,text):
         """Helper for changeTags, changeFlags and similar methods which only need to undoably call
-        _applyDiffs. *text* is used as text for the created undocommand."""
-        inverseChanges = {elem:diff.inverse() for elem,diff in changes.items()}
-        command = GenericLevelCommand(redoMethod=self._applyDiffs,
-                                      redoArgs={"changes" : changes},
-                                      undoMethod=self._applyDiffs,
-                                      undoArgs={"changes": inverseChanges},
-                                      text=text,
-                                      errorClass=filebackends.TagWriteError)
-        self.stack.push(command)
+        *method* with *changes* (or its inverse). *text* is used as text for the created undocommand."""
+        if len(changes) > 0:
+            inverseChanges = {elem:diff.inverse() for elem,diff in changes.items()}
+            command = GenericLevelCommand(redoMethod=method,
+                                          redoArgs={"changes" : changes},
+                                          undoMethod=method,
+                                          undoArgs={"changes": inverseChanges},
+                                          text=text)
+            self.stack.push(command)
         
     def setCovers(self, coverDict):
         """Set the covers for one or more elements.
@@ -303,16 +325,41 @@ class Level(application.ChangeEventDispatcher):
         The action can be undone. *elemToMajor* maps elements to boolean values indicating the
         desired major state.
         """
-        reversed = {elem:(not major) for (elem, major) in elemToMajor.items()}
-        command = GenericLevelCommand(redoMethod=self._setMajorFlags,
-                                      redoArgs={"elemToMajor" : elemToMajor,
-                                                "emitEvent" : emitEvent},
-                                      undoMethod=self._setMajorFlags,
-                                      undoArgs={"elemToMajor" : reversed,
-                                                "emitEvent" : emitEvent},
-                                      text=self.tr("change major property"))
-        self.stack.push(command)
+        if len(elemToMajor) > 0:
+            inverseChanges = {elem: (not major) for (elem, major) in elemToMajor.items()}
+            command = GenericLevelCommand(redoMethod=self._setMajorFlags,
+                                          redoArgs={"elemToMajor" : elemToMajor,
+                                                    "emitEvent" : emitEvent},
+                                          undoMethod=self._setMajorFlags,
+                                          undoArgs={"elemToMajor" : inverseChanges,
+                                                    "emitEvent" : emitEvent},
+                                          text=self.tr("change major property"))
+            self.stack.push(command)
     
+    def changeContents(self, contentDict):
+        """Set contents according to *contentDict* which maps parents to content lists."""
+        if len(contentDict) > 0:
+            inverseChanges = {parent: parent.contents for parent in contentDict}
+            command = GenericLevelCommand(redoMethod=self._changeContents,
+                                          redoArgs={"contentDict": contentDict},
+                                          undoMethod=self._changeContents,
+                                          undoArgs={"contentDict": inverseChanges},
+                                          text=self.tr("change contents"))
+            self.stack.push(command)
+        
+    def setContents(self, parent, contents):
+        """Set the content list of *parent*."""
+        if not isinstance(contents, elements.ContentList):
+            contents = elements.ContentList.fromList(contents)
+        command = GenericLevelCommand(redoMethod=self._setContents,
+                                      redoArgs={"parent": parent,
+                                                "contents": contents},
+                                      undoMethod=self._setContents,
+                                      undoArgs={"parent": parent,
+                                                "contents": parent.contents},
+                                      text=self.tr("set contents"))
+        self.stack.push(command)
+        
     def insertContents(self, parent, insertions):
         """Insert contents with predefined positions into a container.
         
@@ -349,7 +396,7 @@ class Level(application.ChangeEventDispatcher):
     
     def removeContents(self, parent, positions):
         """Undoably remove children with *positions* from *parent*."""
-        undoInsertions = [(pos, self.get(parent.contents.at(pos))) for pos in positions]
+        undoInsertions = [(pos, self[parent.contents.at(pos)]) for pos in positions]
         command = GenericLevelCommand(redoMethod=self._removeContents,
                                       redoArgs={"parent" : parent,
                                                 "positions" : positions,
@@ -425,109 +472,125 @@ class Level(application.ChangeEventDispatcher):
                                                 "emitEvent" : True},
                                       undoMethod=self._renameFiles,
                                       undoArgs={"renamings": reversed},
-                                      text=self.tr("rename files"),
-                                      errorClass=RenameFilesError)
+                                      text=self.tr("rename files"))
         self.stack.push(command)
     
     def commit(self, elements=None):
         """Undoably commit given *elements* (or everything, if not specified) into the parent level.
         """
-        from . import commands
-        self.stack.beginMacro('commit')
+        from . import reallevel
         if elements is None:
-            elements = list(self.elements.values())
-        else:
-            elements = self.children(elements)
-
+            elements = self.elements.values()
+        if len(elements) == 0:
+            return
+        self.stack.beginMacro(self.tr("commit"), dbTransaction=self.parent is real)
+      
         if self.parent is real:
+            # First load all missing files
+            for element in elements:
+                if element.isFile() and element.id not in real:
+                    real.collect(element.id if element.isInDb() else element.url)
+            
+            # 1. Collect data
+            # 2. Write file tags (do this first because it is most likely to fail). Private tags must
+            #    be excluded first, because files have not yet been added to the database. Tags must be
+            #    changed before adding files to the db, because files on real might contain external tags.
+            # 3. Add elements to database
+            # 4. Change remaining tags (i.e. container tags and private tags)
+            # 5. change other stuff (same as if self.parent is not real)
+            
+            # 1. Collect data
+            addToDbElements = [] # Have to be added to the db (this does overlap oldElements below)
+            fileTagChanges = {}
+            remainingTagChanges = {}
+            for element in elements:
+                if element.isFile():
+                    inParent = self.parent[element.id]
+                    if element.isInDb():
+                        newTags = element.tags.copy()
+                    else:
+                        addToDbElements.append(inParent)
+                        if element.tags.containsPrivateTags():
+                            newTags = element.tags.withoutPrivateTags()
+                            remainingTagChanges[inParent] = tags.TagDifference(
+                                                    additions=list(element.tags.privateTags().getTuples()))
+                        else: newTags = element.tags.copy()
+                    fileTagChanges[inParent] = tags.TagStorageDifference(inParent.tags, newTags)
+                else: # containers
+                    if element.isInDb():
+                        inParent = self.parent[element.id]
+                        remainingTagChanges[inParent] = tags.TagStorageDifference(inParent.tags,
+                                                                                  element.tags.copy())
+                    else:
+                        addToDbElements.append(element.copy(level=self.parent))
+                        # we do not have to change tags of new containers
+                        
+            # 2.-4.
             try:
-                #  files with neg. ID that exist in DB (due to playlist loads) suck ... get rid of them
-                # quickly by putting them into DB.
-                tempFilesInReal = [real.get(elem.id) for elem in elements if elem.id < 0 and elem.id in real]
-                newFiles = [elem for elem in elements if elem.id < 0 and elem.isFile() and elem.id not in real]
-                newElements = newFiles + [elem for elem in elements if elem.isContainer() and elem.id < 0]
-                oldElements = [elem for elem in elements if elem not in newElements]
-                if len(tempFilesInReal) > 0:
-                    self.stack.push(commands.CreateDBElementsCommand(tempFilesInReal, newInLevel=False))
-                if len(newFiles) > 0:
-                    #TODO: Doesn't this forget the tempFilesInReal?
-                    # no - they can't have tags different from the filesystem
-                    real.setFileTagsAndRename(newFiles)
-                if len(newElements) > 0:
-                    self.stack.push(commands.CreateDBElementsCommand(newElements, newInLevel=True))
-                db.transaction()
+                real.changeTags(fileTagChanges)
             except (filebackends.TagWriteError, OSError) as e:
                 self.stack.abortMacro()
                 raise e
+            real.addToDb(addToDbElements)
+            real.changeTags(remainingTagChanges)
         else:
-            newElements = [elem for elem in elements if elem.id not in self.parent.elements ]
-            oldElements = [elem for elem in elements if elem.id in self.parent.elements ]
-            self.parent.copyElements(newElements)
+            self.parent.addElements([element.copy(level=self.parent)
+                                     for element in elements if element.id not in self.parent])
+        
+        # 5. Change other stuff
+        oldElements = (element for element in elements if element.id in self.parent)
+        contentChanges = {}
         tagChanges = {}
-        for oldEl in oldElements:
-            inParent = self.parent.get(oldEl.id)
-            if oldEl.flags != inParent.flags:
-                self.parent.changeFlags({inParent : flags.FlagListDifference(inParent.flags, oldEl.flags)})
-            if oldEl.tags != inParent.tags:
-                tagChanges[inParent] = tags.TagStorageDifference(inParent.tags, oldEl.tags)
-            if oldEl.data != inParent.data:
-                self.parent.changeData({inParent : data.DataDifference(inParent.data, oldEl.data)})
-            if oldEl.isContainer():
-                if oldEl.major != inParent.major:
-                    self.parent.setMajorFlags({inParent: oldEl.major})
+        flagChanges = {}
+        dataChanges = {}
+        majorChanges = {}
+        urlChanges = {}
+        # It is important to copy lists etc. in the following because this level will continue to use 
+        # the old elements.
+        for element in oldElements:
+            inParent = self.parent[element.id]
+            # Tag changes have been done already if parent is real
+            if self.parent is not real and element.tags != inParent.tags:
+                tagChanges[inParent] = tags.TagStorageDifference(inParent.tags, element.tags.copy())
+            if element.flags != inParent.flags:
+                flagChanges[inParent] = flags.FlagListDifference(inParent.flags, element.flags[:])
+            if element.data != inParent.data:
+                dataChanges[inParent] = data.DataDifference(inParent.data, element.data.copy())
+            if element.isContainer():
+                if element.contents != inParent.contents:
+                    contentChanges[inParent] = element.contents.copy()
+                if element.major != inParent.major:
+                    majorChanges[inParent] = element.major
             else:
-                if oldEl.url != inParent.url:
-                    self.parent.renameFiles( {inParent:(inParent.url, oldEl.url)} )
-        if len(tagChanges) > 0:
-            self.parent.changeTags(tagChanges)
-        if self.parent is real:
-            db.commit()
-        self.stack.endMacro()
-            
-    def copyElements(self, elements):
-        """Copy and load *elements* into self. Supports undo/redo."""
-        from . import commands
-        self.stack.push(commands.CopyElementsCommand(self, elements))
-
-    def deleteElements(self, elements):
-        elements = list(elements)
-        self.stack.beginMacro("delete elements")
-        # 1st step: isolate the elements (remove contents & parents)
-        for element in elements:
-            if element.isContainer() and len(element.contents) > 0:
-                self.removeContents(element, element.contents.positions)
-            if len(element.parents) > 0:
-                for parentId in element.parents:
-                    parent = self.get(parentId)
-                    self.removeContents(parent, parent.contents.positionsOf(id=element.id))
-        command = GenericLevelCommand(redoMethod=self._removeElements,
-                                      redoArgs={"elements" : elements},
-                                      undoMethod=self._addElements,
-                                      undoArgs={"elements" : elements})
-        self.stack.push(command)
+                if element.url != inParent.url:
+                    urlChanges[inParent] = (inParent.url, element.url)
+                
+        self.parent.changeContents(contentChanges)
+        self.parent.changeTags(tagChanges)
+        self.parent.changeFlags(flagChanges)
+        self.parent.changeData(dataChanges)
+        self.parent.setMajorFlags(majorChanges)
+        self.parent.renameFiles(urlChanges)
+        
         self.stack.endMacro()
     
     # ====================================================================================
     # The following functions implement no undo/redo handling and should be used with care
-    # ====================================================================================
-    
-    def _createContainer(self, tags, flags, data, major, contents, id=None):
-        if id is None:
-            id = db.nextId()
-        container = elements.Container(self, id,
-                                       inDB=False, # inDB is corrected in reallevel's reimplementation
-                                       major=major,
-                                       tags=tags,
-                                       flags=flags,
-                                       data=data,
-                                       contents=contents)
-        self.elements[id] = container
-        if contents is not None:
-            for childId in contents:
-                self.get(childId).parents.append(id)
-            self.emitEvent(dataIds=contents)
-        return container
-    
+    # ====================================================================================   
+    def _addElements(self, elements):
+        for element in elements:
+            assert element.id not in self and element.level is self
+            self.elements[element.id] = element
+            
+        #TODO: emit event
+            
+    def _removeElements(self, elements):
+        for element in elements:
+            del self.elements[element.id]
+            
+        #TODO remove from all contents or check that this has been done
+        #TODO: emit event
+            
     def _applyDiffs(self, changes, emitEvent=True):
         """Given the dict *changes* mapping elements to Difference objects (e.g. tags.TagDifference, apply
         these differences to the elements. Do not emit an ElementChangedEvent if *emitEvent* is False.
@@ -536,8 +599,16 @@ class Level(application.ChangeEventDispatcher):
             diff.apply(element)
         if emitEvent:
             self.emitEvent([element.id for element in changes])
+        
+    # On real level these methods are implemented differently
+    _changeTags = _applyDiffs
+    _changeFlags = _applyDiffs
+    _changeData = _applyDiffs
 
     def _setData(self,type,elementToData):
+        """For each (element, datalist) tuple in *elementToData* change the data of element of type *type*
+        to datalist. Do not change data of other types.
+        """
         for element,data in elementToData.items():
             if data is not None:
                 if isinstance(data,tuple):
@@ -554,28 +625,26 @@ class Level(application.ChangeEventDispatcher):
         if emitEvent:
             self.emitEvent([elem.id for elem in elemToMajor])
     
-    def _addElements(self, elements):
-        for element in elements:
-            assert element.level is self
-            self.elements[element.id] = element
-            if element.isContainer():
-                for childId in element.contents:
-                    self.get(childId).parents.append(element.id)
-    
-    def _removeElements(self, elements):
-        """Remove the given element from this level.
-        """
-        for element in elements:
-            del self.elements[element.id]
-            if element.isContainer():
-                for childId in element.contents:
-                    self.get(childId).parents.remove(element.id)
-    
-    def _importElements(self, elements):
-        """Create the elements *elements* from a different level into this one."""
-        for elem in elements:
-            self.elements[elem.id] = elem.copy()
-            elem.level = self
+    def _changeContents(self, contentDict):
+        """Set contents according to *contentDict* which maps parents to content lists."""
+        for parent, contents in contentDict.items():
+            # Note that the created events will be merged if this is used inside an UndoCommand.
+            self._setContents(parent, contents)
+            
+    def _setContents(self, parent, contents):
+        """Set the contents of *parent* to the ContentList *contents*."""
+        assert isinstance(contents, elements.ContentList)
+        dataIds = []
+        for id in parent.contents:
+            if id not in contents:
+                self[id].parents.remove(parent.id)
+                dataIds.append(id)
+        for id in contents:
+            if parent.id not in self[id].parents:
+                self[id].parents.append(parent.id)
+                dataIds.append(id)
+        parent.contents = contents
+        self.emitEvent(dataIds=dataIds, contentIds=(parent.id,))
 
     def _insertContents(self, parent, insertions, emitEvent=True):
         """Insert some elements under *parent*. The insertions must be given as an iterable of
@@ -600,7 +669,7 @@ class Level(application.ChangeEventDispatcher):
             parent.contents.remove(pos=pos)
         for id in childIds:
             if id not in parent.contents:
-                self.get(id).parents.remove(parent.id)
+                self[id].parents.remove(parent.id)
                 dataIds.append(id)
         if emitEvent:
             self.emitEvent(dataIds=dataIds, contentIds=(parent.id, ))
@@ -623,27 +692,10 @@ class Level(application.ChangeEventDispatcher):
     
     # ====================================================================================
     # Special stuff
-    # ====================================================================================
-         
-    def reload(self, id):
-        """Reload the file with *id* from the parent level and return the new version.
-        
-        This will (by means of an undo command) detach the file from all potential parents;
-        afterwards it is reloaded from the parent level (or filesystem, if it is not found
-        there).
-        """
-        assert id in self.elements
-        assert self.get(id).isFile()
-        self.stack.beginMacro(self.tr('reload'))
-        for parentId in self.elements[id].parents:
-            parent = self.get(parentId)
-            self.removeContents(parent, parent.contents.positionsOf(id))
-        self.stack.endMacro()
-        del self.elements[id]
-        return self.get(id)
-            
+    # ====================================================================================           
     def createWrappers(self, wrapperString, createFunc=None):
-        """Create a wrapper tree containing elements of this level and return its root node.
+        """Create a wrapper tree containing elements of this level and return its root node. This method
+        is used to restore a tree from a string representation using elements of this level.
         
         *wrapperString* must be a string like   "X[A[A1,A2],B[B1,B2]],Z"
         where the identifiers must be names of existing elements of this level. This method does not check
@@ -651,6 +703,9 @@ class Level(application.ChangeEventDispatcher):
         
         If *createFunc* is not None, it will be used to create wrappers (instead of the constructor of
         Wrapper). It must take the parent wrapper and the name as arguments and return a Wrapper instance.
+        
+        If *createFunc* is None, all names in *wrapperString* must be ids and wrappers are created using
+        these ids.
         """  
         roots = []
         currentWrapper = None
@@ -685,7 +740,7 @@ class Level(application.ChangeEventDispatcher):
                 else: currentList = currentWrapper.contents
             else:
                 if createFunc is None:
-                    element = self.get(int(token))
+                    element = self.get[int(token)]
                     wrapper = Wrapper(element)
                     if currentWrapper is not None:
                         assert currentWrapper.element.id in wrapper.element.parents
@@ -696,18 +751,12 @@ class Level(application.ChangeEventDispatcher):
     
     def __str__(self):
         return 'Level({})'.format(self.name)
-
-
-_idToUrl = {}
+    
+        
 _urlToId = {}
 
-def idFromUrl(url, create=True):
-    """Return the id for the given url.
-    
-    For elements in the database this is a positive number. Otherwise if the url is known
-    under a temporary id, that one is returned. If not and *create* is True, a new id is reserved for this
-    url and returned. Otherwise a KeyError is raised.
-    """
+def idFromUrl(url, create=False):
+    """Return the id for the given url. If *create* is True and no id exists so far, create one."""
     if url in _urlToId:
         return _urlToId[url]
     else:
@@ -717,18 +766,5 @@ def idFromUrl(url, create=True):
                 id = db.nextId()
             else: raise KeyError("There is no id for url '{}'".format(url))
         _urlToId[url] = id
-        _idToUrl[id] = url
         return id
-
-
-def urlFromId(id):
-    if id in _idToUrl:
-        return _idToUrl[id]
-    else:
-        url = db.url(id)
-        if url is None:
-            raise KeyError("There is not url for id {}".format(id))
-        url = filebackends.BackendURL.fromString(db.url(id))
-        _idToUrl[id] = url
-        _urlToId[url] = id
         

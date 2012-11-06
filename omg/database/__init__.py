@@ -121,8 +121,10 @@ def connect(**kwargs):
     with _nextIdLock:
         global _nextId
         if _nextId is None:
-            _nextId = 1 + query("SELECT MAX(id) FROM {}elements".format(prefix)).getSingle()
-        
+            try:
+                _nextId = 1 + query("SELECT MAX(id) FROM {}elements".format(prefix)).getSingle()
+            except sql.DBException: # table does not exist yet (in the install tool, test scripts...)
+                _nextId = 1         
     return contextManager
 
 

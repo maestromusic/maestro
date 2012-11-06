@@ -21,7 +21,7 @@
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from . import logging
+from . import logging, database as db
 logger = logging.getLogger(__name__)
 
 
@@ -73,7 +73,7 @@ class UndoStack(QtCore.QObject):
         be redone next."""
         return self._commands[index]
         
-    def beginMacro(self,text,finalMethod=None):
+    def beginMacro(self, text, dbTransaction=False, finalMethod=None):
         """Begin a macro. The macro will contain all commands that are pushed until endMacro is called.
         *text* will be used as command description in e.g. menu commands for undo/redo. Macros may be nested,
         the outermost macro will be redone/undone at once.
@@ -88,9 +88,12 @@ class UndoStack(QtCore.QObject):
         self._macroDepth += 1
         if self._macroDepth == 1:
             assert self._currentMacro is None
-            self._currentMacro = Macro(text,finalMethod)
+            self._currentMacro = Macro(text, dbTransaction, finalMethod)
         elif finalMethod is not None:
             raise ValueError("finalMethod may only be used with the outermost macro.")
+        if dbTransaction and not self._currentMacro.dbTransaction:
+            db.transaction()
+            self._currentMacro.dbTransaction = True
         
     def push(self,command):
         """Add a command to the stack. This calls the command's redo-method."""
@@ -120,6 +123,8 @@ class UndoStack(QtCore.QObject):
         if self._macroDepth == 0:
             assert self._currentMacro is not None
             self._push(self._currentMacro)
+            if self._currentMacro.dbTransaction:
+                db.commit()
             self._emitSignals()
             self._emitQueuedEvents()
             self._currentMacro = None
@@ -171,7 +176,11 @@ class UndoStack(QtCore.QObject):
             raise UndoStackError("There is no command to undo.")
         self._inUndoRedo = True
         commandOrMacro = self._commands[self._index-1]
+        if isinstance(commandOrMacro, Macro) and commandOrMacro.dbTransaction:
+            db.transaction()
         commandOrMacro.undo()
+        if isinstance(commandOrMacro, Macro) and commandOrMacro.dbTransaction:
+            db.commit()
         self._index -= 1
         self._emitQueuedEvents()
         self._inUndoRedo = False
@@ -185,7 +194,11 @@ class UndoStack(QtCore.QObject):
             raise UndoStackError("There is no command to redo.")
         self._inUndoRedo = True
         commandOrMacro = self._commands[self._index]
+        if isinstance(commandOrMacro, Macro) and commandOrMacro.dbTransaction:
+            db.transaction()
         commandOrMacro.redo()
+        if isinstance(commandOrMacro, Macro) and commandOrMacro.dbTransaction:
+            db.commit()
         self._index += 1
         self._emitQueuedEvents()
         self._inUndoRedo = False
@@ -287,22 +300,31 @@ class Macro:
     If *finalMethod* is not None, it will be called after all commands have been performed (no matter
     whether the commands have been redone or undone.
     """
-    def __init__(self,text,finalMethod=None):
+    def __init__(self, text, dbTransaction=False, finalMethod=None):
         self._text = text
         self.commands = []
+        self.dbTransaction = dbTransaction
         self.finalMethod = finalMethod
     
     def redo(self):
+        if self.dbTransaction:
+            db.transaction()
         for command in self.commands:
             command.redo()
         if self.finalMethod is not None:
             self.finalMethod()
+        if self.dbTransaction:
+            db.commit()
     
     def undo(self):
+        if self.dbTransaction:
+            db.transaction()
         for command in reversed(self.commands):
             command.undo()
         if self.finalMethod is not None:
             self.finalMethod()
+        if self.dbTransaction:
+            db.commit()
             
     def text(self):
         # this is a function so that macros behave like QUndoCommands

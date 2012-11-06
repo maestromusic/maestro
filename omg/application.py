@@ -173,10 +173,10 @@ def run(cmdConfig=[],type='gui',exitPoint=None):
 
     if type == 'gui':
         # Weird things might happen if these tagtypes are external
-        if not tags.get(config.options.tags.title_tag).isInDB():
+        if not tags.get(config.options.tags.title_tag).isInDb():
             logger.error("Title tag '{}' is missing in tagids table.".format(config.options.tags.title_tag))
             runInstaller()
-        if not tags.get(config.options.tags.album_tag).isInDB():
+        if not tags.get(config.options.tags.album_tag).isInDb():
             logger.error("Album tag '{}' is missing in tagids table.".format(config.options.tags.album_tag))
             runInstaller()
             

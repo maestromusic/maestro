@@ -233,7 +233,7 @@ class TagManagerTableWidget(QtGui.QTableWidget):
             # Perform different tests via a for-loop
             for check,message in (
                     (not allowChanges,self.tr("Cannot change a tag that appears in elements.")),
-                    (tags.isInDB(newName),self.tr("A tag named '{}' already exists.").format(newName)),
+                    (tags.isInDb(newName),self.tr("A tag named '{}' already exists.").format(newName)),
                     (not tags.isValidTagName(newName),self.tr("'{}' is not a valid tagname.").format(newName))
                  ):
                  if check:

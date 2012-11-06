@@ -53,8 +53,9 @@ class CoverAction(treeactions.TreeAction):
         self.setEnabled(selection.hasWrappers())
     
     def doAction(self):
-        CoverDialog(self.parent(), self.level(),
-                            [wrap.element.id for wrap in self.parent().nodeSelection.wrappers()]).exec_()
+        CoverDialog(self.parent(),
+                    self.level(),
+                    [wrap.elementd for wrap in self.parent().nodeSelection.wrappers()]).exec_()
             
             
 class Cover:
@@ -110,7 +111,7 @@ class CoverDialogModel(QtCore.QObject):
     
         - *stack* is the QUndoStack used by the dialog
         - *level* is the level from which the elements are taken
-        - *elids* specifies the elements by their id
+        - *elements* the elements whose cover can be selected
         
     """
     
@@ -127,11 +128,11 @@ class CoverDialogModel(QtCore.QObject):
     # Emitted when the busy-state changes. The argument states whether at least one provider is busy
     busyChanged = QtCore.pyqtSignal(bool)
     
-    def __init__(self,stack,level,elids):
+    def __init__(self,stack,level,elements):
         super().__init__()
         self.stack = stack
         self.level = level
-        self.elements = level.getFromIds(elids)
+        self.elements = elements
         self.currentElement = self.elements[0]
                                  
         # Initialize covers
@@ -265,15 +266,14 @@ class CoverDialogModel(QtCore.QObject):
         
         
 class CoverDialog(QtGui.QDialog):
-    """A dialog that allows to change covers of some elements on the given level. The elements are specified
-    by their ids in *elids*. The dialog will allow the user to load covers from files, urls or cover
-    providers from the covers-module.
+    """A dialog that allows to change covers of some elements on the given level. The dialog will allow the
+    user to load covers from files, urls or cover providers from the covers-module.
     """
-    def __init__(self,parent,level,elids):
+    def __init__(self, parent, level, elements):
         super().__init__(parent)
         self.setWindowTitle(self.tr("Edit covers"))
         
-        self.model = CoverDialogModel(QtGui.QUndoStack(),level,elids)
+        self.model = CoverDialogModel(QtGui.QUndoStack(), level, elements)
         self.model.currentElementChanged.connect(self._handleCurrentElementChanged)
         self.model.providerStatusChanged.connect(self._handleProviderStatusChanged)
         self.model.availableCoversChanged.connect(self._fillAvailableCovers)

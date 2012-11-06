@@ -22,7 +22,7 @@ from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
 from .. import strutils, utils, config, logging, application, filebackends
-from ..core import tags, levels, commands
+from ..core import tags, levels
 from ..models import tageditor as tageditormodel, simplelistmodel, flageditor as flageditormodel
 from ..gui import singletageditor, tagwidgets, treeactions, mainwindow, flageditor, dialogs
 from ..gui.misc import widgetlist
@@ -83,7 +83,7 @@ class TagEditorDock(QtGui.QDockWidget):
             allElements = (w.element for w in mimeData.wrappers())
             level = mimeData.level
         elif mimeData.hasUrls():
-            allElements = levels.real.getFromPaths(url for url in event.mimeData().urls()
+            allElements = levels.real.collectMany(url for url in event.mimeData().urls()
                            if url.isValid() and url.scheme() == 'file' and os.path.exists(url.toLocalFile()))
             level = levels.real
         else:
@@ -119,8 +119,8 @@ class TagEditorDialog(QtGui.QDialog):
         self.setWindowTitle(self.tr("Edit tags"))
         self.resize(600,450) #TODO: make this cleverer
         self.stack = application.stack.beginSubstack()
-        self.level = levels.Level("TagEditor",level,stack=self.stack)
-        elements = self.level.getFromIds([element.id for element in elements])
+        self.level = levels.Level("TagEditor", level, elements=elements, stack=self.stack)
+        elements = self.level.elements.values() # copies of the former elements
         
         self.setLayout(QtGui.QVBoxLayout())
         self.tagedit = TagEditorWidget(self.level,elements,stack=self.stack,flagEditorInTitleLine=False)
@@ -164,7 +164,7 @@ class TagEditorDialog(QtGui.QDialog):
         try:
             # make sure that this command is added via application.stack
             self.level.stack = application.stack
-            self.level.commit(self.tagedit.model.getElements())
+            self.level.commit()
             self.stack.endSubstack()
             super().accept()
         except filebackends.TagWriteError as e:
@@ -173,9 +173,10 @@ class TagEditorDialog(QtGui.QDialog):
     
     def _handleReset(self):
         """Handle clicks on the reset button: Reload all elements and clear the stack."""
-        self.stack.clearSubstack()
+        ids = [element.id for element in self.level.elements]
         self.level.elements = {}
-        elements = self.level.getFromIds([element.id for element in self.tagedit.model.getElements()])
+        elements = self.level.collectMany(ids)
+        self.stack.clearSubstack()
         self.tagedit.setElements(self.level,elements)
         
         
@@ -408,8 +409,8 @@ class TagEditorWidget(QtGui.QWidget):
         newTag = tagBox.getTag()
 
         # Do not allow external tags in internal elements
-        if not newTag.isInDB() and any(element.inDB for record in self.model.getRecords(oldTag)
-                                                    for element in record.elementsWithValue):
+        if not newTag.isInDb() and any(element.isInDb() for record in self.model.getRecords(oldTag)
+                                                        for element in record.elementsWithValue):
             text = self.tr("You must add tagtypes to the database before adding such tags to elements "
                            "within the database.")
             newTag = tagwidgets.AddTagTypeDialog.addTagType(newTag,text)
@@ -634,7 +635,7 @@ class RecordDialog(QtGui.QDialog):
         
         # Do not allow external tags in internal elements
         tagType = self.typeEditor.getTag()
-        if not tagType.isInDB() and any(element.inDB for element in self._getSelectedElements()):
+        if not tagType.isInDb() and any(element.isInDb() for element in self._getSelectedElements()):
             text = self.tr("You must add tagtypes to the database before adding such tags to elements "
                            "within the database.")
             newTag = tagwidgets.AddTagTypeDialog.addTagType(tagType,text)

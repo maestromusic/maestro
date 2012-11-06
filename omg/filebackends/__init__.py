@@ -31,7 +31,9 @@ urlTypes = {}
 class ParsedUrl:
     def __init__(self, urlString):
         self.scheme, rest = urlString.split("://", 1)
-        self.netloc, rpath = rest.split("/", 1)
+        if '/' in rest:
+            self.netloc, rpath = rest.split("/", 1)
+        else: self.netloc, rpath = '', rest 
         self.path = "/" + rpath
 
     def geturl(self):

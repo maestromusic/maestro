@@ -80,6 +80,8 @@ class StandardDelegate(AbstractDelegate):
         
         if self.profile.options['showMajor'] and element.isContainer() and element.major:
             self.addCenter(ColorBarItem(QtGui.QColor(255,0,0),5,titleItem.sizeHint(self)[1]))
+        if not element.isInDb():
+            self.addCenter(ColorBarItem(QtGui.QColor(255,255,0),5,titleItem.sizeHint(self)[1]))
         if urlWarning is not None:
             self.addCenter(urlWarning)
         self.addCenter(titleItem)
@@ -190,7 +192,7 @@ class StandardDelegate(AbstractDelegate):
                 # (this is clear if id in ancestorIds, otherwise we did so when painting the corresponding
                 # wrapper in the current tree structure)
                 continue
-            ancestor = element.level.get(id)
+            ancestor = element.level.fetch(id)
             if not onlyMajor or ancestor.major:
                 ancestorIds.append(id)
                 ancestors.append(ancestor)

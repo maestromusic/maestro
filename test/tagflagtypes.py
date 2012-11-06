@@ -16,17 +16,12 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import unittest
-
 from omg import application, database as db
 from omg.core import flags, tags
+from . import testcase
 
 
-class TagTypeTestCase(unittest.TestCase):
-    def setUp(self):
-        application.stack.clear()
-        self.checks = []
-        
+class TagTypeTestCase(testcase.UndoableTestCase):
     def check(self,values,redo=True):
         result = db.query("SELECT tagtype,title,icon,private,sort FROM {}tagids WHERE tagname='testtag'"
                           .format(db.prefix))
@@ -44,19 +39,7 @@ class TagTypeTestCase(unittest.TestCase):
             self.assertEqual(tags.tagList.index(tag),values[4])
         else:
             self.assertRaises(db.sql.EmptyResultException,result.getSingleRow)
-        
-        if redo:
-            self.checks.append((values,application.stack.index()))
-    
-    def checkUndo(self):
-        """Undo all changes and do the checks again at the right moments."""
-        for values,index in reversed(self.checks):
-            application.stack.setIndex(index)
-            self.check(values,redo=False)
-        
-        application.stack.setIndex(0)
-        self.check(None,redo=False) # all steps undone
-        
+
     def runTest(self):
         index = len(tags.tagList)
         
@@ -85,13 +68,10 @@ class TagTypeTestCase(unittest.TestCase):
         self.check(("text",None,None,False,0))
         
         self.checkUndo()
+        self.check(None,redo=False) # all steps undone
         
         
-class FlagTypeTestCase(unittest.TestCase):
-    def setUp(self):
-        application.stack.clear()
-        self.checks = []
-        
+class FlagTypeTestCase(testcase.UndoableTestCase):
     def check(self,name,iconPath,redo=True):
         result = db.query("SELECT name,icon FROM {}flag_names WHERE name='testflag' OR name='testflag2'"
                 .format(db.prefix))
@@ -108,18 +88,6 @@ class FlagTypeTestCase(unittest.TestCase):
                 self.assertEqual(dbIconPath,iconPath)
                 break;
             else: self.fail() # two flags found by the db query
-            
-        if redo:
-            self.checks.append((name,iconPath,application.stack.index()))
-    
-    def checkUndo(self):
-        """Undo all changes and do the checks again at the right moments."""
-        for name,iconPath,index in reversed(self.checks):
-            application.stack.setIndex(index)
-            self.check(name,iconPath,redo=False)
-        
-        application.stack.setIndex(0)
-        self.check(None,None,redo=False) # all steps undone
         
     def runTest(self):
         flagType = flags.addFlagType('testflag')
@@ -141,6 +109,7 @@ class FlagTypeTestCase(unittest.TestCase):
         self.check('testflag','testpath2')
         
         self.checkUndo()
+        self.check(None,None,redo=False) # all steps undone
         
         
 if __name__ == "__main__":

@@ -24,6 +24,7 @@ from ..core import elements, levels, nodes
 from ..models import rootedtreemodel
 
 from collections import OrderedDict
+import itertools
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +83,8 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
             insertPosition = parent.contents[row-1].position + 1
         application.stack.beginMacro(self.tr("drop"))
         if mimeData.hasFormat(config.options.gui.mime):
-            elements = [ node.element for node in mimeData.wrappers() ]
+            ids = [ node.element.id for node in mimeData.wrappers() ]
+            elements = self.level.collectMany(ids)
             if action == Qt.MoveAction:
                 levelRemovals = {}
                 modelRemovals = {}
@@ -134,6 +136,8 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
         This convenience function either alters the RootNode, if parent is self.root, or updates
         the level.
         """
+        removedWrappers = [parent.contents[i] for i in rows]
+        application.stack.beginMacro(self.tr('remove elements'))
         if parent is self.root:
             newContents = [ self.root.contents[i].element
                             for i in range(len(self.root.contents))
@@ -141,10 +145,19 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
             application.stack.push(ChangeRootCommand(self, newContents))
         else:
             self.level.removeContentsAuto(parent.element, indexes=rows)
+        
+        elementsToRemove = []
+        for wrapper in itertools.chain.from_iterable(w.getAllNodes() for w in removedWrappers):
+            if wrapper.element.id not in self:
+                elementsToRemove.append(wrapper.element)
+        if len(elementsToRemove) > 0:
+            self.level.removeElements(elementsToRemove)
+            
+        application.stack.endMacro()
     
-    def loadFile(self, path):
-        """Load a file into this model. The default implementation calls level.get()."""
-        return self.level.get(path)
+    def loadFile(self, url):
+        """Load a file into this model. The default implementation calls level.collect()."""
+        return self.level.collect(url)
     
     def prepareURLs(self, urls, parent):
         """Prepare *urls* to be dropped under *parent*; returns a list of Elements."""
@@ -198,7 +211,7 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
                 if node.element.id in dataIds:
                     self.dataChanged.emit(self.getIndex(node), self.getIndex(node))
                 if node.element.id in contentIds:
-                    self._changeContents(self.getIndex(node), self.level.get(node.element.id).contents)
+                    self._changeContents(self.getIndex(node), self.level[node.element.id].contents)
                     contents[:] = [wrapper for wrapper in contents if wrapper in node.contents ]
 
     def _changeContents(self, index, new):
@@ -249,7 +262,7 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
     def _insertContents(self, index, row, ids, positions=None):
         """Insert wrappers into the tree without any undo/redo/event handling."""
         self.beginInsertRows(index, row, row + len(ids) - 1)
-        wrappers = [nodes.Wrapper(self.level.get(id)) for id in ids]
+        wrappers = [nodes.Wrapper(self.level[id]) for id in ids]
         if positions:
             for pos, wrap in zip(positions, wrappers):
                 wrap.position = pos

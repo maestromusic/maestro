@@ -37,7 +37,7 @@ class BrowserDelegate(StandardDelegate):
             leftData   = ['t:composer','t:artist','t:performer'],
             rightData  = ['t:date','t:conductor'],
             overwrite  = {"fitInTitleRowData": profiles.DataPiece(tags.get("date"))
-                                         if tags.isInDB("date") else None},
+                                         if tags.isInDb("date") else None},
             addOptions = [profiles.DelegateOption("showSortValues",
                          translate("Delegates","Display sort values instead of real values"),"bool",False)]
     )

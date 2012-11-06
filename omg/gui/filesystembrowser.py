@@ -111,7 +111,7 @@ class FileSystemSelection(selection.NodeSelection):
     def __init__(self, paths):
         super().__init__(levels.real,[])
         urls = [filebackends.BackendURL.fromString("file:///" + path) for path in paths]
-        self._files = levels.real.getFromUrls(urls)
+        self._files = levels.real.collectMany(urls)
         
     def elements(self,recursive=False):
         return self._files

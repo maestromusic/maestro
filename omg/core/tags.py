@@ -261,7 +261,6 @@ class Tag:
             * iconPath: Path to the tagtype's icon or None if if doesn't have an icon.
             * icon: A QIcon loaded from above path (read-only)
             * private: Whether the tag is private, i.e. stored only in the database and not in files.
-            * isInDB: Whether the tag is contained in the database.
 
         You must use the get-method to get instances of this class. This method will ensure that there is
         always only one instance of a given tag and that this instance is updated automatically on
@@ -302,7 +301,7 @@ class Tag:
         """Clear some attributes. This happens when adding a tagtype to the database is undone."""
         self.id,self.type,self.rawTitle,self.iconPath,self.private = None,None,None,None,False
     
-    def isInDB(self):
+    def isInDb(self):
         """Return whether this tagtype is internal, i.e. contained in the database."""
         return self.id is not None
     
@@ -389,9 +388,9 @@ def isValidTagName(name):
         return False
 
 
-def isInDB(name):
+def isInDb(name):
     """Return whether a tag with the given name exists in the database."""
-    return name in _tagsByName and _tagsByName[name].isInDB()
+    return name in _tagsByName and _tagsByName[name].isInDb()
 
 
 def get(identifier,addDialogIfNew=False):
@@ -453,7 +452,7 @@ def addTagType(tagType,type,**data):
     """
     if isinstance(tagType,str):
         tagType = get(tagType)
-    if tagType.isInDB():
+    if tagType.isInDb():
         raise ValueError("Cannot add tag '{}' because it is already in the DB.".format(tagType))
     if 'title' in data:
         if data['title'] is not None and isTitle(data['title']):
@@ -511,7 +510,7 @@ def _addTagType(tagType,**data):
 def removeTagType(tagType):
     """Remove a tagtype from the database. The tagtype must not be contained in any internal elements!
     """
-    if not tagType.isInDB():
+    if not tagType.isInDb():
         raise ValueError("Cannot remove external tagtype '{}' from DB.".format(tagType))
     if tagType in (TITLE,ALBUM):
         raise ValueError("Cannot remove title or album tag.")
@@ -552,7 +551,7 @@ def changeTagType(tagType,**data):
     If the type cannot be changed because an (external) element contains a value which is invalid for the new
     type, a TagValueError is raised.
     """
-    if not tagType.isInDB():
+    if not tagType.isInDb():
         raise ValueError("Cannot change an external tagtype '{}'.".format(tagType))
     if ('type' in data and data['type'] != tagType.type) \
             or ('private' in data and data['private'] != tagType.private):
@@ -575,7 +574,7 @@ def changeTagType(tagType,**data):
     
 def _changeTagType(tagType,**data):
     """Like changeTagType, but not undoable."""
-    assert tagType.isInDB()
+    assert tagType.isInDb()
     
     # Below we will build a query like UPDATE tagids SET ... using the list of assignments (e.g. tagtype=?).
     # The parameters will be sent with the query to replace the question marks.
@@ -881,12 +880,26 @@ class Storage(dict):
         for tag,valueList in other.items():
             self.removeValues(tag,*valueList)
 
-    def withoutPrivateTags(self):
+    def containsPrivateTags(self):
+        """Return whether at least one tag in this object is private."""
+        return any(tag.private for tag in self)
+    
+    def privateTags(self):
+        """Return a Storage-object containing only the private tags of this object."""
+        return Storage({tag: l for tag,l in self.items() if tag.private})
+        
+    def withoutPrivateTags(self, copy=False):
         """Return a Storage-object containing the same tags but without private tags. If there are no private
-        tags, return simply this object itself."""
-        if any(tag.private for tag in self):
+        tags and *copy* is False, return simply this object itself."""
+        if copy or any(tag.private for tag in self):
             return Storage({tag: l for tag,l in self.items() if not tag.private})
         else: return self
+        
+    def getTuples(self):
+        """Return a generator that yields the tags as (tag,value)-tuples.""" 
+        for tag in self:
+            for value in self[tag]:
+                yield (tag,value)
 
 
 class TagDifference:
@@ -1052,7 +1065,7 @@ class TagDict(dict):
 
     def keys(self):
         result = [tag for tag in tagList if tag in self]
-        external = [tag for tag in super().keys() if not tag.isInDB()]
+        external = [tag for tag in super().keys() if not tag.isInDb()]
         external.sort(key=lambda tag: tag.name)
         result.extend(external)
         return result 

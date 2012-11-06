@@ -100,7 +100,7 @@ class GrammarRenamer(profiles.Profile):
                 if len(self.currentParents) > 0:
                     ret["value"] = self.positionFormat.format(self.currentParents[0][0])
         if macro != "#":
-            if tags.isInDB(macro.lower()):
+            if tags.isInDb(macro.lower()):
                 tag = tags.get(macro.lower())
                 if tag in elemTag:
                     ret["value"] = ",".join(map(str, elemTag[tag])).translate(self.translation)

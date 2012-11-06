@@ -125,12 +125,12 @@ class SequenceDict(dict):
         Also update the attribute toplevelIds.
         """
         self.add(elementId,fileIndex)
-        element = self.level.get(elementId)
+        element = self.level.collect(elementId)
         if len(element.parents) == 0:
             if element.id not in self.toplevelIds:
                 self.toplevelIds.append(element.id)
         else:
-            for id in self.level.get(elementId).parents:
+            for id in self.level.collect(elementId).parents:
                 self._addFileToElement(id,fileIndex)
                 
     def longest(self,ids,boundingSequence=None):
@@ -151,7 +151,7 @@ class SequenceDict(dict):
                     seq = seq.bounded(boundingSequence)
                 if seq is not None and (longest is None or len(seq) > len(longest)):
                     longest = seq
-                    element = self.level.get(id)
+                    element = self.level.collect(id)
         return longest, element
      
     def remove(self,sequence):

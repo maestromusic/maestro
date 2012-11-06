@@ -342,7 +342,7 @@ class DelegateOption:
         elif self.type == 'bool':
             return value == 'True'
         elif self.type == 'tag':
-            if tags.isInDB(value):
+            if tags.isInDb(value):
                 return tags.get(value)
         elif self.type == 'datapiece':
             if value == 'none':

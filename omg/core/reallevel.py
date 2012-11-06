@@ -16,6 +16,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+import itertools
+
 from PyQt4 import QtCore
 
 from . import elements, levels, tags, flags
@@ -23,6 +25,10 @@ from .. import database as db, filebackends, logging
 from ..database import write
 
 logger = logging.getLogger(__name__)
+
+
+# The ids of all elements that are in the database and have been loaded to some level 
+_dbIds = set()
 
 
 class RealLevel(levels.Level):
@@ -38,45 +44,67 @@ class RealLevel(levels.Level):
     
     def __init__(self):
         super().__init__('REAL', None)
-        # This hack makes the inherited implementations of get and load work with the overwritten
-        # implementation of loadIntoChild
-        self.parent = self
     
-    def loadIntoChild(self, ids, child):
-        """Loads IDs which are not yet known from database (if positive) or filesystem (else)."""
-        notFound = []
-        for id in ids:
-            if id in self.elements:
-                child.elements[id] = self.elements[id].copy()
-                child.elements[id].level = child
-            else: notFound.append(id)
-        if len(notFound) > 0:
-            positiveIds = [id for id in notFound if id > 0]
-            urls = [levels.urlFromId(id) for id in notFound if id < 0]
-            if len(positiveIds) > 0:
-                self.loadFromDB(positiveIds, child)
-            if len(urls) > 0:
-                self.loadURLs(urls, child)
+    def collect(self, param):
+        self._ensureLoaded([param])
+        return self[param]
+    
+    def collectMany(self, params):
+        self._ensureLoaded(params)
+        return [self[param] for param in params]
+    
+    # The difference between fetch, _fetch and collect is only important on levels below real.
+    fetch = collect
+    _fetch = collect
+    fetchMany = collectMany
+    get = collect #TODO deprecated
+    
+    def _ensureLoaded(self, params):
+        # note that __contains__ (p not in self) ensures that p is either int or url 
+        ids = [p for p in params if isinstance(p, int) and p not in self]
+        urls = []
+        for p in params:
+            if isinstance(p, filebackends.BackendURL) and p not in self:
+                id = db.idFromUrl(p)
+                if id is not None:
+                    ids.append(id)
+                else: urls.append(p)
+                
+        if len(ids) > 0:
+            # this will silently ignore ids which are not found in the DB
+            self.loadFromDb(ids)
+        if len(urls) > 0:
+            self.loadFromUrls(urls)
+        if any(p not in self for p in params):
+            # This means that an element could not be loaded (e.g. params contains the id of a new container
+            # which only exists on the editor level).
+            raise levels.ElementGetError(self,[p for p in params if p not in self])
+     
+    def loadFromDb(self, idList, level=None):
+        """Load elements specified by *idList* from the database into *level* which defaults to the
+        real level."""
+        if level is None:
+            level = self
             
-    def loadFromDB(self, idList, level):
-        """Load elements specified by *idList* from the database into *level*."""
         if len(idList) == 0: # queries will fail otherwise
-            return 
-        idList = db.csList(idList)
+            return []
+        
+        csIdList = db.csList(idList)
         
         # bare elements
         result = db.query("""
                 SELECT el.id, el.file, el.major, f.url, f.length
                 FROM {0}elements AS el LEFT JOIN {0}files AS f ON el.id = f.element_id
                 WHERE el.id IN ({1})
-                """.format(db.prefix, idList))
+                """.format(db.prefix, csIdList))
         for (id, file, major, url, length) in result:
+            _dbIds.add(id)
             if file:
-                level.elements[id] = elements.File(level, id, inDB=True,
+                level.elements[id] = elements.File(level, id,
                                                    url=filebackends.BackendURL.fromString(url),
                                                    length=length)
             else:
-                level.elements[id] = elements.Container(level, id, inDB=True, major=major)
+                level.elements[id] = elements.Container(level, id, major=major)
                 
         # contents
         result = db.query("""
@@ -84,7 +112,7 @@ class RealLevel(levels.Level):
                 FROM {0}elements AS el JOIN {0}contents AS c ON el.id = c.container_id
                 WHERE el.id IN ({1})
                 ORDER BY position
-                """.format(db.prefix, idList))
+                """.format(db.prefix, csIdList))
         for (id, pos, contentId) in result:
             level.elements[id].contents.insert(pos, contentId)
             
@@ -93,7 +121,7 @@ class RealLevel(levels.Level):
                 SELECT el.id,c.container_id
                 FROM {0}elements AS el JOIN {0}contents AS c ON el.id = c.element_id
                 WHERE el.id IN ({1})
-                """.format(db.prefix, idList))
+                """.format(db.prefix, csIdList))
         for (id, contentId) in result:
             level.elements[id].parents.append(contentId)
             
@@ -102,7 +130,7 @@ class RealLevel(levels.Level):
                 SELECT el.id,t.tag_id,t.value_id
                 FROM {0}elements AS el JOIN {0}tags AS t ON el.id = t.element_id
                 WHERE el.id IN ({1})
-                """.format(db.prefix, idList))
+                """.format(db.prefix, csIdList))
         for (id,tagId,valueId) in result:
             tag = tags.get(tagId)
             level.elements[id].tags.add(tag, db.valueFromId(tag, valueId))
@@ -112,7 +140,7 @@ class RealLevel(levels.Level):
                 SELECT el.id,f.flag_id
                 FROM {0}elements AS el JOIN {0}flags AS f ON el.id = f.element_id
                 WHERE el.id IN ({1})
-                """.format(db.prefix, idList))
+                """.format(db.prefix, csIdList))
         for (id, flagId) in result:
             level.elements[id].flags.append(flags.get(flagId))
             
@@ -122,9 +150,10 @@ class RealLevel(levels.Level):
                 FROM {}data
                 WHERE element_id IN ({})
                 ORDER BY element_id,type,sort
-                """.format(db.prefix, idList))
+                """.format(db.prefix, csIdList))
         # This is a bit complicated because the data should be stored in tuples, not lists
         # Changing the lists would break undo/redo
+        #TODO: is this really necessary?
         current = None
         buffer = []
         for (id, type, data) in result:
@@ -141,102 +170,267 @@ class RealLevel(levels.Level):
         if current is not None:
             level.elements[current[0]].data[current[1]] = tuple(buffer)
             
-    def loadURLs(self, urls, level):
-        """Loads files given by *urls*, into *level*."""
+        return [self.elements[id] for id in idList]
+            
+    def loadFromUrls(self, urls, level=None):
+        """Loads files given by *urls*, into *level* which defaults to the real level. This must not be
+        used for elements which are contained in the database."""
+        if level is None:
+            level = self
+            
+        result = []
         for url in urls:
             backendFile = url.getBackendFile()
             backendFile.readTags()
             fTags = backendFile.tags
             fLength = backendFile.length
             fPosition = backendFile.position
-            id = db.idFromUrl(url)
-            if id is None:
-                id = levels.idFromUrl(url)
-                inDB = False
-                flags = []
-            else:
-                flags = db.flags(id)
-                # TODO: Load private tags!
-                inDB = True
-                logger.warning("loadFromURLs called on '{}', which is in DB. Are you "
-                           " sure this is correct?".format(url))
-            elem = elements.File(level, id=id, inDB=inDB, url=url, length=fLength, tags=fTags, flags=flags)
+            if db.idFromUrl(url) is not None:
+                raise RuntimeError("loadFromURLs called on '{}', which is in DB.".format(url))
+            id = levels.idFromUrl(url, create=True)
+            elem = elements.File(level, id=id, url=url, length=fLength, tags=fTags)
             if fPosition is not None:
                 elem.filePosition = fPosition            
             level.elements[id] = elem
-    
-    def setFileTagsAndRename(self, files):
-        """Undoably set tags and URLs of the given files as they are in the object. Do not alter the
-        database."""
-        urlChanges = {}
-        for file in files:
-            if file.url != levels.urlFromId(file.id):
-                urlChanges[file] = (urlFromId(file.id), file.url)
-        if len(urlChanges) > 0:
-            self.renameFiles(urlChanges)
-        tagChanges = {}
-        for file in files:
-            #  check if tags are different
-            backendFile = file.url.getBackendFile()
-            backendFile.readTags()
-            publicTags = file.tags.withoutPrivateTags()
-            if len(publicTags) > 0 and backendFile.tags != publicTags:
-                diff = tags.TagStorageDifference(backendFile.tags, publicTags)
-                tagChanges[file] = diff
-        if len(tagChanges) > 0:
-            inverseChanges = {elem:diff.inverse() for elem,diff in tagChanges.items()}
-            command = levels.GenericLevelCommand(redoMethod=filebackends.changeTags,
-                                          redoArgs={"changes" : tagChanges},
-                                          undoMethod=filebackends.changeTags,
-                                          undoArgs={"changes": inverseChanges},
-                                          text=self.tr("change tags"),
-                                          errorClass=filebackends.TagWriteError)
-            self.stack.push(command)
+            result.append(elem)
+        return result
             
     # =============================================================
     # Overridden from Level: these methods modify DB and filesystem
     # =============================================================
-    def _elementToDBHelper(self, element):
-        db.write.setTags(element.id, element.tags)
-        db.write.setFlags(element.id, element.flags)
-        db.write.setData(element.id, element.data)
-        if element.isContainer():
-            db.write.setContents(element.id, element.contents)
-        else:
-            db.write.addFiles([(element.id, str(element.url), 0, element.length)])
-        
-    def _createContainer(self, tags, flags, data, major, contents, id=None):
-        if id is not None:
-            raise ValueError("Don't call _createContainer with an ID on real!")
-        db.transaction()
-        id = db.write.createElements([ (False, True, 0, major) ])[0]
-        element = super()._createContainer(tags, flags, data, major, contents, id)
-        element.inDB = True
-        self._elementToDBHelper(element)
-        db.commit()
-        return element
+    def commit(self, elements=None):
+        raise RuntimeError("Cannot commit real level.")
     
-    def _addElements(self, elements):
-        super()._addElements(elements)
-        db.transaction()
-        db.write.createElementsWithIds([(elem.id, elem.isFile(), len(elem.parents) == 0,
-                                          len(elem.contents) if elem.isContainer() else 0,
-                                          elem.major if elem.isContainer() else False)
-                                        for elem in elements])
+    def addElements(self, elements):
+        if not all(element.isContainer() for element in elements):
+            raise ValueError("On real level addElements may only be used for containers.")
+        self.addToDb(elements)
+
+    def removeElements(self, elements):
+        if not all(element.isContainer() for element in elements):
+            raise ValueError("On real level removeElements may only be used for containers.")
+        self.removeFromDB(elements)
+        
+    # These are used by the super class implementations of addElements and removeElements
+    def _addElements(self): raise NotImplementedError()
+    def _removeElements(self): raise NotImplementedError()
+    
+    def addToDb(self, elements):
+        """Add the given elements to the database including their tags, flags, data and contents. Remarks:
+        
+            - element.level must be this level,
+            - files must already be loaded on real, containers must not,
+            - this method will not change the elements but assume that in particular their parent-lists
+              are correct (on the real level).
+        
+        """
+        assert all(element.level is self for element in elements)
+        #elements = [element if element.level is self else element.copy(level=self) for element in elements]
+        command = levels.GenericLevelCommand(redoMethod=self._addToDb,
+                                             redoArgs={"elements": elements},
+                                             undoMethod=self._removeFromDb,
+                                             undoArgs={"elements": elements},
+                                             text=self.tr("Add elements to database"))
+        self.stack.push(command)
+        
+    def removeFromDb(self, elements):
+        """Remove the given elements with all their tags etc. from the database. Containers are also
+        removed from the real level. No element may be contained in any container unless this container
+        is also in *elements*.
+        """
+        command = levels.GenericLevelCommand(redoMethod=self._removeFromDb,
+                                             redoArgs={"elements": elements},
+                                             undoMethod=self._addToDb,
+                                             undoArgs={"elements": elements},
+                                             text=self.tr("Remove elements from database"))
+        self.stack.push(command)
+    
+    def _addToDb(self, elements):
+        """Like addToDb but not undoable."""
+        if len(elements) == 0:
+            return # multiquery will fail otherwise
+        
         for element in elements:
-            self._elementToDBHelper(element)
+            assert not element.isInDb()
+            assert element.level is self
+            if element.id not in self:
+                assert element.isContainer()
+                self.elements[element.id] = element
+            else: assert element.isFile() 
+        
+        db.transaction()
+        
+        data = [(element.id,
+                 element.isFile(),
+                 element.major if element.isContainer() else False)
+                        for element in elements]
+        db.multiQuery("INSERT INTO {}elements (id, file, major)\
+                       VALUES (?,?,?)".format(db.prefix), data)
+
+        # Do this early, otherwise e.g. setFlags might raise a ConsistencyError)
+        _dbIds.update(element.id for element in elements)
+            
+        for element in elements:
+            db.write.setTags(element.id, element.tags)
+            db.write.setFlags(element.id, element.flags)
+            db.write.setData(element.id, element.data)
+                
+        newFiles = [element for element in elements if element.isFile()]
+        if len(newFiles) > 0:
+            db.multiQuery("INSERT INTO {}files (element_id, url, hash, length) VALUES (?,?,0,?)"
+                          .format(db.prefix),
+                          ((element.id, str(element.url), element.length) for element in newFiles))
+            self.filesAdded.emit(newFiles)
+        
+        contentData = []
+        for element in elements:
+            if element.isContainer():
+                contentData.extend((element.id,item[0],item[1]) for item in element.contents.items())
+                for childId in element.contents:
+                    if element.id not in self[childId].parents:
+                        self[childId].parents.append(element.id)
+                        
+        if len(contentData) > 0:
+            db.multiQuery("INSERT INTO {}contents (container_id, position, element_id) VALUES (?,?,?)"
+                          .format(db.prefix), contentData)
+            db.write.updateToplevelFlags(data[2] for data in contentData)
+                                      
+        db.commit()
+                
+    def _removeFromDb(self, elements):
+        """Like removeFromDb but not undoable."""
+        for element in elements:
+            if element.isContainer():
+                del self.elements[element.id]
+                for childId in element.contents:
+                    self[childId].parents.remove(element.id)
+        _dbIds.difference_update(element.id for element in elements)
+        
+        # Rely on foreign keys to delete all tags, flags etc. from the database
+        ids = itertools.chain.from_iterable(element.contents for element in elements
+                                                             if element.isContainer())
+        db.write.updateToplevelFlags(ids)
+        db.query("DELETE FROM {}elements WHERE id IN ({})"
+                 .format(db.prefix, db.csList(element.id for element in elements)))
+        
+    def deleteElements(self, elements):
+        elements = list(elements)
+        self.stack.beginMacro("delete elements")
+        # 1st step: isolate the elements (remove contents & parents)
+        for element in elements:
+            if element.isContainer() and len(element.contents) > 0:
+                self.removeContents(element, element.contents.positions)
+            if len(element.parents) > 0:
+                for parentId in element.parents:
+                    parent = self.collect(parentId)
+                    self.removeContents(parent, parent.contents.positionsOf(id=element.id))
+        command = GenericLevelCommand(redoMethod=self._removeElements,
+                                      redoArgs={"elements" : elements},
+                                      undoMethod=self._addElements,
+                                      undoArgs={"elements" : elements})
+        self.stack.push(command)
+        self.stack.endMacro()
+
+    def _changeTags(self, changes, emitEvent=True):
+        filebackends.changeTags(changes) # might raise TagWriteError
+        
+        dbChanges = {el: diffs for el,diffs in changes.items() if el.isInDb()}
+        if len(dbChanges) > 0:
+            db.transaction()
+            dbRemovals = [(el.id,tag.id,db.idFromValue(tag,value))
+                          for el,diff in dbChanges.items()
+                          for tag,value in diff.getRemovals() if tag.isInDb()]
+            if len(dbRemovals):
+                db.multiQuery("DELETE FROM {}tags WHERE element_id=? AND tag_id=? AND value_id=?"
+                              .format(db.prefix),dbRemovals)
+                
+            dbAdditions = [(el.id,tag.id,db.idFromValue(tag,value,insert=True))
+                           for el,diff in dbChanges.items()
+                           for tag,value in diff.getAdditions() if tag.isInDb()]
+            if len(dbAdditions):
+                db.multiQuery("INSERT INTO {}tags (element_id,tag_id,value_id) VALUES (?,?,?)"
+                              .format(db.prefix),dbAdditions)
+            files = [ (elem.id, ) for elem in dbChanges if elem.isFile() ]
+            if len(files) > 0:
+                db.multiQuery("UPDATE {}files SET verified=CURRENT_TIMESTAMP WHERE element_id=?"
+                              .format(db.prefix),files)
+            db.commit()
+        super()._applyDiffs(changes, emitEvent)
+        
+    def _changeFlags(self, changes, emitEvent=True):
+        if not all(element.isInDb() for element in changes.keys()):
+            raise levels.ConsistencyError("Elements on real must be added to the DB before adding tags.")
+        db.transaction()
+        dbRemovals = [(el.id,flag.id) for el,diff in changes.items() for flag in diff.getRemovals()]
+        if len(dbRemovals):
+            db.multiQuery("DELETE FROM {}flags WHERE element_id = ? AND flag_id = ?".format(db.prefix),
+                          dbRemovals)
+        dbAdditions = [(el.id,flag.id) for el,diff in changes.items() for flag in diff.getAdditions()]
+        if len(dbAdditions):
+            db.multiQuery("INSERT INTO {}flags (element_id,flag_id) VALUES(?,?)".format(db.prefix),
+                          dbAdditions)
+        db.commit()
+        super()._applyDiffs(changes, emitEvent)
+            
+    def _changeData(self, changes, emitEvent):
+        if not all(element.isInDb() for element in changes.keys()):
+            raise levels.ConsistencyError("Elements on real must be added to the DB before adding data.")
+        super()._applyDiffs(changes, emitEvent)
+        db.transaction()
+        for element, diff in changes.items():
+            for type, (a, b) in diff.diffs.items():
+                if a is not None:
+                    db.query("DELETE FROM {}data WHERE type=? AND element_id=?"
+                             .format(db.prefix), type, element.id)
+                if b is not None:
+                    db.multiQuery("INSERT INTO {}data (element_id, type, sort, data) VALUES (?,?,?,?)"
+                                  .format(db.prefix),
+                                  [(element.id, type, i, val) for i, val in enumerate(b)])
+        db.commit()
+                
+    def _setData(self, type, elementToData):
+        if not all(element.isInDb() for element in elementToData.keys()):
+            raise levels.ConsistencyError("Elements on real must be added to the DB before adding tags.")
+        super()._setData(type, elementToData)
+        values = []
+        for element, data in elementToData.items():
+            if data is not None:
+                values.extend((element.id, type, i, d) for i, d in enumerate(data))
+        db.transaction()
+        db.query("DELETE FROM {}data WHERE type = ? AND element_id IN ({})"
+                 .format(db.prefix,db.csIdList(elementToData.keys())),type)
+        if len(values) > 0:
+            db.multiQuery("INSERT INTO {}data (element_id,type,sort,data) VALUES (?,?,?,?)"
+                          .format(db.prefix),values)
         db.commit()
         
-    def _removeElements(self, elements):
-        super()._removeElements(elements)
-        if any (elem.isFile() for elem in elements):
-            self.filesRemoved.emit([elem for elem in elements if elem.isFile()])
-        db.write.deleteElements([elem.id for elem in elements])
+    def _setMajorFlags(self, elemToMajor, emitEvent=True):
+        if not all(element.isContainer() for element in elemToMajor):
+            raise ValueError("Only containers may have the major flag.")
+        super()._setMajorFlags(elemToMajor, emitEvent)
+        db.write.setMajor((el.id,major) for (el, major) in elemToMajor.items() )
+    
+    def _setContents(self, parent, contents):
+        db.transaction()
+        db.query("DELETE FROM {}contents WHERE container_id = ?".format(db.prefix), parent.id)
+        #Note: This checks skips elements which are not loaded on real. This should rarely happen and
+        # due to foreign key constraints the following query will fail anyway (but with a DBException).
+        if not all(self[childId].isInDb() for childId in contents if childId in self):
+            raise levels.ConsistencyError("Elements must be in the DB before being added to a container.")
+            
+        # if some contents are not in the database yet.
+        db.multiQuery("INSERT INTO {}contents (container_id, position, element_id) VALUES (?, ?, ?)"
+                      .format(db.prefix),
+                      [(parent.id, pos, childId) for pos, childId in contents.items()])
+        db.commit()
+        super()._setContents(parent, contents)
         
     def _insertContents(self, parent, insertions, emitEvent=True):
+        if not all(element.isInDb() for pos,element in insertions):
+            raise levels.ConsistencyError("Elements must be in the DB before being added to a container.")
         db.transaction()
-        db.multiQuery("INSERT INTO {}contents (container_id, position, element_id) "
-                      "       VALUES (?, ?, ?)".format(db.prefix),
+        db.multiQuery("INSERT INTO {}contents (container_id, position, element_id) VALUES (?, ?, ?)"
+                      .format(db.prefix),
                       [(parent.id, pos, child.id) for pos, child in insertions])
         db.write.updateElementsCounter((parent.id,))
         db.commit()
@@ -249,6 +443,10 @@ class RealLevel(levels.Level):
         db.write.updateElementsCounter((parent.id,))
         db.commit()
         super()._removeContents(parent, positions, emitEvent)
+    
+    def _changePositions(self, parent, changes, emitEvent=True):
+        super()._changePositions(parent, changes, emitEvent)
+        db.write.changePositions(parent.id, list(changes.items()))
     
     def _renameFiles(self, renamings, emitEvent=True):
         """On the real level, files are renamed both on disk and in DB."""
@@ -267,74 +465,3 @@ class RealLevel(levels.Level):
         self.filesRenamed.emit(renamings)
         super()._renameFiles(renamings, emitEvent)
     
-    def _changePositions(self, parent, changes, emitEvent=True):
-        super()._changePositions(parent, changes, emitEvent)
-        db.write.changePositions(parent.id, list(changes.items()))
-    
-    def _changeTags(self, changes, emitEvent=True):
-        filebackends.changeTags(changes) # might raise TagWriteError
-        
-        db.transaction()
-        dbRemovals = [(el.id,tag.id,db.idFromValue(tag,value))
-                      for el,diff in changes.items() for tag,value in diff.getRemovals() if tag.isInDB()]
-        if len(dbRemovals):
-            db.multiQuery("DELETE FROM {}tags WHERE element_id=? AND tag_id=? AND value_id=?"
-                          .format(db.prefix),dbRemovals)
-            
-        dbAdditions = [(el.id,tag.id,db.idFromValue(tag,value,insert=True))
-                       for el,diff in changes.items() for tag,value in diff.getAdditions() if tag.isInDB()]
-        if len(dbAdditions):
-            db.multiQuery("INSERT INTO {}tags (element_id,tag_id,value_id) VALUES (?,?,?)"
-                          .format(db.prefix),dbAdditions)
-        files = [ (elem.id, ) for elem in changes if elem.isFile() ]
-        if len(files) > 0:
-            db.multiQuery("UPDATE {}files SET verified=CURRENT_TIMESTAMP WHERE element_id=?"
-                          .format(db.prefix),files)
-        db.commit()
-        super()._applyDiffs(changes, emitEvent)
-        
-    def _changeFlags(self, changes, emitEvent=True):
-        db.transaction()
-        dbRemovals = [(el.id,flag.id) for el,diff in changes.items() for flag in diff.getRemovals()]
-        if len(dbRemovals):
-            db.multiQuery("DELETE FROM {}flags WHERE element_id = ? AND flag_id = ?".format(db.prefix),
-                          dbRemovals)
-        dbAdditions = [(el.id,flag.id) for el,diff in changes.items() for flag in diff.getAdditions()]
-        if len(dbAdditions):
-            db.multiQuery("INSERT INTO {}flags (element_id,flag_id) VALUES(?,?)".format(db.prefix),
-                          dbAdditions)
-        db.commit()
-        super()._applyDiffs(changes, emitEvent)
-            
-    def _changeData(self, changes, emitEvent):
-        super()._applyDiffs(changes, emitEvent)
-        db.transaction()
-        for element, diff in changes.items():
-            for type, (a, b) in diff.diffs.items():
-                if a is not None:
-                    db.query("DELETE FROM {}data WHERE type=? AND element_id=?"
-                             .format(db.prefix), type, element.id)
-                if b is not None:
-                    db.multiQuery("INSERT INTO {}data (element_id, type, sort, data) VALUES (?,?,?,?)"
-                                  .format(db.prefix),
-                                  [(element.id, type, i, val) for i, val in enumerate(b)])
-        db.commit()
-                
-    def _setData(self, type, elementToData):
-        super()._setData(type, elementToData)
-        values = []
-        for element, data in elementToData.items():
-            if data is not None:
-                values.extend((element.id, type, i, d) for i, d in enumerate(data))
-        db.transaction()
-        db.query("DELETE FROM {}data WHERE type = ? AND element_id IN ({})"
-                 .format(db.prefix,db.csIdList(elementToData.keys())),type)
-        if len(values) > 0:
-            db.multiQuery("INSERT INTO {}data (element_id,type,sort,data) VALUES (?,?,?,?)"
-                          .format(db.prefix),values)
-        db.commit()
-        
-    def _setMajorFlags(self, elemToMajor, emitEvent=True):
-        super()._setMajorFlags(elemToMajor, emitEvent)
-        db.write.setMajor((el.id,major) for (el, major) in elemToMajor.items() )
-        

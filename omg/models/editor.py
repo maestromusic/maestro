@@ -63,9 +63,7 @@ class EditorModel(leveltreemodel.LevelTreeModel):
           deleted or replaced according to the config options tags.auto_delete and tags.auto_replace
         - information about external tags: the model manages a list of ExternalTagInfo-instances which are
           used by the editor's ExternalTagsWidget.
-        - reloading elements: When an element is loaded into the editor that does exist on the editor
-          level but is not visible in any EditorModel, it will be reset to its state on real level.
-          This is necessary, when an element is dropped, changed, removed and dropped again.
+          
     """
     instances = weakref.WeakSet() # all existing editor models
     extTagInfosChanged = QtCore.pyqtSignal() # will be emitted when the list of ExternalTagInfos changed
@@ -80,20 +78,12 @@ class EditorModel(leveltreemodel.LevelTreeModel):
             _processor = AutoTagProcessor()
     
     def loadFile(self, url):
-        if url not in self.level:
-            element = self.level.get(url)
+        if url in self.level:
+            return self.level[url]
         else:
-            # if the element is present on editor level, check whether it is visible in any EditorModel
-            # otherwise reload it (=reset to its state on real level)
-            id = levels.idFromUrl(url)
-            for model in self.instances:
-                if id in model:
-                    # skip auto tag processing if the element is loaded from another editor
-                    return self.level.get(url)
-            element = self.level.reload(id)
-        
-        _processor.perform(element)
-        return element
+            element = self.level.collect(url) #TODO this loads each element separately and is thus inefficient
+            _processor.perform(element)
+            return element
 
     def _addToExtTagInfo(self,type,tag,newTag,element):
         """Add *element* to the ExternalTagInfo specified by *type*, *tag* and *newTag*. Create such an
@@ -124,7 +114,7 @@ class EditorModel(leveltreemodel.LevelTreeModel):
                         
             # Compute infos of type 'external'
             for tag in element.tags:
-                if not tag.isInDB():
+                if not tag.isInDb():
                     self._addToExtTagInfo('external',tag,None,element)
 
         self.extTagInfosChanged.emit()
@@ -145,9 +135,9 @@ class EditorModel(leveltreemodel.LevelTreeModel):
             # Only update infos of type 'external'
             changed = False
             for id in event.dataIds:
-                element = self.level.get(id)
+                element = self.level[id]
                 for tag in element.tags:
-                    if not tag.isInDB():
+                    if not tag.isInDb():
                         if self._addToExtTagInfo('external',tag,None,element):
                             changed = True
                             
@@ -196,7 +186,7 @@ class EditorModel(leveltreemodel.LevelTreeModel):
     def commit(self):
         """Commit the contents of this editor."""
         _processor.removeElements(wrapper.element for wrapper in self.root.getAllNodes(skipSelf=True))
-        levels.editor.commit([wrapper.element for wrapper in self.root.contents])
+        levels.editor.commit()
         for editorModel in EditorModel.instances:
             editorModel._updateExtTagInfos()
             
@@ -256,7 +246,7 @@ class AutoTagProcessor:
             changed = True
             
         for tag in list(element.tags.keys()): # copy because dict will be modified
-            if tag.isInDB():
+            if tag.isInDb():
                 # do not auto process internal tags even if the config file says so
                 continue
         

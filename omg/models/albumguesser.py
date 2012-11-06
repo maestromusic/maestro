@@ -104,10 +104,10 @@ class StandardGuesser(profiles.Profile):
                 if key not in byKey:
                     byKey[key] = []
                 byKey[key].append(element)
-        self.albums.extend(self.level.get(id) for id in existingParents)
+        self.albums.extend(self.level.collectMany(existingParents))
         for key, elements in byKey.items():
             if pureDirMode or (self.albumTag in elements[0].tags):
-                elementsWithoutPos = { e for e in elements if e.filePosition is None }
+                elementsWithoutPos = { e for e in elements if not hasattr(element,'filePosition') }
                 elementsWithPos = sorted(set(elements) - elementsWithoutPos, key = lambda e: e.filePosition)
                 children = {}
                 for element in elementsWithPos:

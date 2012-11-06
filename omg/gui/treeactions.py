@@ -20,7 +20,7 @@ from PyQt4 import QtGui
 from PyQt4.QtCore import Qt
 
 from .. import application, utils, filebackends
-from ..core import levels, tags, commands
+from ..core import levels, tags
 from ..core.nodes import RootNode, Wrapper
 from ..models import leveltreemodel
 from ..models.browser import BrowserModel
