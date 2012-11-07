@@ -155,6 +155,12 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
             
         application.stack.endMacro()
     
+    def clear(self):
+        """Remove everything below the root node."""
+        application.stack.beginMacro(self.tr('clear'))
+        self.removeElements(self.root, range(len(self.root.contents)))
+        application.stack.endMacro()
+        
     def loadFile(self, url):
         """Load a file into this model. The default implementation calls level.collect()."""
         return self.level.collect(url)

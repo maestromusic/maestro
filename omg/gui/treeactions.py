@@ -193,7 +193,7 @@ class MergeAction(TreeAction):
 
 
 class ClearTreeAction(TreeAction):
-    """This action clears a tree model using a simple ChangeRootCommand."""
+    """This action clears a tree model."""
     
     def __init__(self, parent):
         super().__init__(parent, shortcut = "Shift+Del")
@@ -204,8 +204,7 @@ class ClearTreeAction(TreeAction):
         self.setEnabled(self.parent().model().root.getContentsCount() > 0)
     
     def doAction(self):
-        model = self.parent().model()
-        application.stack.push(leveltreemodel.ChangeRootCommand(model, [], self.tr('clear')))
+        self.parent().model().clear()
 
 
 class CommitTreeAction(TreeAction):
