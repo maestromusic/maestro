@@ -83,7 +83,7 @@ class LevelChangedEvent(application.ChangeEvent):
         super().__init__()
         assert type(self) is not LevelChangedEvent
         for attr in self._idAttributes:
-            if attr not in args:
+            if attr not in args or args[attr] is None:
                 ids = []
             elif not isinstance(args[attr], list):
                 ids = list(args[attr])

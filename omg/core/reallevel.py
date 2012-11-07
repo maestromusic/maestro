@@ -415,6 +415,8 @@ class RealLevel(levels.Level):
     
     def _setContents(self, parent, contents):
         db.transaction()
+        changedChildIds = set(id for id in contents if id not in parent.contents)\
+                                .union(id for id in parent.contents if id not in contents)
         db.query("DELETE FROM {}contents WHERE container_id = ?".format(db.prefix), parent.id)
         #Note: This checks skips elements which are not loaded on real. This should rarely happen and
         # due to foreign key constraints...
@@ -426,6 +428,9 @@ class RealLevel(levels.Level):
         db.multiQuery("INSERT INTO {}contents (container_id, position, element_id) VALUES (?, ?, ?)"
                       .format(db.prefix),
                       [(parent.id, pos, childId) for pos, childId in contents.items()])
+        db.write.updateElementsCounter((parent.id,))
+        if len(changedChildIds) > 0:
+            db.write.updateToplevelFlags(changedChildIds)
         db.commit()
         super()._setContents(parent, contents)
 
@@ -437,14 +442,17 @@ class RealLevel(levels.Level):
                       .format(db.prefix),
                       [(parent.id, pos, child.id) for pos, child in insertions])
         db.write.updateElementsCounter((parent.id,))
+        db.write.updateToplevelFlags(child.id for _,child in insertions)
         db.commit()
         super()._insertContents(parent, insertions, emitEvent)
         
     def _removeContents(self, parent, positions, emitEvent=True):
         db.transaction()
+        childIds = [parent.contents.at(pos) for pos in positions]
         db.multiQuery("DELETE FROM {}contents WHERE container_id=? AND position=?"
                    .format(db.prefix), [(parent.id, pos) for pos in positions])
         db.write.updateElementsCounter((parent.id,))
+        db.write.updateToplevelFlags(childIds)
         db.commit()
         super()._removeContents(parent, positions, emitEvent)
     
