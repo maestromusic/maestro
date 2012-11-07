@@ -103,9 +103,7 @@ class EditorModel(leveltreemodel.LevelTreeModel):
     def _updateExtTagInfos(self):
         """Rebuild the list of ExternalTagInfos from scratch."""
         self.extTagInfos = []
-        for wrapper in self.root.getAllNodes(skipSelf=True):
-            element = wrapper.element
-            
+        for element in self.level.elements.values():
             # Get infos of type 'deleted' and 'replaced' from the processor
             if element in _processor.processed:
                 for info in _processor.processed[element]:
@@ -127,14 +125,15 @@ class EditorModel(leveltreemodel.LevelTreeModel):
         
     def _handleLevelChanged(self, event):
         super()._handleLevelChanged(event)
-        
-        if len(event.contentIds) > 0:
+        if isinstance(event, (levels.ElementAddedEvent, levels.ElementRemovedEvent)):
             # Rebuild infos from scratch
             self._updateExtTagInfos()
         else:
             # Only update infos of type 'external'
             changed = False
             for id in event.dataIds:
+                if id not in self.level:
+                    continue
                 element = self.level[id]
                 for tag in element.tags:
                     if not tag.isInDb():

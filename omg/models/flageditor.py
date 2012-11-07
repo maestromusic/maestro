@@ -22,7 +22,7 @@ from PyQt4 import QtCore, QtGui
 
 from . import tageditor
 from .. import application
-from ..core import tags, flags
+from ..core import tags, flags, levels
 
 
 class Record:
@@ -175,6 +175,14 @@ class FlagEditorModel(QtCore.QObject):
     def _handleLevelChanged(self,event):
         """React to change events of the underlying level."""
         currentIds = [el.id for el in self.elements]
+        if isinstance(event, levels.ElementRemovedEvent):
+            if any(id in event.ids for id in currentIds):
+                self.setElements(self.level,
+                                 [element for element in self.elements if element.id not in event.ids])
+            
+        if not isinstance(event, levels.ElementChangedEvent):
+            return
+        
         if all(id not in currentIds for id in event.dataIds):
             return # not our problem
         

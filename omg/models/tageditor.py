@@ -214,7 +214,7 @@ class TagEditorChangeEvent(application.ChangeEvent):
     
     TagEditorChangeEvents may be merged and will contain several methods and arguments dicts then.
     """
-    def __init__(self,model,statusNumber,method,args):
+    def __init__(self, model, statusNumber, method, args):
         self.model = model
         self.statusNumber = statusNumber
         self.methods = [method]
@@ -243,7 +243,7 @@ class TagEditorChangeEvent(application.ChangeEvent):
             
         self.contentIds = tuple()
     
-    def merge(self,other):
+    def merge(self, other):
         if isinstance(other,TagEditorChangeEvent) \
                 and other.model is self.model and self.statusNumber == other.statusNumber:
             self.methods.extend(other.methods)
@@ -251,6 +251,15 @@ class TagEditorChangeEvent(application.ChangeEvent):
             self.dataIds.extend([id for id in other.dataIds if id not in self.dataIds])
             return True
         return False
+    
+    def filtered(self, ids):
+        # filtered events are used to forward events to another level. On that level there is no use for
+        # the special information of TagEditorChangeEvents. And all elements stored in self.args will refer
+        # to the wrong level.
+        remainingIds = [id for id in self.dataIds if id not in ids]
+        if len(remainingIds) == 0:
+            return None
+        else: return levels.ElementChangedEvent(dataIds=remainingIds)
 
 
 class TagEditorUndoCommand(QtGui.QUndoCommand):
@@ -693,6 +702,14 @@ class TagEditorModel(QtCore.QObject):
     
     def _handleLevelChanged(self,event):
         """React to change events of the underlying level."""
+        if isinstance(event, levels.ElementRemovedEvent):
+            if any(element.id in event.ids for element in self.elements):
+                self.setElements(self.level,
+                                 [element for element in self.elements if element.id not in event.ids])
+        
+        if not isinstance(event, levels.ElementChangedEvent):
+            return
+        
         if isinstance(event,TagEditorChangeEvent) \
                 and event.model is self and event.statusNumber == self._statusNumber:
             # Yeah, the event carries special information that tells us how to react to it.

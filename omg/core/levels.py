@@ -73,38 +73,64 @@ class ConsistencyError(RuntimeError):
     pass
 
 
-class ElementChangedEvent(application.ChangeEvent):
-    #TODO comment
-    def __init__(self, dataIds=None, contentIds=None):
+class LevelChangedEvent(application.ChangeEvent):
+    """This is an abstract class that contains generic code for its subclasses ElementChangedEvent,
+    ElementAddedEvent, ElementRemovedEvent.
+    """
+    # Attributes which store a list of element ids; used by the generic implementation of merge and filtered.
+    _idAttributes = ('ids', )
+    def __init__(self, **args):
         super().__init__()
-        if dataIds is None:
-            dataIds = []
-        elif type(dataIds) is not list:
-            dataIds = list(dataIds)
-        self.dataIds = dataIds
-        if contentIds is None:
-            contentIds = []
-        elif type(contentIds) is not list:
-            contentIds = list(contentIds)
-        self.contentIds = contentIds
+        assert type(self) is not LevelChangedEvent
+        for attr in self._idAttributes:
+            if attr not in args:
+                ids = []
+            elif not isinstance(args[attr], list):
+                ids = list(args[attr])
+            else: ids = args[attr]
+            setattr(self, attr, ids)
         
-    def merge(self,other):
-        if isinstance(other,ElementChangedEvent):
-            if self.dataIds is None:
-                self.dataIDs = other.dataIds
-            else:
-                self.dataIds.extend([id for id in other.dataIds if id not in self.dataIds])
-            if self.contentIds is None:
-                self.dataIDs = other.contentIds
-            else:
-                self.contentIds.extend([id for id in other.contentIds if id not in self.contentIds])
+    def merge(self, other):
+        if isinstance(other, type(self)):
+            for attr in self._idAttributes:
+                getattr(self, attr).extend(getattr(other, attr))
             return True
-        else:
-            return False
-
-
+        else: return False
+        
+    def filtered(self, ids):
+        """Return a version of this event where all changes of the elements with the given ids have been
+        filtered out. Return None, if no changes remain. The resulting event must be usable on a different
+        level, which is not a problem as long as events only use ids.
+        """
+        remainingIds = {attr: [id for id in getattr(self,attr) if id not in ids]
+                        for attr in self._idAttributes}
+        if all(len(remIds) == 0 for remIds in remainingIds.values()):
+            return None
+        elif all(len(remIds) == len(self.ids) for remIds in remainingIds.values()):
+            return self
+        else: return type(self)(**remainingIds)
+        
+        
+class ElementChangedEvent(LevelChangedEvent):
+    """Emitted when one or more elements have changed. Two constructor arguments and attributes:
+    *dataIds* specifies a set of elements whose data (tags, flags, etc.; in particular including parents)
+    has changed. For elements in *contentIds* the contents have changed.
+    """  
+    _idAttributes = ('dataIds', 'contentIds')
+        
+class ElementAddedEvent(LevelChangedEvent):
+    """Emitted when one or more elements have been added to the level. It has only one constructor argument
+    and attribute *ids* which specifies the elements by their id."""
+    
+class ElementRemovedEvent(LevelChangedEvent):
+    """Emitted when one or more elements have been removed from the level. It has only one constructor
+    argument and attribute *ids* which specifies the elements by their id."""
+          
+        
 class GenericLevelCommand(QtGui.QUndoCommand):
-    #TODO comment
+    """Generic UndoCommand that is used by all undoable methods of Level. It will call *redoMethod* with
+    *redoArgs* on redo an handle undos analogously. *text* is an optional text for the command.
+    """
     def __init__(self, redoMethod, redoArgs, undoMethod, undoArgs, text=None):
         super().__init__()
         if text is not None:
@@ -150,10 +176,18 @@ class Level(application.ChangeEventDispatcher):
             assert all(element.level is parent for element in elements)
             self.elements = {element.id: element.copy(level=self) for element in elements}
         self.stack = stack if stack is not None else application.stack
+    
+    def emit(self, event):
+        super().emit(event)
+        for level in allLevels:
+            if level.parent is self:
+                filteredEvent = event.filtered(level.elements.keys())
+                if filteredEvent is not None:
+                    level.emit(filteredEvent)
         
     def emitEvent(self, dataIds=None, contentIds=None):
-        """Simple shortcut to emit an event."""
-        self.emit(ElementChangedEvent(dataIds,contentIds))
+        """Simple shortcut to emit an ElementChangedEvent."""
+        self.emit(ElementChangedEvent(dataIds=dataIds, contentIds=contentIds))
     
     def __contains__(self, param):
         """Returns if the given element is loaded in this level.
@@ -575,15 +609,14 @@ class Level(application.ChangeEventDispatcher):
         for element in elements:
             assert element.id not in self and element.level is self
             self.elements[element.id] = element
-            
-        #TODO: emit event
+        if len(elements) > 0:
+            self.emit(ElementAddedEvent(ids=[element.id for element in elements]))
             
     def _removeElements(self, elements):
         for element in elements:
             del self.elements[element.id]
-            
-        #TODO remove from all contents or check that this has been done
-        #TODO: emit event
+        if len(elements) > 0:
+            self.emit(ElementRemovedEvent(ids=[element.id for element in elements]))
             
     def _applyDiffs(self, changes, emitEvent=True):
         """Given the dict *changes* mapping elements to Difference objects (e.g. tags.TagDifference, apply
@@ -761,4 +794,3 @@ def idFromUrl(url, create=False):
             else: raise KeyError("There is no id for url '{}'".format(url))
         _urlToId[url] = id
         return id
-        

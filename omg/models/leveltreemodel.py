@@ -204,15 +204,16 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
     
     def _handleLevelChanged(self, event):
         """Update elements if the state of the level has changed."""
-        dataIds = event.dataIds
-        contentIds = event.contentIds
-        for node, contents in self.walk(self.root):
-            if isinstance(node, nodes.Wrapper):
-                if node.element.id in dataIds:
-                    self.dataChanged.emit(self.getIndex(node), self.getIndex(node))
-                if node.element.id in contentIds:
-                    self._changeContents(self.getIndex(node), self.level[node.element.id].contents)
-                    contents[:] = [wrapper for wrapper in contents if wrapper in node.contents ]
+        if isinstance(event, levels.ElementChangedEvent):
+            dataIds = event.dataIds
+            contentIds = event.contentIds
+            for node, contents in self.walk(self.root):
+                if isinstance(node, nodes.Wrapper):
+                    if node.element.id in dataIds:
+                        self.dataChanged.emit(self.getIndex(node), self.getIndex(node))
+                    if node.element.id in contentIds:
+                        self._changeContents(self.getIndex(node), self.level[node.element.id].contents)
+                        contents[:] = [wrapper for wrapper in contents if wrapper in node.contents ]
 
     def _changeContents(self, index, new):
         """Change contents of a node in the tree.

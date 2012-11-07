@@ -110,6 +110,8 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
     
                
     def _handleLevelChanged(self,event):
+        if not isinstance(event, levels.ElementChangedEvent):
+            return
         #TODO
         pass
         
