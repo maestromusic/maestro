@@ -75,16 +75,18 @@ class RealFile(BackendFile):
             key = key.lower()
             if key in ["tracknumber", "discnumber"]:
                 self.ignoredTags[key] = values
-            else:
+            elif tags.isValidTagName(key):
                 tag = tags.get(key)
                 validValues = []
                 for string in values:
                     try:
                         validValues.append(tag.convertValue(string, crop=True))
                     except tags.TagValueError:
-                        logger.error("Invalid value for tag '{}' found: {}".format(tag.name,string))
+                        logger.error("Invalid value for tag '{}' found: {}".format(tag.name, string))
                 if len(validValues) > 0:
                     self.tags.add(tag, *validValues)
+            else:
+                logger.error("Invalid tag name '{}' found : {}".format(key, self.url))
         
     @property
     def length(self):
