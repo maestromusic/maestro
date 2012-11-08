@@ -32,19 +32,19 @@ class DataDifference:
             if a != b:
                 self.diffs[key] = (a, b)
             
-    def apply(self, dataA):
+    def apply(self, element):
         for key, (_, b) in self.diffs.items():
             if b is None:
-                del dataA[key]
+                del element.data[key]
             else:
-                dataA[key] = b
+                element.data[key] = b
                 
-    def revert(self, dataB):
+    def revert(self, element):
         for key, (a, _) in self.diffs.items():
             if a is None:
-                del dataB[key]
+                del element.data[key]
             else:
-                dataB[key] = a
+                element.data[key] = a
                 
     def inverse(self):
         ret = DataDifference(None, None)
