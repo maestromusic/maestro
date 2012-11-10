@@ -380,7 +380,7 @@ class RealLevel(levels.Level):
         db.commit()
         super()._applyDiffs(changes, emitEvent)
             
-    def _changeData(self, changes, emitEvent):
+    def _changeData(self, changes, emitEvent=True):
         if not all(element.isInDb() for element in changes.keys()):
             raise levels.ConsistencyError("Elements on real must be added to the DB before adding data.")
         super()._applyDiffs(changes, emitEvent)
