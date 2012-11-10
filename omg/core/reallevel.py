@@ -296,10 +296,12 @@ class RealLevel(levels.Level):
             db.write.updateToplevelFlags(data[2] for data in contentData)
                                       
         db.commit()
+        self.emit(levels.ElementAddedEvent(ids=[el.id for el in elements]))
                 
     def _removeFromDb(self, elements):
         """Like removeFromDb but not undoable."""
         for element in elements:
+            assert element.isInDb()
             if element.isContainer():
                 del self.elements[element.id]
                 for childId in element.contents:
@@ -313,7 +315,9 @@ class RealLevel(levels.Level):
         db.query("DELETE FROM {}elements WHERE id IN ({})"
                  .format(db.prefix, db.csList(element.id for element in elements)))
         
-    def deleteElements(self, elements):
+        self.emit(levels.ElementRemovedEvent(ids=[el.id for el in elements]))
+        
+    def deleteElements(self, elements, fromDisk=False):
         elements = list(elements)
         self.stack.beginMacro("delete elements")
         # 1st step: isolate the elements (remove contents & parents)
@@ -324,12 +328,13 @@ class RealLevel(levels.Level):
                 for parentId in element.parents:
                     parent = self.collect(parentId)
                     self.removeContents(parent, parent.contents.positionsOf(id=element.id))
-        command = levels.GenericLevelCommand(redoMethod=self._removeElements,
-                                      redoArgs={"elements" : elements},
-                                      undoMethod=self._addElements,
-                                      undoArgs={"elements" : elements})
-        self.stack.push(command)
+        self.removeFromDb([element for element in elements if element.isInDb()])
         self.stack.endMacro()
+        if fromDisk and any(element.isFile() for element in elements):
+            for element in elements:
+                if element.isFile():
+                    element.url.getBackendFile().delete()
+            self.stack.clear()
 
     def _changeTags(self, changes, emitEvent=True, dbOnly=False):
         if not dbOnly:

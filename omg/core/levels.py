@@ -106,7 +106,7 @@ class LevelChangedEvent(application.ChangeEvent):
                         for attr in self._idAttributes}
         if all(len(remIds) == 0 for remIds in remainingIds.values()):
             return None
-        elif all(len(remIds) == len(self.ids) for remIds in remainingIds.values()):
+        elif all(len(remIds) == len(getattr(self,attr)) for attr,remIds in remainingIds.items()):
             return self
         else: return type(self)(**remainingIds)
         

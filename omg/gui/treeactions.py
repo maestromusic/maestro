@@ -138,6 +138,7 @@ class RemoveFromParentAction(TreeAction):
             raise NotImplementedError()
         application.stack.endMacro()
 
+
 class DeleteAction(TreeAction):
     """Action to delete elements from the database and/or filesystem."""
     
@@ -148,32 +149,44 @@ class DeleteAction(TreeAction):
         self.allowDisk = allowDisk
             
     def initialize(self, selection):
-        if self.level() is levels.real:
-            self.setEnabled(selection.hasElements())
-        else:
-            self.setEnabled(selection.hasFiles() and \
-                            all(wrap.element.url.CAN_DELETE for wrap in selection.fileWrappers()))
+        self.setEnabled(selection.hasElements())
     
     def doAction(self):
         selection = self.parent().nodeSelection
         files = [wrap.element for wrap in selection.fileWrappers()]
-        self.level().deleteElements(self.parent().nodeSelection.elements())
+        dialog = DeleteDialog(files,self.parent())
+        print(dialog.exec_())
+        return
+        self.level().deleteElements(selection.elements())
         if self.allowDisk and len(files) > 0:
-            if self.level() is levels.real:
-                message = self.tr("You have deleted the following files from OMG:\n{}\n"
-                                  "Do you want them deleted completely (<b>can not be reversed!!</b>)")
-            else:
-                message = self.tr("Are you sure to <b>irrevocably</b> delete the following files?\n{}")
-            ans = dialogs.question(
-                      self.tr("delete files?"),
-                      message.format("\n".join(str(file.url) for file in files)),
-                      self.parent())
-            if ans:
-                for file in files:
-                    file.url.getBackendFile().delete()
-                application.stack.clear()
+            self.level().deleteElements(files, fromDisk=True)
             
 
+class DeleteDialog(QtGui.QDialog):
+    """Special dialog to display the files that have been deleted from database and may be deleted from disk.
+    It is used in DeleteAction."""
+    def __init__(self, files, parent):
+        super().__init__(parent)
+        self.setWindowTitle(self.tr("Delete files?"))
+        self.resize(400,300)
+        layout = QtGui.QVBoxLayout(self)
+        label = QtGui.QLabel(
+                             self.tr("You have deleted the following %n file(s) from OMG."
+                                     "Do you want them deleted completely?\n"
+                                     "<b>This cannot be reversed!</b>",
+                                     '', len(files)))
+        label.setWordWrap(True)
+        layout.addWidget(label)
+        listWidget = QtGui.QListWidget()
+        listWidget.addItems([str(file.url) for file in files])
+        layout.addWidget(listWidget)
+        buttonBox = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Yes | QtGui.QDialogButtonBox.No)
+        buttonBox.button(QtGui.QDialogButtonBox.No).setDefault(True)
+        buttonBox.rejected.connect(self.reject)
+        buttonBox.accepted.connect(self.accept)
+        layout.addWidget(buttonBox)
+        
+    
 class MergeAction(TreeAction):
     """Action to merge selected elements into a new container."""
     

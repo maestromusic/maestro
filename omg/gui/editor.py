@@ -40,7 +40,6 @@ class EditorTreeView(treeview.TreeView):
     actionConfig.addActionDefinition(((sect, 'major?'),), treeactions.ToggleMajorAction)
     actionConfig.addActionDefinition(((sect, 'position+'),), treeactions.ChangePositionAction, mode="+1")
     actionConfig.addActionDefinition(((sect, 'position-'),), treeactions.ChangePositionAction, mode="-1")
-    actionConfig.addActionDefinition(((sect, 'deleteFiles'),), treeactions.DeleteAction, text=translate(__name__, "delete file(s)"))
     sect = translate(__name__, "editor")
     
     actionConfig.addActionDefinition(((sect, 'clearEditor'),), treeactions.ClearTreeAction)
