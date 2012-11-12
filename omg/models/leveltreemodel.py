@@ -24,7 +24,6 @@ from ..core import elements, levels, nodes
 from ..models import rootedtreemodel
 
 from collections import OrderedDict
-import itertools
 
 logger = logging.getLogger(__name__)
 
@@ -136,8 +135,6 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
         This convenience function either alters the RootNode, if parent is self.root, or updates
         the level.
         """
-        if self.level is not levels.real:
-            removedWrappers = [parent.contents[i] for i in rows]
         application.stack.beginMacro(self.tr('remove elements'))
         if parent is self.root:
             newContents = [ self.root.contents[i].element
@@ -146,14 +143,6 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
             application.stack.push(ChangeRootCommand(self, newContents))
         else:
             self.level.removeContentsAuto(parent.element, indexes=rows)
-        
-        if self.level is not levels.real:
-            elementsToRemove = []
-            for wrapper in itertools.chain.from_iterable(w.getAllNodes() for w in removedWrappers):
-                if wrapper.element.id not in self:
-                    elementsToRemove.append(wrapper.element)
-            if len(elementsToRemove) > 0:
-                self.level.removeElements(elementsToRemove)
             
         application.stack.endMacro()
     

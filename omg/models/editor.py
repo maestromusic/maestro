@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import weakref
+import weakref, itertools
 
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
@@ -81,10 +81,23 @@ class EditorModel(leveltreemodel.LevelTreeModel):
         if url in self.level:
             return self.level[url]
         else:
-            element = self.level.collect(url) #TODO this loads each element separately and is thus inefficient
+            #TODO leveltreemodel.loadFile loads each element separately and is thus inefficient
+            element = self.level.collect(url)
             _processor.perform(element)
             return element
-
+        
+    def removeElements(self, parent, rows):
+        application.stack.beginMacro(self.tr('remove elements'))
+        removedWrappers = [parent.contents[i] for i in rows]
+        super().removeElements(parent, rows)
+        elementsToRemove = []
+        for wrapper in itertools.chain.from_iterable(w.getAllNodes() for w in removedWrappers):
+            if wrapper.element.id not in self:
+                elementsToRemove.append(wrapper.element)
+        if len(elementsToRemove) > 0:
+            self.level.removeElements(elementsToRemove)
+        application.stack.endMacro()
+        
     def _addToExtTagInfo(self,type,tag,newTag,element):
         """Add *element* to the ExternalTagInfo specified by *type*, *tag* and *newTag*. Create such an
         object if it does not yet exist."""
