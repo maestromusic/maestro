@@ -197,8 +197,7 @@ class RecordModel(QtCore.QObject):
         self.tagChanged.emit(oldTag,newTag)
     
     
-class TagEditorChangeEvent(application.ChangeEvent):
-    # Do not inherit ElementChangedEvent, so that these events are not affected by ElementChangedEvent.merge.
+class TagEditorChangeEvent(levels.ElementChangedEvent):
     """A special change event for the tageditor. It can be used as usual ElementChangeEvent (contentIds and
     dataIds) but stores additional information for the tageditor.
     
@@ -706,7 +705,7 @@ class TagEditorModel(QtCore.QObject):
             if any(element.id in event.ids for element in self.elements):
                 self.setElements(self.level,
                                  [element for element in self.elements if element.id not in event.ids])
-        
+                
         if not isinstance(event, levels.ElementChangedEvent):
             return
         

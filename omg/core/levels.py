@@ -91,7 +91,7 @@ class LevelChangedEvent(application.ChangeEvent):
             setattr(self, attr, ids)
         
     def merge(self, other):
-        if isinstance(other, type(self)):
+        if type(other) is type(self): # do not merge with subclasses because they might carry more data
             for attr in self._idAttributes:
                 getattr(self, attr).extend(getattr(other, attr))
             return True
