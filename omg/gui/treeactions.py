@@ -154,12 +154,11 @@ class DeleteAction(TreeAction):
     def doAction(self):
         selection = self.parent().nodeSelection
         files = [wrap.element for wrap in selection.fileWrappers()]
-        dialog = DeleteDialog(files,self.parent())
-        print(dialog.exec_())
-        return
         self.level().deleteElements(selection.elements())
         if self.allowDisk and len(files) > 0:
-            self.level().deleteElements(files, fromDisk=True)
+            dialog = DeleteDialog(files,self.parent())
+            if dialog.exec_() == QtGui.QDialog.Accepted:
+                self.level().deleteElements(files, fromDisk=True)
             
 
 class DeleteDialog(QtGui.QDialog):
