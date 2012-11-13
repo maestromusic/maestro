@@ -169,11 +169,10 @@ class AbstractCoverProvider(QtCore.QObject):
         raise NotImplementedError()
 
 
-class CoverUndoCommand(QtGui.QUndoCommand):
+class CoverUndoCommand:
     """UndoCommand that changes the covers of one or more elements in the given level. *covers* must be a
     dict mapping elements to either a cover path or a QPixmap or None."""
-    def __init__(self,level,covers):
-        super().__init__()
+    def __init__(self, level, covers):
         self.level = level
         self.covers = {}
         for element,coverOrPath in covers.items():

@@ -642,17 +642,16 @@ def _convertTagTypeOnLevels(tagType, valueType):
         application.stack.push(command)
         
         
-class TagTypeUndoCommand(QtGui.QUndoCommand):
+class TagTypeUndoCommand:
     """This command adds, changes or removes a tagtype. Which keyword arguments are necessary depends on the
     first parameter *action*. Use the methods addTagType, removeTagType and changeTagTyp instead of using
     this command directly.
     """
     def __init__(self,action,tagType,**data):
-        texts = {ADD:   translate("TagTypeUndoCommand","Add tagtype to DB"),
-                 REMOVE: translate("TagTypeUndoCommand","Remove tagtype from DB"),
-                 CHANGE: translate("TagTypeUndoCommand","Change tagtype")
-                }
-        super().__init__(texts[action])
+        self.text = {ADD:   translate("TagTypeUndoCommand","Add tagtype to DB"),
+                     REMOVE: translate("TagTypeUndoCommand","Remove tagtype from DB"),
+                     CHANGE: translate("TagTypeUndoCommand","Change tagtype")
+                    }[action]
         self.action = action
         if self.action == ADD:
             self.tagType = tagType
@@ -719,7 +718,7 @@ def _moveTagTypes(newList):
     application.dispatcher.emit(TagTypeOrderChangeEvent())
     
     
-class TagTypeOrderUndoCommand(QtGui.QUndoCommand):
+class TagTypeOrderUndoCommand:
     """Command that changes the order of the tagtypes. *newList* specifies the new order and will be used
     as replacement for tags.tagList. *newList* must contain the same tagtypes as tags.tagList.
     
@@ -728,7 +727,7 @@ class TagTypeOrderUndoCommand(QtGui.QUndoCommand):
     tags.tagList is restored.
     """ 
     def __init__(self,newList):
-        super().__init__(translate("TagTypeOrderUndoCommand","Change tagtype order"))
+        self.text = translate("TagTypeOrderUndoCommand","Change tagtype order")
         self.oldList = tagList
         self.newList = newList
     

@@ -127,14 +127,12 @@ class ElementRemovedEvent(LevelChangedEvent):
     argument and attribute *ids* which specifies the elements by their id."""
           
         
-class GenericLevelCommand(QtGui.QUndoCommand):
+class GenericLevelCommand:
     """Generic UndoCommand that is used by all undoable methods of Level. It will call *redoMethod* with
     *redoArgs* on redo an handle undos analogously. *text* is an optional text for the command.
     """
-    def __init__(self, redoMethod, redoArgs, undoMethod, undoArgs, text=None):
-        super().__init__()
-        if text is not None:
-            self.setText(text)
+    def __init__(self, redoMethod, redoArgs, undoMethod, undoArgs, text=''):
+        self.text = text
         self.redoMethod, self.redoArgs = redoMethod, redoArgs
         self.undoMethod, self.undoArgs = undoMethod, undoArgs
             
@@ -172,9 +170,7 @@ class Level(application.ChangeEventDispatcher):
         self.parent = parent
         if elements is None:
             self.elements = {}
-        else:
-            assert all(element.level is parent for element in elements)
-            self.elements = {element.id: element.copy(level=self) for element in elements}
+        else: self.elements = {element.id: element.copy(level=self) for element in elements}
         self.stack = stack if stack is not None else application.stack
     
     def emit(self, event):
@@ -511,7 +507,7 @@ class Level(application.ChangeEventDispatcher):
             elements = self.elements.values()
         if len(elements) == 0:
             return
-        self.stack.beginMacro(self.tr("commit"), dbTransaction=self.parent is real)
+        self.stack.beginMacro(self.tr("commit"), transaction=self.parent is real)
       
         if self.parent is real:
             # First load all missing files

@@ -261,7 +261,7 @@ class TagEditorChangeEvent(levels.ElementChangedEvent):
         else: return levels.ElementChangedEvent(dataIds=remainingIds)
 
 
-class TagEditorUndoCommand(QtGui.QUndoCommand):
+class TagEditorUndoCommand:
     """Special UndoCommand for the TagEditor. After changing the level it emits a TagEditorChangeEvent
     instead of a usual ElementChangeEvent.
     
@@ -271,13 +271,14 @@ class TagEditorUndoCommand(QtGui.QUndoCommand):
         - a method from ['insertRecord','removeRecord','changeRecord','insertTag','removeTag','changeTag'],
         - a dict with key-word arguments to that method.
     """
-    def __init__(self,model,method,args):
+    def __init__(self, model, method, args):
         self.model = model
         self.level = model.level
         self.statusNumber = model._statusNumber
         self.method = method
         self.args = args
         self.undoMethod, self.undoArgs = self._computeUndoMethod(method,args)
+        self.text = '' # no text necessary as these are always used in macros
         
     def redo(self):
         self._modifyLevel(self.method,self.args) # May raise TagWriteError

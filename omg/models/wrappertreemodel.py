@@ -154,12 +154,12 @@ class WrapperTreeModel(rootedtreemodel.RootedTreeModel):
                         
 
                     
-class InsertCommand(QtGui.QUndoCommand):
+class InsertCommand:
     """UndoCommand that inserts the given list of wrappers at the index *position* into the wrapper *parent*.
     *model* is the WrapperTreeModel containing *parent*.
     """
     def __init__(self,model,parent,position,wrappers):
-        super().__init__(translate("WrapperTreeModel","Insert contents"))
+        self.text = translate("WrapperTreeModel","Insert contents")
         self.model = model
         self.parent = parent
         self.position = position
@@ -172,7 +172,7 @@ class InsertCommand(QtGui.QUndoCommand):
         self.model._remove(self.parent,self.position,self.position+len(self.wrappers)-1)
         
       
-class RemoveCommand(QtGui.QUndoCommand):
+class RemoveCommand:
     """UndoCommand that removes arbitrary nodes from *model*. *rangeList* is a list of 3-tuples, each
     specifying a range of nodes with a common parent that should be removed. To be precise, each tuple
     consist of
@@ -197,7 +197,7 @@ class RemoveCommand(QtGui.QUndoCommand):
     (this is done recursively).
     """
     def __init__(self,model,rangeList,removeEmptyParents=False):
-        super().__init__(translate("WrapperTreeModel","Remove contents"))
+        self.text = translate("WrapperTreeModel","Remove contents")
         self.model = model
         
         # Make dict mapping parent to list of ranges with this parent
@@ -315,10 +315,10 @@ class RemoveCommand(QtGui.QUndoCommand):
         return result
 
              
-class ChangeCommand(QtGui.QUndoCommand):
+class ChangeCommand:
     """UndoCommand to replace the complete contents of a WrapperTreeModel by *newContents*."""
     def __init__(self,model,newContents):
-        super().__init__(translate("WrapperTreeModel","Change tree"))
+        self.text = translate("WrapperTreeModel","Change tree")
         self.model = model
         self.before = model.root.contents
         self.after = newContents

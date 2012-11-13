@@ -28,10 +28,11 @@ class SortValueChangeEvent(application.ChangeEvent):
     def __init__(self,tag,valueId,oldValue,newValue):
         self.tag,self.valueId,self.oldValue,self.newValue = tag,valueId,oldValue,newValue       
 
-class ChangeSortValueCommand(QtGui.QUndoCommand):
+
+class ChangeSortValueCommand:
     """An UndoCommand that changes the sort value of a tag value."""
-    def __init__(self, tag, valueId, oldSort, newSort, text = translate(__name__, "change sort value")):
-        super().__init__(text)
+    def __init__(self, tag, valueId, oldSort, newSort):
+        self.text = translate("ChangeSortValueCommand", "change sort value")
         self.tag = tag
         self.valueId = valueId
         self.oldSort = oldSort
@@ -47,19 +48,21 @@ class ChangeSortValueCommand(QtGui.QUndoCommand):
         dbWrite.setSortValue(self.tag, self.valueId, new)
         application.dispatcher.emit(SortValueChangeEvent(self.tag, self.valueId, old, new))
 
+
 class HiddenAttributeChangeEvent(application.ChangeEvent):
     """This event is emitted when the "hidden" attribute of a tag value changes."""
     def __init__(self, tag, valueId, newState):
         self.tag, self.valueId, self.newState = tag, valueId, newState
 
-class HiddenAttributeCommand(QtGui.QUndoCommand):
+
+class HiddenAttributeCommand:
     """A command to change the "hidden" attribute of a tag value."""
-    def __init__(self, tag, valueId, newState = None, text = translate(__name__, 'change hidden flag')):
+    def __init__(self, tag, valueId, newState = None):
         """Create the command. If newState is None, then the old one will be fetched from the database
         and the new one set to its negative.
         Otherwise, this class assumes that the current state is (not newState), so don't call this
         whith newState = oldState."""
-        super().__init__(text)
+        self.text = translate("HiddenAttributeCommand", "change hidden flag")
         self.tag = tag
         self.valueId = valueId
         self.newState = db.hidden(tag, valueId) if newState is None else newState
@@ -73,3 +76,4 @@ class HiddenAttributeCommand(QtGui.QUndoCommand):
     def setHidden(self, newState):
         dbWrite.setHidden(self.tag, self.valueId, newState)
         application.dispatcher.emit(HiddenAttributeChangeEvent(self.tag, self.valueId, newState))
+        

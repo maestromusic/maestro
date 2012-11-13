@@ -18,14 +18,13 @@
 
 import itertools, urllib
 
-from PyQt4 import QtCore, QtGui
-
 from . import wrappertreemodel, treebuilder
 from .. import application, config, logging, player, utils
 from ..core import levels
 from ..core.nodes import RootNode, Wrapper
 
 logger = logging.getLogger(__name__)
+
  
 class PlaylistModel(wrappertreemodel.WrapperTreeModel):
     """Model for Playlists of a player backend."""
@@ -497,7 +496,7 @@ class PlaylistChangeCommand(wrappertreemodel.ChangeCommand):
         self.model._updateCurrentlyPlayingNodes()
         
 
-class PlaylistMoveInBackendCommand(QtGui.QUndoCommand):
+class PlaylistMoveInBackendCommand:
     """This command moves songs in the backend. It does not change the PlaylistModel but assumes that the 
     model is changed accordingly using PlaylistInsertCommand and PlaylistRemoveCommands. The advantage of
     PlaylistMoveInBackendCommand is that it really uses Player.move instead of removing and inserting. Thus,
@@ -505,7 +504,7 @@ class PlaylistMoveInBackendCommand(QtGui.QUndoCommand):
     *wrappers* are to be moved into *parent* at *position*.
     """
     def __init__(self,model,wrappers,parent,position):
-        super().__init__()
+        self.text = '' # not necessary because the command is always part of a macro 
         self.model = model
         self.moves = []
         insertOffset = parent.offset() + sum(w.fileCount() for w in parent.contents[:position])

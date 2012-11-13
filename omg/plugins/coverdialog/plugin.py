@@ -90,7 +90,7 @@ class Cover:
         return not self.__eq__(other)
 
 
-class CoverUndoCommand(QtGui.QUndoCommand):
+class CoverUndoCommand:
     """UndoCommand that is internally used by the CoverDialog. It sets the cover of *element* in the
     CoverDialogModel *model* to *new* (which may be None)."""
     def __init__(self,model,element,new):

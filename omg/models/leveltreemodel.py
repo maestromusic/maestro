@@ -270,16 +270,15 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
         self.endInsertRows()
 
 
-class ChangeRootCommand(QtGui.QUndoCommand):
+class ChangeRootCommand:
     """Command to change the root node's contents in a LevelTreeModel.
     """
     
-    def __init__(self, model, newContents, text="<change root>"):
-        super().__init__()
+    def __init__(self, model, newContents, text="change root"):
+        self.text = text
         self.model = model
         self.old = [ wrapper.element for wrapper in model.root.contents ]
         self.new = newContents
-        self.setText(text)
     
     def redo(self):
         self.model._changeContents(QtCore.QModelIndex(), self.new )

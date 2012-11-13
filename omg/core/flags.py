@@ -214,17 +214,16 @@ def _changeFlagType(flagType,**data):
         application.dispatcher.emit(FlagTypeChangedEvent(CHANGED,flagType))
 
 
-class FlagTypeUndoCommand(QtGui.QUndoCommand):
+class FlagTypeUndoCommand:
     """This command adds, changes or deletes a flagtype. Which keyword arguments are necessary depends on the
     first argument *action*. Use the methods addFlagType, deleteFlagType and changeFlagType instead of
     creating a command directly.
     """
     def __init__(self,action,flagType=None,**data):
-        texts = {ADD:   translate("FlagTypeUndoCommand","Add flagType"),
-                 DELETE: translate("FlagTypeUndoCommand","Delete flagType"),
-                 CHANGE: translate("FlagTypeUndoCommand","Change flagType")
-                }
-        super().__init__(texts[action])
+        self.text = {ADD:   translate("FlagTypeUndoCommand","Add flagType"),
+                     DELETE: translate("FlagTypeUndoCommand","Delete flagType"),
+                     CHANGE: translate("FlagTypeUndoCommand","Change flagType")
+                    }[action]
         self.action = action
         if self.action == ADD:
             self.addData = data

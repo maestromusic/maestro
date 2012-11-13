@@ -114,11 +114,11 @@ mainwindow.addWidgetData(mainwindow.WidgetData(
     
 class TagEditorDialog(QtGui.QDialog):
     """The tageditor as dialog. It uses its own level and commits the level when the dialog is accepted."""
-    def __init__(self,level,elements,parent=None):
+    def __init__(self, level, elements, parent=None):
         QtGui.QDialog.__init__(self,parent)
         self.setWindowTitle(self.tr("Edit tags"))
         self.resize(600,450) #TODO: make this cleverer
-        self.stack = application.stack.beginSubstack()
+        self.stack = application.stack.createSubstack(modalDialog=True)
         self.level = levels.Level("TagEditor", level, elements=elements, stack=self.stack)
         elements = self.level.elements.values() # copies of the former elements
         
@@ -157,15 +157,15 @@ class TagEditorDialog(QtGui.QDialog):
         buttonLayout.addWidget(commitButton)
     
     def reject(self):
-        self.stack.endSubstack()
+        self.stack.closeSubstack(self.stack)
         super().reject()
         
     def accept(self):
         try:
-            # make sure that this command is added via application.stack
+            self.stack.closeSubstack(self.stack)
+            # make sure that the commit is added via application.stack
             self.level.stack = application.stack
             self.level.commit()
-            self.stack.endSubstack()
             super().accept()
         except filebackends.TagWriteError as e:
             e.displayMessage()
@@ -173,10 +173,10 @@ class TagEditorDialog(QtGui.QDialog):
     
     def _handleReset(self):
         """Handle clicks on the reset button: Reload all elements and clear the stack."""
-        ids = [element.id for element in self.level.elements]
+        ids = list(self.level.elements.keys())
         self.level.elements = {}
         elements = self.level.collectMany(ids)
-        self.stack.clearSubstack()
+        self.stack.resetSubstack(self.stack)
         self.tagedit.setElements(self.level,elements)
         
         
