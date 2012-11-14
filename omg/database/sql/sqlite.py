@@ -16,18 +16,18 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import sqlite3, datetime
-from . import DBException, AbstractSql, AbstractSqlResult, EmptyResultException, transactionLock
+import sqlite3, datetime, threading
+
+from . import DBException, AbstractSql, AbstractSqlResult, EmptyResultException
 from ... import utils, logging
 
-sqlite3.register_adapter(utils.FlexiDate,lambda f: f.toSql())
+sqlite3.register_adapter(utils.FlexiDate, utils.FlexiDate.toSql)
 
 logger = logging.getLogger(__name__)
+transactionLock = threading.RLock()
 
 
 class Sql(AbstractSql):
-    _inTransaction = False
-    
     def connect(self,path, isolation_level=None):
         # There doesn't seem to be a real documentation of the isolation_level parameter. 
         # But I like the conclusion of this discussion:
@@ -72,6 +72,7 @@ class Sql(AbstractSql):
         
     def transaction(self):
         if super().transaction():
+            transactionLock.acquire()
             self.query('BEGIN TRANSACTION')
             return True
         else: return False
@@ -79,12 +80,14 @@ class Sql(AbstractSql):
     def commit(self):
         if super().commit():
             self._db.commit()
+            transactionLock.release()
             return True
         else: return False
         
     def rollback(self):
         super().rollback()
         self._db.rollback()
+        transactionLock.release()
         
     def getDate(self,value):
         return datetime.datetime.strptime(value,"%Y-%m-%d %H:%M:%S").replace(tzinfo=datetime.timezone.utc)
