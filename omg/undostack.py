@@ -127,7 +127,7 @@ class UndoStack(QtCore.QObject):
         self._currentMacro.end()
         # Remember that Macros are not added to their parent macro or to the stack unless they are finished.
         if self._currentMacro.parent is not None:
-            self._currentMacro.parent.commands.append(macro)
+            self._currentMacro.parent.commands.append(self._currentMacro)
             self._currentMacro = self._currentMacro.parent
         else:
             # outermost macro has been closed
