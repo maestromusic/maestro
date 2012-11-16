@@ -21,6 +21,8 @@ import os.path, hashlib, re, time
 from PyQt4 import  QtGui, QtCore
 from PyQt4.QtCore import Qt
 
+translate = QtCore.QCoreApplication.translate
+
 from .. import config
 from . import tags
 from .elements import Element
@@ -175,6 +177,7 @@ class CoverUndoCommand:
     def __init__(self, level, covers):
         self.level = level
         self.covers = {}
+        self.text = translate(__name__, 'change covers')
         for element,coverOrPath in covers.items():
             oldPath = element.getCoverPath()
             
