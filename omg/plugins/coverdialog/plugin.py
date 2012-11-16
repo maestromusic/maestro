@@ -93,7 +93,7 @@ class Cover:
 class CoverUndoCommand:
     """UndoCommand that is internally used by the CoverDialog. It sets the cover of *element* in the
     CoverDialogModel *model* to *new* (which may be None)."""
-    def __init__(self,model,element,new):
+    def __init__(self, model, element, new):
         super().__init__()
         self.model = model
         self.element = element
@@ -110,10 +110,8 @@ class CoverUndoCommand:
 class CoverDialogModel(QtCore.QObject):
     """Model that is used by the CoverDialog.
     
-        - *stack* is the QUndoStack used by the dialog
         - *level* is the level from which the elements are taken
         - *elements* the elements whose cover can be selected
-        
     """
     
     # Emitted when the user has selected a different element.
@@ -129,9 +127,9 @@ class CoverDialogModel(QtCore.QObject):
     # Emitted when the busy-state changes. The argument states whether at least one provider is busy
     busyChanged = QtCore.pyqtSignal(bool)
     
-    def __init__(self,stack,level,elements):
+    def __init__(self, level, elements):
         super().__init__()
-        self.stack = stack
+        self.stack = level.stack.createSubstack(modalDialog=True)
         self.level = level
         self.elements = elements
         self.currentElement = self.elements[0]
@@ -222,7 +220,7 @@ class CoverDialogModel(QtCore.QObject):
     def setCover(self,cover):
         """Set the cover of the current element (undoable)."""
         if cover != self.currentCovers[self.currentElement]:
-            command = CoverUndoCommand(self,self.currentElement,cover)
+            command = CoverUndoCommand(self, self.currentElement,cover)
             self.stack.push(command)
     
     def _setCover(self,element,cover):
@@ -246,7 +244,7 @@ class CoverDialogModel(QtCore.QObject):
             else: cover = Cover(path)
         
             if cover != self.currentCovers[element]:
-                command = CoverUndoCommand(self,element,cover)
+                command = CoverUndoCommand(self, element,cover)
                 self.stack.push(command)
         
         self.stack.endMacro()
@@ -274,7 +272,7 @@ class CoverDialog(QtGui.QDialog):
         super().__init__(parent)
         self.setWindowTitle(self.tr("Edit covers"))
         
-        self.model = CoverDialogModel(QtGui.QUndoStack(), level, elements)
+        self.model = CoverDialogModel(level, elements)
         self.model.currentElementChanged.connect(self._handleCurrentElementChanged)
         self.model.providerStatusChanged.connect(self._handleProviderStatusChanged)
         self.model.availableCoversChanged.connect(self._fillAvailableCovers)

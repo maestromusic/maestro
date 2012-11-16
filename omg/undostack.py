@@ -69,6 +69,10 @@ class UndoStack(QtCore.QObject):
         be redone next."""
         return self._index
     
+    def count(self):
+        """Return the number of commands on the stack."""
+        return len(self._commands)
+    
     def command(self,index):
         """Return the UndoCommand at the given index. stack.command(stack.index()) is the command that will
         be redone next."""
