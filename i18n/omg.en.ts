@@ -216,6 +216,24 @@
     </message>
 </context>
 <context>
+    <name>BrowserTreeView</name>
+    <message>
+        <location filename="../omg/gui/browser.py" line="315"/>
+        <source>browser</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/browser.py" line="317"/>
+        <source>elements</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/browser.py" line="322"/>
+        <source>delete from OMG</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>ChangePositionAction</name>
     <message>
         <location filename="../omg/gui/treeactions.py" line="269"/>
@@ -1046,6 +1064,19 @@ being loaded</source>
     </message>
 </context>
 <context>
+    <name>EditorTreeView</name>
+    <message>
+        <location filename="../omg/gui/editor.py" line="35"/>
+        <source>elements</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/editor.py" line="43"/>
+        <source>editor</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>EditorWidget</name>
     <message>
         <location filename="../omg/gui/editor.py" line="105"/>
@@ -1113,6 +1144,37 @@ being loaded</source>
     <message>
         <location filename="../omg/gui/filesystembrowser.py" line="130"/>
         <source>File System Browser</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>FileSystemBrowserDock</name>
+    <message>
+        <location filename="../omg/gui/filesystembrowser.py" line="105"/>
+        <source>Filesystem: {}</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>FileSystemBrowserModel</name>
+    <message>
+        <location filename="../omg/gui/filesystembrowser.py" line="47"/>
+        <source>contains music which is not in OMG&apos;s database</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/filesystembrowser.py" line="48"/>
+        <source>in sync with OMG&apos;s database</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/filesystembrowser.py" line="49"/>
+        <source>does not contain music</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/filesystembrowser.py" line="50"/>
+        <source>unknown folder status</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -2285,6 +2347,19 @@ guessing. This is useful in most cases, unless you have albums that are split ac
     </message>
 </context>
 <context>
+    <name>PlaylistTreeView</name>
+    <message>
+        <location filename="../omg/gui/playlist.py" line="36"/>
+        <source>tags</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/playlist.py" line="40"/>
+        <source>playlist</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>PlaylistWidget</name>
     <message>
         <location filename="../omg/gui/playlist.py" line="84"/>
@@ -2578,6 +2653,14 @@ guessing. This is useful in most cases, unless you have albums that are split ac
     <message>
         <location filename="../omg/plugins/renamer/gui.py" line="35"/>
         <source>rename files</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>RenameFilesError</name>
+    <message>
+        <location filename="../omg/core/levels.py" line="65"/>
+        <source>Error renaming file</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -3375,6 +3458,30 @@ guessing. This is useful in most cases, unless you have albums that are split ac
     <message>
         <location filename="../omg/install.py" line="533"/>
         <source>There is more than one tag with name &apos;{}&apos;.</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>TagWriteError</name>
+    <message>
+        <location filename="../omg/filebackends/__init__.py" line="175"/>
+        <source>Error saving tags</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/filebackends/__init__.py" line="176"/>
+        <source>Could not write tags of file {}:
+</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/filebackends/__init__.py" line="177"/>
+        <source>File is readonly</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/filebackends/__init__.py" line="178"/>
+        <source>Tags &apos;{}&apos; not supported by format</source>
         <translation type="unfinished"></translation>
     </message>
 </context>

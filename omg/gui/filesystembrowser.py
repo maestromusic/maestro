@@ -44,11 +44,11 @@ class FileSystemBrowserModel(QtGui.QFileSystemModel):
         'problem'  : getIcon("folder_problem.svg") }
     
     descriptions = {
-        'unsynced' : translate(__name__, "contains music which is not in OMG's database"),
-        'ok'       : translate(__name__, "in sync with OMG's database"),
-        'nomusic'  : translate(__name__, "does not contain music"),
-        'unknown'  : translate(__name__, "unknown folder status"),
-        'problem'  : translate(__name__, "conflict with database") }
+        'unsynced' : translate("FileSystemBrowserModel", "contains music which is not in OMG's database"),
+        'ok'       : translate("FileSystemBrowserModel", "in sync with OMG's database"),
+        'nomusic'  : translate("FileSystemBrowserModel", "does not contain music"),
+        'unknown'  : translate("FileSystemBrowserModel", "unknown folder status"),
+        'problem'  : translate(__nam"FileSystemBrowserModel"e__, "conflict with database") }
     
     def __init__(self, parent = None):
         QtGui.QFileSystemModel.__init__(self, parent)
@@ -102,7 +102,7 @@ class FileSystemBrowserDock(QtGui.QDockWidget):
     """A DockWidget wrapper for the FileSystemBrowser."""
     def __init__(self,parent=None,location=None):
         QtGui.QDockWidget.__init__(self, parent)
-        self.setWindowTitle(translate(__name__,"Filesystem: {}").format(config.options.main.collection))
+        self.setWindowTitle(translate("FileSystemBrowserDock", "Filesystem: {}").format(config.options.main.collection))
         self.setWidget(FileSystemBrowser())
         
 

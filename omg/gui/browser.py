@@ -312,15 +312,15 @@ class BrowserTreeView(treeview.TreeView):
     _optimizers = None
     
     actionConfig = treeview.TreeActionConfiguration()
-    sect = translate(__name__, "browser")
+    sect = translate("BrowserTreeView", "browser")
     actionConfig.addActionDefinition(((sect, 'value'),), treeactions.TagValueAction)
-    sect = translate(__name__, "elements")
+    sect = translate("BrowserTreeView", "elements")
     actionConfig.addActionDefinition(((sect, 'editTags'),), treeactions.EditTagsAction, recursive=False)
     actionConfig.addActionDefinition(((sect, 'editTagsR'),), treeactions.EditTagsAction, recursive=True)
     actionConfig.addActionDefinition(((sect, 'remove'),), treeactions.RemoveFromParentAction)
     actionConfig.addActionDefinition(((sect, 'rename'),), treeactions.RenameAction)
     actionConfig.addActionDefinition(((sect, 'delete'),), treeactions.DeleteAction,
-                                     text=translate(__name__, "delete from OMG"))
+                                     text=translate("BrowserTreeView", "delete from OMG"))
     actionConfig.addActionDefinition(((sect, 'merge'),), treeactions.MergeAction)
     actionConfig.addActionDefinition(((sect, 'major?'),), treeactions.ToggleMajorAction)
     actionConfig.addActionDefinition(((sect, 'position+'),), treeactions.ChangePositionAction, mode="+1")

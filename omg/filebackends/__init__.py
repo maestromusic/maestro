@@ -172,10 +172,10 @@ class TagWriteError(RuntimeError):
         
     def displayMessage(self):
         from ..gui import dialogs
-        title = translate(__name__, "Error saving tags")
-        msg1 = translate(__name__, "Could not write tags of file {}:\n").format(self.url)
-        msgReadonly = translate(__name__, "File is readonly")
-        msgProblem = translate(__name__, "Tags '{}' not supported by format").format(self.problems)
+        title = translate("TagWriteError", "Error saving tags")
+        msg1 = translate("TagWriteError", "Could not write tags of file {}:\n").format(self.url)
+        msgReadonly = translate("TagWriteError", "File is readonly")
+        msgProblem = translate("TagWriteError", "Tags '{}' not supported by format").format(self.problems)
         dialogs.warning(title, msg1 + (msgReadonly if self.problems is None else msgProblem))
 
 

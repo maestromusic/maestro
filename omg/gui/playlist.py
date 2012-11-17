@@ -33,11 +33,11 @@ class PlaylistTreeView(treeview.TreeView):
     level = None
     
     actionConfig = treeview.TreeActionConfiguration()
-    sect = translate(__name__, "tags")
+    sect = translate("PlaylistTreeView", "tags")
     actionConfig.addActionDefinition(((sect, 'edittagsS'),), treeactions.EditTagsAction, recursive=False)
     actionConfig.addActionDefinition(((sect, 'edittagsR'),), treeactions.EditTagsAction, recursive=True)
     
-    sect = translate(__name__, "playlist")
+    sect = translate("PlaylistTreeView", "playlist")
     actionConfig.addActionDefinition(((sect, 'removeFromPL'),), treeactions.RemoveFromPlaylistAction)
     actionConfig.addActionDefinition(((sect, 'clearPL'),), treeactions.ClearPlaylistAction)
     

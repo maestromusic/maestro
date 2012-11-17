@@ -21,6 +21,8 @@ import os.path, functools
 from PyQt4 import QtCore, QtGui, QtNetwork
 from PyQt4.QtCore import Qt
 
+translate = QtCore.QCoreApplication.translate
+
 from ...core import covers
 from ...core.elements import Element
 from ...gui import treeactions
@@ -95,6 +97,7 @@ class CoverUndoCommand:
     CoverDialogModel *model* to *new* (which may be None)."""
     def __init__(self, model, element, new):
         super().__init__()
+        self.text = translate("CoverUndoCommand", "change cover")
         self.model = model
         self.element = element
         self.old = model.getCover(element)

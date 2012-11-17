@@ -177,7 +177,7 @@ class CoverUndoCommand:
     def __init__(self, level, covers):
         self.level = level
         self.covers = {}
-        self.text = translate(__name__, 'change covers')
+        self.text = translate("CoverUndoCommand", "change covers")
         for element,coverOrPath in covers.items():
             oldPath = element.getCoverPath()
             

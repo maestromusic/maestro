@@ -32,7 +32,7 @@ class EditorTreeView(treeview.TreeView):
     """This is the main widget of an editor: The tree view showing the current element tree."""
 
     actionConfig = treeview.TreeActionConfiguration()
-    sect = translate(__name__, "elements")
+    sect = translate("EditorTreeView", "elements")
     actionConfig.addActionDefinition(((sect, 'editTags'),), treeactions.EditTagsAction, recursive=False)
     actionConfig.addActionDefinition(((sect, 'editTagsR'),), treeactions.EditTagsAction, recursive=True)
     actionConfig.addActionDefinition(((sect, 'remove'),), treeactions.RemoveFromParentAction)
@@ -40,7 +40,7 @@ class EditorTreeView(treeview.TreeView):
     actionConfig.addActionDefinition(((sect, 'major?'),), treeactions.ToggleMajorAction)
     actionConfig.addActionDefinition(((sect, 'position+'),), treeactions.ChangePositionAction, mode="+1")
     actionConfig.addActionDefinition(((sect, 'position-'),), treeactions.ChangePositionAction, mode="-1")
-    sect = translate(__name__, "editor")
+    sect = translate("EditorTreeView", "editor")
     
     actionConfig.addActionDefinition(((sect, 'clearEditor'),), treeactions.ClearTreeAction)
     actionConfig.addActionDefinition(((sect, 'commit'),), treeactions.CommitTreeAction)

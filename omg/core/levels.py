@@ -62,8 +62,8 @@ class RenameFilesError(RuntimeError):
         
     def displayMessage(self):
         from ..gui import dialogs
-        title = translate(__name__, "Error renaming file")
-        msg = translate(__name__, "Could not rename '{}' to '{}':\n"
+        title = translate("RenameFilesError", "Error renaming file")
+        msg = translate("RenameFilesError", "Could not rename '{}' to '{}':\n"
                                   "{}".format(self.oldUrl, self.newUrl, self.message))
         dialogs.warning(title, msg)
 
