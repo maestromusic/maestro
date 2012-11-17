@@ -1,29 +1,124 @@
-
-SOURCES =
-      ../omg/application.py\
-	  ../omg/gui/browserdialog.py\
-	  ../omg/gui/browser.py\
-	  ../omg/gui/dialogs.py\
-	  ../omg/gui/editor.py\
-	  ../omg/gui/playlist.py\
-	  ../omg/gui/delegates/__init__.py\
-      ../omg/gui/playback.py\
-      ../omg/gui/playerwidgets.py\
-	  ../omg/gui/singletageditor.py\
-	  ../omg/gui/tageditor.py\
-	  ../omg/gui/tagwidgets.py\
-	  ../omg/gui/mainwindow.py\
-      ../omg/gui/treeview.py\
-      ../omg/install.py\
-	  ../omg/models/editor.py\
-	  ../omg/modify/__init__.py\
-      ../omg/plugins/dbanalyzer/__init__.py\
-      ../omg/plugins/searchanalyzer/__init__.py\
-      ../omg/plugins/configeditor/__init__.py\
-      ../omg/plugins/mpd/__init__.py
-         
-
-
+SOURCES = \
+    ../omg/config/__init__.py \
+    ../omg/config/configio.py \
+    ../omg/config/defaultconfig.py \
+    ../omg/filebackends/__init__.py \
+    ../omg/filebackends/filesystem.py \
+    ../omg/constants.py \
+    ../omg/utils.py \
+    ../omg/install.py \
+    ../omg/database/write.py \
+    ../omg/database/__init__.py \
+    ../omg/database/sql/oursql.py \
+    ../omg/database/sql/__init__.py \
+    ../omg/database/sql/pymysql.py \
+    ../omg/database/sql/sqlite.py \
+    ../omg/database/sql/qtsql.py \
+    ../omg/database/sql/myconnpy.py \
+    ../omg/database/tables.py \
+    ../omg/__init__.py \
+    ../omg/logging.py \
+    ../omg/filesystem/__init__.py \
+    ../omg/filesystem/dialogs.py \
+    ../omg/core/__init__.py \
+    ../omg/core/data.py \
+    ../omg/core/elements.py \
+    ../omg/core/covers.py \
+    ../omg/core/reallevel.py \
+    ../omg/core/tagcommands.py \
+    ../omg/core/nodes.py \
+    ../omg/core/tags.py \
+    ../omg/core/flags.py \
+    ../omg/core/levels.py \
+    ../omg/undostack.py \
+    ../omg/strutils.py \
+    ../omg/translations.py \
+    ../omg/resources.py \
+    ../omg/profiles.py \
+    ../omg/models/simplelistmodel.py \
+    ../omg/models/editor.py \
+    ../omg/models/__init__.py \
+    ../omg/models/rootedtreemodel.py \
+    ../omg/models/browser.py \
+    ../omg/models/albumguesser.py \
+    ../omg/models/tageditor.py \
+    ../omg/models/flageditor.py \
+    ../omg/models/playlist.py \
+    ../omg/models/leveltreemodel.py \
+    ../omg/models/wrappertreemodel.py \
+    ../omg/models/treebuilder.py \
+    ../omg/models/mimedata.py \
+    ../omg/search/criteria.py \
+    ../omg/search/__init__.py \
+    ../omg/search/searchparser.py \
+    ../omg/search/searchbox.py \
+    ../omg/gui/mainwindow.py \
+    ../omg/gui/filesystembrowser.py \
+    ../omg/gui/editor.py \
+    ../omg/gui/__init__.py \
+    ../omg/gui/preferences/__init__.py \
+    ../omg/gui/preferences/tagmanager.py \
+    ../omg/gui/preferences/flagmanager.py \
+    ../omg/gui/preferences/delegates.py \
+    ../omg/gui/browser.py \
+    ../omg/gui/tageditor.py \
+    ../omg/gui/treeactions.py \
+    ../omg/gui/treeview.py \
+    ../omg/gui/playback.py \
+    ../omg/gui/singletageditor.py \
+    ../omg/gui/flageditor.py \
+    ../omg/gui/browserdialog.py \
+    ../omg/gui/delegates/editor.py \
+    ../omg/gui/delegates/__init__.py \
+    ../omg/gui/delegates/abstractdelegate.py \
+    ../omg/gui/delegates/browser.py \
+    ../omg/gui/delegates/profiles.py \
+    ../omg/gui/delegates/playlist.py \
+    ../omg/gui/tagmatchdialog.py \
+    ../omg/gui/playerwidgets.py \
+    ../omg/gui/profiles.py \
+    ../omg/gui/dialogs.py \
+    ../omg/gui/tagwidgets.py \
+    ../omg/gui/playlist.py \
+    ../omg/gui/misc/widgetlist.py \
+    ../omg/gui/misc/__init__.py \
+    ../omg/gui/misc/iconchooser.py \
+    ../omg/gui/misc/listview.py \
+    ../omg/gui/misc/dockwidgettitlebutton.py \
+    ../omg/gui/misc/hiddeneditor.py \
+    ../omg/gui/misc/dynamicgridlayout.py \
+    ../omg/gui/misc/lineedits.py \
+    ../omg/gui/misc/iconbuttonbar.py \
+    ../omg/gui/misc/busyindicator.py \
+    ../omg/gui/selection.py \
+    ../omg/gui/coverbrowser.py \
+    ../omg/plugins/logodock/__init__.py \
+    ../omg/plugins/logodock/plugin.py \
+    ../omg/plugins/coverdialog/__init__.py \
+    ../omg/plugins/coverdialog/plugin.py \
+    ../omg/plugins/dialog.py \
+    ../omg/plugins/phonon/__init__.py \
+    ../omg/plugins/phonon/plugin.py \
+    ../omg/plugins/__init__.py \
+    ../omg/plugins/dbanalyzer/__init__.py \
+    ../omg/plugins/dbanalyzer/plugin.py \
+    ../omg/plugins/dbanalyzer/resources.py \
+    ../omg/plugins/dbanalyzer/checks.py \
+    ../omg/plugins/lastfmcovers/__init__.py \
+    ../omg/plugins/lastfmcovers/plugin.py \
+    ../omg/plugins/mpd/__init__.py \
+    ../omg/plugins/mpd/plugin.py \
+    ../omg/plugins/mpd/thread.py \
+    ../omg/plugins/mpd/filebackend.py \
+    ../omg/plugins/searchanalyzer/__init__.py \
+    ../omg/plugins/searchanalyzer/plugin.py \
+    ../omg/plugins/renamer/__init__.py \
+    ../omg/plugins/renamer/plugin.py \
+    ../omg/plugins/renamer/gui.py \
+    ../omg/plugins/configeditor/__init__.py \
+    ../omg/plugins/configeditor/plugin.py \
+    ../omg/application.py \
+    ../omg/player.py \
 
 TRANSLATIONS = omg.de.ts omg.en.ts omg.de_LU.ts
 CODECFORTR = UTF-8

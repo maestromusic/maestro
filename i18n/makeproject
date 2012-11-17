@@ -1,0 +1,12 @@
+#!/bin/bash
+# This script generates a project file for pylupdate4.
+
+echo "SOURCES = \\" > omg.pro
+
+#grep -Rl --include=*.py 'translate(' ../omg | sed 's/^/    /' | sed 's/$/ \\/' >> omg.pro
+find ../omg -name *.py | sed 's/^/    /' | sed 's/$/ \\/' >> omg.pro
+
+
+echo "" >> omg.pro
+echo "TRANSLATIONS = omg.de.ts omg.en.ts omg.de_LU.ts" >> omg.pro
+echo "CODECFORTR = UTF-8" >> omg.pro
