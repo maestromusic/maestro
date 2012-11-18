@@ -48,7 +48,7 @@ class FileSystemBrowserModel(QtGui.QFileSystemModel):
         'ok'       : translate("FileSystemBrowserModel", "in sync with OMG's database"),
         'nomusic'  : translate("FileSystemBrowserModel", "does not contain music"),
         'unknown'  : translate("FileSystemBrowserModel", "unknown folder status"),
-        'problem'  : translate(__nam"FileSystemBrowserModel"e__, "conflict with database") }
+        'problem'  : translate("FileSystemBrowserModel", "conflict with database") }
     
     def __init__(self, parent = None):
         QtGui.QFileSystemModel.__init__(self, parent)
