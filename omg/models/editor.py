@@ -197,7 +197,7 @@ class EditorModel(leveltreemodel.LevelTreeModel):
     
     def commit(self):
         """Commit the contents of this editor."""
-        _processor.removeElements(wrapper.element for wrapper in self.root.getAllNodes(skipSelf=True))
+        _processor.removeElements(levels.editor.elements.values())
         levels.editor.commit()
         for editorModel in EditorModel.instances:
             editorModel._updateExtTagInfos()

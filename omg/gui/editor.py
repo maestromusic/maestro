@@ -285,7 +285,7 @@ class ExternalTagsWidget(QtGui.QScrollArea):
             # Construct a QItemSelection storing the whole selection and add it to the model at once.
             # Otherwise a selectionChanged signal would be emitted after each selected wrapper. 
             itemSelection = QtGui.QItemSelection()
-            for wrapper in self.editor.model().root.getAllNodes(skipSelf=True):
+            for wrapper in self.editor.model().getAllNodes():
                 if wrapper.element in info.elements:
                     index = self.editor.model().getIndex(wrapper)
                     itemSelection.select(index,index)

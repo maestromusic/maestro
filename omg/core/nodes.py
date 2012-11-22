@@ -110,7 +110,7 @@ class Node:
                 return i
         return -1
     
-    def getAllNodes(self, skipSelf = False):
+    def getAllNodes(self, skipSelf=False):
         """Generator which will return all nodes contained in this node or in children of it, including the
         node itself if *skipSelf* is not set True."""
         if not skipSelf:

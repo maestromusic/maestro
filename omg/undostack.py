@@ -57,7 +57,8 @@ class UndoStack(QtCore.QObject):
         super().__init__()
         self._commands = []        # QUndoCommands on the stack
         self._index = 0            # Position before the command that will be executed on redo
-        self._currentMacro = None  # macro while it is built.
+        self._activeMacros = []    # list of nested macros that are being built (first is outermost)
+        self._attachTo = None
         self._inUndoRedo = False   # True during undo and redo
         self._eventQueue = []      # list of tuples (dispatcher,event)
         self._undoAction = UndoRedoAction(self,redo=False)
@@ -69,6 +70,9 @@ class UndoStack(QtCore.QObject):
         be redone next."""
         return self._index
     
+    def isComposing(self):
+        return len(self._activeMacros) > 0 or self._attachTo is not None
+    
     def count(self):
         """Return the number of commands on the stack."""
         return len(self._commands)
@@ -79,89 +83,67 @@ class UndoStack(QtCore.QObject):
         return self._commands[index]
         
     def beginMacro(self, *args, **kwargs):
-        """Begin a macro. The macro will contain all commands that are pushed until endMacro is called.
-        *text* will be used as command description in e.g. menu commands for undo/redo. Macros may be nested,
-        the outermost macro will be redone/undone at once.
-        
-        If *finalMethod* is given it will be called at the end of the macro. Usually this method updates
-        some model/view after the changes in the macro. *finalMethod* may only be used together with the
-        outermost macro.
-        """ 
+        """Begin a macro. The arguments are the same as in the constructor of Macro.""" 
         if self._inUndoRedo:
             raise UndoStackError("Cannot begin a macro during undo/redo.")
-        macro = Macro(*args, **kwargs)
-        if self._currentMacro is None:
-            self._currentMacro = macro
-        else:
-            macro.parent = self._currentMacro
-            self._currentMacro = macro
+        self._activeMacros.append(Macro(*args, **kwargs))
         # Macros are not added to their parent macro or to the stack unless they are finished.
-        # (This make abortMacro easier)
+        # (This makes abortMacro easier)
             
-    def push(self, command, transaction=False):
-        """Add a command to the stack. This calls the command's redo-method."""
+    def push(self, command, *args, **kwargs):
+        """Add a command to the stack and call its redo-method. If other arguments are given, a macro around
+        the command is constructed and those arguments are passed to the constructor of macro.
+        """
         assert not isinstance(command, Macro) # will not work correctly
         if self._inUndoRedo:
             raise UndoStackError("Cannot push a command during undo/redo.")
-        if not transaction or self._currentMacro.transaction:
-            command.redo()
-            if self._currentMacro is None:
-                self._push(command)
-                self._emitSignals()
-            else: self._currentMacro.commands.append(command)
-        else:
-            # use a macro instead
-            self.beginMacro(command.text, transaction=True)
+        if len(self._activeMacros) == 0 or len(args) > 0 or len(kwargs) > 0:
+            self.beginMacro(command.text, *args, **kwargs)
             self.push(command)
             self.endMacro()
-        
-    def _push(self,command):
-        """Helper for push and endMacro."""
-        # Overwrite commands after self._index
-        self._commands[self._index:] = [command]
-        self._index += 1
+        else:
+            command.redo()
+            self._activeMacros[-1].add(command)
         
     def endMacro(self):
         """Ends composition of a macro command."""
-        if self._currentMacro is None:
+        if len(self._activeMacros) == 0:
             raise UndoStackError("Cannot end a macro when no macro is being built.")
         if self._inUndoRedo:
             raise UndoStackError("Cannot end a macro during undo/redo.")
 
-        self._currentMacro.end()
+        # Do not use pop here. The macro must remain active until the end (mainly for _emitQueuedEvents)
+        macro = self._activeMacros[-1]
+        macro.end()
         # Remember that Macros are not added to their parent macro or to the stack unless they are finished.
-        if self._currentMacro.parent is not None:
-            self._currentMacro.parent.commands.append(self._currentMacro)
-            self._currentMacro = self._currentMacro.parent
+        if len(self._activeMacros) > 1:
+            self._activeMacros[-2].add(macro)
+            del self._activeMacros[-1]
         else:
             # outermost macro has been closed
-            self._push(self._currentMacro)
+            self._commands[self._index:] = [macro] # overwrite rest of the stack
+            self._index += 1
             self._emitSignals()
             self._emitQueuedEvents()
-            self._currentMacro = None
+            self._activeMacros = []
             
     def abortMacro(self):
         """Abort the current macro: Undo all commands that have been added to it and delete the macro. This
         is better than endMacro+undo because it doesn't leave an unfinished macro on the stack."""
-        if self._currentMacro is None:
+        if len(self._activeMacros) == 0:
             raise UndoStackError("Cannot abort macro, because no macro is being built.")
         if self._inUndoRedo:
             raise UndoStackError("Cannot end a macro during undo/redo.")
         
-        # Abort all unfinished macros
-        self._currentMacro.abort()
-        while self._currentMacro.parent is not None:
-            # Because unfinished macros have not yet been added to their parent, parent.abort() does not
-            # undo the child macro again.
-            self._currentMacro = self._currentMacro.parent
-            self._currentMacro.abort()
-        self._currentMacro = None
+        for macro in reversed(self._activeMacros):
+            macro.abort()
+        self._activeMacros = []
         self._eventQueue = []
-        # No need to change the stack because the macro has not yet been added to the stack.
-
+        # No need to change the stack because active macros have not been added to the stack.
+        
     def clear(self):
         """Delete all commands on the stack."""
-        if self._inUndoRedo or self._currentMacro is not None:
+        if self._inUndoRedo or self.isComposing():
             raise UndoStackError("Cannot clear the stack during undo/redo or while a macro is built.")
         self._commands = []
         self._index = 0
@@ -187,7 +169,7 @@ class UndoStack(QtCore.QObject):
     
     def undo(self):
         """Undo the last command/macro."""
-        if self._inUndoRedo or self._currentMacro is not None:
+        if self._inUndoRedo or self.isComposing():
             raise UndoStackError("Cannot undo a command during undo/redo or while a macro is built.""")
         if self._index == 0:
             raise UndoStackError("There is no command to undo.")
@@ -201,7 +183,7 @@ class UndoStack(QtCore.QObject):
     
     def redo(self):
         """Redo the next command/macro."""
-        if self._inUndoRedo or self._currentMacro is not None:
+        if self._inUndoRedo or self.isComposing():
             raise UndoStackError("Cannot redo a command during undo/redo or while a macro is built.""")
         if self._index == len(self._commands):
             raise UndoStackError("There is no command to redo.")
@@ -215,7 +197,7 @@ class UndoStack(QtCore.QObject):
         
     def setIndex(self,index):
         """Undo/redo commands until there are *index* commands left that can be undone."""
-        if self._inUndoRedo or self._currentMacro is not None:
+        if self._inUndoRedo or self.isComposing():
             raise UndoStackError("Cannot change index during undo/redo or while a macro is built.""")
         if index != self._index:
             if not 0 <= index <= len(self._commands):
@@ -244,10 +226,11 @@ class UndoStack(QtCore.QObject):
     
     def shouldDelayEvents(self):
         """Return whether events should be delayed."""
-        return self._currentMacro is not None or self._inUndoRedo
+        return self.isComposing() or self._inUndoRedo
     
     def _emitQueuedEvents(self):
         """Emit all events that have been queued."""
+        #print("_emitQueuedEvents: {}".format(len(self._eventQueue)))
         for dispatcher,event in self._eventQueue:
             # Use dispatcher._signal.emit instead of dispatcher.emit to really emit signals
             dispatcher._signal.emit(event)
@@ -262,7 +245,7 @@ class UndoStack(QtCore.QObject):
                 if e.merge(event):
                     return # event was merged
                 break # Only try to merge with the last event of the same dispatcher
-        else: self._eventQueue.append((dispatcher,event))
+        self._eventQueue.append((dispatcher,event))
             
     def createSubstack(self, modalDialog=False):
         """Start a substack and return it. 
@@ -274,7 +257,7 @@ class UndoStack(QtCore.QObject):
         This procedure ensures that undo/redo works during modal dialogs even if global commands are pushed
         between commands editing the dialog's sublevel.
         """
-        if self._inUndoRedo or self._currentMacro is not None:
+        if self._inUndoRedo or self.isComposing():
             raise UndoStackError("Cannot start a substack during undo/redo or while a macro is built.""")
         substack = Substack(self)
         if modalDialog:
@@ -289,7 +272,7 @@ class UndoStack(QtCore.QObject):
     def resetSubstack(self, substack):
         """Remove all commands that were added via the substack from the stack. Do not close the substack.
         """
-        if self._inUndoRedo or self._currentMacro is not None:
+        if self._inUndoRedo or self.isComposing():
             raise UndoStackError("Cannot reset a substack during undo/redo or while a macro is built.""")
     
         self._index = _filterSubstackCommands(substack, self._commands, self._index)
@@ -298,7 +281,7 @@ class UndoStack(QtCore.QObject):
     def closeSubstack(self, substack):
         """Remove all commands that were added via the substack from the stack and close the substack."""
         
-        if self._inUndoRedo or self._currentMacro is not None:
+        if self._inUndoRedo or self.isComposing():
             raise UndoStackError("Cannot close a substack during undo/redo or while a macro is built.""")
     
         substack._closed = True
@@ -335,11 +318,16 @@ class Macro:
     def __init__(self, text, transaction=False, preMethod=None, postMethod=None):
         self.text = text
         self.commands = []
-        self.parent = None
         self.transaction = transaction
         self.preMethod = preMethod
         self.postMethod = postMethod
+        self.attachedCommands = []
+        self.finished = False
         self.begin()
+    
+    def add(self, commandOrMacro):
+        """Add a command or macro to this macro."""
+        (self.commands if not self.finished else self.attachedCommands).append(commandOrMacro)
     
     def begin(self):
         """Perform stuff before the commands of this macro are redone/undone."""
@@ -354,6 +342,7 @@ class Macro:
             self.postMethod()
         if self.transaction:
             db.commit()
+        self.finished = True # after first redo, the macro is finished
     
     def redo(self):
         """(Re)do this macro and all of the commands inside."""
@@ -361,6 +350,9 @@ class Macro:
         for command in self.commands:
             command.redo()
         self.end()
+        for command in self.attachedCommands:
+            print("REDOING ATTACHED COMMAND {}".format(command))
+            command.redo()
     
     def undo(self):
         """Undo this macro and all of the commands inside."""
@@ -368,15 +360,28 @@ class Macro:
         for command in reversed(self.commands):
             command.undo()
         self.end()
+        for command in reversed(self.attachedCommands):
+            print("UNDOING ATTACHED COMMAND {}".format(command))
+            command.undo()
             
     def abort(self):
         """Abort this macro during its construction (i.e. between UndoStack.beginMacro and
         UndoStack.endMacro) and undo all of its changes."""
         for command in reversed(self.commands):
             command.undo()
-        if self.transaction():
+        if self.transaction:
             #This assumes that this macro has not been finished
             db.rollback()
+            
+    def printStructure(self, indent = ''):
+        """Debug method: print the tree below this node using indentation."""
+        print(indent + str(self))
+        indent, aIndent = indent+'  ', indent+'A '
+        for commands, newIndent in (self.commands, indent), (self.attachedCommands, aIndent): 
+            for command in commands:
+                if isinstance(command, Macro):
+                    command.printStructure(newIndent)
+                else: print(newIndent + str(command))
         
 
 class Substack:
@@ -430,7 +435,10 @@ def _filterSubstackCommands(substack, commands, index=0):
             continue
         elif isinstance(command,Macro):
             _filterSubstackCommands(substack, command.commands)
-            if len(command.commands) == 0:
+            _filterSubstackCommands(substack, command.attachedCommands)
+            #TODO: Should macros be removed which have no commands but attached commands?
+            if len(command.commands) == 0 and len(command.attachedCommands) == 0:
+                # if the macro is empty, remove it
                 del commands[i]
                 if index > i:
                     index -= 1

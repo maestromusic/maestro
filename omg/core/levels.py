@@ -110,6 +110,11 @@ class LevelChangedEvent(application.ChangeEvent):
             return self
         else: return type(self)(**remainingIds)
         
+    def __repr__(self):
+        return "<{}: {}>".format(type(self).__name__,
+                                 " - ".join(",".join(str(id) for id in getattr(self,attr))
+                                            for attr in self._idAttributes))
+        
         
 class ElementChangedEvent(LevelChangedEvent):
     """Emitted when one or more elements have changed. Two constructor arguments and attributes:
@@ -721,11 +726,12 @@ class Level(application.ChangeEventDispatcher):
         is used to restore a tree from a string representation using elements of this level.
         
         *wrapperString* must be a string like   "X[A[A1,A2],B[B1,B2]],Z"
-        where the identifiers must be names of existing elements of this level. This method does not check
-        whether the given structure is valid.
+        where the identifiers must be names of existing elements of this level. If the given structure is
+        invalid a ValueError is raised.
         
         If *createFunc* is not None, it will be used to create wrappers (instead of the constructor of
         Wrapper). It must take the parent wrapper and the name as arguments and return a Wrapper instance.
+        It might raise ValueErrors if the wrapper string is invalid.
         
         If *createFunc* is None, all names in *wrapperString* must be ids and wrappers are created using
         these ids.
@@ -749,12 +755,14 @@ class Level(application.ChangeEventDispatcher):
             if last != i:
                 yield s[last:i]
                 
-        #TODO check consistency
         for token in _getTokens(wrapperString):
             if token == ',':
                 continue
             if token == '[':
                 currentWrapper = currentList[-1]
+                if not currentWrapper.isContainer():
+                    raise ValueError("Invalid wrapper string: {} is not a container."
+                                     .format(currentWrapper.element.id))
                 currentList = currentWrapper.contents
             elif token == ']':
                 currentWrapper = currentWrapper.parent
@@ -763,12 +771,15 @@ class Level(application.ChangeEventDispatcher):
                 else: currentList = currentWrapper.contents
             else:
                 if createFunc is None:
-                    element = self.get[int(token)]
+                    element = self.get[int(token)] # might raise ValueError
                     wrapper = Wrapper(element)
                     if currentWrapper is not None:
-                        assert currentWrapper.element.id in wrapper.element.parents
                         wrapper.parent = currentWrapper
-                else: wrapper = createFunc(currentWrapper,token)
+                else:
+                    wrapper = createFunc(currentWrapper,token) # may raise ValueError
+                if currentWrapper is not None and wrapper.element.id not in currentWrapper.element.contents:
+                    raise ValueError("Invalid wrapper string: {} is not contained in {}."
+                                     .format(wrapper.element.id, currentWrapper.element.id))
                 currentList.append(wrapper)
         return roots
     

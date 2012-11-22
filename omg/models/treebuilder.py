@@ -181,8 +181,8 @@ class SequenceDict(dict):
         return any(s.start <= sequence.start and s.end >= sequence.end for s in self[id])
              
         
-def buildTree(level,wrappers,parent=None,preWrapper=None,postWrapper=None):
-    """Build a tree over the given list of wrapper return its root wrappers as list.
+def buildTree(level, wrappers, parent=None, preWrapper=None, postWrapper=None):
+    """Build a tree over the given list of wrappers return its root wrappers as list.
     If possible add containers to the tree to generate a nice tree structure. This method is for example
     used by the playlist to generate a nice tree playlist from a simple list of files.
     
@@ -192,7 +192,6 @@ def buildTree(level,wrappers,parent=None,preWrapper=None,postWrapper=None):
     inserted into this wrapper. If this is not possible because not all *wrappers* are descendants of
     *parent* it will retry with the parent of *parent* and so on.
     
-    will generate a treestructure that can be inserted into parent 
     *preWrapper* and *postWrapper* specify the file-wrapper before and after the new tree if the tree is e.g.
     to be inserted into a playlist. When building the container structure, ancestors of these wrappers in the
     existing tree structure are favored. Existing Wrappers will not be changed, though. It is the task of

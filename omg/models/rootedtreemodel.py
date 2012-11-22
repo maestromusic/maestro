@@ -154,9 +154,10 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
             
         return self.createIndex(pos,0,node)     
 
-    def getAllNodes(self, skipSelf = False):
-        """Generator which will return all nodes contained in the tree in depth-first-manner."""
-        return self.root.getAllNodes(skipSelf)
+    def getAllNodes(self):
+        """Generator which will return all nodes contained in the tree (excluding the rootnode) 
+        in depth-first-manner. If *skipSelf*."""
+        return self.root.getAllNodes(skipSelf=True)
     
     def breadthFirstTraversal(self):
         """Generator which will return all nodes contained in the tree in breadth-first-manner."""
