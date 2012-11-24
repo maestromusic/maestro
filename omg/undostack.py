@@ -272,8 +272,8 @@ class UndoStack(QtCore.QObject):
     def resetSubstack(self, substack):
         """Remove all commands that were added via the substack from the stack. Do not close the substack.
         """
-        if self._inUndoRedo or self.isComposing():
-            raise UndoStackError("Cannot reset a substack during undo/redo or while a macro is built.""")
+        #if self._inUndoRedo:
+        #    raise UndoStackError("Cannot reset a substack during undo/redo.""")
     
         self._index = _filterSubstackCommands(substack, self._commands, self._index)
         self._emitSignals()
@@ -281,8 +281,8 @@ class UndoStack(QtCore.QObject):
     def closeSubstack(self, substack):
         """Remove all commands that were added via the substack from the stack and close the substack."""
         
-        if self._inUndoRedo or self.isComposing():
-            raise UndoStackError("Cannot close a substack during undo/redo or while a macro is built.""")
+        #if self._inUndoRedo:
+        #    raise UndoStackError("Cannot close a substack during undo/redo.""")
     
         substack._closed = True
         self._index = _filterSubstackCommands(substack, self._commands, self._index)
@@ -351,7 +351,6 @@ class Macro:
             command.redo()
         self.end()
         for command in self.attachedCommands:
-            print("REDOING ATTACHED COMMAND {}".format(command))
             command.redo()
     
     def undo(self):
@@ -361,7 +360,6 @@ class Macro:
             command.undo()
         self.end()
         for command in reversed(self.attachedCommands):
-            print("UNDOING ATTACHED COMMAND {}".format(command))
             command.undo()
             
     def abort(self):
@@ -406,6 +404,14 @@ class Substack:
         if self._closed:
             raise UndoStackError("Cannot push commands via a closed substack.")
         self._mainStack.push(SubstackCommand(self, command))
+        
+    def reset(self):
+        """Remove all commands of the substack from the main stack. Do not close the substack."""
+        self._mainStack.resetSubstack(self)
+        
+    def close(self):
+        """Close the substack, removing all of its commands from the main stack."""
+        self._mainStack.closeSubstack(self)
         
     
 class SubstackCommand:

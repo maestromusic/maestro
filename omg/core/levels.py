@@ -323,6 +323,7 @@ class Level(application.ChangeEventDispatcher):
         On real level this method might raise a TagWriteError if writing (some or all) tags to the
         filesystem fails.
         """
+        print("changeTags {}".format(changes))
         self._changeSomething(self._changeTags, changes, self.tr("change tags"))
         
     def changeFlags(self, changes):
