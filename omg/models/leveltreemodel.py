@@ -25,6 +25,7 @@ from ..models import rootedtreemodel
 
 from collections import OrderedDict
 
+translate = QtCore.QCoreApplication.translate
 logger = logging.getLogger(__name__)
 
 
@@ -145,7 +146,7 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
             self.level.removeContentsAuto(parent.element, indexes=rows)
             
         application.stack.endMacro()
-    
+
     def clear(self):
         """Remove everything below the root node."""
         application.stack.beginMacro(self.tr('clear'))
@@ -273,15 +274,14 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
 class ChangeRootCommand:
     """Command to change the root node's contents in a LevelTreeModel.
     """
-    
-    def __init__(self, model, newContents, text="change root"):
-        self.text = text
+    def __init__(self, model, newContents):
+        self.text = translate("ChangeRootCommand", "change root nodes")
         self.model = model
         self.old = [ wrapper.element for wrapper in model.root.contents ]
         self.new = newContents
     
     def redo(self):
-        self.model._changeContents(QtCore.QModelIndex(), self.new )
+        self.model._changeContents(QtCore.QModelIndex(), self.new)
         
     def undo(self):
-        self.model._changeContents(QtCore.QModelIndex(), self.old )
+        self.model._changeContents(QtCore.QModelIndex(), self.old)

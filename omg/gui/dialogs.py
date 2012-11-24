@@ -288,10 +288,18 @@ class MergeDialog(QtGui.QDialog):
                 self.level.removeContents(parent, [wrapper.position for wrapper in self.wrappers])
                 self.level.insertContents(parent, [(insertPosition, container)] )
         else:
-            rows = [self.parentNode.contents.index(wrapper) for wrapper in self.wrappers]
-            insertIndex = rows[0]
-            self.model.removeElements(self.parentNode, rows)
-            self.model.insertElements(self.parentNode, insertIndex, [ container ])
+            from ..models import leveltreemodel
+            if isinstance(self.model, leveltreemodel.LevelTreeModel):
+                rows = [self.parentNode.contents.index(wrapper) for wrapper in self.wrappers]
+                insertIndex = rows[0]
+                for i in range(len(rows)):
+                    if rows[i] >= insertIndex:
+                        rows[i] += 1
+                # Insert first, otherwise EditorTreeModel might remove elements from the level.
+                self.model.insertElements(self.parentNode, insertIndex, [container])
+                self.model.removeElements(self.parentNode, rows)
+            #else: Nothing to do: Merge has been performed in the level and the model does not allow a merge
+                
         if self.level is levels.real:
             db.commit()
         self.level.stack.endMacro()

@@ -90,13 +90,18 @@ class EditorModel(leveltreemodel.LevelTreeModel):
         application.stack.beginMacro(self.tr('remove elements'))
         removedWrappers = [parent.contents[i] for i in rows]
         super().removeElements(parent, rows)
+        self._handleRemovedWrappers(removedWrappers)
+        application.stack.endMacro()
+
+    def _handleRemovedWrappers(self, wrappers):
+        """For the given wrappers and all their descendants check whether they are contained in any
+        EditorModel. Remove those that are not found from the editor level."""
         elementsToRemove = []
-        for wrapper in itertools.chain.from_iterable(w.getAllNodes() for w in removedWrappers):
-            if wrapper.element.id not in self:
+        for wrapper in itertools.chain.from_iterable(w.getAllNodes() for w in wrappers):
+            if all(wrapper.element.id not in editorModel for editorModel in EditorModel.instances):
                 elementsToRemove.append(wrapper.element)
         if len(elementsToRemove) > 0:
             self.level.removeElements(elementsToRemove)
-        application.stack.endMacro()
         
     def _addToExtTagInfo(self,type,tag,newTag,element):
         """Add *element* to the ExternalTagInfo specified by *type*, *tag* and *newTag*. Create such an
