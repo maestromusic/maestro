@@ -115,16 +115,25 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
             return
         dataIds = event.dataIds
         contentIds = event.contentIds
-        for node in self.getAllNodes():
-            if node.element.id in dataIds:
-                self.dataChanged.emit(self.getIndex(node), self.getIndex(node))
-            if node.element.id in contentIds:
-                if any(c.element.id not in node.element.contents for c in node.contents):
-                    wrappers = [w.copy() for w in node.contents] # copy or undo/redo will wreak havoc
-                    insertPos = node.parent.index(node)
-                    # this will also remove the eventually empty parent...
-                    self.remove(node, 0, len(node.contents)-1, updateBackend='never')
-                    self.insert(node.parent, insertPos, wrappers, updateBackend='never')
+        generator = self.getAllNodes()
+        try:
+            descend = None # must be None first
+            while True:
+                node = generator.send(descend)
+                descend = True
+                if node.element.id in dataIds:
+                    self.dataChanged.emit(self.getIndex(node), self.getIndex(node))
+                if node.element.id in contentIds:
+                    if any(c.element.id not in node.element.contents for c in node.contents):
+                        wrappers = [w.copy() for w in node.contents] # copy or undo/redo will wreak havoc
+                        insertPos = node.parent.index(node)
+                        # this will also remove the eventually empty parent...
+                        self.remove(node, 0, len(node.contents)-1, updateBackend='never')
+                        self.insert(node.parent, insertPos, wrappers, updateBackend='never')
+                        # because children were built from scratch, there is no need to descend to them
+                        descend = False
+        except StopIteration:
+            pass
         
     def dropMimeData(self,mimeData,action,row,column,parentIndex):
         # Compute drop position
