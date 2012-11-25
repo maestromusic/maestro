@@ -20,9 +20,8 @@ import time
 import socket, threading
 
 import mpd
-from PyQt4 import QtCore, QtGui
+from PyQt4 import QtCore
 
-from omg.core import tags
 from omg import logging, player
 
 logger = logging.getLogger(__name__)
@@ -230,8 +229,10 @@ class MPDThread(QtCore.QThread):
     def disconnect(self):
         if not self.connected:
             return
+        self.idler.noidle()
         self.idler.disconnect()
         self.connected = False
+        logger.debug('mpd thread disconnected')
         self.changeFromMPD.emit('disconnect', None)
         
     def run(self):
@@ -242,10 +243,12 @@ class MPDThread(QtCore.QThread):
                 if not self.connected:
                     self.connect()
                 self.watchMPDStatus()
-            except (mpd.ConnectionError, socket.error) as e:
-                self.disconnect()
+            except (mpd.ConnectionError, socket.error):
+                if not self.shouldConnect.is_set():
+                    return
                 logger.debug('MPD {} could not connect'.format(self.host))
-                #self.changeFromMPD.emit('disconnect', 'no connection to MPD host')
+                self.connected = False
+                self.changeFromMPD.emit('disconnect', 'no connection to MPD host')
                 self.sleep(5)
         
     def quit(self):

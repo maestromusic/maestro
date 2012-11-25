@@ -19,7 +19,7 @@
 import itertools, urllib
 
 from . import wrappertreemodel, treebuilder
-from .. import application, config, logging, player, utils
+from .. import application, config, logging, utils
 from ..core import levels
 from ..core.nodes import RootNode, Wrapper
 
@@ -30,13 +30,16 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
     """Model for Playlists of a player backend."""
     _dontGlueAway = None # See glue and move
     
-    def __init__(self,backend=None,level=None):
+    def __init__(self, backend=None, level=None, stack=None):
         """Initialize with an empty playlist."""
         super().__init__(level if level is not None else levels.real)
 
         self.backend = backend
         self.current = None
-        
+        if stack is None:
+            self.stack = application.stack
+        else:
+            self.stack = stack
         # self.current and all of its parents. The delegate draws an arrow in front of these nodes
         self.currentlyPlayingNodes = []
         self.level.connect(self._handleLevelChanged)
@@ -101,11 +104,11 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
     def resetFromUrls(self, urls, updateBackend='always'):
         """Reset the playlist to contain the given files. This method is undoable."""
         wrappers = self._buildWrappersFromUrls(urls)
-        application.stack.push(PlaylistChangeCommand(self, wrappers, updateBackend))
+        self.stack.push(PlaylistChangeCommand(self, wrappers, updateBackend))
 
     def clear(self, updateBackend='always'):
         """Clear the playlist."""
-        application.stack.push(PlaylistChangeCommand(self, [], updateBackend))
+        self.stack.push(PlaylistChangeCommand(self, [], updateBackend))
     
     def _handleLevelChanged(self,event):
         if not isinstance(event, levels.LevelChangedEvent):
@@ -139,7 +142,7 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         if self._internalMove:
             return self.move(list(mimeData.wrappers()),parent,position)
 
-        application.stack.beginMacro(self.tr("Drop elements"))
+        self.stack.beginMacro(self.tr("Drop elements"))
         
         # Create wrappers
         if mimeData.hasFormat(config.options.gui.mime):
@@ -154,7 +157,7 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
             wrappers = [Wrapper(element) for element in self.level.collectMany(urls)]
                
         self.insert(parent,position,wrappers)
-        application.stack.endMacro()
+        self.stack.endMacro()
         return True
     
     def _getPrePostWrappers(self,parent,position):
@@ -183,7 +186,7 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         """
         assert not parent.isFile()
         origWrappers = wrappers
-        application.stack.beginMacro(self.tr("Insert elements"))
+        self.stack.beginMacro(self.tr("Insert elements"))
         
         # Build a tree
         preWrapper, postWrapper = self._getPrePostWrappers(parent,position)
@@ -228,13 +231,13 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         
         # Insert
         command = PlaylistInsertCommand(self, parent, position, wrappers, updateBackend)
-        application.stack.push(command)
+        self.stack.push(command)
         
         # Glue at the edges
         self.glue(parent,position+len(wrappers))
         self.glue(parent,position)
         
-        application.stack.endMacro()
+        self.stack.endMacro()
         
     def insertUrlsAtOffset(self, offset, urls, updateBackend='always'):
         """Insert the given paths at the given offset."""
@@ -259,12 +262,12 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         if any(p in wrappers for p in parent.getParents(includeSelf=True)):
             return False
         
-        application.stack.beginMacro(self.tr("Move elements"), postMethod=self._updateCurrentlyPlayingNodes)
+        self.stack.beginMacro(self.tr("Move elements"), postMethod=self._updateCurrentlyPlayingNodes)
         
         # First change the backend
         # We use a special command to really move songs within the backend (contrary to removing and
         # inserting them). This keeps the status of the current song intact even if it is moved.
-        application.stack.push(PlaylistMoveInBackendCommand(self,wrappers,parent,position))
+        self.stack.push(PlaylistMoveInBackendCommand(self,wrappers,parent,position))
         
         # Remove wrappers.
         # This might change the insert position for several reasons:
@@ -287,7 +290,7 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         self._dontGlueAway = None
         self.insert(parent, position, wrappers, updateBackend='never')
                 
-        application.stack.endMacro()
+        self.stack.endMacro()
         return True
     
     def remove(self,parent,first,last, updateBackend='always'):
@@ -307,15 +310,15 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         
     def removeMany(self, ranges, updateBackend='always'):
         """See WrapperTreeModel.removeMany."""
-        application.stack.beginMacro(self.tr('Remove from playlist'))
+        self.stack.beginMacro(self.tr('Remove from playlist'))
         command = PlaylistRemoveCommand(self, ranges, updateBackend)
-        application.stack.push(command)
+        self.stack.push(command)
         
         # Process gaps in reversed order to keep indexes below the same parent intact
         for parent,gap in reversed(command.getGaps()):
             self.glue(parent,gap)
         
-        application.stack.endMacro()
+        self.stack.endMacro()
         
     def merge(self,first,second,firstIntoSecond):
         """If *firstIntoSecond* is True, copy the contents of *first* into *second* (insert them at the
