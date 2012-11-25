@@ -143,27 +143,31 @@ class EditorModel(leveltreemodel.LevelTreeModel):
         
     def _handleLevelChanged(self, event):
         super()._handleLevelChanged(event)
-        if isinstance(event, (levels.ElementAddedEvent, levels.ElementRemovedEvent)):
+        if not isinstance(event, levels.LevelChangedEvent):
+            return
+        
+        if len(event.addedIds) > 0 or len(event.removedIds) > 0:
             # Rebuild infos from scratch
             self._updateExtTagInfos()
-        else:
-            # Only update infos of type 'external'
-            changed = False
-            for id in event.dataIds:
-                if id not in self.level:
-                    continue
-                element = self.level[id]
-                for tag in element.tags:
-                    if not tag.isInDb():
-                        if self._addToExtTagInfo('external',tag,None,element):
-                            changed = True
-                            
-                for info in self.extTagInfos[:]:
-                    if info.type == 'external' and info.tag not in element.tags and element in info.elements:
-                        info.elements.remove(element)
-                        if len(info.elements) == 0:
-                            self.extTagInfos.remove(info)
+            return
+        
+        # Only update infos of type 'external'
+        changed = False
+        for id in event.dataIds:
+            if id not in self.level:
+                continue
+            element = self.level[id]
+            for tag in element.tags:
+                if not tag.isInDb():
+                    if self._addToExtTagInfo('external',tag,None,element):
                         changed = True
+                        
+            for info in self.extTagInfos[:]:
+                if info.type == 'external' and info.tag not in element.tags and element in info.elements:
+                    info.elements.remove(element)
+                    if len(info.elements) == 0:
+                        self.extTagInfos.remove(info)
+                    changed = True
                         
             if changed:
                 self.extTagInfosChanged.emit()

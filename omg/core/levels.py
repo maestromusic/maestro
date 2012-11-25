@@ -74,64 +74,110 @@ class ConsistencyError(RuntimeError):
 
 
 class LevelChangedEvent(application.ChangeEvent):
-    """This is an abstract class that contains generic code for its subclasses ElementChangedEvent,
-    ElementAddedEvent, ElementRemovedEvent.
+    """Event that is emitted when elements on a level change. The event stores the ids of changed elements
+    in several sets, grouped by the type of a the change:
+    
+        - dataIds: tags, flags, parents, data etc. have changed,
+        - contentIds: contents have changed
+        - addedIds, removedIds: have been added to/removed from the level
+        - dbAddedIds, dbRemovedIds: have been added to/removed from the database (such events are sent to
+          all levels, not only the real-level).
+        
+    The constructor accepts these sets as keyword-arguments.
+    Note: ids in 'removedIds' will be removed from all other sets.
     """
     # Attributes which store a list of element ids; used by the generic implementation of merge and filtered.
-    _idAttributes = ('ids', )
+    _idAttributes = ('dataIds', 'contentIds', 'addedIds', 'removedIds', 'dbAddedIds', 'dbRemovedIds')
+       
     def __init__(self, **args):
         super().__init__()
-        assert type(self) is not LevelChangedEvent
         for attr in self._idAttributes:
-            if attr not in args or args[attr] is None:
-                ids = []
-            elif not isinstance(args[attr], list):
-                ids = list(args[attr])
-            else: ids = args[attr]
-            setattr(self, attr, ids)
+            if attr in args and len(args[attr]) > 0:
+                ids = args[attr]
+                if not isinstance(ids, set):
+                    ids = set(ids)
+                setattr(self, attr, ids)
+        if len(self.removedIds) > 0:
+            self._clearIds(self.removedIds)
+            
+    def __getattr__(self, attr):
+        if attr in self._idAttributes:
+            return set()
+        else: raise AttributeError("LevelChangedEvent has no attribute '{}'.".format(attr))
+        
+    def _clearIds(self, ids):
+        """Remove *ids* from all idLists except 'removedIds'.""" 
+        for attr in self._idAttributes:
+            if attr != 'removedIds':
+                getattr(self, attr).difference_update(ids)
+       
+    def __init__(self, **args):
+        super().__init__()
+        for attr in self._idAttributes:
+            if attr in args:
+                ids = args[attr]
+                if not isinstance(ids, set):
+                    ids = set(ids)
+                setattr(self, attr, ids)
+        if len(self.removedIds) > 0:
+            self._clearIds(self.removedIds)
+            
+    def __getattr__(self, attr):
+        if attr in self._idAttributes:
+            return set()
+        else: raise AttributeError("LevelChangedEvent has no attribute '{}'.".format(attr))
         
     def merge(self, other):
         if type(other) is type(self): # do not merge with subclasses because they might carry more data
             for attr in self._idAttributes:
-                getattr(self, attr).extend(getattr(other, attr))
+                if len(getattr(other, attr)) > 0:
+                    idList = getattr(other, attr)
+                    if len(getattr(self, attr)) > 0:
+                        getattr(self, attr).update(idList)
+                    else: setattr(self, attr, idList)
+            if len(other.removedIds) > 0:
+                self._clearIds(other.removedIds)
             return True
         else: return False
         
-    def filtered(self, ids):
-        """Return a version of this event where all changes of the elements with the given ids have been
-        filtered out. Return None, if no changes remain. The resulting event must be usable on a different
-        level, which is not a problem as long as events only use ids.
+    def forwardEvent(self, level):
+        """Check whether this event should be forwarded to *level* (which must be a sublevel of the level
+        where the event was originally emitted). If so, return a version of the event to be forwarded (this
+        can be the event or a modified copy of it). Otherwise return None.
+        Note: The resulting event must be usable on a different level, which is not a problem as long as
+        events only use ids.
         """
-        remainingIds = {attr: [id for id in getattr(self,attr) if id not in ids]
-                        for attr in self._idAttributes}
-        if all(len(remIds) == 0 for remIds in remainingIds.values()):
-            return None
-        elif all(len(remIds) == len(getattr(self,attr)) for attr,remIds in remainingIds.items()):
+        if len(self.addedIds) == 0 and len(self.removedIds) == 0 and \
+            all(id not in self.dataIds and id not in self.contentIds for id in level.elements):
             return self
-        else: return type(self)(**remainingIds)
+        idLists = {}
+        
+        if len(self.dataIds) > 0:
+            idLists['dataIds'] = self.dataIds.difference(level.elements.keys())
+        if len(self.contentIds) > 0:
+            idLists['contentIds'] = self.contentIds.difference(level.elements.keys())
+        # Never forward addedIds/removedIds
+        # Always forward dbAddedIds/dbRemovedIds completely
+        if len(self.dbAddedIds) > 0:
+            idLists['dbAddedIds'] = self.dbAddedIds
+        if len(self.dbRemovedIds) > 0:
+            idLists['dbRemovedIds'] = self.dbRemovedIds
+        
+        if any(len(l) > 0 for l in idLists.values()):
+            return LevelChangedEvent(**idLists)
+        else: return None
         
     def __repr__(self):
-        return "<{}: {}>".format(type(self).__name__,
-                                 " - ".join(",".join(str(id) for id in getattr(self,attr))
-                                            for attr in self._idAttributes))
-        
-        
-class ElementChangedEvent(LevelChangedEvent):
-    """Emitted when one or more elements have changed. Two constructor arguments and attributes:
-    *dataIds* specifies a set of elements whose data (tags, flags, etc.; in particular including parents)
-    has changed. For elements in *contentIds* the contents have changed.
-    """  
-    _idAttributes = ('dataIds', 'contentIds')
-        
-class ElementAddedEvent(LevelChangedEvent):
-    """Emitted when one or more elements have been added to the level. It has only one constructor argument
-    and attribute *ids* which specifies the elements by their id."""
-    
-class ElementRemovedEvent(LevelChangedEvent):
-    """Emitted when one or more elements have been removed from the level. It has only one constructor
-    argument and attribute *ids* which specifies the elements by their id."""
-          
-        
+        abbreviations = {'dataIds': 'D', 'contentIds': 'C', 'addedIds': 'L+', 'removedIds': 'L-',
+                         'dbAddedIds': 'DB+', 'dbRemovedIds': 'DB-'}
+        formattedLists = []
+        for attr in self._idAttributes:
+            if len(getattr(self, attr)) > 0:
+                formattedLists.append("{}:{}".format(abbreviations[attr],
+                                                     ",".join(str(id) for id in getattr(self, attr))))
+        return "<{}: {}>".format(type(self).__name__, "; ".join(formattedLists))
+
+
 class GenericLevelCommand:
     """Generic UndoCommand that is used by all undoable methods of Level. It will call *redoMethod* with
     *redoArgs* on redo an handle undos analogously. *text* is an optional text for the command.
@@ -182,13 +228,13 @@ class Level(application.ChangeEventDispatcher):
         super().emit(event)
         for level in allLevels:
             if level.parent is self:
-                filteredEvent = event.filtered(level.elements.keys())
-                if filteredEvent is not None:
-                    level.emit(filteredEvent)
+                forwardEvent = event.forwardEvent(level)
+                if forwardEvent is not None:
+                    level.emit(forwardEvent)
         
-    def emitEvent(self, dataIds=None, contentIds=None):
-        """Simple shortcut to emit an ElementChangedEvent."""
-        self.emit(ElementChangedEvent(dataIds=dataIds, contentIds=contentIds))
+    def emitEvent(self, **args):
+        """Simple shortcut to emit an LevelChangedEvent."""
+        self.emit(LevelChangedEvent(**args))
     
     def __contains__(self, param):
         """Returns if the given element is loaded in this level.
@@ -323,7 +369,6 @@ class Level(application.ChangeEventDispatcher):
         On real level this method might raise a TagWriteError if writing (some or all) tags to the
         filesystem fails.
         """
-        print("changeTags {}".format(changes))
         self._changeSomething(self._changeTags, changes, self.tr("change tags"))
         
     def changeFlags(self, changes):
@@ -609,13 +654,13 @@ class Level(application.ChangeEventDispatcher):
             assert element.id not in self and element.level is self
             self.elements[element.id] = element
         if len(elements) > 0:
-            self.emit(ElementAddedEvent(ids=[element.id for element in elements]))
+            self.emit(LevelChangedEvent(addedIds=[element.id for element in elements]))
             
     def _removeElements(self, elements):
         for element in elements:
             del self.elements[element.id]
         if len(elements) > 0:
-            self.emit(ElementRemovedEvent(ids=[element.id for element in elements]))
+            self.emit(LevelChangedEvent(removedIds=[element.id for element in elements]))
             
     def _applyDiffs(self, changes):
         """Given the dict *changes* mapping elements to Difference objects (e.g. tags.TagDifference, apply
@@ -623,7 +668,7 @@ class Level(application.ChangeEventDispatcher):
         """
         for element, diff in changes.items():
             diff.apply(element)
-        self.emitEvent([element.id for element in changes])
+        self.emitEvent(dataIds=[element.id for element in changes])
         
     # On real level these methods are implemented differently
     _changeTags = _applyDiffs

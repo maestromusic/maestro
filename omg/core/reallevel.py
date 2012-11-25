@@ -296,7 +296,7 @@ class RealLevel(levels.Level):
             db.write.updateToplevelFlags(data[2] for data in contentData)
                                       
         db.commit()
-        self.emit(levels.ElementAddedEvent(ids=[el.id for el in elements]))
+        self.emit(levels.LevelChangedEvent(dbAddedIds=[el.id for el in elements]))
                 
     def _removeFromDb(self, elements):
         """Like removeFromDb but not undoable."""
@@ -315,7 +315,7 @@ class RealLevel(levels.Level):
         db.query("DELETE FROM {}elements WHERE id IN ({})"
                  .format(db.prefix, db.csList(element.id for element in elements)))
         
-        self.emit(levels.ElementRemovedEvent(ids=[el.id for el in elements]))
+        self.emit(levels.LevelChangedEvent(dbRemovedIds=[el.id for el in elements]))
         
     def deleteElements(self, elements, fromDisk=False):
         elements = list(elements)

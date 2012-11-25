@@ -172,18 +172,17 @@ class FlagEditorModel(QtCore.QObject):
         if len(differences) > 0:
             self.level.changeFlags(differences)
 
-    def _handleLevelChanged(self,event):
+    def _handleLevelChanged(self, event):
         """React to change events of the underlying level."""
-        currentIds = [el.id for el in self.elements]
-        if isinstance(event, levels.ElementRemovedEvent):
-            if any(id in event.ids for id in currentIds):
-                self.setElements(self.level,
-                                 [element for element in self.elements if element.id not in event.ids])
-            
-        if not isinstance(event, levels.ElementChangedEvent):
+        if not isinstance(event, levels.LevelChangedEvent):
             return
         
-        if all(id not in currentIds for id in event.dataIds):
+        if len(event.removedIds) > 0 and any(element.id in event.removedIds for element in self.elements):
+            self.setElements(self.level,
+                             [element for element in self.elements if element.id not in event.removedIds])
+            return # setElements will built records from scratch
+        
+        if len(event.dataIds) == 0 or not any(element.id in event.dataIds for element in self.elements):
             return # not our problem
         
         actualRecords = self._createRecords()

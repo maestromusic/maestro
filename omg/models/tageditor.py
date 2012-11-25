@@ -208,7 +208,7 @@ class RecordModel(QtCore.QObject):
 class TagEditorUndoCommand:
     """Special UndoCommand for the TagEditor. It is used together in a macro with a normal undocommand
     created by Level.changeTags to update the internal structure of the tageditor accordingly. When the
-    macro is finished and an ElementChangedEvent is emitted, the tageditor will detect that it is already
+    macro is finished and an LevelChangedEvent is emitted, the tageditor will detect that it is already
     up-to-date and do nothing. Without TagEditorUndoCommand it would have to compute the appropriate change
     of its internal structure from the changed ids. This is difficult and in some cases even impossible. 
     
@@ -610,22 +610,22 @@ class TagEditorModel(QtCore.QObject):
             result = list(filter(lambda s: s in record.value,result))
         return result
     
-    def _handleLevelChanged(self,event):
+    def _handleLevelChanged(self, event):
         """React to change events of the underlying level."""
-        if isinstance(event, levels.ElementRemovedEvent):
-            if any(element.id in event.ids for element in self.elements):
-                self.setElements(self.level,
-                                 [element for element in self.elements if element.id not in event.ids])
-                
-        if not isinstance(event, levels.ElementChangedEvent):
+        if not isinstance(event, levels.LevelChangedEvent):
             return
         
-        # When tags are changed via the tageditor, its internal structure is updated together with the
-        # change and here is nothing to do. Thus, if a change in the tags is detected below, the tag change
-        # must originate somewhere else.
+        if len(event.removedIds) > 0 and any(element.id in event.removedIds for element in self.elements):
+            self.setElements(self.level,
+                             [element for element in self.elements if element.id not in event.removedIds])
+            return # setElements will built records from scratch
         
-        currentIds = [el.id for el in self.elements]
-        if all(id not in currentIds for id in event.dataIds):
+        # When tags are changed via the tageditor, its internal structure is updated together with the
+        # change and here is nothing to do (i.e. the following code will detect no change).
+        # Thus, if a change in the tags is detected below, the tag change must originate somewhere outside
+        # the tageditor.
+        
+        if len(event.dataIds) == 0 or not any(element.id in event.dataIds for element in self.elements):
             return # not our problem
 
         changed = False
