@@ -74,9 +74,9 @@ class ConsistencyError(RuntimeError):
 
 
 class LevelChangedEvent(application.ChangeEvent):
-    """Event that is emitted when elements on a level change. The event stores the ids of changed elements
-    in several sets, grouped by the type of a the change:
+    """Event that is emitted when elements on a level change.
     
+    The event stores the ids of changed elements in several sets, grouped by the type of the change:
         - dataIds: tags, flags, parents, data etc. have changed,
         - contentIds: contents have changed
         - addedIds, removedIds: have been added to/removed from the level
@@ -110,22 +110,6 @@ class LevelChangedEvent(application.ChangeEvent):
         for attr in self._idAttributes:
             if attr != 'removedIds':
                 getattr(self, attr).difference_update(ids)
-       
-    def __init__(self, **args):
-        super().__init__()
-        for attr in self._idAttributes:
-            if attr in args:
-                ids = args[attr]
-                if not isinstance(ids, set):
-                    ids = set(ids)
-                setattr(self, attr, ids)
-        if len(self.removedIds) > 0:
-            self._clearIds(self.removedIds)
-            
-    def __getattr__(self, attr):
-        if attr in self._idAttributes:
-            return set()
-        else: raise AttributeError("LevelChangedEvent has no attribute '{}'.".format(attr))
         
     def merge(self, other):
         if type(other) is type(self): # do not merge with subclasses because they might carry more data
