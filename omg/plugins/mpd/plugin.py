@@ -171,8 +171,8 @@ class MPDPlayerBackend(player.PlayerBackend):
     
     def _seek(self):
         if self.seekRequest is not None:
-            self.prepareCommander()
-            self.commander.seek(self._current, self.seekRequest)
+            with self.prepareCommander():
+                self.commander.seek(self._current, self.seekRequest)
         self.seekRequest = None
     
     def updateElapsed(self):
@@ -302,22 +302,22 @@ class MPDPlayerBackend(player.PlayerBackend):
         
         Since MPD connection is delegated to a subthread, this method might be slow.
         """
-        self.prepareCommander()
-        info = self.commander.listallinfo(path)[0]
-        storage = tags.Storage()
-        length = None
-        for key, values in info.items():
-            if key in ("file", "last-modified", "track"):
-                #  mpd delivers these but they aren't keys
-                continue
-            if key == "time":
-                length = int(values)
-                continue
-            tag = tags.get(key)
-            if not isinstance(values, list):
-                values = [ values ]
-            storage[tag] = [ tag.convertValue(value, crop=True) for value in values ]
-        return storage, length
+        with self.prepareCommander():
+            info = self.commander.listallinfo(path)[0]
+            storage = tags.Storage()
+            length = None
+            for key, values in info.items():
+                if key in ("file", "last-modified", "track"):
+                    #  mpd delivers these but they aren't keys
+                    continue
+                if key == "time":
+                    length = int(values)
+                    continue
+                tag = tags.get(key)
+                if not isinstance(values, list):
+                    values = [ values ]
+                storage[tag] = [ tag.convertValue(value, crop=True) for value in values ]
+            return storage, length
         
     def __str__(self):
         return "MPDPlayerBackend({})".format(self.name)
