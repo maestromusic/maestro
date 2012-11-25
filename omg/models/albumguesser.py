@@ -154,7 +154,7 @@ class StandardGuesser(profiles.Profile):
         for key, contents in byKey.items():
             metaTags = tags.findCommonTags(contents.values())
             metaTags[tags.TITLE] = [key[1]]
-            self.level.setMajorFlags({album:False for album in contents.values()}, emitEvent=False)
+            self.level.setMajorFlags({album:False for album in contents.values()})
             container = self.level.createContainer(tags=metaTags,
                                                    contents=ContentList.fromPairs(contents.items()),
                                                    major=True)

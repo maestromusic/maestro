@@ -336,7 +336,7 @@ class RealLevel(levels.Level):
                     element.url.getBackendFile().delete()
             self.stack.clear()
 
-    def _changeTags(self, changes, emitEvent=True, dbOnly=False):
+    def _changeTags(self, changes, dbOnly=False):
         if not dbOnly:
             filebackends.changeTags(changes) # might raise TagWriteError
         
@@ -363,9 +363,9 @@ class RealLevel(levels.Level):
             db.commit()
             if len(files) > 0 and not dbOnly:
                 self.filesModified.emit(files)
-        super()._applyDiffs(changes, emitEvent)
+        super()._changeTags(changes)
         
-    def _changeFlags(self, changes, emitEvent=True):
+    def _changeFlags(self, changes):
         if not all(element.isInDb() for element in changes.keys()):
             raise levels.ConsistencyError("Elements on real must be added to the DB before adding tags.")
         db.transaction()
@@ -378,12 +378,12 @@ class RealLevel(levels.Level):
             db.multiQuery("INSERT INTO {}flags (element_id,flag_id) VALUES(?,?)".format(db.prefix),
                           dbAdditions)
         db.commit()
-        super()._applyDiffs(changes, emitEvent)
+        super()._changeFlags(changes)
             
-    def _changeData(self, changes, emitEvent=True):
+    def _changeData(self, changes):
         if not all(element.isInDb() for element in changes.keys()):
             raise levels.ConsistencyError("Elements on real must be added to the DB before adding data.")
-        super()._applyDiffs(changes, emitEvent)
+        super()._changeData(changes)
         db.transaction()
         for element, diff in changes.items():
             for type, (a, b) in diff.diffs.items():
@@ -412,10 +412,10 @@ class RealLevel(levels.Level):
                           .format(db.prefix),values)
         db.commit()
         
-    def _setMajorFlags(self, elemToMajor, emitEvent=True):
+    def _setMajorFlags(self, elemToMajor):
         if not all(element.isContainer() for element in elemToMajor):
             raise ValueError("Only containers may have the major flag.")
-        super()._setMajorFlags(elemToMajor, emitEvent)
+        super()._setMajorFlags(elemToMajor)
         db.write.setMajor((el.id,major) for (el, major) in elemToMajor.items() )
     
     def _setContents(self, parent, contents):
@@ -439,7 +439,7 @@ class RealLevel(levels.Level):
         db.commit()
         super()._setContents(parent, contents)
 
-    def _insertContents(self, parent, insertions, emitEvent=True):
+    def _insertContents(self, parent, insertions):
         if not all(element.isInDb() for pos, element in insertions):
             raise levels.ConsistencyError("Elements must be in the DB before being added to a container.")
         db.transaction()
@@ -449,9 +449,9 @@ class RealLevel(levels.Level):
         db.write.updateElementsCounter((parent.id,))
         db.write.updateToplevelFlags(child.id for _,child in insertions)
         db.commit()
-        super()._insertContents(parent, insertions, emitEvent)
+        super()._insertContents(parent, insertions)
         
-    def _removeContents(self, parent, positions, emitEvent=True):
+    def _removeContents(self, parent, positions):
         db.transaction()
         childIds = [parent.contents.at(pos) for pos in positions]
         db.multiQuery("DELETE FROM {}contents WHERE container_id=? AND position=?"
@@ -459,13 +459,13 @@ class RealLevel(levels.Level):
         db.write.updateElementsCounter((parent.id,))
         db.write.updateToplevelFlags(childIds)
         db.commit()
-        super()._removeContents(parent, positions, emitEvent)
+        super()._removeContents(parent, positions)
     
-    def _changePositions(self, parent, changes, emitEvent=True):
-        super()._changePositions(parent, changes, emitEvent)
+    def _changePositions(self, parent, changes):
+        super()._changePositions(parent, changes)
         db.write.changePositions(parent.id, list(changes.items()))
     
-    def _renameFiles(self, renamings, emitEvent=True):
+    def _renameFiles(self, renamings):
         """On the real level, files are renamed both on disk and in DB."""
         doneFiles = []
         try:
@@ -480,4 +480,4 @@ class RealLevel(levels.Level):
             raise levels.RenameFilesError(oldUrl, newUrl, str(e))
         db.write.changeUrls([ (str(newUrl), element.id) for element, (_, newUrl) in renamings.items() ])
         self.filesRenamed.emit(renamings)
-        super()._renameFiles(renamings, emitEvent)
+        super()._renameFiles(renamings)

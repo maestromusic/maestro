@@ -355,7 +355,7 @@ class Level(application.ChangeEventDispatcher):
         from . import covers
         self.stack.push(covers.CoverUndoCommand(self, coverDict))
     
-    def setMajorFlags(self, elemToMajor, emitEvent=True):
+    def setMajorFlags(self, elemToMajor):
         """Set the major flags of one or more containers.
         
         The action can be undone. *elemToMajor* maps elements to boolean values indicating the
@@ -364,11 +364,9 @@ class Level(application.ChangeEventDispatcher):
         if len(elemToMajor) > 0:
             inverseChanges = {elem: (not major) for (elem, major) in elemToMajor.items()}
             command = GenericLevelCommand(redoMethod=self._setMajorFlags,
-                                          redoArgs={"elemToMajor" : elemToMajor,
-                                                    "emitEvent" : emitEvent},
+                                          redoArgs={"elemToMajor" : elemToMajor},
                                           undoMethod=self._setMajorFlags,
-                                          undoArgs={"elemToMajor" : inverseChanges,
-                                                    "emitEvent" : emitEvent},
+                                          undoArgs={"elemToMajor" : inverseChanges},
                                           text=self.tr("change major property"))
             self.stack.push(command)
     
@@ -484,12 +482,11 @@ class Level(application.ChangeEventDispatcher):
             raise ConsistencyError('Position conflict: cannot perform change')
         command = GenericLevelCommand(redoMethod=self._changePositions,
                                       redoArgs={"parent" : parent,
-                                                "changes" : changes,
-                                                "emitEvent" : True},
+                                                "changes" : changes},
                                       undoMethod=self._changePositions,
                                       undoArgs={"parent" : parent,
-                                                "changes" : {b:a for a,b in changes.items()},
-                                                "emitEvent" : True},
+                                                "changes" : {b:a for a,b in changes.items()}
+                                                },
                                       text=self.tr("change positions"))
         self.stack.push(command)
     
@@ -620,14 +617,13 @@ class Level(application.ChangeEventDispatcher):
         if len(elements) > 0:
             self.emit(ElementRemovedEvent(ids=[element.id for element in elements]))
             
-    def _applyDiffs(self, changes, emitEvent=True):
+    def _applyDiffs(self, changes):
         """Given the dict *changes* mapping elements to Difference objects (e.g. tags.TagDifference, apply
-        these differences to the elements. Do not emit an ElementChangedEvent if *emitEvent* is False.
+        these differences to the elements.
         """
         for element, diff in changes.items():
             diff.apply(element)
-        if emitEvent:
-            self.emitEvent([element.id for element in changes])
+        self.emitEvent([element.id for element in changes])
         
     # On real level these methods are implemented differently
     _changeTags = _applyDiffs
@@ -645,14 +641,13 @@ class Level(application.ChangeEventDispatcher):
                 else: element.data[type] = tuple(data)
             elif type in element.data:
                 del element.data[type]
-        self.emitEvent([element.id for element in elementToData])
+        self.emitEvent(dataIds=[element.id for element in elementToData])
     
-    def _setMajorFlags(self, elemToMajor, emitEvent=True):
+    def _setMajorFlags(self, elemToMajor):
         """Set major of several elements."""
         for elem, major in elemToMajor.items():
             elem.major = major
-        if emitEvent:
-            self.emitEvent([elem.id for elem in elemToMajor])
+        self.emitEvent(dataIds=[elem.id for elem in elemToMajor])
     
     def _changeContents(self, contentDict):
         """Set contents according to *contentDict* which maps parents to content lists."""
@@ -675,7 +670,7 @@ class Level(application.ChangeEventDispatcher):
         parent.contents = contents
         self.emitEvent(dataIds=dataIds, contentIds=(parent.id,))
 
-    def _insertContents(self, parent, insertions, emitEvent=True):
+    def _insertContents(self, parent, insertions):
         """Insert some elements under *parent*. The insertions must be given as an iterable of
         (position, element) tuples.
         """
@@ -685,10 +680,9 @@ class Level(application.ChangeEventDispatcher):
             if parent.id not in element.parents:
                 element.parents.append(parent.id)
                 dataIds.append(element.id)
-        if emitEvent:
-            self.emitEvent(dataIds=dataIds, contentIds=(parent.id, ))
+        self.emitEvent(dataIds=dataIds, contentIds=(parent.id, ))
 
-    def _removeContents(self, parent, positions, emitEvent=True):
+    def _removeContents(self, parent, positions):
         """Remove the children at given *positions* under parent.
         """
         positions = list(positions) # copy because the list will change
@@ -700,24 +694,21 @@ class Level(application.ChangeEventDispatcher):
             if id not in parent.contents:
                 self[id].parents.remove(parent.id)
                 dataIds.append(id)
-        if emitEvent:
-            self.emitEvent(dataIds=dataIds, contentIds=(parent.id, ))
+        self.emitEvent(dataIds=dataIds, contentIds=(parent.id, ))
 
-    def _renameFiles(self, renamings, emitEvent=True):
+    def _renameFiles(self, renamings):
         """Rename files based on *renamings*, a dict from elements to (oldUrl, newUrl) pairs.
         """
         for element, (_, newUrl) in renamings.items():
             element.url = newUrl
-        if emitEvent:
-            self.emitEvent([elem.id for elem in renamings])
+        self.emitEvent(dataIds=[elem.id for elem in renamings])
 
-    def _changePositions(self, parent, changes, emitEvent=True):
+    def _changePositions(self, parent, changes):
         """Change positions of elements."""
         for i, position in enumerate(parent.contents.positions):
             if position in changes:
                 parent.contents.positions[i] = changes[position]
-        if emitEvent:
-            self.emitEvent(contentIds=(parent.id, ))
+        self.emitEvent(contentIds=(parent.id, ))
     
     # ====================================================================================
     # Special stuff
