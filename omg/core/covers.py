@@ -267,7 +267,7 @@ def _makeFilePath(element,forceAscii=False):
         if len(fileName.encode()) + len(currentExt.encode()) > MAX_FILENAME_LENGTH:
             length = MAX_FILENAME_LENGTH - len(currentExt.encode())
             # ignore errors that may arise from cropping the string inside a multibyte character
-            fileName = fileName.encoded()[:length].decode('utf-8','ignore')
+            fileName = fileName.encode()[:length].decode('utf-8','ignore')
             continue
         
         path = os.path.join(COVER_DIR,'large',fileName+currentExt)
