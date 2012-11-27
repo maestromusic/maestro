@@ -25,9 +25,10 @@ from . import rootedtreemodel, mimedata
 from .. import config, search, database as db, logging, utils
 from ..core import tags, levels
 from ..core.elements import Element
-from ..core.nodes import Node, RootNode, Wrapper
+from ..core.nodes import Node, RootNode, Wrapper, TextNode
 from ..gui import selection
 
+translate = QtCore.QCoreApplication.translate
 logger = logging.getLogger(__name__)
 
 searchEngine = None # The search engine used by all browsers
@@ -55,6 +56,7 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
     _searchRequests = None
     
     nodeLoaded = QtCore.pyqtSignal(Node)
+    hasContentsChanged = QtCore.pyqtSignal(bool)
     
     def __init__(self,layers,sortTags):
         super().__init__(BrowserRootNode(self))
@@ -68,6 +70,11 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
             initSearchEngine()
         
         searchEngine.searchFinished.connect(self._handleSearchFinished)
+    
+    def hasContents(self):
+        """Return whether the current model currently contains elements."""
+        # A textnode is only used in empty models to display e.g. "no search results"
+        return len(self.root.contents) >= 1 and not (isinstance(self.root.contents[0], TextNode))
     
     def reset(self,table=None):
         """Reset the model reloading all data from self.table. If *table* is given, first set self.table to
@@ -114,10 +121,23 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
         assert node == self.root or isinstance(node,CriterionNode)
         
         if node == self.root:
+            oldHasContents = self.hasContents()
             # No need to search...load directly
             if len(self.layers) > 0:
                 self._loadTagLayer(node,self.table)
             else: self._loadContainerLayer(node,self.table)
+            if len(self.root.contents) == 0:
+                if self.table == 'elements':
+                    text = self.tr("Your database is empty."
+                                   " Drag files from the filesystembrowser into the editor,"
+                                   " modify them and click 'Commit'.")
+                else:
+                    text = self.tr("No elements found.")
+                self.beginInsertRows(QtCore.QModelIndex(), 0, 0)
+                self.root.setContents([TextNode(text, wordWrap=True)])
+                self.endInsertRows()
+            if self.hasContents() != oldHasContents:
+                self.hasContentsChanged.emit(self.hasContents())
         else:
             method = searchEngine.search if not wait else searchEngine.searchAndWait
             # Collect the criteria in this node and its parents and put the search results into smallResult
@@ -333,7 +353,7 @@ class CriterionNode(Node):
         """
         if self.contents is None:
             if not wait:
-                self.contents = [LoadingNode(self)]
+                self.setContents([LoadingNode()])
                 self.model._startLoading(self)
                 # The contents will be added in BrowserModel.searchFinished
             else:
@@ -423,27 +443,14 @@ class BrowserRootNode(RootNode):
         super().__init__(model)
         self.layerIndex = -1
         
-
-class LoadingNode(Node):
+        
+class LoadingNode(TextNode):
     """This is a placeholder for those moments when we must wait for a search to terminate before we can
     display the real contents. The delegate will draw the string "Loading...".
     """
-    def __init__(self,parent):
-        self.parent = parent
-    
-    def hasContents(self):
-        return False
-    
-    @property
-    def contents(self):
-        return list()
-    
-    def __str__(self):
-        return "<LoadingNode>"
+    def __init__(self):
+        super().__init__(translate("BrowserModel", "Loading..."))
         
-    def toolTipText(self):
-        None
-    
 
 class BrowserMimeData(mimedata.MimeData):
     """This is the subclass of mimedata.MimeData that is used by the browser. The main differences are that

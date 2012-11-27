@@ -24,7 +24,7 @@ from PyQt4.QtCore import Qt
 from .abstractdelegate import *
 from ... import config, strutils, database as db, utils
 from ...core import tags
-from ...core.nodes import RootNode, Wrapper
+from ...core.nodes import RootNode, Wrapper, TextNode
 from ...models import browser as browsermodel
 from . import profiles
 
@@ -34,7 +34,15 @@ class StandardDelegate(AbstractDelegate):
     OMG. In fact, subclasses like BrowserDelegate and EditorDelegate mainly provide different default values
     for these options."""
     def layout(self,index,availableWidth):
-        wrapper = self.model.data(index)
+        node = self.model.data(index)
+        if isinstance(node, TextNode):
+            if node.wordWrap:
+                self.addCenter(MultiTextItem([node.text],[]))
+            else: self.addCenter(TextItem(node.text))
+        if not isinstance(node, Wrapper):
+            return
+        
+        wrapper = node
         element = wrapper.element
         level = element.level
        

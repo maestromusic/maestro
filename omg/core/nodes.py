@@ -423,3 +423,25 @@ class Wrapper(Node):
         return "<W: {}>".format(self.getTitle()) 
 
     # Note that no __eq__ method is defined for wrappers. Different wrapper instances really are different.
+
+
+class TextNode(Node):
+    """A node that simply displays a piece of text."""
+    def __init__(self, text, wordWrap=False, parent=None):
+        self.text = text
+        self.wordWrap = wordWrap
+        self.parent = parent
+        
+    def hasContents(self):
+        return False
+    
+    @property
+    def contents(self):
+        return list()
+    
+    def __str__(self):
+        return "<TextNode: {}>".format(self.text)
+        
+    def toolTipText(self):
+        return self.text
+    

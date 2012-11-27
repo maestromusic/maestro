@@ -329,6 +329,8 @@ class BrowserTreeView(treeview.TreeView):
     def __init__(self,parent,layers,sortTags,delegateProfile):
         super().__init__(levels.real,parent)
         self.setModel(browsermodel.BrowserModel(layers,sortTags))
+        self.setRootIsDecorated(self.model().hasContents())
+        self.model().hasContentsChanged.connect(self.setRootIsDecorated)
         self.header().sectionResized.connect(self.model().layoutChanged)
         self.setItemDelegate(browserdelegate.BrowserDelegate(self,delegateProfile))
         self._optimizers = []
