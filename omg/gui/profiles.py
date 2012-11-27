@@ -87,12 +87,18 @@ class NoProfileYetWidget(QtGui.QWidget):
         layout = QtGui.QVBoxLayout(self)
         layout.setContentsMargins(0,0,0,0)
          
-        if isinstance(self.category,profiles.TypedProfileCategory):
-            label = QtGui.QLabel(
-                        self.tr("There is no profile yet. To create one, choose a name and a type:"))
-        else: label = QtGui.QLabel(self.tr("There is no profile yet. To create one, choose a name:"))
+        label = QtGui.QLabel()
         label.setWordWrap(True)
         layout.addWidget(label)
+        
+        if isinstance(self.category,profiles.TypedProfileCategory):
+            if len(self.category.types) == 0:
+                label.setText(self.tr("There is no profile type. Probably you need to install a plugin"
+                                      " that adds support for '{}'.").format(self.category.name))
+                return
+            label.setText(self.tr("There is no profile yet. To create one, choose a name and a type:"))
+        else: label.setText(self.tr("There is no profile yet. To create one, choose a name:"))
+
         hLayout = QtGui.QHBoxLayout() # hLayout prevents the form widgets to stretch over the whole width
         layout.addLayout(hLayout)
         formLayout = QtGui.QFormLayout()
