@@ -374,7 +374,7 @@ class MainWindow(QtGui.QMainWindow):
             success = self.restoreGeometry(config.binary["mainwindow_geometry"])
         else: success = False
         if not success: # Default geometry
-            self.resize(800,600)
+            self.resize(1000,800)
             # Center the window
             screen = QtGui.QDesktopWidget().screenGeometry()
             size = self.geometry()
@@ -383,9 +383,14 @@ class MainWindow(QtGui.QMainWindow):
         # Restore maximized state
         if "mainwindow_maximized" in config.binary and config.binary["mainwindow_maximized"]:
             self.showMaximized()
-            
-        # Restore central widgets
+                
         self._centralWidgets = {}
+        self._dockWidgets = {}
+        if len(config.storage.gui.central_widgets) == 0 and len(config.storage.gui.dock_widgets) == 0:
+            self.createDefaultWidgets()
+            return
+        
+        # Restore central widgets
         for id,options in config.storage.gui.central_widgets:
             data = WidgetData.fromId(id)
             # It may happen that data is None (for example if it belongs to a widget from a plugin and this
@@ -396,7 +401,6 @@ class MainWindow(QtGui.QMainWindow):
         if config.storage.gui.central_tab_index < self.centralWidget().count():
             self.centralWidget().setCurrentIndex(config.storage.gui.central_tab_index)
         # Restore dock widgets (create them with correct object names and use QMainWindow.restoreState)
-        self._dockWidgets = {}
         for id,objectName,location,options in config.storage.gui.dock_widgets:
             data = WidgetData.fromId(id)
             if data is not None: # As above it may happen that data is None.
@@ -452,16 +456,30 @@ class MainWindow(QtGui.QMainWindow):
         config.binary["mainwindow_maximized"] = self.isMaximized()
         config.binary["mainwindow_geometry"] = bytearray(self.saveGeometry())
         config.binary["mainwindow_state"] = bytearray(self.saveState())
+        
+    def createDefaultWidgets(self):
+        """Create the default set of central and dock widgets. Use this method if no widgets can be loaded
+        from the storage file."""
+        for id in 'playlist', 'editor':
+            data = WidgetData.fromId(id)
+            self.addCentralWidget(data)
+        self.centralWidget().setCurrentIndex(1)
+        for id in 'browser', 'filesystembrowser', 'tageditor':
+            data = WidgetData.fromId(id)
+            self.addDockWidget(data) 
 
     def showPreferences(self):
+        """Open preferences dialog."""
         from . import preferences
         preferences.show("main")
         
     def showTagManager(self):
+        """Open tag manager within preferences."""
         from . import preferences
         preferences.show("main/tagmanager")
         
     def showFlagManager(self):
+        """Open flag manager within preferences."""
         from . import preferences
         preferences.show("main/flagmanager")
 
