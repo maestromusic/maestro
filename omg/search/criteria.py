@@ -159,7 +159,7 @@ class TextCriterion(Criterion):
                             valueType.name,tagIdList,whereClause))
 
         if self.ids is not None:
-            subQueries.append("(SELECT DISTINCT {0} FROM {1} AS el WHERE id IN ({2}))"
+            subQueries.append("SELECT DISTINCT {0} FROM {1} AS el WHERE id IN ({2})"
                                 .format(_formatColumns(columns,"el"),fromTable,db.csList(self.ids)))
         return [" UNION ".join(subQueries)] + parameters
             
