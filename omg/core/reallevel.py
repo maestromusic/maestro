@@ -262,10 +262,11 @@ class RealLevel(levels.Level):
         
         data = [(element.id,
                  element.isFile(),
-                 element.major if element.isContainer() else False)
+                 element.major if element.isContainer() else False,
+                 len(element.parents) == 0)
                         for element in elements]
-        db.multiQuery("INSERT INTO {}elements (id, file, major)\
-                       VALUES (?,?,?)".format(db.prefix), data)
+        db.multiQuery("INSERT INTO {}elements (id, file, major, toplevel)\
+                       VALUES (?,?,?,?)".format(db.prefix), data)
 
         # Do this early, otherwise e.g. setFlags might raise a ConsistencyError)
         _dbIds.update(element.id for element in elements)
@@ -277,9 +278,11 @@ class RealLevel(levels.Level):
                 
         newFiles = [element for element in elements if element.isFile()]
         if len(newFiles) > 0:
-            db.multiQuery("INSERT INTO {}files (element_id, url, hash, length) VALUES (?,?,0,?)"
+            from .. import filesystem
+            db.multiQuery("INSERT INTO {}files (element_id, url, hash, length) VALUES (?,?,?,?)"
                           .format(db.prefix),
-                          ((element.id, str(element.url), element.length) for element in newFiles))
+                          ((element.id, str(element.url), filesystem.getNewfileHash(element.url),
+                            element.length) for element in newFiles))
             self.filesAdded.emit(newFiles)
         
         contentData = []
