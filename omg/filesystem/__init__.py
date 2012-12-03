@@ -35,7 +35,7 @@ HAS_NEW_FILES = 2
 PROBLEM = 4
 
 def init():
-    global synchronizer, notifier, null, enabled
+    global synchronizer, notifier, enabled
     import _strptime
     if config.options.filesystem.disable:
         return
@@ -45,7 +45,6 @@ def init():
     levels.real.filesAdded.connect(synchronizer.handleAdd, Qt.QueuedConnection)
     levels.real.filesRemoved.connect(synchronizer.handleRemove, Qt.QueuedConnection)
     levels.real.filesModified.connect(synchronizer.handleModify, Qt.QueuedConnection)
-    null = open(os.devnull)
     enabled = True
     
 def shutdown():
@@ -61,7 +60,6 @@ def shutdown():
     synchronizer.eventThread.exit()
     synchronizer.eventThread.wait()
     synchronizer = None
-    null.close()
     logger.debug("Filesystem module: shutdown complete")
 
 def getFolderState(path):
@@ -109,7 +107,7 @@ def computeHash(url):
              '-f', 's16le',
              '-t', '15',
              '-'],
-            stdout=subprocess.PIPE, stderr=null # this is due to a bug that ffmpeg ignores -v quiet
+            stdout=subprocess.PIPE
         )
     else:
         raise ValueError('Dump method"{}" not supported'.format(config.options.filesystem.dump_method))
@@ -310,6 +308,7 @@ class FileSystemSynchronizer(QtCore.QObject):
         self.eventThread.started.connect(self.init)
         self.eventThread.timer.timeout.connect(self.scanFilesystem)
         self.tracks = {}
+        self.missingHashes = set()
         self.dbTracks = set()
         self.dbDirectories = set()
         self.directories = {}
@@ -337,7 +336,9 @@ class FileSystemSynchronizer(QtCore.QObject):
                 continue
             track = Track(url)
             track.id = elid
-            if not db.isNull(elhash):
+            if db.isNull(elhash) or elhash == "0":
+                self.missingHashes.add(track)
+            else:
                 track.hash = elhash
             track.verified = db.getDate(verified)
             self.tracks[track.url] = track
@@ -375,6 +376,16 @@ class FileSystemSynchronizer(QtCore.QObject):
         self.loadNewFiles()
         self.initialized.set()
         self.initializationComplete.emit()
+        if len(self.missingHashes) > 0:
+            lenMissing = len(self.missingHashes)
+            for i, track in enumerate(self.missingHashes):
+                track.hash = computeHash(track.url)
+                logger.info("Storing hash of {}/{} unhashed files".format(i, lenMissing))
+                db.query("UPDATE {}files SET hash=? WHERE element_id=?".format(db.prefix),
+                         track.hash, track.id)
+                if self.should_stop.is_set():
+                    break
+        del self.missingHashes
         self.scanFilesystem()
     
     def getDirectory(self, path):
@@ -415,11 +426,16 @@ class FileSystemSynchronizer(QtCore.QObject):
                 else:
                     filehash = computeHash(track.url)
                     if filehash != track.hash:
-                        logger.debug("audio data modified!")
+                        logger.debug("audio data modified! {} != {} ".format(filehash, track.hash))
                         track.hash = filehash
                         track.verified = modified
+                        db.query("UPDATE {}files "
+                                 "  SET hash=?, verified=CURRENT_TIMESTAMP "
+                                 "  WHERE element_id=?".format(db.prefix), filehash, track.id)
                     else:
-                        logger.error("TODO: update hash & db")
+                        db.query("UPDATE {}files "
+                                 "  SET verified=CURRENT_TIMESTAMP "
+                                 "  WHERE element_id=?".format(db.prefix), track.id)
     
     def addTrack(self, dir, url):
         filehash = computeHash(url)
