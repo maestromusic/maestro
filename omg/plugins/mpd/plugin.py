@@ -23,7 +23,7 @@ import mpd
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from omg import player, logging, profiles
+from omg import application, player, logging, profiles
 from omg.core import tags
 from omg.models import playlist
 from . import filebackend as mpdfilebackend
@@ -52,7 +52,8 @@ class MPDPlayerBackend(player.PlayerBackend):
     
     def __init__(self, name, type, state):
         super().__init__(name, type, state)
-        self.playlist = playlist.PlaylistModel(self)
+        self.stack = application.stack.createSubstack()
+        self.playlist = playlist.PlaylistModel(self, stack=self.stack)
         self.urls = []
 
         if state is None:
@@ -67,7 +68,6 @@ class MPDPlayerBackend(player.PlayerBackend):
         self._numFrontends = 0
         
         self.commander = mpd.MPDClient()
-        self.commanderConnected = False
         
         self.separator = QtGui.QAction("MPD", self)
         self.separator.setSeparator(True)
@@ -93,7 +93,7 @@ class MPDPlayerBackend(player.PlayerBackend):
         self.mpdthread.host = host
         self.mpdthread.port = port
         self.mpdthread.password = password
-        if self.commanderConnected:
+        if self.commander._sock is not None:
             self.commander.disconnect()
             with self.prepareCommander():
                 pass
@@ -111,15 +111,12 @@ class MPDPlayerBackend(player.PlayerBackend):
     
     @contextlib.contextmanager
     def prepareCommander(self):
-        if not self.commanderConnected:
+        if self.commander._sock is None:
             self.commander.connect(self.mpdthread.host, self.mpdthread.port)
-            self.commanderConnected = True
         try:
             yield
-        except (mpd.ConnectionError, socket.error) as e:
-            self.commander.disconnect()
+        except (mpd.ConnectionError, socket.error):
             self.commander.connect(self.mpdthread.host, self.mpdthread.port)
-            self.commanderConnected = True
         
 
     def state(self):
@@ -203,6 +200,9 @@ class MPDPlayerBackend(player.PlayerBackend):
             self.connectionState = player.DISCONNECTED
             self._state = player.STOP
             self.stateChanged.emit(player.STOP)
+            if self.commander._sock is not None:
+                self.commander.disconnect()
+            application.stack.resetSubstack(self.stack)
             self.connectionStateChanged.emit(player.DISCONNECTED)
         elif what == 'elapsed':
             self._currentStart = how
@@ -257,9 +257,9 @@ class MPDPlayerBackend(player.PlayerBackend):
         if self._numFrontends == 0:
             self.mpdthread.shouldConnect.clear()
             self.mpdthread.disconnect()
-            if self.commanderConnected:
+            if self.commander._sock is not None:
                 self.commander.disconnect()
-                self.commanderConnected = False
+            application.stack.resetSubstack(self.stack)
     
     def insertIntoPlaylist(self, pos, urls):
         with self.prepareCommander():

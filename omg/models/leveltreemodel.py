@@ -105,7 +105,7 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
                         #  when elements above insert position are removed, insert row is decreased
                         row -= len([pos for pos in positions if pos < insertPosition])
                 for rparent, rows in modelRemovals.items():
-                    rparent.model.removeElements(rparent, rows)
+                    rparent.model.removeElements(rparent, rows, move=True)
         else:  # text/uri-list
             elements = self.prepareURLs(mimeData.urls(), parent)
         ret = len(elements) != 0
@@ -130,7 +130,7 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
         else:
             self.level.insertContentsAuto(parent.element, row, elements)
     
-    def removeElements(self, parent, rows):
+    def removeElements(self, parent, rows, move=False):
         """Undoably remove elements in *rows* under *parent* (a wrapper).
         
         This convenience function either alters the RootNode, if parent is self.root, or updates

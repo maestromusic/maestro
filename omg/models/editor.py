@@ -86,11 +86,12 @@ class EditorModel(leveltreemodel.LevelTreeModel):
             _processor.perform(element)
             return element
         
-    def removeElements(self, parent, rows):
+    def removeElements(self, parent, rows, move=False):
         application.stack.beginMacro(self.tr('remove elements'))
         removedWrappers = [parent.contents[i] for i in rows]
         super().removeElements(parent, rows)
-        self._handleRemovedWrappers(removedWrappers)
+        if not move:
+            self._handleRemovedWrappers(removedWrappers)
         application.stack.endMacro()
 
     def _handleRemovedWrappers(self, wrappers):

@@ -130,11 +130,11 @@ class CoverDialogModel(QtCore.QObject):
     # Emitted when the busy-state changes. The argument states whether at least one provider is busy
     busyChanged = QtCore.pyqtSignal(bool)
     
-    def __init__(self, level, elements):
+    def __init__(self, level, elements, stack):
         super().__init__()
-        self.stack = level.stack.createSubstack(modalDialog=True)
         self.level = level
         self.elements = elements
+        self.stack = stack
         self.currentElement = self.elements[0]
                                  
         # Initialize covers
@@ -275,7 +275,8 @@ class CoverDialog(QtGui.QDialog):
         super().__init__(parent)
         self.setWindowTitle(self.tr("Edit covers"))
         
-        self.model = CoverDialogModel(level, elements)
+        self.stack = level.stack.createSubstack(modalDialog=True)
+        self.model = CoverDialogModel(level, elements, self.stack)
         self.model.currentElementChanged.connect(self._handleCurrentElementChanged)
         self.model.providerStatusChanged.connect(self._handleProviderStatusChanged)
         self.model.availableCoversChanged.connect(self._fillAvailableCovers)
@@ -397,6 +398,7 @@ class CoverDialog(QtGui.QDialog):
         self.model.startFetchingCovers()
         self._fillAvailableCovers()
         self._updateCoverLabel()
+        self.finished.connect(lambda _ : application.stack.closeSubstack(self.stack))
     
     def _fillAvailableCovers(self):
         """Fill the list of available covers with those of the current element."""
