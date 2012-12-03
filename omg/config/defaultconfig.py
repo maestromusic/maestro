@@ -90,6 +90,7 @@ defaults = OrderedDict((
 ("filesystem", {
     "scan_interval": (int,120,"Interval (in seconds) in which the filesystem will be rescanned for changes"),
     "dump_method": (str,"ffmpeg", "Method used to dump raw audio data from files for hashing"),
+    "force_check": (bool, False, "force re-hashing all files"),
     "disable":(bool,False,"completely disable filesystem synchronization"),
 }),
 ("misc", {

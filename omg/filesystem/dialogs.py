@@ -22,7 +22,7 @@ from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
 from .. import application
-from ..core import levels, tags
+from ..core import levels
 from ..models.leveltreemodel import LevelTreeModel
 from ..gui import delegates, treeactions, treeview
 from ..gui.delegates import abstractdelegate, editor as editordelegate
@@ -36,12 +36,12 @@ class LostFilesDelegate(delegates.StandardDelegate):
     
     def __init__(self, view):
         self.profile = delegates.profiles.DelegateProfile("lostfiles") 
-        super().__init__(self.profile)
-        self.options['showPaths'] = True
-        self.options['showMajer'] = False
-        self.options['appendRemainingTags'] = False
-        self.options['showAllAncestors'] = True
-        self.options['showFlagIcons'] = True
+        super().__init__(view, self.profile)
+        self.profile.options['showPaths'] = True
+        self.profile.options['showMajer'] = False
+        self.profile.options['appendRemainingTags'] = False
+        self.profile.options['showAllAncestors'] = True
+        self.profile.options['showFlagIcons'] = True
         self.goodPathStyle = abstractdelegate.DelegateStyle(1, False, True, Qt.darkGreen)
         self.badPathStyle = abstractdelegate.DelegateStyle(1, False, True, Qt.red)
         
@@ -85,7 +85,7 @@ class SetPathAction(treeactions.TreeAction):
             print('changing url: {}->{}'.format(elem.url, newUrl))
             db.write.changeUrls([ (str(newUrl), elem.id) ])
             elem.url = newUrl
-            levels.real.emitEvent([elem.id])
+            levels.real.emitEvent(dataIds=(elem.id,))
 
 
 class MissingFilesDialog(QtGui.QDialog):

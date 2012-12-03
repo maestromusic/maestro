@@ -401,16 +401,18 @@ class FileSystemSynchronizer(QtCore.QObject):
         
     def checkTrack(self, dir, track):
         modified = mTimeStamp(track.url)
-        if modified > track.verified:
+        if modified > track.verified or config.options.filesystem.force_check:
             logger.debug('found modified track {}: {}>{}'.format(track.url, modified, track.verified))
             if track.id is None:
-                logger.debug("just updating hash")
-                track.hash = computeHash(track.url)
+                
+                newHash = computeHash(track.url)
                 track.verified = modified
-                db.query("UPDATE {}newfiles "
-                         "  SET hash=?, verified=CURRENT_TIMESTAMP "
-                         "  WHERE url=?".format(db.prefix),
-                         track.hash, str(track.url))
+                if newHash != track.hash:
+                    logger.debug("just updating hash")
+                    db.query("UPDATE {}newfiles "
+                             "  SET hash=?, verified=CURRENT_TIMESTAMP "
+                             "  WHERE url=?".format(db.prefix),
+                             track.hash, str(track.url))
             else:
                 if track.id in levels.real:
                     dbTags = levels.real.get(track.id).tags
@@ -584,7 +586,9 @@ class FileSystemSynchronizer(QtCore.QObject):
             self.dbDirectories = set()
     
     def moveTrack(self, track, newUrl):
-        newDir = self.getDirectory(os.path.dirname(newUrl.path))[0]
+        newDir, created = self.getDirectory(os.path.dirname(newUrl.path))
+        if len(created) > 0:
+            self.storeDirectories(created)
         oldDir = track.directory
         oldDir.tracks.remove(track)
         if newUrl in self.tracks:
