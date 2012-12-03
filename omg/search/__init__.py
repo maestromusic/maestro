@@ -492,9 +492,10 @@ class SearchThread(threading.Thread):
                     SearchThread._procContainer(processedIds, id)
             args = [data for haveToAdd,data in processedIds.values() if haveToAdd]
             if len(args) > 0:
+                command = 'INSERT IGNORE' if db.type == 'mysql' else 'INSERT OR IGNORE' 
                 db.multiQuery(
-                    "REPLACE INTO {} (id,file,major,direct) VALUES (?,?,?,0)"
-                    .format(resultTable),args)
+                    "{} INTO {} (id,file,major,direct) VALUES (?,?,?,0)"
+                    .format(command, resultTable),args)
         
         setTopLevelFlags(resultTable)
         # Always include all children of direct results => select from elements
