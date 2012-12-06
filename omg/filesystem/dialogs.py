@@ -158,15 +158,15 @@ class ModifiedTagsDialog(QtGui.QDialog):
         dbTree.setRootIsDecorated(False)
         dbTree.setModel(dbModel)
         dbTree.setItemDelegate(editordelegate.EditorDelegate(dbTree, delegateProfile))
-        fsLevel = levels.real.subLevel([dbElem], 'tmp')
-        fsElem = fsLevel.get(track.id)
+        fsLevel = levels.Level('tmp', levels.real, [dbElem])
+        fsElem = fsLevel[track.id]
         fsElemTags = fsElem.tags
         nonPrivateTags = [tag for tag in fsElemTags if not tag.private]
         for tag in nonPrivateTags:
             del fsElemTags[tag]
         for tag, values in fsTags.items():
             fsElemTags[tag] = values
-        fsModel = LevelTreeModel(fsLevel, [fsLevel.get(track.id)])
+        fsModel = LevelTreeModel(fsLevel, [fsLevel[track.id]])
         fsTree = treeview.TreeView(fsLevel, affectGlobalSelection=False)
         fsTree.setRootIsDecorated(False)
         fsTree.setModel(fsModel)
