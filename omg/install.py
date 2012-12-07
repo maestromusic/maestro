@@ -258,9 +258,28 @@ class GeneralSettingsWidget(SettingsWidget):
         formLayout.addRow(self.tr("Database type"),dbChooserLayout)
         
         audioBackendLayout = QtGui.QVBoxLayout()
-        self.mpdBox = QtGui.QRadioButton(self.tr("MPD"))
-        self.mpdBox.setChecked(True)
+        audioBackendFound = False
+        try:
+            from PyQt4.phonon import Phonon
+            self.phononBox = QtGui.QRadioButton(self.tr("Phonon"))
+            self.phononBox.setChecked(True)
+            audioBackendFound = True
+        except ImportError:
+            self.phononBox = QtGui.QRadioButton(self.tr("Phonon (cannot find PyQt4.phonon)"))
+            self.phononBox.setEnabled(False)
+        audioBackendLayout.addWidget(self.phononBox)
+        try:
+            import mpd
+            self.mpdBox = QtGui.QRadioButton(self.tr("MPD"))
+            self.mpdBox.setChecked(not audioBackendFound) # not if Phonon is already checked
+            audioBackendFound = True
+        except ImportError:
+            self.mpdBox = QtGui.QRadioButton(self.tr("MPD (cannot find python-mpd2)"))
+            self.mpdBox.setEnabled(False)
         audioBackendLayout.addWidget(self.mpdBox)
+        if not audioBackendFound:
+            noBackendBox = QtGui.QRadioButton(self.tr("No backend (to choose a backend later, enable the corresponding plugin)."))
+            audioBackendLayout.addWidget(noBackendBox)
         formLayout.addRow(self.tr("Audio backend"),audioBackendLayout)
         
     def finish(self):
@@ -272,7 +291,9 @@ class GeneralSettingsWidget(SettingsWidget):
             QtGui.QMessageBox.warning(self,self.tr("No music directory"),
                                       self.tr("You must choose a directory for your music collection."))
             return False
-        if self.mpdBox.isChecked() and "mpd" not in config.options.main.plugins:
+        if self.phononBox.isChecked() and "phonon" not in config.options.main.plugins:
+            config.options.main.plugins.append("phonon")
+        elif self.mpdBox.isChecked() and "mpd" not in config.options.main.plugins:
             config.options.main.plugins.append("mpd")
         return True
     
