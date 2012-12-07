@@ -192,17 +192,20 @@ def resetDatabase():
         table.create()
 
 
-def createTables():
-    """Create all tables in an empty database (without inserting any data)."""
+def createTables(ignoreExisting=False):
+    """Create all tables in an empty database (without inserting any data). If *ignoreExisting* is True,
+    only missing tables will be created."""
     from . import tables
     # Some tables are referenced by other tables and must therefore be dropped last and created first
     referencedTables = [table for table in tables.tables if table.name in
         [prefix+"elements",prefix+"tagids",prefix+"flag_names"]]
     otherTables = [table for table in tables.tables if table not in referencedTables]
     for table in referencedTables:
-        table.create()
+        if not ignoreExisting or not table.exists():
+            table.create()
     for table in otherTables:
-        table.create()
+        if not ignoreExisting or not table.exists():
+            table.create()
 
 
 # Standard methods which are redirected to this thread's connection object (see sql.AbstractSql)

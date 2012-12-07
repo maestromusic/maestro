@@ -321,25 +321,36 @@ class DBSettingsWidget(SettingsWidget):
                                       self.tr("I cannot connect to the database."))
             return False 
         
+        from .database import tables
+        if all(table.exists() for table in tables.tables):
+            return True
+        
+        if len(db.listTables()) > 0: # otherwise we assume a new installation and create all tables
+            buttons = QtGui.QMessageBox.Yes | QtGui.QMessageBox.No | QtGui.QMessageBox.Abort
+            if not any(table.exists() for table in tables.tables): 
+                if QtGui.QMessageBox.question(self, self.tr("Database tables missing"),
+                        self.tr("Although the database is not empty, I cannot find any of my tables. If you "
+                                "use a table prefix, please check whether it is correct. Shall I continue "
+                                "and create the missing tables?"),
+                          buttons, QtGui.QMessageBox.Yes) != QtGui.QMessageBox.Yes:
+                    db.close()
+                    return False
+            else:
+                missingTables = [table.name for table in tables.tables if not table.exists()]
+                if QtGui.QMessageBox.question(self, self.tr("Database table(s) missing"),
+                          self.tr("Some tables are missing: {}. Shall I continue and create them?")
+                                    .format(', '.join(missingTables)),
+                          buttons, QtGui.QMessageBox.Yes) != QtGui.QMessageBox.Yes:
+                    db.close()
+                    return False
+        
         try:
-            if len(db.listTables()) == 0:
-                db.createTables()
+            db.createTables(ignoreExisting=True)
         except db.sql.DBException as e:
             logger.error("I cannot create database tables. SQL error: {}".format(e.message))
             QtGui.QMessageBox.warning(self,self.tr("Cannot create tables"),
                                       self.tr("I cannot create the database tables. Please make sure that "
                                               "the specified user has the necessary permissions."))
-            db.close()
-            return False 
-        
-        # If the database was not empty (thus no new tables were created) it might happen, that the user
-        # specified the wrong prefix.
-        if db.prefix+'tagids' not in db.listTables():
-            logger.error("Cannot find table '{}tagids'".format(db.prefix))
-            QtGui.QMessageBox.warning(self,self.tr("Database table missing"),
-                                      self.tr("Although the database is not empty, it does not contain a "
-                                              "table '{}tagids'. Did you provide the correct table prefix?")
-                                                .format(db.prefix))
             db.close()
             return False 
         return True
@@ -380,7 +391,7 @@ class SQLiteWidget(DBSettingsWidget):
         result = QtGui.QFileDialog.getSaveFileName(self,self.tr("Choose database file"),path)
         if result:
             self.pathLineEdit.setText(result)
-            
+    
     def finish(self):
         config.options.database.sqlite_path = self.pathLineEdit.text()
         return super().finish()
@@ -435,7 +446,7 @@ class MySQLWidget(DBSettingsWidget):
         config.options.database.prefix = self.dbPrefixLineEdit.text()
             
         return super().finish()
-    
+        
     
 class TagWidget(SettingsWidget):
     """This widgets, which is a much simplified version of the TagManager, allows the user to define the
@@ -704,5 +715,4 @@ def run():
     
 if __name__ == "__main__":
     run()
-    
     
