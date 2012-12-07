@@ -121,7 +121,7 @@ CREATE TABLE {0}contents (
     FOREIGN KEY(element_id) REFERENCES {0}elements(id) ON DELETE CASCADE
 )
 """.format(db.prefix),
-"CREATE INDEX contents_element_idx ON {}contents (element_id)".format(db.prefix)
+"CREATE INDEX {0}contents_element_idx ON {0}contents (element_id)".format(db.prefix)
 )
 
 #-------#
@@ -151,11 +151,11 @@ CREATE TABLE {0}files (
     FOREIGN KEY(element_id) REFERENCES {0}elements(id) ON DELETE CASCADE
 )
 """.format(db.prefix),
-"CREATE INDEX files_url_idx ON {}files (url)".format(db.prefix),
-"CREATE INDEX files_hash_idx ON {}files (hash)".format(db.prefix),
-"CREATE INDEX files_length_idx ON {}files (length)".format(db.prefix),
+"CREATE INDEX {0}files_url_idx ON {0}files (url)".format(db.prefix),
+"CREATE INDEX {0}files_hash_idx ON {0}files (hash)".format(db.prefix),
+"CREATE INDEX {0}files_length_idx ON {0}files (length)".format(db.prefix),
 """
-CREATE TRIGGER files_timestamp_trg AFTER UPDATE ON {0}files
+CREATE TRIGGER {0}files_timestamp_trg AFTER UPDATE ON {0}files
 BEGIN
 UPDATE {0}files SET verified = CURRENT_TIMESTAMP WHERE element_id = new.element_id;
 END
@@ -213,8 +213,8 @@ CREATE TABLE {0}tags (
     FOREIGN KEY(tag_id) REFERENCES {0}tagids(id) ON DELETE CASCADE
 )
 """.format(db.prefix),
-"CREATE INDEX tags_tag_value_idx ON {}tags (tag_id,value_id)".format(db.prefix),
-"CREATE INDEX tags_element_idx ON {}tags (element_id)".format(db.prefix))
+"CREATE INDEX {0}tags_tag_value_idx ON {0}tags (tag_id,value_id)".format(db.prefix),
+"CREATE INDEX {0}tags_element_idx ON {0}tags (element_id)".format(db.prefix))
 
 #----------------#
 # values_varchar #
@@ -241,7 +241,7 @@ CREATE TABLE {0}values_varchar (
     FOREIGN KEY(tag_id) REFERENCES {0}tagids(id) ON DELETE CASCADE
 )
 """.format(db.prefix,constants.TAG_VARCHAR_LENGTH),
-"CREATE INDEX values_varchar_idx ON {}values_varchar (value)".format(db.prefix))
+"CREATE INDEX {0}values_varchar_idx ON {0}values_varchar (value)".format(db.prefix))
 
 #-------------#
 # values_text #
@@ -264,7 +264,7 @@ CREATE TABLE {0}values_text (
     FOREIGN KEY(tag_id) REFERENCES {0}tagids(id) ON DELETE CASCADE
 )
 """.format(db.prefix),
-"CREATE INDEX values_text_idx ON {}values_text (value)".format(db.prefix))
+"CREATE INDEX {0}values_text_idx ON {0}values_text (value)".format(db.prefix))
 
 #-------------#
 # values_date #
@@ -287,7 +287,7 @@ CREATE TABLE {0}values_date (
     FOREIGN KEY(tag_id) REFERENCES {0}tagids(id) ON DELETE CASCADE
 )
 """.format(db.prefix),
-"CREATE INDEX values_date_idx ON {}values_date (value)".format(db.prefix))
+"CREATE INDEX {0}values_date_idx ON {0}values_date (value)".format(db.prefix))
 
 #------------#
 # flag_names #
@@ -328,7 +328,7 @@ CREATE TABLE {0}flags (
     FOREIGN KEY(flag_id) REFERENCES {0}flag_names(id) ON DELETE CASCADE
 )
 """.format(db.prefix),
-"CREATE UNIQUE INDEX flags_idx ON {}flags (element_id,flag_id)".format(db.prefix))
+"CREATE UNIQUE INDEX {0}flags_idx ON {0}flags (element_id,flag_id)".format(db.prefix))
 
 #---------#
 # folders #
@@ -365,10 +365,10 @@ CREATE TABLE {}newfiles (
     verified   INTEGER DEFAULT CURRENT_TIMESTAMP
 )
 """.format(db.prefix),
-"CREATE INDEX newfiles_url_idx ON {}newfiles (url)".format(db.prefix),
-"CREATE INDEX newfiles_hash_idx ON {}newfiles (hash)".format(db.prefix),
+"CREATE INDEX {0}newfiles_url_idx ON {0}newfiles (url)".format(db.prefix),
+"CREATE INDEX {0}newfiles_hash_idx ON {0}newfiles (hash)".format(db.prefix),
 """
-CREATE TRIGGER newfiles_timestamp_trg AFTER UPDATE ON {0}newfiles
+CREATE TRIGGER {0}newfiles_timestamp_trg AFTER UPDATE ON {0}newfiles
 BEGIN
 UPDATE {0}newfiles SET verified = CURRENT_TIMESTAMP WHERE url = new.url;
 END
@@ -397,7 +397,7 @@ CREATE TABLE {0}data (
     FOREIGN KEY(element_id) REFERENCES {0}elements(id) ON DELETE CASCADE
 )
 """.format(db.prefix),
-"CREATE INDEX data_idx ON {}data (element_id,type,sort)".format(db.prefix)
+"CREATE INDEX {0}data_idx ON {0}data (element_id,type,sort)".format(db.prefix)
 )
 
 tables = [SQLTable(queries) for queries in tables]
