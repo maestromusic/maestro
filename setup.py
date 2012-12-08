@@ -41,7 +41,7 @@ setup(name='omg',
       entry_points = {
           'gui_scripts' : ['omg = omg.application:run',
                            'omgsetup = omg.install:run',
-                           'dbanalyzer = omg.plugins.dbanalyzer.plugin:run'], 
+                           'omgdbanalyzer = omg.plugins.dbanalyzer.plugin:run'], 
           },
       test_loader = "test.testloader:TestLoader",
       test_suite = "test.all"
