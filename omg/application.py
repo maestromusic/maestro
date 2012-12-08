@@ -337,9 +337,19 @@ def init(cmdConfig=[],type='console',exitPoint='noplugins'):
     return run(cmdConfig,type,exitPoint)
 
 
+def executeEntryPoint(name, category='gui_scripts'):
+    """Replace this process by a new one, running one of OMG's entrypoints. *category* and *name* specify
+    the entrypoint, see setup.py."""
+    os.execl(sys.executable, os.path.basename(sys.executable), "-c",
+        "import sys, pkg_resources;"
+        "sys.exit(pkg_resources.load_entry_point('omg==0.3-currentgit', '{}', '{}')())"
+            .format(category, name)
+        )
+
+
 def runInstaller():
     """Run the graphical installer."""
-    os.execl(sys.executable, os.path.basename(sys.executable), "-m", "omg.install")
+    executeEntryPoint('omgsetup')
             
     
 if __name__ == "__main__":

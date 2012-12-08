@@ -125,10 +125,9 @@ class InstallToolWindow(QtGui.QWidget):
         """Write config file, close the install tool and start OMG."""
         # Write config values
         config.shutdown()
-        
-        import os, sys, os.path
         logger.info("Install tool finished. Ready to start OMG.")
-        os.execl(sys.executable, os.path.basename(sys.executable), "-m", "omg.application")
+        from omg.application import executeEntryPoint
+        executeEntryPoint('omg')
     
     def _handlePrevButton(self):
         """Handle the previous button."""
