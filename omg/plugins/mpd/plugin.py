@@ -236,8 +236,8 @@ class MPDPlayerBackend(player.PlayerBackend):
             for pos, url in urlified:
                 self.urls[pos:pos] = [ url ]
         elif what == 'playlist':
-            print("Change from MPD: playlist")
-            print(how)
+            logger.debug("Change from MPD: playlist")
+            logger.debug(how)
             self.playlist.resetFromUrls([self.makeUrl(path) for path in how])
         else:
             print('WHAT? {}'.format(what))
@@ -263,14 +263,16 @@ class MPDPlayerBackend(player.PlayerBackend):
     
     def insertIntoPlaylist(self, pos, urls):
         with self.prepareCommander():
+            inserted = []
             try:
                 with self.atomicOp:
                     for position, url in enumerate(urls, start=pos):
                         self.commander.addid(url.path, position)
                         self.mpdthread.playlistVersion += 1 if position == len(self.mpdthread.mpd_playlist) else 2
                         self.mpdthread.mpd_playlist[position:position] = [url.path]
-            except mpd.CommandError as e:
-                raise player.BackendError('Some files could not be inserted: {}'.format(e))
+                        inserted.append(url)
+            except mpd.CommandError:
+                raise player.InsertError('Could not insert all files', inserted)
     
     def removeFromPlaylist(self, begin, end):
         with self.prepareCommander():

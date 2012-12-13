@@ -19,7 +19,7 @@
 import itertools, urllib
 
 from . import wrappertreemodel, treebuilder
-from .. import application, config, logging, utils
+from .. import application, config, logging, player, utils
 from ..core import levels
 from ..core.nodes import RootNode, Wrapper
 
@@ -197,6 +197,14 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         origWrappers = wrappers
         self.stack.beginMacro(self.tr("Insert elements"))
         
+        command = PlaylistInsertCommand(self, parent, position, wrappers, updateBackend)
+        self.stack.push(command)
+        if hasattr(command, 'error'):
+            from ..gui import dialogs
+            dialogs.warning(self.tr('problem inserting files'),
+                            str(command.error))
+            wrappers = origWrappers = command.wrappers
+        
         # Build a tree
         preWrapper, postWrapper = self._getPrePostWrappers(parent,position)
         wrappers = treebuilder.buildTree(self.level,origWrappers,parent,preWrapper,postWrapper)
@@ -235,12 +243,6 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
             for i in range(startPos,endPos):
                 while wrappers[i].getContentsCount() == 1 and wrappers[i] not in origWrappers:
                     wrappers[i] = wrappers[i].contents[0]
-                    
-        #print("FINAL WRAPPERS: {}".format(wrappers))
-        
-        # Insert
-        command = PlaylistInsertCommand(self, parent, position, wrappers, updateBackend)
-        self.stack.push(command)
         
         # Glue at the edges
         self.glue(parent,position+len(wrappers))
@@ -458,7 +460,22 @@ class PlaylistInsertCommand(wrappertreemodel.InsertCommand):
                 predecessor = self.parent.contents[self.position-1] 
                 offset = predecessor.offset() + predecessor.fileCount()
             files = itertools.chain.from_iterable(w.getAllFiles() for w in self.wrappers)
-            self.model.backend.insertIntoPlaylist(offset,(f.element.url for f in files))
+            try:
+                self.model.backend.insertIntoPlaylist(offset,(f.element.url for f in files))
+            except player.BackendError as e:
+                try:
+                    inserted = e.successfulURLs
+                    wrappers = []
+                    insertiter = iter(inserted)
+                    url = next(insertiter)
+                    for wrapper in itertools.chain.from_iterable(w.getAllFiles() for w in self.wrappers):
+                        if wrapper.element.url == url:
+                            wrappers.append(wrapper)
+                            url = next(insertiter)
+                except StopIteration:
+                    pass
+                self.wrappers = wrappers
+                self.error = e
         elif self._updateBackend == 'onundoredo':
             self._updateBackend = 'always' # from now on
         super().redo()
