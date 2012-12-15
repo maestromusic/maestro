@@ -36,6 +36,12 @@ profiles.manager.addCategory(profileCategory)
 class BackendError(Exception):
     pass
 
+class InsertError(BackendError):
+    
+    def __init__(self, msg, successfulURLs=[]):
+        super().__init__(msg)
+        self.successfulURLs = successfulURLs
+
 class PlayerBackend(profiles.Profile):
     """This is the base class for modules that implement connection to a backend
     providing audio playback and playlist management.
