@@ -11,6 +11,10 @@
         <file>icons/folder.svg</file>
         <file>icons/folder_problem.svg</file>
         <file>icons/folder_unknown.svg</file>
+        <file>icons/file_unsynced.svg</file>
+        <file>icons/file_ok.svg</file>
+        <file>icons/file_problem.svg</file>
+        <file>icons/file_unknown.svg</file>
         <file>icons/expand.png</file>
         <file>icons/collapse.png</file>
         <file>icons/clear.png</file>

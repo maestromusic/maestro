@@ -36,19 +36,25 @@ translate = QtCore.QCoreApplication.translate
 
 class FileSystemBrowserModel(QtGui.QFileSystemModel):
     
-    icons = {
+    folderIcons = {
         'unsynced' : getIcon("folder_unsynced.svg"),
         'ok'       : getIcon("folder_ok.svg"),
         'nomusic'  : getIcon("folder.svg"),
         'unknown'  : getIcon("folder_unknown.svg"),
         'problem'  : getIcon("folder_problem.svg") }
     
+    fileIcons = {
+        'unsynced' : getIcon("file_unsynced.svg"),
+        'ok'       : getIcon("file_ok.svg"),
+        'unknown'  : getIcon("file_unknown.svg"),
+        'problem'  : getIcon("file_problem.svg") }
+    
     descriptions = {
         'unsynced' : translate("FileSystemBrowserModel", "contains music which is not in OMG's database"),
         'ok'       : translate("FileSystemBrowserModel", "in sync with OMG's database"),
         'nomusic'  : translate("FileSystemBrowserModel", "does not contain music"),
-        'unknown'  : translate("FileSystemBrowserModel", "unknown folder status"),
-        'problem'  : translate("FileSystemBrowserModel", "conflict with database") }
+        'unknown'  : translate("FileSystemBrowserModel", "unknown status"),
+        'problem'  : translate("FileSystemBrowserModel", "in conflict with database") }
     
     def __init__(self, parent = None):
         QtGui.QFileSystemModel.__init__(self, parent)
@@ -71,7 +77,15 @@ class FileSystemBrowserModel(QtGui.QFileSystemModel):
                     return super().data(index, role)
                 status = filesystem.getFolderState(dir)
                 if role == Qt.DecorationRole:
-                    return self.icons[status]
+                    return self.folderIcons[status]
+                else:
+                    return self.descriptions[status]
+            else:
+                path = relPath(info.absoluteFilePath())
+                url = filebackends.BackendURL.fromString("file:///" + path)
+                status = filesystem.getFileState(url)
+                if role == Qt.DecorationRole:
+                    return self.fileIcons[status]
                 else:
                     return self.descriptions[status]
         return super().data(index, role) 
