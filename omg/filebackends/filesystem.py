@@ -53,7 +53,7 @@ class RealFile(BackendFile):
         this object, but won't be contained in self.tags. Likewise, discnumber is ignored.
         """
         
-        self._taglibFile = taglib.File(self.url.absPath) 
+        self._taglibFile = taglib.File(self.url.absPath, applyID3v2Hack=True) 
         self.tags = tags.Storage()
         self.ignoredTags = dict()
         if "TRACKNUMBER" in self._taglibFile.tags:
