@@ -255,6 +255,7 @@ class SynchronizeHelper(QtCore.QObject):
                     backendFile = track.url.getBackendFile()
                     backendFile.readTags()
                     backendFile.tags = dbTags.withoutPrivateTags()
+                    backendFile.saveTags()
                 else:
                     from .. import application
                     application.stack.clear()
