@@ -28,6 +28,7 @@ logger = logging.getLogger(__name__)
 
 synchronizer = None
 enabled = False
+null = open(os.devnull) 
 
 NO_MUSIC = 0
 HAS_FILES = 1
@@ -107,7 +108,8 @@ def computeHash(url):
              '-f', 's16le',
              '-t', '15',
              '-'],
-            stdout=subprocess.PIPE
+            stdout=subprocess.PIPE,
+            stderr=null
         )
     else:
         raise ValueError('Dump method"{}" not supported'.format(config.options.filesystem.dump_method))
