@@ -75,9 +75,9 @@ class Plugin(object):
             logger.info("Disabling plugin '{}'...".format(self.name))
             self.module.disable()
             if hasattr(self.module,'defaultConfig'):
-                config.optionObject.removePlugins([self.name])
+                config.optionObject.removePlugins(list(self.module.defaultConfig().keys()))
             if hasattr(self.module,'defaultStorage'):
-                config.storageObject.removePlugins([self.name])
+                config.storageObject.removePlugins(list(self.module.defaultStorage().keys()))
             if self.name in config.options.main.plugins:
                 config.options.main.plugins = [n for n in config.options.main.plugins if n != self.name]
             self.enabled = False

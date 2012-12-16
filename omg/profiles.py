@@ -216,16 +216,30 @@ class TypedProfileCategory(ProfileCategory):
         super().__init__(name,title,storageOption,profileClass)
         self.types = []
         
+    def getType(self, name):
+        """Return the type of the given name or None if such a type does not exist."""
+        for type in self.types:
+            if type.name == name:
+                return type
+        return None
+        
     def addType(self,type):
         """Add a type to the category. Load all profiles of this type from the storage file and add them
         to the category."""
         if type not in self.types:
+            if self.getType(type.name) != None:
+                raise ValueError("There is already a profile type of name '{}'.".format(type.name))
             self.types.append(type)
             self.typeAdded.emit(type)
             self.loadProfiles(restrictToType=type)
             
     def removeType(self,type):
-        """Remove a type and all profiles of this type from the storage file."""
+        """Remove a type and all profiles of this type from the storage file. *type* may either be the type
+        or its name."""
+        if isinstance(type, str):
+            type = self.getType(type)
+            if type is None:
+                raise ValueError("There is no profile type of name '{}'.".format(name))
         for profile in self.profiles:
             if profile.type == type:
                 profile.builtIn = False # delete built-in profiles, too

@@ -20,10 +20,11 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from . import treeview, mainwindow, treeactions, playerwidgets, profiles as profilesgui, delegates
-from ..core import levels
+from ..core import levels, nodes
 from .delegates import playlist as playlistdelegate
 from .treeactions import *
 from .. import player
+from ..models import rootedtreemodel
 
 translate = QtCore.QCoreApplication.translate
 
@@ -52,6 +53,10 @@ class PlaylistTreeView(treeview.TreeView):
         self.viewport().setMouseTracking(True)
         self.doubleClicked.connect(self._handleDoubleClick)
         self.setItemDelegate(playlistdelegate.PlaylistDelegate(self,delegateProfile))
+        self.emptyModel = rootedtreemodel.RootedTreeModel()
+        self.emptyModel.root.setContents([nodes.TextNode(
+                                        self.tr("Please configure and choose a backend to play music."),
+                                        wordWrap=True)])
 
     def setBackend(self, backend):
         if self.backend is not None:
@@ -59,11 +64,15 @@ class PlaylistTreeView(treeview.TreeView):
         self.backend = backend
         if backend is not None:
             model = backend.playlist
-            self.setModel(model)
-            self.itemDelegate().model = model
-            self.updateNodeSelection()
-            self.model().modelReset.connect(self.expandAll)
-        
+            self.setRootIsDecorated(True)
+        else:
+            model = self.emptyModel
+            self.setRootIsDecorated(False)
+        self.setModel(model)
+        self.itemDelegate().model = model
+        self.updateNodeSelection()
+        self.model().modelReset.connect(self.expandAll)
+
     def _handleDoubleClick(self, idx):
         if idx.isValid():
             offset = idx.internalPointer().offset()
