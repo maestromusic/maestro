@@ -150,7 +150,7 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         # Handle internal moves separately
         if self._internalMove:
             return self.move(list(mimeData.wrappers()),parent,position)
-
+ 
         self.stack.beginMacro(self.tr("Drop elements"))
         
         # Create wrappers
@@ -164,10 +164,14 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
             urls = itertools.chain.from_iterable(
                                     utils.collectFiles(url.path() for url in mimeData.urls()).values())
             wrappers = [Wrapper(element) for element in self.level.collectMany(urls)]
-               
-        self.insert(parent,position,wrappers)
-        self.stack.endMacro()
-        return True
+        
+        if len(wrappers) == 0:
+            return True
+        
+        if self.insert(parent,position,wrappers):
+            self.stack.endMacro()
+            return True
+        else: return False # macro has been aborted
     
     def _getPrePostWrappers(self,parent,position):
         """From the subtree below *parent* return the last leaf in parent.contents[:position] and the first
@@ -192,18 +196,13 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
             - Glue the inserted wrappers with existing wrappers right before or after the insert position
             (e.g. when inserting a file next to its album container. It will be moved below the album).
              
+        Return False if no element could be inserted (but not if *wrappers* is empty).
         """
+        if len(wrappers) == 0:
+            return True
         assert not parent.isFile()
         origWrappers = wrappers
         self.stack.beginMacro(self.tr("Insert elements"))
-        
-        command = PlaylistInsertCommand(self, parent, position, wrappers, updateBackend)
-        self.stack.push(command)
-        if hasattr(command, 'error'):
-            from ..gui import dialogs
-            dialogs.warning(self.tr('problem inserting files'),
-                            str(command.error))
-            wrappers = origWrappers = command.wrappers
         
         # Build a tree
         preWrapper, postWrapper = self._getPrePostWrappers(parent,position)
@@ -244,11 +243,23 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
                 while wrappers[i].getContentsCount() == 1 and wrappers[i] not in origWrappers:
                     wrappers[i] = wrappers[i].contents[0]
         
+        # Insert
+        command = PlaylistInsertCommand(self, parent, position, wrappers, updateBackend)
+        self.stack.push(command)
+        if hasattr(command, 'error'):
+            from ..gui import dialogs
+            dialogs.warning(self.tr('Playlist error'), str(command.error))
+            wrappers = command.wrappers
+            if len(wrappers) == 0:
+                self.stack.abortMacro()
+                return False
+            
         # Glue at the edges
         self.glue(parent,position+len(wrappers))
         self.glue(parent,position)
         
         self.stack.endMacro()
+        return True
         
     def insertUrlsAtOffset(self, offset, urls, updateBackend='always'):
         """Insert the given paths at the given offset."""
@@ -452,7 +463,7 @@ class PlaylistInsertCommand(wrappertreemodel.InsertCommand):
         self._updateBackend = updateBackend
         self._count = sum(w.fileCount() for w in wrappers)
     
-    def redo(self):
+    def redo(self, firstRedo=False):
         if self._updateBackend == 'always':
             if self.position == 0:
                 offset = self.parent.offset()
@@ -462,25 +473,32 @@ class PlaylistInsertCommand(wrappertreemodel.InsertCommand):
             files = itertools.chain.from_iterable(w.getAllFiles() for w in self.wrappers)
             try:
                 self.model.backend.insertIntoPlaylist(offset,(f.element.url for f in files))
-            except player.BackendError as e:
-                try:
-                    inserted = e.successfulURLs
-                    wrappers = []
-                    insertiter = iter(inserted)
-                    url = next(insertiter)
-                    for wrapper in itertools.chain.from_iterable(w.getAllFiles() for w in self.wrappers):
-                        if wrapper.element.url == url:
-                            wrappers.append(wrapper)
-                            url = next(insertiter)
-                except StopIteration:
-                    pass
-                self.wrappers = wrappers
-                self.error = e
+            except player.BackendError as error:
+                self.error = error
+                if not firstRedo:
+                    raise error
+                else:
+                    def filterSuccessful(wrappers):
+                        successful = []
+                        for wrapper in wrappers:
+                            if wrapper.isFile():
+                                if wrapper.element.url in error.successfulURLs:
+                                    successful.append(wrapper)
+                            else: # container
+                                filtered = filterSuccessful(wrapper.contents)
+                                if len(filtered) < len(wrapper.contents):
+                                    wrapper.setContents(filtered)
+                                if len(wrapper.contents) > 0:
+                                    successful.append(wrapper)
+                        return successful
+                    self.wrappers = filterSuccessful(self.wrappers)
         elif self._updateBackend == 'onundoredo':
             self._updateBackend = 'always' # from now on
         super().redo()
         
     def undo(self):
+        if len(self.wrappers) == 0:
+            return # this may happen due to the filtering in redo
         if self._updateBackend != 'never':
             offset = self.parent.contents[self.position].offset()
             self.model.backend.removeFromPlaylist(offset,offset+self._count)
