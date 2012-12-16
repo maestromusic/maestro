@@ -102,7 +102,12 @@ class UndoStack(QtCore.QObject):
             self.push(command)
             self.endMacro()
         else:
-            command.redo()
+            # Check whether argument 'firstRedo' should be used
+            code = command.redo.__code__
+            if code.co_varnames[:code.co_argcount] == ('self', 'firstRedo'):
+                assert command.redo.__defaults__ == (False,)
+                command.redo(firstRedo=True)
+            else: command.redo()
             self._activeMacros[-1].add(command)
         
     def endMacro(self):
