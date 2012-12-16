@@ -155,7 +155,24 @@ class Node:
             for element in self.getContents() if not reverse else reversed(self.getContents()):
                 for file in element.getAllFiles(reverse):
                     yield file
-
+                    
+    def getAllContainers(self, contentsFirst=False, reverse=False):
+        """Generator which will return all containers contained in this node or in children of it
+        (possibly including the node itself).
+        
+        If *contentsFirst* is True, contents of a container will be returned prior to the container.
+        If *reverse* is True, containers will be returned in reversed order.
+        """
+        assert self.getContents() is not None
+        if self.isContainer():
+            if contentsFirst == reverse: # both True or both False
+                yield self
+            for element in self.getContents() if not reverse else reversed(self.getContents()):
+                for container in element.getAllContainers(contentsFirst,reverse):
+                    yield container
+            if contentsFirst != reverse:
+                yield self
+                    
     def fileCount(self):
         """Return the number of files contained in this element or in descendants of it. If this node
         is a file, return 1."""
