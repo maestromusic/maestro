@@ -270,10 +270,7 @@ class MPDThread(QtCore.QThread):
                 if 'player' in changed:
                     self.updatePlayer()
                     changed.remove('player')
+                if 'update' in changed:
+                    changed.remove('update')
                 if len(changed) > 0:
                     logger.warning('unhandled MPD changes: {}'.format(changed))
-            
-            
-    def updateDB(self):
-        if self.connected:
-            self.client.update()

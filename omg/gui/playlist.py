@@ -56,6 +56,8 @@ class PlaylistTreeView(treeview.TreeView):
     def setBackend(self, backend):
         if self.backend is not None:
             self.model().modelReset.disconnect(self.expandAll)
+            for action in self.backend.treeActions():
+                self.removeLocalAction(action)
         self.backend = backend
         if backend is not None:
             model = backend.playlist
@@ -63,6 +65,8 @@ class PlaylistTreeView(treeview.TreeView):
             self.itemDelegate().model = model
             self.updateNodeSelection()
             self.model().modelReset.connect(self.expandAll)
+            for action in backend.treeActions():
+                self.addLocalAction(action)
         
     def _handleDoubleClick(self, idx):
         if idx.isValid():

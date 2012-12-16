@@ -73,7 +73,7 @@ class MPDPlayerBackend(player.PlayerBackend):
         self.separator.setSeparator(True)
         
         self.updateDBAction = QtGui.QAction("Update Database", self)
-        self.updateDBAction.triggered.connect(self.mpdthread.updateDB)
+        self.updateDBAction.triggered.connect(self.updateDB)
         
         self.stateChanged.connect(self.checkElapsedTimer)
         self.elapsedTimer = QtCore.QTimer(self)
@@ -181,6 +181,10 @@ class MPDPlayerBackend(player.PlayerBackend):
         else:
             self.elapsedTimer.stop()
 
+    def updateDB(self):
+        with self.prepareCommander():
+            self.commander.update()
+    
     def makeUrl(self, path):
         mpdurl = mpdfilebackend.MPDURL("mpd://" + self.name + "/" + path)
         return mpdurl.getBackendFile().url
@@ -242,9 +246,9 @@ class MPDPlayerBackend(player.PlayerBackend):
         else:
             print('WHAT? {}'.format(what))
                     
-    def addTreeActions(self, view):
-        view.addAction(self.separator)
-        view.addAction(self.updateDBAction)
+    def treeActions(self):
+        yield self.separator
+        yield self.updateDBAction
     
     def registerFrontend(self, obj):
         self._numFrontends += 1

@@ -115,11 +115,11 @@ class PlayerBackend(profiles.Profile):
         first song, this is ignored."""
         raise NotImplementedError()
     
-    def addTreeActions(self, playlist):
+    def treeActions(self):
         """This method can be used to add custom actions to a treeview which are specific
         to this backend. The actions should be added to *playlist* by calling its
         *addAction* method."""
-        pass
+        raise StopIteration()
     
     def setPlaylist(self, urls):
         """Clear the playlist and set it to the given urls."""

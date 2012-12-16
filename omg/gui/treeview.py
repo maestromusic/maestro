@@ -158,19 +158,34 @@ class TreeView(QtGui.QTreeView):
             if callable is not None:
                 self.treeActions[name] = action = callable(self, *args, **kwargs)
                 self.addAction(action)
-        self.actionConfig.actionDefinitionAdded.connect(self.addTreeAction)
-        self.actionConfig.actionDefinitionRemoved.connect(self.removeTreeAction)
+        self.actionConfig.actionDefinitionAdded.connect(self._addTreeAction)
+        self.actionConfig.actionDefinitionRemoved.connect(self._removeTreeAction)
+        self.localActions = []
         
-    def removeTreeAction(self, name):
-        action = self.treeActions[name]
-        self.removeAction(action)
-        del self.treeActions[name]
         
-    def addTreeAction(self, path):
+    def _addTreeAction(self, path):
         callable, args, kwargs = self.actionConfig.getDefinition(path)
         if callable is not None:
             action = self.treeActions[path[-1][1]] = callable(self, *args, **kwargs)
             self.addAction(action)
+    
+    def _removeTreeAction(self, name):
+        action = self.treeActions[name]
+        self.removeAction(action)
+        del self.treeActions[name]
+    
+    def addLocalAction(self, action):
+        """Used add an action to this treeview instance only, without the global actionConfig.
+        
+        The action will be appended to the end of the context menu.
+        """
+        self.addAction(action)
+        self.localActions.append(action)
+        
+    def removeLocalAction(self, action):
+        """Remove an action previously added by *addLocalAction*."""
+        self.removeAction(action)
+        self.localActions.remove(action)
     
     def setModel(self, model):
         super().setModel(model)
@@ -194,6 +209,8 @@ class TreeView(QtGui.QTreeView):
         
     def contextMenuEvent(self, event):
         menu = self.actionConfig.createMenu(self, self.treeActions)
+        for action in self.localActions:
+            menu.addAction(action)
         if menu is not None:
             menu.popup(event.globalPos())
             event.accept()
