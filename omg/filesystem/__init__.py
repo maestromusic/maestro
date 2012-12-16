@@ -81,6 +81,22 @@ def getFolderState(path):
             pass
     return 'unknown'
 
+def getFileState(url):
+    """Return the state of a given file.
+    """
+    if enabled and synchronizer.initialized.is_set():
+        try:
+            track = synchronizer.tracks[url]
+            if track.problem:
+                return 'problem'
+            elif track.id is not None:
+                return 'ok'
+            else:
+                return 'unsynced'
+        except KeyError:
+            pass
+    return 'unknown'
+
 def getNewfileHash(url):
     """Return the hash of a file specified by *url* which is not yet in the database.
     
@@ -404,8 +420,15 @@ class FileSystemSynchronizer(QtCore.QObject):
         
     def checkTrack(self, dir, track):
         modified = mTimeStamp(track.url)
-        if modified > track.verified or config.options.filesystem.force_check:
+        check = False
+        if modified > track.verified:
             logger.debug('found modified track {}: {}>{}'.format(track.url, modified, track.verified))
+            check = True
+        elif config.options.filesystem.force_check and \
+                track.directory.path.startswith(config.options.filesystem.force_check):
+            logger.debug('check of "{}" forced'.format(track.url))
+            check = True
+        if check:
             if track.id is None:
                 
                 newHash = computeHash(track.url)
