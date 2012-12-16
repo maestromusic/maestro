@@ -51,6 +51,9 @@ class RealLevel(levels.Level):
         return self[param]
     
     def collectMany(self, params):
+        # We need to iterate params twice
+        if not isinstance(params, (list, tuple)):
+            params = list(params)
         self._ensureLoaded(params)
         return [self[param] for param in params]
     

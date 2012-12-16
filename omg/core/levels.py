@@ -252,7 +252,7 @@ class Level(application.ChangeEventDispatcher):
         any parent level."""
         missing = [param for param in params if param not in self]
         if len(missing) > 0:
-            self.parent._ensureLoaded(params)
+            self.parent._ensureLoaded(missing)
     
     #TODO do something about this ugly correct parents stuff
     def _correctParents(self, element, changeLevel):
