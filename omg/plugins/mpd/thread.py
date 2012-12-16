@@ -43,11 +43,12 @@ class MPDThread(QtCore.QThread):
         super().__init__(None)
         self.backend = backend
         self.host, self.port, self.password = host, port, password
-        self.playlistVersion = self.state  = None
+        self.playlistVersion = self.state = None
         self.current = self.elapsed = None
         self.currentLength = self.volume = None
         self.seekRequest = None
         self.connected = False
+        self.outputs = None
         self.shouldConnect = threading.Event()
         self.idler = mpd.MPDClient()
         self.commander = mpd.MPDClient()
@@ -215,15 +216,22 @@ class MPDThread(QtCore.QThread):
         if playlistVersion != self.playlistVersion:
             self._handleExternalPlaylistChange(playlistVersion)
     
+    def updateOutputs(self, emit=True):
+        outputs = self.idler.outputs()
+        if emit and outputs != self.outputs:
+            self.changeFromMPD.emit('outputs', outputs)
+        self.outputs = outputs
+        
     def connect(self):
         self.idler.connect(self.host, self.port, CONNECTION_TIMEOUT)
         self.mpd_status = self.idler.status()
         self.updateMixer(False)
         self.updatePlaylist(False)
-        self.updatePlayer(False)    
+        self.updatePlayer(False)
+        self.updateOutputs(False)
         self.changeFromMPD.emit('connect', (self.mpd_playlist[:], self.current,
                                             self.currentLength, self.calculateStart(self.elapsed),
-                                            self.state))
+                                            self.state, self.volume, self.outputs))
         self.connected = True  
     
     def disconnect(self):
@@ -272,5 +280,8 @@ class MPDThread(QtCore.QThread):
                     changed.remove('player')
                 if 'update' in changed:
                     changed.remove('update')
+                elif 'output' in changed:
+                    self.updateOutputs()
+                    changed.remove('output')
                 if len(changed) > 0:
                     logger.warning('unhandled MPD changes: {}'.format(changed))
