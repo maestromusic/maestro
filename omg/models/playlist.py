@@ -459,6 +459,7 @@ class PlaylistInsertCommand(wrappertreemodel.InsertCommand):
         if not updateBackend in ('always', 'never', 'onundoredo'):
             raise ValueError("Invalid value for 'updateBackend' argument: {}".format(updateBackend))
         self._updateBackend = updateBackend
+        self._count = sum(w.fileCount() for w in self.wrappers)
     
     def redo(self, firstRedo=False):
         if self._updateBackend == 'always':
@@ -489,9 +490,10 @@ class PlaylistInsertCommand(wrappertreemodel.InsertCommand):
                                     successful.append(wrapper)
                         return successful
                     self.wrappers = filterSuccessful(self.wrappers)
-            self._count = sum(w.fileCount() for w in self.wrappers)
+                    self._count = sum(w.fileCount() for w in self.wrappers)
         elif self._updateBackend == 'onundoredo':
             self._updateBackend = 'always' # from now on
+        
         super().redo()
         
     def undo(self):

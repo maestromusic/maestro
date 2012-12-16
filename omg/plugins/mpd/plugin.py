@@ -262,6 +262,12 @@ class MPDPlayerBackend(player.PlayerBackend):
             application.stack.resetSubstack(self.stack)
     
     def insertIntoPlaylist(self, pos, urls):
+        """Insert *urls* into the MPD playlist at position *pos*.
+        
+        This methode raises a player.InsertError if not all of the files could be added to MPDs
+        playlist, which happens if the URL is not known to MPD. The list of URls successfully
+        inserted is contained in the error object's *successfulURLs* attribute.
+        """
         with self.prepareCommander():
             inserted = []
             try:
@@ -277,12 +283,10 @@ class MPDPlayerBackend(player.PlayerBackend):
     def removeFromPlaylist(self, begin, end):
         with self.prepareCommander():
             with self.atomicOp:
-                print('atomic op')
                 self.mpdthread.playlistVersion += end-begin
                 del self.mpdthread.mpd_playlist[begin:end]
                 for _ in range(end-begin):
                     self.commander.delete(begin)
-                print('done')
         
     def move(self,fromOffset,toOffset):
         
