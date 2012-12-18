@@ -159,9 +159,10 @@ class PhononPlayerBackend(player.PlayerBackend):
         return utils.absPath(self.playlist.root.fileAtOffset(offset).element.url.path)
     
     def save(self):
-        return {'playlist': self.playlist.wrapperString(),
-                'current': self.playlist.current
-                }
+        if self.playlist.current is not None:
+            current = self.playlist.current.offset()
+        else: current = None
+        return {'playlist': self.playlist.wrapperString(), 'current': current}
         
     def __str__(self):
         return "PhononAudioBackend({})".format(self.name)
