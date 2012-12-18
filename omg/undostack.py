@@ -110,15 +110,16 @@ class UndoStack(QtCore.QObject):
             else: command.redo()
             self._activeMacros[-1].add(command)
         
-    def endMacro(self):
-        """Ends composition of a macro command."""
+    def endMacro(self, abortIfEmpty=False):
+        """Ends composition of a macro command. If *abortIfEmpty* is True and no commands have been added
+        to the macro, it will simply be dropped (and never reach the stack)."""
         if len(self._activeMacros) == 0:
             raise UndoStackError("Cannot end a macro when no macro is being built.")
         if self._inUndoRedo:
             raise UndoStackError("Cannot end a macro during undo/redo.")
 
         # Do not use pop here. The macro must remain active until the end (mainly for _emitQueuedEvents)
-        macro = self._activeMacros[-1]
+        macro = self._activeMacros[-1]           
         macro.end()
         # Remember that Macros are not added to their parent macro or to the stack unless they are finished.
         if len(self._activeMacros) > 1:
@@ -126,6 +127,10 @@ class UndoStack(QtCore.QObject):
             del self._activeMacros[-1]
         else:
             # outermost macro has been closed
+            if abortIfEmpty and macro.isEmpty():
+                self._activeMacros = []
+                assert len(self._eventQueue) == 0
+                return
             self._commands[self._index:] = [macro] # overwrite rest of the stack
             self._index += 1
             self._emitSignals()
@@ -376,6 +381,10 @@ class Macro:
             #This assumes that this macro has not been finished
             db.rollback()
             
+    def isEmpty(self):
+        """Return whether this macro is empty, i.e. no command has been added to it."""
+        return all(isinstance(command, Macro) and command.isEmpty() for command in self.commands)
+    
     def printStructure(self, indent = ''):
         """Debug method: print the tree below this node using indentation."""
         print(indent + str(self))
