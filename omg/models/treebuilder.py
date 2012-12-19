@@ -219,9 +219,8 @@ def buildTree(level, wrappers, parent=None, preWrapper=None, postWrapper=None):
 
     
 def _buildTree(wrappers,seqs,boundingSeq,toplevelIds):
-    """Build a tree over the part of *wrappers* specified by *boundingSeq* (over all wrappers if
-    *boundingSeq* is None. *seqs* is the SequenceDict, *toplevelIds* are the elements that may be used at
-    the highest level.
+    """Build a tree over the part of *files* specified by *boundingSeq* (over all files if *boundingSeq* is
+    None. *seqs* is the SequenceDict, *toplevelIds* are the elements that may be used at the highest level.
     """
     # Root nodes are not necessarily added in correct order. Insert them indexed by the start point of their
     # sequence and at the end sort them by the start point.
@@ -241,22 +240,20 @@ def _buildTree(wrappers,seqs,boundingSeq,toplevelIds):
             seqs.remove(longestSeq)
             continue
         
-        if element.isFile():
-            # if the element is a file, the sequence might still be longer than one, if the file is
-            # repeated in the playlist.
-            for i in range(longestSeq.start, longestSeq.end+1):
-                if element == wrappers[i].element:
-                    roots[i] = wrappers[i]
-                else: roots[i] = Wrapper(element)
+        # Create a wrapper for the tree...or use the one that was submitted
+        if len(longestSeq) == 1 and element == wrappers[longestSeq.start].element:
+            wrapper = wrappers[longestSeq.start]
         else:
             wrapper = Wrapper(element)
-            # For containers recursively create the tree below. Bound the tree creation to longestSeq.
-            # Choose only roots which are contents of element.
-            childContents = _buildTree(wrappers,seqs,longestSeq,element.contents)
-            wrapper.setContents(childContents)
-            findPositions(wrapper,wrapper.contents)
-            roots[longestSeq.start] = wrapper
-            
+            if wrapper.isContainer():
+                # For containers recursively create the tree below. Bound the tree creation to longestSeq.
+                # Choose only roots which are contents of element.
+                childContents = _buildTree(wrappers,seqs,longestSeq,element.contents)
+                wrapper.setContents(childContents)
+                findPositions(wrapper,wrapper.contents)
+        
+        # Add the wrapper to roots and remove the sequence from all sequences
+        roots[longestSeq.start] = wrapper
         seqs.remove(longestSeq)
     
     # Sort root nodes by start point
