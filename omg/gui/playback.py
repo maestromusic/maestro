@@ -228,7 +228,7 @@ class VolumeLabel(QtGui.QLabel):
     mediumIcon = utils.getPixmap('volume_medium.png')
     highIcon = utils.getPixmap('volume_high.png')
     
-    def __init__(self,parent = None):
+    def __init__(self,parent=None):
         """Initialize this label with the given parent."""
         QtGui.QLabel.__init__(self, parent)
         self.volume = -1

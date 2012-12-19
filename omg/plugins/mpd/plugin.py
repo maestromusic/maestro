@@ -69,11 +69,13 @@ class MPDPlayerBackend(player.PlayerBackend):
         
         self.commander = mpd.MPDClient()
         
+        # actions
         self.separator = QtGui.QAction("MPD", self)
         self.separator.setSeparator(True)
-        
-        self.updateDBAction = QtGui.QAction("Update Database", self)
-        self.updateDBAction.triggered.connect(self.mpdthread.updateDB)
+        self.updateDBAction = QtGui.QAction(self.tr("Update Database"), self)
+        self.updateDBAction.triggered.connect(self.updateDB)
+        self.configOutputsAction = QtGui.QAction(self.tr("Audio outputs..."), self)
+        self.configOutputsAction.triggered.connect(self.showOutputDialog)
         
         self.stateChanged.connect(self.checkElapsedTimer)
         self.elapsedTimer = QtCore.QTimer(self)
@@ -181,6 +183,14 @@ class MPDPlayerBackend(player.PlayerBackend):
         else:
             self.elapsedTimer.stop()
 
+    def updateDB(self, path=None):
+        """Update MPD's database. An optional *path* can be given to only update that file/dir."""
+        with self.prepareCommander():
+            if path:
+                self.commander.update(path)
+            else:
+                self.commander.update()
+    
     def makeUrl(self, path):
         mpdurl = mpdfilebackend.MPDURL("mpd://" + self.name + "/" + path)
         return mpdurl.getBackendFile().url
@@ -188,7 +198,8 @@ class MPDPlayerBackend(player.PlayerBackend):
     @QtCore.pyqtSlot(str, object)
     def _handleMPDChange(self, what, how):
         if what == 'connect':
-            paths, self._current, self._currentLength, self._currentStart, self._state = how
+            paths, self._current, self._currentLength, self._currentStart, \
+                self._state, self._volume, self._outputs = how
             self.urls = [self.makeUrl(path) for path in paths]
             self.playlist.initFromUrls(self.urls)
             self.playlist.setCurrent(self._current)
@@ -239,12 +250,15 @@ class MPDPlayerBackend(player.PlayerBackend):
             logger.debug("Change from MPD: playlist")
             logger.debug(how)
             self.playlist.resetFromUrls([self.makeUrl(path) for path in how])
+        elif what == 'outputs':
+            self._outputs = how
         else:
             print('WHAT? {}'.format(what))
                     
-    def addTreeActions(self, view):
-        view.addAction(self.separator)
-        view.addAction(self.updateDBAction)
+    def treeActions(self):
+        yield self.separator
+        yield self.updateDBAction
+        yield self.configOutputsAction
     
     def registerFrontend(self, obj):
         self._numFrontends += 1
@@ -262,6 +276,12 @@ class MPDPlayerBackend(player.PlayerBackend):
             application.stack.resetSubstack(self.stack)
     
     def insertIntoPlaylist(self, pos, urls):
+        """Insert *urls* into the MPD playlist at position *pos*.
+        
+        This methode raises a player.InsertError if not all of the files could be added to MPDs
+        playlist, which happens if the URL is not known to MPD. The list of URls successfully
+        inserted is contained in the error object's *successfulURLs* attribute.
+        """
         with self.prepareCommander():
             inserted = []
             try:
@@ -277,12 +297,10 @@ class MPDPlayerBackend(player.PlayerBackend):
     def removeFromPlaylist(self, begin, end):
         with self.prepareCommander():
             with self.atomicOp:
-                print('atomic op')
                 self.mpdthread.playlistVersion += end-begin
                 del self.mpdthread.mpd_playlist[begin:end]
                 for _ in range(end-begin):
                     self.commander.delete(begin)
-                print('done')
         
     def move(self,fromOffset,toOffset):
         
@@ -320,6 +338,30 @@ class MPDPlayerBackend(player.PlayerBackend):
                     values = [ values ]
                 storage[tag] = [ tag.convertValue(value, crop=True) for value in values ]
             return storage, length
+        
+    def showOutputDialog(self):
+        dialog = QtGui.QDialog(application.mainWindow)
+        layout = QtGui.QVBoxLayout()
+        layout.addWidget(QtGui.QLabel(self.tr("Choose which audio outputs to use:")))
+        checkboxes = []
+        for output in sorted(self._outputs, key=lambda out:out["outputid"]):
+            checkbox = QtGui.QCheckBox(output["outputname"])
+            checkbox.setChecked(output["outputenabled"] == "1")
+            checkboxes.append(checkbox)
+            layout.addWidget(checkbox)
+        dbb = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Cancel | QtGui.QDialogButtonBox.Ok)
+        layout.addWidget(dbb)
+        dbb.accepted.connect(dialog.accept)
+        dbb.rejected.connect(dialog.reject)
+        dialog.setLayout(layout)
+        if dialog.exec_() == QtGui.QDialog.Accepted:
+            for checkbox, output in zip(checkboxes, self._outputs):
+                if output["outputenabled"] == "0" and checkbox.isChecked():
+                    with self.prepareCommander():
+                        self.commander.enableoutput(output["outputid"])
+                elif output["outputenabled"] == "1" and not checkbox.isChecked():
+                    with self.prepareCommander():
+                        self.commander.disableoutput(output["outputid"])
         
     def __str__(self):
         return "MPDPlayerBackend({})".format(self.name)

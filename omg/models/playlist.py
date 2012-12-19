@@ -234,7 +234,6 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         # Build a tree
         preWrapper, postWrapper = self._getPrePostWrappers(parent,position)
         wrappers = treebuilder.buildTree(self.level,origWrappers,parent,preWrapper,postWrapper)
-        #print("WRAPPERS: {}".format(wrappers))
         
         # Check whether we have to split the parent because some wrappers do not fit into parent
         # It might be necessary to split several parents
@@ -413,7 +412,6 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         It is unspecified which wrapper will be removed when two wrappers are glued. The list
         self._dontGlueAway may be used to save some nodes from being removed in a glue.
         """
-        #print("This is glue for parent {} at {}".format(parent,position))
         if position == 0 or position == parent.getContentsCount():
             return # nothing to glue here
         preWrapper,postWrapper = self._getPrePostWrappers(parent,position)
@@ -490,7 +488,7 @@ class PlaylistInsertCommand(wrappertreemodel.InsertCommand):
         if not updateBackend in ('always', 'never', 'onundoredo'):
             raise ValueError("Invalid value for 'updateBackend' argument: {}".format(updateBackend))
         self._updateBackend = updateBackend
-        self._count = sum(w.fileCount() for w in wrappers)
+        self._count = sum(w.fileCount() for w in self.wrappers)
     
     def redo(self, firstRedo=False):
         if self._updateBackend == 'always':
@@ -521,8 +519,10 @@ class PlaylistInsertCommand(wrappertreemodel.InsertCommand):
                                     successful.append(wrapper)
                         return successful
                     self.wrappers = filterSuccessful(self.wrappers)
+                    self._count = sum(w.fileCount() for w in self.wrappers)
         elif self._updateBackend == 'onundoredo':
             self._updateBackend = 'always' # from now on
+        
         super().redo()
         
     def undo(self):
@@ -540,7 +540,6 @@ class PlaylistInsertCommand(wrappertreemodel.InsertCommand):
 class PlaylistRemoveCommand(wrappertreemodel.RemoveCommand):
     """Subclass of RemoveCommand that additionally changes the backend."""
     def __init__(self, model, ranges, updateBackend, removeEmptyParents=True):
-        #print("this is a PlaylistRemoveCommand for {}".format(','.join(str(range) for range in ranges)))
         assert all(range[2] >= range[1] for range in ranges)
         super().__init__(model,ranges,removeEmptyParents)
         if not updateBackend in ('always', 'never', 'onundoredo'):
