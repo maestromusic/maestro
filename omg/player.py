@@ -119,7 +119,7 @@ class PlayerBackend(profiles.Profile):
         """This method can be used to add custom actions to a treeview which are specific
         to this backend. The actions should be added to *playlist* by calling its
         *addAction* method."""
-        raise StopIteration()
+        return []
     
     def setPlaylist(self, urls):
         """Clear the playlist and set it to the given urls."""
