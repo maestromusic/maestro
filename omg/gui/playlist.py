@@ -29,7 +29,7 @@ from ..models import rootedtreemodel
 translate = QtCore.QCoreApplication.translate
 
 
-class PlaylistTreeView(treeview.TreeView):
+class PlaylistTreeView(treeview.DraggingTreeView):
     """This is the main widget of a playlist: The tree view showing the current element tree."""
     level = None
     
@@ -45,12 +45,6 @@ class PlaylistTreeView(treeview.TreeView):
     def __init__(self, delegateProfile):
         super().__init__(levels.real)
         self.backend = None
-        self.setSelectionMode(self.ExtendedSelection)
-        self.setDragEnabled(True)
-        self.setAcceptDrops(True)
-        self.setDefaultDropAction(Qt.MoveAction)
-        self.setDropIndicatorShown(True)
-        self.viewport().setMouseTracking(True)
         self.doubleClicked.connect(self._handleDoubleClick)
         self.setItemDelegate(playlistdelegate.PlaylistDelegate(self,delegateProfile))
         self.emptyModel = rootedtreemodel.RootedTreeModel()
@@ -58,6 +52,10 @@ class PlaylistTreeView(treeview.TreeView):
                                         self.tr("Please configure and choose a backend to play music."),
                                         wordWrap=True)])
 
+    @property
+    def stack(self):
+        return self.model().stack
+    
     def setBackend(self, backend):
         if self.backend is not None:
             self.model().modelReset.disconnect(self.expandAll)
@@ -77,11 +75,6 @@ class PlaylistTreeView(treeview.TreeView):
         if idx.isValid():
             offset = idx.internalPointer().offset()
             self.backend.setCurrent(offset)
-        
-    def dropEvent(self,event):
-        self.model()._internalMove = event.source() == self and event.dropAction() == Qt.MoveAction
-        super().dropEvent(event)
-        self.model()._internalMove = None
         
     def removeSelected(self):
         self.model().removeMany(self.selectedRanges())

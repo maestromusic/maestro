@@ -21,6 +21,7 @@ from collections import OrderedDict
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
+from .. import application
 from ..core.elements import Container
 from ..core.nodes import Wrapper
 from . import selection, treeactions
@@ -152,9 +153,11 @@ class TreeView(QtGui.QTreeView):
         self.setAlternatingRowColors(True)
         self.setSelectionMode(QtGui.QAbstractItemView.ExtendedSelection)
         self.setDragEnabled(True)
+        self.setDefaultDropAction(Qt.CopyAction)
+        self.viewport().setMouseTracking(True)
         
         self.treeActions = {}
-        for name,  (callable, args, kwargs) in self.actionConfig:
+        for name, (callable, args, kwargs) in self.actionConfig:
             if callable is not None:
                 self.treeActions[name] = action = callable(self, *args, **kwargs)
                 self.addAction(action)
@@ -179,11 +182,7 @@ class TreeView(QtGui.QTreeView):
     def focusInEvent(self, event):
         self.updateNodeSelection()
         super().focusInEvent(event)
-    
-    def dropEvent(self, event):
-        super().dropEvent(event)
-        self.updateNodeSelection()
-        
+
     def updateNodeSelection(self):
         selectionModel = self.selectionModel()
         if selectionModel is not None: # happens if the view is empty
@@ -231,3 +230,69 @@ class TreeView(QtGui.QTreeView):
         return [(self.model().data(itemRange.parent()),itemRange.top(),itemRange.bottom())
                     for itemRange in selection]
     
+    
+class DraggingTreeView(TreeView):
+    """This is the baseclass of tree views that allow to drag and drop wrappers, e.g. playlist and editor.
+    It handles the following issues:
+    
+        - Drag&drop actions must be enclosed in one undo-macro.
+        - Drags between views of the same class default to a move, drags between different views to a copy.
+          Via the shift and control modifier this default can be overridden. 
+        - Models might need to know when a drag&drop action is going on. For this DraggingTreeView will
+          call the methods startDrag and endDrag on models which provide them (both without arguments).
+        
+    """
+    def __init__(self, level, parent=None, affectGlobalSelection=True):
+        super().__init__(level, parent, affectGlobalSelection)
+        self.setDefaultDropAction(Qt.MoveAction)
+        self.setAcceptDrops(True)
+        self.setDropIndicatorShown(True)
+    
+    @property
+    def stack(self):
+        """Return the stack that is used for changes to this tree."""
+        return application.stack
+    
+    def startDrag(self, supportedActions):
+        model = self.model()
+        self.stack.beginMacro("Drag and Drop")
+        if hasattr(model, 'startDrag'):
+            model.startDrag()
+        try:
+            super().startDrag(supportedActions)
+        finally:
+            if hasattr(model, 'endDrag'):
+                model.endDrag()
+            self.stack.endMacro(abortIfEmpty=True)
+            
+    def _changeDropAction(self, event):
+        if event.keyboardModifiers() & Qt.ShiftModifier:
+            event.setDropAction(Qt.MoveAction)
+        elif event.keyboardModifiers() & Qt.ControlModifier:
+            event.setDropAction(Qt.CopyAction)
+        elif isinstance(event.source(), type(self)):
+            event.setDropAction(Qt.MoveAction)
+        else: 
+            event.setDropAction(Qt.CopyAction)
+            
+    def dragEnterEvent(self, event):
+        self._changeDropAction(event)
+        event.accept()
+        super().dragEnterEvent(event)
+        
+    def dragMoveEvent(self, event):
+        self._changeDropAction(event)
+        event.accept()
+        super().dragMoveEvent(event)
+        
+    def dropEvent(self, event):
+        # workaround due to bug #67
+        if event.mouseButtons() & Qt.LeftButton:
+            event.ignore()
+            return
+        self._changeDropAction(event)
+        self.model()._internalMove = event.source() == self and event.dropAction() == Qt.MoveAction
+        super().dropEvent(event)
+        self.model()._internalMove = False
+        self.updateNodeSelection()
+        

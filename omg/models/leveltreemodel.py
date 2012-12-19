@@ -16,14 +16,14 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+import collections
+
 from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
 from .. import application, config, logging, utils
 from ..core import elements, levels, nodes
 from ..models import rootedtreemodel
-
-from collections import OrderedDict
 
 translate = QtCore.QCoreApplication.translate
 logger = logging.getLogger(__name__)
@@ -42,6 +42,7 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
         If *elements* is given, these elements will be initially loaded under the root node.
         """
         super().__init__()
+        self._dnd_active = False
         self.level = level
         if elements:
             self._changeContents(QtCore.QModelIndex(), elements)
@@ -85,27 +86,6 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
         if mimeData.hasFormat(config.options.gui.mime):
             ids = [ node.element.id for node in mimeData.wrappers() ]
             elements = self.level.collectMany(ids)
-            if action == Qt.MoveAction:
-                levelRemovals = {}
-                modelRemovals = {}
-                for node in mimeData.wrappers():
-                    if isinstance(node.parent, nodes.Wrapper):
-                        elem, pos = node.parent.element, node.position
-                        dct = levelRemovals
-                    else:
-                        elem, pos = node.parent, node.parent.contents.index(node)
-                        dct = modelRemovals
-                    if elem not in dct:
-                        dct[elem] = [pos]
-                    else:
-                        dct[elem].append(pos)
-                for rparent, positions in levelRemovals.items():
-                    self.level.removeContentsAuto(rparent, positions=positions)
-                    if isinstance(parent, nodes.Wrapper) and rparent is parent.element:
-                        #  when elements above insert position are removed, insert row is decreased
-                        row -= len([pos for pos in positions if pos < insertPosition])
-                for rparent, rows in modelRemovals.items():
-                    rparent.model.removeElements(rparent, rows, move=True)
         else:  # text/uri-list
             elements = self.prepareURLs(mimeData.urls(), parent)
         ret = len(elements) != 0
@@ -113,9 +93,41 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
         application.stack.endMacro()
         return ret   
     
-    def removeRows(self, row, count, parent):
-        """Qt should not handle removals: DropMimeData does this for us."""
-        return True
+    def startDrag(self):
+        """Called by the view, when a drag starts."""
+        self._dnd_active = True
+        self._dnd_removeTuples = []
+    
+    def endDrag(self):
+        """Called by the view, when a drag ends."""
+        self._dnd_active = False
+        if len(self._dnd_removeTuples) > 0:
+            removeData = collections.defaultdict(set)
+            for element, row, count in self._dnd_removeTuples:
+                removeData[element].update(range(row,row+count))
+            for element, rows in removeData.items():
+                if element is None:
+                    self.removeElements(self.root, rows)
+                else: self.level.removeContentsAuto(element, indexes=rows)
+            self._dnd_removeTuples = []
+        
+
+    def removeRows(self, row, count, parentIndex):
+        parent = self.data(parentIndex)
+        if not self._dnd_active: 
+            self.removeElements(parent, list(range(row, row+count)))
+            return True
+        else:
+            # After DnD move operations Qt calls removeRows to remove content from the source model.
+            # Depending on the selection, several calls to removeRows might be necessary. In models where a
+            # remove operation can trigger changes at other places in the model, this can cause problem.
+            # Thus, during a drag we collect all such calls and remove their contents only in endDrag.   
+            # See ticket #129.
+            if parent is self.root:
+                element = None
+            else: element = parent.element
+            self._dnd_removeTuples.append((element, row, count))
+            return False
         
     def insertElements(self, parent, row, elements):
         """Undoably insert *elements* (a list of Elements) under *parent*, which is a wrapper.
@@ -130,7 +142,7 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
         else:
             self.level.insertContentsAuto(parent.element, row, elements)
     
-    def removeElements(self, parent, rows, move=False):
+    def removeElements(self, parent, rows):
         """Undoably remove elements in *rows* under *parent* (a wrapper).
         
         This convenience function either alters the RootNode, if parent is self.root, or updates
@@ -167,7 +179,7 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
         progress.setRange(0, numFiles)
         progress.setMinimumDuration(200)
         progress.setWindowModality(Qt.WindowModal)
-        filesByFolder = OrderedDict()
+        filesByFolder = collections.OrderedDict()
         elements = []
         try:
             # load files into editor level

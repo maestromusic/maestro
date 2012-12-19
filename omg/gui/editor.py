@@ -28,7 +28,7 @@ from ..models.editor import EditorModel
 from .delegates import editor as editordelegate
 
         
-class EditorTreeView(treeview.TreeView):
+class EditorTreeView(treeview.DraggingTreeView):
     """This is the main widget of an editor: The tree view showing the current element tree."""
 
     actionConfig = treeview.TreeActionConfiguration()
@@ -47,49 +47,11 @@ class EditorTreeView(treeview.TreeView):
 
     def __init__(self, delegateProfile):
         super().__init__(levels.editor)
-        self.setSelectionMode(self.ExtendedSelection)
-        self.setDragEnabled(True)
-        self.setAcceptDrops(True)
-        self.setDefaultDropAction(Qt.MoveAction)
-        self.setDropIndicatorShown(True)
         self.setModel(EditorModel())
         self.setItemDelegate(editordelegate.EditorDelegate(self, delegateProfile))
-        self.viewport().setMouseTracking(True)
         self.autoExpand = True
         self.model().rowsInserted.connect(self._expandInsertedRows)
-
-    def dragEnterEvent(self, event):
-        if event.source() is self:
-            event.setDropAction(Qt.MoveAction)
-        else:
-            event.setDropAction(Qt.CopyAction)
-        event.acceptProposedAction()
-        super().dragEnterEvent(event)
-        
-    def dragMoveEvent(self, event):
-        if isinstance(event.source(), EditorTreeView):
-            if event.keyboardModifiers() & Qt.ShiftModifier:
-                event.setDropAction(Qt.MoveAction)
-            elif event.keyboardModifiers() & Qt.ControlModifier:
-                event.setDropAction(Qt.CopyAction)
-        super().dragMoveEvent(event)
-        
-    def dropEvent(self, event):
-        # workaround due to bug #67
-        if event.mouseButtons() & Qt.LeftButton:
-            event.ignore()
-            return
-        if isinstance(event.source(), EditorTreeView):
-            if event.keyboardModifiers() & Qt.ShiftModifier:
-                event.setDropAction(Qt.MoveAction)
-            elif event.keyboardModifiers() & Qt.ControlModifier:
-                event.setDropAction(Qt.CopyAction)
-            elif event.source() is self:
-                event.setDropAction(Qt.MoveAction)
-            else:
-                event.setDropAction(Qt.CopyAction)
-        super().dropEvent(event)
-        
+       
     def _expandInsertedRows(self, parent, start, end):
         if self.autoExpand:
             for row in range(start, end+1):

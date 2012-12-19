@@ -33,6 +33,7 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
     def __init__(self, backend=None, level=None, stack=None):
         """Initialize with an empty playlist."""
         super().__init__(level if level is not None else levels.real)
+        self._dnd_active = False
 
         self.backend = backend
         self.current = None
@@ -134,6 +135,31 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
                         descend = False
         except StopIteration:
             pass
+    
+    def startDrag(self):
+        """Called by the view, when a drag starts."""
+        self._dnd_active = True
+        self._dnd_removeTuples = []
+    
+    def endDrag(self):
+        """Called by the view, when a drag ends."""
+        self._dnd_active = False
+        self.removeMany(self._dnd_removeTuples)
+        self._dnd_removeTuples = []
+        
+    def removeRows(self, row, count, parentIndex):
+        parent = self.data(parentIndex)
+        if not self._dnd_active: 
+            self.remove(parent, row, row+count-1)
+            return True
+        else:
+            # After DnD move operations Qt calls removeRows to remove content from the source model.
+            # Depending on the selection, several calls to removeRows might be necessary. In models where a
+            # remove operation can trigger changes at other places in the model, this can cause problem.
+            # Thus, during a drag we collect all such calls and remove their contents only in endDrag.  
+            # See ticket #129.
+            self._dnd_removeTuples.append((parent, row, row+count-1))
+            return False
         
     def dropMimeData(self,mimeData,action,row,column,parentIndex):
         # Compute drop position
@@ -159,7 +185,8 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
             if hasattr(mimeData,'level') and mimeData.level is levels.real:
                 wrappers = [wrapper.copy() for wrapper in mimeData.wrappers()]
             else:
-                wrappers = [levels.real.get(wrapper.element.id) for wrapper in mimeData.fileWrappers()]   
+                wrappers = [Wrapper(levels.real.get(wrapper.element.id))
+                            for wrapper in mimeData.fileWrappers()]   
         else:
             urls = itertools.chain.from_iterable(
                                     utils.collectFiles(url.path() for url in mimeData.urls()).values())
@@ -332,6 +359,8 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         
     def removeMany(self, ranges, updateBackend='always'):
         """See WrapperTreeModel.removeMany."""
+        if len(ranges) == 0:
+            return
         self.stack.beginMacro(self.tr('Remove from playlist'))
         command = PlaylistRemoveCommand(self, ranges, updateBackend)
         self.stack.push(command)

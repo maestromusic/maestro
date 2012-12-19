@@ -86,7 +86,7 @@ class WrapperTreeModel(rootedtreemodel.RootedTreeModel):
         is removed, respectively."""
         self.removeMany([(parent,first,last)])
         
-    def removeMany(self,ranges):   
+    def removeMany(self, ranges):   
         """Remove arbitrary wrappers from the model. *ranges* is a list of tuples consisting of a parent,
         whose contents should be modified and the first and last index that should be removed (confer the
         arguments of remove). So at first glance removeMany is equivalent
@@ -97,8 +97,9 @@ class WrapperTreeModel(rootedtreemodel.RootedTreeModel):
         But in fact removeMany does some magic so that you can safely call it with any ranges (see
         RemoveCommand).
         """
-        command = RemoveCommand(self,ranges)
-        application.stack.push(command)
+        if len(ranges) == 0:
+            return
+        application.stack.push(RemoveCommand(self, ranges))
         
     def supportedDropActions(self):
         return Qt.CopyAction | Qt.MoveAction
