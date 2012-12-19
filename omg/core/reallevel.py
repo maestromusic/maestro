@@ -173,8 +173,11 @@ class RealLevel(levels.Level):
             buffer.append(data)
         if current is not None:
             level.elements[current[0]].data[current[1]] = tuple(buffer)
-            
-        return [self.elements[id] for id in idList]
+        
+        try:
+            return [self.elements[id] for id in idList]
+        except KeyError as e: # probably some ids were not contained in the database
+            raise levels.ElementGetError(self, [id for id in idList if id not in self])
             
     def loadFromUrls(self, urls, level=None):
         """Loads files given by *urls*, into *level* which defaults to the real level. This must not be

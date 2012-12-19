@@ -44,11 +44,15 @@ def init():
     
 
 class ElementGetError(RuntimeError):
-    """Error indicating that some elements failed to be loaded by some level."""
-    def __init__(self, level, elements, text=''):
+    """Error indicating that some elements failed to be loaded by some level. *params* is a list of either
+    ids or urls for which no element could be loaded."""
+    def __init__(self, level, params, text="Could not load some elements"):
         super().__init__(text)
         self.level = level
-        self.elements = elements
+        self.params = params
+        
+    def __str__(self):
+        return "{} ({}): {}".format(super().__str__(), self.level, self.params) 
 
 
 class RenameFilesError(RuntimeError):
@@ -752,10 +756,13 @@ class Level(application.ChangeEventDispatcher):
         
         If *createFunc* is not None, it will be used to create wrappers (instead of the constructor of
         Wrapper). It must take the parent wrapper and the name as arguments and return a Wrapper instance.
-        It might raise ValueErrors if the wrapper string is invalid.
+        It might raise ValueErrors if the wrapper string is invalid and an ElementGetError if the string
+        is basically valid but no element can be loaded for it (like an id that does not belong to a file). 
         
         If *createFunc* is None, all names in *wrapperString* must be ids and wrappers are created using
         these ids.
+        
+        Identifiers for which no element can be created due to an ElementGetError will simply be skipped.
         """  
         roots = []
         currentWrapper = None
@@ -775,11 +782,13 @@ class Level(application.ChangeEventDispatcher):
                 i += 1
             if last != i:
                 yield s[last:i]
-                
+        
         for token in _getTokens(wrapperString):
             if token == ',':
                 continue
             if token == '[':
+                if len(currentList) == 0:
+                    raise ValueError("Invalid wrapper string: {}".format(wrapperString))
                 currentWrapper = currentList[-1]
                 if not currentWrapper.isContainer():
                     raise ValueError("Invalid wrapper string: {} is not a container."
@@ -791,17 +800,22 @@ class Level(application.ChangeEventDispatcher):
                     currentList = roots
                 else: currentList = currentWrapper.contents
             else:
-                if createFunc is None:
-                    element = self.get[int(token)] # might raise ValueError
-                    wrapper = Wrapper(element)
-                    if currentWrapper is not None:
-                        wrapper.parent = currentWrapper
-                else:
-                    wrapper = createFunc(currentWrapper,token) # may raise ValueError
-                if currentWrapper is not None and wrapper.element.id not in currentWrapper.element.contents:
-                    raise ValueError("Invalid wrapper string: {} is not contained in {}."
-                                     .format(wrapper.element.id, currentWrapper.element.id))
-                currentList.append(wrapper)
+                try:
+                    if createFunc is None:
+                        element = self.get[int(token)] # might raise ValueError
+                        wrapper = Wrapper(element)
+                        if currentWrapper is not None:
+                            wrapper.parent = currentWrapper
+                    else:
+                        wrapper = createFunc(currentWrapper,token) # may raise ValueError
+                
+                    if currentWrapper is not None and wrapper.element.id not in currentWrapper.element.contents:
+                        raise ValueError("Invalid wrapper string: {} is not contained in {}."
+                                         .format(wrapper.element.id, currentWrapper.element.id))
+                    currentList.append(wrapper)
+                except ElementGetError as e:
+                    logger.warning(str(e))
+                    continue
         return roots
     
     def __str__(self):

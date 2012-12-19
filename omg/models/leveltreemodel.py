@@ -197,7 +197,7 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
                 self.guessProfile.guessAlbums(self.level, filesByFolder)
                 return self.guessProfile.albums + self.guessProfile.singles
         except levels.ElementGetError as e:
-            print(e)
+            logger.warning(str(e))
             return []
         
     def __contains__(self, arg):

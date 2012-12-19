@@ -51,12 +51,16 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         self._updateCurrentlyPlayingNodes()
     
     def setCurrent(self, offset):
-        """Set the currently playing song to the song with the given offset. If offset is None, no song is
-        currently playing."""
+        """Set the currently playing song to the song with the given offset. If offset is None or invalid,
+        no song should be currently playing."""
         if offset is None:     
             self.clearCurrent() 
         else:
-            self.current = self.root.fileAtOffset(offset)
+            try:
+                self.current = self.root.fileAtOffset(offset)
+            except IndexError:
+                self.clearCurrent()
+                return
             self._updateCurrentlyPlayingNodes()
         
     def _updateCurrentlyPlayingNodes(self):
@@ -474,8 +478,8 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
             return Wrapper(element,parent=parent)
         try:
             wrappers = levels.real.createWrappers(wrapperString,createFunc=_createFunc)
-        except ValueError:
-            #TODO show an error message
+        except ValueError as e:
+            logger.warning(str(e))
             return
         self._setRootContents(wrappers)
         
