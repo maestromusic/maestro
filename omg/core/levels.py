@@ -528,13 +528,14 @@ class Level(application.ChangeEventDispatcher):
         
         On the real level, this can raise a FileRenameError.
         """
-        reversed =  {file:(newUrl, oldUrl) for  (file, (oldUrl, newUrl)) in renamings.items()}
-        command = GenericLevelCommand(redoMethod=self._renameFiles,
-                                      redoArgs={"renamings" : renamings},
-                                      undoMethod=self._renameFiles,
-                                      undoArgs={"renamings": reversed},
-                                      text=self.tr("rename files"))
-        self.stack.push(command)
+        if len(renamings):
+            reversed =  {file:(newUrl, oldUrl) for  (file, (oldUrl, newUrl)) in renamings.items()}
+            command = GenericLevelCommand(redoMethod=self._renameFiles,
+                                          redoArgs={"renamings" : renamings},
+                                          undoMethod=self._renameFiles,
+                                          undoArgs={"renamings": reversed},
+                                          text=self.tr("rename files"))
+            self.stack.push(command)
     
     def commit(self, elements=None):
         """Undoably commit given *elements* (or everything, if not specified) into the parent level.

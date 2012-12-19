@@ -230,26 +230,27 @@ class RealLevel(levels.Level):
               are correct (on the real level).
         
         """
-        assert all(element.level is self for element in elements)
-        #elements = [element if element.level is self else element.copy(level=self) for element in elements]
-        command = levels.GenericLevelCommand(redoMethod=self._addToDb,
-                                             redoArgs={"elements": elements},
-                                             undoMethod=self._removeFromDb,
-                                             undoArgs={"elements": elements},
-                                             text=self.tr("Add elements to database"))
-        self.stack.push(command)
+        if len(elements):
+            assert all(element.level is self for element in elements)
+            command = levels.GenericLevelCommand(redoMethod=self._addToDb,
+                                                 redoArgs={"elements": elements},
+                                                 undoMethod=self._removeFromDb,
+                                                 undoArgs={"elements": elements},
+                                                 text=self.tr("Add elements to database"))
+            self.stack.push(command)
         
     def removeFromDb(self, elements):
         """Remove the given elements with all their tags etc. from the database. Containers are also
         removed from the real level. No element may be contained in any container unless this container
         is also in *elements*.
         """
-        command = levels.GenericLevelCommand(redoMethod=self._removeFromDb,
-                                             redoArgs={"elements": elements},
-                                             undoMethod=self._addToDb,
-                                             undoArgs={"elements": elements},
-                                             text=self.tr("Remove elements from database"))
-        self.stack.push(command)
+        if len(elements):
+            command = levels.GenericLevelCommand(redoMethod=self._removeFromDb,
+                                                 redoArgs={"elements": elements},
+                                                 undoMethod=self._addToDb,
+                                                 undoArgs={"elements": elements},
+                                                 text=self.tr("Remove elements from database"))
+            self.stack.push(command)
     
     def _addToDb(self, elements):
         """Like addToDb but not undoable."""
