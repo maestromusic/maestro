@@ -68,11 +68,15 @@ class PhononPlayerBackend(player.PlayerBackend):
         self.audioOutput = phonon.AudioOutput(phonon.MusicCategory)
         phonon.createPath(self.mediaObject,self.audioOutput)
     
-    # Insert etc. are handled by the PlaylistModel
+    # Insert etc. are handled by the PlaylistModel. We only have to change the state if necessary.
     def insertIntoPlaylist(self,pos,paths): pass
     def move(self,fromOffset,toOffset): pass
     
     def removeFromPlaylist(self,begin,end):
+        if self.playlist.current is None:
+            self.setState(player.STOP)
+            
+    def setPlaylist(self, urls):
         if self.playlist.current is None:
             self.setState(player.STOP)
         
@@ -124,6 +128,11 @@ class PhononPlayerBackend(player.PlayerBackend):
             else:
                 self.setState(player.STOP)
             self.currentChanged.emit(offset)
+        elif offset is not None \
+                and self._getPath(offset) != self.mediaObject.currentSource().url().toString():
+            source = phonon.MediaSource(self._getPath(offset))
+            self.mediaObject.setCurrentSource(source)
+            self.mediaObject.play()
     
     def elapsed(self):
         return self.mediaObject.currentTime() / 1000
