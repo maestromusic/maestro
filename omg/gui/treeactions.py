@@ -356,7 +356,7 @@ class ClearPlaylistAction(TreeAction):
         self.setEnabled(self.parent().model().root.hasContents() > 0)
         
     def doAction(self):
-        self.parent().backend.clearPlaylist()
+        self.parent().model().clear()
         
             
 class TagValueAction(TreeAction):

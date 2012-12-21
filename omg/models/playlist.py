@@ -585,7 +585,7 @@ class PlaylistChangeCommand(wrappertreemodel.ChangeCommand):
     def redo(self):
         super().redo()
         if self._updateBackend == 'always':
-            urls = list(f.element.url for f in self.model.root.getAllFiles())
+            urls = [element.url for f in self.model.root.getAllFiles()]
             self.model.backend.setPlaylist(urls)
         elif self._updateBackend == 'onundoredo':
             self._updateBackend = 'always' # from now on
