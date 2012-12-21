@@ -23,7 +23,7 @@ from PyQt4.QtCore import Qt
 
 from .abstractdelegate import *
 from ... import config, strutils, database as db, utils
-from ...core import tags
+from ...core import tags, levels
 from ...core.nodes import RootNode, Wrapper, TextNode
 from ...models import browser as browsermodel
 from . import profiles
@@ -200,7 +200,10 @@ class StandardDelegate(AbstractDelegate):
                 # (this is clear if id in ancestorIds, otherwise we did so when painting the corresponding
                 # wrapper in the current tree structure)
                 continue
-            ancestor = element.level.fetch(id)
+            try:
+                ancestor = element.level.fetch(id)
+            except levels.ElementGetError: # this may happen if the parent has just been deleted
+                continue
             if not onlyMajor or ancestor.major:
                 ancestorIds.append(id)
                 ancestors.append(ancestor)
