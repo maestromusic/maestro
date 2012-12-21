@@ -437,12 +437,13 @@ class RealLevel(levels.Level):
         # due to foreign key constraints...
         if not all(self[childId].isInDb() for childId in contents if childId in self):
             raise levels.ConsistencyError("Elements must be in the DB before being added to a container.")
-            
-        # ...the following query will fail anyway (but with a DBException)
-        # if some contents are not in the database yet.
-        db.multiQuery("INSERT INTO {}contents (container_id, position, element_id) VALUES (?, ?, ?)"
-                      .format(db.prefix),
-                      [(parent.id, pos, childId) for pos, childId in contents.items()])
+        
+        if len(contents) > 0:
+            # ...the following query will fail anyway (but with a DBException)
+            # if some contents are not in the database yet.
+            db.multiQuery("INSERT INTO {}contents (container_id, position, element_id) VALUES (?, ?, ?)"
+                          .format(db.prefix),
+                          [(parent.id, pos, childId) for pos, childId in contents.items()])
         db.write.updateElementsCounter((parent.id,))
         if len(changedChildIds) > 0:
             db.write.updateToplevelFlags(changedChildIds)
