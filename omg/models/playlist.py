@@ -556,6 +556,8 @@ class PlaylistRemoveCommand(wrappertreemodel.RemoveCommand):
             if self._updateBackend == 'always':
                 startOffset = parent.contents[start].offset()
                 endOffset = parent.contents[end].offset() + parent.contents[end].fileCount()
+                if self.model.current is not None and startOffset <= self.model.current.offset() < endOffset:
+                    self.model.setCurrent(None)
                 self.model.backend.removeFromPlaylist(startOffset,endOffset)
             elif self._updateBackend == 'onundoredo':
                 self._updateBackend = 'always' # from now on
@@ -584,19 +586,19 @@ class PlaylistChangeCommand(wrappertreemodel.ChangeCommand):
         
     def redo(self):
         super().redo()
+        self.model._updateCurrentlyPlayingNodes()
         if self._updateBackend == 'always':
             urls = [element.url for f in self.model.root.getAllFiles()]
             self.model.backend.setPlaylist(urls)
         elif self._updateBackend == 'onundoredo':
             self._updateBackend = 'always' # from now on
-        self.model._updateCurrentlyPlayingNodes()
         
     def undo(self):
         super().undo()
+        self.model._updateCurrentlyPlayingNodes()
         if self._updateBackend != 'never':
             urls = list(f.element.url for f in self.model.root.getAllFiles())
             self.model.backend.setPlaylist(urls)
-        self.model._updateCurrentlyPlayingNodes()
         
 
 class PlaylistMoveInBackendCommand:
