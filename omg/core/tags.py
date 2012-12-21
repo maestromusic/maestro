@@ -914,35 +914,43 @@ class TagDifference:
         self.removals = removals
         self.replacements = replacements
         
-    def apply(self,element):
-        """Change the tags of *element* according to this difference object."""
+    def apply(self,element, withoutPrivateTags=False):
+        """Change the tags of *element* (or anything that has a .tags attribute) according to this
+        difference object. If *withoutPrivateTags* is True, ignore changes to private tags."""
         if self.removals is not None:
             for tag,value in self.removals:
-                element.tags[tag].remove(value)
+                if not (withoutPrivateTags and tag.private):
+                    element.tags[tag].remove(value)
         
         if self.replacements is not None:
             for tag,value,newValue in self.replacements:
-                index = element.tags[tag].index(value)
-                element.tags[tag][index] = newValue
+                if not (withoutPrivateTags and tag.private):
+                    index = element.tags[tag].index(value)
+                    element.tags[tag][index] = newValue
         
         if self.additions is not None:
             for tag,value in self.additions:
-                element.tags.add(tag,value)
+                if not (withoutPrivateTags and tag.private):
+                    element.tags.add(tag,value)
             
-    def revert(self,element):
-        """Undo the changes of this difference object to the tags of *element*."""
+    def revert(self,element, withoutPrivateTags=False):
+        """Undo the changes of this difference object to the tags of *element*.  If *withoutPrivateTags*
+        is True, ignore changes to private tags."""
         if self.additions is not None:
             for tag,value in self.additions:
-                element.tags[tag].remove(value)
+                if not (withoutPrivateTags and tag.private):
+                    element.tags[tag].remove(value)
         
         if self.replacements is not None:
             for tag,value,newValue in self.replacements:
-                index = element.tags[tag].index(newValue)
-                element.tags[tag][index] = value
+                if not (withoutPrivateTags and tag.private):
+                    index = element.tags[tag].index(newValue)
+                    element.tags[tag][index] = value
         
         if self.removals is not None:
             for tag,value in self.removals:
-                element.tags.add(tag,value)
+                if not (withoutPrivateTags and tag.private):
+                    element.tags.add(tag,value)
             
     def getAdditions(self):
         """Return the list of (tag,value) pairs that are added by this TagDifference. This includes new
@@ -998,12 +1006,21 @@ class TagStorageDifference(TagDifference):
         self.oldTags = oldTags
         self.newTags = newTags
         
-    def apply(self,element):
+    def apply(self,element, withoutPrivateTags=False):
         # element may also be a FileBackend
-        element.tags = self.newTags.copy() if self.newTags is not None else Storage()
+        if self.newTags is None:
+            element.tags = Storage()
+        elif withoutPrivateTags:
+            element.tags = self.newTags.withoutPrivateTags(copy=True)
+        else: element.tags = self.newTags.copy()
         
-    def revert(self,element):
-        element.tags = self.oldTags.copy() if self.oldTags is not None else Storage()
+    def revert(self,element, withoutPrivateTags=False):
+        # element may also be a FileBackend
+        if self.newTags is None:
+            element.tags = Storage()
+        elif withoutPrivateTags:
+            element.tags = self.oldTags.withoutPrivateTags(copy=True)
+        else: element.tags = self.oldTags.copy()
         
     def getAdditions(self):
         if self.newTags is None:

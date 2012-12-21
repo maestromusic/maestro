@@ -205,7 +205,7 @@ def changeTags(changes):
             break
         
         currentFileTags = backendFile.tags.copy()
-        diff.apply(backendFile)
+        diff.apply(backendFile, withoutPrivateTags=True)
         #logger.debug('changing tags of {}: {}'.format(backendFile.url, diff))
         problems = backendFile.saveTags()
         if len(problems) > 0:
@@ -218,6 +218,6 @@ def changeTags(changes):
             
     if rollback:
         for backendFile,diff in doneFiles:
-            diff.revert(backendFile.tags)
+            diff.revert(backendFile.tags, withoutPrivateTags=True)
             backendFile.saveTags()
         raise TagWriteError(problemUrl, problems)

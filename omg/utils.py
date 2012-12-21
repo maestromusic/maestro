@@ -99,11 +99,11 @@ class InverseDifference:
     def __init__(self,difference):
         self._diff = difference
         
-    def apply(self,element):
-        self._diff.revert(element)
+    def apply(self,element, *args, **kwargs):
+        self._diff.revert(element, *args, **kwargs)
         
-    def revert(self,element):
-        self._diff.apply(element)
+    def revert(self,element, *args,**kwargs):
+        self._diff.apply(element, *args, **kwargs)
         
     def getAdditions(self):
         return self._diff.getRemovals()
