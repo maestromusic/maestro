@@ -270,10 +270,11 @@ class RealLevel(levels.Level):
         data = [(element.id,
                  element.isFile(),
                  element.major if element.isContainer() else False,
-                 len(element.parents) == 0)
+                 len(element.parents) == 0,
+                 len(element.contents) if element.isContainer() else 0)
                         for element in elements]
-        db.multiQuery("INSERT INTO {}elements (id, file, major, toplevel)\
-                       VALUES (?,?,?,?)".format(db.prefix), data)
+        db.multiQuery("INSERT INTO {}elements (id, file, major, toplevel, elements)\
+                       VALUES (?,?,?,?,?)".format(db.prefix), data)
 
         # Do this early, otherwise e.g. setFlags might raise a ConsistencyError)
         _dbIds.update(element.id for element in elements)
