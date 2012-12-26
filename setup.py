@@ -16,10 +16,17 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
+import sys
+if sys.version_info.major <= 2:
+  print("OMG runs with Python 3.x only. Please re-run setup.py with a Python3 interpreter.""")
+  sys.exit(1)
+
 import distribute_setup
 distribute_setup.use_setuptools()
 from setuptools import setup, find_packages
 from setuptools.command.sdist import sdist
+
+
 original_run = sdist.run
 def sdist_run(self):
     import subprocess
