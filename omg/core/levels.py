@@ -647,7 +647,8 @@ class Level(application.ChangeEventDispatcher):
             
     def _removeElements(self, elements):
         for element in elements:
-            del self.elements[element.id]
+            if element.id in self.elements: # *elements* might contain some elements more than once
+                del self.elements[element.id]
         if len(elements) > 0:
             self.emit(LevelChangedEvent(removedIds=[element.id for element in elements]))
             
