@@ -25,7 +25,9 @@ if sys.version_info.major <= 2:
   sys.exit(1)
 
 import distribute_setup
+
 distribute_setup.use_setuptools()
+
 from setuptools import setup, find_packages
 import setuptools.command.sdist
 import setuptools.command.install
