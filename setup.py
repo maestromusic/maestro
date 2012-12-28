@@ -18,7 +18,8 @@
 #
 import sys
 if sys.version_info.major <= 2:
-  print("OMG runs with Python 3.x only. Please re-run setup.py with a Python3 interpreter.""")
+  print("OMG runs with Python 3.x only. "
+        "Please re-run setup.py with a Python3 interpreter.")
   sys.exit(1)
 
 import distribute_setup
