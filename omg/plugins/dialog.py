@@ -95,4 +95,5 @@ class PluginDialog(QtGui.QWidget):
                     item.setCheckState(False)
                     from ..gui.dialogs import warning
                     warning(self.tr("Error enabling plugin"),
-                            self.tr("Could not enable plugin:\n{}").format(e))
+                            self.tr("Could not enable plugin {}:\n{}")
+                            .format(plugin.name, e))

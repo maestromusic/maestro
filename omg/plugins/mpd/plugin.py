@@ -18,7 +18,10 @@
 
 import contextlib
 import socket, threading, time
-import mpd
+try:
+	import mpd
+except ImportError:
+	raise ImportError("python-mpd2 not installed.")
 
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
