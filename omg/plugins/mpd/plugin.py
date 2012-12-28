@@ -278,6 +278,14 @@ class MPDPlayerBackend(player.PlayerBackend):
                 self.commander.disconnect()
             application.stack.resetSubstack(self.stack)
     
+    def setPlaylist(self, urls):
+        with self.prepareCommander():
+            with self.atomicOp:
+                self.commander.clear()
+                self.mpdthread.playlistVersion += 1
+                self.mpdthread.mpd_playlist = []
+        self.insertIntoPlaylist(0, urls)
+	
     def insertIntoPlaylist(self, pos, urls):
         """Insert *urls* into the MPD playlist at position *pos*.
         
