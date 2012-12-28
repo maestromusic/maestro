@@ -19,7 +19,10 @@
 import urllib.parse
 
 from PyQt4 import QtCore
-from PyQt4.phonon import Phonon as phonon
+try:
+    from PyQt4.phonon import Phonon as phonon
+except ImportError as e:
+    raise ImportError("PyQt4-phonon is not installed.")
 
 from ... import player, profiles, utils, strutils
 from ...models import playlist

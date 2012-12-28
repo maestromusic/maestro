@@ -88,5 +88,11 @@ class PluginDialog(QtGui.QWidget):
             if plugin.enabled and item.checkState() == Qt.Unchecked:
                 plugin.disable()
             elif not plugin.enabled and item.checkState() == Qt.Checked:
-                plugin.enable()
-                plugin.mainWindowInit()
+                try:
+                    plugin.enable()
+                    plugin.mainWindowInit()
+                except Exception as e:
+                    item.setCheckState(False)
+                    from ..gui.dialogs import warning
+                    warning(self.tr("Error enabling plugin"),
+                            self.tr("Could not enable plugin:\n{}").format(e))
