@@ -23,6 +23,11 @@ try:
 except ImportError:
 	raise ImportError("python-mpd2 not installed.")
 
+import pkg_resources
+mpd_version = [ int(x) for x in pkg_resources.get_distribution("python-mpd2").version.split(".")]
+if mpd_version < [0,4,4]:
+    raise ImportError("The installed version of python-mpd2 is too old. OMG needs at least "
+                      "python-mpd2-0.4.4 to function properly.")
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
