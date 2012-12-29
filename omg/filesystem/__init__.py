@@ -28,6 +28,7 @@ logger = logging.getLogger(__name__)
 
 synchronizer = None
 enabled = False
+hashingEnabled = True
 null = open(os.devnull) 
 
 NO_MUSIC = 0
@@ -39,7 +40,17 @@ def init():
     global synchronizer, notifier, enabled
     import _strptime
     if config.options.filesystem.disable:
-        return
+    try:
+        proc = subprocess.Popen(
+            ['ffmpeg', '-version'],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
+    except OSError as e:
+        import errno
+        if e.errno == errno.ENOENT:
+            logger.warning("FFMPEG not installed. File tracking won't be fully functional.")
+            hashingEnabled = False
     synchronizer = FileSystemSynchronizer()
     synchronizer.eventThread.start()
     levels.real.filesRenamed.connect(synchronizer.handleRename, Qt.QueuedConnection)
@@ -395,7 +406,7 @@ class FileSystemSynchronizer(QtCore.QObject):
         self.loadNewFiles()
         self.initialized.set()
         self.initializationComplete.emit()
-        if len(self.missingHashes) > 0:
+        if len(self.missingHashes) > 0 and hashingEnabled:
             lenMissing = len(self.missingHashes)
             for i, track in enumerate(self.missingHashes):
                 track.hash = computeHash(track.url)
@@ -430,9 +441,10 @@ class FileSystemSynchronizer(QtCore.QObject):
             check = True
         if check:
             if track.id is None:
-                
-                newHash = computeHash(track.url)
                 track.verified = modified
+                if not hashingEnabled:
+                    return
+                newHash = computeHash(track.url)
                 if newHash != track.hash:
                     logger.debug("just updating hash")
                     db.query("UPDATE {}newfiles "
@@ -448,7 +460,7 @@ class FileSystemSynchronizer(QtCore.QObject):
                 backendFile.readTags()
                 if dbTags.withoutPrivateTags() != backendFile.tags:
                     logger.debug('Detected modification on file "{}": tags differ'.format(track.url))
-                    track.hash = computeHash(track.url)
+                    track.hash = computeHash(track.url) if hashingEnabled else None
                     self.modifiedTags[track] = (dbTags, backendFile.tags)
                     track.problem = True
                 else:
