@@ -237,16 +237,15 @@ class MPDThread(QtCore.QThread):
     def disconnect(self):
         if not self.connected:
             return
+        self.connected = False
         self.idler.noidle()
         self.idler.disconnect()
-        self.connected = False
+        
         logger.debug('mpd thread disconnected')
         self.changeFromMPD.emit('disconnect', None)
         
     def run(self):
-        while True:
-            if not self.shouldConnect.is_set():
-                return
+        while self.shouldConnect.is_set():
             try:
                 if not self.connected:
                     self.connect()
@@ -265,6 +264,8 @@ class MPDThread(QtCore.QThread):
     
     def watchMPDStatus(self):
         while True:
+            if not self.connected:
+                return
             self.idler.send_idle()
             changed = self.idler.fetch_idle()
             with self.atomicOp:

@@ -125,6 +125,12 @@ class EditorWidget(QtGui.QDockWidget):
                 'guessProfile': guessProfile.name if guessProfile is not None else None, 
                 'delegate': self.editor.itemDelegate().profile.name # a delegate's profile is never None
                 }
+    
+    def okToClose(self):
+        if self.editor.model().containsUncommitedData():
+            return dialogs.question(self.tr("Unsaved changes"),
+                self.tr("The editor contains uncommited changes. Really close?"))
+        return True
 
 
 class OptionDialog(dialogs.FancyPopup):

@@ -18,8 +18,16 @@
 
 import contextlib
 import socket, threading, time
-import mpd
+try:
+	import mpd
+except ImportError:
+	raise ImportError("python-mpd2 not installed.")
 
+import pkg_resources
+mpd_version = [ int(x) for x in pkg_resources.get_distribution("python-mpd2").version.split(".")]
+if mpd_version < [0,4,4]:
+    raise ImportError("The installed version of python-mpd2 is too old. OMG needs at least "
+                      "python-mpd2-0.4.4 to function properly.")
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
@@ -275,6 +283,14 @@ class MPDPlayerBackend(player.PlayerBackend):
                 self.commander.disconnect()
             application.stack.resetSubstack(self.stack)
     
+    def setPlaylist(self, urls):
+        with self.prepareCommander():
+            with self.atomicOp:
+                self.commander.clear()
+                self.mpdthread.playlistVersion += 1
+                self.mpdthread.mpd_playlist = []
+        self.insertIntoPlaylist(0, urls)
+	
     def insertIntoPlaylist(self, pos, urls):
         """Insert *urls* into the MPD playlist at position *pos*.
         

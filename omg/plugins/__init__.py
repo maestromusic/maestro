@@ -128,7 +128,13 @@ def enablePlugins():
     for pluginName in config.options.main.plugins:
         if pluginName != '':
             if pluginName in plugins:
-                plugins[pluginName].enable()
+                try:
+                    plugins[pluginName].enable()
+                except ImportError as e:
+                    from ..gui.dialogs import warning
+                    warning(translate("plugins", "Error enabling plugin"),
+                            translate("plugins", "Could not enable plugin {}:\n{}")
+                            .format(pluginName, e))
             else: logger.error("could not enable plugin {} since it does not exist – check your config!"
                                 .format(pluginName))
 

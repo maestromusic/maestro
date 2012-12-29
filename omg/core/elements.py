@@ -107,6 +107,25 @@ class Element:
         elif self.id not in self.level.parent:
             return None
         else: return self.level.parent[self.id]
+    
+    def equalsButLevel(self, other):
+        """Return True if this element equals *other* in all aspects but possibly the level."""
+        if self.tags != other.tags:
+            return False
+        if self.flags != other.flags:
+            return False
+        if self.data != other.data:
+            return False
+        if self.isContainer():
+            if self.contents != other.contents:
+                return False
+            if self.major != other.major:
+                return False
+        else:
+            if self.url != other.url:
+                return False
+        return True
+
 
 
 class Container(Element):

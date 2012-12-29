@@ -216,6 +216,17 @@ class EditorModel(leveltreemodel.LevelTreeModel):
         """Return whether the editor contains any external tags. While this is the case, a commit is not
         possible."""
         return any(info.type == 'external' for info in self.extTagInfos)
+        
+    def containsUncommitedData(self):
+        """Return whether the editor contains uncommited data."""
+        for wrapper in self.root.getAllNodes(True):
+            element = wrapper.element
+            if not element.isInDb():
+                return True
+            realElement = levels.real.collect(element.id)
+            if not element.equalsButLevel(realElement):
+                return True
+        return False
     
     def commit(self):
         """Commit the contents of this editor."""
