@@ -114,5 +114,5 @@ SOURCES = \
     ../omg/undostack.py \
     ../omg/utils.py \
 
-TRANSLATIONS = omg.de.ts omg.en.ts omg.de_LU.ts
+TRANSLATIONS = omg.de.ts omg.en.ts
 CODECFORTR = UTF-8
