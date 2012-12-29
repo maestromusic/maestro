@@ -170,10 +170,11 @@ class DeleteDialog(QtGui.QDialog):
         self.resize(400,300)
         layout = QtGui.QVBoxLayout(self)
         label = QtGui.QLabel(
-                             self.tr("You have deleted the following %n file(s) from OMG."
-                                     "Do you want them deleted completely?\n"
+                             self.tr("You have deleted the following %n file(s) from OMG. "
+                                     "Do you want them deleted completely?<br />\n"
                                      "<b>This cannot be reversed!</b>",
                                      '', len(files)))
+        label.setTextFormat(Qt.RichText)
         label.setWordWrap(True)
         layout.addWidget(label)
         listWidget = QtGui.QListWidget()

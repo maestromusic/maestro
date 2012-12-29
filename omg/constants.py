@@ -57,4 +57,4 @@ FLAG_VARCHAR_LENGTH = 63
 
 # Separators which may separate different values in tags
 # (usually you'll want to split the tag into one tag for each value)
-SEPARATORS = ('/', " / ", ' - ', ", ")
+SEPARATORS = ('/', " / ", ' - ', ", ", ' & ')
