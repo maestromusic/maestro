@@ -244,10 +244,10 @@ class GeneralSettingsWidget(SettingsWidget):
         
         dbChooserLayout = QtGui.QVBoxLayout()
         dbButtonGroup = QtGui.QButtonGroup()
-        self.sqliteBox = QtGui.QRadioButton(self.tr("SQLite"))
+        self.sqliteBox = QtGui.QRadioButton("SQLite")
         dbButtonGroup.addButton(self.sqliteBox)
         self.sqliteBox.setChecked(config.options.database.type == 'sqlite')
-        self.mysqlBox = QtGui.QRadioButton(self.tr("MySQL"))
+        self.mysqlBox = QtGui.QRadioButton("MySQL")
         dbButtonGroup.addButton(self.mysqlBox)
         self.sqliteBox.setChecked(config.options.database.type == 'mysql')
         dbChooserLayout.addWidget(self.sqliteBox)

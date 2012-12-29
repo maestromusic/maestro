@@ -4,7 +4,7 @@
 echo "SOURCES = \\" > omg.pro
 
 #grep -Rl --include=*.py 'translate(' ../omg | sed 's/^/    /' | sed 's/$/ \\/' >> omg.pro
-find ../omg -name *.py | sed 's/^/    /' | sed 's/$/ \\/' >> omg.pro
+find ../omg -name *.py | grep -v translations.py | grep -v resources.py | sed 's/^/    /' | sed 's/$/ \\/' | sort >> omg.pro
 
 
 echo "" >> omg.pro
