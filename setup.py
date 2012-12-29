@@ -28,51 +28,65 @@ import distribute_setup
 
 distribute_setup.use_setuptools()
 
-from setuptools import setup, find_packages
-import setuptools.command.sdist
-import setuptools.command.install
-import setuptools.command.develop
-import setuptools.command.test
+import glob, os, subprocess
 
+from setuptools import setup, find_packages
+from setuptools.command import sdist, install, develop, test
+
+def updateTranslations():
+    tsFiles = glob.glob("i18n/*.ts")
+    proFile = "i18n/omg.pro"
+    for tsFile in tsFiles:
+        qmFile = tsFile[:-2] + "qm"
+        if not os.path.exists(qmFile):
+            print("Updating translation file: {}".format(qmFile))
+            subprocess.check_call(["lrelease", proFile])
+            return
+    
 
 def updateResources():
-    import os, subprocess
-    resources = [ ("images/images.qrc", "omg/resources.py"),
-                  ("i18n/translations.qrc", "omg/translations.py") ]
+    resources = [ (["images/images.qrc"], "omg/resources.py"),
+                  (["i18n/translations.qrc"] + glob.glob("i18n/*.qm"), "omg/translations.py") ]
     pluginBaseDir = os.path.join("omg", "plugins")
     for subdir in os.listdir(pluginBaseDir):
         pluginDir = os.path.join(pluginBaseDir, subdir)
         if os.path.exists(os.path.join(pluginDir, "resources.qrc")):
-            resources.append( (os.path.join(pluginDir, "resources.qrc"),
+            resources.append( ([os.path.join(pluginDir, "resources.qrc")],
                                os.path.join(pluginDir, "resources.py")) )
-    for qrc, py in resources:
-        if not os.path.exists(py) or os.path.getmtime(qrc) > os.path.getmtime(py):
-            print("Updating resource file: {}".format(py))
-            subprocess.check_call(["pyrcc4", "-py3", "-o", py, qrc])
+    for sources, py in resources:
+        for source in sources:
+            if not os.path.exists(py) or os.path.getmtime(source) > os.path.getmtime(py):
+                print("Updating resource file: {}".format(py))
+                subprocess.check_call(["pyrcc4", "-py3", "-o", py, sources[0]])
+                break
 
-sdist_run = setuptools.command.sdist.sdist.run
+sdist_run = sdist.sdist.run
 def wrapped_sdist_run(self):
+    updateTranslations()
     updateResources()
     sdist_run(self)
-setuptools.command.sdist.sdist.run = wrapped_sdist_run
+sdist.sdist.run = wrapped_sdist_run
 
-install_run = setuptools.command.install.install.run
+install_run = install.install.run
 def wrapped_install_run(self):
+    updateTranslations()
     updateResources()
     install_run(self) 
-setuptools.command.install.install.run = wrapped_install_run
+install.install.run = wrapped_install_run
 
-develop_run = setuptools.command.develop.develop.run
+develop_run = develop.develop.run
 def wrapped_develop_run(self):
+    updateTranslations()
     updateResources()
-    develop_run(self) 
-setuptools.command.develop.develop.run = wrapped_develop_run
+    develop_run(self)
+develop.develop.run = wrapped_develop_run
 
-test_run = setuptools.command.test.test.run
+test_run = test.test.run
 def wrapped_test_run(self):
+    updateTranslations()
     updateResources()
     test_run(self)
-setuptools.command.test.test.run = wrapped_test_run
+test.test.run = wrapped_test_run
 
 setup(name='omg',
       version='0.3-currentgit',

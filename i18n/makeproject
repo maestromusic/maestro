@@ -8,5 +8,5 @@ find ../omg -name *.py | grep -v translations.py | grep -v resources.py | sed 's
 
 
 echo "" >> omg.pro
-echo "TRANSLATIONS = omg.de.ts omg.en.ts omg.de_LU.ts" >> omg.pro
+echo "TRANSLATIONS = omg.de.ts omg.en.ts" >> omg.pro
 echo "CODECFORTR = UTF-8" >> omg.pro
