@@ -107,8 +107,8 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
                 removeData[element].update(range(row,row+count))
             for element, rows in removeData.items():
                 if element is None:
-                    self.removeElements(self.root, rows)
-                else: self.level.removeContentsAuto(element, indexes=rows)
+                    element = self.root
+                self.removeElements(element, rows)
             self._dnd_removeTuples = []
         
 
@@ -143,7 +143,7 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
             self.level.insertContentsAuto(parent.element, row, elements)
     
     def removeElements(self, parent, rows):
-        """Undoably remove elements in *rows* under *parent* (a wrapper).
+        """Undoably remove elements in *rows* under *parent* (a wrapper or an element).
         
         This convenience function either alters the RootNode, if parent is self.root, or updates
         the level.
@@ -155,7 +155,8 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
                             if i not in rows ]
             application.stack.push(ChangeRootCommand(self, newContents))
         else:
-            self.level.removeContentsAuto(parent.element, indexes=rows)
+            element = parent if isinstance(parent, elements.Element) else parent.element
+            self.level.removeContentsAuto(element, indexes=rows)
             
         application.stack.endMacro()
 

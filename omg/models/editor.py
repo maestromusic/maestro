@@ -23,6 +23,7 @@ from PyQt4.QtCore import Qt
 
 from . import leveltreemodel
 from ..core import levels, tags
+from ..core.elements import Element
 from .. import application, config, constants, logging
 
 logger = logging.getLogger(__name__)
@@ -88,20 +89,32 @@ class EditorModel(leveltreemodel.LevelTreeModel):
         
     def removeElements(self, parent, rows):
         application.stack.beginMacro(self.tr('remove elements'))
-        removedWrappers = [parent.contents[i] for i in rows]
+        # Get the ids of the elements that there removed in the editor
+        if isinstance(parent, Element):
+            removedElids = [parent.contents[i] for i in rows]
+        else: removedElids = [parent.contents[i].element.id for i in rows]
         super().removeElements(parent, rows)
-        self._handleRemovedWrappers(removedWrappers)
+        
+        rootIds = [w.element.id for editorModel in EditorModel.instances for w in editorModel.root.contents]
+        # Check which elids do not appear in any editor anymore
+        elidsToRemove = set()
+        self._getElementsToRemove(elidsToRemove, rootIds, removedElids)
+        if len(elidsToRemove) > 0:
+            self.level.removeElements([self.level[id] for id in elidsToRemove])
+            
         application.stack.endMacro()
+        
+    def _inEditor(self, rootIds, elid):
+        return elid in rootIds or (elid in self.level and any(self._inEditor(rootIds,pid) for pid in self.level[elid].parents))
 
-    def _handleRemovedWrappers(self, wrappers):
-        """For the given wrappers and all their descendants check whether they are contained in any
-        EditorModel. Remove those that are not found from the editor level."""
-        elementsToRemove = []
-        for wrapper in itertools.chain.from_iterable(w.getAllNodes() for w in wrappers):
-            if all(wrapper.element.id not in editorModel for editorModel in EditorModel.instances):
-                elementsToRemove.append(wrapper.element)
-        if len(elementsToRemove) > 0:
-            self.level.removeElements(elementsToRemove)
+    def _getElementsToRemove(self, elidsToRemove, rootIds, elids):
+        for id in elids:
+            if not self._inEditor(rootIds, id):
+                elidsToRemove.add(id)
+                # If we are going to remove this element, check its contents recursively
+                element = self.level[id]
+                if element.isContainer():
+                    self._getElementsToRemove(elidsToRemove, rootIds, element.contents.ids)
         
     def _addToExtTagInfo(self,type,tag,newTag,element):
         """Add *element* to the ExternalTagInfo specified by *type*, *tag* and *newTag*. Create such an
