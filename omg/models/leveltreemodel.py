@@ -28,6 +28,9 @@ from ..models import rootedtreemodel
 translate = QtCore.QCoreApplication.translate
 logger = logging.getLogger(__name__)
 
+# Necessary for DnD moves between different (or the same) LevelTreeModel 
+_dnd_ignoreWrapperRemoveRows = False
+
 
 class LevelTreeModel(rootedtreemodel.RootedTreeModel):
     """A tree model for the elements of a level.
@@ -58,7 +61,7 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
             return defaultFlags | Qt.ItemIsDropEnabled | Qt.ItemIsDragEnabled
         else: return defaultFlags | Qt.ItemIsDropEnabled
         
-    def dropMimeData(self, mimeData, action, row, column, parentIndex):
+    def dropMimeData(self, mimeData, action, insertRow, column, parentIndex):
         """Drop stuff into a leveltreemodel. Handles OMG mime and text/uri-list.
         
         If URLs are dropped, they are loaded into the level. If there is an album guesser
@@ -68,30 +71,46 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
         """
         if action == Qt.IgnoreAction:
             return True
+        
+        # Figure out insert position
         parent = self.data(parentIndex, Qt.EditRole)
-        # if the drop is on a file, make it a sibling instead of a child of that file
-        if parent is not self.root and parent.element.isFile():
+        if isinstance(parent, nodes.Wrapper) and parent.element.isFile():
+            # if the drop is on a file, make it a sibling instead of a child of that file
             parent = parent.parent
-            row = parentIndex.row() + 1
-        # drop onto no specific item --> append at the end of the parent
-        if row == -1:
-            row = parent.getContentsCount()
-        if parent is self.root:
-            insertPosition = None
-        elif row == 0:
-            insertPosition = 1
-        else:
-            insertPosition = parent.contents[row-1].position + 1
+            insertRow = parentIndex.row() + 1
+        if insertRow == -1:
+            # drop onto no specific item --> append at the end of the parent
+            insertRow = parent.getContentsCount()
         application.stack.beginMacro(self.tr("drop"))
+        
+        # Get elements to insert
         if mimeData.hasFormat(config.options.gui.mime):
             ids = [ node.element.id for node in mimeData.wrappers() ]
             elements = self.level.collectMany(ids)
         else:  # text/uri-list
             elements = self.prepareURLs(mimeData.urls(), parent)
-        ret = len(elements) != 0
-        self.insertElements(parent, row, elements)
+
+        # Handle moves between LevelTreeModels (see ticket TODO)
+        if action == Qt.MoveAction and mimeData.level == self.level:
+            assert isinstance(self._dnd_source, QtGui.QTreeView)
+            assert isinstance(self._dnd_source.model(), LevelTreeModel) 
+            removals = collections.defaultdict(set)
+            for node in mimeData.wrappers():
+                if isinstance(node.parent, nodes.Wrapper):
+                    index = node.parent.index(node)
+                    if node.parent == parent and index >= insertRow:
+                        index += len(elements)
+                    removals[node.parent.element].add(index)
+            self.insertElements(parent, insertRow, elements)
+            for rParent, rows in removals.items():
+                self._dnd_source.model().removeElements(rParent, rows)
+            global _dnd_ignoreWrapperRemoveRows
+            _dnd_ignoreWrapperRemoveRows = True
+        else: 
+            self.insertElements(parent, insertRow, elements)
+        
         application.stack.endMacro()
-        return ret   
+        return len(elements) != 0
     
     def startDrag(self):
         """Called by the view, when a drag starts."""
@@ -110,10 +129,13 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
                     element = self.root
                 self.removeElements(element, rows)
             self._dnd_removeTuples = []
+        global _dnd_ignoreWrapperRemoveRows
+        _dnd_ignoreWrapperRemoveRows = False
         
-
     def removeRows(self, row, count, parentIndex):
         parent = self.data(parentIndex)
+        if isinstance(parent, nodes.Wrapper) and _dnd_ignoreWrapperRemoveRows:
+            return True
         if not self._dnd_active: 
             self.removeElements(parent, list(range(row, row+count)))
             return True
@@ -143,7 +165,7 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
             self.level.insertContentsAuto(parent.element, row, elements)
     
     def removeElements(self, parent, rows):
-        """Undoably remove elements in *rows* under *parent* (a wrapper or an element).
+        """Undoably remove elements in *rows* under *parent* (a wrapper, an element or the root node).
         
         This convenience function either alters the RootNode, if parent is self.root, or updates
         the level.

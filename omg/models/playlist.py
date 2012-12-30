@@ -18,6 +18,9 @@
 
 import itertools, urllib
 
+from PyQt4 import QtCore, QtGui
+from PyQt4.QtCore import Qt
+
 from . import wrappertreemodel, treebuilder
 from .. import application, config, logging, player, utils
 from ..core import levels
@@ -178,7 +181,9 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         else: position = row
         
         # Handle internal moves separately
-        if self._internalMove:
+        if action == Qt.MoveAction and isinstance(self._dnd_source, QtGui.QTreeView) \
+                and isinstance(self._dnd_source.model(), PlaylistModel) \
+                and self._dnd_source.model().backend == self.backend:
             return self.move(list(mimeData.wrappers()),parent,position)
  
         self.stack.beginMacro(self.tr("Drop elements"))
