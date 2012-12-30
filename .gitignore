@@ -1,4 +1,5 @@
 *.pyc
+*.qm
 .project
 .settings
 .pydevproject

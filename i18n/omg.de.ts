@@ -1,11 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!DOCTYPE TS><TS version="2.0" language="de_DE" sourcelanguage="">
+<!DOCTYPE TS>
+<TS version="2.0" language="de_DE">
 <context>
     <name>AbstractDelegate</name>
     <message numerus="yes">
-        <location filename="../omg/gui/delegates/__init__.py" line="248"/>
+        <location filename="../omg/gui/delegates/__init__.py" line="259"/>
         <source>%n piece(s)</source>
-        <translation type="unfinished">
+        <translation>
             <numerusform>%n Stück</numerusform>
             <numerusform>%n Stücke</numerusform>
         </translation>
@@ -16,12 +17,12 @@
     <message>
         <location filename="../omg/gui/flageditor.py" line="391"/>
         <source>New</source>
-        <translation type="unfinished"></translation>
+        <translation>Neu</translation>
     </message>
     <message>
         <location filename="../omg/gui/flageditor.py" line="394"/>
         <source>FlagManager</source>
-        <translation type="unfinished"></translation>
+        <translation>Flagverwaltung</translation>
     </message>
 </context>
 <context>
@@ -29,77 +30,77 @@
     <message>
         <location filename="../omg/gui/tagwidgets.py" line="552"/>
         <source>Add tag type</source>
-        <translation type="unfinished"></translation>
+        <translation>Tagtyp hinzufügen</translation>
     </message>
     <message>
         <location filename="../omg/gui/tagwidgets.py" line="569"/>
         <source>Name:</source>
-        <translation type="unfinished"></translation>
+        <translation>Name:</translation>
     </message>
     <message>
         <location filename="../omg/gui/tagwidgets.py" line="572"/>
         <source>Type:</source>
-        <translation type="unfinished"></translation>
+        <translation>Typ:</translation>
     </message>
     <message>
         <location filename="../omg/gui/tagwidgets.py" line="575"/>
         <source>Title:</source>
-        <translation type="unfinished"></translation>
+        <translation>Titel:</translation>
     </message>
     <message>
         <location filename="../omg/gui/tagwidgets.py" line="578"/>
         <source>Private:</source>
-        <translation type="unfinished"></translation>
+        <translation>Privat:</translation>
     </message>
     <message>
         <location filename="../omg/gui/tagwidgets.py" line="584"/>
         <source>Cancel</source>
-        <translation type="unfinished">Abbrechen</translation>
+        <translation>Abbrechen</translation>
     </message>
     <message>
         <location filename="../omg/gui/tagwidgets.py" line="588"/>
         <source>OK</source>
-        <translation type="unfinished">OK</translation>
+        <translation>OK</translation>
     </message>
     <message>
         <location filename="../omg/gui/tagwidgets.py" line="597"/>
         <source>Tag exists already</source>
-        <translation type="unfinished"></translation>
+        <translation>Tag existiert bereits</translation>
     </message>
     <message>
         <location filename="../omg/gui/tagwidgets.py" line="597"/>
         <source>There is already a tag named &apos;{}&apos;.</source>
-        <translation type="unfinished"></translation>
+        <translation>Es existiert bereits ein Tag namens „{}“.</translation>
     </message>
     <message>
         <location filename="../omg/gui/tagwidgets.py" line="601"/>
         <source>Invalid tagname</source>
-        <translation type="unfinished">Ungültiger Tagname</translation>
+        <translation>Ungültiger Tagname</translation>
     </message>
     <message>
         <location filename="../omg/gui/tagwidgets.py" line="601"/>
         <source>&apos;{}&apos; is not a valid tagname.</source>
-        <translation type="unfinished">&apos;{}&apos; ist kein gültiger Tagname.</translation>
+        <translation>„{}“ ist kein gültiger Tagname.</translation>
     </message>
     <message>
         <location filename="../omg/gui/tagwidgets.py" line="606"/>
         <source>Title exists already</source>
-        <translation type="unfinished"></translation>
+        <translation>Titel existiert bereits</translation>
     </message>
     <message>
         <location filename="../omg/gui/tagwidgets.py" line="606"/>
         <source>There is already a tag with title &apos;{}&apos;.</source>
-        <translation type="unfinished"></translation>
+        <translation>Es gibt bereits ein Tag mit dem Titel „{}“.</translation>
     </message>
     <message>
         <location filename="../omg/gui/tagwidgets.py" line="617"/>
         <source>Cannot add tagtype</source>
-        <translation type="unfinished"></translation>
+        <translation>Kann Tagtyp nicht erstellen</translation>
     </message>
     <message>
         <location filename="../omg/gui/tagwidgets.py" line="617"/>
         <source>The tag already appears in some elements with values that cannot be converted to the chosen type. Change the type or edit those elements.</source>
-        <translation type="unfinished"></translation>
+        <translation>Der Tagtyp kommt bereits mit Werten, die nicht automatisch konvertiert werden können, in manchen Elementen vor. Bitte Typ ändern oder diese Elemente bearbeiten.</translation>
     </message>
 </context>
 <context>
@@ -107,12 +108,12 @@
     <message>
         <location filename="../omg/models/albumguesser.py" line="176"/>
         <source>Default</source>
-        <translation type="unfinished"></translation>
+        <translation>Standard</translation>
     </message>
     <message>
         <location filename="../omg/models/albumguesser.py" line="179"/>
         <source>Album guesser</source>
-        <translation type="unfinished"></translation>
+        <translation>Gruppierer</translation>
     </message>
 </context>
 <context>
@@ -120,32 +121,32 @@
     <message>
         <location filename="../omg/gui/playerwidgets.py" line="38"/>
         <source>new</source>
-        <translation type="unfinished">neu</translation>
+        <translation>Neu</translation>
     </message>
     <message>
         <location filename="../omg/gui/playerwidgets.py" line="40"/>
         <source>remove</source>
-        <translation type="unfinished">entfernen</translation>
+        <translation>Entfernen</translation>
     </message>
     <message>
         <location filename="../omg/gui/playerwidgets.py" line="57"/>
         <source>Profile name:</source>
-        <translation type="unfinished">Profilbezeichnung:</translation>
+        <translation>Profilbezeichnung:</translation>
     </message>
     <message>
         <location filename="../omg/gui/playerwidgets.py" line="117"/>
         <source>newProfile</source>
-        <translation type="unfinished">neuesProfil</translation>
+        <translation>neuesProfil</translation>
     </message>
     <message>
         <location filename="../omg/gui/playerwidgets.py" line="31"/>
         <source>Configure Player Backends</source>
-        <translation type="unfinished"></translation>
+        <translation>Spieler-Backend Einstellen</translation>
     </message>
     <message>
         <location filename="../omg/gui/playerwidgets.py" line="59"/>
         <source>Backend:</source>
-        <translation type="unfinished"></translation>
+        <translation>Backend:</translation>
     </message>
 </context>
 <context>
@@ -153,7 +154,7 @@
     <message>
         <location filename="../omg/gui/browser.py" line="50"/>
         <source>Browser</source>
-        <translation type="unfinished">Browser</translation>
+        <translation>Browser</translation>
     </message>
 </context>
 <context>
@@ -161,17 +162,17 @@
     <message>
         <location filename="../omg/gui/delegates/browser.py" line="59"/>
         <source>Unknown/Various</source>
-        <translation type="unfinished"></translation>
+        <translation>Unbekannt / Verschiedene</translation>
     </message>
     <message>
         <location filename="../omg/gui/delegates/browser.py" line="61"/>
         <source>Hidden</source>
-        <translation type="unfinished"></translation>
+        <translation>Versteckt</translation>
     </message>
     <message>
         <location filename="../omg/gui/delegates/browser.py" line="63"/>
         <source>Loading...</source>
-        <translation type="unfinished"></translation>
+        <translation>Lädt…</translation>
     </message>
 </context>
 <context>
@@ -179,32 +180,32 @@
     <message>
         <location filename="../omg/gui/browserdialog.py" line="56"/>
         <source>Flags</source>
-        <translation type="unfinished">Flags</translation>
+        <translation>Flags</translation>
     </message>
     <message>
         <location filename="../omg/gui/browserdialog.py" line="69"/>
         <source>Options</source>
-        <translation type="unfinished">Optionen</translation>
+        <translation>Optionen</translation>
     </message>
     <message>
         <location filename="../omg/gui/browserdialog.py" line="82"/>
         <source>Instant search</source>
-        <translation type="unfinished">Sofort suchen</translation>
+        <translation>Sofort suchen</translation>
     </message>
     <message>
         <location filename="../omg/gui/browserdialog.py" line="87"/>
         <source>Show hidden values</source>
-        <translation type="unfinished">Versteckte Werte anzeigen</translation>
+        <translation>Versteckte Werte anzeigen</translation>
     </message>
     <message>
         <location filename="../omg/gui/browserdialog.py" line="92"/>
         <source>Configure Views...</source>
-        <translation type="unfinished">Teilbrowser konfigurieren...</translation>
+        <translation>Teilbrowser konfigurieren…</translation>
     </message>
     <message>
         <location filename="../omg/gui/browserdialog.py" line="73"/>
         <source>Item Display:</source>
-        <translation type="unfinished"></translation>
+        <translation>Element-Darstellung:</translation>
     </message>
 </context>
 <context>
@@ -212,7 +213,25 @@
     <message>
         <location filename="../omg/gui/browser.py" line="42"/>
         <source>Browser</source>
-        <translation type="unfinished">Browser</translation>
+        <translation>Browser</translation>
+    </message>
+</context>
+<context>
+    <name>BrowserModel</name>
+    <message>
+        <location filename="../omg/models/browser.py" line="131"/>
+        <source>Your database is empty. Drag files from the filesystembrowser into the editor, modify them and click &apos;Commit&apos;.</source>
+        <translation>Die Datenbank ist leer. Zum Füllen Dateien aus dem Dateisystem-Browser in den Editor ziehen, ggf. bearbeiten und auf „Speichern“ klicken. </translation>
+    </message>
+    <message>
+        <location filename="../omg/models/browser.py" line="135"/>
+        <source>No elements found.</source>
+        <translation>Keine Elemente gefunden.</translation>
+    </message>
+    <message>
+        <location filename="../omg/models/browser.py" line="452"/>
+        <source>Loading...</source>
+        <translation>Lädt…</translation>
     </message>
 </context>
 <context>
@@ -220,17 +239,17 @@
     <message>
         <location filename="../omg/gui/browser.py" line="315"/>
         <source>browser</source>
-        <translation type="unfinished"></translation>
+        <translation>Browser</translation>
     </message>
     <message>
         <location filename="../omg/gui/browser.py" line="317"/>
         <source>elements</source>
-        <translation type="unfinished"></translation>
+        <translation>Elemente</translation>
     </message>
     <message>
         <location filename="../omg/gui/browser.py" line="322"/>
         <source>delete from OMG</source>
-        <translation type="unfinished"></translation>
+        <translation>Aus OMG entfernen</translation>
     </message>
 </context>
 <context>
@@ -238,21 +257,29 @@
     <message>
         <location filename="../omg/gui/treeactions.py" line="269"/>
         <source>choose position...</source>
-        <translation type="unfinished"></translation>
+        <translation>Position wählen…</translation>
     </message>
     <message>
         <location filename="../omg/gui/treeactions.py" line="271"/>
         <source>increase position</source>
-        <translation type="unfinished"></translation>
+        <translation>Position erhöhen</translation>
     </message>
     <message>
         <location filename="../omg/gui/treeactions.py" line="273"/>
         <source>decrease position</source>
-        <translation type="unfinished"></translation>
+        <translation>Position verringern</translation>
     </message>
     <message>
         <location filename="../omg/gui/treeactions.py" line="291"/>
         <source>error</source>
+        <translation>Fehler</translation>
+    </message>
+</context>
+<context>
+    <name>ChangeRootCommand</name>
+    <message>
+        <location filename="../omg/models/leveltreemodel.py" line="290"/>
+        <source>change root nodes</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -261,90 +288,90 @@
     <message>
         <location filename="../omg/core/tagcommands.py" line="35"/>
         <source>change sort value</source>
-        <translation type="unfinished"></translation>
+        <translation>Sortierwert ändern</translation>
     </message>
 </context>
 <context>
     <name>ChooseAndConfigureProfileWidget</name>
     <message>
-        <location filename="../omg/gui/profiles.py" line="154"/>
+        <location filename="../omg/gui/profiles.py" line="160"/>
         <source>Choose a profile: </source>
-        <translation type="unfinished"></translation>
+        <translation>Profil wählen:</translation>
     </message>
     <message>
-        <location filename="../omg/gui/profiles.py" line="240"/>
+        <location filename="../omg/gui/profiles.py" line="246"/>
         <source>Add new profile</source>
-        <translation type="unfinished"></translation>
+        <translation>Profil hinzufügen</translation>
     </message>
     <message>
-        <location filename="../omg/gui/profiles.py" line="165"/>
+        <location filename="../omg/gui/profiles.py" line="171"/>
         <source>...of type {}</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../omg/gui/profiles.py" line="183"/>
-        <source>Rename</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../omg/gui/profiles.py" line="186"/>
-        <source>Delete</source>
-        <translation type="unfinished"></translation>
+        <translation>…vom Typ {}</translation>
     </message>
     <message>
         <location filename="../omg/gui/profiles.py" line="189"/>
+        <source>Rename</source>
+        <translation>Umbenennen</translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/profiles.py" line="192"/>
+        <source>Delete</source>
+        <translation>Löschen</translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/profiles.py" line="195"/>
         <source>(built-in profile)</source>
-        <translation type="unfinished"></translation>
+        <translation>(eingebautes Profil)</translation>
     </message>
     <message>
-        <location filename="../omg/gui/profiles.py" line="216"/>
+        <location filename="../omg/gui/profiles.py" line="222"/>
         <source>Configure {} of type {}</source>
-        <translation type="unfinished"></translation>
+        <translation>Konfiguriere „{}“ vom Typ {}</translation>
     </message>
     <message>
-        <location filename="../omg/gui/profiles.py" line="217"/>
+        <location filename="../omg/gui/profiles.py" line="223"/>
         <source>Configure {}</source>
-        <translation type="unfinished"></translation>
+        <translation>Konfiguriere „{}“</translation>
     </message>
     <message>
-        <location filename="../omg/gui/profiles.py" line="218"/>
+        <location filename="../omg/gui/profiles.py" line="224"/>
         <source>Configure</source>
-        <translation type="unfinished"></translation>
+        <translation>Konfigurieren</translation>
     </message>
     <message>
-        <location filename="../omg/gui/profiles.py" line="254"/>
+        <location filename="../omg/gui/profiles.py" line="260"/>
         <source>Choose a profile name</source>
-        <translation type="unfinished"></translation>
+        <translation></translation>
     </message>
     <message>
-        <location filename="../omg/gui/profiles.py" line="271"/>
+        <location filename="../omg/gui/profiles.py" line="277"/>
         <source>Profile name</source>
-        <translation type="unfinished"></translation>
+        <translation>Name des Profiles</translation>
     </message>
     <message>
-        <location filename="../omg/gui/profiles.py" line="279"/>
+        <location filename="../omg/gui/profiles.py" line="285"/>
         <source>Invalid name</source>
-        <translation type="unfinished"></translation>
+        <translation>Ungültiger Name</translation>
     </message>
     <message>
-        <location filename="../omg/gui/profiles.py" line="279"/>
+        <location filename="../omg/gui/profiles.py" line="285"/>
         <source>There is already a profile of this name.</source>
-        <translation type="unfinished"></translation>
+        <translation>Ein Profil mit diesem Namen existiert bereits.</translation>
     </message>
     <message>
-        <location filename="../omg/gui/profiles.py" line="271"/>
+        <location filename="../omg/gui/profiles.py" line="277"/>
         <source>Choose a new name</source>
-        <translation type="unfinished"></translation>
+        <translation>Neuen Namen auswählen</translation>
     </message>
     <message>
-        <location filename="../omg/gui/profiles.py" line="285"/>
+        <location filename="../omg/gui/profiles.py" line="291"/>
         <source>Delete profile</source>
-        <translation type="unfinished"></translation>
+        <translation>Profil löschen</translation>
     </message>
     <message>
-        <location filename="../omg/gui/profiles.py" line="285"/>
+        <location filename="../omg/gui/profiles.py" line="291"/>
         <source>Should the profile &apos;{}&apos; really be deleted?</source>
-        <translation type="unfinished"></translation>
+        <translation>Profile „{}“ wirklich löschen?</translation>
     </message>
 </context>
 <context>
@@ -352,7 +379,7 @@
     <message>
         <location filename="../omg/gui/treeactions.py" line="353"/>
         <source>clear playlist</source>
-        <translation type="unfinished"></translation>
+        <translation>leeren</translation>
     </message>
 </context>
 <context>
@@ -360,7 +387,7 @@
     <message>
         <location filename="../omg/gui/treeactions.py" line="213"/>
         <source>clear</source>
-        <translation type="unfinished"></translation>
+        <translation>Leeren</translation>
     </message>
 </context>
 <context>
@@ -368,17 +395,17 @@
     <message>
         <location filename="../omg/gui/treeactions.py" line="228"/>
         <source>commit this tree</source>
-        <translation type="unfinished"></translation>
+        <translation>Sichtbare Elemente speichern</translation>
     </message>
     <message>
         <location filename="../omg/gui/treeactions.py" line="241"/>
         <source>No commit possible</source>
-        <translation type="unfinished"></translation>
+        <translation>Speichern nicht möglich</translation>
     </message>
     <message>
         <location filename="../omg/gui/treeactions.py" line="241"/>
         <source>While the editor contains external tags, no commit is possible. Delete those tags or add their tagtype to the database.</source>
-        <translation type="unfinished"></translation>
+        <translation>Solange der Editor Dateien mit externen Tags enthält, ist ein Speichern nicht möglich. Löschen Sie diese Tags oder erstellen Sie neue OMG-Tagtypen dafür. </translation>
     </message>
 </context>
 <context>
@@ -386,7 +413,7 @@
     <message>
         <location filename="../omg/plugins/configeditor/plugin.py" line="107"/>
         <source>reset to default</source>
-        <translation type="unfinished"></translation>
+        <translation>Standard</translation>
     </message>
 </context>
 <context>
@@ -394,23 +421,7 @@
     <message>
         <location filename="../omg/plugins/coverdialog/plugin.py" line="53"/>
         <source>Edit covers...</source>
-        <translation type="unfinished"></translation>
-    </message>
-</context>
-<context>
-    <name>CoverBrowser</name>
-    <message>
-        <location filename="../omg/gui/coverbrowser.py" line="43"/>
-        <source>Cover Browser</source>
-        <translation type="unfinished"></translation>
-    </message>
-</context>
-<context>
-    <name>CoverBrowserDock</name>
-    <message>
-        <location filename="../omg/gui/coverbrowser.py" line="37"/>
-        <source>Cover Browser</source>
-        <translation type="unfinished"></translation>
+        <translation>Cover bearbeiten…</translation>
     </message>
 </context>
 <context>
@@ -418,113 +429,113 @@
     <message>
         <location filename="../omg/plugins/coverdialog/plugin.py" line="276"/>
         <source>Edit covers</source>
-        <translation type="unfinished"></translation>
+        <translation>Cover bearbeiten</translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverdialog/plugin.py" line="313"/>
+        <location filename="../omg/plugins/coverdialog/plugin.py" line="314"/>
         <source>Open from file...</source>
-        <translation type="unfinished"></translation>
+        <translation>Aus Datei…</translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverdialog/plugin.py" line="318"/>
+        <location filename="../omg/plugins/coverdialog/plugin.py" line="319"/>
         <source>Open from URL...</source>
-        <translation type="unfinished"></translation>
+        <translation>URL öffnen…</translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverdialog/plugin.py" line="324"/>
+        <location filename="../omg/plugins/coverdialog/plugin.py" line="325"/>
         <source>Fetch from {}</source>
-        <translation type="unfinished"></translation>
+        <translation>Von {} holen</translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverdialog/plugin.py" line="333"/>
+        <location filename="../omg/plugins/coverdialog/plugin.py" line="334"/>
         <source>Covers are
 being loaded</source>
-        <translation type="unfinished"></translation>
+        <translation>Covers werden geladen</translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverdialog/plugin.py" line="339"/>
+        <location filename="../omg/plugins/coverdialog/plugin.py" line="340"/>
         <source>Remove cover</source>
-        <translation type="unfinished"></translation>
+        <translation>Cover entfernen</translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverdialog/plugin.py" line="361"/>
+        <location filename="../omg/plugins/coverdialog/plugin.py" line="362"/>
         <source>Undo</source>
-        <translation type="unfinished">Rückgängig</translation>
+        <translation>Rückgängig</translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverdialog/plugin.py" line="366"/>
+        <location filename="../omg/plugins/coverdialog/plugin.py" line="367"/>
         <source>Redo</source>
-        <translation type="unfinished">Wiederholen</translation>
+        <translation>Wiederholen</translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverdialog/plugin.py" line="374"/>
+        <location filename="../omg/plugins/coverdialog/plugin.py" line="375"/>
         <source>Reset</source>
-        <translation type="unfinished">Zurücksetzen</translation>
+        <translation>Zurücksetzen</translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverdialog/plugin.py" line="377"/>
+        <location filename="../omg/plugins/coverdialog/plugin.py" line="378"/>
         <source>Cancel</source>
-        <translation type="unfinished">Abbrechen</translation>
+        <translation>Abbrechen</translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverdialog/plugin.py" line="380"/>
+        <location filename="../omg/plugins/coverdialog/plugin.py" line="381"/>
         <source>OK</source>
-        <translation type="unfinished">OK</translation>
+        <translation>OK</translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverdialog/plugin.py" line="484"/>
+        <location filename="../omg/plugins/coverdialog/plugin.py" line="486"/>
         <source>Open cover file</source>
-        <translation type="unfinished"></translation>
+        <translation>Cover von Datei öffnen</translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverdialog/plugin.py" line="484"/>
+        <location filename="../omg/plugins/coverdialog/plugin.py" line="486"/>
         <source>Image files (*.png *.jpg *.bmp);;All files (*)</source>
-        <translation type="unfinished"></translation>
+        <translation>Bilddateien (*.png, *.jpg, *.bmp);;Alle Dateien (*)</translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverdialog/plugin.py" line="494"/>
+        <location filename="../omg/plugins/coverdialog/plugin.py" line="496"/>
         <source>Failed to open the file</source>
-        <translation type="unfinished"></translation>
+        <translation>Öffnen fehlgeschlagen</translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverdialog/plugin.py" line="494"/>
+        <location filename="../omg/plugins/coverdialog/plugin.py" line="496"/>
         <source>The file could not be opened.</source>
-        <translation type="unfinished"></translation>
+        <translation>Konnte die Datei nicht öffnen.</translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverdialog/plugin.py" line="503"/>
+        <location filename="../omg/plugins/coverdialog/plugin.py" line="505"/>
         <source>Open cover URL</source>
-        <translation type="unfinished"></translation>
+        <translation>Cover aus URL öffnen</translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverdialog/plugin.py" line="503"/>
+        <location filename="../omg/plugins/coverdialog/plugin.py" line="505"/>
         <source>Please enter the URL of the cover:</source>
-        <translation type="unfinished"></translation>
+        <translation>URL des Covers eingeben:</translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverdialog/plugin.py" line="510"/>
+        <location filename="../omg/plugins/coverdialog/plugin.py" line="512"/>
         <source>Invalid URL</source>
-        <translation type="unfinished"></translation>
+        <translation>Ungültige URL</translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverdialog/plugin.py" line="510"/>
+        <location filename="../omg/plugins/coverdialog/plugin.py" line="512"/>
         <source>The specified URL is invalid.</source>
-        <translation type="unfinished"></translation>
+        <translation>Die eingegebene URL ist ungültig.</translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverdialog/plugin.py" line="527"/>
+        <location filename="../omg/plugins/coverdialog/plugin.py" line="529"/>
         <source>Invalid image</source>
-        <translation type="unfinished"></translation>
+        <translation>Ungültige Bilddaten</translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverdialog/plugin.py" line="527"/>
+        <location filename="../omg/plugins/coverdialog/plugin.py" line="529"/>
         <source>Could not load cover image from &apos;{}&apos;.</source>
-        <translation type="unfinished"></translation>
+        <translation>Laden des Covers von „{}“ fehlgeschlagen.</translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverdialog/plugin.py" line="536"/>
+        <location filename="../omg/plugins/coverdialog/plugin.py" line="538"/>
         <source>A network error appeared: {}</source>
-        <translation type="unfinished"></translation>
+        <translation>Netzwerk-Fehler: {}</translation>
     </message>
 </context>
 <context>
@@ -532,17 +543,17 @@ being loaded</source>
     <message>
         <location filename="../omg/plugins/coverdialog/plugin.py" line="188"/>
         <source>{}: {}</source>
-        <translation type="unfinished"></translation>
+        <translation>{}: {}</translation>
     </message>
     <message>
         <location filename="../omg/plugins/coverdialog/plugin.py" line="193"/>
         <source>Could not fetch any cover for {}</source>
-        <translation type="unfinished"></translation>
+        <translation>Konnte kein Cover für {} laden</translation>
     </message>
     <message>
         <location filename="../omg/plugins/coverdialog/plugin.py" line="242"/>
         <source>Reset</source>
-        <translation type="unfinished">Zurücksetzen</translation>
+        <translation>Zurücksetzen</translation>
     </message>
 </context>
 <context>
@@ -550,12 +561,12 @@ being loaded</source>
     <message>
         <location filename="../omg/core/covers.py" line="180"/>
         <source>change covers</source>
-        <translation type="unfinished"></translation>
+        <translation>Cover ändern</translation>
     </message>
     <message>
         <location filename="../omg/plugins/coverdialog/plugin.py" line="100"/>
         <source>change cover</source>
-        <translation type="unfinished"></translation>
+        <translation>Cover ändern</translation>
     </message>
 </context>
 <context>
@@ -563,12 +574,12 @@ being loaded</source>
     <message>
         <location filename="../omg/plugins/dbanalyzer/checks.py" line="278"/>
         <source>ID</source>
-        <translation type="unfinished"></translation>
+        <translation>ID</translation>
     </message>
     <message>
         <location filename="../omg/plugins/dbanalyzer/checks.py" line="241"/>
         <source>Name</source>
-        <translation type="unfinished"></translation>
+        <translation>Name</translation>
     </message>
     <message>
         <location filename="../omg/plugins/dbanalyzer/checks.py" line="128"/>
@@ -797,34 +808,54 @@ being loaded</source>
 <context>
     <name>DBSettingsWidget</name>
     <message>
-        <location filename="../omg/install.py" line="299"/>
+        <location filename="../omg/install.py" line="319"/>
         <source>Database connection failed</source>
-        <translation type="unfinished">Verbindung zur Datenbank fehlgeschlagen</translation>
+        <translation>Verbindung zur Datenbank fehlgeschlagen</translation>
     </message>
     <message>
-        <location filename="../omg/install.py" line="299"/>
+        <location filename="../omg/install.py" line="319"/>
         <source>I cannot connect to the database.</source>
-        <translation type="unfinished">Es konnte keine Verbindung zur Datenbank hergestellt werden.</translation>
+        <translation>Es konnte keine Verbindung zur Datenbank hergestellt werden.</translation>
     </message>
     <message>
-        <location filename="../omg/install.py" line="308"/>
+        <location filename="../omg/install.py" line="350"/>
         <source>Cannot create tables</source>
-        <translation type="unfinished">Tabellen konnten nicht erstellt werden</translation>
+        <translation>Tabellen konnten nicht erstellt werden</translation>
     </message>
     <message>
-        <location filename="../omg/install.py" line="308"/>
+        <location filename="../omg/install.py" line="350"/>
         <source>I cannot create the database tables. Please make sure that the specified user has the necessary permissions.</source>
-        <translation type="unfinished">Die Datenbanktabellen konnten nicht angelegt werden. Bitte überprüfe, ob der angegebene Benutzer die erforderlichen Rechte hat.</translation>
+        <translation>Die Datenbanktabellen konnten nicht angelegt werden. Bitte überprüfen Sie, ob der angegebene Benutzer die erforderlichen Rechte hat.</translation>
     </message>
     <message>
         <location filename="../omg/install.py" line="318"/>
         <source>Database table missing</source>
-        <translation type="unfinished">Tabelle fehlt</translation>
+        <translation type="obsolete">Tabelle fehlt</translation>
     </message>
     <message>
         <location filename="../omg/install.py" line="318"/>
         <source>Although the database is not empty, it does not contain a table &apos;{}tagids&apos;. Did you provide the correct table prefix?</source>
-        <translation type="unfinished">Die Datenbank ist zwar nicht leer, enthält aber keine Tabelle &apos;{}tagids&apos;. Hast du den richtigen Tabellenpräfix eingegeben?</translation>
+        <translation type="obsolete">Die Datenbank ist zwar nicht leer, enthält aber keine Tabelle &apos;{}tagids&apos;. Hast du den richtigen Tabellenpräfix eingegeben?</translation>
+    </message>
+    <message>
+        <location filename="../omg/install.py" line="330"/>
+        <source>Database tables missing</source>
+        <translation>Fehlende Datenbank-Tabellen</translation>
+    </message>
+    <message>
+        <location filename="../omg/install.py" line="330"/>
+        <source>Although the database is not empty, I cannot find any of my tables. If you use a table prefix, please check whether it is correct. Shall I continue and create the missing tables?</source>
+        <translation>Obwohl die Datenbank nicht leer ist, konnte keine benötigte Tabelle gefunden wurden. Wenn Sie ein Tabellenpräfix verwenden, überprüfen Sie dieses. Sollen die fehlenden Tabellen erstellt werden?</translation>
+    </message>
+    <message>
+        <location filename="../omg/install.py" line="339"/>
+        <source>Database table(s) missing</source>
+        <translation>Fehlende Datenbank-Tabelle(n)</translation>
+    </message>
+    <message>
+        <location filename="../omg/install.py" line="339"/>
+        <source>Some tables are missing: {}. Shall I continue and create them?</source>
+        <translation>Einige Datenbank-Tabellen fehlen: {}. Sollen sie jetzt angelegt werden?</translation>
     </message>
 </context>
 <context>
@@ -840,12 +871,12 @@ being loaded</source>
     <message>
         <location filename="../omg/gui/preferences/delegates.py" line="306"/>
         <source>Add to left column...</source>
-        <translation type="unfinished"></translation>
+        <translation>Zur linken Spalte hinzufügen…</translation>
     </message>
     <message>
         <location filename="../omg/gui/preferences/delegates.py" line="306"/>
         <source>Add to right column...</source>
-        <translation type="unfinished"></translation>
+        <translation>Zur rechten Spalte hinzufügen…</translation>
     </message>
 </context>
 <context>
@@ -853,97 +884,97 @@ being loaded</source>
     <message>
         <location filename="../omg/gui/delegates/profiles.py" line="363"/>
         <source>Display major flag</source>
-        <translation type="unfinished">Major-Flag anzeigen</translation>
+        <translation>Major-Flag anzeigen</translation>
     </message>
     <message>
         <location filename="../omg/gui/delegates/profiles.py" line="364"/>
         <source>Display position numbers</source>
-        <translation type="unfinished">Positionsnummern anzeigen</translation>
+        <translation>Position anzeigen</translation>
     </message>
     <message>
         <location filename="../omg/gui/delegates/profiles.py" line="365"/>
         <source>Display paths</source>
-        <translation type="unfinished">Pfade anzeigen</translation>
+        <translation>Pfad anzeigen</translation>
     </message>
     <message>
         <location filename="../omg/gui/delegates/profiles.py" line="366"/>
         <source>Display flag icons</source>
-        <translation type="unfinished">Flag-Icons anzeigen</translation>
+        <translation>Flag-Icons anzeigen</translation>
     </message>
     <message>
         <location filename="../omg/gui/delegates/profiles.py" line="367"/>
         <source>Remove flags which appear in ancestor elements</source>
-        <translation type="unfinished">Flags, die auch in Obercontainern vorkommen, nicht anzeigen</translation>
+        <translation>Flags, die auch in Elterncontainern vorkommen, nicht anzeigen</translation>
     </message>
     <message>
         <location filename="../omg/gui/delegates/profiles.py" line="373"/>
         <source>Size of covers</source>
-        <translation type="unfinished">Covergröße</translation>
+        <translation>Covergröße</translation>
     </message>
     <message>
         <location filename="../omg/gui/delegates/editor.py" line="29"/>
         <source>Editor</source>
-        <translation type="unfinished"></translation>
+        <translation>Editor</translation>
     </message>
     <message>
-        <location filename="../omg/gui/delegates/__init__.py" line="57"/>
+        <location filename="../omg/gui/delegates/__init__.py" line="65"/>
         <source>#{} in {}</source>
-        <translation type="unfinished"></translation>
+        <translation>Nr. {} in {}</translation>
     </message>
     <message>
-        <location filename="../omg/gui/delegates/__init__.py" line="58"/>
+        <location filename="../omg/gui/delegates/__init__.py" line="66"/>
         <source>In {}</source>
-        <translation type="unfinished"></translation>
+        <translation>In {}</translation>
     </message>
     <message>
         <location filename="../omg/gui/delegates/browser.py" line="34"/>
         <source>Browser</source>
-        <translation type="unfinished"></translation>
+        <translation>Browser</translation>
     </message>
     <message>
         <location filename="../omg/gui/delegates/browser.py" line="34"/>
         <source>Display sort values instead of real values</source>
-        <translation type="unfinished"></translation>
+        <translation>Sortierwerte statt echter Werte anzeigen</translation>
     </message>
     <message>
         <location filename="../omg/gui/delegates/profiles.py" line="40"/>
         <source>Item display</source>
-        <translation type="unfinished"></translation>
+        <translation>Element-Darstellung</translation>
     </message>
     <message>
         <location filename="../omg/gui/delegates/profiles.py" line="295"/>
         <source>Length</source>
-        <translation type="unfinished"></translation>
+        <translation>Länge</translation>
     </message>
     <message>
         <location filename="../omg/gui/delegates/profiles.py" line="295"/>
         <source>Number of files</source>
-        <translation type="unfinished"></translation>
+        <translation>Anzahl Dateien</translation>
     </message>
     <message>
         <location filename="../omg/gui/delegates/profiles.py" line="295"/>
         <source>Filetype</source>
-        <translation type="unfinished"></translation>
+        <translation>Dateityp</translation>
     </message>
     <message>
         <location filename="../omg/gui/delegates/profiles.py" line="295"/>
         <source>Filenumber and length</source>
-        <translation type="unfinished"></translation>
+        <translation>Dateianzahl und Länge</translation>
     </message>
     <message>
         <location filename="../omg/gui/delegates/profiles.py" line="360"/>
         <source>Fontsize</source>
-        <translation type="unfinished"></translation>
+        <translation>Schriftgröße</translation>
     </message>
     <message>
         <location filename="../omg/gui/delegates/profiles.py" line="361"/>
         <source>Display major parent containers which are not in the tree.</source>
-        <translation type="unfinished"></translation>
+        <translation>alternative Major-Elterncontainer anzeigen.</translation>
     </message>
     <message>
         <location filename="../omg/gui/delegates/profiles.py" line="362"/>
         <source>Display all parent containers which are not in the tree.</source>
-        <translation type="unfinished"></translation>
+        <translation>Alle alternativen Container anzeigen.</translation>
     </message>
     <message>
         <location filename="../omg/gui/delegates/profiles.py" line="368"/>
@@ -953,17 +984,17 @@ being loaded</source>
     <message>
         <location filename="../omg/gui/delegates/profiles.py" line="369"/>
         <source>Append all tags that are not listed above</source>
-        <translation type="unfinished"></translation>
+        <translation>Übrige Tags anhängen</translation>
     </message>
     <message>
         <location filename="../omg/gui/delegates/profiles.py" line="377"/>
         <source>Standard</source>
-        <translation type="unfinished"></translation>
+        <translation>Standard</translation>
     </message>
     <message>
         <location filename="../omg/gui/delegates/playlist.py" line="31"/>
         <source>Playlist</source>
-        <translation type="unfinished"></translation>
+        <translation>Abspielliste</translation>
     </message>
 </context>
 <context>
@@ -971,22 +1002,22 @@ being loaded</source>
     <message>
         <location filename="../omg/gui/preferences/delegates.py" line="45"/>
         <source>Choose a configuration: </source>
-        <translation type="unfinished"></translation>
+        <translation>Konfiguration wählen:</translation>
     </message>
     <message>
         <location filename="../omg/gui/preferences/delegates.py" line="58"/>
         <source>Manage configurations...</source>
-        <translation type="unfinished"></translation>
+        <translation>Konfigurationen verwalten…</translation>
     </message>
     <message>
         <location filename="../omg/gui/preferences/delegates.py" line="68"/>
         <source>Reset this configuration</source>
-        <translation type="unfinished"></translation>
+        <translation>Konfiguration zurücksetzen</translation>
     </message>
     <message>
         <location filename="../omg/gui/preferences/delegates.py" line="72"/>
         <source>Close</source>
-        <translation type="unfinished"></translation>
+        <translation>Schließen</translation>
     </message>
 </context>
 <context>
@@ -994,15 +1025,15 @@ being loaded</source>
     <message>
         <location filename="../omg/gui/treeactions.py" line="169"/>
         <source>Delete files?</source>
-        <translation type="unfinished"></translation>
+        <translation>Dateien löschen?</translation>
     </message>
     <message numerus="yes">
         <location filename="../omg/gui/treeactions.py" line="172"/>
         <source>You have deleted the following %n file(s) from OMG.Do you want them deleted completely?
 &lt;b&gt;This cannot be reversed!&lt;/b&gt;</source>
-        <translation type="unfinished">
-            <numerusform></numerusform>
-            <numerusform></numerusform>
+        <translation>
+            <numerusform>Die folgende %n Datei wurde aus OMG gelöscht. Soll sie &lt;b&gt;endgültig&lt;/b&gt; gelöscht werden? &lt;b&gt; Dies kann nicht rückgängig gemacht werden! &lt;/b&gt;</numerusform>
+            <numerusform>Die folgenden %n Dateien wurden aus OMG gelöscht. Sollen sie &lt;b&gt;endgültig&lt;/b&gt; gelöscht werden? &lt;b&gt; Dies kann nicht rückgängig gemacht werden! &lt;/b&gt;</numerusform>
         </translation>
     </message>
 </context>
@@ -1016,22 +1047,22 @@ being loaded</source>
     <message>
         <location filename="../omg/gui/flageditor.py" line="442"/>
         <source>OK</source>
-        <translation type="unfinished">OK</translation>
+        <translation>OK</translation>
     </message>
     <message>
         <location filename="../omg/gui/flageditor.py" line="445"/>
         <source>Cancel</source>
-        <translation type="unfinished">Abbrechen</translation>
+        <translation>Abbrechen</translation>
     </message>
     <message>
         <location filename="../omg/gui/flageditor.py" line="453"/>
         <source>No element selected</source>
-        <translation type="unfinished"></translation>
+        <translation>Kein Element ausgewählt</translation>
     </message>
     <message>
         <location filename="../omg/gui/flageditor.py" line="453"/>
         <source>You must select at lest one element.</source>
-        <translation type="unfinished"></translation>
+        <translation>Es muss mindestens ein Element ausgewählt sein.</translation>
     </message>
 </context>
 <context>
@@ -1039,20 +1070,20 @@ being loaded</source>
     <message>
         <location filename="../omg/gui/treeactions.py" line="62"/>
         <source>edit tags (recursively)</source>
-        <translation type="unfinished"></translation>
+        <translation>Tags bearbeiten (rekursiv)</translation>
     </message>
     <message>
         <location filename="../omg/gui/treeactions.py" line="62"/>
         <source>edit tags</source>
-        <translation type="unfinished"></translation>
+        <translation>Tags bearbeiten</translation>
     </message>
 </context>
 <context>
     <name>Editor</name>
     <message>
-        <location filename="../omg/gui/editor.py" line="296"/>
+        <location filename="../omg/gui/editor.py" line="264"/>
         <source>editor</source>
-        <translation type="unfinished"></translation>
+        <translation>Editor</translation>
     </message>
 </context>
 <context>
@@ -1060,7 +1091,7 @@ being loaded</source>
     <message>
         <location filename="../omg/models/editor.py" line="90"/>
         <source>remove elements</source>
-        <translation type="unfinished"></translation>
+        <translation>Elemente entfernen</translation>
     </message>
 </context>
 <context>
@@ -1068,20 +1099,30 @@ being loaded</source>
     <message>
         <location filename="../omg/gui/editor.py" line="35"/>
         <source>elements</source>
-        <translation type="unfinished"></translation>
+        <translation>Elemente</translation>
     </message>
     <message>
         <location filename="../omg/gui/editor.py" line="43"/>
         <source>editor</source>
-        <translation type="unfinished"></translation>
+        <translation>Editor</translation>
     </message>
 </context>
 <context>
     <name>EditorWidget</name>
     <message>
-        <location filename="../omg/gui/editor.py" line="105"/>
+        <location filename="../omg/gui/editor.py" line="67"/>
         <source>Editor</source>
-        <translation type="unfinished"></translation>
+        <translation>Editor</translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/editor.py" line="131"/>
+        <source>Unsaved changes</source>
+        <translation>Nicht gespeicherte Änderungen</translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/editor.py" line="131"/>
+        <source>The editor contains uncommited changes. Really close?</source>
+        <translation>Der Editor enthält nicht gespeicherte Änderungen. Wirklich beenden?</translation>
     </message>
 </context>
 <context>
@@ -1089,93 +1130,98 @@ being loaded</source>
     <message>
         <location filename="../omg/core/elements.py" line="60"/>
         <source>&lt;No title&gt;</source>
-        <translation type="unfinished"></translation>
+        <translation>&lt;kein Titel&gt;</translation>
     </message>
 </context>
 <context>
     <name>ExternalTagsWidget</name>
     <message numerus="yes">
-        <location filename="../omg/gui/editor.py" line="245"/>
+        <location filename="../omg/gui/editor.py" line="213"/>
         <source>Tag &apos;{}&apos; was deleted from %n element(s) {} {}</source>
-        <translation type="unfinished">
-            <numerusform></numerusform>
-            <numerusform></numerusform>
+        <translation>
+            <numerusform>Tag „{}“ aus einem Element entfernt {} {}</numerusform>
+            <numerusform>Tag „{}“ aus %n Elementen entfernt {} {}</numerusform>
         </translation>
     </message>
     <message>
-        <location filename="../omg/gui/editor.py" line="260"/>
+        <location filename="../omg/gui/editor.py" line="228"/>
         <source>Select</source>
-        <translation type="unfinished"></translation>
+        <translation>Auswählen</translation>
     </message>
     <message>
-        <location filename="../omg/gui/editor.py" line="251"/>
+        <location filename="../omg/gui/editor.py" line="219"/>
         <source>Undo</source>
-        <translation type="unfinished">Rückgängig</translation>
+        <translation>Rückgängig</translation>
     </message>
     <message numerus="yes">
-        <location filename="../omg/gui/editor.py" line="251"/>
+        <location filename="../omg/gui/editor.py" line="219"/>
         <source>Tag &apos;{}&apos; was replaced by &apos;{}&apos; in %n element(s) {} {}</source>
-        <translation type="unfinished">
-            <numerusform></numerusform>
-            <numerusform></numerusform>
+        <translation>
+            <numerusform>Tag „{}“ wurde in einem Element durch „{}“ ersetzt {} {}</numerusform>
+            <numerusform>Tag „{}“ wurde in %n Elementen durch „{}“ ersetzt {} {}</numerusform>
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../omg/gui/editor.py" line="260"/>
+        <location filename="../omg/gui/editor.py" line="228"/>
         <source>External tag &apos;{}&apos; found in %n element(s) {} {} {}</source>
-        <translation type="unfinished">
-            <numerusform></numerusform>
-            <numerusform></numerusform>
+        <translation>
+            <numerusform>Externes Tag „{}“ in einem Element gefunden {} {} {}</numerusform>
+            <numerusform>Externes Tag „{}“ in %n Elementen gefunden {} {} {}</numerusform>
         </translation>
     </message>
     <message>
-        <location filename="../omg/gui/editor.py" line="260"/>
+        <location filename="../omg/gui/editor.py" line="228"/>
         <source>Add to database</source>
-        <translation type="unfinished"></translation>
+        <translation>Zur Datenbank hinzufügen</translation>
     </message>
     <message>
-        <location filename="../omg/gui/editor.py" line="260"/>
+        <location filename="../omg/gui/editor.py" line="228"/>
         <source>Delete</source>
-        <translation type="unfinished"></translation>
+        <translation>Löschen</translation>
     </message>
 </context>
 <context>
     <name>FileSystemBrowser</name>
     <message>
-        <location filename="../omg/gui/filesystembrowser.py" line="130"/>
+        <location filename="../omg/gui/filesystembrowser.py" line="144"/>
         <source>File System Browser</source>
-        <translation type="unfinished"></translation>
+        <translation>Dateisystem-Browser</translation>
     </message>
 </context>
 <context>
     <name>FileSystemBrowserDock</name>
     <message>
-        <location filename="../omg/gui/filesystembrowser.py" line="105"/>
+        <location filename="../omg/gui/filesystembrowser.py" line="119"/>
         <source>Filesystem: {}</source>
-        <translation type="unfinished"></translation>
+        <translation>Dateisystem: {}</translation>
     </message>
 </context>
 <context>
     <name>FileSystemBrowserModel</name>
     <message>
-        <location filename="../omg/gui/filesystembrowser.py" line="47"/>
+        <location filename="../omg/gui/filesystembrowser.py" line="53"/>
         <source>contains music which is not in OMG&apos;s database</source>
-        <translation type="unfinished"></translation>
+        <translation>Enthält Musik die noch nicht in OMG aufgenommen wurde</translation>
     </message>
     <message>
-        <location filename="../omg/gui/filesystembrowser.py" line="48"/>
+        <location filename="../omg/gui/filesystembrowser.py" line="54"/>
         <source>in sync with OMG&apos;s database</source>
-        <translation type="unfinished"></translation>
+        <translation>Mit OMG synchronisiert</translation>
     </message>
     <message>
-        <location filename="../omg/gui/filesystembrowser.py" line="49"/>
+        <location filename="../omg/gui/filesystembrowser.py" line="55"/>
         <source>does not contain music</source>
-        <translation type="unfinished"></translation>
+        <translation>Enthält keine Musik</translation>
     </message>
     <message>
-        <location filename="../omg/gui/filesystembrowser.py" line="50"/>
-        <source>unknown folder status</source>
-        <translation type="unfinished"></translation>
+        <location filename="../omg/gui/filesystembrowser.py" line="56"/>
+        <source>unknown status</source>
+        <translation>Unbekannter Status</translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/filesystembrowser.py" line="57"/>
+        <source>in conflict with database</source>
+        <translation>Konflikt mit OMGs Datenbank</translation>
     </message>
 </context>
 <context>
@@ -1183,12 +1229,12 @@ being loaded</source>
     <message>
         <location filename="../omg/gui/flageditor.py" line="40"/>
         <source>Flags</source>
-        <translation type="unfinished">Flags</translation>
+        <translation>Flags</translation>
     </message>
     <message>
         <location filename="../omg/gui/flageditor.py" line="41"/>
         <source>Flags: </source>
-        <translation type="unfinished"></translation>
+        <translation>Flags:</translation>
     </message>
 </context>
 <context>
@@ -1196,143 +1242,143 @@ being loaded</source>
     <message>
         <location filename="../omg/gui/preferences/flagmanager.py" line="92"/>
         <source>Icon</source>
-        <translation type="unfinished"></translation>
+        <translation>Symbol</translation>
     </message>
     <message>
         <location filename="../omg/gui/preferences/flagmanager.py" line="92"/>
         <source>Name</source>
-        <translation type="unfinished"></translation>
+        <translation>Name</translation>
     </message>
     <message>
         <location filename="../omg/gui/preferences/flagmanager.py" line="92"/>
         <source># of elements</source>
-        <translation type="unfinished"></translation>
+        <translation>Anzahl Elemente</translation>
     </message>
     <message>
         <location filename="../omg/gui/preferences/flagmanager.py" line="92"/>
         <source>Actions</source>
-        <translation type="unfinished"></translation>
+        <translation>Aktionen</translation>
     </message>
     <message>
         <location filename="../omg/gui/preferences/flagmanager.py" line="59"/>
         <source>Add flag</source>
-        <translation type="unfinished"></translation>
+        <translation>Flag hinzufügen</translation>
     </message>
     <message>
         <location filename="../omg/gui/preferences/flagmanager.py" line="63"/>
         <source>Undo</source>
-        <translation type="unfinished">Rückgängig</translation>
+        <translation>Rückgängig</translation>
     </message>
     <message>
         <location filename="../omg/gui/preferences/flagmanager.py" line="66"/>
         <source>Redo</source>
-        <translation type="unfinished">Wiederholen</translation>
+        <translation>Wiederholen</translation>
     </message>
     <message>
         <location filename="../omg/gui/preferences/flagmanager.py" line="73"/>
         <source>Close</source>
-        <translation type="unfinished"></translation>
+        <translation>Schließen</translation>
     </message>
     <message>
         <location filename="../omg/gui/preferences/flagmanager.py" line="122"/>
         <source>Delete flag</source>
-        <translation type="unfinished"></translation>
+        <translation>Flag löschen</translation>
     </message>
     <message>
         <location filename="../omg/gui/preferences/flagmanager.py" line="125"/>
         <source>Show in browser</source>
-        <translation type="unfinished"></translation>
+        <translation>Im Browser zeigen</translation>
     </message>
     <message numerus="yes">
         <location filename="../omg/gui/preferences/flagmanager.py" line="145"/>
         <source>Do you really want to delete the flag &apos;{}&apos;? It will be deleted from %n element(s).</source>
-        <translation type="unfinished">
-            <numerusform></numerusform>
-            <numerusform></numerusform>
+        <translation>
+            <numerusform>Flag „{}“ wirklich löschen? Es wird aus einem Element entfernt. </numerusform>
+            <numerusform>Flag „{}“ wirklich löschen? Es wird aus %n Elementen entfernt.</numerusform>
         </translation>
     </message>
     <message>
         <location filename="../omg/gui/preferences/flagmanager.py" line="146"/>
         <source>Do you really want to delete the flag &apos;{}&apos;?</source>
-        <translation type="unfinished"></translation>
+        <translation>Flag „{}“ wirklich löschen?</translation>
     </message>
     <message>
         <location filename="../omg/gui/preferences/flagmanager.py" line="147"/>
         <source>Delete flag?</source>
-        <translation type="unfinished"></translation>
+        <translation>Flag löschen?</translation>
     </message>
     <message>
         <location filename="../omg/gui/preferences/flagmanager.py" line="176"/>
         <source>Cannot change flag</source>
-        <translation type="unfinished"></translation>
+        <translation>Kann Flag nicht ändern</translation>
     </message>
     <message>
         <location filename="../omg/gui/preferences/flagmanager.py" line="169"/>
         <source>&apos;{}&apos; is not a valid flagname.</source>
-        <translation type="unfinished"></translation>
+        <translation>Ungültiger Flag-Name: „{}“.</translation>
     </message>
     <message>
         <location filename="../omg/gui/preferences/flagmanager.py" line="176"/>
         <source>A flag name &apos;{}&apos; does already exist.</source>
-        <translation type="unfinished"></translation>
+        <translation>Ein Flag „{}“ existiert bereits.</translation>
     </message>
     <message numerus="yes">
         <location filename="../omg/gui/preferences/flagmanager.py" line="182"/>
         <source>Do you really want to change the flag &apos;{}&apos;? It will be changed in %n element(s).</source>
-        <translation type="unfinished">
-            <numerusform></numerusform>
-            <numerusform></numerusform>
+        <translation>
+            <numerusform>Flag „{}“ wirklich ändern? Es wird in einem Element geändert.</numerusform>
+            <numerusform>Flag „{}“ wirklich ändern? Es wird in %n Elementen geändert.</numerusform>
         </translation>
     </message>
     <message>
         <location filename="../omg/gui/preferences/flagmanager.py" line="184"/>
         <source>Change flag?</source>
-        <translation type="unfinished"></translation>
+        <translation>Flag ändern?</translation>
     </message>
     <message>
         <location filename="../omg/gui/preferences/flagmanager.py" line="216"/>
         <source>Add icon...</source>
-        <translation type="unfinished"></translation>
+        <translation>Symbol hinzufügen…</translation>
     </message>
     <message>
         <location filename="../omg/gui/preferences/flagmanager.py" line="217"/>
         <source>Change icon...</source>
-        <translation type="unfinished"></translation>
+        <translation>Symbol ändern…</translation>
     </message>
     <message>
         <location filename="../omg/gui/preferences/flagmanager.py" line="220"/>
         <source>Remove icon</source>
-        <translation type="unfinished"></translation>
+        <translation>Symbol entfernen</translation>
     </message>
     <message>
         <location filename="../omg/gui/preferences/flagmanager.py" line="274"/>
         <source>New Flag</source>
-        <translation type="unfinished"></translation>
+        <translation>Neues Flag</translation>
     </message>
     <message>
         <location filename="../omg/gui/preferences/flagmanager.py" line="274"/>
         <source>Please enter the name of the new flag</source>
-        <translation type="unfinished"></translation>
+        <translation>Name des neuen Flags:</translation>
     </message>
     <message>
         <location filename="../omg/gui/preferences/flagmanager.py" line="280"/>
         <source>Cannot create flag</source>
-        <translation type="unfinished"></translation>
+        <translation>Kann Flag nicht erstellen</translation>
     </message>
     <message>
         <location filename="../omg/gui/preferences/flagmanager.py" line="280"/>
         <source>This flag does already exist.</source>
-        <translation type="unfinished"></translation>
+        <translation>Flag existiert bereits.</translation>
     </message>
     <message>
         <location filename="../omg/gui/preferences/flagmanager.py" line="284"/>
         <source>Invalid flagname</source>
-        <translation type="unfinished"></translation>
+        <translation>Ungültiger Flag-Name</translation>
     </message>
     <message>
         <location filename="../omg/gui/preferences/flagmanager.py" line="284"/>
         <source>This is no a valid flagname.</source>
-        <translation type="unfinished"></translation>
+        <translation>Dies ist kein gültiger Flagname.</translation>
     </message>
 </context>
 <context>
@@ -1340,17 +1386,17 @@ being loaded</source>
     <message>
         <location filename="../omg/core/flags.py" line="223"/>
         <source>Add flagType</source>
-        <translation type="unfinished"></translation>
+        <translation>Flagtyp hinzufügen</translation>
     </message>
     <message>
         <location filename="../omg/core/flags.py" line="224"/>
         <source>Delete flagType</source>
-        <translation type="unfinished"></translation>
+        <translation>Flagtyp löschen</translation>
     </message>
     <message>
         <location filename="../omg/core/flags.py" line="225"/>
         <source>Change flagType</source>
-        <translation type="unfinished"></translation>
+        <translation>Flagtyp ändern</translation>
     </message>
 </context>
 <context>
@@ -1358,13 +1404,13 @@ being loaded</source>
     <message>
         <location filename="../omg/gui/flageditor.py" line="233"/>
         <source>{} (in {})</source>
-        <translation type="unfinished"></translation>
+        <translation>{} (in {})</translation>
     </message>
     <message numerus="yes">
         <location filename="../omg/gui/flageditor.py" line="257"/>
         <source>(And %n other)</source>
-        <translation type="unfinished">
-            <numerusform></numerusform>
+        <translation>
+            <numerusform>(und %n weitere)</numerusform>
             <numerusform></numerusform>
         </translation>
     </message>
@@ -1376,7 +1422,7 @@ being loaded</source>
     <message>
         <location filename="../omg/gui/flageditor.py" line="345"/>
         <source>Edit elements with flag...</source>
-        <translation type="unfinished"></translation>
+        <translation>Bearbeite Elemente mit Flag…</translation>
     </message>
 </context>
 <context>
@@ -1390,14 +1436,14 @@ being loaded</source>
 <context>
     <name>FlattenDialog</name>
     <message>
-        <location filename="../omg/gui/dialogs.py" line="308"/>
+        <location filename="../omg/gui/dialogs.py" line="316"/>
         <source>Flatten out containers</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/gui/dialogs.py" line="309"/>
+        <location filename="../omg/gui/dialogs.py" line="317"/>
         <source>recursively</source>
-        <translation type="unfinished"></translation>
+        <translation>Rekursiv</translation>
     </message>
 </context>
 <context>
@@ -1405,70 +1451,90 @@ being loaded</source>
     <message>
         <location filename="../omg/utils.py" line="185"/>
         <source>dd</source>
-        <translation type="unfinished"></translation>
+        <translation>TT</translation>
     </message>
     <message>
         <location filename="../omg/utils.py" line="186"/>
         <source>mm</source>
-        <translation type="unfinished"></translation>
+        <translation>MM</translation>
     </message>
     <message>
         <location filename="../omg/utils.py" line="187"/>
         <source>YYYY</source>
-        <translation type="unfinished"></translation>
+        <translation>JJJJ</translation>
     </message>
 </context>
 <context>
     <name>GeneralSettingsWidget</name>
     <message>
-        <location filename="../omg/install.py" line="232"/>
+        <location filename="../omg/install.py" line="231"/>
         <source>General settings</source>
-        <translation type="unfinished">Allgemeine Einstellungen</translation>
+        <translation>Allgemeine Einstellungen</translation>
     </message>
     <message>
-        <location filename="../omg/install.py" line="244"/>
+        <location filename="../omg/install.py" line="243"/>
         <source>Music directory</source>
-        <translation type="unfinished">Musikverzeichnis</translation>
+        <translation>Musikverzeichnis</translation>
     </message>
     <message>
-        <location filename="../omg/install.py" line="248"/>
+        <location filename="../omg/install.py" line="247"/>
         <source>SQLite</source>
-        <translation type="unfinished">SQLite</translation>
+        <translation>SQLite</translation>
     </message>
     <message>
-        <location filename="../omg/install.py" line="251"/>
+        <location filename="../omg/install.py" line="250"/>
         <source>MySQL</source>
-        <translation type="unfinished">MySQL</translation>
+        <translation>MySQL</translation>
     </message>
     <message>
-        <location filename="../omg/install.py" line="258"/>
+        <location filename="../omg/install.py" line="257"/>
         <source>Database type</source>
         <translation type="unfinished">Datenbanktyp</translation>
     </message>
     <message>
-        <location filename="../omg/install.py" line="261"/>
+        <location filename="../omg/install.py" line="272"/>
         <source>MPD</source>
         <translation type="unfinished">MPD</translation>
     </message>
     <message>
-        <location filename="../omg/install.py" line="264"/>
+        <location filename="../omg/install.py" line="282"/>
         <source>Audio backend</source>
         <translation type="unfinished">Audio-Backend</translation>
     </message>
     <message>
-        <location filename="../omg/install.py" line="281"/>
+        <location filename="../omg/install.py" line="301"/>
         <source>Choose music collection directory</source>
         <translation type="unfinished">Musikverzeichnis wählen</translation>
     </message>
     <message>
-        <location filename="../omg/install.py" line="272"/>
+        <location filename="../omg/install.py" line="290"/>
         <source>No music directory</source>
         <translation type="unfinished">Kein Musikverzeichnis gewählt</translation>
     </message>
     <message>
-        <location filename="../omg/install.py" line="272"/>
+        <location filename="../omg/install.py" line="290"/>
         <source>You must choose a directory for your music collection.</source>
         <translation type="unfinished">Du musst ein Musikverzeichnis wählen.</translation>
+    </message>
+    <message>
+        <location filename="../omg/install.py" line="263"/>
+        <source>Phonon</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/install.py" line="267"/>
+        <source>Phonon (cannot find PyQt4.phonon)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/install.py" line="276"/>
+        <source>MPD (cannot find python-mpd2)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/install.py" line="280"/>
+        <source>No backend (to choose a backend later, enable the corresponding plugin).</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -1632,17 +1698,17 @@ guessing. This is useful in most cases, unless you have albums that are split ac
 <context>
     <name>IconLabel</name>
     <message>
-        <location filename="../omg/install.py" line="659"/>
+        <location filename="../omg/install.py" line="690"/>
         <source>Add icon...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/install.py" line="660"/>
+        <location filename="../omg/install.py" line="691"/>
         <source>Change icon...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/install.py" line="664"/>
+        <location filename="../omg/install.py" line="695"/>
         <source>Remove icon</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1673,27 +1739,27 @@ guessing. This is useful in most cases, unless you have albums that are split ac
 <context>
     <name>LanguageWidget</name>
     <message>
-        <location filename="../omg/install.py" line="203"/>
+        <location filename="../omg/install.py" line="202"/>
         <source>Language</source>
         <translation type="unfinished">Sprache</translation>
     </message>
     <message>
-        <location filename="../omg/install.py" line="214"/>
+        <location filename="../omg/install.py" line="213"/>
         <source>Please choose a language: </source>
         <translation type="unfinished">Bitte wähle eine Sprache:</translation>
     </message>
     <message>
-        <location filename="../omg/install.py" line="221"/>
+        <location filename="../omg/install.py" line="220"/>
         <source>Next</source>
         <translation type="unfinished">Weiter</translation>
     </message>
     <message>
-        <location filename="../omg/install.py" line="222"/>
+        <location filename="../omg/install.py" line="221"/>
         <source>Previous</source>
         <translation type="unfinished">Zurück</translation>
     </message>
     <message>
-        <location filename="../omg/install.py" line="223"/>
+        <location filename="../omg/install.py" line="222"/>
         <source>OMG Install Tool</source>
         <translation type="unfinished">OMG Installationstool</translation>
     </message>
@@ -1727,72 +1793,72 @@ guessing. This is useful in most cases, unless you have albums that are split ac
 <context>
     <name>Level</name>
     <message>
-        <location filename="../omg/core/levels.py" line="280"/>
+        <location filename="../omg/core/levels.py" line="319"/>
         <source>Add elements</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/core/levels.py" line="289"/>
+        <location filename="../omg/core/levels.py" line="328"/>
         <source>Remove elements</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/core/levels.py" line="307"/>
+        <location filename="../omg/core/levels.py" line="346"/>
         <source>Create container</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/core/levels.py" line="321"/>
+        <location filename="../omg/core/levels.py" line="360"/>
         <source>change tags</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/core/levels.py" line="325"/>
+        <location filename="../omg/core/levels.py" line="364"/>
         <source>change flags</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/core/levels.py" line="329"/>
+        <location filename="../omg/core/levels.py" line="368"/>
         <source>change data</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/core/levels.py" line="360"/>
+        <location filename="../omg/core/levels.py" line="399"/>
         <source>change major property</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/core/levels.py" line="373"/>
+        <location filename="../omg/core/levels.py" line="410"/>
         <source>change contents</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/core/levels.py" line="384"/>
+        <location filename="../omg/core/levels.py" line="421"/>
         <source>set contents</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/core/levels.py" line="414"/>
+        <location filename="../omg/core/levels.py" line="451"/>
         <source>insert contents</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/core/levels.py" line="460"/>
+        <location filename="../omg/core/levels.py" line="497"/>
         <source>remove contents</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/core/levels.py" line="479"/>
+        <location filename="../omg/core/levels.py" line="516"/>
         <source>change positions</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/core/levels.py" line="496"/>
+        <location filename="../omg/core/levels.py" line="533"/>
         <source>rename files</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/core/levels.py" line="510"/>
+        <location filename="../omg/core/levels.py" line="547"/>
         <source>commit</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1800,22 +1866,22 @@ guessing. This is useful in most cases, unless you have albums that are split ac
 <context>
     <name>LevelTreeModel</name>
     <message>
-        <location filename="../omg/models/leveltreemodel.py" line="83"/>
+        <location filename="../omg/models/leveltreemodel.py" line="85"/>
         <source>drop</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/models/leveltreemodel.py" line="138"/>
+        <location filename="../omg/models/leveltreemodel.py" line="151"/>
         <source>remove elements</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/models/leveltreemodel.py" line="151"/>
+        <location filename="../omg/models/leveltreemodel.py" line="164"/>
         <source>clear</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/models/leveltreemodel.py" line="165"/>
+        <location filename="../omg/models/leveltreemodel.py" line="178"/>
         <source>Importing {0} files...</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1831,32 +1897,32 @@ guessing. This is useful in most cases, unless you have albums that are split ac
 <context>
     <name>MPDConfigWidget</name>
     <message>
-        <location filename="../omg/plugins/mpd/plugin.py" line="338"/>
+        <location filename="../omg/plugins/mpd/plugin.py" line="402"/>
         <source>Password:</source>
         <translation type="unfinished">Passwort:</translation>
     </message>
     <message>
-        <location filename="../omg/plugins/mpd/plugin.py" line="331"/>
+        <location filename="../omg/plugins/mpd/plugin.py" line="395"/>
         <source>Host:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/mpd/plugin.py" line="335"/>
+        <location filename="../omg/plugins/mpd/plugin.py" line="399"/>
         <source>Port:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/mpd/plugin.py" line="342"/>
+        <location filename="../omg/plugins/mpd/plugin.py" line="406"/>
         <source>Password visible?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/mpd/plugin.py" line="346"/>
+        <location filename="../omg/plugins/mpd/plugin.py" line="410"/>
         <source>Save</source>
         <translation type="unfinished">Speichern</translation>
     </message>
     <message>
-        <location filename="../omg/plugins/mpd/plugin.py" line="349"/>
+        <location filename="../omg/plugins/mpd/plugin.py" line="413"/>
         <source>Reset</source>
         <translation type="unfinished">Zurücksetzen</translation>
     </message>
@@ -1864,8 +1930,23 @@ guessing. This is useful in most cases, unless you have albums that are split ac
 <context>
     <name>MPDPlayerBackend</name>
     <message>
-        <location filename="../omg/plugins/mpd/plugin.py" line="36"/>
+        <location filename="../omg/plugins/mpd/plugin.py" line="44"/>
         <source>MPD</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/mpd/plugin.py" line="83"/>
+        <source>Update Database</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/mpd/plugin.py" line="85"/>
+        <source>Audio outputs...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/mpd/plugin.py" line="361"/>
+        <source>Choose which audio outputs to use:</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -1874,77 +1955,77 @@ guessing. This is useful in most cases, unless you have albums that are split ac
     <message>
         <location filename="../omg/gui/mainwindow.py" line="165"/>
         <source>OMG version {}</source>
-        <translation type="unfinished">OMG Version {}</translation>
+        <translation>OMG Version {}</translation>
     </message>
     <message>
         <location filename="../omg/gui/mainwindow.py" line="188"/>
         <source>&amp;Edit</source>
-        <translation type="unfinished">&amp;Bearbeiten</translation>
+        <translation>&amp;Bearbeiten</translation>
     </message>
     <message>
         <location filename="../omg/gui/mainwindow.py" line="193"/>
         <source>&amp;View</source>
-        <translation type="unfinished">&amp;Ansicht</translation>
+        <translation>&amp;Ansicht</translation>
     </message>
     <message>
         <location filename="../omg/gui/mainwindow.py" line="194"/>
         <source>&amp;Extras</source>
-        <translation type="unfinished">&amp;Extras</translation>
+        <translation>&amp;Extras</translation>
     </message>
     <message>
         <location filename="../omg/gui/mainwindow.py" line="195"/>
         <source>&amp;Help</source>
-        <translation type="unfinished">&amp;Hilfe</translation>
+        <translation>&amp;Hilfe</translation>
     </message>
     <message>
         <location filename="../omg/gui/mainwindow.py" line="213"/>
         <source>&amp;About</source>
-        <translation type="unfinished">&amp;Über</translation>
+        <translation>&amp;Über</translation>
     </message>
     <message>
-        <location filename="../omg/gui/mainwindow.py" line="271"/>
+        <location filename="../omg/gui/mainwindow.py" line="253"/>
         <source>New dock widget</source>
-        <translation type="unfinished">Neues Dockfenster</translation>
+        <translation>Neues Dockfenster</translation>
     </message>
     <message>
         <location filename="../omg/gui/mainwindow.py" line="470"/>
         <source>About OMG</source>
-        <translation type="unfinished">Über OMG</translation>
+        <translation>Über OMG</translation>
     </message>
     <message>
         <location filename="../omg/gui/mainwindow.py" line="470"/>
         <source>This is OMG version {} by Martin Altmayer and Michael Helmling.</source>
-        <translation type="unfinished">Dies ist OMG Version {} von Martin Altmayer und Michael Helmling.</translation>
+        <translation>OMG Version {} von Martin Altmayer und Michael Helmling.</translation>
     </message>
     <message>
         <location filename="../omg/gui/mainwindow.py" line="203"/>
         <source>Tagmanager...</source>
-        <translation type="unfinished">Tagmanager...</translation>
+        <translation>Tagverwaltung…</translation>
     </message>
     <message>
         <location filename="../omg/gui/mainwindow.py" line="208"/>
         <source>Flagmanager...</source>
-        <translation type="unfinished">Flagmanager...</translation>
+        <translation>Flagverwaltung…</translation>
     </message>
     <message>
         <location filename="../omg/gui/mainwindow.py" line="198"/>
         <source>Preferences...</source>
-        <translation type="unfinished">Einstellungen...</translation>
+        <translation>Einstellungen…</translation>
     </message>
     <message>
         <location filename="../omg/gui/mainwindow.py" line="181"/>
         <source>Ctrl+F</source>
-        <translation type="unfinished"></translation>
+        <translation>Strg+F</translation>
     </message>
     <message>
         <location filename="../omg/gui/mainwindow.py" line="218"/>
         <source>&amp;Fullscreen</source>
-        <translation type="unfinished"></translation>
+        <translation>&amp;Vollbild</translation>
     </message>
     <message>
         <location filename="../omg/gui/mainwindow.py" line="221"/>
         <source>F12</source>
-        <translation type="unfinished"></translation>
+        <translation>F12</translation>
     </message>
 </context>
 <context>
@@ -1952,72 +2033,72 @@ guessing. This is useful in most cases, unless you have albums that are split ac
     <message>
         <location filename="../omg/gui/preferences/delegates.py" line="503"/>
         <source>Manage configurations</source>
-        <translation type="unfinished"></translation>
+        <translation>Konfigurationen Verwalten</translation>
     </message>
     <message>
         <location filename="../omg/gui/preferences/delegates.py" line="506"/>
         <source>&lt;i&gt;Italic configurations&lt;/i&gt; are built in and cannot be deleted.</source>
-        <translation type="unfinished"></translation>
+        <translation>&lt;i&gt;Kursive Konfigurationen&lt;/i&gt; sind eingebaut und können nicht gelöscht werden.</translation>
     </message>
     <message>
         <location filename="../omg/gui/preferences/delegates.py" line="508"/>
         <source>Click on a name to change it.</source>
-        <translation type="unfinished"></translation>
+        <translation>Zum Ändern auf einen Namen klicken.</translation>
     </message>
     <message>
         <location filename="../omg/gui/preferences/delegates.py" line="524"/>
         <source>Add configuration</source>
-        <translation type="unfinished"></translation>
+        <translation>Konfiguration hinzufügen</translation>
     </message>
     <message>
         <location filename="../omg/gui/preferences/delegates.py" line="530"/>
         <source>Reset to defaults</source>
-        <translation type="unfinished"></translation>
+        <translation>Zurücksetzen</translation>
     </message>
     <message>
         <location filename="../omg/gui/preferences/delegates.py" line="535"/>
         <source>Delete</source>
-        <translation type="unfinished"></translation>
+        <translation>Löschen</translation>
     </message>
     <message>
         <location filename="../omg/gui/preferences/delegates.py" line="542"/>
         <source>Close</source>
-        <translation type="unfinished"></translation>
+        <translation>Schließen</translation>
     </message>
     <message>
         <location filename="../omg/gui/preferences/delegates.py" line="551"/>
         <source>Name</source>
-        <translation type="unfinished"></translation>
+        <translation>Name</translation>
     </message>
     <message>
         <location filename="../omg/gui/preferences/delegates.py" line="551"/>
         <source>Type</source>
-        <translation type="unfinished"></translation>
+        <translation>Typ</translation>
     </message>
     <message>
         <location filename="../omg/gui/preferences/delegates.py" line="591"/>
         <source>Delete configurations</source>
-        <translation type="unfinished"></translation>
+        <translation>Konfigurationen löschen</translation>
     </message>
     <message numerus="yes">
         <location filename="../omg/gui/preferences/delegates.py" line="591"/>
         <source>Should I really delete %n configuration(s)?</source>
-        <translation type="unfinished">
-            <numerusform></numerusform>
-            <numerusform></numerusform>
+        <translation>
+            <numerusform>Konfiguration wirklich löschen?</numerusform>
+            <numerusform>Wirklich %n Konfigurationen löschen?</numerusform>
         </translation>
     </message>
     <message>
         <location filename="../omg/gui/preferences/delegates.py" line="601"/>
         <source>Reset configurations</source>
-        <translation type="unfinished"></translation>
+        <translation>Zurücksetzen</translation>
     </message>
     <message numerus="yes">
         <location filename="../omg/gui/preferences/delegates.py" line="601"/>
         <source>Should I really reset %n configuration(s)?</source>
-        <translation type="unfinished">
-            <numerusform></numerusform>
-            <numerusform></numerusform>
+        <translation>
+            <numerusform>Konfiguration wirklich zurücksetzen?</numerusform>
+            <numerusform>Wirklich %n Konfigurationen zurücksetzen?</numerusform>
         </translation>
     </message>
 </context>
@@ -2026,7 +2107,7 @@ guessing. This is useful in most cases, unless you have albums that are split ac
     <message>
         <location filename="../omg/gui/treeactions.py" line="300"/>
         <source>match tags from filename</source>
-        <translation type="unfinished"></translation>
+        <translation>Tags aus Dateinamen generieren</translation>
     </message>
 </context>
 <context>
@@ -2034,7 +2115,7 @@ guessing. This is useful in most cases, unless you have albums that are split ac
     <message>
         <location filename="../omg/gui/treeactions.py" line="194"/>
         <source>merge...</source>
-        <translation type="unfinished"></translation>
+        <translation>Zusammenführen…</translation>
     </message>
 </context>
 <context>
@@ -2042,32 +2123,32 @@ guessing. This is useful in most cases, unless you have albums that are split ac
     <message>
         <location filename="../omg/gui/dialogs.py" line="188"/>
         <source>Merge elements</source>
-        <translation type="unfinished"></translation>
+        <translation>Elemente Zusammenführen</translation>
     </message>
     <message>
         <location filename="../omg/gui/dialogs.py" line="199"/>
         <source>of new container:</source>
-        <translation type="unfinished"></translation>
+        <translation>des neuen Containers:</translation>
     </message>
     <message>
         <location filename="../omg/gui/dialogs.py" line="209"/>
         <source>Assign common tags</source>
-        <translation type="unfinished"></translation>
+        <translation>Gemeinsame Tags zuweisen</translation>
     </message>
     <message>
         <location filename="../omg/gui/dialogs.py" line="213"/>
         <source>Auto-adjust positions</source>
-        <translation type="unfinished"></translation>
+        <translation>Positionen anpassen</translation>
     </message>
     <message>
         <location filename="../omg/gui/dialogs.py" line="231"/>
         <source>Remove prefixes from children&apos;s {}:</source>
-        <translation type="unfinished"></translation>
+        <translation>Vom {} der Kinder zu entfernendes Präfix:</translation>
     </message>
     <message>
         <location filename="../omg/gui/dialogs.py" line="247"/>
         <source>merge</source>
-        <translation type="unfinished"></translation>
+        <translation>Zusammenführen</translation>
     </message>
 </context>
 <context>
@@ -2075,17 +2156,17 @@ guessing. This is useful in most cases, unless you have albums that are split ac
     <message>
         <location filename="../omg/filesystem/dialogs.py" line="104"/>
         <source>Missing Files Detected</source>
-        <translation type="unfinished"></translation>
+        <translation>Fehlende Dateien</translation>
     </message>
     <message>
         <location filename="../omg/filesystem/dialogs.py" line="106"/>
         <source>The following files were removed from the filesystem by another program. Please select those that should also be removed from OMG&apos;s database, and provide a new path for the others.</source>
-        <translation type="unfinished"></translation>
+        <translation>Die folgenden Dateien wurden mit einem anderen Programm von der Festplatte entfernt. Bitte ggf. neuen Pfad angeben oder auch aus OMG entfernen.</translation>
     </message>
     <message>
         <location filename="../omg/filesystem/dialogs.py" line="127"/>
         <source>delete</source>
-        <translation type="unfinished"></translation>
+        <translation>Löschen</translation>
     </message>
 </context>
 <context>
@@ -2093,151 +2174,156 @@ guessing. This is useful in most cases, unless you have albums that are split ac
     <message>
         <location filename="../omg/filesystem/dialogs.py" line="147"/>
         <source>Modified Tags Detected</source>
-        <translation type="unfinished"></translation>
+        <translation>Tags Geändert </translation>
     </message>
     <message>
         <location filename="../omg/filesystem/dialogs.py" line="149"/>
         <source>&lt;b&gt;In Database:&lt;/b&gt;</source>
-        <translation type="unfinished"></translation>
+        <translation>&lt;b&gt;In der Datenbank:&lt;/b&gt;</translation>
     </message>
     <message>
         <location filename="../omg/filesystem/dialogs.py" line="150"/>
         <source>&lt;b&gt;On Disk:&lt;/b&gt;</source>
-        <translation type="unfinished"></translation>
+        <translation>&lt;b&gt;In der Datei:&lt;/b&gt;</translation>
     </message>
     <message>
         <location filename="../omg/filesystem/dialogs.py" line="178"/>
         <source>use DB tags</source>
-        <translation type="unfinished"></translation>
+        <translation>Tags aus der Datenbank übernehmen</translation>
     </message>
     <message>
         <location filename="../omg/filesystem/dialogs.py" line="179"/>
         <source>use disk tags</source>
-        <translation type="unfinished"></translation>
+        <translation>Tags aus der Datei übernehmen</translation>
     </message>
 </context>
 <context>
     <name>MySQLWidget</name>
     <message>
-        <location filename="../omg/install.py" line="372"/>
+        <location filename="../omg/install.py" line="403"/>
         <source>MySQL settings</source>
-        <translation type="unfinished">MySQL Einstellungen</translation>
+        <translation>MySQL-Einstellungen</translation>
     </message>
     <message>
-        <location filename="../omg/install.py" line="374"/>
+        <location filename="../omg/install.py" line="405"/>
         <source>Please create an empty database for OMG. The password will be stored as plain text.</source>
-        <translation type="unfinished">Bitte erstelle eine leere Datenbank für OMG. Das Passwort wird als Klartext gespeichert.</translation>
+        <translation>Bitte  eine leere Datenbank für OMG erstellen. Das Passwort wird im Klartext gespeichert.</translation>
     </message>
     <message>
-        <location filename="../omg/install.py" line="384"/>
+        <location filename="../omg/install.py" line="415"/>
         <source>Database name</source>
-        <translation type="unfinished">Datenbankname</translation>
+        <translation>Datenbankname</translation>
     </message>
     <message>
-        <location filename="../omg/install.py" line="386"/>
+        <location filename="../omg/install.py" line="417"/>
         <source>Database user</source>
-        <translation type="unfinished">Datenbankbenutzer</translation>
+        <translation>Datenbankbenutzer</translation>
     </message>
     <message>
-        <location filename="../omg/install.py" line="395"/>
+        <location filename="../omg/install.py" line="426"/>
         <source>Database password</source>
-        <translation type="unfinished">Datenbankpasswort</translation>
+        <translation>Datenbankpasswort</translation>
     </message>
     <message>
-        <location filename="../omg/install.py" line="397"/>
+        <location filename="../omg/install.py" line="428"/>
         <source>Database host</source>
-        <translation type="unfinished">Datenbankhost</translation>
+        <translation>Datenbankhost</translation>
     </message>
     <message>
-        <location filename="../omg/install.py" line="399"/>
+        <location filename="../omg/install.py" line="430"/>
         <source>Database port</source>
-        <translation type="unfinished">Datenbankport</translation>
+        <translation>Datenbankport</translation>
     </message>
     <message>
-        <location filename="../omg/install.py" line="401"/>
+        <location filename="../omg/install.py" line="432"/>
         <source>Table prefix (optional)</source>
-        <translation type="unfinished">Tabellenpräfix (optional)</translation>
+        <translation>Tabellenpräfix (optional)</translation>
     </message>
     <message>
-        <location filename="../omg/install.py" line="411"/>
+        <location filename="../omg/install.py" line="442"/>
         <source>Invalid port</source>
-        <translation type="unfinished">Ungültiger Port</translation>
+        <translation>Ungültiger Port</translation>
     </message>
     <message>
-        <location filename="../omg/install.py" line="411"/>
+        <location filename="../omg/install.py" line="442"/>
         <source>Please enter a correct port number.</source>
-        <translation type="unfinished">Bitte gib eine korrekte Portnummer ein.</translation>
+        <translation>Bitte korrekte Portnummer angeben.</translation>
     </message>
 </context>
 <context>
     <name>NoProfileYetWidget</name>
     <message>
-        <location filename="../omg/gui/profiles.py" line="91"/>
+        <location filename="../omg/gui/profiles.py" line="99"/>
         <source>There is no profile yet. To create one, choose a name and a type:</source>
-        <translation type="unfinished"></translation>
+        <translation>Es existiert noch kein Profil. Zum Erstellen Namen und Typ auswählen.</translation>
     </message>
     <message>
-        <location filename="../omg/gui/profiles.py" line="93"/>
+        <location filename="../omg/gui/profiles.py" line="100"/>
         <source>There is no profile yet. To create one, choose a name:</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../omg/gui/profiles.py" line="105"/>
-        <source>Name:</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../omg/gui/profiles.py" line="109"/>
-        <source>Type:</source>
-        <translation type="unfinished"></translation>
+        <translation>Kein Profil vorhanden. Zum Erstellen einen Namen auswählen:</translation>
     </message>
     <message>
         <location filename="../omg/gui/profiles.py" line="111"/>
+        <source>Name:</source>
+        <translation>Name:</translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/profiles.py" line="115"/>
+        <source>Type:</source>
+        <translation>Typ:</translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/profiles.py" line="117"/>
         <source>Add profile</source>
-        <translation type="unfinished"></translation>
+        <translation>Profil hinzufügen</translation>
     </message>
     <message>
-        <location filename="../omg/gui/profiles.py" line="129"/>
+        <location filename="../omg/gui/profiles.py" line="135"/>
         <source>Invalid name</source>
-        <translation type="unfinished"></translation>
+        <translation>Ungültiger Name</translation>
     </message>
     <message>
-        <location filename="../omg/gui/profiles.py" line="129"/>
+        <location filename="../omg/gui/profiles.py" line="135"/>
         <source>There is already a profile of this name.</source>
-        <translation type="unfinished"></translation>
+        <translation>Ein Profil mit diesem Namen existiert bereits.</translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/profiles.py" line="96"/>
+        <source>There is no profile type. Probably you need to install a plugin that adds support for &apos;{}&apos;.</source>
+        <translation>Kein Profil-Typ vorhanden. Vermutlich muss ein Plugin zur Unterstützung von „{}“ installiert oder aktiviert werden.</translation>
     </message>
 </context>
 <context>
     <name>OptionDialog</name>
     <message>
-        <location filename="../omg/gui/editor.py" line="178"/>
+        <location filename="../omg/gui/editor.py" line="146"/>
         <source>Auto expand</source>
-        <translation type="unfinished"></translation>
+        <translation>Alles ausklappen</translation>
     </message>
     <message>
-        <location filename="../omg/gui/editor.py" line="183"/>
+        <location filename="../omg/gui/editor.py" line="151"/>
         <source>Auto expand dropped containers</source>
-        <translation type="unfinished"></translation>
+        <translation>Eingefügte Container ausklappen</translation>
     </message>
     <message>
-        <location filename="../omg/gui/editor.py" line="189"/>
+        <location filename="../omg/gui/editor.py" line="157"/>
         <source>Select album guessing profile</source>
-        <translation type="unfinished"></translation>
+        <translation>Profil für den Gruppierer wählen</translation>
     </message>
     <message>
-        <location filename="../omg/gui/editor.py" line="193"/>
+        <location filename="../omg/gui/editor.py" line="161"/>
         <source>Guess albums</source>
-        <translation type="unfinished"></translation>
+        <translation>Gruppieren</translation>
     </message>
     <message>
-        <location filename="../omg/gui/editor.py" line="200"/>
+        <location filename="../omg/gui/editor.py" line="168"/>
         <source>Item display</source>
-        <translation type="unfinished"></translation>
+        <translation>Element-Darstellung</translation>
     </message>
     <message>
         <location filename="../omg/gui/tageditor.py" line="703"/>
         <source>Load elements recursively</source>
-        <translation type="unfinished"></translation>
+        <translation>Elemente rekursiv laden</translation>
     </message>
 </context>
 <context>
@@ -2245,33 +2331,33 @@ guessing. This is useful in most cases, unless you have albums that are split ac
     <message>
         <location filename="../omg/plugins/renamer/gui.py" line="78"/>
         <source>From: {}</source>
-        <translation type="unfinished"></translation>
+        <translation>Von: {}</translation>
     </message>
     <message>
         <location filename="../omg/plugins/renamer/gui.py" line="81"/>
         <source>To: {}</source>
-        <translation type="unfinished"></translation>
+        <translation>Nach: {}</translation>
     </message>
     <message>
         <location filename="../omg/plugins/renamer/gui.py" line="84"/>
         <source>Unchanged: {}</source>
-        <translation type="unfinished"></translation>
+        <translation>Unverändert: {}</translation>
     </message>
 </context>
 <context>
     <name>PhononPlayerBackend</name>
     <message>
-        <location filename="../omg/plugins/phonon/plugin.py" line="31"/>
+        <location filename="../omg/plugins/phonon/plugin.py" line="34"/>
         <source>Phonon</source>
-        <translation type="unfinished"></translation>
+        <translation>Lokale Wiedergabe</translation>
     </message>
 </context>
 <context>
     <name>Playback</name>
     <message>
-        <location filename="../omg/gui/playback.py" line="184"/>
+        <location filename="../omg/gui/playback.py" line="181"/>
         <source>playback</source>
-        <translation type="unfinished"></translation>
+        <translation>Wiedergabe</translation>
     </message>
 </context>
 <context>
@@ -2279,32 +2365,32 @@ guessing. This is useful in most cases, unless you have albums that are split ac
     <message>
         <location filename="../omg/gui/playback.py" line="39"/>
         <source>playback controls</source>
-        <translation type="unfinished"></translation>
+        <translation>Wiedergabesteuerung</translation>
     </message>
     <message>
-        <location filename="../omg/gui/playback.py" line="116"/>
+        <location filename="../omg/gui/playback.py" line="113"/>
         <source>Current song</source>
-        <translation type="unfinished"></translation>
+        <translation>Aktueller Titel</translation>
     </message>
     <message>
-        <location filename="../omg/gui/playback.py" line="118"/>
+        <location filename="../omg/gui/playback.py" line="115"/>
         <source>no song selected</source>
-        <translation type="unfinished"></translation>
+        <translation>Kein Titel ausgewählt</translation>
     </message>
     <message>
-        <location filename="../omg/gui/playback.py" line="137"/>
+        <location filename="../omg/gui/playback.py" line="134"/>
         <source>connecting...</source>
-        <translation type="unfinished"></translation>
+        <translation>Verbinde…</translation>
     </message>
     <message>
-        <location filename="../omg/gui/playback.py" line="139"/>
+        <location filename="../omg/gui/playback.py" line="136"/>
         <source>unable to connect</source>
-        <translation type="unfinished"></translation>
+        <translation>Verbindung fehlgeschlagen</translation>
     </message>
     <message>
-        <location filename="../omg/gui/playback.py" line="159"/>
+        <location filename="../omg/gui/playback.py" line="156"/>
         <source>No backend selected</source>
-        <translation type="unfinished"></translation>
+        <translation>Kein Backend ausgewählt</translation>
     </message>
 </context>
 <context>
@@ -2312,74 +2398,84 @@ guessing. This is useful in most cases, unless you have albums that are split ac
     <message>
         <location filename="../omg/player.py" line="31"/>
         <source>Playback</source>
-        <translation type="unfinished"></translation>
+        <translation>Wiedergabe</translation>
     </message>
 </context>
 <context>
     <name>Playlist</name>
     <message>
-        <location filename="../omg/gui/playlist.py" line="164"/>
+        <location filename="../omg/gui/playlist.py" line="170"/>
         <source>playlist</source>
-        <translation type="unfinished"></translation>
+        <translation>Abspielliste</translation>
     </message>
 </context>
 <context>
     <name>PlaylistModel</name>
     <message>
-        <location filename="../omg/models/playlist.py" line="133"/>
+        <location filename="../omg/models/playlist.py" line="184"/>
         <source>Drop elements</source>
-        <translation type="unfinished"></translation>
+        <translation>Drag &amp; Drop</translation>
     </message>
     <message>
-        <location filename="../omg/models/playlist.py" line="177"/>
+        <location filename="../omg/models/playlist.py" line="236"/>
         <source>Insert elements</source>
-        <translation type="unfinished"></translation>
+        <translation>Einfügen</translation>
     </message>
     <message>
-        <location filename="../omg/models/playlist.py" line="258"/>
+        <location filename="../omg/models/playlist.py" line="317"/>
         <source>Move elements</source>
-        <translation type="unfinished"></translation>
+        <translation>Verschieben</translation>
     </message>
     <message>
-        <location filename="../omg/models/playlist.py" line="301"/>
+        <location filename="../omg/models/playlist.py" line="367"/>
         <source>Remove from playlist</source>
-        <translation type="unfinished"></translation>
+        <translation>Aus Liste entfernen</translation>
+    </message>
+    <message>
+        <location filename="../omg/models/playlist.py" line="281"/>
+        <source>Playlist error</source>
+        <translation>Abspiellisten-Fehler</translation>
     </message>
 </context>
 <context>
     <name>PlaylistTreeView</name>
     <message>
-        <location filename="../omg/gui/playlist.py" line="36"/>
+        <location filename="../omg/gui/playlist.py" line="37"/>
         <source>tags</source>
-        <translation type="unfinished"></translation>
+        <translation>Tags</translation>
     </message>
     <message>
-        <location filename="../omg/gui/playlist.py" line="40"/>
+        <location filename="../omg/gui/playlist.py" line="41"/>
         <source>playlist</source>
-        <translation type="unfinished"></translation>
+        <translation>Abspielliste</translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/playlist.py" line="51"/>
+        <source>Please configure and choose a backend to play music.</source>
+        <translation>Um Musik abzuspielen, muss ein Backend konfiguriert und ausgewählt sein.</translation>
     </message>
 </context>
 <context>
     <name>PlaylistWidget</name>
     <message>
-        <location filename="../omg/gui/playlist.py" line="84"/>
+        <location filename="../omg/gui/playlist.py" line="90"/>
         <source>Playlist</source>
-        <translation type="unfinished"></translation>
+        <translation>Abspielliste</translation>
     </message>
     <message>
-        <location filename="../omg/gui/playlist.py" line="114"/>
+        <location filename="../omg/gui/playlist.py" line="120"/>
         <source>Item Display:</source>
-        <translation type="unfinished"></translation>
+        <translation>Element-Darstellung:</translation>
     </message>
     <message>
-        <location filename="../omg/gui/playlist.py" line="146"/>
+        <location filename="../omg/gui/playlist.py" line="152"/>
         <source>no backend selected</source>
-        <translation type="unfinished"></translation>
+        <translation>Kein Backend ausgewählt</translation>
     </message>
     <message>
-        <location filename="../omg/gui/playlist.py" line="159"/>
+        <location filename="../omg/gui/playlist.py" line="165"/>
         <source>no connection</source>
-        <translation type="unfinished"></translation>
+        <translation>Keine Verbindung</translation>
     </message>
 </context>
 <context>
@@ -2387,47 +2483,58 @@ guessing. This is useful in most cases, unless you have albums that are split ac
     <message>
         <location filename="../omg/plugins/dialog.py" line="33"/>
         <source>Enabled</source>
-        <translation type="unfinished"></translation>
+        <translation>Aktiviert</translation>
     </message>
     <message>
         <location filename="../omg/plugins/dialog.py" line="34"/>
         <source>Name</source>
-        <translation type="unfinished"></translation>
+        <translation>Name</translation>
     </message>
     <message>
         <location filename="../omg/plugins/dialog.py" line="35"/>
         <source>Author</source>
-        <translation type="unfinished"></translation>
+        <translation>Autor</translation>
     </message>
     <message>
         <location filename="../omg/plugins/dialog.py" line="36"/>
         <source>Version</source>
-        <translation type="unfinished"></translation>
+        <translation>Version</translation>
     </message>
     <message>
         <location filename="../omg/plugins/dialog.py" line="37"/>
         <source>Description</source>
-        <translation type="unfinished"></translation>
+        <translation>Beschreibung</translation>
     </message>
     <message>
         <location filename="../omg/plugins/dialog.py" line="38"/>
         <source>Minimum OMG version</source>
-        <translation type="unfinished"></translation>
+        <translation>Min. OMG-Version</translation>
     </message>
     <message>
         <location filename="../omg/plugins/dialog.py" line="39"/>
         <source>Maximum OMG version</source>
-        <translation type="unfinished"></translation>
+        <translation>Max. OMG-Version</translation>
     </message>
     <message>
         <location filename="../omg/plugins/dialog.py" line="50"/>
         <source>Warning: Changes will be performed immediately!</source>
-        <translation type="unfinished"></translation>
+        <translation>Warnung: Änderungen werden sofort durchgeführt!</translation>
     </message>
     <message>
         <location filename="../omg/plugins/dialog.py" line="57"/>
         <source>Close</source>
-        <translation type="unfinished"></translation>
+        <translation>Schließen</translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/dialog.py" line="97"/>
+        <source>Error enabling plugin</source>
+        <translation>Fehler beim Aktivieren des Plugins</translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/dialog.py" line="97"/>
+        <source>Could not enable plugin {}:
+{}</source>
+        <translation>Konnte das Plugin „{}“ nicht aktivieren: {}</translation>
     </message>
 </context>
 <context>
@@ -2435,27 +2542,27 @@ guessing. This is useful in most cases, unless you have albums that are split ac
     <message>
         <location filename="../omg/gui/preferences/__init__.py" line="96"/>
         <source>Preferences - OMG</source>
-        <translation type="unfinished"></translation>
+        <translation>Einstellungen – OMG</translation>
     </message>
     <message>
         <location filename="../omg/plugins/configeditor/plugin.py" line="172"/>
         <source>cancel</source>
-        <translation type="unfinished"></translation>
+        <translation>Abbrechen</translation>
     </message>
     <message>
         <location filename="../omg/plugins/configeditor/plugin.py" line="174"/>
         <source>save</source>
-        <translation type="unfinished"></translation>
+        <translation>Speichern</translation>
     </message>
     <message>
         <location filename="../omg/plugins/configeditor/plugin.py" line="189"/>
         <source>unsaved changes</source>
-        <translation type="unfinished"></translation>
+        <translation>Nicht gespeicherte Änderungen</translation>
     </message>
     <message>
         <location filename="../omg/plugins/configeditor/plugin.py" line="189"/>
         <source>Do you want to save your changes before proceeding?</source>
-        <translation type="unfinished"></translation>
+        <translation>Änderungen Speichern?</translation>
     </message>
 </context>
 <context>
@@ -2463,40 +2570,40 @@ guessing. This is useful in most cases, unless you have albums that are split ac
     <message>
         <location filename="../omg/gui/preferences/__init__.py" line="254"/>
         <source>Main</source>
-        <translation type="unfinished"></translation>
+        <translation>Allgemein</translation>
     </message>
     <message>
         <location filename="../omg/gui/preferences/__init__.py" line="255"/>
         <source>Tag Manager</source>
-        <translation type="unfinished"></translation>
+        <translation>Tagverwaltung</translation>
     </message>
     <message>
         <location filename="../omg/gui/preferences/__init__.py" line="257"/>
         <source>Flag Manager</source>
-        <translation type="unfinished"></translation>
+        <translation>Flagverwaltung</translation>
     </message>
     <message>
         <location filename="../omg/gui/preferences/__init__.py" line="259"/>
         <source>Element display</source>
-        <translation type="unfinished"></translation>
+        <translation>Element-Darstellung</translation>
     </message>
     <message>
         <location filename="../omg/gui/preferences/__init__.py" line="262"/>
         <source>Plugins</source>
-        <translation type="unfinished"></translation>
+        <translation>Plugins</translation>
     </message>
 </context>
 <context>
     <name>ProfileComboBox</name>
     <message>
-        <location filename="../omg/gui/profiles.py" line="344"/>
+        <location filename="../omg/gui/profiles.py" line="350"/>
         <source>{} (type: {})</source>
-        <translation type="unfinished"></translation>
+        <translation>{} (Typ: {})</translation>
     </message>
     <message>
-        <location filename="../omg/gui/profiles.py" line="357"/>
+        <location filename="../omg/gui/profiles.py" line="363"/>
         <source>Configure...</source>
-        <translation type="unfinished"></translation>
+        <translation>Konfigurieren…</translation>
     </message>
 </context>
 <context>
@@ -2504,20 +2611,20 @@ guessing. This is useful in most cases, unless you have albums that are split ac
     <message>
         <location filename="../omg/gui/profiles.py" line="31"/>
         <source>Profile Configuration: {}</source>
-        <translation type="unfinished"></translation>
+        <translation>Profilkonfiguration: {}</translation>
     </message>
 </context>
 <context>
     <name>RealLevel</name>
     <message>
-        <location filename="../omg/core/reallevel.py" line="229"/>
+        <location filename="../omg/core/reallevel.py" line="235"/>
         <source>Add elements to database</source>
-        <translation type="unfinished"></translation>
+        <translation>Elemente aufnehmen</translation>
     </message>
     <message>
-        <location filename="../omg/core/reallevel.py" line="241"/>
+        <location filename="../omg/core/reallevel.py" line="248"/>
         <source>Remove elements from database</source>
-        <translation type="unfinished"></translation>
+        <translation>Elemente entfernen</translation>
     </message>
 </context>
 <context>
@@ -2525,27 +2632,27 @@ guessing. This is useful in most cases, unless you have albums that are split ac
     <message>
         <location filename="../omg/gui/tageditor.py" line="585"/>
         <source>Add tag value</source>
-        <translation type="unfinished">Tag-Wert hinzufügen</translation>
+        <translation>Tag-Wert hinzufügen</translation>
     </message>
     <message>
         <location filename="../omg/gui/tageditor.py" line="615"/>
         <source>Type: </source>
-        <translation type="unfinished">Typ: </translation>
+        <translation>Typ: </translation>
     </message>
     <message>
         <location filename="../omg/gui/tageditor.py" line="618"/>
         <source>Value: </source>
-        <translation type="unfinished">Wert: </translation>
+        <translation>Wert: </translation>
     </message>
     <message>
         <location filename="../omg/gui/tageditor.py" line="620"/>
         <source>Elements: </source>
-        <translation type="unfinished">Elemente: </translation>
+        <translation>Elemente: </translation>
     </message>
     <message>
         <location filename="../omg/gui/tageditor.py" line="650"/>
         <source>Invalid value</source>
-        <translation type="unfinished">Ungültiger Wert</translation>
+        <translation>Ungültiger Wert</translation>
     </message>
     <message>
         <location filename="../omg/gui/tageditor.py" line="650"/>
@@ -2659,7 +2766,7 @@ guessing. This is useful in most cases, unless you have albums that are split ac
 <context>
     <name>RenameFilesError</name>
     <message>
-        <location filename="../omg/core/levels.py" line="65"/>
+        <location filename="../omg/core/levels.py" line="69"/>
         <source>Error renaming file</source>
         <translation type="unfinished"></translation>
     </message>
@@ -2675,22 +2782,22 @@ guessing. This is useful in most cases, unless you have albums that are split ac
 <context>
     <name>SQLiteWidget</name>
     <message>
-        <location filename="../omg/install.py" line="331"/>
+        <location filename="../omg/install.py" line="362"/>
         <source>SQLite settings</source>
         <translation type="unfinished">SQLite Einstellungen</translation>
     </message>
     <message>
-        <location filename="../omg/install.py" line="333"/>
+        <location filename="../omg/install.py" line="364"/>
         <source>Choose an existing SQLite database file or enter a path where a new database should be created. Use the prefix &apos;config:&apos; to specify a path relative the configuration directory.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/install.py" line="349"/>
+        <location filename="../omg/install.py" line="380"/>
         <source>Database file</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/install.py" line="359"/>
+        <location filename="../omg/install.py" line="390"/>
         <source>Choose database file</source>
         <translation type="unfinished"></translation>
     </message>
@@ -2737,42 +2844,42 @@ guessing. This is useful in most cases, unless you have albums that are split ac
 <context>
     <name>SpecialTagsWidget</name>
     <message>
-        <location filename="../omg/install.py" line="591"/>
+        <location filename="../omg/install.py" line="622"/>
         <source>Special tag settings</source>
         <translation type="unfinished">Spezielle Tags</translation>
     </message>
     <message>
-        <location filename="../omg/install.py" line="593"/>
+        <location filename="../omg/install.py" line="624"/>
         <source>One of the special tags (usually called &apos;title&apos; and &apos;album&apos;) is missing in the tagids-table. If you chose different names for these tags, please specify those names below. If not, something is wrong with your database.</source>
         <translation type="unfinished">Eines der speziellen Tags (normalerweise &apos;title&apos; und &apos;album&apos;) fehlt in der tagids-Tabelle. Wenn du andere Namen für diese Tags gewählt hast, gib diese hier ein. Wenn nicht, ist irgendwas an der Datenbank faul.</translation>
     </message>
     <message>
-        <location filename="../omg/install.py" line="606"/>
+        <location filename="../omg/install.py" line="637"/>
         <source>Title tag</source>
         <translation type="unfinished">Titeltag</translation>
     </message>
     <message>
-        <location filename="../omg/install.py" line="607"/>
+        <location filename="../omg/install.py" line="638"/>
         <source>Album tag</source>
         <translation type="unfinished">Albumtag</translation>
     </message>
     <message>
-        <location filename="../omg/install.py" line="618"/>
+        <location filename="../omg/install.py" line="649"/>
         <source>Tag does not exist</source>
         <translation type="unfinished">Tag existiert nicht</translation>
     </message>
     <message>
-        <location filename="../omg/install.py" line="618"/>
+        <location filename="../omg/install.py" line="649"/>
         <source>There is no tag of name &apos;{}&apos;.</source>
         <translation type="unfinished">Es gibt kein Tag &apos;{}&apos; in der Datenbank.</translation>
     </message>
     <message>
-        <location filename="../omg/install.py" line="624"/>
+        <location filename="../omg/install.py" line="655"/>
         <source>Invalid tag</source>
         <translation type="unfinished">Ungültiger Tag</translation>
     </message>
     <message>
-        <location filename="../omg/install.py" line="624"/>
+        <location filename="../omg/install.py" line="655"/>
         <source>The tag &apos;{}&apos; is either not of type &apos;varchar&apos; or private.</source>
         <translation type="unfinished">Der Tag &apos;{}&apos; ist entweder nicht vom Typ &apos;varchar&apos; oder privat.</translation>
     </message>
@@ -2808,12 +2915,12 @@ guessing. This is useful in most cases, unless you have albums that are split ac
 <context>
     <name>SynchronizeHelper</name>
     <message>
-        <location filename="../omg/filesystem/__init__.py" line="233"/>
+        <location filename="../omg/filesystem/__init__.py" line="249"/>
         <source>Move detected</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/filesystem/__init__.py" line="233"/>
+        <location filename="../omg/filesystem/__init__.py" line="249"/>
         <source>A file was renamed (or moved) outside OMG:
 {}</source>
         <translation type="unfinished"></translation>
@@ -2886,64 +2993,60 @@ guessing. This is useful in most cases, unless you have albums that are split ac
 <context>
     <name>TagEditorModel</name>
     <message>
-        <location filename="../omg/models/tageditor.py" line="485"/>
+        <location filename="../omg/models/tageditor.py" line="415"/>
         <source>Add record</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/models/tageditor.py" line="512"/>
+        <location filename="../omg/models/tageditor.py" line="439"/>
         <source>Remove record</source>
         <translation type="unfinished"></translation>
     </message>
     <message numerus="yes">
-        <location filename="../omg/models/tageditor.py" line="519"/>
+        <location filename="../omg/models/tageditor.py" line="446"/>
         <source>Remove %n record(s)</source>
         <translation type="unfinished">
-            <numerusform></numerusform>
             <numerusform></numerusform>
         </translation>
     </message>
     <message>
-        <location filename="../omg/models/tageditor.py" line="541"/>
+        <location filename="../omg/models/tageditor.py" line="464"/>
         <source>Change record</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/models/tageditor.py" line="575"/>
+        <location filename="../omg/models/tageditor.py" line="492"/>
         <source>Remove tag</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/models/tageditor.py" line="595"/>
+        <location filename="../omg/models/tageditor.py" line="512"/>
         <source>Change tag</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/models/tageditor.py" line="624"/>
+        <location filename="../omg/models/tageditor.py" line="540"/>
         <source>Split</source>
         <translation type="unfinished"></translation>
     </message>
     <message numerus="yes">
-        <location filename="../omg/models/tageditor.py" line="631"/>
+        <location filename="../omg/models/tageditor.py" line="547"/>
         <source>Split %n record(s)</source>
         <translation type="unfinished">
             <numerusform></numerusform>
-            <numerusform></numerusform>
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../omg/models/tageditor.py" line="666"/>
+        <location filename="../omg/models/tageditor.py" line="577"/>
         <source>Edit %n record(s)</source>
         <translation type="unfinished">
             <numerusform></numerusform>
-            <numerusform></numerusform>
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../omg/models/tageditor.py" line="678"/>
+        <location filename="../omg/models/tageditor.py" line="588"/>
         <source>Extend %n record(s)</source>
         <translation type="unfinished">
-            <numerusform></numerusform>
             <numerusform></numerusform>
         </translation>
     </message>
@@ -3361,104 +3464,104 @@ guessing. This is useful in most cases, unless you have albums that are split ac
 <context>
     <name>TagWidget</name>
     <message>
-        <location filename="../omg/install.py" line="425"/>
+        <location filename="../omg/install.py" line="456"/>
         <source>Tag settings (optional)</source>
-        <translation type="unfinished">Tag Einstellungen (optional)</translation>
-    </message>
-    <message>
-        <location filename="../omg/install.py" line="434"/>
-        <source>Name</source>
-        <translation type="unfinished">Name</translation>
-    </message>
-    <message>
-        <location filename="../omg/install.py" line="435"/>
-        <source>Value-Type</source>
-        <translation type="unfinished">Werttyp</translation>
-    </message>
-    <message>
-        <location filename="../omg/install.py" line="437"/>
-        <source>Icon</source>
-        <translation type="unfinished">Icon</translation>
-    </message>
-    <message>
-        <location filename="../omg/install.py" line="438"/>
-        <source>Private?</source>
-        <translation type="unfinished">Privat?</translation>
-    </message>
-    <message>
-        <location filename="../omg/install.py" line="450"/>
-        <source>Add tag</source>
-        <translation type="unfinished">Tag hinzufügen</translation>
-    </message>
-    <message>
-        <location filename="../omg/install.py" line="533"/>
-        <source>Some tags have the same name</source>
-        <translation type="unfinished">Doppelter Tagname</translation>
-    </message>
-    <message>
-        <location filename="../omg/install.py" line="533"/>
-        <source>There is more than one tag with name &apos;{}&apos;.</source>
-        <translation type="unfinished">Der Name &apos;{}&apos; wurde mehrmals verwendet.</translation>
-    </message>
-    <message>
-        <location filename="../omg/install.py" line="426"/>
-        <source>Uncheck tags that you do not want to be created. The first two tags play a special role: They are used for songtitles and albumtitles. Do not change their names unless you really know what you do!</source>
-        <translation type="unfinished">Entferne die Häkchen bei Tags, die du nicht erstellen möchtest. Die ersten beiden Tags spielen eine besondere Rolle: Sie werden als Titel von Stücken und Alben benutzt. Ändere ihren Namen nur, wenn du wirklich weißt, was du tust!</translation>
-    </message>
-    <message>
-        <location filename="../omg/install.py" line="527"/>
-        <source>Invalid tagname</source>
-        <translation type="unfinished">Ungültiger Tagname</translation>
-    </message>
-    <message>
-        <location filename="../omg/install.py" line="527"/>
-        <source>&apos;{}&apos; is not a valid tagname.</source>
-        <translation type="unfinished">&apos;{}&apos; ist kein gültiger Tagname.</translation>
-    </message>
-    <message>
-        <location filename="../omg/install.py" line="457"/>
-        <source>Title</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../omg/install.py" line="458"/>
-        <source>Album</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../omg/install.py" line="459"/>
-        <source>Composer</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../omg/install.py" line="460"/>
-        <source>Artist</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../omg/install.py" line="461"/>
-        <source>Performer</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../omg/install.py" line="462"/>
-        <source>Conductor</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../omg/install.py" line="463"/>
-        <source>Genre</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../omg/install.py" line="464"/>
-        <source>Date</source>
-        <translation type="unfinished"></translation>
+        <translation>Tag-Einstellungen (optional)</translation>
     </message>
     <message>
         <location filename="../omg/install.py" line="465"/>
+        <source>Name</source>
+        <translation>Name</translation>
+    </message>
+    <message>
+        <location filename="../omg/install.py" line="466"/>
+        <source>Value-Type</source>
+        <translation>Werttyp</translation>
+    </message>
+    <message>
+        <location filename="../omg/install.py" line="468"/>
+        <source>Icon</source>
+        <translation>Symbol</translation>
+    </message>
+    <message>
+        <location filename="../omg/install.py" line="469"/>
+        <source>Private?</source>
+        <translation>Privat?</translation>
+    </message>
+    <message>
+        <location filename="../omg/install.py" line="481"/>
+        <source>Add tag</source>
+        <translation>Tag hinzufügen</translation>
+    </message>
+    <message>
+        <location filename="../omg/install.py" line="564"/>
+        <source>Some tags have the same name</source>
+        <translation>Doppelter Tagname</translation>
+    </message>
+    <message>
+        <location filename="../omg/install.py" line="564"/>
+        <source>There is more than one tag with name &apos;{}&apos;.</source>
+        <translation>Der Name „{}“ wurde mehrmals verwendet.</translation>
+    </message>
+    <message>
+        <location filename="../omg/install.py" line="457"/>
+        <source>Uncheck tags that you do not want to be created. The first two tags play a special role: They are used for songtitles and albumtitles. Do not change their names unless you really know what you do!</source>
+        <translation>Entferne die Häkchen bei Tags, die du nicht erstellen möchtest. Die ersten beiden Tags spielen eine besondere Rolle: Sie werden als Titel von Stücken und Alben benutzt. Ändere ihren Namen nur, wenn du wirklich weißt, was du tust!</translation>
+    </message>
+    <message>
+        <location filename="../omg/install.py" line="558"/>
+        <source>Invalid tagname</source>
+        <translation>Ungültiger Tagname</translation>
+    </message>
+    <message>
+        <location filename="../omg/install.py" line="558"/>
+        <source>&apos;{}&apos; is not a valid tagname.</source>
+        <translation>„{}“ ist kein gültiger Tagname.</translation>
+    </message>
+    <message>
+        <location filename="../omg/install.py" line="488"/>
+        <source>Title</source>
+        <translation>Titel</translation>
+    </message>
+    <message>
+        <location filename="../omg/install.py" line="489"/>
+        <source>Album</source>
+        <translation>Album</translation>
+    </message>
+    <message>
+        <location filename="../omg/install.py" line="490"/>
+        <source>Composer</source>
+        <translation>Komponist</translation>
+    </message>
+    <message>
+        <location filename="../omg/install.py" line="491"/>
+        <source>Artist</source>
+        <translation>Künstler</translation>
+    </message>
+    <message>
+        <location filename="../omg/install.py" line="492"/>
+        <source>Performer</source>
+        <translation>Interpret</translation>
+    </message>
+    <message>
+        <location filename="../omg/install.py" line="493"/>
+        <source>Conductor</source>
+        <translation>Dirigent</translation>
+    </message>
+    <message>
+        <location filename="../omg/install.py" line="494"/>
+        <source>Genre</source>
+        <translation>Genre</translation>
+    </message>
+    <message>
+        <location filename="../omg/install.py" line="495"/>
+        <source>Date</source>
+        <translation>Datum</translation>
+    </message>
+    <message>
+        <location filename="../omg/install.py" line="496"/>
         <source>Comment</source>
-        <translation type="unfinished"></translation>
+        <translation>Kommentar</translation>
     </message>
 </context>
 <context>
@@ -3466,23 +3569,23 @@ guessing. This is useful in most cases, unless you have albums that are split ac
     <message>
         <location filename="../omg/filebackends/__init__.py" line="175"/>
         <source>Error saving tags</source>
-        <translation type="unfinished"></translation>
+        <translation>Fehler beim Speichern der Tags</translation>
     </message>
     <message>
         <location filename="../omg/filebackends/__init__.py" line="176"/>
         <source>Could not write tags of file {}:
 </source>
-        <translation type="unfinished"></translation>
+        <translation>Konnte Tags in {} nicht speichern:</translation>
     </message>
     <message>
         <location filename="../omg/filebackends/__init__.py" line="177"/>
         <source>File is readonly</source>
-        <translation type="unfinished"></translation>
+        <translation>Datei ist nur lesbar</translation>
     </message>
     <message>
         <location filename="../omg/filebackends/__init__.py" line="178"/>
         <source>Tags &apos;{}&apos; not supported by format</source>
-        <translation type="unfinished"></translation>
+        <translation>Tags „{}“ werden vom Dateiformat nicht unterstützt</translation>
     </message>
 </context>
 <context>
@@ -3490,7 +3593,7 @@ guessing. This is useful in most cases, unless you have albums that are split ac
     <message>
         <location filename="../omg/gui/tageditor.py" line="104"/>
         <source>Tageditor</source>
-        <translation type="unfinished"></translation>
+        <translation>Tageditor</translation>
     </message>
 </context>
 <context>
@@ -3498,35 +3601,35 @@ guessing. This is useful in most cases, unless you have albums that are split ac
     <message>
         <location filename="../omg/gui/treeactions.py" line="318"/>
         <source>major?</source>
-        <translation type="unfinished"></translation>
+        <translation>Major?</translation>
     </message>
 </context>
 <context>
     <name>UndoRedoAction</name>
     <message>
-        <location filename="../omg/undostack.py" line="447"/>
+        <location filename="../omg/undostack.py" line="475"/>
         <source>Redo</source>
-        <translation type="unfinished">Wiederholen</translation>
+        <translation>Wiederholen</translation>
     </message>
     <message>
-        <location filename="../omg/undostack.py" line="448"/>
+        <location filename="../omg/undostack.py" line="476"/>
         <source>Ctrl+Y</source>
-        <translation type="unfinished">Strg+Y</translation>
+        <translation>Strg+Y</translation>
     </message>
     <message>
-        <location filename="../omg/undostack.py" line="453"/>
+        <location filename="../omg/undostack.py" line="481"/>
         <source>Undo</source>
-        <translation type="unfinished">Rückgängig</translation>
+        <translation>Rückgängig</translation>
     </message>
     <message>
-        <location filename="../omg/undostack.py" line="454"/>
+        <location filename="../omg/undostack.py" line="482"/>
         <source>Ctrl+Z</source>
-        <translation type="unfinished">Strg+Z</translation>
+        <translation>Strg+Z</translation>
     </message>
     <message>
-        <location filename="../omg/undostack.py" line="462"/>
+        <location filename="../omg/undostack.py" line="490"/>
         <source>{}: {}</source>
-        <translation type="unfinished"></translation>
+        <translation>{}: {}</translation>
     </message>
 </context>
 <context>
@@ -3534,7 +3637,7 @@ guessing. This is useful in most cases, unless you have albums that are split ac
     <message>
         <location filename="../omg/gui/browserdialog.py" line="264"/>
         <source>View {}: </source>
-        <translation type="unfinished">Teilbrowser {}: </translation>
+        <translation>Teilbrowser {}: </translation>
     </message>
 </context>
 <context>
@@ -3542,66 +3645,66 @@ guessing. This is useful in most cases, unless you have albums that are split ac
     <message>
         <location filename="../omg/gui/browserdialog.py" line="196"/>
         <source>Browser configuration</source>
-        <translation type="unfinished">Browsereinstellungen</translation>
+        <translation>Browsereinstellungen</translation>
     </message>
     <message>
         <location filename="../omg/gui/browserdialog.py" line="206"/>
         <source>Number of views: </source>
-        <translation type="unfinished">Anzahl der Teilbrowser: </translation>
+        <translation>Anzahl der Teilbrowser: </translation>
     </message>
     <message>
         <location filename="../omg/gui/browserdialog.py" line="225"/>
         <source>Cancel</source>
-        <translation type="unfinished">Abbrechen</translation>
+        <translation>Abbrechen</translation>
     </message>
     <message>
         <location filename="../omg/gui/browserdialog.py" line="228"/>
         <source>OK</source>
-        <translation type="unfinished">OK</translation>
+        <translation>OK</translation>
     </message>
 </context>
 <context>
     <name>VolumeLabel</name>
     <message>
-        <location filename="../omg/gui/playback.py" line="250"/>
+        <location filename="../omg/gui/playback.py" line="256"/>
         <source>{}%</source>
-        <translation type="unfinished"></translation>
+        <translation>{}%</translation>
     </message>
 </context>
 <context>
     <name>Wrapper</name>
     <message>
-        <location filename="../omg/core/nodes.py" line="368"/>
+        <location filename="../omg/core/nodes.py" line="408"/>
         <source>Flags: {}</source>
-        <translation type="unfinished"></translation>
+        <translation>Flags: {}</translation>
     </message>
     <message>
-        <location filename="../omg/core/nodes.py" line="371"/>
+        <location filename="../omg/core/nodes.py" line="411"/>
         <source>URL: {}</source>
-        <translation type="unfinished"></translation>
+        <translation>URL: {}</translation>
     </message>
 </context>
 <context>
     <name>WrapperTreeModel</name>
     <message>
-        <location filename="../omg/models/wrappertreemodel.py" line="146"/>
+        <location filename="../omg/models/wrappertreemodel.py" line="147"/>
         <source>Split node</source>
-        <translation type="unfinished"></translation>
+        <translation>Knoten aufteilen</translation>
     </message>
     <message>
-        <location filename="../omg/models/wrappertreemodel.py" line="162"/>
+        <location filename="../omg/models/wrappertreemodel.py" line="163"/>
         <source>Insert contents</source>
-        <translation type="unfinished"></translation>
+        <translation>Inhalte einfügen</translation>
     </message>
     <message>
-        <location filename="../omg/models/wrappertreemodel.py" line="200"/>
+        <location filename="../omg/models/wrappertreemodel.py" line="201"/>
         <source>Remove contents</source>
-        <translation type="unfinished"></translation>
+        <translation>Inhalte entfernen</translation>
     </message>
     <message>
-        <location filename="../omg/models/wrappertreemodel.py" line="321"/>
+        <location filename="../omg/models/wrappertreemodel.py" line="322"/>
         <source>Change tree</source>
-        <translation type="unfinished"></translation>
+        <translation>Baum ändern</translation>
     </message>
 </context>
 <context>
@@ -3609,10 +3712,24 @@ guessing. This is useful in most cases, unless you have albums that are split ac
     <message numerus="yes">
         <location filename="../omg/strutils.py" line="70"/>
         <source>%n days</source>
-        <translation type="unfinished">
-            <numerusform></numerusform>
+        <translation>
+            <numerusform>%n Tage</numerusform>
             <numerusform></numerusform>
         </translation>
+    </message>
+</context>
+<context>
+    <name>plugins</name>
+    <message>
+        <location filename="../omg/plugins/__init__.py" line="135"/>
+        <source>Error enabling plugin</source>
+        <translation>Fehler beim Aktivieren des Plugins</translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/__init__.py" line="135"/>
+        <source>Could not enable plugin {}:
+{}</source>
+        <translation>Konnte das Plugin „{}“ nicht aktivieren: {}</translation>
     </message>
 </context>
 <context>
@@ -3620,17 +3737,17 @@ guessing. This is useful in most cases, unless you have albums that are split ac
     <message>
         <location filename="../omg/core/tags.py" line="245"/>
         <source>Standard type for normal (not too long) text values</source>
-        <translation type="unfinished"></translation>
+        <translation>Standardtyp für normale (nicht allzu lange) Textwerte</translation>
     </message>
     <message>
         <location filename="../omg/core/tags.py" line="246"/>
         <source>Type for long texts (like e.g. lyrics)</source>
-        <translation type="unfinished"></translation>
+        <translation>Typ für lange Textwerte (z.B. Songtexte)</translation>
     </message>
     <message>
         <location filename="../omg/core/tags.py" line="247"/>
         <source>Type for dates</source>
-        <translation type="unfinished"></translation>
+        <translation>Typ für Daten</translation>
     </message>
 </context>
 <context>
@@ -3638,12 +3755,12 @@ guessing. This is useful in most cases, unless you have albums that are split ac
     <message>
         <location filename="../omg/gui/tagwidgets.py" line="783"/>
         <source>Cancel</source>
-        <translation type="unfinished">Abbrechen</translation>
+        <translation>Abbrechen</translation>
     </message>
     <message>
         <location filename="../omg/gui/tagwidgets.py" line="784"/>
         <source>Ok</source>
-        <translation type="unfinished">OK</translation>
+        <translation>OK</translation>
     </message>
 </context>
 </TS>
