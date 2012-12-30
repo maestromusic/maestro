@@ -212,8 +212,9 @@ class Level(application.ChangeEventDispatcher):
         else: self.elements = {element.id: element.copy(level=self) for element in elements}
         self.stack = stack if stack is not None else application.stack
         
-        self.lastInsertId = None
-        self.lastInsertPositions = []
+        # These are necessary to solve ticket #138
+        self.lastInsertId = None      # last element into which something has been inserted
+        self.lastInsertPositions = [] # positions of that element that have been inserted
     
     def emit(self, event):
         super().emit(event)
