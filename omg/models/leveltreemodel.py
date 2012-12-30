@@ -28,9 +28,6 @@ from ..models import rootedtreemodel
 translate = QtCore.QCoreApplication.translate
 logger = logging.getLogger(__name__)
 
-# Necessary for DnD moves between different (or the same) LevelTreeModel 
-_dnd_ignoreWrapperRemoveRows = False
-
 
 class LevelTreeModel(rootedtreemodel.RootedTreeModel):
     """A tree model for the elements of a level.
@@ -90,25 +87,8 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
         else:  # text/uri-list
             elements = self.prepareURLs(mimeData.urls(), parent)
 
-        # Handle moves between LevelTreeModels (see ticket TODO)
-        if action == Qt.MoveAction and mimeData.level == self.level:
-            assert isinstance(self._dnd_source, QtGui.QTreeView)
-            assert isinstance(self._dnd_source.model(), LevelTreeModel) 
-            removals = collections.defaultdict(set)
-            for node in mimeData.wrappers():
-                if isinstance(node.parent, nodes.Wrapper):
-                    index = node.parent.index(node)
-                    if node.parent == parent and index >= insertRow:
-                        index += len(elements)
-                    removals[node.parent.element].add(index)
+        if len(elements) > 0:
             self.insertElements(parent, insertRow, elements)
-            for rParent, rows in removals.items():
-                self._dnd_source.model().removeElements(rParent, rows)
-            global _dnd_ignoreWrapperRemoveRows
-            _dnd_ignoreWrapperRemoveRows = True
-        else: 
-            self.insertElements(parent, insertRow, elements)
-        
         application.stack.endMacro()
         return len(elements) != 0
     
@@ -122,47 +102,43 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
         self._dnd_active = False
         if len(self._dnd_removeTuples) > 0:
             removeData = collections.defaultdict(set)
-            for element, row, count in self._dnd_removeTuples:
-                removeData[element].update(range(row,row+count))
+            for element, rows in self._dnd_removeTuples:
+                removeData[element].update(rows)
             for element, rows in removeData.items():
-                if element is None:
-                    element = self.root
                 self.removeElements(element, rows)
             self._dnd_removeTuples = []
-        global _dnd_ignoreWrapperRemoveRows
-        _dnd_ignoreWrapperRemoveRows = False
-        
+    
     def removeRows(self, row, count, parentIndex):
         parent = self.data(parentIndex)
-        if isinstance(parent, nodes.Wrapper) and _dnd_ignoreWrapperRemoveRows:
-            return True
-        if not self._dnd_active: 
+        if not self._dnd_active or parent is self.root:
             self.removeElements(parent, list(range(row, row+count)))
             return True
         else:
             # After DnD move operations Qt calls removeRows to remove content from the source model.
             # Depending on the selection, several calls to removeRows might be necessary. In models where a
-            # remove operation can trigger changes at other places in the model, this can cause problem.
+            # remove operation can trigger changes at other places in the model, this can cause problems.
             # Thus, during a drag we collect all such calls and remove their contents only in endDrag.   
             # See ticket #129.
-            if parent is self.root:
-                element = None
-            else: element = parent.element
-            self._dnd_removeTuples.append((element, row, count))
+            rows = range(row, row+count)
+            # If this is exactly the node in which nodes have been dropped we might have to update rows.
+            if [wrapper.element.id for wrapper in parent.contents] != parent.element.contents.ids:
+                assert parent.element.id == self.level.lastInsertId
+                insertedRows = set(i for i,pos in enumerate(parent.element.contents.positions)
+                                   if pos in self.level.lastInsertPositions)
+                rows = _mapOldRowsToNew(rows, len(parent.element.contents), insertedRows)
+            self._dnd_removeTuples.append((parent.element, rows))
             return False
+        
         
     def insertElements(self, parent, row, elements):
         """Undoably insert *elements* (a list of Elements) under *parent*, which is a wrapper.
         
-        This convenience function either pushes a ChangeRootCommand, if *parent* is this model's
+        This convenience function either pushes an InsertIntoRootCommand, if *parent* is this model's
         root, or updates the level otherwise.
         """
         if parent is self.root:
-            contents = [ node.element for node in self.root.contents ]
-            contents[row:row] = elements
-            application.stack.push(ChangeRootCommand(self, contents))
-        else:
-            self.level.insertContentsAuto(parent.element, row, elements)
+            application.stack.push(InsertIntoRootCommand(self, row, [element.id for element in elements]))
+        else: self.level.insertContentsAuto(parent.element, row, elements)
     
     def removeElements(self, parent, rows):
         """Undoably remove elements in *rows* under *parent* (a wrapper, an element or the root node).
@@ -172,14 +148,10 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
         """
         application.stack.beginMacro(self.tr('remove elements'))
         if parent is self.root:
-            newContents = [ self.root.contents[i].element
-                            for i in range(len(self.root.contents))
-                            if i not in rows ]
-            application.stack.push(ChangeRootCommand(self, newContents))
+            application.stack.push(RemoveFromRootCommand(self, rows))
         else:
             element = parent if isinstance(parent, elements.Element) else parent.element
             self.level.removeContentsAuto(element, indexes=rows)
-            
         application.stack.endMacro()
 
     def clear(self):
@@ -301,9 +273,31 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
             for pos, wrap in zip(positions, wrappers):
                 wrap.position = pos
         for wrapper in wrappers:
-            wrapper.loadContents(recursive = True)
+            wrapper.loadContents(recursive=True)
         self.data(index, Qt.EditRole).insertContents(row, wrappers) 
         self.endInsertRows()
+
+    
+def _mapOldRowsToNew(rows, newRowCount, insertedRows):
+    """Map from old row indexes to new ones after some rows have been inserted: This method assumes that
+    in a list of *newRowCount* rows the rows given by *insertedRows* have been inserted. *rows* is a list
+    of row indexes before the insertion that should be mapped to indexes after insertion. The method returns
+    the list of new row indexes.
+    """ 
+    if len(rows) == 0:
+        return
+    nextRowIndex = 0
+    newRows = []
+    oldRow = -1
+    for newRow in range(newRowCount):
+        if newRow not in insertedRows:
+            oldRow += 1
+        if oldRow == rows[nextRowIndex]:
+            newRows.append(newRow)
+            nextRowIndex += 1
+            if nextRowIndex == len(rows):
+                break
+    return newRows
 
 
 class ChangeRootCommand:
@@ -320,3 +314,38 @@ class ChangeRootCommand:
         
     def undo(self):
         self.model._changeContents(QtCore.QModelIndex(), self.old)
+        
+        
+class InsertIntoRootCommand:
+    """Command to insert elements with the given ids into the root node of *model* at *row*."""
+    def __init__(self, model, row, ids):
+        self.text = translate("LevelTreeModel", "insert root nodes")
+        self.model = model
+        self.row = row
+        self.ids = ids
+        
+    def redo(self):
+        self.model._insertContents(QtCore.QModelIndex(), self.row, self.ids)
+        
+    def undo(self):
+        self.model._removeContents(QtCore.QModelIndex(), self.row, self.row+len(self.ids)-1)
+        
+        
+class RemoveFromRootCommand:
+    """Command to remove the elements in the given *rows* from the root node of *model*."""
+    def __init__(self, model, rows):
+        self.text = translate("LevelTreeModel", "remove root nodes")
+        self.model = model
+        self.rows = rows
+        self.ids = [(row,self.model.root.contents[row].element.id) for row in rows]
+        self.ids.sort()
+        
+    def redo(self):
+        for row in self.rows:
+            self.model._removeContents(QtCore.QModelIndex(), row, row)
+            
+    def undo(self):
+        shift = 0
+        for row, id in self.ids:
+            self.model._insertContents(QtCore.QModelIndex(), row+shift, [id])
+            shift += 1

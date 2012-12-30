@@ -211,6 +211,9 @@ class Level(application.ChangeEventDispatcher):
             self.elements = {}
         else: self.elements = {element.id: element.copy(level=self) for element in elements}
         self.stack = stack if stack is not None else application.stack
+        
+        self.lastInsertId = None
+        self.lastInsertPositions = []
     
     def emit(self, event):
         super().emit(event)
@@ -709,8 +712,11 @@ class Level(application.ChangeEventDispatcher):
         """Insert some elements under *parent*. The insertions must be given as an iterable of
         (position, element) tuples.
         """
+        self.lastInsertId = parent.id
+        self.lastInsertPositions = set()
         dataIds = []
         for pos, element in insertions:
+            self.lastInsertPositions.add(pos)
             parent.contents.insert(pos, element.id)
             if parent.id not in element.parents:
                 element.parents.append(parent.id)
