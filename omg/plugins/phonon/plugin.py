@@ -19,7 +19,10 @@
 import urllib.parse
 
 from PyQt4 import QtCore
-from PyQt4.phonon import Phonon as phonon
+try:
+    from PyQt4.phonon import Phonon as phonon
+except ImportError as e:
+    raise ImportError("PyQt4-phonon is not installed.")
 
 from ... import player, profiles, utils, strutils
 from ...models import playlist
@@ -79,17 +82,16 @@ class PhononPlayerBackend(player.PlayerBackend):
     def setPlaylist(self, urls):
         if self.playlist.current is None:
             self.setState(player.STOP)
-        
+    
+    phononToStateMap = { phonon.LoadingState: player.STOP,
+                         phonon.StoppedState: player.STOP,
+                         phonon.PlayingState: player.PLAY,
+                         phonon.BufferingState: player.PLAY,
+                         phonon.PausedState: player.PAUSE,
+                         phonon.ErrorState: player.STOP }
     def state(self):
         """Return the current state (one of player.STOP, player.PLAY, player.PAUSE)."""
-        return {
-            phonon.LoadingState: player.STOP,
-            phonon.StoppedState: player.STOP,
-            phonon.PlayingState: player.PLAY,
-            phonon.BufferingState: player.PLAY,
-            phonon.PausedState: player.PAUSE,
-            phonon.ErrorState: player.STOP
-        }[self.mediaObject.state()]
+        return self.phononToStateMap[self.mediaObject.state()]
         
     def setState(self, state):
         if state != self.state():
@@ -124,7 +126,7 @@ class PhononPlayerBackend(player.PlayerBackend):
             if offset is not None:
                 source = phonon.MediaSource(self._getPath(offset))
                 self.mediaObject.setCurrentSource(source)
-                self.mediaObject.play()
+                self.setState(player.PLAY)
             else:
                 self.setState(player.STOP)
             self.currentChanged.emit(offset)

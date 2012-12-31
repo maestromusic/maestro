@@ -308,8 +308,8 @@ class DraggingTreeView(TreeView):
             event.ignore()
             return
         self._changeDropAction(event)
-        self.model()._internalMove = event.source() == self and event.dropAction() == Qt.MoveAction
+        self.model()._dnd_source = event.source()
         super().dropEvent(event)
-        self.model()._internalMove = False
+        self.model()._dnd_source = None
         self.updateNodeSelection()
         

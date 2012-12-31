@@ -73,7 +73,7 @@ class MimeData(QtCore.QMimeData):
     
     def wrappers(self):
         """Search the tree for the toplevel wrappers and return them. This differs from the result of
-        getNodes only if some nodes are no wrappers (but e.g. ValueNodes from the broswer).
+        nodes only if some nodes are no wrappers (but e.g. ValueNodes from the broswer).
         In other words: Strip everything at the top of the tree that is not a Wrapper and remove the rest.
         """
         return self._selection.toplevelWrappers()

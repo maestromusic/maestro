@@ -58,7 +58,6 @@ class UndoStack(QtCore.QObject):
         self._commands = []        # QUndoCommands on the stack
         self._index = 0            # Position before the command that will be executed on redo
         self._activeMacros = []    # list of nested macros that are being built (first is outermost)
-        self._attachTo = None
         self._inUndoRedo = False   # True during undo and redo
         self._eventQueue = []      # list of tuples (dispatcher,event)
         self._undoAction = UndoRedoAction(self,redo=False)
@@ -71,7 +70,7 @@ class UndoStack(QtCore.QObject):
         return self._index
     
     def isComposing(self):
-        return len(self._activeMacros) > 0 or self._attachTo is not None
+        return len(self._activeMacros) > 0
     
     def count(self):
         """Return the number of commands on the stack."""
@@ -155,9 +154,17 @@ class UndoStack(QtCore.QObject):
         """Delete all commands on the stack."""
         if self._inUndoRedo or self.isComposing():
             raise UndoStackError("Cannot clear the stack during undo/redo or while a macro is built.")
+        self._clear()
+        
+    def _clear(self):
+        """Unconditionally delete all commands, active macros and everything from the stack.
+        Emit queued events."""
         self._commands = []
+        self._activeMacros = []
         self._index = 0
-        self._emitSignals()           
+        self._emitQueuedEvents()
+        self._emitSignals()
+        self._inUndoRedo = False         
            
     def canUndo(self):
         """Returns whether there is a command that can be undone."""
@@ -185,7 +192,13 @@ class UndoStack(QtCore.QObject):
             raise UndoStackError("There is no command to undo.")
         self._inUndoRedo = True
         commandOrMacro = self._commands[self._index-1]
-        commandOrMacro.undo()
+        try:
+            commandOrMacro.undo()
+        except Exception as e:
+            logger.exception(e)
+            self._clear()
+            logger.warning("Undostack cleared")
+            return
         self._index -= 1
         self._emitQueuedEvents()
         self._inUndoRedo = False
@@ -199,7 +212,12 @@ class UndoStack(QtCore.QObject):
             raise UndoStackError("There is no command to redo.")
         self._inUndoRedo = True
         commandOrMacro = self._commands[self._index]
-        commandOrMacro.redo()
+        try:
+            commandOrMacro.redo()
+        except Exception as e:
+            logger.exception(e)
+            self._clear()
+            logger.warning("Undostack cleared")
         self._index += 1
         self._emitQueuedEvents()
         self._inUndoRedo = False
@@ -214,13 +232,19 @@ class UndoStack(QtCore.QObject):
                 raise ValueError("Invalid index {} (there are {} commands on the stack)."
                                  .format(index,len(self._commands)))
             self._inUndoRedo = True
-            if index < self._index:
-                for command in reversed(self._commands[index:self._index]):
-                    command.undo()
-            else:
-                for command in self._commands[self._index:index]:
-                    command.redo()
-            self._index = index
+            try:
+                if index < self._index:
+                    for command in reversed(self._commands[index:self._index]):
+                        command.undo()
+                else:
+                    for command in self._commands[self._index:index]:
+                        command.redo()
+            except Exception as e:
+                logger.exception(e)
+                self._clear()
+                logger.warning("Undostack cleared")
+                return
+            self._index = index    
             self._emitQueuedEvents()
             self._inUndoRedo = False
             self._emitSignals()

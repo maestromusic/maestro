@@ -125,7 +125,6 @@ class RealFile(BackendFile):
             values = [tag.fileFormat(value) for value in values]
             self._taglibFile.tags[tag.name.upper()] = values
         unsuccessful = self._taglibFile.save()
-        del self._taglibFile
         ret = {key.upper(): values for key,values in unsuccessful.items()}
         return ret
 

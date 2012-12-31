@@ -71,12 +71,9 @@ class PlaybackWidget(QtGui.QDockWidget):
         self.titleLabel = QtGui.QLabel(self)
         self.titleLabel.setTextFormat(Qt.AutoText)
         self.titleLabel.setWordWrap(True)
-        #topLayout.addStretch()
         topLayout.addWidget(self.titleLabel)
-        #topLayout.addStretch()
-        self.seekSlider = QtGui.QSlider(Qt.Horizontal,self)
+        self.seekSlider = PlaybackSlider(Qt.Horizontal, self)
         self.seekSlider.setRange(0,1000)
-        self.seekSlider.setTracking(False)
         
         bottomLayout = QtGui.QHBoxLayout()
         self.seekLabel = QtGui.QLabel("", self)
@@ -191,6 +188,15 @@ data = mainwindow.WidgetData(id = "playback",
                              preferredDockArea = Qt.TopDockWidgetArea)
 mainwindow.addWidgetData(data)
 
+class PlaybackSlider(QtGui.QSlider):
+    
+    def mouseReleaseEvent(self, event):
+        if not self.isSliderDown():
+            val = QtGui.QStyle.sliderValueFromPosition(self.minimum(),
+                    self.maximum(), event.x(), self.width())
+            self.sliderMoved.emit(val)
+        return super().mouseReleaseEvent(event)
+        
 class PlayPauseButton(QtGui.QPushButton):
     """Special button with two states. Depending on the state different signals (play and pause)
     are emitted when the button is clicked and the button shows different icons."""

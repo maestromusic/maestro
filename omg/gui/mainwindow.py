@@ -43,7 +43,7 @@ To work with this system central widgets or dock widget must follow some rules:
 
 """
 
-import functools
+import functools, itertools
 
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
@@ -228,24 +228,6 @@ class MainWindow(QtGui.QMainWindow):
             self.showFullScreen()
         else:
             self.showNormal()
-            
-    def getCentralWidgets(self):
-        return self._centralWidgets
-    
-    def getDockWidgets(self):
-        return self._dockWidgets
-    
-    def getWidgets(self,id,central=True,docks=True):
-        """Return the list of widgets corresponding to the WidgetData-instance determined by *id*. If you
-        set *central* or *docks* to False, central or dockwidgets, respectively, won't be considered.
-        """
-        data = WidgetData.fromId(id)
-        result = []
-        if central and data in self._centralWidgets:
-            result.append(self._centralWidgets[data])
-        if docks and data in self._dockWidgets:
-            result.extend(self._dockWidgets[data])
-        return result
         
     def updateViewMenu(self):
         """Update the view menu whenever the list of registered widgets has changed."""
@@ -547,7 +529,14 @@ class MainWindow(QtGui.QMainWindow):
                 result.extend(widgets)
                 break
         return result
-
+        
+    def closeEvent(self, event):
+        for widget in itertools.chain(itertools.chain(*self._dockWidgets.values()),
+                                      self._centralWidgets.values()):
+            if hasattr(widget, "okToClose") and not widget.okToClose():
+                event.ignore()
+                return
+        event.accept()
 
 class Location:
     """This small class stores location information for dockwidgets when the layout is saved/restored. Note
