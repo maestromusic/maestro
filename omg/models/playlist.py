@@ -170,20 +170,21 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         
     def dropMimeData(self,mimeData,action,row,column,parentIndex):
         # Compute drop position
-        if parentIndex.isValid():
-            parent = parentIndex.internalPointer()
-        else: parent = self.root
-        if row == -1 or row == parent.getContentsCount():
-            if parent.isFile(): # Drop onto a file => drop behind it
-                position = parent.parent.index(parent) + 1
-                parent = parent.parent
+        parent = self.data(parentIndex, Qt.EditRole)
+        if parent.isFile(): # Drop onto a file => drop behind it
+            position = parent.parent.index(parent) + 1
+            parent = parent.parent
+        elif row == -1:
+            # no specific position: insert at the beginning or end
+            if self.dndTarget is not None and self.dndTarget.isExpanded(parentIndex):
+                position = 0
             else: position = parent.getContentsCount()
         else: position = row
         
         # Handle internal moves separately
-        if action == Qt.MoveAction and isinstance(self._dnd_source, QtGui.QTreeView) \
-                and isinstance(self._dnd_source.model(), PlaylistModel) \
-                and self._dnd_source.model().backend == self.backend:
+        if action == Qt.MoveAction and isinstance(self.dndSource, QtGui.QTreeView) \
+                and isinstance(self.dndSource.model(), PlaylistModel) \
+                and self.dndSource.model().backend == self.backend:
             return self.move(list(mimeData.wrappers()),parent,position)
  
         self.stack.beginMacro(self.tr("Drop elements"))

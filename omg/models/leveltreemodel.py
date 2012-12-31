@@ -58,7 +58,7 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
             return defaultFlags | Qt.ItemIsDropEnabled | Qt.ItemIsDragEnabled
         else: return defaultFlags | Qt.ItemIsDropEnabled
         
-    def dropMimeData(self, mimeData, action, insertRow, column, parentIndex):
+    def dropMimeData(self, mimeData, action, row, column, parentIndex):
         """Drop stuff into a leveltreemodel. Handles OMG mime and text/uri-list.
         
         If URLs are dropped, they are loaded into the level. If there is an album guesser
@@ -69,15 +69,17 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
         if action == Qt.IgnoreAction:
             return True
         
-        # Figure out insert position
+        # Compute drop position
         parent = self.data(parentIndex, Qt.EditRole)
-        if isinstance(parent, nodes.Wrapper) and parent.element.isFile():
-            # if the drop is on a file, make it a sibling instead of a child of that file
+        if parent.isFile(): # Drop onto a file => drop behind it
+            row = parent.parent.index(parent) + 1
             parent = parent.parent
-            insertRow = parentIndex.row() + 1
-        if insertRow == -1:
-            # drop onto no specific item --> append at the end of the parent
-            insertRow = parent.getContentsCount()
+        elif row == -1:
+            # no specific position: insert at the beginning or end
+            if self.dndTarget is not None and self.dndTarget.isExpanded(parentIndex):
+                row = 0
+            else: row = parent.getContentsCount()
+
         application.stack.beginMacro(self.tr("drop"))
         
         # Get elements to insert
@@ -88,7 +90,7 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
             elements = self.prepareURLs(mimeData.urls(), parent)
 
         if len(elements) > 0:
-            self.insertElements(parent, insertRow, elements)
+            self.insertElements(parent, row, elements)
         application.stack.endMacro()
         return len(elements) != 0
     
