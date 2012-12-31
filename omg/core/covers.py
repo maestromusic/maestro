@@ -56,7 +56,8 @@ def init():
     else: COVER_DIR = os.path.normpath(os.path.join(config.CONFDIR,coverPath))
     
     # Make sure that this directory exists
-    os.makedirs(COVER_DIR,exist_ok=True)
+    if not os.path.isdir(COVER_DIR):
+        os.makedirs(COVER_DIR)
     
     
 def shutdown():
