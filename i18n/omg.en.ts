@@ -254,33 +254,28 @@
 <context>
     <name>ChangePositionAction</name>
     <message>
-        <location filename="../omg/gui/treeactions.py" line="269"/>
+        <location filename="../omg/gui/treeactions.py" line="270"/>
         <source>choose position...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/gui/treeactions.py" line="271"/>
+        <location filename="../omg/gui/treeactions.py" line="272"/>
         <source>increase position</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/gui/treeactions.py" line="273"/>
+        <location filename="../omg/gui/treeactions.py" line="274"/>
         <source>decrease position</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/gui/treeactions.py" line="291"/>
+        <location filename="../omg/gui/treeactions.py" line="292"/>
         <source>error</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
     <name>ChangeRootCommand</name>
-    <message>
-        <location filename="../omg/models/leveltreemodel.py" line="290"/>
-        <source>change root nodes</source>
-        <translation type="unfinished"></translation>
-    </message>
 </context>
 <context>
     <name>ChangeSortValueCommand</name>
@@ -376,7 +371,7 @@
 <context>
     <name>ClearPlaylistAction</name>
     <message>
-        <location filename="../omg/gui/treeactions.py" line="353"/>
+        <location filename="../omg/gui/treeactions.py" line="354"/>
         <source>clear playlist</source>
         <translation type="unfinished"></translation>
     </message>
@@ -384,7 +379,7 @@
 <context>
     <name>ClearTreeAction</name>
     <message>
-        <location filename="../omg/gui/treeactions.py" line="213"/>
+        <location filename="../omg/gui/treeactions.py" line="214"/>
         <source>clear</source>
         <translation type="unfinished"></translation>
     </message>
@@ -392,17 +387,17 @@
 <context>
     <name>CommitTreeAction</name>
     <message>
-        <location filename="../omg/gui/treeactions.py" line="228"/>
+        <location filename="../omg/gui/treeactions.py" line="229"/>
         <source>commit this tree</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/gui/treeactions.py" line="241"/>
+        <location filename="../omg/gui/treeactions.py" line="242"/>
         <source>No commit possible</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/gui/treeactions.py" line="241"/>
+        <location filename="../omg/gui/treeactions.py" line="242"/>
         <source>While the editor contains external tags, no commit is possible. Delete those tags or add their tagtype to the database.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -420,6 +415,22 @@
     <message>
         <location filename="../omg/plugins/coverdialog/plugin.py" line="53"/>
         <source>Edit covers...</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>CoverBrowser</name>
+    <message>
+        <location filename="../omg/gui/coverbrowser.py" line="43"/>
+        <source>Cover Browser</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>CoverBrowserDock</name>
+    <message>
+        <location filename="../omg/gui/coverbrowser.py" line="37"/>
+        <source>Cover Browser</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -558,7 +569,7 @@ being loaded</source>
 <context>
     <name>CoverUndoCommand</name>
     <message>
-        <location filename="../omg/core/covers.py" line="180"/>
+        <location filename="../omg/core/covers.py" line="181"/>
         <source>change covers</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1018,7 +1029,7 @@ being loaded</source>
     </message>
     <message numerus="yes">
         <location filename="../omg/gui/treeactions.py" line="172"/>
-        <source>You have deleted the following %n file(s) from OMG.Do you want them deleted completely?
+        <source>You have deleted the following %n file(s) from OMG. Do you want them deleted completely?&lt;br /&gt;
 &lt;b&gt;This cannot be reversed!&lt;/b&gt;</source>
         <translation type="unfinished">
             <numerusform></numerusform>
@@ -1078,7 +1089,7 @@ being loaded</source>
 <context>
     <name>EditorModel</name>
     <message>
-        <location filename="../omg/models/editor.py" line="90"/>
+        <location filename="../omg/models/editor.py" line="91"/>
         <source>remove elements</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1417,7 +1428,7 @@ being loaded</source>
 <context>
     <name>FlattenAction</name>
     <message>
-        <location filename="../omg/gui/treeactions.py" line="251"/>
+        <location filename="../omg/gui/treeactions.py" line="252"/>
         <source>flatten...</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1463,16 +1474,6 @@ being loaded</source>
     <message>
         <location filename="../omg/install.py" line="243"/>
         <source>Music directory</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../omg/install.py" line="247"/>
-        <source>SQLite</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../omg/install.py" line="250"/>
-        <source>MySQL</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -1782,72 +1783,72 @@ guessing. This is useful in most cases, unless you have albums that are split ac
 <context>
     <name>Level</name>
     <message>
-        <location filename="../omg/core/levels.py" line="319"/>
+        <location filename="../omg/core/levels.py" line="323"/>
         <source>Add elements</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/core/levels.py" line="328"/>
+        <location filename="../omg/core/levels.py" line="332"/>
         <source>Remove elements</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/core/levels.py" line="346"/>
+        <location filename="../omg/core/levels.py" line="350"/>
         <source>Create container</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/core/levels.py" line="360"/>
+        <location filename="../omg/core/levels.py" line="364"/>
         <source>change tags</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/core/levels.py" line="364"/>
+        <location filename="../omg/core/levels.py" line="368"/>
         <source>change flags</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/core/levels.py" line="368"/>
+        <location filename="../omg/core/levels.py" line="372"/>
         <source>change data</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/core/levels.py" line="399"/>
+        <location filename="../omg/core/levels.py" line="403"/>
         <source>change major property</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/core/levels.py" line="410"/>
+        <location filename="../omg/core/levels.py" line="414"/>
         <source>change contents</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/core/levels.py" line="421"/>
+        <location filename="../omg/core/levels.py" line="425"/>
         <source>set contents</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/core/levels.py" line="451"/>
+        <location filename="../omg/core/levels.py" line="455"/>
         <source>insert contents</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/core/levels.py" line="497"/>
+        <location filename="../omg/core/levels.py" line="501"/>
         <source>remove contents</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/core/levels.py" line="516"/>
+        <location filename="../omg/core/levels.py" line="520"/>
         <source>change positions</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/core/levels.py" line="533"/>
+        <location filename="../omg/core/levels.py" line="537"/>
         <source>rename files</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/core/levels.py" line="547"/>
+        <location filename="../omg/core/levels.py" line="551"/>
         <source>commit</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1855,7 +1856,7 @@ guessing. This is useful in most cases, unless you have albums that are split ac
 <context>
     <name>LevelTreeModel</name>
     <message>
-        <location filename="../omg/models/leveltreemodel.py" line="85"/>
+        <location filename="../omg/models/leveltreemodel.py" line="83"/>
         <source>drop</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1865,13 +1866,23 @@ guessing. This is useful in most cases, unless you have albums that are split ac
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/models/leveltreemodel.py" line="164"/>
+        <location filename="../omg/models/leveltreemodel.py" line="161"/>
         <source>clear</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/models/leveltreemodel.py" line="178"/>
+        <location filename="../omg/models/leveltreemodel.py" line="175"/>
         <source>Importing {0} files...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/models/leveltreemodel.py" line="308"/>
+        <source>insert root nodes</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/models/leveltreemodel.py" line="323"/>
+        <source>remove root nodes</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -2094,7 +2105,7 @@ guessing. This is useful in most cases, unless you have albums that are split ac
 <context>
     <name>MatchTagsFromFilenamesAction</name>
     <message>
-        <location filename="../omg/gui/treeactions.py" line="300"/>
+        <location filename="../omg/gui/treeactions.py" line="301"/>
         <source>match tags from filename</source>
         <translation type="unfinished"></translation>
     </message>
@@ -2102,7 +2113,7 @@ guessing. This is useful in most cases, unless you have albums that are split ac
 <context>
     <name>MergeAction</name>
     <message>
-        <location filename="../omg/gui/treeactions.py" line="194"/>
+        <location filename="../omg/gui/treeactions.py" line="195"/>
         <source>merge...</source>
         <translation type="unfinished"></translation>
     </message>
@@ -2401,27 +2412,27 @@ guessing. This is useful in most cases, unless you have albums that are split ac
 <context>
     <name>PlaylistModel</name>
     <message>
-        <location filename="../omg/models/playlist.py" line="184"/>
+        <location filename="../omg/models/playlist.py" line="190"/>
         <source>Drop elements</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/models/playlist.py" line="236"/>
+        <location filename="../omg/models/playlist.py" line="242"/>
         <source>Insert elements</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/models/playlist.py" line="317"/>
+        <location filename="../omg/models/playlist.py" line="323"/>
         <source>Move elements</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/models/playlist.py" line="367"/>
+        <location filename="../omg/models/playlist.py" line="373"/>
         <source>Remove from playlist</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/models/playlist.py" line="281"/>
+        <location filename="../omg/models/playlist.py" line="287"/>
         <source>Playlist error</source>
         <translation type="unfinished"></translation>
     </message>
@@ -2708,7 +2719,7 @@ guessing. This is useful in most cases, unless you have albums that are split ac
 <context>
     <name>RemoveFromPlaylistAction</name>
     <message>
-        <location filename="../omg/gui/treeactions.py" line="339"/>
+        <location filename="../omg/gui/treeactions.py" line="340"/>
         <source>remove from playlist</source>
         <translation type="unfinished"></translation>
     </message>
@@ -3411,22 +3422,22 @@ guessing. This is useful in most cases, unless you have albums that are split ac
 <context>
     <name>TagValueAction</name>
     <message>
-        <location filename="../omg/gui/treeactions.py" line="370"/>
+        <location filename="../omg/gui/treeactions.py" line="371"/>
         <source>edit tagvalue</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/gui/treeactions.py" line="376"/>
+        <location filename="../omg/gui/treeactions.py" line="377"/>
         <source>edit tagvalue &quot;{}&quot;</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/gui/treeactions.py" line="382"/>
+        <location filename="../omg/gui/treeactions.py" line="383"/>
         <source>choose tag mode</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/gui/treeactions.py" line="382"/>
+        <location filename="../omg/gui/treeactions.py" line="383"/>
         <source>tag:</source>
         <translation type="unfinished"></translation>
     </message>
@@ -3592,7 +3603,7 @@ guessing. This is useful in most cases, unless you have albums that are split ac
 <context>
     <name>ToggleMajorAction</name>
     <message>
-        <location filename="../omg/gui/treeactions.py" line="318"/>
+        <location filename="../omg/gui/treeactions.py" line="319"/>
         <source>major?</source>
         <translation type="unfinished"></translation>
     </message>
@@ -3600,27 +3611,27 @@ guessing. This is useful in most cases, unless you have albums that are split ac
 <context>
     <name>UndoRedoAction</name>
     <message>
-        <location filename="../omg/undostack.py" line="475"/>
+        <location filename="../omg/undostack.py" line="499"/>
         <source>Redo</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/undostack.py" line="476"/>
+        <location filename="../omg/undostack.py" line="500"/>
         <source>Ctrl+Y</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/undostack.py" line="481"/>
+        <location filename="../omg/undostack.py" line="505"/>
         <source>Undo</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/undostack.py" line="482"/>
+        <location filename="../omg/undostack.py" line="506"/>
         <source>Ctrl+Z</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/undostack.py" line="490"/>
+        <location filename="../omg/undostack.py" line="514"/>
         <source>{}: {}</source>
         <translation type="unfinished"></translation>
     </message>
