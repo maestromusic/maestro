@@ -41,7 +41,7 @@ class Profile(QtCore.QObject): # to allow subclasses to have signals
     def __init__(self,name,type=None,state=None):
         super().__init__()
         self.name = name
-        assert type is None or isinstance(type,ProfileType)
+        assert type is None or isinstance(type, ProfileType)
         self.type = type
     
     def save(self):
@@ -59,7 +59,9 @@ class Profile(QtCore.QObject): # to allow subclasses to have signals
         """Return a copy of this profile."""
         return type(self)(self.name, self.type, self.save())
     
-    
+    def __str__(self):
+        return "{}(name={})".format(type(self).__name__, self.name)
+
 class ProfileType:
     """Optionally profiles may have a type. This is useful to
     

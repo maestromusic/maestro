@@ -15,18 +15,14 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from calendar import format
 
 import pyparsing
 from pyparsing import Forward, Literal, OneOrMore, Optional, Word, alphas, alphanums, nums
 
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import Qt
+from PyQt4 import QtCore
 
-from ...core import tags, levels
-from ... import logging, config, profiles
-from ...gui import profiles as profilesgui
-
+from ...core import tags
+from ... import config, profiles
 
 translate = QtCore.QCoreApplication.translate
 
@@ -72,6 +68,7 @@ def disable():
 
 class FormatSyntaxError(SyntaxError):
     pass
+
 class GrammarRenamer(profiles.Profile):
         
     className = "GrammarRenamer"
