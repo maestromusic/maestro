@@ -64,8 +64,8 @@ class FileSystemBrowserModel(QtGui.QFileSystemModel):
         return 1
     
     @QtCore.pyqtSlot(object)
-    def handleStateChange(self, dir):
-        index = self.index(dir.absPath)
+    def handleStateChange(self, url):
+        index = self.index(url.absPath)
         self.dataChanged.emit(index, index)    
     
     def data(self, index, role=Qt.DisplayRole):
@@ -99,6 +99,7 @@ class FileSystemBrowser(QtGui.QTreeView):
         self.setRootIndex(musikindex)
         if filesystem.enabled:
             filesystem.synchronizer.folderStateChanged.connect(self.model().handleStateChange)
+            filesystem.synchronizer.fileStateChanged.connect(self.model().handleStateChange)
             filesystem.synchronizer.initializationComplete.connect(self.model().layoutChanged)
         
         self.setSelectionMode(self.ExtendedSelection)

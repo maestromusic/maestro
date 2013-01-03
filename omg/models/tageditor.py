@@ -351,7 +351,7 @@ class TagEditorModel(QtCore.QObject):
                     elementLists[tag] = collections.OrderedDict()
                 for value in element.tags[tag]:
                     if value not in elementLists[tag]:
-                         elementLists[tag][value] = [element]
+                        elementLists[tag][value] = [element]
                     else: elementLists[tag][value].append(element)
         
         # The final result should of course be a dict (tag->list of records). The dict should first

@@ -17,6 +17,7 @@
 
 
 import os, re, itertools
+from collections import OrderedDict
 
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
@@ -89,7 +90,7 @@ class StandardGuesser(profiles.Profile):
             self.level.stack.endMacro()
 
     def _guessHelper(self, files):
-        byKey = {}
+        byKey = OrderedDict()
         existingParents = set()
         pureDirMode = self.directoryMode and len(self.groupTags) == 0
         for element in files:

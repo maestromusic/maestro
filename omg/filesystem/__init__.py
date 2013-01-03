@@ -322,6 +322,7 @@ class EventThread(QtCore.QThread):
 class FileSystemSynchronizer(QtCore.QObject):
     
     folderStateChanged = QtCore.pyqtSignal(object)
+    fileStateChanged = QtCore.pyqtSignal(object)
     initializationComplete = QtCore.pyqtSignal()
     
     hashesComputed = QtCore.pyqtSignal(list)
@@ -439,7 +440,8 @@ class FileSystemSynchronizer(QtCore.QObject):
         modified = mTimeStamp(track.url)
         check = False
         if modified > track.verified:
-            logger.debug('found modified track {}: {}>{}'.format(track.url, modified, track.verified))
+            logger.debug('found modified track {}: {}>{}'.format(os.path.basename(track.url.path),
+                                                                 modified, track.verified))
             check = True
         elif config.options.filesystem.force_check and \
                 track.directory.path.startswith(config.options.filesystem.force_check):
@@ -469,6 +471,7 @@ class FileSystemSynchronizer(QtCore.QObject):
                     track.hash = computeHash(track.url) if hashingEnabled else None
                     self.modifiedTags[track] = (dbTags, backendFile.tags)
                     track.problem = True
+                    self.fileStateChanged.emit(track.url)
                 else:
                     filehash = computeHash(track.url)
                     if filehash != track.hash:
@@ -656,12 +659,12 @@ class FileSystemSynchronizer(QtCore.QObject):
         if oldDir != newDir:
             stateChanges += oldDir.updateState(True, False, True, self.folderStateChanged)
         self.updateDirectories(stateChanges)
+        self.fileStateChanged.emit(newUrl)
     
     @QtCore.pyqtSlot(list)
     def handleModify(self, urls):
         """Called when files were modified on the disk. Updates hashes & timestamp."""
         for url in urls:
-            print('modify {}'.format(url))
             if url not in self.tracks:
                 continue
             track = self.tracks[url]
@@ -706,6 +709,7 @@ class FileSystemSynchronizer(QtCore.QObject):
                     newHashes.append(track)
             track.id = file.id
             modifiedDirs += dir.updateState(True, False, True, self.folderStateChanged)
+            self.fileStateChanged.emit(file.url)
         self.hashesComputed.emit(newHashes)
         self.storeDirectories(newDirectories)
         self.updateDirectories(modifiedDirs)
