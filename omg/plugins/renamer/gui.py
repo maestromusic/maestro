@@ -18,7 +18,7 @@
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from ... import config
+from ... import config, logging
 from ...gui import treeview, treeactions, delegates, profiles as profilesgui
 from ...gui.delegates import abstractdelegate
 from ...models import leveltreemodel
@@ -26,6 +26,7 @@ from ...core import levels
 from . import plugin
 
 translate = QtCore.QCoreApplication.translate
+logger = logging.getLogger(__name__)
 
 class RenameFilesAction(treeactions.TreeAction):
     """Action to rename files in a container according to the tags and the container structure."""
@@ -106,9 +107,9 @@ class RenameDialog(QtGui.QDialog):
         mainLayout = QtGui.QVBoxLayout()
         
         profile = plugin.profileCategory.getFromStorage(config.storage.renamer.current_profile)
-        
-        self.configDisplay = GrammarConfigurationWidget(temporary=True,profile=profile)
-        mainLayout.addWidget(self.configDisplay,1)
+        logger.debug("Renamer profile: {}".format(profile))
+        self.configDisplay = GrammarConfigurationWidget(temporary=True, profile=profile)
+        mainLayout.addWidget(self.configDisplay, 1)
         self.configDisplay.temporaryChanged.connect(self._handleTemporaryChanged)
         self.statusLabel = QtGui.QLabel()
         self.statusLabel.setVisible(False)
@@ -131,7 +132,7 @@ class RenameDialog(QtGui.QDialog):
         self.tree.expandAll()
         
         self.bb = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Cancel | QtGui.QDialogButtonBox.Ok)
-        self.bb.accepted.connect(self.accept)
+        self.bb.accepted.connect(self.checkAccept)
         self.bb.rejected.connect(self.reject)
         
         mainLayout.addWidget(self.tree, 100)
@@ -140,6 +141,7 @@ class RenameDialog(QtGui.QDialog):
         
         self.setLayout(mainLayout)
         self.resize(800,700)
+        self._handleTemporaryChanged()
         
     def _handleTemporaryChanged(self):
         """Handle changes to the temporary profile of self.configDisplay."""
@@ -167,6 +169,13 @@ class RenameDialog(QtGui.QDialog):
         self.model.modelReset.emit()
         self.tree.expandAll()
     
+    def checkAccept(self):
+        if self.configDisplay.tempProfile != self.configDisplay.profile:
+            from ...gui.dialogs import question
+            if question(self.tr("Profile Changed"),
+                        self.tr("Save modified profile {}?").format(self.configDisplay.profile.name)):
+                self.configDisplay._handleSave()
+        self.accept()
     
 class GrammarConfigurationWidget(QtGui.QWidget):
     """This widget is used in two places to configure grammar profiles:
@@ -201,6 +210,8 @@ class GrammarConfigurationWidget(QtGui.QWidget):
             topLayout.addWidget(QtGui.QLabel(self.tr("Choose a profile:")))
             self.profileChooser = profilesgui.ProfileComboBox(plugin.profileCategory)
             self.profileChooser.profileChosen.connect(self.setProfile)
+            if profile is not None:
+                self.profileChooser.setCurrentProfile(profile)
             topLayout.addWidget(self.profileChooser)
             
             self.menuButton = QtGui.QPushButton(self.tr("Actions"))

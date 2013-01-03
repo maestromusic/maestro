@@ -541,7 +541,8 @@ class TagEditorWidget(QtGui.QWidget):
         selectedRecords = [editor.getRecord() for editor in self.selectionManager.getSelectedWidgets()]
         commonStart = strutils.commonPrefix(str(record.value) for record in selectedRecords)
         text,ok = QtGui.QInputDialog.getText(self,self.tr("Edit common start"),
-                         self.tr("Insert a new text will replace the common start of all selected records:"),
+                         self.tr("Insert a new text which will replace the common start "
+                                 "of all selected records:"),
                          text=commonStart)
         if ok:
             newValues = [text+record.value[len(commonStart):] for record in selectedRecords]

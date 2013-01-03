@@ -257,6 +257,9 @@ class DraggingTreeView(TreeView):
           Via the shift and control modifier this default can be overridden. 
         - Models might need to know when a drag&drop action is going on. For this DraggingTreeView will
           call the methods startDrag and endDrag on models which provide them (both without arguments).
+        - Before dropMimeData is called a DraggingTreeView will set the attributes dndSource and dndTarget
+          of the receiving model to the sending widget and itself. If the drag was started in an external
+          application, dndSource will be None. 
         
     """
     def __init__(self, level, parent=None, affectGlobalSelection=True):
@@ -308,8 +311,10 @@ class DraggingTreeView(TreeView):
             event.ignore()
             return
         self._changeDropAction(event)
-        self.model()._internalMove = event.source() == self and event.dropAction() == Qt.MoveAction
+        self.model().dndSource = event.source()
+        self.model().dndTarget = self
         super().dropEvent(event)
-        self.model()._internalMove = False
+        self.model().dndSource = None
+        self.model().dndTarget = None
         self.updateNodeSelection()
         

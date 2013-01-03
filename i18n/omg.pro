@@ -17,6 +17,7 @@ SOURCES = \
     ../omg/database/__init__.py \
     ../omg/database/sql/__init__.py \
     ../omg/database/sql/myconnpy.py \
+    ../omg/database/sql/oursql.py \
     ../omg/database/sql/pymysql.py \
     ../omg/database/sql/qtsql.py \
     ../omg/database/sql/sqlite.py \
@@ -28,6 +29,7 @@ SOURCES = \
     ../omg/filesystem/__init__.py \
     ../omg/gui/browserdialog.py \
     ../omg/gui/browser.py \
+    ../omg/gui/coverbrowser.py \
     ../omg/gui/delegates/abstractdelegate.py \
     ../omg/gui/delegates/browser.py \
     ../omg/gui/delegates/editor.py \
@@ -41,6 +43,7 @@ SOURCES = \
     ../omg/gui/__init__.py \
     ../omg/gui/mainwindow.py \
     ../omg/gui/misc/busyindicator.py \
+    ../omg/gui/misc/dockwidgettitlebutton.py \
     ../omg/gui/misc/dynamicgridlayout.py \
     ../omg/gui/misc/hiddeneditor.py \
     ../omg/gui/misc/iconbuttonbar.py \
