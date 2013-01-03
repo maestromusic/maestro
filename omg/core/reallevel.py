@@ -368,12 +368,13 @@ class RealLevel(levels.Level):
                 db.multiQuery("INSERT INTO {}tags (element_id,tag_id,value_id) VALUES (?,?,?)"
                               .format(db.prefix),dbAdditions)
             files = [ (elem.id, ) for elem in dbChanges if elem.isFile() ]
+            fileUrls = [ elem.url for elem in dbChanges if elem.isFile() ]
             if len(files) > 0:
                 db.multiQuery("UPDATE {}files SET verified=CURRENT_TIMESTAMP WHERE element_id=?"
                               .format(db.prefix),files)
             db.commit()
             if len(files) > 0 and not dbOnly:
-                self.filesModified.emit(files)
+                self.filesModified.emit(fileUrls)
         super()._changeTags(changes)
         
     def _changeFlags(self, changes):
