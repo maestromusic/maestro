@@ -45,7 +45,7 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
         self._dnd_active = False
         self.level = level
         if elements:
-            self._insertContents(QtCore.QModelIndex(), [element.id for element in elements])
+            self._insertContents(QtCore.QModelIndex(), 0, [element.id for element in elements])
         level.connect(self._handleLevelChanged)
         
     def supportedDropActions(self):
