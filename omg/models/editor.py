@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2012 Martin Altmayer, Michael Helmling
+# Copyright (C) 2012-2013 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,9 +16,9 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import weakref, itertools
+import weakref
 
-from PyQt4 import QtCore, QtGui
+from PyQt4 import QtCore
 from PyQt4.QtCore import Qt
 
 from . import leveltreemodel
@@ -284,11 +284,9 @@ class AutoTagProcessor:
     def perform(self,element):
         """Change tags of *element* according to the config options tags.auto_delete and tags.auto_replace.
         Store information about the performed operations in self.processed."""
-        changed = False
         if element in self.processed:
             # element is being reload
             del self.processed[element]
-            changed = True
             
         for tag in list(element.tags.keys()): # copy because dict will be modified
             if tag.isInDb():

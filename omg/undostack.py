@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2009-2012 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2013 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -82,10 +82,14 @@ class UndoStack(QtCore.QObject):
         return self._commands[index]
         
     def beginMacro(self, *args, **kwargs):
-        """Begin a macro. The arguments are the same as in the constructor of Macro.""" 
+        """Begin a new macro and return it.
+        
+        The arguments are the same as in the *Macro* constructor.""" 
         if self._inUndoRedo:
             raise UndoStackError("Cannot begin a macro during undo/redo.")
-        self._activeMacros.append(Macro(*args, **kwargs))
+        macro = Macro(*args, **kwargs)
+        self._activeMacros.append(macro)
+        return macro
         # Macros are not added to their parent macro or to the stack unless they are finished.
         # (This makes abortMacro easier)
             
