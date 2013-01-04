@@ -103,7 +103,6 @@ def connect(**kwargs):
         logger.warning(
             "database.connect has been called although a connection for this thread was already open.")
         return connections[threadId]
-    logger.debug("Thread {} connecting to database".format(QtCore.QThread.currentThread()))
     global type, prefix
     type = config.options.database.type
     prefix = config.options.database.prefix
@@ -150,7 +149,6 @@ def close():
         connection = connections[threadId]
         del connections[threadId]
         connection.close()
-        logger.debug("Thread {} has closed database connection".format(QtCore.QThread.currentThread()))
 
 
 def nextId():

@@ -25,7 +25,6 @@ from PyQt4.QtCore import Qt
 from .. import config, logging, profiles
 from ..core import tags
 from ..core.elements import ContentList
-from ..utils import relPath
 
 logger = logging.getLogger(__name__)
 translate = QtCore.QCoreApplication.translate
@@ -72,11 +71,13 @@ class StandardGuesser(profiles.Profile):
         """Perform the album guessing on *level*. *files* is a dictionary mapping
         directory name to a list of File objects."""
         self.albums = []
-        self.singles = []
+        self.toplevels = set()
         self.level = level
+        self.orders = {}
+        self.currentOrder = 0
         if len(self.groupTags) == 0 and not self.directoryMode:
             # no grouping -> concatenate filesByFolder
-            self.singles = list(itertools.chain(*files.values()))
+            self.toplevels = list(itertools.chain(*files.values()))
         else:
             self.level.stack.beginMacro(self.tr('guess albums'))
             if self.directoryMode:
@@ -86,17 +87,22 @@ class StandardGuesser(profiles.Profile):
                 self._guessHelper(itertools.chain(*files.values()))
             
             if self.metaRegex is not None:
-                self.guessMetaContainers()    
+                self.guessMetaContainers()
+            self.toplevels = sorted(self.toplevels, key=lambda elem: self.orders[elem])    
             self.level.stack.endMacro()
 
     def _guessHelper(self, files):
+        files = list(files)
         byKey = OrderedDict()
-        existingParents = set()
+        existingParents = []
         pureDirMode = self.directoryMode and len(self.groupTags) == 0
         for element in files:
+            self.orders[element] = self.currentOrder
+            self.currentOrder += 1
             if len(element.parents) > 0:
                 # there are already parents -> use the first one
-                existingParents.add(element.parents[0])
+                if element.parents[0] not in existingParents:
+                    existingParents.append(element.parents[0])
             else:
                 if pureDirMode:
                     key = os.path.dirname(element.url.path)
@@ -105,7 +111,12 @@ class StandardGuesser(profiles.Profile):
                 if key not in byKey:
                     byKey[key] = []
                 byKey[key].append(element)
-        self.albums.extend(self.level.collectMany(existingParents))
+        existing = self.level.collectMany(existingParents)
+        for elem in existing:
+            self.orders[elem] = self.currentOrder
+            self.currentOrder += 1
+        self.albums.extend(existing)
+        self.toplevels.update(existing)
         for key, elements in byKey.items():
             if pureDirMode or (self.albumTag in elements[0].tags):
                 elementsWithoutPos = { e for e in elements if not hasattr(element,'filePosition') }
@@ -127,9 +138,11 @@ class StandardGuesser(profiles.Profile):
                 container = self.level.createContainer(tags=albumTags,
                                                        major=True,
                                                        contents=ContentList.fromPairs(children.items()))
+                self.orders[container] = self.orders[elements[0]]
                 self.albums.append(container)
+                self.toplevels.add(container)
             else:
-                self.singles.extend(elements)
+                self.toplevels.update(elements)
                 
     def guessMetaContainers(self):
         byKey = {}
@@ -159,10 +172,14 @@ class StandardGuesser(profiles.Profile):
             container = self.level.createContainer(tags=metaTags,
                                                    contents=ContentList.fromPairs(contents.items()),
                                                    major=True)
+            self.orders[container] = self.orders[contents[min(contents)]]
             self.albums.append(container)
+            self.toplevels.add(container)
             for c in contents.values():
                 if c in self.albums:
                     self.albums.remove(c)
+                if c in self.toplevels:
+                    self.toplevels.remove(c)
 
     def configurationWidget(self):
         return GuessProfileConfigWidget(self)
@@ -171,6 +188,7 @@ class StandardGuesser(profiles.Profile):
 class ProfileCategory(profiles.ProfileCategory):
     """Subclass of ProfileCategory that loads a default profile if no profile was loaded from the storage
     file."""
+    
     def loadProfiles(self):
         super().loadProfiles()
         if len(self.profiles) == 0:
@@ -191,6 +209,7 @@ class GuessProfileConfigWidget(QtGui.QWidget):
     tag is the "main" grouper tag; this one is used to determine the TITLE-tag of the new album as well as
     for automatic meta-container guessing. Additionally, each profile sets the "directory mode" flag. If 
     that is enabled, only albums within the same directory on the filesystem will be grouped together."""
+    
     def __init__(self, profile=None):
         super().__init__()
         self.setSizePolicy(QtGui.QSizePolicy.MinimumExpanding,QtGui.QSizePolicy.MinimumExpanding)

@@ -237,16 +237,12 @@ class MPDPlayerBackend(player.PlayerBackend):
             self._volume = how
             self.volumeChanged.emit(how)
         elif what == 'remove':
-            print("Change from MPD: remove")
-            print(how)
             self.playlist.removeByOffset(how[0][0],
                                          len(how),
                                          updateBackend='onundoredo')
             for pos, url in reversed(how):
                 del self.urls[pos]
         elif what == 'insert':
-            print("Change from MPD: insert")
-            print(how)
             pos = how[0][0]
             urlified = [ (pos,self.makeUrl(path)) for pos,path in how ]
             self.playlist.insertUrlsAtOffset(how[0][0],
@@ -255,8 +251,6 @@ class MPDPlayerBackend(player.PlayerBackend):
             for pos, url in urlified:
                 self.urls[pos:pos] = [ url ]
         elif what == 'playlist':
-            logger.debug("Change from MPD: playlist")
-            logger.debug(how)
             self.playlist.resetFromUrls([self.makeUrl(path) for path in how])
         elif what == 'outputs':
             self._outputs = how

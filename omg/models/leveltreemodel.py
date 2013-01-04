@@ -197,7 +197,7 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
             else:
                 self.guessProfile.guessAlbums(self.level, filesByFolder)
                 self.level.stack.endMacro()
-                return self.guessProfile.albums + self.guessProfile.singles
+                return self.guessProfile.toplevels
         except levels.ElementGetError as e:
             logger.warning(str(e))
             macro.abort()

@@ -580,7 +580,8 @@ class Level(application.ChangeEventDispatcher):
                             remainingTagChanges[inParent] = tags.TagDifference(
                                                     additions=list(element.tags.privateTags().getTuples()))
                         else: newTags = element.tags.copy()
-                    fileTagChanges[inParent] = tags.TagStorageDifference(inParent.tags, newTags)
+                    if inParent.tags != newTags:
+                        fileTagChanges[inParent] = tags.TagStorageDifference(inParent.tags, newTags)
                 else: # containers
                     if element.isInDb():
                         inParent = self.parent[element.id]
