@@ -99,7 +99,7 @@ class StandardGuesser(profiles.Profile):
                 existingParents.add(element.parents[0])
             else:
                 if pureDirMode:
-                    key = relPath(os.path.dirname(element.path))
+                    key = os.path.dirname(element.url.path)
                 else:
                     key = tuple( (tuple(element.tags[tag]) if tag in element.tags else None) for tag in self.groupTags)
                 if key not in byKey:

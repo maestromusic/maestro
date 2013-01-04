@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2009-2012 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2013 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -263,7 +263,7 @@ def contents(elids,recursive=False):
     return _contentsParentsHelper(elids,recursive,"element_id","container_id")
 
 
-def parents(elids,recursive = False):
+def parents(elids,recursive=False):
     """Return a set containing the ids of all parents of the elements with ids *elids* (which may be a list
     or a single id). If *recursive* is True all ancestors will be added recursively.
     """
@@ -372,7 +372,7 @@ def cacheTagValues():
             _valueToId[tag] = {value: id for id,value in _idToValue[tag].items()}
       
 
-def valueFromId(tagSpec,valueId):
+def valueFromId(tagSpec, valueId):
     """Return the value from the tag *tagSpec* with id *valueId* or raise an sql.EmptyResultException if
     that id does not exist. Date tags will be returned as FlexiDate.
     """
@@ -401,7 +401,7 @@ def valueFromId(tagSpec,valueId):
     return value
 
 
-def idFromValue(tagSpec,value,insert=False):
+def idFromValue(tagSpec, value, insert=False):
     """Return the id of the given value in the tag-table of tag *tagSpec*. If the value does not exist,
     raise an sql.EmptyResultException, unless the optional parameter *insert* is set to True. In that case
     insert the value into the table and return its id.
@@ -423,7 +423,7 @@ def idFromValue(tagSpec,value,insert=False):
                  .format(prefix,tag.type.name)
         else: q = "SELECT id FROM {}values_{} WHERE tag_id = ? AND value = ?".format(prefix,tag.type)
         id = query(q,tag.id,value).getSingle()
-    except sql.EmptyResultException as e:
+    except sql.EmptyResultException:
         if insert:
             result = query("INSERT INTO {}values_{} (tag_id,value) VALUES (?,?)"
                              .format(prefix,tag.type.name),tag.id,value)
