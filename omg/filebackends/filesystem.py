@@ -27,7 +27,7 @@ import taglib
 
 from . import BackendFile, BackendURL, urlTypes
 from .. import logging, utils
-from ..core import tags
+from ..core import tags, levels
 
 logger = logging.getLogger(__name__)
 
@@ -126,6 +126,7 @@ class RealFile(BackendFile):
             self._taglibFile.tags[tag.name.upper()] = values
         unsuccessful = self._taglibFile.save()
         ret = {key.upper(): values for key,values in unsuccessful.items()}
+        levels.real.filesModified.emit([self.url])
         return ret
 
 

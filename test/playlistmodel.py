@@ -108,7 +108,12 @@ class InsertTestCase(PlaylistTestCase):
         playlist.insert(playlist.root,0,level.makeWrappers('A1,A2,A3'))
         self.check('A[A1,A2,A3]')
         playlist.clear()
-
+        
+        # Insert the same file twice (ticket #131)
+        playlist.insert(playlist.root,0,level.makeWrappers('A1,A1'))
+        self.check('Pl[A1,A1]')
+        playlist.clear()
+        
         # Now the playlist has the longest sequence. Do not create any of A,C,X,Y,Z,T
         playlist.insert(playlist.root,0,level.makeWrappers('A3,A2,A1,E3,D5,D4,D3'))
         self.check('A3,Pl[A2,A1,E3,D5,D4],D3')
@@ -156,7 +161,6 @@ class InsertTestCase(PlaylistTestCase):
                 
         # Glue checks
         #=====================
-        
         # Check simple glueing
         playlist.insert(playlist.root,0,level.makeWrappers('A2,A3'))
         self.check('A[A2,A3]')
@@ -394,7 +398,7 @@ def load_tests(loader, standard_tests, pattern):
     level.addChild('Pl','D4')
     level.addChild('Pl','D5')
 
-    #print({id: element.tags[tags.TITLE][0] for id,element in level.elements.items()})
+    print(["{}: {}".format(id,level.elements[id].tags[tags.TITLE][0]) for id in sorted(level.elements.keys())])
     
     playlist = playlistmodel.PlaylistModel(backend=PseudoBackend(),level=level)
     
