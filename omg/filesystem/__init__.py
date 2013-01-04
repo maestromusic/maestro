@@ -254,8 +254,9 @@ class SynchronizeHelper(QtCore.QObject):
     def addFileHashes(self, tracks):
         """Updates the hashes of *tracks* in the files table and also their timestamps.
         """ 
-        db.multiQuery("UPDATE {}files SET hash=?, verified=CURRENT_TIMESTAMP WHERE element_id=?"
-                      .format(db.prefix), [ (track.hash, track.id) for track in tracks ]) 
+        if len(tracks):
+            db.multiQuery("UPDATE {}files SET hash=?, verified=CURRENT_TIMESTAMP WHERE element_id=?"
+                          .format(db.prefix), [ (track.hash, track.id) for track in tracks ]) 
 
     @QtCore.pyqtSlot(int, object)
     def changeURL(self, id, newUrl):
