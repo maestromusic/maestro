@@ -329,12 +329,10 @@ class RemoveFromRootCommand:
     def redo(self):
         startRow = None
         for i,row in enumerate(self.rows):
-            print(i,row)
             if startRow is None:
                 startRow = row
             if i+1 < len(self.rows) and self.rows[i+1] == row + 1:
                 continue
-            print("remove", startRow, row)
             self.model._removeContents(QtCore.QModelIndex(), startRow, row)
             startRow = None
             

@@ -119,7 +119,10 @@ class RemoveFromParentAction(TreeAction):
     def doAction(self):
         model = self.parent().model()
         byParent = {}
-        for wrapper in self.parent().nodeSelection.wrappers():
+        wrappers = self.parent().nodeSelection.wrappers()
+        for wrapper in wrappers:
+            if any(p in wrappers for p in wrapper.getParents()):
+                continue
             parent = wrapper.parent
             if parent not in byParent:
                 byParent[parent] = []
