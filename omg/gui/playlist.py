@@ -34,11 +34,11 @@ class PlaylistTreeView(treeview.DraggingTreeView):
     level = None
     
     actionConfig = treeview.TreeActionConfiguration()
-    sect = translate("PlaylistTreeView", "tags")
+    sect = translate("PlaylistTreeView", "Tags")
     actionConfig.addActionDefinition(((sect, 'edittagsS'),), treeactions.EditTagsAction, recursive=False)
     actionConfig.addActionDefinition(((sect, 'edittagsR'),), treeactions.EditTagsAction, recursive=True)
     
-    sect = translate("PlaylistTreeView", "playlist")
+    sect = translate("PlaylistTreeView", "Playlist")
     actionConfig.addActionDefinition(((sect, 'removeFromPL'),), treeactions.RemoveFromPlaylistAction)
     actionConfig.addActionDefinition(((sect, 'clearPL'),), treeactions.ClearPlaylistAction)
     
@@ -149,7 +149,7 @@ class PlaylistWidget(QtGui.QDockWidget):
             self.setActiveWidgetByState(backend.connectionState)
             backend.connectionStateChanged.connect(self.setActiveWidgetByState)
         else:
-            self.errorLabel.setText(self.tr("no backend selected"))
+            self.errorLabel.setText(self.tr("No backend selected"))
 
         self.backend = backend
         self.treeview.setBackend(self.backend)
@@ -162,13 +162,13 @@ class PlaylistWidget(QtGui.QDockWidget):
             self.mainLayout.insertWidget(self.mainWidgetIndex, self.treeview)
             self.treeview.show()
         else:
-            self.errorLabel.setText(self.tr("no connection"))
+            self.errorLabel.setText(self.tr("No connection"))
             self.mainLayout.insertWidget(self.mainWidgetIndex, self.errorLabel)
             self.errorLabel.show()
         
         
 mainwindow.addWidgetData(mainwindow.WidgetData(
-                    id="playlist", name=translate("Playlist", "playlist"),
+                    id="playlist", name=translate("Playlist", "Playlist"),
                     theClass=PlaylistWidget,
                     central=True, dock=True, default=True, unique=False,
                     preferredDockArea=Qt.RightDockWidgetArea))

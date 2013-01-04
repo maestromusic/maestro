@@ -192,10 +192,10 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         # Create wrappers
         if mimeData.hasFormat(config.options.gui.mime):
             # Do not simply copy wrappers from other levels as they might be invalid on real level
-            if hasattr(mimeData,'level') and mimeData.level is levels.real:
+            if hasattr(mimeData,'level') and mimeData.level == self.level:
                 wrappers = [wrapper.copy() for wrapper in mimeData.wrappers()]
             else:
-                wrappers = [Wrapper(levels.real.get(wrapper.element.id))
+                wrappers = [Wrapper(self.level.collect(wrapper.element.id))
                             for wrapper in mimeData.fileWrappers()]   
         else:
             urls = itertools.chain.from_iterable(
@@ -478,12 +478,12 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
             """This is used as createFunc-argument for Level.createWrappers."""
             if token.startswith('EXT:'):
                 url = urllib.parse.unquote(token[4:]) # remove "EXT:"
-                element = levels.real.get(url)
+                element = self.level.collect(url)
             else:
-                element = levels.real.get(int(token))
+                element = self.level.collect(int(token))
             return Wrapper(element,parent=parent)
         try:
-            wrappers = levels.real.createWrappers(wrapperString,createFunc=_createFunc)
+            wrappers = self.level.createWrappers(wrapperString,createFunc=_createFunc)
         except ValueError as e:
             logger.warning(str(e))
             return

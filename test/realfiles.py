@@ -114,6 +114,9 @@ class InvalidTagsTest(BaseTest):
         self.assertEqual(list(self.file.tags.keys()),[tag])
         self.assertTrue(len(self.file.tags[tag]) == 1)
         self.assertTrue(tag.isValid(self.file.tags[tag][0]))
+        
+    def tearDown(self):
+        os.remove(self.test)
 
 
 @unittest.skip("Broken because pytaglib does not write comments in mp3.")

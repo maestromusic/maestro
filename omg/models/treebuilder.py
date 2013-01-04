@@ -45,8 +45,19 @@ class Sequence:
             return Sequence(start,end)
         else: return None
         
+    def __contains__(self, key):
+        return self.start <= key <= self.end
+        
     def __repr__(self):
         return "[{},{}]".format(self.start,self.end)
+    
+    def asRange(self):
+        """Return a range object iterating over this sequence."""
+        return range(self.start,self.end+1)
+    
+    def asTuple(self):
+        """Return a tuple representing this sequence."""
+        return (self.start, self.end)
     
 
 class SequenceDict(dict):
@@ -130,6 +141,7 @@ class SequenceDict(dict):
                 self._addIndexToParents(index, pid)
         
     def longest(self, ids, boundingSequence=None):
+        #TODO update comment
         """Search for a longest sequence in this dict. Only search in the lists of the elements given by
         the ids *ids* and if *boudingSequence* is not None, compare sequences not by their real length but by
         the length of the sequences bounded to *boundingSequence*.
@@ -148,6 +160,8 @@ class SequenceDict(dict):
                 if seq is not None and (longest is None or len(seq) > len(longest)):
                     longest = seq
                     element = self.level.collect(id)
+        if boundingSequence is not None and longest is not None:
+            longest = longest.bounded(boundingSequence)
         return longest, element
      
     def remove(self,sequence):
@@ -231,29 +245,27 @@ def _buildTree(wrappers, seqs, boundingSeq, toplevelIds):
         if longestSeq is None:
             # All wrappers in *boundingSeq* are covered
             break
-        
-        # Skip sequences that are completely out of range (this may happen due to preWrapper/postWrapper)
-        if longestSeq.end < 0 or longestSeq.start >= len(wrappers):
+        boundedSeq = longestSeq.bounded(Sequence(0,len(wrappers)-1))
+        if boundedSeq is None or len(boundedSeq) == 0:
+            # Skip sequences that are completely out of range (this may happen due to preWrapper/postWrapper)
             seqs.remove(longestSeq)
             continue
         
         # Create a wrapper for the tree
         assert element.isContainer()
         wrapper = Wrapper(element)
-        childContents = _buildTree(wrappers,seqs,longestSeq,element.contents.ids)
+        childContents = _buildTree(wrappers, seqs, boundedSeq, element.contents.ids)
         wrapper.setContents(childContents)
         findPositions(wrapper,wrapper.contents)
         
         # Add the wrapper to roots and remove the sequence from all sequences
-        realSeq = (max(longestSeq.start,0), min(longestSeq.end,len(wrappers)-1))
-        assert realSeq not in roots
-        roots[realSeq] = wrapper
+        roots[boundedSeq.asTuple()] = wrapper
         seqs.remove(longestSeq)
     
     # Finally add elements that have not been covered by any container
     uncovered = []
-    for i, w in enumerate(wrappers):
-        if not any(startIndex <= i <= endIndex for (startIndex,endIndex), root in roots.items()):
+    for i in boundingSeq.asRange() if boundingSeq is not None else range(len(wrappers)):
+        if not any(startIndex <= i <= endIndex for (startIndex, endIndex), root in roots.items()):
             uncovered.append(i)
     for i in uncovered:
         roots[(i,i)] = wrappers[i]
