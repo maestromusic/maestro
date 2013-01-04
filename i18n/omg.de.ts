@@ -1654,7 +1654,9 @@ guess the album structure of files which are dropped into the editor.
 Album guessing is done by means of a list of tags; all files whose tags coincide for this list will then be 
 considered an album. The &quot;main&quot; grouper tag determines the TITLE tag of the new album. If &quot;directory mode&quot; 
 is on, files will only be grouped together if they are in the same directory.</source>
-        <translation type="unfinished"></translation>
+        <translation>Konfiguration der Gruppierer-Profile. Diese Profile bestimmen, wie der Editor versucht die Albenstruktur von neuen Dateien zu erraten.
+
+Gruppiert wird mit Hilfe einer Liste von Tags: Alle Dateien, deren Tagwerte für diese Tags übereinstimmen, werden als ein Container (Album) angesehen. Das als „Haupt-Tag“ markierte Tag bestimmt den Titel des neu erzeugten Containers. Im „Verzeichnis-Modus“ werden nur Dateien innerhalb eines Ordners gruppiert.  </translation>
     </message>
     <message>
         <location filename="../omg/models/albumguesser.py" line="210"/>
@@ -3174,7 +3176,7 @@ guessing. This is useful in most cases, unless you have albums that are split ac
     <message>
         <location filename="../omg/gui/tageditor.py" line="543"/>
         <source>Insert a new text will replace the common start of all selected records:</source>
-        <translation type="unfinished"></translation>
+        <translation>Neuen Text eingeben, der das gemeinsame Präfix der gewählten Werte ersetzen wird:</translation>
     </message>
     <message>
         <location filename="../omg/gui/tageditor.py" line="550"/>
@@ -3358,32 +3360,32 @@ guessing. This is useful in most cases, unless you have albums that are split ac
     <message>
         <location filename="../omg/gui/tagmatchdialog.py" line="44"/>
         <source>Tag placeholders must be written in the form %{tagname}. The special placeholder %{*} matches any text which is not to be matched to a tag (like file extensions)</source>
-        <translation type="unfinished"></translation>
+        <translation>Platzhalter haben die Form %{tagname}. Der spezielle Platzhalter %{*} steht für beliebigen Text der nicht in ein Tag umgewandelt werden soll (z.B. Dateierweiterungen) </translation>
     </message>
     <message>
         <location filename="../omg/gui/tagmatchdialog.py" line="53"/>
         <source>file path</source>
-        <translation type="unfinished"></translation>
+        <translation>Dateipfad</translation>
     </message>
     <message>
         <location filename="../omg/gui/tagmatchdialog.py" line="53"/>
         <source>proposed tags</source>
-        <translation type="unfinished"></translation>
+        <translation>Ermittelte Tags</translation>
     </message>
     <message>
         <location filename="../omg/gui/tagmatchdialog.py" line="65"/>
         <source>keep other existing tags</source>
-        <translation type="unfinished"></translation>
+        <translation>Existierende Tags behalten</translation>
     </message>
     <message>
         <location filename="../omg/gui/tagmatchdialog.py" line="67"/>
         <source>If this is checked and the files already contain tags not appearing in the format string, these are kept. Otherwise all existing tags are deleted.</source>
-        <translation type="unfinished"></translation>
+        <translation>Ist diese Option gewählt und die Dateien enthalten bereits Tags, die nicht in der Formatdefinition enthalten sind, werden diese nicht gelöscht.</translation>
     </message>
     <message>
         <location filename="../omg/gui/tagmatchdialog.py" line="97"/>
         <source>match tags from filenames</source>
-        <translation type="unfinished"></translation>
+        <translation>Tags aus Dateinamen erkennen</translation>
     </message>
 </context>
 <context>
