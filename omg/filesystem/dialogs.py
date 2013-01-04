@@ -86,6 +86,7 @@ class SetPathAction(treeactions.TreeAction):
             db.write.changeUrls([ (str(newUrl), elem.id) ])
             elem.url = newUrl
             levels.real.emitEvent(dataIds=(elem.id,))
+            elem.problem = False
 
 
 class MissingFilesDialog(QtGui.QDialog):
@@ -104,14 +105,15 @@ class MissingFilesDialog(QtGui.QDialog):
         self.setWindowTitle(self.tr('Missing Files Detected'))
         layout = QtGui.QVBoxLayout()
         label = QtGui.QLabel(self.tr(
-                    "The following files were removed from the filesystem by another program. "
-                    "Please select those that should also be removed from OMG's database, and "
-                    "provide a new path for the others."))
+                    "Some files from OMG's database could not be found anymore in your "
+                    "filesystem. They are shown in red below. For each file, you can either "
+                    "provide a new path manually or delete it from the database."))
         label.setWordWrap(True)
         layout.addWidget(label)
         
-        
-        files = [ levels.real.get(id) for id in ids ]
+        files = [ levels.real.collect(id) for id in ids ]
+        for file in files:
+            file.problem = True
         containers = []
         for pid in set(itertools.chain(*(file.parents for file in files))):
             containers.append(levels.real.get(pid))
@@ -122,18 +124,33 @@ class MissingFilesDialog(QtGui.QDialog):
         self.view.setItemDelegate(LostFilesDelegate(self.view))
         self.view.expandAll()
         
-        self.view.actionConfig.addActionDefinition(
-              ((('losttracks', 'setpath')),), SetPathAction)
-        self.view.actionConfig.addActionDefinition(
-              ((('losttracks', 'delete')),), treeactions.DeleteAction, text=self.tr("delete"), shortcut="Del", allowDisk=False)
+        self.setPathAction = SetPathAction(self.view)
+        self.deleteAction = treeactions.DeleteAction(self.view,
+                                                     text=self.tr("delete"),
+                                                     shortcut=self.tr("Del"),
+                                                     allowDisk=False)
+        self.view.addLocalAction(self.setPathAction)
+        self.view.addLocalAction(self.deleteAction)
         layout.addWidget(self.view)
         
-        buttonBox = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Ok)
-        buttonBox.accepted.connect(self.accept)
-        layout.addWidget(buttonBox)
-        
+        toolbar = QtGui.QToolBar()
+        toolbar.addAction(self.setPathAction)
+        toolbar.addAction(self.deleteAction)
+        buttonLayout = QtGui.QHBoxLayout()
+        buttonLayout.addStretch()
+        buttonLayout.addWidget(toolbar)
+        self.closeButton = QtGui.QPushButton()
+        buttonLayout.addWidget(self.closeButton)
+        self.closeButton.clicked.connect(self.accept)
+        layout.addLayout(buttonLayout)
         self.setLayout(layout)
+        self.updateCloseButton()
+        levels.real.connect(self.updateCloseButton)
         self.resize(800,400)
+    
+    def updateCloseButton(self):
+        numProblem = sum(hasattr(f.element, "problem") for f in self.model.root.getAllFiles())
+        self.closeButton.setText(self.tr("Close (%n files still missing)", None, numProblem))
 
 
 class ModifiedTagsDialog(QtGui.QDialog):

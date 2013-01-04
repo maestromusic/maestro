@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2009-2012 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2013 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -25,9 +25,11 @@ from .. import logging, config, utils, database as db, filebackends
 from ..core import levels, tags
 
 logger = logging.getLogger(__name__)
+translate = QtCore.QCoreApplication.translate
 
 synchronizer = None
 enabled = False
+hashingEnabled = True
 null = open(os.devnull) 
 
 NO_MUSIC = 0
@@ -36,10 +38,25 @@ HAS_NEW_FILES = 2
 PROBLEM = 4
 
 def init():
-    global synchronizer, notifier, enabled
+    global synchronizer, notifier, enabled, hashingEnabled
     import _strptime
     if config.options.filesystem.disable:
         return
+    try:
+        proc = subprocess.Popen(
+            ['ffmpeg', '-version'],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
+    except OSError as e:
+        import errno
+        if e.errno == errno.ENOENT:
+            from ..gui import dialogs
+            dialogs.warning(translate("omg.filesystem", "ffmpeg is missing"),
+                            translate("omg.filesystem", "The 'ffmpeg' binary needed by OMG's file "
+                              "tracking mechanism was not found. Please consider installing ffmpeg "
+                              "for full functionality."))
+            hashingEnabled = False
     synchronizer = FileSystemSynchronizer()
     synchronizer.eventThread.start()
     levels.real.filesRenamed.connect(synchronizer.handleRename, Qt.QueuedConnection)
@@ -132,7 +149,6 @@ def computeHash(url):
     data = proc.stdout.readall()
     proc.wait()
     hash = hashlib.md5(data).hexdigest()
-    assert hash is not None and len(hash) > 10
     return hash
 
 
@@ -141,7 +157,8 @@ def mTimeStamp(url):
     
     Returns a datetime.datetime object with timezone UTC.
     """
-    return datetime.datetime.fromtimestamp(os.path.getmtime(url.absPath), tz=datetime.timezone.utc).replace(microsecond=0)
+    return datetime.datetime.fromtimestamp(os.path.getmtime(url.absPath),
+                                           tz=datetime.timezone.utc).replace(microsecond=0)
 
 
 class Track:
@@ -305,6 +322,7 @@ class EventThread(QtCore.QThread):
 class FileSystemSynchronizer(QtCore.QObject):
     
     folderStateChanged = QtCore.pyqtSignal(object)
+    fileStateChanged = QtCore.pyqtSignal(object)
     initializationComplete = QtCore.pyqtSignal()
     
     hashesComputed = QtCore.pyqtSignal(list)
@@ -395,7 +413,7 @@ class FileSystemSynchronizer(QtCore.QObject):
         self.loadNewFiles()
         self.initialized.set()
         self.initializationComplete.emit()
-        if len(self.missingHashes) > 0:
+        if len(self.missingHashes) > 0 and hashingEnabled:
             lenMissing = len(self.missingHashes)
             for i, track in enumerate(self.missingHashes):
                 track.hash = computeHash(track.url)
@@ -422,7 +440,8 @@ class FileSystemSynchronizer(QtCore.QObject):
         modified = mTimeStamp(track.url)
         check = False
         if modified > track.verified:
-            logger.debug('found modified track {}: {}>{}'.format(track.url, modified, track.verified))
+            logger.debug('found modified track {}: {}>{}'.format(os.path.basename(track.url.path),
+                                                                 modified, track.verified))
             check = True
         elif config.options.filesystem.force_check and \
                 track.directory.path.startswith(config.options.filesystem.force_check):
@@ -430,9 +449,10 @@ class FileSystemSynchronizer(QtCore.QObject):
             check = True
         if check:
             if track.id is None:
-                
-                newHash = computeHash(track.url)
                 track.verified = modified
+                if not hashingEnabled:
+                    return
+                newHash = computeHash(track.url)
                 if newHash != track.hash:
                     logger.debug("just updating hash")
                     db.query("UPDATE {}newfiles "
@@ -448,9 +468,10 @@ class FileSystemSynchronizer(QtCore.QObject):
                 backendFile.readTags()
                 if dbTags.withoutPrivateTags() != backendFile.tags:
                     logger.debug('Detected modification on file "{}": tags differ'.format(track.url))
-                    track.hash = computeHash(track.url)
+                    track.hash = computeHash(track.url) if hashingEnabled else None
                     self.modifiedTags[track] = (dbTags, backendFile.tags)
                     track.problem = True
+                    self.fileStateChanged.emit(track.url)
                 else:
                     filehash = computeHash(track.url)
                     if filehash != track.hash:
@@ -466,7 +487,10 @@ class FileSystemSynchronizer(QtCore.QObject):
                                  "  WHERE element_id=?".format(db.prefix), track.id)
     
     def addTrack(self, dir, url):
-        filehash = computeHash(url)
+        if hashingEnabled:
+            filehash = computeHash(url)
+        else:
+            filehash = None
         track = Track(url)
         dir.addTrack(track)
         self.tracks[url] = track
@@ -504,6 +528,7 @@ class FileSystemSynchronizer(QtCore.QObject):
         #  to improve database performance. 
         newDirectories, modifiedDirectories, newTracks = set(), set(), set()
         THRESHOLD = 250  # number of updates bevor database is called
+        self.eventThread.timer.stop()
         
         for root, dirs, files in os.walk(config.options.main.collection, topdown=True):
             dirs.sort()
@@ -528,7 +553,7 @@ class FileSystemSynchronizer(QtCore.QObject):
                     self.checkTrack(dir, track)
                     if url in self.dbTracks:
                         self.dbTracks.remove(url)
-                else:
+                elif hashingEnabled:
                     track = self.addTrack(dir, url)
                     newTracks.add(track)
                     newTracksInDir += 1
@@ -553,6 +578,7 @@ class FileSystemSynchronizer(QtCore.QObject):
         if self.should_stop.is_set():
             return
         self.findProblems()
+        self.eventThread.timer.start()
         logger.debug("filesystem scan complete")
       
     def findProblems(self):
@@ -633,6 +659,7 @@ class FileSystemSynchronizer(QtCore.QObject):
         if oldDir != newDir:
             stateChanges += oldDir.updateState(True, False, True, self.folderStateChanged)
         self.updateDirectories(stateChanges)
+        self.fileStateChanged.emit(newUrl)
     
     @QtCore.pyqtSlot(list)
     def handleModify(self, urls):
@@ -642,7 +669,10 @@ class FileSystemSynchronizer(QtCore.QObject):
                 continue
             track = self.tracks[url]
             track.modified = mTimeStamp(url)
-            track.hash = computeHash(track.url)
+            if hashingEnabled:
+                track.hash = computeHash(track.url)
+            else:
+                track.hash = None
             if track.id is None:
                 db.query("UPDATE {}newfiles "
                          "  SET hash=?, verified=CURRENT_TIMESTAMP WHERE url=?".format(db.prefix),
@@ -675,9 +705,12 @@ class FileSystemSynchronizer(QtCore.QObject):
                 track.verified = datetime.datetime.now(datetime.timezone.utc)
             else:
                 track = self.addTrack(dir, file.url)
-                newHashes.append(track)
+                if track.hash is not None:
+                    newHashes.append(track)
             track.id = file.id
             modifiedDirs += dir.updateState(True, False, True, self.folderStateChanged)
+            self.fileStateChanged.emit(file.url)
+        self.hashesComputed.emit(newHashes)
         self.storeDirectories(newDirectories)
         self.updateDirectories(modifiedDirs)
     

@@ -1659,33 +1659,33 @@ is on, files will only be grouped together if they are in the same directory.</s
     <message>
         <location filename="../omg/models/albumguesser.py" line="210"/>
         <source>add tag...</source>
-        <translation type="unfinished"></translation>
+        <translation>Tag hinzufügen…</translation>
     </message>
     <message>
         <location filename="../omg/models/albumguesser.py" line="223"/>
         <source>remove tag</source>
-        <translation type="unfinished"></translation>
+        <translation>Tag entfernen</translation>
     </message>
     <message>
         <location filename="../omg/models/albumguesser.py" line="225"/>
         <source>directory mode</source>
-        <translation type="unfinished"></translation>
+        <translation>Verzeichnis-Modus</translation>
     </message>
     <message>
         <location filename="../omg/models/albumguesser.py" line="227"/>
         <source>If this is checked, only files within the same directory will be considered for automatic album
 guessing. This is useful in most cases, unless you have albums that are split across several folders.</source>
-        <translation type="unfinished"></translation>
+        <translation>Im Verzeichnis-Modus werden grundsätzlich nur Dateien innerhalb eines Verzeichnisses zusammengefasst. In den meisten Fällen ist dies sinnvoll, außer Sie haben Alben die über mehrere Ordner verteilt sind.</translation>
     </message>
     <message>
         <location filename="../omg/models/albumguesser.py" line="233"/>
         <source>set to main</source>
-        <translation type="unfinished"></translation>
+        <translation>Zum Haupt-Tag machen</translation>
     </message>
     <message>
         <location filename="../omg/models/albumguesser.py" line="241"/>
         <source>Find Meta-Containers</source>
-        <translation type="unfinished"></translation>
+        <translation>Meta-Container suchen</translation>
     </message>
 </context>
 <context>
@@ -1693,7 +1693,7 @@ guessing. This is useful in most cases, unless you have albums that are split ac
     <message>
         <location filename="../omg/core/tagcommands.py" line="65"/>
         <source>change hidden flag</source>
-        <translation type="unfinished"></translation>
+        <translation>Wert verstecken / zeigen</translation>
     </message>
 </context>
 <context>
@@ -2918,27 +2918,27 @@ guessing. This is useful in most cases, unless you have albums that are split ac
     <message>
         <location filename="../omg/models/albumguesser.py" line="80"/>
         <source>guess albums</source>
-        <translation type="unfinished"></translation>
+        <translation>Gruppieren</translation>
     </message>
     <message>
         <location filename="../omg/models/albumguesser.py" line="116"/>
         <source>Error guessing albums</source>
-        <translation type="unfinished"></translation>
+        <translation>Fehler beim Gruppieren</translation>
     </message>
     <message>
         <location filename="../omg/models/albumguesser.py" line="116"/>
         <source>position {} appears twice in {}</source>
-        <translation type="unfinished"></translation>
+        <translation>Position „{}“ erscheint zweimal in „{}“</translation>
     </message>
     <message>
         <location filename="../omg/models/albumguesser.py" line="150"/>
         <source>Error guessing meta-containers</source>
-        <translation type="unfinished"></translation>
+        <translation>Fehler beim Erkennen der Meta-Container</translation>
     </message>
     <message>
         <location filename="../omg/models/albumguesser.py" line="150"/>
         <source>disc-number {} appears twice in meta-container {}</source>
-        <translation type="unfinished"></translation>
+        <translation>Disknummer „{}“ erscheint doppelt im Meta-Container „{}“</translation>
     </message>
 </context>
 <context>
@@ -2946,13 +2946,13 @@ guessing. This is useful in most cases, unless you have albums that are split ac
     <message>
         <location filename="../omg/filesystem/__init__.py" line="249"/>
         <source>Move detected</source>
-        <translation type="unfinished"></translation>
+        <translation>Verschieben erkannt</translation>
     </message>
     <message>
         <location filename="../omg/filesystem/__init__.py" line="249"/>
         <source>A file was renamed (or moved) outside OMG:
 {}</source>
-        <translation type="unfinished"></translation>
+        <translation>Eine Datei wurde umbenannt (oder verschoben): {}</translation>
     </message>
 </context>
 <context>
@@ -3401,7 +3401,7 @@ guessing. This is useful in most cases, unless you have albums that are split ac
     <message>
         <location filename="../omg/gui/tagwidgets.py" line="290"/>
         <source>&apos;{}&apos; is not a valid tagname</source>
-        <translation>„{}“ ist kein gültiger Tagname.</translation>
+        <translation>„{}“ ist kein gültiger Tagname</translation>
     </message>
 </context>
 <context>
@@ -3463,12 +3463,12 @@ guessing. This is useful in most cases, unless you have albums that are split ac
     <message>
         <location filename="../omg/gui/treeactions.py" line="383"/>
         <source>choose tag mode</source>
-        <translation type="unfinished"></translation>
+        <translation>Tag-Modus wählen</translation>
     </message>
     <message>
         <location filename="../omg/gui/treeactions.py" line="383"/>
         <source>tag:</source>
-        <translation type="unfinished"></translation>
+        <translation>Tag:</translation>
     </message>
 </context>
 <context>
@@ -3476,22 +3476,22 @@ guessing. This is useful in most cases, unless you have albums that are split ac
     <message>
         <location filename="../omg/gui/tagwidgets.py" line="705"/>
         <source>rename all occurences:</source>
-        <translation type="unfinished"></translation>
+        <translation>Alle Vorkommen umbenennen:</translation>
     </message>
     <message>
         <location filename="../omg/gui/tagwidgets.py" line="711"/>
         <source>distinguished sort value:</source>
-        <translation type="unfinished"></translation>
+        <translation>Wert zum Sortieren:</translation>
     </message>
     <message>
         <location filename="../omg/gui/tagwidgets.py" line="718"/>
         <source>value is hidden</source>
-        <translation type="unfinished"></translation>
+        <translation>Versteckt</translation>
     </message>
     <message>
         <location filename="../omg/gui/tagwidgets.py" line="743"/>
         <source>editing {0} value: {1}</source>
-        <translation type="unfinished"></translation>
+        <translation>Bearbeite {0}-Wert „{1}“ </translation>
     </message>
 </context>
 <context>
