@@ -57,7 +57,7 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         """Set the currently playing song to the song with the given offset. If offset is None or invalid,
         no song should be currently playing."""
         if offset is None:     
-            self.clearCurrent() 
+            self.clearCurrent()
         else:
             try:
                 self.current = self.root.fileAtOffset(offset)
@@ -296,7 +296,7 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         
         self.stack.endMacro()
         return True
-        
+    
     def insertUrlsAtOffset(self, offset, urls, updateBackend='always'):
         """Insert the given paths at the given offset."""
         wrappers = [Wrapper(element) for element in self.level.collectMany(urls)]

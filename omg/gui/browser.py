@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2009-2012 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2013 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -21,10 +21,9 @@ import functools
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
-from .. import application, config, constants, database as db, config, utils
+from .. import application, config, database as db, utils
 from ..core import tags, flags, levels
 from ..core.elements import Element, Container
-from ..core.nodes import Wrapper
 from ..search import searchbox, criteria as criteriaModule
 from . import mainwindow, treeview, browserdialog, delegates
 from .delegates import browser as browserdelegate
@@ -373,6 +372,28 @@ class BrowserTreeView(treeview.TreeView):
         if len(self._optimizers) > 0:
             self._optimizers[0].start()
     
+    def mouseDoubleClickEvent(self, event):
+        index = self.indexAt(event.pos())
+        if not index.isValid():
+            return
+        from . import playlist
+        from .. import player
+        if playlist.defaultPlaylist is None:
+            return
+        
+        model = playlist.defaultPlaylist.model()
+        if model.backend.connectionState != player.CONNECTED:
+            return
+        # TODO: this seems too complicated ...
+        wrappers = [w.copy() for w in browsermodel.BrowserMimeData.fromIndexes(self.model(), [index]).wrappers()]
+        if event.modifiers() & Qt.ControlModifier:
+            model.stack.beginMacro(self.tr("Replace Playlist"))
+            model.clear()
+        model.insert(model.root, len(model.root.contents), wrappers)
+        if event.modifiers() & Qt.ControlModifier:
+            model.backend.play()
+            model.stack.endMacro()
+        
        
 class Optimizer(QtCore.QObject):
     """Optimizers improve the display of a BrowserTreeView after its nodes have been loaded. They are 

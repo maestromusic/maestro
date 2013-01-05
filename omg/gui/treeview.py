@@ -22,8 +22,6 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from .. import application
-from ..core.elements import Container
-from ..core.nodes import Wrapper
 from . import selection, treeactions
 
 
