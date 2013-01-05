@@ -113,6 +113,11 @@ def run(cmdConfig=[],type='gui',exitPoint=None):
     app = QtGui.QApplication(sys.argv)
     app.setApplicationName("OMG")
 
+    from . import resources
+    if type == "gui":
+        splash = QtGui.QSplashScreen(QtGui.QPixmap(":/omg/omg_splash.png"))
+        splash.show()
+        app.processEvents()
     # Initialize config and logging
     config.init(cmdConfig,testMode=type=='test')
     
@@ -196,7 +201,7 @@ def run(cmdConfig=[],type='gui',exitPoint=None):
     # Load and initialize remaining modules
     from .core import levels
     levels.init()
-    from . import resources, search, profiles
+    from . import search, profiles
     from .core import covers
     search.init()
     covers.init()
@@ -231,6 +236,7 @@ def run(cmdConfig=[],type='gui',exitPoint=None):
     
     # Launch application
     mainWindow.show()
+    splash.finish(mainWindow)
     returnValue = app.exec_()
     
     # Close operations
