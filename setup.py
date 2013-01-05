@@ -42,8 +42,16 @@ def updateTranslations():
         qmFile = tsFile[:-2] + "qm"
         if not os.path.exists(qmFile) or getmtime(tsFile) > getmtime(qmFile):
             print("Updating translation file: {}".format(qmFile))
-            subprocess.check_call(["lrelease", proFile])
-            return
+            try:
+                subprocess.check_call(["lrelease", proFile])
+            except Exception as e:
+                print(e)
+                try:
+                    subprocess.check_call(["lrelease-qt4", proFile])
+                except Exception as e:
+                    print(e)
+                    print("Warning: Could not update translations")
+                    return
     
 
 def updateResources():
