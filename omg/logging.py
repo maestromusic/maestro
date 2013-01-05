@@ -31,7 +31,7 @@ import sys
 import logging, logging.config
 
 configured = False # Whether logging has been configured (i.e. init has been successfully called).
-
+loggers = set()
 
 class Logger:
     """A logger prints log messages to ``stderr`` until logging is configured. Afterwards it wraps a usual
@@ -87,13 +87,27 @@ class Logger:
                 self._logger = logging.getLogger(self.name)
             self._logger.exception(message)
         
-        
+
+def addHandler(handler):
+    for logger in loggers:
+        if logger._logger is not None:
+            logger._logger.addHandler(handler)
+
+
+def removeHandler(handler):
+    for logger in loggers:
+        if logger._logger is not None:
+            logger._logger.removeHandler(handler)
+
+
 def getLogger(name=None):
     """Return a logger with the given name. If *name* is ``None`` use ``"omg"``. Note that this method works
     even if logging has not been initialized yet."""
     if name is None:
         name = "omg"
-    return Logger(name)
+    logger = Logger(name)
+    loggers.add(logger)
+    return logger
 
 
 def init():

@@ -1,6 +1,7 @@
 <RCC>
     <qresource prefix="/omg">
         <file>omg.png</file>
+        <file>omg_splash.png</file>
         <file>lastfm.gif</file>
         <file>icons/volume_high.png</file>
         <file>icons/volume_medium.png</file>
