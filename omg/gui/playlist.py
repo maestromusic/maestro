@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2009-2012 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2013 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -27,6 +27,9 @@ from .. import player
 from ..models import rootedtreemodel
 
 translate = QtCore.QCoreApplication.translate
+
+# the default playlist used for user commands that do not specify a particular playlist
+defaultPlaylist = None
 
 
 class PlaylistTreeView(treeview.DraggingTreeView):
@@ -63,6 +66,8 @@ class PlaylistTreeView(treeview.DraggingTreeView):
                 self.removeLocalAction(action)
         self.backend = backend
         if backend is not None:
+            global defaultPlaylist
+            defaultPlaylist = self
             model = backend.playlist
             self.setRootIsDecorated(True)
             for action in backend.treeActions():
