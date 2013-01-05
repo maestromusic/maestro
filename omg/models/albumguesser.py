@@ -119,7 +119,7 @@ class StandardGuesser(profiles.Profile):
         self.toplevels.update(existing)
         for key, elements in byKey.items():
             if pureDirMode or (self.albumTag in elements[0].tags):
-                elementsWithoutPos = { e for e in elements if not hasattr(element,'filePosition') }
+                elementsWithoutPos = { e for e in elements if not hasattr(e,'filePosition') }
                 elementsWithPos = sorted(set(elements) - elementsWithoutPos, key = lambda e: e.filePosition)
                 children = {}
                 for element in elementsWithPos:

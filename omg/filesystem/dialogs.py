@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2009-2012 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2013 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -115,8 +115,13 @@ class MissingFilesDialog(QtGui.QDialog):
             file.problem = True
         containers = []
         for pid in set(itertools.chain(*(file.parents for file in files))):
-            containers.append(levels.real.get(pid))
-        self.model = LevelTreeModel(levels.real, containers)
+            containers.append(levels.real.collect(pid))
+        for container in containers:
+            for file in container.getAllFiles():
+                if file in files:
+                    files.remove(file)
+        self.model = LevelTreeModel(levels.real, containers + files)
+        # TODO: containerless files don't disappear in view after deleting
         
         self.view = treeview.TreeView(levels.real, affectGlobalSelection=False)        
         self.view.setModel(self.model)
