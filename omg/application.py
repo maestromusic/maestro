@@ -83,6 +83,24 @@ class ChangeEventDispatcher(QtCore.QObject):
 dispatcher = None
  
 
+class Splash(QtGui.QSplashScreen):
+    """Splash screen showing a logo and the loading progress."""
+    def __init__(self, message):
+        super().__init__(QtGui.QPixmap(":/omg/omg_splash.png"))
+        self.message = message
+        
+    def showMessage(self, message):
+        self.message = message + '…'
+        QtGui.QApplication.instance().processEvents()
+        
+    def drawContents(self, painter):
+        super().drawContents(painter)
+        font = painter.font()
+        font.setPointSize(14)
+        painter.setFont(font)
+        painter.drawText(QtCore.QPoint(20, 70), self.message)
+        
+    
 def run(cmdConfig=[],type='gui',exitPoint=None):
     """This is the entry point of OMG. With the default arguments OMG will start the GUI. Use init if you
     only want to initialize the framework without starting the GUI.
@@ -115,16 +133,10 @@ def run(cmdConfig=[],type='gui',exitPoint=None):
 
     from . import resources
     if type == "gui":
-        pixmap = QtGui.QPixmap(":/omg/omg_splash.png")
-        splash = QtGui.QSplashScreen(pixmap)
-    def updateSplash(msg):
-        if type == "gui":
-            splash.showMessage(msg, Qt.AlignCenter, Qt.red)
-            app.processEvents()
-    if type == "gui":
-        updateSplash("Loading OMG…")
+        splash = Splash("Loading OMG")
         splash.show()
         app.processEvents()
+        
     # Initialize config and logging
     config.init(cmdConfig,testMode=type=='test')
     
@@ -146,8 +158,11 @@ def run(cmdConfig=[],type='gui',exitPoint=None):
         logger.error("No collection directory defined.")
         runInstaller()
     
-    updateSplash("Loading translations…")
+    if type == 'gui':
+        splash.showMessage("Loading translations")
     loadTranslators(app,logger)
+    translate = QtCore.QCoreApplication.translate
+    
     # Initialize dispatcher
     global dispatcher
     dispatcher = ChangeEventDispatcher()
@@ -159,7 +174,9 @@ def run(cmdConfig=[],type='gui',exitPoint=None):
         config.options.database.sqlite_path = ':memory:'
     from . import database
     try:
-        updateSplash("Connecting to database…")
+        if type == 'gui':
+            msg = translate("Splash", "Connecting to database")
+            splash.showMessage(msg)
         database.connect()
     except database.sql.DBException as e:
         logger.error("I cannot connect to the database. Did you provide the correct information in the"
@@ -223,9 +240,9 @@ def run(cmdConfig=[],type='gui',exitPoint=None):
     if type == 'test' or exitPoint == 'noplugins':
         return app
     
-    updateSplash("loading plugins…")
-    
     # Load Plugins
+    if type == 'gui':
+        splash.showMessage(translate("Splash", "Loading plugins"))
     from . import plugins
     plugins.init()
     plugins.enablePlugins()
@@ -236,14 +253,13 @@ def run(cmdConfig=[],type='gui',exitPoint=None):
     from . import filesystem
     filesystem.init()
 
-    updateSplash("loading GUI classes…")
     # Create GUI
+    splash.showMessage(translate("Splash", "Loading GUI classes"))
     # First import all modules that want to add WidgetData
     from .gui import filesystembrowser, editor, browser, tageditor, mainwindow, playback, playlist
     
     global mainWindow
-    updateSplash("creating main window…")
-    app.processEvents()
+    splash.showMessage(translate("Splash", "Creating main window"))
     mainWindow = mainwindow.MainWindow()
     plugins.mainWindowInit()
     
