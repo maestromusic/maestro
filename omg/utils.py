@@ -163,8 +163,8 @@ class FlexiDate:
             match = re.match('%[dmY]([.\-/])%[dmY]([.\-/])%[dmY]',format)
             if match is not None:
                 sep1, sep2 = match.group(1), match.group(2)
-                FlexiDate._sep1, FlexiDate._sep2 = sep1, sep2
-            else: sep1,sep2 = '//'
+            else: sep1, sep2 = '//'
+            FlexiDate._sep1, FlexiDate._sep2 = sep1, sep2
             if format.index('%d') < format.index('%m'):
                 FlexiDate._dateFormat = ('{Y:04d}',
                                          '{m:02d}'+sep2+'{Y:04d}',
