@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2009-2012 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2013 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -695,8 +695,15 @@ class DateLineEdit(lineedits.LineEditWithHint):
         
 
 class TagValuePropertiesWidget(QtGui.QWidget):
-    """A widget that displays properties of tag values (sort tags, hidden status) and allows to change them."""
-    def __init__(self, parent = None):
+    """A widget that displays properties of tag values and allows to change them.
+    
+    The user can choose to:
+      - rename all occurences of that value,
+      - set or remove a distinguished sort value,
+      - select whether the value should be hidden.
+    """
+    
+    def __init__(self, parent=None):
         super().__init__(parent)
         layout = QtGui.QGridLayout()
         self.label = QtGui.QLabel("")
@@ -725,7 +732,7 @@ class TagValuePropertiesWidget(QtGui.QWidget):
         tries to guess the sort value by splitting the tag value at the last space
         and exchanging the two parts."""
         if checked:
-            if self.orig_sortValue is None and self.sortEdit.text() == "":
+            if self.origSortValue is None and self.sortEdit.text() == "":
                 names = self.valueEdit.text().rsplit(' ', 1)
                 if len(names) == 2:
                     self.sortEdit.setText(names[1] + ", " + names[0])
@@ -734,37 +741,44 @@ class TagValuePropertiesWidget(QtGui.QWidget):
         self.tag = tag
         self.valueId = valueId
         self.orig_hidden = db.hidden(tag, valueId)
-        self.orig_sortValue = db.sortValue(tag, valueId)
-        self.orig_value = db.valueFromId(tag, valueId)
+        self.origSortValue = db.sortValue(tag, valueId)
+        self.origValue = db.valueFromId(tag, valueId)
         self.valueEdit.setEnabled(False)
         self.changeValueCheckbox.setChecked(False)
-        self.valueEdit.setText(self.orig_value)
+        self.valueEdit.setText(self.origValue)
         
-        self.label.setText(self.tr('editing {0} value: {1}').format(tag, self.orig_value))
-        if self.orig_sortValue is None:
+        self.label.setText(self.tr('editing {0} value: {1}').format(tag, self.origValue))
+        if self.origSortValue is None:
             self.sortEdit.setText("")
             self.sortValueCheckbox.setChecked(False)
             self.sortEdit.setEnabled(False)
         else:
-            self.sortEdit.setText(self.orig_sortValue)
+            self.sortEdit.setText(self.origSortValue)
             self.sortEdit.setEnabled(True)
             self.sortValueCheckbox.setChecked(True)
         self.hiddenCheckbox.setChecked(self.orig_hidden)
-        
+    
+    def inputAcceptable(self):
+        if self.changeValueCheckbox.isChecked() and self.valueEdit.text().strip() == "":
+            from .dialogs import warning
+            warning(self.tr("Invalid Tag Value"),
+                    self.tr("Please enter a valid tag value."))
+            return False
+        return True
+
     def commit(self):
         from ..core import tagcommands
-        if self.changeValueCheckbox.isChecked() and self.valueEdit.text() != self.orig_value:
-            #TODO: make sure that the new value is not an empty string
-            #TODO command does not exist  
-            command = tagcommands.RenameTagValueCommand(self.tag, self.orig_value, self.valueEdit.text())
-            application.stack.push(command)
+        if self.changeValueCheckbox.isChecked() and self.valueEdit.text() != self.origValue:
+            tagcommands.renameTagValue(self.tag, self.origValue, self.valueEdit.text())
+            self.origValue = self.valueEdit.text()
+            self.valueId = db.idFromValue(self.tag, self.origValue)
         if self.sortValueCheckbox.isChecked():
-            if self.sortEdit.text() != self.orig_sortValue:
-                command = tagcommands.ChangeSortValueCommand(self.tag, self.valueId, self.orig_sortValue,
+            if self.sortEdit.text() != self.origSortValue:
+                command = tagcommands.ChangeSortValueCommand(self.tag, self.valueId, self.origSortValue,
                                                         self.sortEdit.text())
                 application.stack.push(command)
-        elif self.orig_sortValue is not None:
-            command = tagcommands.ChangeSortValueCommand(self.tag, self.valueId, self.orig_sortValue, None)
+        elif self.origSortValue is not None:
+            command = tagcommands.ChangeSortValueCommand(self.tag, self.valueId, self.origSortValue, None)
             application.stack.push(command)
         if self.hiddenCheckbox.isChecked() != self.orig_hidden:
             command = tagcommands.HiddenAttributeCommand(self. tag, self.valueId,
@@ -779,19 +793,12 @@ class TagValuePropertiesWidget(QtGui.QWidget):
         tvp = TagValuePropertiesWidget()
         dialog.layout().addWidget(tvp)
         
-        buttonLine = QtGui.QHBoxLayout()
-        cancelButton = QtGui.QPushButton(tvp.tr('Cancel'))
-        okButton = QtGui.QPushButton(tvp.tr('Ok'))
-        buttonLine.addStretch()
-        buttonLine.addWidget(cancelButton)
-        buttonLine.addWidget(okButton)
-        
-        dialog.layout().addLayout(buttonLine)
+        buttonLine = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Cancel | QtGui.QDialogButtonBox.Ok)        
+        dialog.layout().addWidget(buttonLine)
         tvp.setValue(tag, valueId)
         
-        okButton.clicked.connect(dialog.accept)
-        okButton.setDefault(True)
-        cancelButton.clicked.connect(dialog.reject)
+        buttonLine.accepted.connect(lambda : dialog.accept() if tvp.inputAcceptable() else None)
+        buttonLine.rejected.connect(dialog.reject)
         dialog.exec_()
         if dialog.result() == QtGui.QDialog.Accepted:
             tvp.commit()

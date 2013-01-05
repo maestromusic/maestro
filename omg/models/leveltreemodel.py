@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2009-2012 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2013 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -171,30 +171,36 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
         
         files = utils.collectFiles(sorted(url.path() for url in urls))
         numFiles = sum(len(v) for v in files.values())
-        progress = QtGui.QProgressDialog()
-        progress.setLabelText(self.tr("Importing {0} files...").format(numFiles))
-        progress.setRange(0, numFiles)
-        progress.setMinimumDuration(200)
+        progress = QtGui.QProgressDialog(self.tr("Importing {0} files...").format(numFiles),
+                                         self.tr("Cancel"), 0, numFiles)
+        progress.setMinimumDuration(1000)
         progress.setWindowModality(Qt.WindowModal)
         filesByFolder = collections.OrderedDict()
         elements = []
+        macro = self.level.stack.beginMacro(self.tr("import URLs"))
         try:
             # load files into editor level
             for folder, filesInOneFolder in files.items():
                 filesByFolder[folder] = []
                 for file in filesInOneFolder:
+                    if progress.wasCanceled():
+                        macro.abort()
+                        return []
                     progress.setValue(progress.value() + 1)
                     element = self.loadFile(file)
                     filesByFolder[folder].append(element)
                     elements.append(element)
             progress.close()
             if not self.guessingEnabled or self.guessProfile is None:
+                self.level.stack.endMacro()
                 return elements
             else:
                 self.guessProfile.guessAlbums(self.level, filesByFolder)
-                return self.guessProfile.albums + self.guessProfile.singles
+                self.level.stack.endMacro()
+                return self.guessProfile.toplevels
         except levels.ElementGetError as e:
             logger.warning(str(e))
+            macro.abort()
             return []
         
     def __contains__(self, arg):
@@ -329,12 +335,10 @@ class RemoveFromRootCommand:
     def redo(self):
         startRow = None
         for i,row in enumerate(self.rows):
-            print(i,row)
             if startRow is None:
                 startRow = row
             if i+1 < len(self.rows) and self.rows[i+1] == row + 1:
                 continue
-            print("remove", startRow, row)
             self.model._removeContents(QtCore.QModelIndex(), startRow, row)
             startRow = None
             

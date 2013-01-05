@@ -17,8 +17,11 @@
 #
 
 from PyQt4 import QtGui
+from PyQt4.QtCore import Qt
 
 from ..database import write as dbWrite
+from ..core.levels import real
+from ..core import tags
 from .. import application, database as db
 
 translate = QtGui.QApplication.translate
@@ -52,12 +55,13 @@ class ChangeSortValueCommand:
 class HiddenAttributeChangeEvent(application.ChangeEvent):
     """This event is emitted when the "hidden" attribute of a tag value changes."""
     def __init__(self, tag, valueId, newState):
-        self.tag, self.valueId, self.newState = tag, valueId, newState
+        (self.tag, self.valueId, self.newState) = (tag, valueId, newState)
 
 
 class HiddenAttributeCommand:
     """A command to change the "hidden" attribute of a tag value."""
-    def __init__(self, tag, valueId, newState = None):
+    
+    def __init__(self, tag, valueId, newState=None):
         """Create the command. If newState is None, then the old one will be fetched from the database
         and the new one set to its negative.
         Otherwise, this class assumes that the current state is (not newState), so don't call this
@@ -76,4 +80,44 @@ class HiddenAttributeCommand:
     def setHidden(self, newState):
         dbWrite.setHidden(self.tag, self.valueId, newState)
         application.dispatcher.emit(HiddenAttributeChangeEvent(self.tag, self.valueId, newState))
-        
+
+
+def renameTagValue(tag, oldValue, newValue):
+    """A method to rename *all* instances of a certain tag value. For the real level only.
+    
+    The most prominent use is to correct the spelling of (foreign language) artists, composers etc.
+    """
+    oldId = db.idFromValue(tag, oldValue)
+    newId = db.idFromValue(tag, newValue, insert=True)
+    
+    result = db.query("SELECT element_id, value_id FROM {}tags WHERE tag_id=? AND "
+                        "(value_id=? OR value_id=?)".format(db.prefix),
+                        tag.id, oldId, newId)
+    elemToList = {}
+    for elementId, valueId in result:
+        if elementId not in elemToList:
+            elemToList[elementId] = [valueId]
+        else:
+            elemToList[elementId].append(valueId) 
+    onlyOld = [ id for id, vals in elemToList.items() if len(vals) == 1 and vals[0] == oldId ]
+    both = [ id for id, vals in elemToList.items() if len(vals) == 2 ]
+    bar = QtGui.QProgressDialog(translate("renameTagValue", "Renaming {} to {} ...")
+                                .format(oldValue, newValue),
+                                None,
+                                0,
+                                len(onlyOld) + len(both),
+                                application.mainWindow)
+    bar.setMinimumDuration(1000)
+    bar.setWindowModality(Qt.WindowModal)
+    application.stack.beginMacro(translate("renameTagValue", "rename {} value").format(tag),
+                                 transaction=True)
+    onlyOldDiff = tags.SingleTagDifference(tag, replacements=[(oldValue, newValue)])
+    bothDiff = tags.SingleTagDifference(tag, removals=[newValue])
+    for i, elid in enumerate(onlyOld):
+        bar.setValue(i)
+        real.changeTags({real.fetch(elid) : onlyOldDiff})
+    for i, elid in enumerate(both, start=len(onlyOld)):
+        bar.setValue(i)
+        real.changeTags({real.fetch(elid) : bothDiff})
+    bar.setValue(bar.value()+1)
+    application.stack.endMacro()

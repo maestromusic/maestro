@@ -121,7 +121,7 @@ def run(cmdConfig=[],type='gui',exitPoint=None):
     global logger
     logger = logging.getLogger("omg")
     logger.debug("START")
-                     
+
     if exitPoint == 'config':
         return app
     

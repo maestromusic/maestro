@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2009-2012 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2013 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -119,7 +119,10 @@ class RemoveFromParentAction(TreeAction):
     def doAction(self):
         model = self.parent().model()
         byParent = {}
-        for wrapper in self.parent().nodeSelection.wrappers():
+        wrappers = self.parent().nodeSelection.wrappers()
+        for wrapper in wrappers:
+            if any(p in wrappers for p in wrapper.getParents()):
+                continue
             parent = wrapper.parent
             if parent not in byParent:
                 byParent[parent] = []

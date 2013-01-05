@@ -82,7 +82,6 @@ class SetPathAction(treeactions.TreeAction):
             newUrl = FileURL(path)
             from .. import database as db
             from ..database import write
-            print('changing url: {}->{}'.format(elem.url, newUrl))
             db.write.changeUrls([ (str(newUrl), elem.id) ])
             elem.url = newUrl
             levels.real.emitEvent(dataIds=(elem.id,))

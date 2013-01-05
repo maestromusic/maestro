@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2009-2012 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2013 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -580,7 +580,8 @@ class Level(application.ChangeEventDispatcher):
                             remainingTagChanges[inParent] = tags.TagDifference(
                                                     additions=list(element.tags.privateTags().getTuples()))
                         else: newTags = element.tags.copy()
-                    fileTagChanges[inParent] = tags.TagStorageDifference(inParent.tags, newTags)
+                    if inParent.tags != newTags:
+                        fileTagChanges[inParent] = tags.TagStorageDifference(inParent.tags, newTags)
                 else: # containers
                     if element.isInDb():
                         inParent = self.parent[element.id]
