@@ -202,3 +202,14 @@ class GrammarRenamer(profiles.Profile):
     def configurationWidget(self):
         from . import gui
         return gui.GrammarConfigurationWidget(temporary=False, profile=self)
+    
+    def __neq__(self, other):
+        if not isinstance(other, GrammarRenamer):
+            return True
+        return self.formatString != other.formatString or \
+               self.replaceChars != other.replaceChars or \
+               self.replaceBy != other.replaceBy or \
+               self.removeChars != other.removeChars
+
+    def __eq__(self, other):
+        return not self.__neq__(other)
