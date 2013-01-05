@@ -71,10 +71,10 @@ class EditTagsAction(TreeAction):
         *recursive* is True). This is called by the edit tags actions in the contextmenu.
         """
         from ..gui import tageditor
-        dialog = tageditor.TagEditorDialog(self.parent().model().level,
-                                           self.parent().nodeSelection.elements(self.recursive),
-                                           self.parent())
+        dialog = tageditor.TagEditorDialog(includeContents=self.recursive, parent=self.parent())
+        dialog.useElementsFromSelection(self.parent().nodeSelection)
         dialog.exec_()
+
 
 class RenameAction(TreeAction):
     """Action to rename (or move) a file."""

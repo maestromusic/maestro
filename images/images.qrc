@@ -39,6 +39,7 @@
         <file>icons/editor.png</file>
         <file>icons/real.png</file>
         <file>process-working.png</file>
+        <file>icons/recursive.png</file>
     </qresource>
     <qresource prefix="/omg/flags">
         <file alias="creative-commons.png">flags/fugue/creative-commons.png</file>

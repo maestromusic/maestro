@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 
 class TagEditorDock(QtGui.QDockWidget):
     """DockWidget containing the TagEditor."""
-    def __init__(self,parent=None,state=None,location=None):
+    def __init__(self, parent=None, state=None, location=None):
         super().__init__(parent)
         self.setWindowTitle(self.tr("Tageditor"))
         if location is not None:
@@ -45,19 +45,19 @@ class TagEditorDock(QtGui.QDockWidget):
             
         self.setAcceptDrops(True)
         
-        self.editorWidget = TagEditorWidget(vertical=vertical,dock=self)
+        self.editorWidget = TagEditorWidget(vertical=vertical)
         self.setWidget(self.editorWidget)
         
-        self.loadRecursively = True
+        self.editorWidget.includeContents = True
         if state is not None:
-            if 'loadRecursively' in state:
-                self.loadRecursively = bool(state['loadRecursively'])
+            if 'includeContents' in state:
+                self.editorWidget.includeContents = bool(state['includeContents'])
         
         from . import selection
         selection.changed.connect(self._handleSelectionChanged)
         
     def saveState(self):
-        return {'loadRecursively': self.loadRecursively}
+        return {'includeContents': self.editorWidget.includeContents}
         
     def _handleLocationChanged(self,area):
         """Handle changes in the dock's position."""
@@ -69,8 +69,9 @@ class TagEditorDock(QtGui.QDockWidget):
         into the TagEditorWidget."""
         if not nodeSelection.hasElements():
             return
-        elements = list(nodeSelection.elements(recursive=self.loadRecursively))
-        self.editorWidget.setElements(nodeSelection.level,elements)
+        self.editorWidget.setElements(nodeSelection.level,
+                                      list(nodeSelection.elements(recursive=False)),
+                                      list(nodeSelection.elements(recursive=True)))
         
     def dragEnterEvent(self,event):
         if event.mimeData().hasFormat(config.options.gui.mime) or event.mimeData().hasUrls():
@@ -114,16 +115,17 @@ mainwindow.addWidgetData(mainwindow.WidgetData(
     
 class TagEditorDialog(QtGui.QDialog):
     """The tageditor as dialog. It uses its own level and commits the level when the dialog is accepted."""
-    def __init__(self, level, elements, parent=None):
+    def __init__(self, includeContents=True, parent=None):
         QtGui.QDialog.__init__(self,parent)
         self.setWindowTitle(self.tr("Edit tags"))
         self.resize(600,450) #TODO: make this cleverer
         self.stack = application.stack.createSubstack(modalDialog=True)
-        self.level = levels.Level("TagEditor", level, elements=elements, stack=self.stack)
-        elements = self.level.elements.values() # copies of the former elements
+        self.level = None
         
         self.setLayout(QtGui.QVBoxLayout())
-        self.tagedit = TagEditorWidget(self.level,elements,stack=self.stack,flagEditorInTitleLine=False)
+        self.tagedit = TagEditorWidget(includeContents=includeContents,
+                                       stack=self.stack,
+                                       flagEditorInTitleLine=False)
         self.layout().addWidget(self.tagedit)
         
         style = QtGui.QApplication.style()
@@ -155,7 +157,27 @@ class TagEditorDialog(QtGui.QDialog):
         buttonLayout.addStretch()
         buttonLayout.addWidget(cancelButton)
         buttonLayout.addWidget(commitButton)
-    
+        
+    def setElements(self, level, elements, elementsWithContents=None):
+        """Set the elements in the tageditor. See TagEditorWidget.setElements."""
+        if elementsWithContents is not None and elementsWithContents != elements:
+            self.level = levels.Level("TagEditor", level, elements=elementsWithContents, stack=self.stack)
+            # Get the copies on the new level
+            elements = [self.level[element.id] for element in elements]
+            elementsWithContents = self.level.elements.values()
+        else:
+            self.level = levels.Level("TagEditor", level, elements=elements, stack=self.stack)
+            # Get the copies on the new level
+            elements = self.level.elements.values()
+            elementsWithContents = None
+        self.tagedit.setElements(self.level, elements, elementsWithContents)
+       
+    def useElementsFromSelection(self, nodeSelection):
+        """Use the elements in the given NodeSelection in the tageditor."""
+        self.setElements(nodeSelection.level,
+                         nodeSelection.elements(recursive=False),
+                         nodeSelection.elements(recursive=True))
+        
     def reject(self):
         self.stack.closeSubstack(self.stack)
         super().reject()
@@ -185,16 +207,26 @@ class TagEditorWidget(QtGui.QWidget):
     a flageditor. The TagEditorLayout displays pairs of a TagTypeBox and a SingleTagEditor - one for each
     tag present in the tageditor. The displays the tagtype while the SingleTagEditor shows all records for
     this tag.
+    
+    Arguments:
+    
+        - vertical: Whether the tageditor should at the beginning be in vertical mode.
+        - includeContents: Whether the "Include contents" button should be pressed down at the beginning.
+        - flagEditorInTitleLine: Whether the FlagEditor should be put in the title (button) line.
+        - stack: The stack that should be used. If None, the applications's stack is used.
+        
     """
     # This hack is necessary to ignore changes in the tagboxes while changing the tag programmatically
     # confer _handleTagChanged and _handleTagChangedByUser.
     _ignoreHandleTagChangedByUser = False
     
-    def __init__(self,level=None,elements=None,vertical=False,flagEditorInTitleLine=True,
-                 stack=None,dock=None):
+    def __init__(self, vertical=False, includeContents=True, 
+                 flagEditorInTitleLine=True, stack=None):
         QtGui.QWidget.__init__(self)
+        self.level = None
+        self.elements = None
+        self.elementsWithContents = None
         self.vertical = None # will be set in setVertical below
-        self.dock = dock
         self.flagEditorInTitleLine = flagEditorInTitleLine
         
         self.model = tageditormodel.TagEditorModel(stack=stack)
@@ -208,7 +240,7 @@ class TagEditorWidget(QtGui.QWidget):
         self.selectionManager = widgetlist.SelectionManager()
         # Do not allow the user to select ExpandLines
         self.selectionManager.isSelectable = \
-            lambda wList,widget: not isinstance(widget,singletageditor.ExpandLine)
+            lambda wList,widget: not isinstance(widget, singletageditor.ExpandLine)
         
         self.setLayout(QtGui.QVBoxLayout())
         self.layout().setSpacing(1)
@@ -217,8 +249,8 @@ class TagEditorWidget(QtGui.QWidget):
         # Spacings and margins are inherited. Reset the horizontal values for topLayout
         style = QtGui.QApplication.style()
         self.topLayout.setSpacing(style.pixelMetric(style.PM_LayoutHorizontalSpacing))
-        self.topLayout.setContentsMargins(style.pixelMetric(style.PM_LayoutLeftMargin),0,
-                                          style.pixelMetric(style.PM_LayoutRightMargin),0)
+        self.topLayout.setContentsMargins(style.pixelMetric(style.PM_LayoutLeftMargin), 0,
+                                          style.pixelMetric(style.PM_LayoutRightMargin), 0)
         self.layout().addLayout(self.topLayout)
 
         self.levelLabel = QtGui.QLabel()
@@ -229,19 +261,27 @@ class TagEditorWidget(QtGui.QWidget):
         self.addButton.tagChosen.connect(self._handleAddRecord)
         self.topLayout.addWidget(self.addButton)
         self.removeButton = QtGui.QPushButton()
-        self.removeButton.setIcon(utils.getIcon("remove.png"))
+        self.removeButton.setIcon(utils.getIcon('remove.png'))
         self.removeButton.clicked.connect(self._handleRemoveSelected)
         self.topLayout.addWidget(self.removeButton)
         
-        self.horizontalFlagEditor = flageditor.FlagEditor(self.flagModel,vertical=False)
-        self.topLayout.addWidget(self.horizontalFlagEditor,1)
+        self.includeContentsButton = QtGui.QPushButton()
+        self.includeContentsButton.setCheckable(True)
+        self.includeContentsButton.setChecked(includeContents)
+        self.includeContentsButton.setToolTip(self.tr("Include all contents"))
+        self.includeContentsButton.setIcon(utils.getIcon('recursive.png'))
+        self.includeContentsButton.toggled.connect(self._updateElements)
+        self.topLayout.addWidget(self.includeContentsButton)
+        
+        self.horizontalFlagEditor = flageditor.FlagEditor(self.flagModel, vertical=False)
+        self.topLayout.addWidget(self.horizontalFlagEditor, 1)
         # This stretch will be activated in vertical mode to fill the place of the horizontal flageditor
         self.topLayout.addStretch(0)
         
-        self.optionButton = QtGui.QPushButton()
-        self.optionButton.setIcon(utils.getIcon('options.png'))
-        self.optionButton.clicked.connect(self._handleOptionButton)
-        self.topLayout.addWidget(self.optionButton)
+        #self.optionButton = QtGui.QPushButton()
+        #self.optionButton.setIcon(utils.getIcon('options.png'))
+        #self.optionButton.clicked.connect(self._handleOptionButton)
+        #self.topLayout.addWidget(self.optionButton)
         
         scrollArea = QtGui.QScrollArea()
         scrollArea.setWidgetResizable(True)
@@ -257,17 +297,13 @@ class TagEditorWidget(QtGui.QWidget):
         self.layout().addWidget(self.flagWidget)
         
         # Vertical mode of the flageditor is not used
-        self.verticalFlagEditor = flageditor.FlagEditor(self.flagModel,vertical=False)   
+        self.verticalFlagEditor = flageditor.FlagEditor(self.flagModel, vertical=False)   
         self.layout().addWidget(self.verticalFlagEditor)
         
         self.singleTagEditors = {}
         self.tagBoxes = {}
         
         self.setVertical(vertical)
-        
-        if elements is None:
-            elements = []
-        self.setElements(level,elements)
     
     def setVertical(self,vertical):
         """Set whether this tageditor should be displayed in vertical model."""
@@ -290,13 +326,33 @@ class TagEditorWidget(QtGui.QWidget):
             
         self.vertical = vertical
         
-    def setElements(self,level,elements):
+    def setElements(self, level, elements, elementsWithContents=None):
         """Set the elements that are edited in the tageditor. *level* is the level that contains the
-        elements."""
+        elements. *elements* and *elementsWithContents* are the lists of elements that will be edited when
+        the "Include contents" button is not pressed / pressed, respectively.
+        """
         self.levelLabel.setPixmap(utils.getPixmap('real.png' if level == levels.real or level is None
                                                    else 'editor.png'))
-        self.model.setElements(level,elements)
-        self.flagModel.setElements(level,elements)
+        self.level = level
+        self.elements = elements
+        if elementsWithContents is not None and elementsWithContents != elements:
+            self.elementsWithContents = elementsWithContents
+        else: self.elementsWithContents = None
+        self.includeContentsButton.setEnabled(self.elementsWithContents is not None)
+        self._updateElements()
+        
+    def useElementsFromSelection(self, nodeSelection):
+        """Use the elements in the given NodeSelection in the tageditor."""
+        self.setElements(nodeSelection.level,
+                         nodeSelection.elements(recursive=False),
+                         nodeSelection.elements(recursive=True))
+        
+    def _updateElements(self):
+        """Update the element display."""
+        elements = self.elementsWithContents if self.includeContents else self.elements
+        if elements is not None:
+            self.model.setElements(self.level, elements)
+            self.flagModel.setElements(self.level, elements)
         
     def _insertSingleTagEditor(self,row,tag):
         """Insert a TagTypeBox and a SingleTagEditor for *tag* at the given row."""
@@ -570,6 +626,14 @@ class TagEditorWidget(QtGui.QWidget):
         dialog = OptionDialog(self.optionButton,self)
         dialog.show()
 
+    @property
+    def includeContents(self):
+        return self.elementsWithContents is not None and self.includeContentsButton.isChecked()
+    
+    @includeContents.setter
+    def includeContents(self, value):
+        self.includeContentsButton.setChecked(value)
+
 
 class RecordDialog(QtGui.QDialog):
     """Dialog to edit a single record. Parameters are:
@@ -668,7 +732,7 @@ class RecordDialog(QtGui.QDialog):
     def _handleTagChanged(self,tag):
         """Change the tag of the ValueEditor."""
         self.valueEditor.setTag(tag)
-
+        
 
 class SmallTagTypeBox(tagwidgets.TagTypeBox):
     """Special TagTypeBox for the tageditor. Contrary to regular StackedWidgets it will consume only the
@@ -691,25 +755,14 @@ class SmallTagTypeBox(tagwidgets.TagTypeBox):
         self.label.setIconOnly(iconOnly)
         
         
-class OptionDialog(dialogs.FancyPopup):
-    """Option dialog for a TagEditorWidget."""
-    def __init__(self,parent,tagEditor):
-        super().__init__(parent)
-        self.tagEditor = tagEditor
-        layout = QtGui.QVBoxLayout(self)
-        
-        # loadRecursively is an attribute of the tageditor's dock widget. Do not show the option if the
-        # tageditor is displayed as dialog (without dock)
-        if tagEditor.dock is not None:
-            loadRecursivelyBox = QtGui.QCheckBox(self.tr("Load elements recursively"))
-            loadRecursivelyBox.setChecked(tagEditor.dock.loadRecursively)
-            loadRecursivelyBox.stateChanged.connect(self._handleLoadRecursivelyBox)
-            layout.addWidget(loadRecursivelyBox)
-        
-        layout.addStretch(1)
-        
-    def _handleLoadRecursivelyBox(self,state):
-        self.tagEditor.dock.loadRecursively = state == Qt.Checked
+#class OptionDialog(dialogs.FancyPopup):
+#    """Option dialog for a TagEditorWidget."""
+#    def __init__(self,parent,tagEditor):
+#        super().__init__(parent)
+#        self.tagEditor = tagEditor
+#        layout = QtGui.QVBoxLayout(self)
+#
+#        layout.addStretch(1)
         
 
 class TagEditorLayout(QtGui.QLayout):
