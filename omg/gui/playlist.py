@@ -98,7 +98,7 @@ class PlaylistWidget(QtGui.QDockWidget):
         profileType = playlistdelegate.PlaylistDelegate.profileType
         if state is None:
             backend = None
-            delegateProfile = delegates.profiles.category.get("Playlist")
+            delegateProfile = profileType.default()
         else:
             backend = player.profileCategory.getFromStorage(state['backend'])
             delegateProfile = delegates.profiles.category.getFromStorage(state.get('delegate'),profileType)
