@@ -115,7 +115,14 @@ def run(cmdConfig=[],type='gui',exitPoint=None):
 
     from . import resources
     if type == "gui":
-        splash = QtGui.QSplashScreen(QtGui.QPixmap(":/omg/omg_splash.png"))
+        pixmap = QtGui.QPixmap(":/omg/omg_splash.png")
+        splash = QtGui.QSplashScreen(pixmap)
+    def updateSplash(msg):
+        if type == "gui":
+            splash.showMessage(msg, Qt.AlignCenter, Qt.red)
+            app.processEvents()
+    if type == "gui":
+        updateSplash("Loading OMG…")
         splash.show()
         app.processEvents()
     # Initialize config and logging
@@ -139,8 +146,8 @@ def run(cmdConfig=[],type='gui',exitPoint=None):
         logger.error("No collection directory defined.")
         runInstaller()
     
+    updateSplash("Loading translations…")
     loadTranslators(app,logger)
-
     # Initialize dispatcher
     global dispatcher
     dispatcher = ChangeEventDispatcher()
@@ -152,6 +159,7 @@ def run(cmdConfig=[],type='gui',exitPoint=None):
         config.options.database.sqlite_path = ':memory:'
     from . import database
     try:
+        updateSplash("Connecting to database…")
         database.connect()
     except database.sql.DBException as e:
         logger.error("I cannot connect to the database. Did you provide the correct information in the"
@@ -215,6 +223,8 @@ def run(cmdConfig=[],type='gui',exitPoint=None):
     if type == 'test' or exitPoint == 'noplugins':
         return app
     
+    updateSplash("loading plugins…")
+    
     # Load Plugins
     from . import plugins
     plugins.init()
@@ -226,11 +236,14 @@ def run(cmdConfig=[],type='gui',exitPoint=None):
     from . import filesystem
     filesystem.init()
 
+    updateSplash("loading GUI classes…")
     # Create GUI
     # First import all modules that want to add WidgetData
     from .gui import filesystembrowser, editor, browser, tageditor, mainwindow, playback, playlist
     
     global mainWindow
+    updateSplash("creating main window…")
+    app.processEvents()
     mainWindow = mainwindow.MainWindow()
     plugins.mainWindowInit()
     
