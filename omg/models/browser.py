@@ -171,13 +171,16 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
             tagSet = {tag for tag in tagSet if tag.type == tags.TYPE_VARCHAR}
         
         # Get all values and corresponding ids of the given tag appearing in at least one toplevel result.
+        if db.type == 'sqlite':
+            collate = 'COLLATE NOCASE'
+        else: collate = ''
         result = db.query("""
             SELECT DISTINCT t.tag_id,v.id,v.value,v.hide,v.sort_value
             FROM {1} AS res JOIN {0}tags AS t ON res.id = t.element_id
                      JOIN {0}values_varchar AS v ON t.tag_id = v.tag_id AND t.value_id = v.id
             WHERE res.toplevel = 1 AND t.tag_id IN ({2})
-            ORDER BY COALESCE(v.sort_value,v.value)
-        """.format(db.prefix,table,",".join(str(tag.id) for tag in tagSet)))
+            ORDER BY COALESCE(v.sort_value,v.value) {3}
+        """.format(db.prefix, table, ",".join(str(tag.id) for tag in tagSet), collate))
     
         valueNodes = []
         hiddenNodes = []
