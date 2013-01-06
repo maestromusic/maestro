@@ -675,7 +675,6 @@ class FileSystemSynchronizer(QtCore.QObject):
             else:
                 track.hash = None
             if track.id is None:
-                logger.debug("id is none")
                 db.query("UPDATE {}newfiles "
                          "  SET hash=?, verified=CURRENT_TIMESTAMP WHERE url=?".format(db.prefix),
                          track.hash, str(track.url))

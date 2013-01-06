@@ -252,6 +252,7 @@ class MergeDialog(QtGui.QDialog):
             containerFlags = list(set.intersection(*(set(el.flags) for el in self.elements)))
         else:
             containerTags = tags.Storage()
+            containerFlags = []
         mergeTag = self.tagChooser.getTag()
         containerTags[mergeTag] = [ self.valueEdit.text() ]
         contents = elements.ContentList.fromPairs(enumerate(self.elements, start=1))
