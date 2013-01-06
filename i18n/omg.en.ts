@@ -500,11 +500,6 @@ being loaded</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../omg/plugins/coverdialog/plugin.py" line="486"/>
-        <source>Image files (*.png *.jpg *.bmp);;All files (*)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <location filename="../omg/plugins/coverdialog/plugin.py" line="496"/>
         <source>Failed to open the file</source>
         <translation type="unfinished"></translation>
@@ -547,6 +542,11 @@ being loaded</source>
     <message>
         <location filename="../omg/plugins/coverdialog/plugin.py" line="538"/>
         <source>A network error appeared: {}</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/coverdialog/plugin.py" line="486"/>
+        <source>Image files (*.png *.jpg *.jpeg *.bmp);;All files (*)</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -3889,8 +3889,5 @@ guessing. This is useful in most cases, unless you have albums that are split ac
         <source>Type for dates</source>
         <translation type="unfinished"></translation>
     </message>
-</context>
-<context>
-    <name>tvp</name>
 </context>
 </TS>

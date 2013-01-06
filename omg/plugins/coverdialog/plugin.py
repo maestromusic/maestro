@@ -484,10 +484,10 @@ class CoverDialog(QtGui.QDialog):
     def _handleOpenFromFile(self):
         """Handle the "Open from File..." button."""
         fileName = QtGui.QFileDialog.getOpenFileName(
-                                                self,
-                                                self.tr("Open cover file"),
-                                                os.path.expanduser("~"),
-                                                self.tr("Image files (*.png *.jpg *.bmp);;All files (*)"))
+                                self,
+                                self.tr("Open cover file"),
+                                os.path.expanduser("~"),
+                                self.tr("Image files (*.png *.jpg *.jpeg *.bmp);;All files (*)"))
         if fileName == "": # user canceled the dialog
             return
         
