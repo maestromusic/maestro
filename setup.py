@@ -115,7 +115,7 @@ if exists(join(dirname(__file__), '.git')):
 
 setup(name='omg',
       version='0.3',
-      description='OMG music GUI',
+      description='OMG music manager and player',
       author='Martin Altmayer, Michael Helmling',
       author_email='{altmayer,helmling}@mathematik.uni-kl.de',
       url='http://omg.mathematik.uni-kl.de',
