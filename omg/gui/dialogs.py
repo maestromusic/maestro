@@ -249,7 +249,7 @@ class MergeDialog(QtGui.QDialog):
             db.transaction()
         if self.commonTagsBox.isChecked():
             containerTags = tags.findCommonTags(self.elements)
-            containerFlags = set.intersection(*(set(el.flags) for el in self.elements))
+            containerFlags = list(set.intersection(*(set(el.flags) for el in self.elements)))
         else:
             containerTags = tags.Storage()
         mergeTag = self.tagChooser.getTag()
