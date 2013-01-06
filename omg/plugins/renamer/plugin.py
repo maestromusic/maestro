@@ -191,7 +191,7 @@ class GrammarRenamer(profiles.Profile):
             self.result[element] = self.computeNewPath()
         else:
             for pos, childId in element.contents.items():
-                self.traverse(self.level.get(childId), (pos, element), *parents)
+                self.traverse(self.level.collect(childId), (pos, element), *parents)
         
     def renameContainer(self, level, element):
         self.result = dict()

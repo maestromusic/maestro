@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2009-2012 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2013 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -88,7 +88,7 @@ defaults = OrderedDict((
     }
 }),
 ("filesystem", {
-    "scan_interval": (int,120,"Interval (in seconds) in which the filesystem will be rescanned for changes"),
+    "scan_interval": (int,1800,"Interval (in seconds) in which the filesystem will be rescanned for changes"),
     "dump_method": (str,"ffmpeg", "Method used to dump raw audio data from files for hashing"),
     "force_check": (str, None, "force re-hashing of files under given folder"),
     "disable":(bool,False,"completely disable filesystem synchronization"),
