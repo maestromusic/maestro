@@ -441,12 +441,8 @@ class FileSystemSynchronizer(QtCore.QObject):
         modified = mTimeStamp(track.url)
         check = False
         if modified > track.verified:
-            logger.debug('found modified track {}: {}>{}'.format(os.path.basename(track.url.path),
+            logger.debug('checking track {}: {}>{}'.format(os.path.basename(track.url.path),
                                                                  modified, track.verified))
-            check = True
-        elif config.options.filesystem.force_check and \
-                track.directory.path.startswith(config.options.filesystem.force_check):
-            logger.debug('check of "{}" forced'.format(track.url))
             check = True
         if check:
             if track.id is None:
@@ -728,3 +724,9 @@ class FileSystemSynchronizer(QtCore.QObject):
                                                             self.folderStateChanged)
         self.updateDirectories(modifiedDirs)
         self.storeNewTracks(newTracks)
+    
+    @QtCore.pyqtSlot()    
+    def recheckAll(self):
+        for track in self.tracks.values():
+            track.verified = datetime.datetime(datetime.MINYEAR, 1, 1, tzinfo=datetime.timezone.utc)
+        self.scanFilesystem()
