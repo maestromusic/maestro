@@ -10,11 +10,11 @@ INSTALLATION
 ==============
 Download the latest release from the homepage. Be sure to have all the dependencies, then run
 
-# easy_install3 omg-0.2.tar.gz
+# easy_install3 omg-0.3.tar.gz
 
 If you want to install OMG as normal user inside your home directory, run
 
-$ easy_install3 --user omg-0.2.tar.gz
+$ easy_install3 --user omg-0.3.tar.gz
 
 DEVELOPMENT
 =============
