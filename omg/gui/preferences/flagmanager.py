@@ -16,12 +16,12 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import functools, os
+import functools
 
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from ... import application, constants, database as db, utils
+from ... import application, database as db, utils
 from ...core import flags
 from .. import misc
 from ..misc import iconbuttonbar
@@ -31,7 +31,7 @@ translate = QtCore.QCoreApplication.translate
 
 class FlagManager(QtGui.QWidget):
     """The FlagManager allows to add, edit and delete flagtypes."""
-    def __init__(self,dialog,parent=None):
+    def __init__(self, dialog, parent=None):
         super().__init__(parent)
         self.setLayout(QtGui.QVBoxLayout())
         
@@ -255,7 +255,7 @@ class FlagManager(QtGui.QWidget):
         else:
             from ...core import levels
             for elem in levels.editor.elements:
-                if flag in node.element.flags:
+                if flagType in elem.flags:
                     return 0, False
             return 0, True
         

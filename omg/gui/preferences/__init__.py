@@ -258,5 +258,7 @@ addPanel("main/flagmanager",translate("PreferencesPanel","Flag Manager"),
             ('gui.preferences.flagmanager','FlagManager'))
 addPanel("main/delegates",translate("PreferencesPanel","Element display"),
             ('gui.preferences.delegates','DelegatesPanel'))
+addPanel("main/filesystem",translate("PreferencesPanel","File system"),
+            ('filesystem.preferences', 'FilesystemSettings'))
                    
 addPanel("plugins",translate("PreferencesPanel","Plugins"),('plugins.dialog','PluginDialog'))
