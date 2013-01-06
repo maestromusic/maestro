@@ -28,7 +28,7 @@ class FilesystemSettings(QtGui.QWidget):
         
         layout = QtGui.QVBoxLayout()
         self.recheckButton = QtGui.QPushButton(self.tr("Force recheck of all files"))
-        self.recheckButton.clicked.connect(filesystem.synchronizer.recheckAll, Qt.QueuedConnection)
+        self.recheckButton.clicked.connect(self._handleRecheckButton)
         self.enableBox = QtGui.QCheckBox(self.tr("Enable file system monitoring"))
         self.enableBox.toggled.connect(self.recheckButton.setEnabled)
         self.enableBox.toggled.connect(self._handleEnableBox)
@@ -53,6 +53,10 @@ class FilesystemSettings(QtGui.QWidget):
     
     def _handleEnableBox(self, state):
         config.options.filesystem.disable = not state
+        
+    def _handleRecheckButton(self):
+        if filesystem.enabled:
+            filesystem.synchronizer.recheckAll, Qt.QueuedConnection
     
     def _handleIntervalChanged(self, val):
         if val == 0:
