@@ -19,9 +19,9 @@
 import contextlib
 import socket, threading, time
 try:
-	import mpd
+    import mpd
 except ImportError:
-	raise ImportError("python-mpd2 not installed.")
+    raise ImportError("python-mpd2 not installed.")
 
 import pkg_resources
 mpd_version = [ int(x) for x in pkg_resources.get_distribution("python-mpd2").version.split(".")]
@@ -284,7 +284,7 @@ class MPDPlayerBackend(player.PlayerBackend):
                 self.mpdthread.playlistVersion += 1
                 self.mpdthread.mpd_playlist = []
         self.insertIntoPlaylist(0, urls)
-	
+    
     def insertIntoPlaylist(self, pos, urls):
         """Insert *urls* into the MPD playlist at position *pos*.
         
@@ -296,9 +296,14 @@ class MPDPlayerBackend(player.PlayerBackend):
             inserted = []
             try:
                 with self.atomicOp:
+                    isEnd = (pos == len(self.mpdthread.mpd_playlist))
                     for position, url in enumerate(urls, start=pos):
-                        self.commander.addid(url.path, position)
-                        self.mpdthread.playlistVersion += 1 if position == len(self.mpdthread.mpd_playlist) else 2
+                        if isEnd:
+                            self.commander.add(url.path)
+                            self.mpdthread.playlistVersion += 1
+                        else:
+                            self.commander.addid(url.path, position)
+                            self.mpdthread.playlistVersion += 2
                         self.mpdthread.mpd_playlist[position:position] = [url.path]
                         inserted.append(url)
             except mpd.CommandError:
