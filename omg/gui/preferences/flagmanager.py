@@ -272,7 +272,7 @@ def createNewFlagType(parent = None):
     """Ask the user to supply a name and then create a new flag with this name. Return the new flag or None
     if no flag is created (e.g. if the user aborted the dialog or the supplied name was invalid)."""
     name,ok = QtGui.QInputDialog.getText(parent,translate("FlagManager","New Flag"),
-                                         translate("FlagManager","Please enter the name of the new flag"))
+                                         translate("FlagManager","Please enter the name of the new flag:"))
     if not ok:
         return None
     

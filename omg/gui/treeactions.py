@@ -59,8 +59,8 @@ class EditTagsAction(TreeAction):
     
     def __init__(self, parent, recursive):
         super().__init__(parent)
-        self.setText(self.tr('edit tags (recursively)') if recursive
-                         else self.tr('edit tags'))
+        self.setText(self.tr('Edit tags (recursively)') if recursive
+                         else self.tr('Edit tags'))
         self.recursive = recursive
     
     def initialize(self, selection):
@@ -78,11 +78,10 @@ class EditTagsAction(TreeAction):
 
 class RenameAction(TreeAction):
     """Action to rename (or move) a file."""
-    
     def __init__(self, parent, text=None, shortcut=None):
         super().__init__(parent, shortcut)
         if text is None:
-            self.setText(self.tr('rename'))
+            self.setText(self.tr('Rename'))
         else:
             self.setText(text)
     
@@ -102,14 +101,14 @@ class RenameAction(TreeAction):
             newUrl = FileURL(path)
             self.level().renameFiles( {elem: (elem.url, newUrl) })
    
+   
 class RemoveFromParentAction(TreeAction):
     """Action to remove selected elements from the parent container or rootnode.
     """
-    
     def __init__(self, parent):
         """Initialize action."""
         super().__init__(parent, shortcut="Del")
-        self.setText(self.tr("remove"))
+        self.setText(self.tr("Remove"))
     
     def initialize(self, selection):
         self.setEnabled(not selection.empty() \
@@ -195,7 +194,7 @@ class MergeAction(TreeAction):
     
     def __init__(self, parent):
         super().__init__(parent)
-        self.setText(self.tr("merge..."))
+        self.setText(self.tr("Merge..."))
     
     def initialize(self, selection):
         self.setEnabled(selection.singleParent())
@@ -214,7 +213,7 @@ class ClearTreeAction(TreeAction):
     def __init__(self, parent):
         super().__init__(parent, shortcut = "Shift+Del")
         self.setIcon(utils.getIcon("clear_playlist.png"))
-        self.setText(self.tr('clear'))
+        self.setText(self.tr('Clear'))
     
     def initialize(self, selection):
         self.setEnabled(self.parent().model().root.getContentsCount() > 0)
@@ -229,7 +228,7 @@ class CommitTreeAction(TreeAction):
     def __init__(self, parent):
         super().__init__(parent, shortcut="Shift+Enter")
         self.setIcon(QtGui.qApp.style().standardIcon(QtGui.QStyle.SP_DialogSaveButton))
-        self.setText(self.tr('commit this tree'))
+        self.setText(self.tr('Commit'))
         
     def initialize(self, selection):
         self.setEnabled(len(self.parent().model().root.contents) > 0)
@@ -252,7 +251,7 @@ class FlattenAction(TreeAction):
     children."""
     def __init__(self, parent):
         super().__init__(parent)
-        self.setText(self.tr("flatten..."))
+        self.setText(self.tr("Flatten..."))
         
     def initialize(self, selection):
         self.setEnabled(selection.hasContainers())
@@ -270,11 +269,11 @@ class ChangePositionAction(TreeAction):
         super().__init__(parent, *args, **kwargs)
         self.mode = mode
         if mode == "free":
-            self.setText(self.tr("choose position..."))
+            self.setText(self.tr("Choose position..."))
         elif mode == "+1":
-            self.setText(self.tr("increase position"))
+            self.setText(self.tr("Increase position"))
         elif mode == "-1":
-            self.setText(self.tr("decrease position"))
+            self.setText(self.tr("Decrease position"))
         else:
             raise ValueError("{0} is not a valid ChangePositionAction mode".format(mode))
     
@@ -319,7 +318,7 @@ class ToggleMajorAction(TreeAction):
     
     def __init__(self, parent):
         super().__init__(parent, shortcut = "Ctrl+M")
-        self.setText(self.tr('major?'))
+        self.setText(self.tr('Major?'))
         self.setCheckable(True)
         
     def initialize(self, selection):
@@ -340,7 +339,7 @@ class RemoveFromPlaylistAction(TreeAction):
     
     def __init__(self, parent):
         super().__init__(parent, shortcut = "Del")
-        self.setText(self.tr('remove from playlist'))
+        self.setText(self.tr('Remove from playlist'))
     
     def initialize(self, selection):
         self.setDisabled(selection.empty())
@@ -354,7 +353,7 @@ class ClearPlaylistAction(TreeAction):
     
     def __init__(self, parent):
         super().__init__(parent, shortcut="Shift+Del")
-        self.setText(self.tr('clear playlist'))
+        self.setText(self.tr('Clear playlist'))
         
     def initialize(self, selection):
         self.setEnabled(self.parent().model().root.hasContents() > 0)
@@ -371,20 +370,20 @@ class TagValueAction(TreeAction):
         node = self.parent().currentNode()
         from ..models.browser import ValueNode
         if not isinstance(node, ValueNode):
-            self.setText(self.tr('edit tagvalue'))
+            self.setText(self.tr('Edit tagvalue'))
             self.setEnabled(False)
             return
         self.setEnabled(True)
         self.value = node.values[0]
         self.tagValueSpec = { tags.get(tagId): valueId for tagId, valueId in node.valueIds.items() }
-        self.setText(self.tr('edit tagvalue "{}"').format(self.value))
+        self.setText(self.tr('Edit tagvalue "{}"').format(self.value))
     
     def doAction(self):
         from ..gui.tagwidgets import TagValuePropertiesWidget
         if len(self.tagValueSpec) > 1:
             items = list(map(str, self.tagValueSpec.keys()))
-            ans, ok = QtGui.QInputDialog.getItem(self.parent(), self.tr("choose tag mode"),
-                                       self.tr('tag:'), items)
+            ans, ok = QtGui.QInputDialog.getItem(self.parent(), self.tr("Choose tag mode"),
+                                       self.tr('Tag:'), items)
             if not ok:
                 return
             else:
