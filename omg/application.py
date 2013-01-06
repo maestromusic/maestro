@@ -377,7 +377,7 @@ def executeEntryPoint(name, category='gui_scripts'):
     the entrypoint, see setup.py."""
     os.execl(sys.executable, os.path.basename(sys.executable), "-c",
         "import sys, pkg_resources;"
-        "sys.exit(pkg_resources.load_entry_point('omg==0.3-currentgit', '{}', '{}')())"
+        "sys.exit(pkg_resources.load_entry_point('omg==0.3', '{}', '{}')())"
             .format(category, name)
         )
 
