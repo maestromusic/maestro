@@ -34,6 +34,18 @@ from os.path import dirname, exists, join, getmtime
 from setuptools import setup, find_packages
 from setuptools.command import sdist, install, develop, test
 
+CLASSIFIERS = [
+    'Development Status :: 4 - Beta',
+    'Intended Audience :: End Users/Desktop',
+    'License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)',
+    'Natural Language :: English',
+    'Natural Language :: German',
+    'Operating System :: POSIX :: Linux',
+    'Environment :: X11 Applications :: Qt',
+    'Programming Language :: Python :: 3',
+    'Topic :: Multimedia :: Sound/Audio :: Players'
+]
+
 if exists(join(dirname(__file__), '.git')):
     def updateTranslations():
         """Create *.qm files from *.ts in i18n folder if necessary."""
@@ -110,13 +122,14 @@ setup(name='omg',
       license='GPL3',
       packages=find_packages(),
       include_package_data=True,
-      #py_modules=['distribute_setup'],
-      entry_points = {
-          'gui_scripts' : ['omg = omg.application:run',
+      install_requires=["pytaglib>=0.3.0"],
+      extras_require={ 'mpd': ["python-mpd2>=0.4.6"] },
+      entry_points={
+          'gui_scripts': ['omg = omg.application:run',
                            'omgsetup = omg.install:run',
                            'omgdbanalyzer = omg.plugins.dbanalyzer.plugin:run'], 
           },
-      test_loader = "test.testloader:TestLoader",
-      test_suite = "test.all"
+      test_loader="test.testloader:TestLoader",
+      test_suite="test.all"
     )
 
