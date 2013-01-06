@@ -206,7 +206,7 @@ class MergeDialog(QtGui.QDialog):
         self.removeEdit = QtGui.QLineEdit()
         layout.addWidget(self.removeEdit, 1, 2)
         self.removePrefixBox.toggled.connect(self.removeEdit.setEnabled)
-        self.commonTagsBox = QtGui.QCheckBox(self.tr("Assign common tags"))
+        self.commonTagsBox = QtGui.QCheckBox(self.tr("Assign common tags and flags"))
         self.commonTagsBox.setChecked(True)
         layout.addWidget(self.commonTagsBox, 2, 0, 1, 3)
         if isinstance(self.parentNode, nodes.Wrapper):
@@ -249,12 +249,15 @@ class MergeDialog(QtGui.QDialog):
             db.transaction()
         if self.commonTagsBox.isChecked():
             containerTags = tags.findCommonTags(self.elements)
+            containerFlags = list(set.intersection(*(set(el.flags) for el in self.elements)))
         else:
             containerTags = tags.Storage()
+            containerFlags = []
         mergeTag = self.tagChooser.getTag()
         containerTags[mergeTag] = [ self.valueEdit.text() ]
         contents = elements.ContentList.fromPairs(enumerate(self.elements, start=1))
-        container = self.level.createContainer(tags=containerTags, major=False, contents=contents)
+        container = self.level.createContainer(tags=containerTags, flags=containerFlags,
+                                               major=False, contents=contents)
         if self.removePrefixBox.isChecked():
             childChanges = {}
             prefix = self.removeEdit.text()
@@ -262,9 +265,12 @@ class MergeDialog(QtGui.QDialog):
                 if mergeTag not in elem.tags:
                     continue
                 replacements = [(val, val[len(prefix):]) for val in elem.tags[mergeTag]
-                                                         if val.startswith(prefix)]
-                if len(replacements) > 0:
+                                                         if val.startswith(prefix)
+                                                         and val != prefix]
+                removals = [val for val in elem.tags[mergeTag] if val == prefix]
+                if len(replacements) > 0 or len(removals) > 0:
                     childChanges[elem] = tags.SingleTagDifference(mergeTag,
+                                                                  removals=removals,
                                                                   replacements=replacements)
             if len(childChanges) > 0:
                 from ..filebackends import TagWriteError
