@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2009-2012 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2013 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -30,7 +30,7 @@ from .. import logging, utils
 from ..core import tags, levels
 
 logger = logging.getLogger(__name__)
-
+translate = QtCore.QCoreApplication.translate
 
 class RealFile(BackendFile):
     """A normal file that is accessed directly on the filesystem."""
@@ -103,6 +103,8 @@ class RealFile(BackendFile):
     
     def rename(self, newUrl):
         # TODO: handle open taglib file references
+        if os.path.exists(newUrl.absPath):
+            raise OSError("Target exists.")
         os.renames(self.url.absPath, newUrl.absPath)
         self.url = newUrl
     

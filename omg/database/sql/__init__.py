@@ -53,7 +53,6 @@ import datetime
 
 from ... import logging
 from PyQt4.QtCore import QThread
-transactionLogger = logging.getLogger("transaction")
 logger = logging.getLogger(__name__)
 
 
@@ -168,23 +167,18 @@ class AbstractSql:
         been started.
         """
         self._transactionDepth += 1
-        if self._transactionDepth == 1:
-            transactionLogger.debug("OPEN {}".format(QThread.currentThread()))
         return self._transactionDepth == 1
         
     def commit(self):
         """Commit a transaction. Return True if changes have really been written to the database (and False
         if just a nested transaction was closed)."""
         self._transactionDepth -= 1
-        if self._transactionDepth == 0:
-            transactionLogger.debug("CLOSE {}".format(QThread.currentThread()))
         return self._transactionDepth == 0
         
     def rollback(self):
         """Rollback a transaction. Nested transactions cannot be rolled back."""
         if self._transactionDepth > 1:
             raise RuntimeError("Cannot rollback nested transactions")
-        transactionLogger.debug("ROLLBACK")
         self._transactionDepth = 0
 
     def isNull(self,value):

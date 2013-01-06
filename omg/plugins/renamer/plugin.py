@@ -126,7 +126,7 @@ class GrammarRenamer(profiles.Profile):
             state = {}
         if 'formatString' in state:
             self.formatString = state['formatString']
-        else: self.formatString = "<artist>/I AM A DEFAULT FORMAT STRING/<1.title>/<#> - <title>"
+        else: self.formatString = "<1.artist>/<1.title>/<#> - <title>"
         if 'replaceChars' in state:
             self.replaceChars = state['replaceChars']
         else: self.replaceChars = '\\:/'
@@ -191,7 +191,7 @@ class GrammarRenamer(profiles.Profile):
             self.result[element] = self.computeNewPath()
         else:
             for pos, childId in element.contents.items():
-                self.traverse(self.level.get(childId), (pos, element), *parents)
+                self.traverse(self.level.collect(childId), (pos, element), *parents)
         
     def renameContainer(self, level, element):
         self.result = dict()
@@ -202,3 +202,14 @@ class GrammarRenamer(profiles.Profile):
     def configurationWidget(self):
         from . import gui
         return gui.GrammarConfigurationWidget(temporary=False, profile=self)
+    
+    def __neq__(self, other):
+        if not isinstance(other, GrammarRenamer):
+            return True
+        return self.formatString != other.formatString or \
+               self.replaceChars != other.replaceChars or \
+               self.replaceBy != other.replaceBy or \
+               self.removeChars != other.removeChars
+
+    def __eq__(self, other):
+        return not self.__neq__(other)
