@@ -333,7 +333,7 @@ class TagManagerTableWidget(QtGui.QTableWidget):
         is in the given *row* (depends on current sorting)."""
         # Choose a sensible directory as starting point
         from ..misc import iconchooser
-        result = iconchooser.IconChooser.getIcon([':omg/tags'],tag.iconPath,self)
+        result = iconchooser.IconChooser.getIcon([':omg/tags',':omg/flags'],tag.iconPath,self)
         
         if result and result[1] != tag.iconPath:
             self._setIcon(row,tag,result[1])
