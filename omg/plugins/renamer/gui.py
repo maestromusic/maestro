@@ -28,6 +28,7 @@ from . import plugin
 translate = QtCore.QCoreApplication.translate
 logger = logging.getLogger(__name__)
 
+
 class RenameFilesAction(treeactions.TreeAction):
     """Action to rename files in a container according to the tags and the container structure."""
     
@@ -170,12 +171,14 @@ class RenameDialog(QtGui.QDialog):
         self.tree.expandAll()
     
     def checkAccept(self):
-        if self.configDisplay.tempProfile != self.configDisplay.profile:
+        if self.configDisplay.tempProfile != self.configDisplay.profile \
+                    and self.configDisplay.profile is not None:
             from ...gui.dialogs import question
             if question(self.tr("Profile Changed"),
                         self.tr("Save modified profile {}?").format(self.configDisplay.profile.name)):
                 self.configDisplay._handleSave()
         self.accept()
+    
     
 class GrammarConfigurationWidget(QtGui.QWidget):
     """This widget is used in two places to configure grammar profiles:
@@ -331,5 +334,4 @@ class GrammarConfigurationWidget(QtGui.QWidget):
     
     def _handleReset(self):
         """Reset the text fields to the chosen stored profile."""
-        self._setProfile(self.profile)
-        
+        self._setProfile(self.profile)   

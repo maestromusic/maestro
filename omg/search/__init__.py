@@ -106,7 +106,7 @@ class SearchRequest:
         """Stop this request."""
         with self.engine._thread.lock:
             if not self._stopped:
-                #print("Search: Stopping request {}".format(self))
+                #logger.debug("Search: Stopping request {}".format(self))
                 self._stopped = True
                 self.engine._thread.searchEvent.set()
 
@@ -115,7 +115,7 @@ class SearchRequest:
         with self.engine._thread.lock:
             if self.resultTable in self.engine._thread.lockedTables \
                     and self.engine._thread.lockedTables[self.resultTable] is self:
-                #print("Releasing table {}".format(self.resultTable))
+                #logger.debug("Releasing table {}".format(self.resultTable))
                 del self.engine._thread.lockedTables[self.resultTable]
                 self.engine._thread.searchEvent.set()
             
@@ -219,7 +219,7 @@ class SearchEngine(QtCore.QObject):
         with self._thread.lock:
             if request in self._thread.requests or request.isStopped():
                 return
-            #print("Search: Got new request {}".format(request))
+            #logger.debug("Search: Got new request {}".format(request))
             self._thread.requests.append(request)
         self._thread.searchEvent.set()
 
@@ -342,12 +342,12 @@ class SearchThread(threading.Thread):
                     self.requests.pop(0)
                 releaseTables = [table for table,request in self.lockedTables.items() if request.isStopped()]
                 for table in releaseTables:
-                    #print("Search: Releasing table {}".format(table))
+                    #logger.debug("Releasing table {}".format(table))
                     del self.lockedTables[table]
                     
                 if len(self.requests) == 0 or self.requests[0].resultTable in self.lockedTables:
                     # Wait for something to do or until the result table is not locked anymore
-                    #print("Search: Waiting{}".format(" (no requests)" if len(self.requests) == 0 
+                    #logger.debug("Waiting{}".format(" (no requests)" if len(self.requests) == 0 
                     #                                                  else " (table locked)"))
                     self.lock.release()
                     self.searchEvent.wait()
@@ -382,7 +382,7 @@ class SearchThread(threading.Thread):
                 
                 # Invalid criteria like 'date:foo' do not have results. Calling criterion.getQuery will fail.
                 if any(c.isInvalid() for c in criteria):
-                    #print("Search: Invalid criterion")
+                    #logger.debug("Invalid criterion")
                     truncate(resultTable)                                                                    
                     self.tables[resultTable][1] = []  
                     self.finishRequest(currentRequest)
@@ -394,7 +394,7 @@ class SearchThread(threading.Thread):
                 if criterion is None:
                     # This happens if we finished the search in the last loop or if reduce finds that
                     # all remaining criteria are redundant.
-                    #print("Search: Starting post-processing...")
+                    #logger.debug("Starting post-processing...")
                     self.postProcessing(resultTable)
                     # After post processing forget the data we collected about this table.
                     # Any other search going to this table must first truncate it.
@@ -415,20 +415,20 @@ class SearchThread(threading.Thread):
         with self.lock:
             if not request.isStopped():
                 if request.lockTable:
-                    #print("Search: Add to locked tables: {}".format(request.resultTable))
+                    #logger.debug("Add to locked tables: {}".format(request.resultTable))
                     self.lockedTables[request.resultTable] = request
                 self.requests.remove(request)
-                #print("Search: Finished request {}".format(request))
+                #logger.debug("Finished request {}".format(request))
                 if request._fireEvent:
                     self.engine._finishedEvent.set()
                 else: self.engine.searchFinished.emit(request)
             
     def processCriterion(self,fromTable,resultTable,criterion):
         """Process a criterion. This is where the actual search happens."""
-        #print("Search: processing criterion {}".format(criterion))
+        #logger.debug("processing criterion {}".format(criterion))
         if len(self.tables[resultTable][1]) == 0:
             # We firstly search for the direct results of the first query... 
-            #print("Starting search...")
+            #logger.debug("Starting search...")
             truncate(resultTable)
             queryData = criterion.getQuery(fromTable,columns=('id','file','major'))
             # Prepend the returned query with INSERT INTO...

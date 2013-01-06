@@ -636,7 +636,11 @@ class Level(application.ChangeEventDispatcher):
         self.parent.changeFlags(flagChanges)
         self.parent.changeData(dataChanges)
         self.parent.setMajorFlags(majorChanges)
-        self.parent.renameFiles(urlChanges)
+        try:
+            self.parent.renameFiles(urlChanges)
+        except RenameFilesError as e:
+            self.stack.abortMacro()
+            raise e
         
         self.stack.endMacro()
     
