@@ -27,6 +27,7 @@ SOURCES = \
     ../omg/filebackends/__init__.py \
     ../omg/filesystem/dialogs.py \
     ../omg/filesystem/__init__.py \
+    ../omg/filesystem/preferences.py \
     ../omg/gui/browserdialog.py \
     ../omg/gui/browser.py \
     ../omg/gui/coverbrowser.py \
@@ -95,6 +96,8 @@ SOURCES = \
     ../omg/plugins/__init__.py \
     ../omg/plugins/lastfmcovers/__init__.py \
     ../omg/plugins/lastfmcovers/plugin.py \
+    ../omg/plugins/loggerdock/__init__.py \
+    ../omg/plugins/loggerdock/plugin.py \
     ../omg/plugins/logodock/__init__.py \
     ../omg/plugins/logodock/plugin.py \
     ../omg/plugins/mpd/filebackend.py \

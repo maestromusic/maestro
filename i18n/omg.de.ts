@@ -106,12 +106,12 @@
 <context>
     <name>Albumguesser</name>
     <message>
-        <location filename="../omg/models/albumguesser.py" line="176"/>
+        <location filename="../omg/models/albumguesser.py" line="195"/>
         <source>Default</source>
         <translation>Standard</translation>
     </message>
     <message>
-        <location filename="../omg/models/albumguesser.py" line="179"/>
+        <location filename="../omg/models/albumguesser.py" line="198"/>
         <source>Album guesser</source>
         <translation>Gruppierer</translation>
     </message>
@@ -152,7 +152,7 @@
 <context>
     <name>Browser</name>
     <message>
-        <location filename="../omg/gui/browser.py" line="50"/>
+        <location filename="../omg/gui/browser.py" line="49"/>
         <source>Browser</source>
         <translation>Browser</translation>
     </message>
@@ -211,7 +211,7 @@
 <context>
     <name>BrowserDock</name>
     <message>
-        <location filename="../omg/gui/browser.py" line="42"/>
+        <location filename="../omg/gui/browser.py" line="41"/>
         <source>Browser</source>
         <translation>Browser</translation>
     </message>
@@ -229,7 +229,7 @@
         <translation>Keine Elemente gefunden.</translation>
     </message>
     <message>
-        <location filename="../omg/models/browser.py" line="452"/>
+        <location filename="../omg/models/browser.py" line="455"/>
         <source>Loading...</source>
         <translation>Lädt…</translation>
     </message>
@@ -237,19 +237,24 @@
 <context>
     <name>BrowserTreeView</name>
     <message>
-        <location filename="../omg/gui/browser.py" line="315"/>
+        <location filename="../omg/gui/browser.py" line="314"/>
         <source>browser</source>
         <translation>Browser</translation>
     </message>
     <message>
-        <location filename="../omg/gui/browser.py" line="317"/>
+        <location filename="../omg/gui/browser.py" line="316"/>
         <source>elements</source>
         <translation>Elemente</translation>
     </message>
     <message>
-        <location filename="../omg/gui/browser.py" line="322"/>
+        <location filename="../omg/gui/browser.py" line="321"/>
         <source>delete from OMG</source>
         <translation>Aus OMG entfernen</translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/browser.py" line="390"/>
+        <source>Replace Playlist</source>
+        <translation>Ersetze Playlist</translation>
     </message>
 </context>
 <context>
@@ -257,28 +262,43 @@
     <message>
         <location filename="../omg/gui/treeactions.py" line="270"/>
         <source>choose position...</source>
-        <translation>Position wählen…</translation>
+        <translation type="obsolete">Position wählen…</translation>
     </message>
     <message>
         <location filename="../omg/gui/treeactions.py" line="272"/>
         <source>increase position</source>
-        <translation>Position erhöhen</translation>
+        <translation type="obsolete">Position erhöhen</translation>
     </message>
     <message>
         <location filename="../omg/gui/treeactions.py" line="274"/>
         <source>decrease position</source>
-        <translation>Position verringern</translation>
+        <translation type="obsolete">Position verringern</translation>
     </message>
     <message>
-        <location filename="../omg/gui/treeactions.py" line="292"/>
+        <location filename="../omg/gui/treeactions.py" line="294"/>
         <source>error</source>
         <translation>Fehler</translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/treeactions.py" line="272"/>
+        <source>Choose position...</source>
+        <translation>Wähle Position...</translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/treeactions.py" line="274"/>
+        <source>Increase position</source>
+        <translation>Erhöhe Position</translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/treeactions.py" line="276"/>
+        <source>Decrease position</source>
+        <translation>Verringere Position</translation>
     </message>
 </context>
 <context>
     <name>ChangeSortValueCommand</name>
     <message>
-        <location filename="../omg/core/tagcommands.py" line="35"/>
+        <location filename="../omg/core/tagcommands.py" line="38"/>
         <source>change sort value</source>
         <translation>Sortierwert ändern</translation>
     </message>
@@ -371,7 +391,12 @@
     <message>
         <location filename="../omg/gui/treeactions.py" line="354"/>
         <source>clear playlist</source>
-        <translation>leeren</translation>
+        <translation type="obsolete">leeren</translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/treeactions.py" line="356"/>
+        <source>Clear playlist</source>
+        <translation>Playlist leeren</translation>
     </message>
 </context>
 <context>
@@ -379,6 +404,11 @@
     <message>
         <location filename="../omg/gui/treeactions.py" line="214"/>
         <source>clear</source>
+        <translation type="obsolete">Leeren</translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/treeactions.py" line="216"/>
+        <source>Clear</source>
         <translation>Leeren</translation>
     </message>
 </context>
@@ -387,17 +417,22 @@
     <message>
         <location filename="../omg/gui/treeactions.py" line="229"/>
         <source>commit this tree</source>
-        <translation>Sichtbare Elemente speichern</translation>
+        <translation type="obsolete">Sichtbare Elemente speichern</translation>
     </message>
     <message>
-        <location filename="../omg/gui/treeactions.py" line="242"/>
+        <location filename="../omg/gui/treeactions.py" line="244"/>
         <source>No commit possible</source>
         <translation>Speichern nicht möglich</translation>
     </message>
     <message>
-        <location filename="../omg/gui/treeactions.py" line="242"/>
+        <location filename="../omg/gui/treeactions.py" line="244"/>
         <source>While the editor contains external tags, no commit is possible. Delete those tags or add their tagtype to the database.</source>
         <translation>Solange der Editor Dateien mit externen Tags enthält, ist ein Speichern nicht möglich. Löschen Sie diese Tags oder erstellen Sie neue OMG-Tagtypen dafür. </translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/treeactions.py" line="231"/>
+        <source>Commit</source>
+        <translation>Speichern</translation>
     </message>
 </context>
 <context>
@@ -1031,7 +1066,7 @@ being loaded</source>
 <context>
     <name>DeleteDialog</name>
     <message>
-        <location filename="../omg/gui/treeactions.py" line="169"/>
+        <location filename="../omg/gui/treeactions.py" line="171"/>
         <source>Delete files?</source>
         <translation>Dateien löschen?</translation>
     </message>
@@ -1045,7 +1080,7 @@ being loaded</source>
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../omg/gui/treeactions.py" line="172"/>
+        <location filename="../omg/gui/treeactions.py" line="174"/>
         <source>You have deleted the following %n file(s) from OMG. Do you want them deleted completely?&lt;br /&gt;
 &lt;b&gt;This cannot be reversed!&lt;/b&gt;</source>
         <translation>
@@ -1089,11 +1124,21 @@ being loaded</source>
     <message>
         <location filename="../omg/gui/treeactions.py" line="62"/>
         <source>edit tags (recursively)</source>
-        <translation>Tags bearbeiten (rekursiv)</translation>
+        <translation type="obsolete">Tags bearbeiten (rekursiv)</translation>
     </message>
     <message>
         <location filename="../omg/gui/treeactions.py" line="62"/>
         <source>edit tags</source>
+        <translation type="obsolete">Tags bearbeiten</translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/treeactions.py" line="62"/>
+        <source>Edit tags (recursively)</source>
+        <translation>Tag bearbeiten (rekursiv)</translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/treeactions.py" line="62"/>
+        <source>Edit tags</source>
         <translation>Tags bearbeiten</translation>
     </message>
 </context>
@@ -1202,7 +1247,7 @@ being loaded</source>
 <context>
     <name>FileSystemBrowser</name>
     <message>
-        <location filename="../omg/gui/filesystembrowser.py" line="144"/>
+        <location filename="../omg/gui/filesystembrowser.py" line="145"/>
         <source>File System Browser</source>
         <translation>Dateisystem-Browser</translation>
     </message>
@@ -1210,7 +1255,7 @@ being loaded</source>
 <context>
     <name>FileSystemBrowserDock</name>
     <message>
-        <location filename="../omg/gui/filesystembrowser.py" line="119"/>
+        <location filename="../omg/gui/filesystembrowser.py" line="120"/>
         <source>Filesystem: {}</source>
         <translation>Dateisystem: {}</translation>
     </message>
@@ -1241,6 +1286,29 @@ being loaded</source>
         <location filename="../omg/gui/filesystembrowser.py" line="57"/>
         <source>in conflict with database</source>
         <translation>Konflikt mit OMGs Datenbank</translation>
+    </message>
+</context>
+<context>
+    <name>FilesystemSettings</name>
+    <message>
+        <location filename="../omg/filesystem/preferences.py" line="30"/>
+        <source>Force recheck of all files</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/filesystem/preferences.py" line="32"/>
+        <source>Enable file system monitoring</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/filesystem/preferences.py" line="38"/>
+        <source>Rescan filesystem every {} seconds (set to 0 to disable scans).</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/filesystem/preferences.py" line="39"/>
+        <source>No periodic rescans.</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -1377,7 +1445,7 @@ being loaded</source>
     <message>
         <location filename="../omg/gui/preferences/flagmanager.py" line="274"/>
         <source>Please enter the name of the new flag</source>
-        <translation>Name des neuen Flags:</translation>
+        <translation type="obsolete">Name des neuen Flags:</translation>
     </message>
     <message>
         <location filename="../omg/gui/preferences/flagmanager.py" line="280"/>
@@ -1398,6 +1466,11 @@ being loaded</source>
         <location filename="../omg/gui/preferences/flagmanager.py" line="284"/>
         <source>This is no a valid flagname.</source>
         <translation>Dies ist kein gültiger Flagname.</translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/preferences/flagmanager.py" line="274"/>
+        <source>Please enter the name of the new flag:</source>
+        <translation>Name des neuen Flags:</translation>
     </message>
 </context>
 <context>
@@ -1429,8 +1502,8 @@ being loaded</source>
         <location filename="../omg/gui/flageditor.py" line="257"/>
         <source>(And %n other)</source>
         <translation>
+            <numerusform>(und eine weitere)</numerusform>
             <numerusform>(und %n weitere)</numerusform>
-            <numerusform></numerusform>
         </translation>
     </message>
     <message>
@@ -1449,7 +1522,12 @@ being loaded</source>
     <message>
         <location filename="../omg/gui/treeactions.py" line="252"/>
         <source>flatten...</source>
-        <translation>Verflachen</translation>
+        <translation type="obsolete">Verflachen</translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/treeactions.py" line="254"/>
+        <source>Flatten...</source>
+        <translation>Verflachen...</translation>
     </message>
 </context>
 <context>
@@ -1559,87 +1637,87 @@ being loaded</source>
 <context>
     <name>GrammarConfigurationWidget</name>
     <message>
-        <location filename="../omg/plugins/renamer/gui.py" line="201"/>
+        <location filename="../omg/plugins/renamer/gui.py" line="213"/>
         <source>Choose a profile:</source>
         <translation>Profil wählen:</translation>
     </message>
     <message>
-        <location filename="../omg/plugins/renamer/gui.py" line="206"/>
+        <location filename="../omg/plugins/renamer/gui.py" line="220"/>
         <source>Actions</source>
         <translation>Aktionen</translation>
     </message>
     <message>
-        <location filename="../omg/plugins/renamer/gui.py" line="230"/>
+        <location filename="../omg/plugins/renamer/gui.py" line="244"/>
         <source>Replace:</source>
         <translation>Ersetze:</translation>
     </message>
     <message>
-        <location filename="../omg/plugins/renamer/gui.py" line="232"/>
+        <location filename="../omg/plugins/renamer/gui.py" line="246"/>
         <source>By:</source>
         <translation>Durch:</translation>
     </message>
     <message>
-        <location filename="../omg/plugins/renamer/gui.py" line="234"/>
+        <location filename="../omg/plugins/renamer/gui.py" line="248"/>
         <source>And remove:</source>
         <translation>Und entferne:</translation>
     </message>
     <message>
-        <location filename="../omg/plugins/renamer/gui.py" line="240"/>
+        <location filename="../omg/plugins/renamer/gui.py" line="254"/>
         <source>Save</source>
         <translation>Speichern</translation>
     </message>
     <message>
-        <location filename="../omg/plugins/renamer/gui.py" line="243"/>
+        <location filename="../omg/plugins/renamer/gui.py" line="257"/>
         <source>Reset</source>
         <translation>Zurücksetzen</translation>
     </message>
     <message>
-        <location filename="../omg/plugins/renamer/gui.py" line="272"/>
+        <location filename="../omg/plugins/renamer/gui.py" line="286"/>
         <source>Save as profile {}</source>
         <translation>Speichern als Profil {}</translation>
     </message>
     <message>
-        <location filename="../omg/plugins/renamer/gui.py" line="275"/>
+        <location filename="../omg/plugins/renamer/gui.py" line="289"/>
         <source>Save profile</source>
         <translation>Speichere Profile</translation>
     </message>
     <message>
-        <location filename="../omg/plugins/renamer/gui.py" line="277"/>
+        <location filename="../omg/plugins/renamer/gui.py" line="291"/>
         <source>Save as new profile...</source>
         <translation>Speichern als neues Profile...</translation>
     </message>
     <message>
-        <location filename="../omg/plugins/renamer/gui.py" line="280"/>
+        <location filename="../omg/plugins/renamer/gui.py" line="294"/>
         <source>Reset to profile {}</source>
         <translation>Zu Profile {} zurücksetzen</translation>
     </message>
     <message>
-        <location filename="../omg/plugins/renamer/gui.py" line="283"/>
+        <location filename="../omg/plugins/renamer/gui.py" line="297"/>
         <source>Reset profile</source>
         <translation>Profil zurücksetzen</translation>
     </message>
     <message>
-        <location filename="../omg/plugins/renamer/gui.py" line="287"/>
+        <location filename="../omg/plugins/renamer/gui.py" line="301"/>
         <source>Configure profiles...</source>
         <translation>Profile konfigurieren...</translation>
     </message>
     <message>
-        <location filename="../omg/plugins/renamer/gui.py" line="309"/>
+        <location filename="../omg/plugins/renamer/gui.py" line="323"/>
         <source>Add new profile</source>
         <translation>Profil hinzufügen</translation>
     </message>
     <message>
-        <location filename="../omg/plugins/renamer/gui.py" line="309"/>
+        <location filename="../omg/plugins/renamer/gui.py" line="323"/>
         <source>Choose a profile name</source>
-        <translation>Bitte wählen Sie einen gültigen Profilenamen.</translation>
+        <translation>Bitte wählen Sie einen Profilenamen.</translation>
     </message>
     <message>
-        <location filename="../omg/plugins/renamer/gui.py" line="319"/>
+        <location filename="../omg/plugins/renamer/gui.py" line="333"/>
         <source>Invalid name</source>
         <translation>Ungültiger Name</translation>
     </message>
     <message>
-        <location filename="../omg/plugins/renamer/gui.py" line="319"/>
+        <location filename="../omg/plugins/renamer/gui.py" line="333"/>
         <source>There is already a profile of this name.</source>
         <translation>Ein Profil mit diesem Namen existiert bereits.</translation>
     </message>
@@ -1647,7 +1725,7 @@ being loaded</source>
 <context>
     <name>GuessProfileConfigWidget</name>
     <message>
-        <location filename="../omg/models/albumguesser.py" line="197"/>
+        <location filename="../omg/models/albumguesser.py" line="217"/>
         <source>Configuration of the &quot;album guessing&quot; profiles. These profiles determine how the editor tries to 
 guess the album structure of files which are dropped into the editor.
 
@@ -1659,33 +1737,33 @@ is on, files will only be grouped together if they are in the same directory.</s
 Gruppiert wird mit Hilfe einer Liste von Tags: Alle Dateien, deren Tagwerte für diese Tags übereinstimmen, werden als ein Container (Album) angesehen. Das als „Haupt-Tag“ markierte Tag bestimmt den Titel des neu erzeugten Containers. Im „Verzeichnis-Modus“ werden nur Dateien innerhalb eines Ordners gruppiert.  </translation>
     </message>
     <message>
-        <location filename="../omg/models/albumguesser.py" line="210"/>
+        <location filename="../omg/models/albumguesser.py" line="230"/>
         <source>add tag...</source>
         <translation>Tag hinzufügen…</translation>
     </message>
     <message>
-        <location filename="../omg/models/albumguesser.py" line="223"/>
+        <location filename="../omg/models/albumguesser.py" line="243"/>
         <source>remove tag</source>
         <translation>Tag entfernen</translation>
     </message>
     <message>
-        <location filename="../omg/models/albumguesser.py" line="225"/>
+        <location filename="../omg/models/albumguesser.py" line="245"/>
         <source>directory mode</source>
         <translation>Verzeichnis-Modus</translation>
     </message>
     <message>
-        <location filename="../omg/models/albumguesser.py" line="227"/>
+        <location filename="../omg/models/albumguesser.py" line="247"/>
         <source>If this is checked, only files within the same directory will be considered for automatic album
 guessing. This is useful in most cases, unless you have albums that are split across several folders.</source>
         <translation>Im Verzeichnis-Modus werden grundsätzlich nur Dateien innerhalb eines Verzeichnisses zusammengefasst. In den meisten Fällen ist dies sinnvoll, außer Sie haben Alben die über mehrere Ordner verteilt sind.</translation>
     </message>
     <message>
-        <location filename="../omg/models/albumguesser.py" line="233"/>
+        <location filename="../omg/models/albumguesser.py" line="253"/>
         <source>set to main</source>
         <translation>Zum Haupt-Tag machen</translation>
     </message>
     <message>
-        <location filename="../omg/models/albumguesser.py" line="241"/>
+        <location filename="../omg/models/albumguesser.py" line="261"/>
         <source>Find Meta-Containers</source>
         <translation>Meta-Container suchen</translation>
     </message>
@@ -1693,7 +1771,7 @@ guessing. This is useful in most cases, unless you have albums that are split ac
 <context>
     <name>HiddenAttributeCommand</name>
     <message>
-        <location filename="../omg/core/tagcommands.py" line="65"/>
+        <location filename="../omg/core/tagcommands.py" line="69"/>
         <source>change hidden flag</source>
         <translation>Wert verstecken / zeigen</translation>
     </message>
@@ -1902,19 +1980,37 @@ guessing. This is useful in most cases, unless you have albums that are split ac
         <translation>Leeren</translation>
     </message>
     <message>
-        <location filename="../omg/models/leveltreemodel.py" line="175"/>
+        <location filename="../omg/models/leveltreemodel.py" line="174"/>
         <source>Importing {0} files...</source>
         <translation>{0} Dateien importieren...</translation>
     </message>
     <message>
-        <location filename="../omg/models/leveltreemodel.py" line="308"/>
+        <location filename="../omg/models/leveltreemodel.py" line="314"/>
         <source>insert root nodes</source>
         <translation>Wurzelknoten einfügen</translation>
     </message>
     <message>
-        <location filename="../omg/models/leveltreemodel.py" line="323"/>
+        <location filename="../omg/models/leveltreemodel.py" line="329"/>
         <source>remove root nodes</source>
         <translation>Wurzelknoten entfernen</translation>
+    </message>
+    <message>
+        <location filename="../omg/models/leveltreemodel.py" line="174"/>
+        <source>Cancel</source>
+        <translation>Abbrechen</translation>
+    </message>
+    <message>
+        <location filename="../omg/models/leveltreemodel.py" line="180"/>
+        <source>import URLs</source>
+        <translation>URLs importieren</translation>
+    </message>
+</context>
+<context>
+    <name>LoggerDock</name>
+    <message>
+        <location filename="../omg/plugins/loggerdock/plugin.py" line="30"/>
+        <source>Logger</source>
+        <translation>Logger</translation>
     </message>
 </context>
 <context>
@@ -1928,32 +2024,32 @@ guessing. This is useful in most cases, unless you have albums that are split ac
 <context>
     <name>MPDConfigWidget</name>
     <message>
-        <location filename="../omg/plugins/mpd/plugin.py" line="402"/>
+        <location filename="../omg/plugins/mpd/plugin.py" line="396"/>
         <source>Password:</source>
         <translation>Passwort:</translation>
     </message>
     <message>
-        <location filename="../omg/plugins/mpd/plugin.py" line="395"/>
+        <location filename="../omg/plugins/mpd/plugin.py" line="389"/>
         <source>Host:</source>
         <translation>Host:</translation>
     </message>
     <message>
-        <location filename="../omg/plugins/mpd/plugin.py" line="399"/>
+        <location filename="../omg/plugins/mpd/plugin.py" line="393"/>
         <source>Port:</source>
         <translation>Port:</translation>
     </message>
     <message>
-        <location filename="../omg/plugins/mpd/plugin.py" line="406"/>
+        <location filename="../omg/plugins/mpd/plugin.py" line="400"/>
         <source>Password visible?</source>
         <translation>Passwort anzeigen?</translation>
     </message>
     <message>
-        <location filename="../omg/plugins/mpd/plugin.py" line="410"/>
+        <location filename="../omg/plugins/mpd/plugin.py" line="404"/>
         <source>Save</source>
         <translation>Speichern</translation>
     </message>
     <message>
-        <location filename="../omg/plugins/mpd/plugin.py" line="413"/>
+        <location filename="../omg/plugins/mpd/plugin.py" line="407"/>
         <source>Reset</source>
         <translation>Zurücksetzen</translation>
     </message>
@@ -1976,7 +2072,7 @@ guessing. This is useful in most cases, unless you have albums that are split ac
         <translation>Audioausgänge...</translation>
     </message>
     <message>
-        <location filename="../omg/plugins/mpd/plugin.py" line="361"/>
+        <location filename="../omg/plugins/mpd/plugin.py" line="355"/>
         <source>Choose which audio outputs to use:</source>
         <translation>Wäheln Sie, welche Audioausgänge benutzt werden sollen:</translation>
     </message>
@@ -2136,7 +2232,7 @@ guessing. This is useful in most cases, unless you have albums that are split ac
 <context>
     <name>MatchTagsFromFilenamesAction</name>
     <message>
-        <location filename="../omg/gui/treeactions.py" line="301"/>
+        <location filename="../omg/gui/treeactions.py" line="303"/>
         <source>match tags from filename</source>
         <translation>Tags aus Dateinamen generieren</translation>
     </message>
@@ -2146,7 +2242,12 @@ guessing. This is useful in most cases, unless you have albums that are split ac
     <message>
         <location filename="../omg/gui/treeactions.py" line="195"/>
         <source>merge...</source>
-        <translation>Zusammenführen…</translation>
+        <translation type="obsolete">Zusammenführen…</translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/treeactions.py" line="197"/>
+        <source>Merge...</source>
+        <translation>Zusammenführen...</translation>
     </message>
 </context>
 <context>
@@ -2192,38 +2293,55 @@ guessing. This is useful in most cases, unless you have albums that are split ac
     <message>
         <location filename="../omg/filesystem/dialogs.py" line="106"/>
         <source>The following files were removed from the filesystem by another program. Please select those that should also be removed from OMG&apos;s database, and provide a new path for the others.</source>
-        <translation>Die folgenden Dateien wurden mit einem anderen Programm von der Festplatte entfernt. Bitte ggf. neuen Pfad angeben oder auch aus OMG entfernen.</translation>
+        <translation type="obsolete">Die folgenden Dateien wurden mit einem anderen Programm von der Festplatte entfernt. Bitte ggf. neuen Pfad angeben oder auch aus OMG entfernen.</translation>
     </message>
     <message>
-        <location filename="../omg/filesystem/dialogs.py" line="127"/>
+        <location filename="../omg/filesystem/dialogs.py" line="132"/>
         <source>delete</source>
         <translation>Löschen</translation>
+    </message>
+    <message>
+        <location filename="../omg/filesystem/dialogs.py" line="106"/>
+        <source>Some files from OMG&apos;s database could not be found anymore in your filesystem. They are shown in red below. For each file, you can either provide a new path manually or delete it from the database.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../omg/filesystem/dialogs.py" line="132"/>
+        <source>Del</source>
+        <translation>Entf</translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../omg/filesystem/dialogs.py" line="157"/>
+        <source>Close (%n files still missing)</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+        </translation>
     </message>
 </context>
 <context>
     <name>ModifiedTagsDialog</name>
     <message>
-        <location filename="../omg/filesystem/dialogs.py" line="147"/>
+        <location filename="../omg/filesystem/dialogs.py" line="168"/>
         <source>Modified Tags Detected</source>
         <translation>Tags Geändert </translation>
     </message>
     <message>
-        <location filename="../omg/filesystem/dialogs.py" line="149"/>
+        <location filename="../omg/filesystem/dialogs.py" line="170"/>
         <source>&lt;b&gt;In Database:&lt;/b&gt;</source>
         <translation>&lt;b&gt;In der Datenbank:&lt;/b&gt;</translation>
     </message>
     <message>
-        <location filename="../omg/filesystem/dialogs.py" line="150"/>
+        <location filename="../omg/filesystem/dialogs.py" line="171"/>
         <source>&lt;b&gt;On Disk:&lt;/b&gt;</source>
         <translation>&lt;b&gt;In der Datei:&lt;/b&gt;</translation>
     </message>
     <message>
-        <location filename="../omg/filesystem/dialogs.py" line="178"/>
+        <location filename="../omg/filesystem/dialogs.py" line="199"/>
         <source>use DB tags</source>
         <translation>Tags aus der Datenbank übernehmen</translation>
     </message>
     <message>
-        <location filename="../omg/filesystem/dialogs.py" line="179"/>
+        <location filename="../omg/filesystem/dialogs.py" line="200"/>
         <source>use disk tags</source>
         <translation>Tags aus der Datei übernehmen</translation>
     </message>
@@ -2286,7 +2404,7 @@ guessing. This is useful in most cases, unless you have albums that are split ac
     <message>
         <location filename="../omg/gui/profiles.py" line="99"/>
         <source>There is no profile yet. To create one, choose a name and a type:</source>
-        <translation>Es existiert noch kein Profil. Zum Erstellen Namen und Typ auswählen.</translation>
+        <translation>Es existiert noch kein Profil. Zum Erstellen wählen Sie bitte Namen und Typ aus:</translation>
     </message>
     <message>
         <location filename="../omg/gui/profiles.py" line="100"/>
@@ -2354,23 +2472,23 @@ guessing. This is useful in most cases, unless you have albums that are split ac
     <message>
         <location filename="../omg/gui/tageditor.py" line="703"/>
         <source>Load elements recursively</source>
-        <translation>Elemente rekursiv laden</translation>
+        <translation type="obsolete">Elemente rekursiv laden</translation>
     </message>
 </context>
 <context>
     <name>PathDelegate</name>
     <message>
-        <location filename="../omg/plugins/renamer/gui.py" line="78"/>
+        <location filename="../omg/plugins/renamer/gui.py" line="80"/>
         <source>From: {}</source>
         <translation>Von: {}</translation>
     </message>
     <message>
-        <location filename="../omg/plugins/renamer/gui.py" line="81"/>
+        <location filename="../omg/plugins/renamer/gui.py" line="83"/>
         <source>To: {}</source>
         <translation>Nach: {}</translation>
     </message>
     <message>
-        <location filename="../omg/plugins/renamer/gui.py" line="84"/>
+        <location filename="../omg/plugins/renamer/gui.py" line="86"/>
         <source>Unchanged: {}</source>
         <translation>Unverändert: {}</translation>
     </message>
@@ -2437,6 +2555,11 @@ guessing. This is useful in most cases, unless you have albums that are split ac
     <message>
         <location filename="../omg/gui/playlist.py" line="170"/>
         <source>playlist</source>
+        <translation type="obsolete">Abspielliste</translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/playlist.py" line="175"/>
+        <source>Playlist</source>
         <translation>Abspielliste</translation>
     </message>
 </context>
@@ -2473,39 +2596,59 @@ guessing. This is useful in most cases, unless you have albums that are split ac
     <message>
         <location filename="../omg/gui/playlist.py" line="37"/>
         <source>tags</source>
-        <translation>Tags</translation>
+        <translation type="obsolete">Tags</translation>
     </message>
     <message>
         <location filename="../omg/gui/playlist.py" line="41"/>
         <source>playlist</source>
-        <translation>Abspielliste</translation>
+        <translation type="obsolete">Abspielliste</translation>
     </message>
     <message>
-        <location filename="../omg/gui/playlist.py" line="51"/>
+        <location filename="../omg/gui/playlist.py" line="54"/>
         <source>Please configure and choose a backend to play music.</source>
         <translation>Um Musik abzuspielen, muss ein Backend konfiguriert und ausgewählt sein.</translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/playlist.py" line="40"/>
+        <source>Tags</source>
+        <translation>Tags</translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/playlist.py" line="44"/>
+        <source>Playlist</source>
+        <translation>Abspielliste</translation>
     </message>
 </context>
 <context>
     <name>PlaylistWidget</name>
     <message>
-        <location filename="../omg/gui/playlist.py" line="90"/>
+        <location filename="../omg/gui/playlist.py" line="95"/>
         <source>Playlist</source>
         <translation>Abspielliste</translation>
     </message>
     <message>
-        <location filename="../omg/gui/playlist.py" line="120"/>
+        <location filename="../omg/gui/playlist.py" line="125"/>
         <source>Item Display:</source>
         <translation>Element-Darstellung:</translation>
     </message>
     <message>
         <location filename="../omg/gui/playlist.py" line="152"/>
         <source>no backend selected</source>
-        <translation>Kein Backend ausgewählt</translation>
+        <translation type="obsolete">Kein Backend ausgewählt</translation>
     </message>
     <message>
         <location filename="../omg/gui/playlist.py" line="165"/>
         <source>no connection</source>
+        <translation type="obsolete">Keine Verbindung</translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/playlist.py" line="157"/>
+        <source>No backend selected</source>
+        <translation>Kein Backend ausgewählt</translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/playlist.py" line="170"/>
+        <source>No connection</source>
         <translation>Keine Verbindung</translation>
     </message>
 </context>
@@ -2619,9 +2762,14 @@ guessing. This is useful in most cases, unless you have albums that are split ac
         <translation>Element-Darstellung</translation>
     </message>
     <message>
-        <location filename="../omg/gui/preferences/__init__.py" line="262"/>
+        <location filename="../omg/gui/preferences/__init__.py" line="264"/>
         <source>Plugins</source>
         <translation>Plugins</translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/preferences/__init__.py" line="261"/>
+        <source>File system</source>
+        <translation>Dateisystem</translation>
     </message>
 </context>
 <context>
@@ -2661,47 +2809,47 @@ guessing. This is useful in most cases, unless you have albums that are split ac
 <context>
     <name>RecordDialog</name>
     <message>
-        <location filename="../omg/gui/tageditor.py" line="585"/>
+        <location filename="../omg/gui/tageditor.py" line="650"/>
         <source>Add tag value</source>
         <translation>Tag-Wert hinzufügen</translation>
     </message>
     <message>
-        <location filename="../omg/gui/tageditor.py" line="615"/>
+        <location filename="../omg/gui/tageditor.py" line="680"/>
         <source>Type: </source>
         <translation>Typ: </translation>
     </message>
     <message>
-        <location filename="../omg/gui/tageditor.py" line="618"/>
+        <location filename="../omg/gui/tageditor.py" line="683"/>
         <source>Value: </source>
         <translation>Wert: </translation>
     </message>
     <message>
-        <location filename="../omg/gui/tageditor.py" line="620"/>
+        <location filename="../omg/gui/tageditor.py" line="685"/>
         <source>Elements: </source>
         <translation>Elemente: </translation>
     </message>
     <message>
-        <location filename="../omg/gui/tageditor.py" line="650"/>
+        <location filename="../omg/gui/tageditor.py" line="715"/>
         <source>Invalid value</source>
         <translation>Ungültiger Wert</translation>
     </message>
     <message>
-        <location filename="../omg/gui/tageditor.py" line="650"/>
+        <location filename="../omg/gui/tageditor.py" line="715"/>
         <source>The given value is invalid.</source>
         <translation>Der angegebene Wert ist ungültig.</translation>
     </message>
     <message>
-        <location filename="../omg/gui/tageditor.py" line="632"/>
+        <location filename="../omg/gui/tageditor.py" line="697"/>
         <source>No element selected</source>
         <translation>Kein Element ausgewählt</translation>
     </message>
     <message>
-        <location filename="../omg/gui/tageditor.py" line="632"/>
+        <location filename="../omg/gui/tageditor.py" line="697"/>
         <source>You must select at lest one element.</source>
         <translation>Sie müssen mindestens ein Element auswählen.</translation>
     </message>
     <message>
-        <location filename="../omg/gui/tageditor.py" line="639"/>
+        <location filename="../omg/gui/tageditor.py" line="704"/>
         <source>You must add tagtypes to the database before adding such tags to elements within the database.</source>
         <translation>Sie müssen Tagtypen zur Datenbank hinzufügen, bevor solche Tags zu Elementen in der Datenbank hinzugefügt werden können.</translation>
     </message>
@@ -2744,7 +2892,12 @@ guessing. This is useful in most cases, unless you have albums that are split ac
     <message>
         <location filename="../omg/gui/treeactions.py" line="112"/>
         <source>remove</source>
-        <translation>entfernen</translation>
+        <translation type="obsolete">entfernen</translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/treeactions.py" line="111"/>
+        <source>Remove</source>
+        <translation>Entfernen</translation>
     </message>
 </context>
 <context>
@@ -2752,7 +2905,12 @@ guessing. This is useful in most cases, unless you have albums that are split ac
     <message>
         <location filename="../omg/gui/treeactions.py" line="340"/>
         <source>remove from playlist</source>
-        <translation>aus Playlist entfernen</translation>
+        <translation type="obsolete">aus Playlist entfernen</translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/treeactions.py" line="342"/>
+        <source>Remove from playlist</source>
+        <translation>Aus Liste entfernen</translation>
     </message>
 </context>
 <context>
@@ -2760,36 +2918,51 @@ guessing. This is useful in most cases, unless you have albums that are split ac
     <message>
         <location filename="../omg/gui/treeactions.py" line="85"/>
         <source>rename</source>
-        <translation>umbenennen</translation>
+        <translation type="obsolete">umbenennen</translation>
     </message>
     <message>
-        <location filename="../omg/gui/treeactions.py" line="99"/>
+        <location filename="../omg/gui/treeactions.py" line="98"/>
         <source>Select new file location</source>
         <translation>Neuen Dateipfad wählen </translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/treeactions.py" line="84"/>
+        <source>Rename</source>
+        <translation>Umbenennen</translation>
     </message>
 </context>
 <context>
     <name>RenameDialog</name>
     <message>
-        <location filename="../omg/plugins/renamer/gui.py" line="105"/>
+        <location filename="../omg/plugins/renamer/gui.py" line="107"/>
         <source>Rename {} containers</source>
         <translation>{} Container umbenennen</translation>
     </message>
     <message>
-        <location filename="../omg/plugins/renamer/gui.py" line="158"/>
+        <location filename="../omg/plugins/renamer/gui.py" line="161"/>
         <source>New paths are not unique! Please fix</source>
         <translation>Die neuen Pfade sind nicht eindeutig!</translation>
     </message>
     <message>
-        <location filename="../omg/plugins/renamer/gui.py" line="164"/>
+        <location filename="../omg/plugins/renamer/gui.py" line="167"/>
         <source>Syntax error in format string</source>
         <translation></translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/renamer/gui.py" line="177"/>
+        <source>Profile Changed</source>
+        <translation>Profil geändert</translation>
+    </message>
+    <message>
+        <location filename="../omg/plugins/renamer/gui.py" line="177"/>
+        <source>Save modified profile {}?</source>
+        <translation>Soll das geändertes Profil {} gespeichert werden?</translation>
     </message>
 </context>
 <context>
     <name>RenameFilesAction</name>
     <message>
-        <location filename="../omg/plugins/renamer/gui.py" line="35"/>
+        <location filename="../omg/plugins/renamer/gui.py" line="37"/>
         <source>rename files</source>
         <translation>Dateien umbenennen</translation>
     </message>
@@ -2801,11 +2974,17 @@ guessing. This is useful in most cases, unless you have albums that are split ac
         <source>Error renaming file</source>
         <translation>Fehler beim Umbenennen von Dateien</translation>
     </message>
+    <message>
+        <location filename="../omg/core/levels.py" line="70"/>
+        <source>Could not rename &apos;{}&apos; to &apos;{}&apos;:
+{}</source>
+        <translation>&apos;{}&apos; konnte nicht in &apos;{}&apos; umbenannt werden: {}</translation>
+    </message>
 </context>
 <context>
     <name>Renamer</name>
     <message>
-        <location filename="../omg/plugins/renamer/plugin.py" line="51"/>
+        <location filename="../omg/plugins/renamer/plugin.py" line="47"/>
         <source>Renamer</source>
         <translation>Renamer</translation>
     </message>
@@ -2916,29 +3095,52 @@ guessing. This is useful in most cases, unless you have albums that are split ac
     </message>
 </context>
 <context>
+    <name>Splash</name>
+    <message>
+        <location filename="../omg/application.py" line="179"/>
+        <source>Connecting to database</source>
+        <translation>Verbinde zur Datenbank</translation>
+    </message>
+    <message>
+        <location filename="../omg/application.py" line="245"/>
+        <source>Loading plugins</source>
+        <translation>Lade Plugins</translation>
+    </message>
+    <message>
+        <location filename="../omg/application.py" line="257"/>
+        <source>Loading GUI classes</source>
+        <translation>Lade GUI-Klassen</translation>
+    </message>
+    <message>
+        <location filename="../omg/application.py" line="262"/>
+        <source>Creating main window</source>
+        <translation>Erstelle Hauptfenster</translation>
+    </message>
+</context>
+<context>
     <name>StandardGuesser</name>
     <message>
-        <location filename="../omg/models/albumguesser.py" line="80"/>
+        <location filename="../omg/models/albumguesser.py" line="82"/>
         <source>guess albums</source>
         <translation>Gruppieren</translation>
     </message>
     <message>
-        <location filename="../omg/models/albumguesser.py" line="116"/>
+        <location filename="../omg/models/albumguesser.py" line="128"/>
         <source>Error guessing albums</source>
         <translation>Fehler beim Gruppieren</translation>
     </message>
     <message>
-        <location filename="../omg/models/albumguesser.py" line="116"/>
+        <location filename="../omg/models/albumguesser.py" line="128"/>
         <source>position {} appears twice in {}</source>
         <translation>Position „{}“ erscheint zweimal in „{}“</translation>
     </message>
     <message>
-        <location filename="../omg/models/albumguesser.py" line="150"/>
+        <location filename="../omg/models/albumguesser.py" line="164"/>
         <source>Error guessing meta-containers</source>
         <translation>Fehler beim Erkennen der Meta-Container</translation>
     </message>
     <message>
-        <location filename="../omg/models/albumguesser.py" line="150"/>
+        <location filename="../omg/models/albumguesser.py" line="164"/>
         <source>disc-number {} appears twice in meta-container {}</source>
         <translation>Disknummer „{}“ erscheint doppelt im Meta-Container „{}“</translation>
     </message>
@@ -2946,12 +3148,12 @@ guessing. This is useful in most cases, unless you have albums that are split ac
 <context>
     <name>SynchronizeHelper</name>
     <message>
-        <location filename="../omg/filesystem/__init__.py" line="249"/>
+        <location filename="../omg/filesystem/__init__.py" line="267"/>
         <source>Move detected</source>
         <translation>Verschieben erkannt</translation>
     </message>
     <message>
-        <location filename="../omg/filesystem/__init__.py" line="249"/>
+        <location filename="../omg/filesystem/__init__.py" line="267"/>
         <source>A file was renamed (or moved) outside OMG:
 {}</source>
         <translation>Eine Datei wurde umbenannt (oder verschoben): {}</translation>
@@ -2983,32 +3185,32 @@ guessing. This is useful in most cases, unless you have albums that are split ac
 <context>
     <name>TagEditorDialog</name>
     <message>
-        <location filename="../omg/gui/tageditor.py" line="119"/>
+        <location filename="../omg/gui/tageditor.py" line="120"/>
         <source>Edit tags</source>
         <translation>Tags editieren</translation>
     </message>
     <message>
-        <location filename="../omg/gui/tageditor.py" line="134"/>
+        <location filename="../omg/gui/tageditor.py" line="136"/>
         <source>Undo</source>
         <translation>Rückgängig</translation>
     </message>
     <message>
-        <location filename="../omg/gui/tageditor.py" line="139"/>
+        <location filename="../omg/gui/tageditor.py" line="141"/>
         <source>Redo</source>
         <translation>Wiederholen</translation>
     </message>
     <message>
-        <location filename="../omg/gui/tageditor.py" line="145"/>
+        <location filename="../omg/gui/tageditor.py" line="147"/>
         <source>Reset</source>
         <translation>Zurücksetzen</translation>
     </message>
     <message>
-        <location filename="../omg/gui/tageditor.py" line="148"/>
+        <location filename="../omg/gui/tageditor.py" line="150"/>
         <source>Cancel</source>
         <translation>Abbrechen</translation>
     </message>
     <message>
-        <location filename="../omg/gui/tageditor.py" line="151"/>
+        <location filename="../omg/gui/tageditor.py" line="153"/>
         <source>OK</source>
         <translation>OK</translation>
     </message>
@@ -3089,99 +3291,109 @@ guessing. This is useful in most cases, unless you have albums that are split ac
 <context>
     <name>TagEditorWidget</name>
     <message>
-        <location filename="../omg/gui/tageditor.py" line="451"/>
+        <location filename="../omg/gui/tageditor.py" line="507"/>
         <source>Remove selected</source>
         <translation>Ausgewählte entfernen</translation>
     </message>
     <message>
-        <location filename="../omg/gui/tageditor.py" line="550"/>
+        <location filename="../omg/gui/tageditor.py" line="607"/>
         <source>Invalid value</source>
         <translation>Ungültiger Wert</translation>
     </message>
     <message>
-        <location filename="../omg/gui/tageditor.py" line="435"/>
+        <location filename="../omg/gui/tageditor.py" line="491"/>
         <source>At least one value is invalid for the new type.</source>
         <translation>Mindestens einer der Werte ist im neuen Typ ungültig.</translation>
     </message>
     <message>
-        <location filename="../omg/gui/tageditor.py" line="511"/>
+        <location filename="../omg/gui/tageditor.py" line="567"/>
         <source>Separate at &apos;{}&apos;</source>
         <translation>Bei &apos;{}&apos; trennen</translation>
     </message>
     <message>
-        <location filename="../omg/gui/tageditor.py" line="283"/>
+        <location filename="../omg/gui/tageditor.py" line="319"/>
         <source>Add tag value</source>
         <translation>Tag-Wert hinzufügen</translation>
     </message>
     <message>
-        <location filename="../omg/gui/tageditor.py" line="346"/>
+        <location filename="../omg/gui/tageditor.py" line="402"/>
         <source>Tag write error</source>
         <translation>Fehler beim Schreiben von Tags</translation>
     </message>
     <message>
-        <location filename="../omg/gui/tageditor.py" line="346"/>
+        <location filename="../omg/gui/tageditor.py" line="402"/>
         <source>An error ocurred: {}</source>
         <translation>Ein Fehler trat auf: {}</translation>
     </message>
     <message>
-        <location filename="../omg/gui/tageditor.py" line="414"/>
+        <location filename="../omg/gui/tageditor.py" line="470"/>
         <source>You must add tagtypes to the database before adding such tags to elements within the database.</source>
         <translation>Sie müssen Tagtypen zur Datenbank hinzufügen, bevor solche Tags zu Elementen in der Datenbank hinzugefügt werden können.</translation>
     </message>
     <message>
-        <location filename="../omg/gui/tageditor.py" line="446"/>
+        <location filename="../omg/gui/tageditor.py" line="502"/>
         <source>Add record...</source>
         <translation>Eintrag hinzufügen...</translation>
     </message>
     <message>
-        <location filename="../omg/gui/tageditor.py" line="456"/>
+        <location filename="../omg/gui/tageditor.py" line="512"/>
         <source>Edit record...</source>
         <translation>Eintrag bearbeiten...</translation>
     </message>
     <message>
-        <location filename="../omg/gui/tageditor.py" line="461"/>
+        <location filename="../omg/gui/tageditor.py" line="517"/>
         <source>Extend to all elements</source>
         <translation>Auf alle Elemente erweitern</translation>
     </message>
     <message>
-        <location filename="../omg/gui/tageditor.py" line="466"/>
+        <location filename="../omg/gui/tageditor.py" line="522"/>
         <source>Fancy stuff</source>
         <translation>Spezielle Befehle</translation>
     </message>
     <message>
-        <location filename="../omg/gui/tageditor.py" line="473"/>
+        <location filename="../omg/gui/tageditor.py" line="529"/>
         <source>Edit common start...</source>
         <translation>Gemeinsamen Präfix bearbeiten...</translation>
     </message>
     <message>
-        <location filename="../omg/gui/tageditor.py" line="491"/>
+        <location filename="../omg/gui/tageditor.py" line="547"/>
         <source>Remove common start (including numbers)</source>
         <translation>Entferne gemeinsamen Präfix (inklusive Nummern)</translation>
     </message>
     <message>
-        <location filename="../omg/gui/tageditor.py" line="497"/>
+        <location filename="../omg/gui/tageditor.py" line="553"/>
         <source>Remove common start</source>
         <translation>Entferne gemeinsamen Präfix</translation>
     </message>
     <message>
-        <location filename="../omg/gui/tageditor.py" line="506"/>
+        <location filename="../omg/gui/tageditor.py" line="562"/>
         <source>Remove numbers from beginning</source>
         <translation>Entferne Nummern am Anfang</translation>
     </message>
     <message>
-        <location filename="../omg/gui/tageditor.py" line="543"/>
+        <location filename="../omg/gui/tageditor.py" line="599"/>
         <source>Edit common start</source>
         <translation>Gemeinsamen Präfix bearbeiten</translation>
     </message>
     <message>
         <location filename="../omg/gui/tageditor.py" line="543"/>
         <source>Insert a new text will replace the common start of all selected records:</source>
-        <translation>Neuen Text eingeben, der das gemeinsame Präfix der gewählten Werte ersetzen wird:</translation>
+        <translation type="obsolete">Neuen Text eingeben, der das gemeinsame Präfix der gewählten Werte ersetzen wird:</translation>
     </message>
     <message>
-        <location filename="../omg/gui/tageditor.py" line="550"/>
+        <location filename="../omg/gui/tageditor.py" line="607"/>
         <source>One or more values are invalid.</source>
         <translation>Einer oder mehrere Werte sind ungültig.</translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/tageditor.py" line="271"/>
+        <source>Include all contents</source>
+        <translation>Alle Unterelmente miteinbeziehen</translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/tageditor.py" line="599"/>
+        <source>Insert a new text which will replace the common start of all selected records:</source>
+        <translation>Geben Sie einen neuen Text ein, der den gemeinsamen Anfang aller ausgewähten Einträge ersetzen soll:</translation>
     </message>
 </context>
 <context>
@@ -3455,45 +3667,75 @@ guessing. This is useful in most cases, unless you have albums that are split ac
     <message>
         <location filename="../omg/gui/treeactions.py" line="371"/>
         <source>edit tagvalue</source>
-        <translation>Tagwert bearbeiten</translation>
+        <translation type="obsolete">Tagwert bearbeiten</translation>
     </message>
     <message>
         <location filename="../omg/gui/treeactions.py" line="377"/>
         <source>edit tagvalue &quot;{}&quot;</source>
-        <translation>Bearbeite Tagwert „{}“</translation>
+        <translation type="obsolete">Bearbeite Tagwert „{}“</translation>
     </message>
     <message>
         <location filename="../omg/gui/treeactions.py" line="383"/>
         <source>choose tag mode</source>
-        <translation>Tag-Modus wählen</translation>
+        <translation type="obsolete">Tag-Modus wählen</translation>
     </message>
     <message>
         <location filename="../omg/gui/treeactions.py" line="383"/>
         <source>tag:</source>
+        <translation type="obsolete">Tag:</translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/treeactions.py" line="373"/>
+        <source>Edit tagvalue</source>
+        <translation>Tagwert bearbeiten</translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/treeactions.py" line="379"/>
+        <source>Edit tagvalue &quot;{}&quot;</source>
+        <translation>Tagwert &quot;{}&quot; bearbeiten</translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/treeactions.py" line="385"/>
+        <source>Choose tag mode</source>
+        <translation>Wähle Tag-Modus</translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/treeactions.py" line="385"/>
+        <source>Tag:</source>
         <translation>Tag:</translation>
     </message>
 </context>
 <context>
     <name>TagValuePropertiesWidget</name>
     <message>
-        <location filename="../omg/gui/tagwidgets.py" line="705"/>
+        <location filename="../omg/gui/tagwidgets.py" line="712"/>
         <source>rename all occurences:</source>
         <translation>Alle Vorkommen umbenennen:</translation>
     </message>
     <message>
-        <location filename="../omg/gui/tagwidgets.py" line="711"/>
+        <location filename="../omg/gui/tagwidgets.py" line="718"/>
         <source>distinguished sort value:</source>
         <translation>Wert zum Sortieren:</translation>
     </message>
     <message>
-        <location filename="../omg/gui/tagwidgets.py" line="718"/>
+        <location filename="../omg/gui/tagwidgets.py" line="725"/>
         <source>value is hidden</source>
         <translation>Versteckt</translation>
     </message>
     <message>
-        <location filename="../omg/gui/tagwidgets.py" line="743"/>
+        <location filename="../omg/gui/tagwidgets.py" line="750"/>
         <source>editing {0} value: {1}</source>
         <translation>Bearbeite {0}-Wert „{1}“ </translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/tagwidgets.py" line="764"/>
+        <source>Invalid Tag Value</source>
+        <translation>Ungültiger Tagwert</translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/tagwidgets.py" line="764"/>
+        <source>Please enter a valid tag value.</source>
+        <translation>Bitte geben Sie einen gültigen Tagwert ein.</translation>
     </message>
 </context>
 <context>
@@ -3626,7 +3868,7 @@ guessing. This is useful in most cases, unless you have albums that are split ac
 <context>
     <name>Tageditor</name>
     <message>
-        <location filename="../omg/gui/tageditor.py" line="104"/>
+        <location filename="../omg/gui/tageditor.py" line="105"/>
         <source>Tageditor</source>
         <translation>Tageditor</translation>
     </message>
@@ -3636,33 +3878,38 @@ guessing. This is useful in most cases, unless you have albums that are split ac
     <message>
         <location filename="../omg/gui/treeactions.py" line="319"/>
         <source>major?</source>
+        <translation type="obsolete">Major?</translation>
+    </message>
+    <message>
+        <location filename="../omg/gui/treeactions.py" line="321"/>
+        <source>Major?</source>
         <translation>Major?</translation>
     </message>
 </context>
 <context>
     <name>UndoRedoAction</name>
     <message>
-        <location filename="../omg/undostack.py" line="499"/>
+        <location filename="../omg/undostack.py" line="503"/>
         <source>Redo</source>
         <translation>Wiederholen</translation>
     </message>
     <message>
-        <location filename="../omg/undostack.py" line="500"/>
+        <location filename="../omg/undostack.py" line="504"/>
         <source>Ctrl+Y</source>
         <translation>Strg+Y</translation>
     </message>
     <message>
-        <location filename="../omg/undostack.py" line="505"/>
+        <location filename="../omg/undostack.py" line="509"/>
         <source>Undo</source>
         <translation>Rückgängig</translation>
     </message>
     <message>
-        <location filename="../omg/undostack.py" line="506"/>
+        <location filename="../omg/undostack.py" line="510"/>
         <source>Ctrl+Z</source>
         <translation>Strg+Z</translation>
     </message>
     <message>
-        <location filename="../omg/undostack.py" line="514"/>
+        <location filename="../omg/undostack.py" line="518"/>
         <source>{}: {}</source>
         <translation>{}: {}</translation>
     </message>
@@ -3709,12 +3956,12 @@ guessing. This is useful in most cases, unless you have albums that are split ac
 <context>
     <name>Wrapper</name>
     <message>
-        <location filename="../omg/core/nodes.py" line="408"/>
+        <location filename="../omg/core/nodes.py" line="406"/>
         <source>Flags: {}</source>
         <translation>Flags: {}</translation>
     </message>
     <message>
-        <location filename="../omg/core/nodes.py" line="411"/>
+        <location filename="../omg/core/nodes.py" line="409"/>
         <source>URL: {}</source>
         <translation>URL: {}</translation>
     </message>
@@ -3754,6 +4001,19 @@ guessing. This is useful in most cases, unless you have albums that are split ac
     </message>
 </context>
 <context>
+    <name>omg.filesystem</name>
+    <message>
+        <location filename="../omg/filesystem/__init__.py" line="55"/>
+        <source>ffmpeg is missing</source>
+        <translation>ffmpeg kann nicht gefunden werden</translation>
+    </message>
+    <message>
+        <location filename="../omg/filesystem/__init__.py" line="55"/>
+        <source>The &apos;ffmpeg&apos; binary needed by OMG&apos;s file tracking mechanism was not found. Please consider installing ffmpeg for full functionality.</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>plugins</name>
     <message>
         <location filename="../omg/plugins/__init__.py" line="135"/>
@@ -3765,6 +4025,19 @@ guessing. This is useful in most cases, unless you have albums that are split ac
         <source>Could not enable plugin {}:
 {}</source>
         <translation>Konnte das Plugin „{}“ nicht aktivieren: {}</translation>
+    </message>
+</context>
+<context>
+    <name>renameTagValue</name>
+    <message>
+        <location filename="../omg/core/tagcommands.py" line="104"/>
+        <source>Renaming {} to {} ...</source>
+        <translation>Benenne {} in {} um...</translation>
+    </message>
+    <message>
+        <location filename="../omg/core/tagcommands.py" line="112"/>
+        <source>rename {} value</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -3790,12 +4063,12 @@ guessing. This is useful in most cases, unless you have albums that are split ac
     <message>
         <location filename="../omg/gui/tagwidgets.py" line="783"/>
         <source>Cancel</source>
-        <translation>Abbrechen</translation>
+        <translation type="obsolete">Abbrechen</translation>
     </message>
     <message>
         <location filename="../omg/gui/tagwidgets.py" line="784"/>
         <source>Ok</source>
-        <translation>OK</translation>
+        <translation type="obsolete">OK</translation>
     </message>
 </context>
 </TS>
