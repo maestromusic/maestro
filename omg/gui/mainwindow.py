@@ -163,7 +163,7 @@ class MainWindow(QtGui.QMainWindow):
         super().__init__(parent)
         self.setDockNestingEnabled(True)
         self.setWindowTitle(self.tr('OMG version {}').format(constants.VERSION))
-        self.setWindowIcon(QtGui.QIcon(":omg/omg.png"))
+        self.setWindowIcon(QtGui.QIcon(":omg/omg_square.svg"))
         
         from . import selection
         selection.changed = self._globalSelectionChanged

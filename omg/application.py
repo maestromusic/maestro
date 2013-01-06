@@ -130,6 +130,7 @@ def run(cmdConfig=[],type='gui',exitPoint=None):
     # Some Qt-classes need a running QApplication before they can be created
     app = QtGui.QApplication(sys.argv)
     app.setApplicationName("OMG")
+    app.setApplicationVersion(constants.VERSION)
 
     from . import resources
     if type == "gui":
@@ -175,8 +176,7 @@ def run(cmdConfig=[],type='gui',exitPoint=None):
     from . import database
     try:
         if type == 'gui':
-            msg = translate("Splash", "Connecting to database")
-            splash.showMessage(msg)
+            splash.showMessage(translate("Splash", "Connecting to database"))
         database.connect()
     except database.sql.DBException as e:
         logger.error("I cannot connect to the database. Did you provide the correct information in the"
@@ -232,7 +232,7 @@ def run(cmdConfig=[],type='gui',exitPoint=None):
     covers.init()
     
     import omg.filebackends
-    import omg.filebackends.filesystem  #as fsBackend #TODO: necessary?
+    import omg.filebackends.filesystem
     
     global network
     network = QtNetwork.QNetworkAccessManager()
