@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import os.path, subprocess, hashlib, datetime, threading, queue, time
+import os.path, subprocess, hashlib, datetime, threading, time
 
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
@@ -43,7 +43,7 @@ def init():
     if config.options.filesystem.disable:
         return
     try:
-        proc = subprocess.Popen(
+        subprocess.Popen(
             ['ffmpeg', '-version'],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE
@@ -642,7 +642,6 @@ class FileSystemSynchronizer(QtCore.QObject):
         oldDir.tracks.remove(track)
         if newUrl in self.tracks:
             existingTrack = self.tracks[newUrl]
-            assert existingTrack.id is None
             newDir.tracks.remove(existingTrack)
             db.query("DELETE FROM {}newfiles WHERE url=?".format(db.prefix),
                              str(newUrl))
@@ -665,12 +664,18 @@ class FileSystemSynchronizer(QtCore.QObject):
             if url not in self.tracks:
                 continue
             track = self.tracks[url]
-            track.modified = mTimeStamp(url)
+            try:
+                track.modified = mTimeStamp(url)
+            except FileNotFoundError:
+                # this happens if, e.g. during a commit, a file is both modified and renamed,
+                # and the "filesModified" signal appears first.
+                continue
             if hashingEnabled:
                 track.hash = computeHash(track.url)
             else:
                 track.hash = None
             if track.id is None:
+                logger.debug("id is none")
                 db.query("UPDATE {}newfiles "
                          "  SET hash=?, verified=CURRENT_TIMESTAMP WHERE url=?".format(db.prefix),
                          track.hash, str(track.url))
@@ -685,6 +690,7 @@ class FileSystemSynchronizer(QtCore.QObject):
                 continue
             if oldUrl in self.tracks:
                 self.moveTrack(self.tracks[oldUrl], newUrl)
+            db.query("DELETE FROM {}newfiles WHERE url=?".format(db.prefix), str(oldUrl))
         db.commit()
 
     @QtCore.pyqtSlot(list)
