@@ -31,6 +31,7 @@ class FilesystemSettings(QtGui.QWidget):
         self.recheckButton.clicked.connect(filesystem.synchronizer.recheckAll, Qt.QueuedConnection)
         self.enableBox = QtGui.QCheckBox(self.tr("Enable file system monitoring"))
         self.enableBox.toggled.connect(self.recheckButton.setEnabled)
+        self.enableBox.toggled.connect(self._handleEnableBox)
         self.scanIntervalBox = QtGui.QSpinBox()
         self.scanIntervalBox.setMinimum(0)
         self.scanIntervalBox.setMaximum(24*3600)
@@ -49,7 +50,10 @@ class FilesystemSettings(QtGui.QWidget):
         layout.addWidget(self.recheckButton)
         layout.addStretch()        
         self.setLayout(layout)
-        
+    
+    def _handleEnableBox(self, state):
+        config.options.filesystem.disable = not state
+    
     def _handleIntervalChanged(self, val):
         if val == 0:
             self.scanIntervalLabel.setText(self.scanDisabledText)
