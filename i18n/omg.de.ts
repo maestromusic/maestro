@@ -1293,22 +1293,22 @@ being loaded</source>
     <message>
         <location filename="../omg/filesystem/preferences.py" line="30"/>
         <source>Force recheck of all files</source>
-        <translation type="unfinished"></translation>
+        <translation>Alle Dateien erneut überprüfen</translation>
     </message>
     <message>
         <location filename="../omg/filesystem/preferences.py" line="32"/>
         <source>Enable file system monitoring</source>
-        <translation type="unfinished"></translation>
+        <translation>Überwachung des Dateisystems aktivieren</translation>
     </message>
     <message>
         <location filename="../omg/filesystem/preferences.py" line="38"/>
         <source>Rescan filesystem every {} seconds (set to 0 to disable scans).</source>
-        <translation type="unfinished"></translation>
+        <translation>Schneller Scan des Dateisystems alle {} Sekunden (0 deaktiviert Scans). </translation>
     </message>
     <message>
         <location filename="../omg/filesystem/preferences.py" line="39"/>
         <source>No periodic rescans.</source>
-        <translation type="unfinished"></translation>
+        <translation>Keine periodischen Scans.</translation>
     </message>
 </context>
 <context>
@@ -2303,7 +2303,7 @@ guessing. This is useful in most cases, unless you have albums that are split ac
     <message>
         <location filename="../omg/filesystem/dialogs.py" line="106"/>
         <source>Some files from OMG&apos;s database could not be found anymore in your filesystem. They are shown in red below. For each file, you can either provide a new path manually or delete it from the database.</source>
-        <translation type="unfinished"></translation>
+        <translation>Die in rot dargestellten Dateien existieren in OMGs Datenbank, aber nicht mehr auf dem Dateisystem. Jede Datei kann entweder auch aus OMG entfernt werden, oder ein neuer Pfad wird manuell gewählt.</translation>
     </message>
     <message>
         <location filename="../omg/filesystem/dialogs.py" line="132"/>
@@ -2313,8 +2313,9 @@ guessing. This is useful in most cases, unless you have albums that are split ac
     <message numerus="yes">
         <location filename="../omg/filesystem/dialogs.py" line="157"/>
         <source>Close (%n files still missing)</source>
-        <translation type="unfinished">
-            <numerusform></numerusform>
+        <translation>
+            <numerusform>Schließen (noch eine fehlende Datei)</numerusform>
+            <numerusform>Schließen (noch %n fehlende Dateien)</numerusform>
         </translation>
     </message>
 </context>
@@ -4010,7 +4011,7 @@ guessing. This is useful in most cases, unless you have albums that are split ac
     <message>
         <location filename="../omg/filesystem/__init__.py" line="55"/>
         <source>The &apos;ffmpeg&apos; binary needed by OMG&apos;s file tracking mechanism was not found. Please consider installing ffmpeg for full functionality.</source>
-        <translation type="unfinished"></translation>
+        <translation>Das Programm „ffmpeg“, welches für den Tracking-Mechanismus von OMG benötigt wird, wurde nicht gefunden. Bitte installieren Sie es, um alle Funktionen von OMG nutzen zu können.</translation>
     </message>
 </context>
 <context>
@@ -4037,7 +4038,7 @@ guessing. This is useful in most cases, unless you have albums that are split ac
     <message>
         <location filename="../omg/core/tagcommands.py" line="112"/>
         <source>rename {} value</source>
-        <translation type="unfinished"></translation>
+        <translation>„{}“-Wert umbenennen</translation>
     </message>
 </context>
 <context>
