@@ -22,9 +22,8 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from . import rootedtreemodel
-from .. import application, database as db, models, config, utils, models
-from ..core import levels
-from ..core.nodes import RootNode, Wrapper
+from .. import application, config, utils
+from ..core.nodes import Wrapper
 
 translate = QtCore.QCoreApplication.translate
 
