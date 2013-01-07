@@ -60,9 +60,7 @@ class PhononPlayerBackend(player.PlayerBackend):
                 self.playlist.setCurrent(state['current'])
 
         self._nextSource = None # used in self._handleSourceChanged
-        
         self.connectionState = player.CONNECTED
-
         # Initialize Phonon        
         self.mediaObject = phonon.MediaObject()
         self.mediaObject.aboutToFinish.connect(self._handleAboutToFinish)
@@ -108,9 +106,18 @@ class PhononPlayerBackend(player.PlayerBackend):
                 if self.current() is None:
                     self.setCurrent(0) # this starts playing
                 else: self.mediaObject.play()
+                QtCore.QTimer.singleShot(500, self.checkPlaying)
             else: self.mediaObject.pause()
             self.stateChanged.emit(state)
-     
+            
+    
+    def checkPlaying(self):
+        if self.state() != player.PLAY:
+            from omg.gui.dialogs import warning
+            warning(self.tr("Error Playing Song"),
+                    self.tr("Phonon could not play back the selected file."))
+            self.stateChanged.emit(self.state())
+    
     def volume(self):
         return int(self.audioOutput.volume() * 100)
     
@@ -163,11 +170,11 @@ class PhononPlayerBackend(player.PlayerBackend):
             self._nextSource = phonon.MediaSource(self._getPath(self.currentOffset()+1))
             self.mediaObject.enqueue(self._nextSource)
             
-    def _handleSourceChanged(self,newSource):
+    def _handleSourceChanged(self, newSource):
         if newSource == self._nextSource:
             self.playlist.setCurrent(self.currentOffset() + 1)
             self._nextSource = None
-            
+        
     def _handleTick(self,pos):
         self.elapsedChanged.emit(pos / 1000)
     
