@@ -205,7 +205,7 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         if len(wrappers) == 0:
             return True
         
-        if self.insert(parent,position,wrappers):
+        if self.insert(parent, position, wrappers):
             self.stack.endMacro()
             return True
         else: return False # macro has been aborted
@@ -284,7 +284,9 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         self.stack.push(command)
         if hasattr(command, 'error'):
             from ..gui import dialogs
+            QtGui.qApp.setOverrideCursor(Qt.ArrowCursor)
             dialogs.warning(self.tr('Playlist error'), str(command.error))
+            QtGui.qApp.restoreOverrideCursor()
             wrappers = command.wrappers
             if len(wrappers) == 0:
                 self.stack.abortMacro()
