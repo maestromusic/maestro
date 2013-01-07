@@ -45,9 +45,6 @@ class InsertError(BackendError):
 class PlayerBackend(profiles.Profile):
     """This is the base class for modules that implement connection to a backend
     providing audio playback and playlist management.
-    
-    In addition to the setter functions below, the attributes state, volume, currentSong,
-    elapsed should be present in each implementing subclass.
     """
     stateChanged = QtCore.pyqtSignal(int) #Emits one of {PLAY, STOP,PAUSE} if the backend's state has changed
     volumeChanged = QtCore.pyqtSignal(int)
