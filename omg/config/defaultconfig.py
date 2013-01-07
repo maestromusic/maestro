@@ -114,7 +114,7 @@ storage = OrderedDict((
         "version": 1,
         "formatters": {
             "consoleFormatter": {"format": "%(asctime)s: %(levelname)s - %(name)s - %(message)s"},
-            "fileFormatter": {"format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s}"},
+            "fileFormatter": {"format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s"},
         },
         "handlers": {
             "consoleHandler": {
