@@ -733,7 +733,7 @@ class TagValuePropertiesWidget(QtGui.QWidget):
         and exchanging the two parts."""
         if checked:
             if self.origSortValue is None and self.sortEdit.text() == "":
-                names = self.valueEdit.text().rsplit(' ', 1)
+                names = self.valueEdit.getText().rsplit(' ', 1)
                 if len(names) == 2:
                     self.sortEdit.setText(names[1] + ", " + names[0])
                 
