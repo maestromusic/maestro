@@ -72,7 +72,7 @@ class EditTagsAction(TreeAction):
         """
         from ..gui import tageditor
         dialog = tageditor.TagEditorDialog(includeContents=self.recursive, parent=self.parent())
-        dialog.useElementsFromSelection(self.parent().nodeSelection)
+        dialog.useElementsFromSelection(self.parent().selection)
         dialog.exec_()
 
 
@@ -89,12 +89,9 @@ class RenameAction(TreeAction):
         self.setEnabled(selection.singleWrapper() and selection.hasFiles())
     
     def doAction(self):
-        """Open a dialog to edit the tags of the currently selected elements (and the children, if
-        *recursive* is True). This is called by the edit tags actions in the contextmenu.
-        """
         import os.path
         from ..filebackends.filesystem import FileURL
-        elem = next(self.parent().nodeSelection.fileWrappers()).element
+        elem = next(self.parent().selection.fileWrappers()).element
         path = QtGui.QFileDialog.getOpenFileName(self, self.tr("Select new file location"),
                                                  (os.path.dirname(elem.url.path)))
         if path != "":
@@ -118,7 +115,7 @@ class RemoveFromParentAction(TreeAction):
     def doAction(self):
         model = self.parent().model()
         byParent = {}
-        wrappers = self.parent().nodeSelection.wrappers()
+        wrappers = self.parent().selection.wrappers()
         for wrapper in wrappers:
             if any(p in wrappers for p in wrapper.getParents()):
                 continue
@@ -154,7 +151,7 @@ class DeleteAction(TreeAction):
         self.setEnabled(selection.hasElements())
     
     def doAction(self):
-        selection = self.parent().nodeSelection
+        selection = self.parent().selection
         files = [wrap.element for wrap in selection.fileWrappers()]
         self.level().deleteElements(selection.elements())
         if self.allowDisk and len(files) > 0:
@@ -200,7 +197,7 @@ class MergeAction(TreeAction):
         self.setEnabled(selection.singleParent())
 
     def doAction(self):
-        selection = self.parent().nodeSelection
+        selection = self.parent().selection
         from ..gui.dialogs import MergeDialog
         nodes = sorted(selection.wrappers(), key=lambda wrap: wrap.parent.contents.index(wrap))
         dialog = MergeDialog(self.parent().model(), nodes, self.parent())
@@ -260,7 +257,7 @@ class FlattenAction(TreeAction):
         from ..gui.dialogs import FlattenDialog
         dialog = FlattenDialog(parent = self.parent())
         if dialog.exec_() == QtGui.QDialog.Accepted:
-            flatten(self.parent().level, self.parent().nodeSelection.wrappers(), dialog.recursive())
+            flatten(self.parent().level, self.parent().selection.wrappers(), dialog.recursive())
             
 
 class ChangePositionAction(TreeAction):
@@ -285,7 +282,7 @@ class ChangePositionAction(TreeAction):
         
     def doAction(self):
         from ..gui.dialogs import warning
-        selection = self.parent().nodeSelection
+        selection = self.parent().selection
         positions = [wrap.position for wrap in selection.wrappers()]
         parent = selection.wrappers()[0].parent.element
         try:
@@ -309,7 +306,7 @@ class MatchTagsFromFilenamesAction(TreeAction):
         """Open a TagMatchDialog for the selected elements."""
         from ..gui import tagmatchdialog
         dialog = tagmatchdialog.TagMatchDialog(self.parent().level,
-                                               self.parent().nodeSelection.wrappers(),
+                                               self.parent().selection.wrappers(),
                                                self.parent())
         dialog.exec_()
 

@@ -64,14 +64,14 @@ class TagEditorDock(QtGui.QDockWidget):
         vertical = self.isFloating() or area in [Qt.LeftDockWidgetArea,Qt.RightDockWidgetArea]
         self.editorWidget.setVertical(vertical)
     
-    def _handleSelectionChanged(self,nodeSelection):
+    def _handleSelectionChanged(self, selection):
         """React to changes to the global selection: Load the elements of the selected wrappers
         into the TagEditorWidget."""
-        if not nodeSelection.hasElements():
+        if not selection.hasElements():
             return
-        self.editorWidget.setElements(nodeSelection.level,
-                                      list(nodeSelection.elements(recursive=False)),
-                                      list(nodeSelection.elements(recursive=True)))
+        self.editorWidget.setElements(selection.level,
+                                      list(selection.elements(recursive=False)),
+                                      list(selection.elements(recursive=True)))
         
     def dragEnterEvent(self,event):
         if event.mimeData().hasFormat(config.options.gui.mime) or event.mimeData().hasUrls():
@@ -172,11 +172,11 @@ class TagEditorDialog(QtGui.QDialog):
             elementsWithContents = None
         self.tagedit.setElements(self.level, elements, elementsWithContents)
        
-    def useElementsFromSelection(self, nodeSelection):
-        """Use the elements in the given NodeSelection in the tageditor."""
-        self.setElements(nodeSelection.level,
-                         nodeSelection.elements(recursive=False),
-                         nodeSelection.elements(recursive=True))
+    def useElementsFromSelection(self, selection):
+        """Use the elements in the given Selection in the tageditor."""
+        self.setElements(selection.level,
+                         selection.elements(recursive=False),
+                         selection.elements(recursive=True))
         
     def reject(self):
         self.stack.closeSubstack(self.stack)
@@ -341,11 +341,11 @@ class TagEditorWidget(QtGui.QWidget):
         self.includeContentsButton.setEnabled(self.elementsWithContents is not None)
         self._updateElements()
         
-    def useElementsFromSelection(self, nodeSelection):
-        """Use the elements in the given NodeSelection in the tageditor."""
-        self.setElements(nodeSelection.level,
-                         nodeSelection.elements(recursive=False),
-                         nodeSelection.elements(recursive=True))
+    def useElementsFromSelection(self, selection):
+        """Use the elements in the given Selection in the tageditor."""
+        self.setElements(selection.level,
+                         selection.elements(recursive=False),
+                         selection.elements(recursive=True))
         
     def _updateElements(self):
         """Update the element display."""

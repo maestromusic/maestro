@@ -25,9 +25,9 @@ from .. import application
 from . import selection, treeactions
 
 
-class NodeSelection(selection.NodeSelection):
+class Selection(selection.Selection):
     """Objects of this class store a selection of nodes in a TreeView. Different than a QItemSelectionModel,
-    a NodeSelection knows about Nodes, Elements etc and provides special methods to determine properties
+    a Selection knows about Nodes, Elements etc and provides special methods to determine properties
     of the selection. Actions can use this information to decide whether they are enabled or not.
 
     *model* is a QItemSelectionModel.
@@ -39,7 +39,7 @@ class NodeSelection(selection.NodeSelection):
         super().__init__(level,[model.model().data(index) for index in model.selectedIndexes()])
         self._model = model
         
-    def nodes(self,onlyToplevel=False):
+    def nodes(self, onlyToplevel=False):
         """Return all nodes that are currently selected. If *onlyToplevel* is True, nodes will be excluded
         if an ancestor is also selected.
         """
@@ -190,19 +190,19 @@ class TreeView(QtGui.QTreeView):
     
     def setModel(self, model):
         super().setModel(model)
-        self.updateNodeSelection()
+        self.updateSelection()
     
     def focusInEvent(self, event):
-        self.updateNodeSelection()
+        self.updateSelection()
         super().focusInEvent(event)
 
-    def updateNodeSelection(self):
+    def updateSelection(self):
         selectionModel = self.selectionModel()
         if selectionModel is not None: # happens if the view is empty
-            self.nodeSelection = NodeSelection(self.level,selectionModel)
+            self.selection = Selection(self.level, selectionModel)
             for action in self.treeActions.values():
                 if isinstance(action, treeactions.TreeAction):
-                    action.initialize(self.nodeSelection)
+                    action.initialize(self.selection)
         
     def contextMenuEvent(self, event):
         menu = self.actionConfig.createMenu(self, self.treeActions)
@@ -213,24 +213,12 @@ class TreeView(QtGui.QTreeView):
             event.accept()
         else:
             event.ignore()
-        
-    def keyPressEvent(self, event):
-        self.updateNodeSelection()
-        super().keyPressEvent(event)
-        
-    def mousePressEvent(self, event):
-        self.updateNodeSelection()
-        super().mousePressEvent(event)
-    
-    def keyReleaseEvent(self, event):
-        self.updateNodeSelection()
-        super().keyReleaseEvent(event)
-        
+               
     def selectionChanged(self, selected, deselected):
         super().selectionChanged(selected, deselected)
-        self.updateNodeSelection()
-        if self.affectGlobalSelection and not self.nodeSelection.empty():
-            selection.setGlobalSelection(self.nodeSelection)  
+        self.updateSelection()
+        if self.affectGlobalSelection and not self.selection.empty():
+            selection.setGlobalSelection(self.selection)  
     
     def currentNode(self):
         current = self.currentIndex()
@@ -314,5 +302,5 @@ class DraggingTreeView(TreeView):
         super().dropEvent(event)
         self.model().dndSource = None
         self.model().dndTarget = None
-        self.updateNodeSelection()
+        self.updateSelection()
         

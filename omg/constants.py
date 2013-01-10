@@ -18,7 +18,7 @@
 
 import os
 
-VERSION = '0.3.0' # major, minor, revision
+VERSION = '0.4.0' # major, minor, revision
 
 HOME    = os.path.expanduser("~")
 

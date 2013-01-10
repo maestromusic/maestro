@@ -77,7 +77,7 @@ class PlaylistTreeView(treeview.DraggingTreeView):
             self.setRootIsDecorated(False)
         self.setModel(model)
         self.itemDelegate().model = model
-        self.updateNodeSelection()
+        self.updateSelection()
         self.model().modelReset.connect(self.expandAll) 
 
     def _handleDoubleClick(self, idx):

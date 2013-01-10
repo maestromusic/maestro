@@ -21,7 +21,7 @@ import itertools
 from PyQt4 import QtCore
 from PyQt4.QtCore import Qt
 
-from . import rootedtreemodel, mimedata
+from . import rootedtreemodel
 from .. import config, search, database as db, logging, utils
 from ..core import tags, levels
 from ..core.elements import Element
@@ -109,8 +109,8 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
     def mimeTypes(self):
         return [config.options.gui.mime]
         
-    def mimeData(self,indexes):
-        return BrowserMimeData.fromIndexes(self,indexes)
+    def mimeData(self, indexes):
+        return BrowserMimeData.fromIndexes(self, indexes)
 
     def _startLoading(self,node,wait=False):
         """Start loading the contents of *node*, which must be either root or a CriterionNode (The contents of
@@ -455,12 +455,12 @@ class LoadingNode(TextNode):
         super().__init__(translate("BrowserModel", "Loading..."))
         
 
-class BrowserMimeData(mimedata.MimeData):
-    """This is the subclass of mimedata.MimeData that is used by the browser. The main differences are that
+class BrowserMimeData(selection.MimeData):
+    """This is the subclass of selection.MimeData that is used by the browser. The main differences are that
     the browser contains nodes that are no elements and that they may not have loaded their contents yet.   
     """  
-    def __init__(self, nodeSelection):
-        super().__init__(nodeSelection)
+    def __init__(self, selection):
+        super().__init__(selection)
         self._wrappersLoaded = False
 
     def wrappers(self):
@@ -482,11 +482,3 @@ class BrowserMimeData(mimedata.MimeData):
             return itertools.chain.from_iterable(self._getElementsInstantly(child)
                                                     for child in node.getContents())
         else: return [] # Should be a LoadingNode
-
-    @staticmethod
-    def fromIndexes(model,indexList):
-        """Generate a MimeData instance from the indexes in *indexList*. *model* must be the model containing
-        these indexes.
-        """
-        nodes = [model.data(index,role=Qt.EditRole) for index in indexList]
-        return BrowserMimeData(selection.NodeSelection(model.level,nodes))

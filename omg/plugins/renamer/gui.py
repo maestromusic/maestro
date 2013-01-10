@@ -50,7 +50,7 @@ class RenameFilesAction(treeactions.TreeAction):
                 if not file.url.CAN_RENAME:
                     return False
             return True
-        elements = [elem for elem in self.parent().nodeSelection.elements() if check(elem)]
+        elements = [elem for elem in self.parent().selection.elements() if check(elem)]
         dialog = RenameDialog(self.parent(), self.level(), elements)
         dialog.exec_()
         if dialog.result() == dialog.Accepted:

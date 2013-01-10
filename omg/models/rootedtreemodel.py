@@ -19,7 +19,7 @@
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from . import mimedata
+from ..gui import selection
 from .. import logging, config
 from ..core.nodes import Node, RootNode
 
@@ -76,7 +76,7 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
         return (config.options.gui.mime,"text/uri-list")
     
     def mimeData(self,indexes):
-        return mimedata.MimeData.fromIndexes(self,indexes)
+        return selection.MimeData.fromIndexes(self, indexes)
     
     def toolTipText(self, index):
         if index:

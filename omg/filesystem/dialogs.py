@@ -74,7 +74,7 @@ class SetPathAction(treeactions.TreeAction):
         *recursive* is True). This is called by the edit tags actions in the contextmenu.
         """
         from ..filebackends.filesystem import FileURL
-        elem = next(self.parent().nodeSelection.fileWrappers()).element
+        elem = next(self.parent().selection.fileWrappers()).element
         path = QtGui.QFileDialog.getOpenFileName(application.mainWindow,
                                                  self.tr("Select new file location"),
                                                  os.path.dirname(elem.url.absPath))

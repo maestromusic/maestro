@@ -18,33 +18,37 @@
 
 import itertools
 
-from ..core.nodes import RootNode, Wrapper
+from PyQt4 import QtCore, QtGui
+from PyQt4.QtCore import Qt
+
+from .. import config
+from ..core.nodes import Wrapper, RootNode
+
 
 _globalSelection = None
 
 # This signal is emitted when the global selection changes. As parameter it contains the current global
-# selection as NodeSelection object.
+# selection as Selection object.
 changed = None
 # Because a signal must be bound to a QObject, this signal is defined in MainWindow.
 # We cannot import mainwindow here because we have to import this module there to define
-# MainWindow._globalSelectionChanged = QtCore.pyqtSignal(selection.NodeSelection)
+# MainWindow._globalSelectionChanged = QtCore.pyqtSignal(selection.Selection)
 # For this reason this signal is initialized in MainWindow.__init__ 
 
 
 def getGlobalSelection():
-    """Return the level in which the global selection is contained and the wrappers that form the current
-    global selection."""
+    """Return the Selection-instance that is globally selected."""
     return _globalSelection
 
 
-def setGlobalSelection(nodeSelection):
+def setGlobalSelection(selection):
     """Set the global selection."""
     global _globalSelection
-    _globalSelection = nodeSelection
+    _globalSelection = selection
     changed.emit(_globalSelection)
 
 
-class NodeSelection:
+class Selection:
     """Objects of this class store a selection of nodes and provide methods to e.g. determine whether
     at least one file is selected or to get all selected wrappers including all of their descendants.
     Actions can use this information to decide whether they are enabled or not.
@@ -54,7 +58,7 @@ class NodeSelection:
     If it is clear that only wrappers can be selected, you can set *onlyWrappers* to True to increase
     performance.
     """
-    def __init__(self,level,nodes,onlyWrappers=False):
+    def __init__(self, level, nodes, onlyWrappers=False):
         self.level = level
         self._nodes = nodes
         
@@ -67,15 +71,15 @@ class NodeSelection:
                 node = node.parent
         nodes.sort(key=lambda n: tuple(indexGenerator(n)))
         
-        if onlyWrappers or all(isinstance(node,Wrapper) for node in self._nodes):
+        if onlyWrappers or all(isinstance(node, Wrapper) for node in self._nodes):
             self._wrappers = self._nodes
         else: self._wrappers = [node for node in self._nodes if isinstance(node,Wrapper)]
-    
+        
     def empty(self):
         """Return whether no nodes are selected at all."""
         return len(self._nodes) == 0
     
-    def nodes(self,onlyToplevel=False):
+    def nodes(self, onlyToplevel=False):
         """Return all nodes that are currently selected. If *onlyToplevel* is True, exclude nodes if an
         ancestor is also selected.
         """
@@ -86,7 +90,7 @@ class NodeSelection:
             return [n for n in self._nodes if not any(parent in self._nodes for parent in n.getParents())]
         
     def wrappers(self, recursive=False):
-        """Return a list of all selected element wrappers. If *recursive* is True return all children of
+        """Return a list of all selected element wrappers. If *recursive* is True, return all children of
         selected wrappers. If a wrapper is selected and one of its parents is also selected, don't return
         it twice.
         """
@@ -100,61 +104,63 @@ class NodeSelection:
             return wrappers
         
     def toplevelWrappers(self):
-        """Search the tree for the toplevel wrappers and return them. This differs from the result of
-        getNodes only if some nodes are no wrappers (but e.g. ValueNodes from the broswer).
+        """Search the tree for the toplevel wrappers and return them.
         In other words: Strip everything at the top of the tree that is not a Wrapper and remove the rest.
         """
         return self._toplevelWrappers(self._nodes)
          
     def _toplevelWrappers(self,nodes):
-        """Like getWrappers, but use the given nodes."""
+        """Like toplevelWrappers, but use the given nodes."""
         return itertools.chain.from_iterable(
                         [node] if isinstance(node,Wrapper) else self._toplevelWrappers(node.getContents())
                     for node in nodes)
+    
+    def fileWrappers(self, recursive=False, schemes=None):
+        """Return a generator of all file wrappers that are selected.
+        If *recursive* is True, also return files of which at least one parent is selected. If
+        *schemes* is specified it must be a list of file backend schemes; then only files
+        with those schemes will be returned.
+        """
+        if schemes is None:
+            return (w for w in self.wrappers(recursive) if w.isFile())
+        return (w for w in self.wrappers(recursive)
+                  if w.isFile() and w.element.url.scheme in schemes)
         
-    def elements(self,recursive=False):
+    def elements(self, recursive=False):
         """Return all elements that are selected. Remove duplicates (elements might be selected in several
         wrappers."""
-        elements = set()
+        elids = set()
         def check(w):
-            if w.element in elements:
+            if w.element.id in elids:
                 return False
             else:
-                elements.add(w.element)
+                elids.add(w.element.id)
                 return True
         return (w.element for w in self.wrappers(recursive) if check(w))
-        
-    def singleWrapper(self):
-        """Return True iff one single element is selected. This does not exclude that other non-element
-        nodes are selected too."""
-        return len(self._wrappers) == 1
     
-    def singleParent(self, requireParentElement = False):
-        """Return True iff all selected elements share the same parent. IF *requireParentElement* is True,
-        that parent must also be an element, otherwise False is returned."""
-        if len(self._wrappers) == 0:
-            return False
-        parent = self._wrappers[0].parent
-        if requireParentElement and not isinstance(parent,Wrapper):
-            return False
-        return all(w.parent == parent for w in self._wrappers[1:])
+    def files(self, recursive=False):
+        """Return all files (not file wrappers!) that are selected. Remove duplicates (elements might be
+        selected in several wrappers."""
+        return (element for element in self.elements(recursive) if element.isFile())
 
     def hasWrappers(self):
         """True iff at least one wrapper is selected."""
-        return len(self._wrappers) > 0
+        return len(self.wrappers()) > 0
     
     def hasElements(self):
         """True iff at least one element is selected (this element might be contained in a wrapper)."""
-        return len(self._wrappers) > 0
+        return self.hasWrappers()
     
     def hasContainers(self):
         """True iff at least one container is selected."""
-        return any(w.isContainer() for w in self._wrappers)
+        return any(w.isContainer() for w in self.wrappers())
 
     def hasFiles(self, recursive=False, schemes=None):
         """True iff at least one file is selected.
         
-        The parameters *recursive* and *schemes* behave like in fileWrappers().
+        If *recursive* is True, also count files of which at least one parent is selected. If
+        *schemes* is specified it must be a list of file backend schemes; then only files
+        with those schemes will be counted.
         """
         iter = self.fileWrappers(recursive, schemes)
         try:
@@ -162,15 +168,91 @@ class NodeSelection:
             return True
         except StopIteration:
             return False
+        
+    def singleWrapper(self):
+        """Return True iff one single element is selected. This does not exclude that other non-element
+        nodes are selected too."""
+        return len(self.wrappers()) == 1
     
-    def fileWrappers(self, recursive=False, schemes=None):
-        """Return a generator of all file wrappers that are selected.
+    def singleParent(self, requireParentIsWrapper=False):
+        """Return True iff at least one node is selected and all selected nodes share the same parent.
+        If *requireParentIsWrapper* is True, that parent must be a wrapper, otherwise False is returned."""
+        wrappers = self.wrappers()
+        if len(wrappers) == 0:
+            return False
+        parent = wrappers[0].parent
+        if requireParentIsWrapper and not isinstance(parent,Wrapper):
+            return False
+        return all(w.parent == parent for w in wrappers[1:])
+    
+    def backendUrls(self):
+        """Return a list of BackendUrls of all files contained in this MimeData-instance."""
+        return [wrapper.element.url for wrapper in self.fileWrappers()]
         
-        If *recursive* is True, also return files of which at least one parent is selected. If
-        *schemes* is specified it must be a list of file backend schemes; then only files
-        with that schemes will be returned."""
-        if schemes is None:
-            return (w for w in self.wrappers(recursive) if w.isFile())
-        return (w for w in self.wrappers(recursive)
-                  if w.isFile() and w.element.url.scheme in schemes)
+    def urls(self): # inherited
+        """Return a list of QUrls of all files contained in this MimeData-instance."""
+        return [url.toQUrl() for url in self.backendUrls()]
+    
+    @staticmethod
+    def fromIndexes(model, indexList):
+        """Generate a MimeData instance from the indexes in *indexList*. *model* must be the model containing
+        these indexes.
+        """
+        return Selection(model.level, [model.data(index,role=Qt.EditRole) for index in indexList])
+    
+    @staticmethod
+    def fromElements(level, elements):
+        return MimeData(level, [Wrapper(element) for element in elements])
+
+
+class MimeData(QtCore.QMimeData):
+    """Subclass of QMimeData specialized to transport a tree of nodes. It supports two MimeTypes: The first
+    one is used internally by omg and stores the tree-structure. Its name is stored in the config variable 
+    "gui->mime". The second one is "text/uri-list" and contains a list of URLs to all files in the tree. This
+    type is used by applications like Amarok and Dolphin.
         
+    Use the attribute 'level' to check whether the wrappers in the MimeData are on the level used by the
+    widget/model where they are dropped. If not, they might contain elements that do not exist on the second
+    level as well as an invalid tree structure.
+    """
+    def __init__(self, selection):
+        super().__init__()
+        self.selection = selection
+        
+    def __getattr__(self, attr):
+        print("getattr", attr)
+        return getattr(self.selection, attr)
+        
+    def hasFormat(self, format):
+        return format in self.formats()
+    
+    def formats(self):
+        return [config.options.gui.mime, "text/uri-list"]
+    
+    def hasUrls(self):
+        return True
+    
+    def urls(self): #inherited
+        return self.selection.urls()
+        
+    def retrieveData(self, mimeType, type=None):
+        if mimeType == config.options.gui.mime:
+            return self.selection.nodes()
+        elif mimeType == "text/uri-list":
+            return self.urls()
+        else:
+            # following the documentation of Qt a null QVariant should be returned
+            # PyQt does not allow to instantiate QVariant
+            return None
+           
+    @classmethod
+    def fromIndexes(cls, model, indexList):
+        """Generate a MimeData instance from the indexes in *indexList*. *model* must be the model containing
+        these indexes.
+        """
+        return cls(Selection.fromIndexes(model, indexList))
+    
+    @classmethod
+    def fromElements(cls, level, elements):
+        return cls(Selection.fromElements(elements))
+    

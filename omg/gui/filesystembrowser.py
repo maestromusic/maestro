@@ -121,7 +121,7 @@ class FileSystemBrowserDock(QtGui.QDockWidget):
         self.setWidget(FileSystemBrowser())
         
 
-class FileSystemSelection(selection.NodeSelection):
+class FileSystemSelection(selection.Selection):
     
     def __init__(self, paths):
         super().__init__(levels.real,[])

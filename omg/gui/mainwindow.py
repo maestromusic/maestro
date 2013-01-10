@@ -157,7 +157,7 @@ class MainWindow(QtGui.QMainWindow):
     _dockWidgets = None
     
     # Use gui.selection.changed instead
-    _globalSelectionChanged = QtCore.pyqtSignal(selection.NodeSelection)
+    _globalSelectionChanged = QtCore.pyqtSignal(selection.Selection)
     
     def __init__(self,parent=None):
         super().__init__(parent)
