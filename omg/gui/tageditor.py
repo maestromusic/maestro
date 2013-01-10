@@ -349,7 +349,7 @@ class TagEditorWidget(QtGui.QWidget):
         
     def _updateElements(self):
         """Update the element display."""
-        elements = self.elementsWithContents if self.includeContents else self.elements
+        elements = self.elementsWithContents if self.elementsWithContents is not None and self.includeContents else self.elements
         if elements is not None:
             self.model.setElements(self.level, elements)
             self.flagModel.setElements(self.level, elements)
@@ -628,7 +628,7 @@ class TagEditorWidget(QtGui.QWidget):
 
     @property
     def includeContents(self):
-        return self.elementsWithContents is not None and self.includeContentsButton.isChecked()
+        return self.includeContentsButton.isChecked()
     
     @includeContents.setter
     def includeContents(self, value):
