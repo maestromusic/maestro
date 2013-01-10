@@ -43,7 +43,7 @@ To work with this system central widgets or dock widget must follow some rules:
 
 """
 
-import functools, itertools
+import functools, itertools, collections
 
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
@@ -366,7 +366,7 @@ class MainWindow(QtGui.QMainWindow):
         if "mainwindow_maximized" in config.binary and config.binary["mainwindow_maximized"]:
             self.showMaximized()
                 
-        self._centralWidgets = {}
+        self._centralWidgets = collections.OrderedDict() 
         self._dockWidgets = {}
         if len(config.storage.gui.central_widgets) == 0 and len(config.storage.gui.dock_widgets) == 0:
             self.createDefaultWidgets()
