@@ -269,8 +269,8 @@ class SynchronizeHelper(QtCore.QObject):
                         "{}".format(str(newUrl))), application.mainWindow)
         db.query('UPDATE {}files SET url=? WHERE element_id=?'.format(db.prefix), str(newUrl), id)
         if id in levels.real.elements:
-            levels.real.get(id).url = newUrl
-            levels.real.emitEvent([id])
+            levels.real.collect(id).url = newUrl
+            levels.real.emitEvent(dataIds=[id])
     
     @QtCore.pyqtSlot(list)
     def showLostTracksDialog(self, tracks):

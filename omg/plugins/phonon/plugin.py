@@ -17,6 +17,7 @@
 #
 
 import urllib.parse
+import os.path
 
 from PyQt4 import QtCore
 try:
@@ -24,7 +25,7 @@ try:
 except ImportError as e:
     raise ImportError("PyQt4-phonon is not installed.")
 
-from ... import player, profiles, utils, strutils
+from ... import player, profiles, utils
 from ...models import playlist
         
 translate = QtCore.QCoreApplication.translate
@@ -59,9 +60,7 @@ class PhononPlayerBackend(player.PlayerBackend):
                 self.playlist.setCurrent(state['current'])
 
         self._nextSource = None # used in self._handleSourceChanged
-        
         self.connectionState = player.CONNECTED
-
         # Initialize Phonon        
         self.mediaObject = phonon.MediaObject()
         self.mediaObject.aboutToFinish.connect(self._handleAboutToFinish)
@@ -72,7 +71,13 @@ class PhononPlayerBackend(player.PlayerBackend):
         phonon.createPath(self.mediaObject,self.audioOutput)
     
     # Insert etc. are handled by the PlaylistModel. We only have to change the state if necessary.
-    def insertIntoPlaylist(self,pos,paths): pass
+    def insertIntoPlaylist(self, pos, urls):
+        urls = list(urls)
+        for i, url in enumerate(urls):
+            if not os.path.exists(url.absPath):
+                raise player.InsertError(self.tr("Can not play '{}': File does not exist.")
+                                         .format(url), urls[:i])
+            
     def move(self,fromOffset,toOffset): pass
     
     def removeFromPlaylist(self,begin,end):
@@ -101,9 +106,18 @@ class PhononPlayerBackend(player.PlayerBackend):
                 if self.current() is None:
                     self.setCurrent(0) # this starts playing
                 else: self.mediaObject.play()
+                QtCore.QTimer.singleShot(500, self.checkPlaying)
             else: self.mediaObject.pause()
             self.stateChanged.emit(state)
-     
+            
+    
+    def checkPlaying(self):
+        if self.state() != player.PLAY:
+            from omg.gui.dialogs import warning
+            warning(self.tr("Error Playing Song"),
+                    self.tr("Phonon could not play back the selected file."))
+            self.stateChanged.emit(self.state())
+    
     def volume(self):
         return int(self.audioOutput.volume() * 100)
     
@@ -156,11 +170,11 @@ class PhononPlayerBackend(player.PlayerBackend):
             self._nextSource = phonon.MediaSource(self._getPath(self.currentOffset()+1))
             self.mediaObject.enqueue(self._nextSource)
             
-    def _handleSourceChanged(self,newSource):
+    def _handleSourceChanged(self, newSource):
         if newSource == self._nextSource:
             self.playlist.setCurrent(self.currentOffset() + 1)
             self._nextSource = None
-            
+        
     def _handleTick(self,pos):
         self.elapsedChanged.emit(pos / 1000)
     

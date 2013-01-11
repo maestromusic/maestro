@@ -22,7 +22,7 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from . import wrappertreemodel, treebuilder
-from .. import application, config, logging, player, utils
+from .. import application, config, logging, player, utils, filebackends
 from ..core import levels
 from ..core.nodes import RootNode, Wrapper
 
@@ -205,7 +205,7 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         if len(wrappers) == 0:
             return True
         
-        if self.insert(parent,position,wrappers):
+        if self.insert(parent, position, wrappers):
             self.stack.endMacro()
             return True
         else: return False # macro has been aborted
@@ -284,7 +284,9 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         self.stack.push(command)
         if hasattr(command, 'error'):
             from ..gui import dialogs
+            QtGui.qApp.setOverrideCursor(Qt.ArrowCursor)
             dialogs.warning(self.tr('Playlist error'), str(command.error))
+            QtGui.qApp.restoreOverrideCursor()
             wrappers = command.wrappers
             if len(wrappers) == 0:
                 self.stack.abortMacro()
@@ -478,6 +480,7 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
             """This is used as createFunc-argument for Level.createWrappers."""
             if token.startswith('EXT:'):
                 url = urllib.parse.unquote(token[4:]) # remove "EXT:"
+                url = filebackends.BackendURL.fromString(url)
                 element = self.level.collect(url)
             else:
                 element = self.level.collect(int(token))
