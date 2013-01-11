@@ -44,10 +44,10 @@ selectableLayers = utils.mapRecursively(partial(tags.get,addDialogIfNew=True),[
 ])
 
 
-class BrowserDialog(dialogs.FancyTabbedPopup):
+class AbstractBrowserDialog(dialogs.FancyTabbedPopup):
     """Popup dialog that allows to configure the Browser."""
     def __init__(self,browser):
-        dialogs.FancyTabbedPopup.__init__(self,browser.optionButton,300,170)
+        super().__init__(browser.optionButton, 300, 170)
         self.browser = browser
         self.viewConfigurations = []
                 
@@ -63,11 +63,30 @@ class BrowserDialog(dialogs.FancyTabbedPopup):
         self.flagView.selectionChanged.connect(self._handleSelectionChanged)
         self.flagTab.layout().addWidget(self.flagView)
         
-        optionTab = QtGui.QWidget()
-        optionLayout = QtGui.QVBoxLayout()
-        optionTab.setLayout(optionLayout)
-        self.tabWidget.addTab(optionTab,self.tr("Options"))
+        self.optionTab = QtGui.QWidget()
+        self.optionTab.setLayout(QtGui.QVBoxLayout())
+        self.tabWidget.addTab(self.optionTab,self.tr("Options"))
         
+        # Option tab is filled in subclasses
+        
+    def hideEvent(self,event):
+        super().hideEvent(event)
+        self.close()
+        
+    def close(self):
+        self.browser._handleDialogClosed()
+        super().close()
+        
+    def _handleSelectionChanged(self):
+        if len(self.flagView.selectedFlagTypes) > 0:
+            self.browser.setCriterionFilter([criteriaModule.FlagsCriterion(self.flagView.selectedFlagTypes)])
+        else: self.browser.setCriterionFilter([])
+          
+          
+class BrowserDialog(AbstractBrowserDialog):
+    def __init__(self, browser):
+        super().__init__(browser)
+        optionLayout = self.optionTab.layout()
         lineLayout = QtGui.QHBoxLayout()
         optionLayout.addLayout(lineLayout)
         lineLayout.addWidget(QtGui.QLabel(self.tr("Item Display:")))
@@ -94,26 +113,13 @@ class BrowserDialog(dialogs.FancyTabbedPopup):
         viewConfigButton.setSizePolicy(QtGui.QSizePolicy(QtGui.QSizePolicy.Fixed,QtGui.QSizePolicy.Fixed))
         optionLayout.addWidget(viewConfigButton)
         
-        optionLayout.addStretch(1)
-        
-    def hideEvent(self,event):
-        super().hideEvent(event)
-        self.close()
-        
-    def close(self):
-        self.browser._handleDialogClosed()
-        super().close()
+        optionLayout.addStretch(1)          
         
     def _handleProfileChosen(self,profile):
         for view in self.browser.views:
             view.itemDelegate().setProfile(profile)
-        
-    def _handleSelectionChanged(self):
-        if len(self.flagView.selectedFlagTypes) > 0:
-            self.browser.setCriterionFilter([criteriaModule.FlagsCriterion(self.flagView.selectedFlagTypes)])
-        else: self.browser.setCriterionFilter([])
-          
             
+
 class FlagView(QtGui.QTableWidget):
     selectionChanged = QtCore.pyqtSignal(list)
     

@@ -54,22 +54,13 @@ class Selection:
     Actions can use this information to decide whether they are enabled or not.
 
     *level* is the level that contains all selected wrappers.
-    *nodes* are the selected nodes. This must be a list and it will be sorted.
+    *nodes* are the selected nodes.
     If it is clear that only wrappers can be selected, you can set *onlyWrappers* to True to increase
     performance.
     """
     def __init__(self, level, nodes, onlyWrappers=False):
         self.level = level
         self._nodes = nodes
-        
-        # Sort nodes
-        def indexGenerator(node):
-            """Return the index of *node* in its parent, the index of the parent in the grandparent and
-            so on."""
-            while not isinstance(node,RootNode):
-                yield node.parent.index(node)
-                node = node.parent
-        nodes.sort(key=lambda n: tuple(indexGenerator(n)))
         
         if onlyWrappers or all(isinstance(node, Wrapper) for node in self._nodes):
             self._wrappers = self._nodes
@@ -195,14 +186,18 @@ class Selection:
     
     @staticmethod
     def fromIndexes(model, indexList):
-        """Generate a MimeData instance from the indexes in *indexList*. *model* must be the model containing
-        these indexes.
+        """Generate a Selection instance from the QModelIndexes in *indexList*. The indexes will be sorted
+        by their position in the tree. *model* must be the model containing these indexes.
         """
+        indexList.sort() # QModelIndex implements < 
         return Selection(model.level, [model.data(index,role=Qt.EditRole) for index in indexList])
     
     @staticmethod
     def fromElements(level, elements):
-        return MimeData(level, [Wrapper(element) for element in elements])
+        wrappers = [Wrapper(element) for element in elements]
+        for wrapper in wrappers:
+            wrapper.loadContents(recursive=True)
+        return Selection(level, wrappers)
 
 
 class MimeData(QtCore.QMimeData):
@@ -247,8 +242,8 @@ class MimeData(QtCore.QMimeData):
            
     @classmethod
     def fromIndexes(cls, model, indexList):
-        """Generate a MimeData instance from the indexes in *indexList*. *model* must be the model containing
-        these indexes.
+        """Generate a MimeData instance from the QModelIndexes in *indexList*. The indexes will be sorted
+        by their position in the tree. *model* must be the model containing these indexes.
         """
         return cls(Selection.fromIndexes(model, indexList))
     

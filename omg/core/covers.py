@@ -85,7 +85,7 @@ def get(path,size=None):
     """Return a QPixmap with the cover from the specified path which can be absolute or relative to the
     cover folder. If *size* is given, the result will be scaled to have *size* for width and height.
     If *size* is one of the cached sizes, this method will use the cache to skip the scaling.
-    """ 
+    """
     # First try to return from cache
     if size in cacheSizes:
         cachePath = _cachePath(path,size)
@@ -102,11 +102,20 @@ def get(path,size=None):
         pixmap = pixmap.scaled(size,size,transformMode=Qt.SmoothTransformation)
         
     # Store in cache
-    if size in cacheSizes:
-        os.makedirs(os.path.dirname(cachePath),exist_ok=True)
-        pixmap.save(cachePath,config.options.misc.cover_extension)
+    #if size in cacheSizes:
+    #    os.makedirs(os.path.dirname(cachePath),exist_ok=True)
+    #    pixmap.save(cachePath,config.options.misc.cover_extension)
         
     return pixmap
+
+def getAsync(imageLoader, path, size=None):
+    if size in cacheSizes:
+        cachePath = _cachePath(path, size)
+        if os.path.exists(cachePath):
+            path = cachePath
+    elif not os.path.isabs(path):
+        path = os.path.join(COVER_DIR, path)
+    return imageLoader.loadImage(path, QtCore.QSize(size, size))
 
 
 def addCacheSize(size):
