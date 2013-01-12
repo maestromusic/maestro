@@ -630,11 +630,6 @@ class TagEditorModel(QtCore.QObject):
 
         changed = False
         actualRecords = self._createRecords()
-        for record in actualRecords[tags.TITLE]:
-            print("ACTUAL", record)
-        print("=====")
-        for record in self.records[tags.TITLE]:
-            print("CURRENT", record)
         
         for tag in self.records.tags():
             if tag not in actualRecords:
