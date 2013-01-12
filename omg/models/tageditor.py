@@ -637,11 +637,16 @@ class TagEditorModel(QtCore.QObject):
                     self.records.removeRecord(record)
                 self.records.removeTag(tag)
                 changed = True
+            elif len(self.records[tag]) > len(actualRecords[tag]):
+                recordsToRemove = self.records[tag][len(actualRecords[tag]):]
+                for record in recordsToRemove:
+                    self.records.removeRecord(record)
         
         for tag in actualRecords:
             if tag not in self.records.tags():
                 self.records.insertTag(len(self.records.tags()),tag)
                 changed = True
+            
             for i,record in enumerate(actualRecords[tag]):
                 if i >= len(self.records[tag]):
                     self.records.insertRecord(i,record)
