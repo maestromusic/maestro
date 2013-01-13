@@ -57,8 +57,9 @@ class ChangeEventDispatcher(QtCore.QObject):
     queue events during macros and undo/redo.""" 
     _signal = QtCore.pyqtSignal(ChangeEvent)
     
-    def __init__(self):
+    def __init__(self, stack=stack):
         super().__init__()
+        self.stack = stack
         if config.options.misc.debug_events:
             def _debugAll(event):
                 logger.debug("EVENT: " + str(event))
@@ -66,13 +67,13 @@ class ChangeEventDispatcher(QtCore.QObject):
         
     def emit(self,event):
         """Emit an event."""
-        if not stack.shouldDelayEvents():
+        if not self.stack.shouldDelayEvents():
             self._signal.emit(event)
-        else: stack.addEvent(self,event)
+        else: self.stack.addEvent(self,event)
     
-    def connect(self,handler):
+    def connect(self,handler, type=Qt.AutoConnection):
         """Connect a function to this dispatcher."""
-        self._signal.connect(handler)
+        self._signal.connect(handler, type)
         
     def disconnect(self,handler):
         """Disconnect a function from this dispatcher."""
@@ -231,8 +232,8 @@ def run(cmdConfig=[],type='gui',exitPoint=None):
     search.init()
     covers.init()
     
-    import omg.filebackends
     import omg.filebackends.filesystem
+    omg.filebackends.filesystem.init()
     
     global network
     network = QtNetwork.QNetworkAccessManager()

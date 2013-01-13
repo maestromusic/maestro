@@ -27,10 +27,15 @@ import taglib
 
 from . import BackendFile, BackendURL, urlTypes
 from .. import logging, utils
-from ..core import tags, levels
+from ..core import tags
 
 logger = logging.getLogger(__name__)
 translate = QtCore.QCoreApplication.translate
+
+def init():
+    # register the file:// URL scheme
+    urlTypes["file"] = FileURL
+
 
 class RealFile(BackendFile):
     """A normal file that is accessed directly on the filesystem."""
@@ -61,6 +66,7 @@ class RealFile(BackendFile):
                 """Parse a string like "7" or "2/5" to a (integer) position.
                 
                 If *string* has the form "2/5", the first number will be returned."""
+                # TODO: this loses information about total tracks :(
                 string = string.strip()
                 if string.isdecimal():
                     return int(string)
@@ -106,10 +112,14 @@ class RealFile(BackendFile):
         if os.path.exists(newUrl.absPath):
             raise OSError("Target exists.")
         os.renames(self.url.absPath, newUrl.absPath)
+        from ..core import levels
+        levels.real.emitFilesystemEvent(renamed=((self.url, newUrl),))
         self.url = newUrl
     
     def delete(self):
         os.remove(self.url.absPath)
+        from ..core import levels
+        levels.real.emitFilesystemEvent(deleted=(self.url,))
         
     def saveTags(self):
         """Save what's in self.tags to the file.
@@ -128,7 +138,8 @@ class RealFile(BackendFile):
             self._taglibFile.tags[tag.name.upper()] = values
         unsuccessful = self._taglibFile.save()
         ret = {key.upper(): values for key,values in unsuccessful.items()}
-        levels.real.filesModified.emit([self.url])
+        from ..core import levels
+        levels.real.emitFilesystemEvent(modified=(self.url,))
         return ret
 
 
@@ -162,7 +173,3 @@ class FileURL(BackendURL):
     def toQUrl(self):
         """Return a QUrl from this URL. Return None if that is not possible (e.g. weird scheme)."""
         return QtCore.QUrl('file://'+self.absPath)
-
-
-# register the file:// URL scheme
-urlTypes["file"] = FileURL

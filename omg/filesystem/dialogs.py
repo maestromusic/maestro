@@ -55,7 +55,10 @@ class LostFilesDelegate(delegates.StandardDelegate):
 
 
 class SetPathAction(treeactions.TreeAction):
-    """Action to rename (or move) a file."""
+    """Action to change the URL of a file without any undo/redo.
+    
+    Used by the LostFilesDialog to correct URLs of files moved outside of OMG.
+    """
     
     def __init__(self, parent, text=None, shortcut=None):
         super().__init__(parent, shortcut)
@@ -63,6 +66,7 @@ class SetPathAction(treeactions.TreeAction):
             self.setText(self.tr('choose path'))
         else:
             self.setText(text)
+        self.setPaths = []
     
     def initialize(self, selection):
         self.setEnabled(selection.singleWrapper() and \
@@ -83,9 +87,36 @@ class SetPathAction(treeactions.TreeAction):
             from .. import database as db
             from ..database import write
             db.write.changeUrls([ (str(newUrl), elem.id) ])
+            self.setPaths.append( (elem.url, newUrl) )
             elem.url = newUrl
             levels.real.emitEvent(dataIds=(elem.id,))
             elem.problem = False
+
+
+class RemoveMissingFilesAction(treeactions.TreeAction):
+    """Action to remove elements from the database which are missing on the filesystem."""
+    
+    def __init__(self, parent):
+        """Initialize the action."""
+        super().__init__(parent)
+        self.setShortcut(self.tr("Del"))
+        self.setText(self.tr("Remove"))
+        self.removedURLs = []
+            
+    def initialize(self, selection):
+        self.setEnabled(selection.hasElements())
+    
+    def doAction(self):
+        model = self.parent().model()
+        selection = self.parent().nodeSelection
+        belowRoot = [wrap.parent.index(wrap) for wrap in selection.wrappers()
+                     if wrap.parent is self.parent().model().root]
+        self.removedURLs.extend(wrapper.element.url for wrapper in selection.fileWrappers())
+        elements = selection.elements()
+        if len(belowRoot) > 0:
+            for row in sorted(belowRoot, reverse=True):
+                model._removeContents(QtCore.QModelIndex(), row, row)
+        levels.real.deleteElements(elements)
 
 
 class MissingFilesDialog(QtGui.QDialog):
@@ -129,10 +160,7 @@ class MissingFilesDialog(QtGui.QDialog):
         self.view.expandAll()
         
         self.setPathAction = SetPathAction(self.view)
-        self.deleteAction = treeactions.DeleteAction(self.view,
-                                                     text=self.tr("delete"),
-                                                     shortcut=self.tr("Del"),
-                                                     allowDisk=False)
+        self.deleteAction = RemoveMissingFilesAction(self.view)
         self.view.addLocalAction(self.setPathAction)
         self.view.addLocalAction(self.deleteAction)
         layout.addWidget(self.view)
