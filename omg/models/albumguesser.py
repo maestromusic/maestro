@@ -23,7 +23,7 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from .. import config, logging, profiles
-from ..core import tags
+from ..core import flags, tags
 from ..core.elements import ContentList
 
 logger = logging.getLogger(__name__)
@@ -48,23 +48,34 @@ class StandardGuesser(profiles.Profile):
         same directory.
         *metaRegex* is a regular expression that finds meta-container indicators; if it is None, this
         will be skipped."""
-        super().__init__(name,type,state)
+        super().__init__(name, type, state)
         
         if state is None:
             state = {}
         if 'groupTags' in state:
             self.groupTags = [tags.get(t) for t in state['groupTags']]
-        else: self.groupTags = [tags.get("album")]
+        else:
+            self.groupTags = [tags.get("album")]
         self.albumTag = self.groupTags[0] if len(self.groupTags) > 0 else None
         self.directoryMode = 'directoryMode' in state and state['directoryMode']
         if 'metaRegex' in state:
             self.metaRegex = state['metaRegex']
-        else: self.metaRegex = r" ?[([]?(?:cd|disc|part|teil|disk|vol)\.? ?([iI0-9]+)[)\]]?"
+        else:
+            self.metaRegex = r" ?[([]?(?:cd|disc|part|teil|disk|vol)\.? ?([iI0-9]+)[)\]]?"
+        if "compilationFlag" in state:
+            try:
+                self.compilationFlag = flags.get(state["compilationFlag"])
+            except ValueError:
+                self.compilationFlag = None
+        else:
+            self.compilationFlag = None
+            
         
     def save(self):
         return {'groupTags': [tag.name for tag in self.groupTags],
                 'directoryMode': self.directoryMode,
-                'metaRegex': self.metaRegex
+                'metaRegex': self.metaRegex,
+                'compilationFlag': self.compilationFlag
                 }
     
     def guessAlbums(self, level, files):
@@ -264,6 +275,15 @@ guessing. This is useful in most cases, unless you have albums that are split ac
         regexLayout.addWidget(self.regexCheck)
         regexLayout.addWidget(self.regexEdit)
         mainLayout.addLayout(regexLayout)
+        compilationLayout = QtGui.QHBoxLayout()
+        self.compilationCheck = QtGui.QCheckBox(self.tr("Assing flag to compilations:"))
+        self.compilationFlagChooser = QtGui.QComboBox()
+        self.flagnames = sorted(flag.name for flag in flags.allFlags())
+        self.compilationFlagChooser.addItems(self.flagnames)
+        compilationLayout.addWidget(self.compilationCheck)
+        compilationLayout.addWidget(self.compilationFlagChooser)
+        self.compilationCheck.toggled.connect(self.compilationFlagChooser.setEnabled)
+        mainLayout.addLayout(compilationLayout)
         
         self.setCurrentProfile(profile)
         
@@ -292,6 +312,14 @@ guessing. This is useful in most cases, unless you have albums that are split ac
             else:
                 self.regexCheck.setChecked(False)
                 self.regexEdit.setDisabled(True)
+            if profile.compilationFlag is not None:
+                self.compilationCheck.setChecked(True)
+                self.compilationFlagChooser.setEnabled(True)
+                self.compilationFlagChooser.setCurrentIndex(
+                                    self.flagnames.index(profile.compilationFlag))
+            else:
+                self.compilationCheck.setChecked(False)
+                self.compilationFlagChooser.setEnabled(False)
     
     def currentConfig(self):
         tags = []
