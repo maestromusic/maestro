@@ -66,7 +66,6 @@ class RealFile(BackendFile):
                 """Parse a string like "7" or "2/5" to a (integer) position.
                 
                 If *string* has the form "2/5", the first number will be returned."""
-                # TODO: this loses information about total tracks :(
                 string = string.strip()
                 if string.isdecimal():
                     return int(string)
@@ -76,10 +75,12 @@ class RealFile(BackendFile):
                     logger.warning("Cannot parse tracknumber '{}' in file '{}'".format(string, self.url))
                     return None
             #  Only consider the first tracknumber ...
-            self.position = parsePosition(self._taglibFile.tags["TRACKNUMBER"][0]) 
+            self.position = parsePosition(self._taglibFile.tags["TRACKNUMBER"][0])
+        if "COMPILATION" in self._taglibFile.tags:
+            self.compilation = self._taglibFile.tags["COMPILATION"][0]
         for key, values in self._taglibFile.tags.items():
             key = key.lower()
-            if key in ["tracknumber", "discnumber"]:
+            if key in ["tracknumber", "discnumber", "compilation"]:
                 self.ignoredTags[key] = values
             elif tags.isValidTagName(key):
                 tag = tags.get(key)
