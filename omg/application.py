@@ -223,6 +223,7 @@ def run(cmdConfig=[],type='gui',exitPoint=None):
     from . import undostack
     global stack
     stack = undostack.UndoStack()
+    dispatcher.stack = stack
     
     # Load and initialize remaining modules
     from .core import levels

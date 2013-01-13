@@ -37,7 +37,7 @@ class StandardGuesser(profiles.Profile):
     detect meta-containers."""
     
     className = "standardGuesser"
-    defaultMetaRegex = r" ?[([]?(?:cd|disc|part|teil|disk|vol)\.? ?([iI0-9]+)[)\]]?"
+    defaultMetaRegex = r" ?[([]?(?:cd|disc|part|teil|disk|vol)[^a-zA-Z]\.? ?([iI0-9]+)[)\]]?"
     def __init__(self, name, type, state):
         """Initialize a guesser profile with the given *name*.
         
