@@ -52,6 +52,17 @@ def hasKnownExtension(file):
     else:
         return s[1].lower() in config.options.main.extensions
 
+def parsePosition(string):
+    """Parse a string like "7" or "2/5" to a (integer) position.
+    
+    If *string* has the form "2/5", the first number will be returned."""
+    string = string.strip()
+    if string.isdecimal():
+        return int(string)
+    elif re.match('\d+\s*/\s*\d+$',string):
+        return int(string.split('/')[0])
+    else:
+        return None
 
 def relPath(file):
     """Return the relative path of a music file against the collection base path."""

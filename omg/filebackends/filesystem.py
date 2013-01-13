@@ -18,8 +18,8 @@
 
 """This module implements the BackendFile and BackendURL for files on the local filesystem."""
 
+from collections import OrderedDict
 import os.path
-import re
 
 from PyQt4 import QtCore
 
@@ -50,38 +50,22 @@ class RealFile(BackendFile):
     def __init__(self, url):
         assert url.scheme == "file"
         super().__init__(url)
-                
+        
+    specialTagNames = "tracknumber", "compilation", "discnumber"
+           
     def readTags(self):
         """Load the tags from disk using pytaglib.
         
-        If the file has a TRACKNUMBER tag, its value is stored in the position attribute of
-        this object, but won't be contained in self.tags. Likewise, discnumber is ignored.
+        Special tags (tracknumber, compilation, discnumber) are stored in the "specialTags" attribute.
         """
         
         self._taglibFile = taglib.File(self.url.absPath, applyID3v2Hack=True) 
         self.tags = tags.Storage()
-        self.ignoredTags = dict()
-        if "TRACKNUMBER" in self._taglibFile.tags:
-            def parsePosition(string):
-                """Parse a string like "7" or "2/5" to a (integer) position.
-                
-                If *string* has the form "2/5", the first number will be returned."""
-                string = string.strip()
-                if string.isdecimal():
-                    return int(string)
-                elif re.match('\d+\s*/\s*\d+$',string):
-                    return int(string.split('/')[0])
-                else:
-                    logger.warning("Cannot parse tracknumber '{}' in file '{}'".format(string, self.url))
-                    return None
-            #  Only consider the first tracknumber ...
-            self.position = parsePosition(self._taglibFile.tags["TRACKNUMBER"][0])
-        if "COMPILATION" in self._taglibFile.tags:
-            self.compilation = self._taglibFile.tags["COMPILATION"][0]
+        self.specialTags = OrderedDict()
         for key, values in self._taglibFile.tags.items():
             key = key.lower()
-            if key in ["tracknumber", "discnumber", "compilation"]:
-                self.ignoredTags[key] = values
+            if key in self.specialTagNames:
+                self.specialTags[key] = values
             elif tags.isValidTagName(key):
                 tag = tags.get(key)
                 validValues = []
@@ -132,7 +116,7 @@ class RealFile(BackendFile):
         tags/values that remain unsaved will be returned.
         """
         self._taglibFile.tags = dict()
-        for tag, values in self.ignoredTags.items():
+        for tag, values in self.specialTags.items():
             self._taglibFile.tags[tag.upper()] = values
         for tag, values in self.tags.items():
             values = [tag.fileFormat(value) for value in values]

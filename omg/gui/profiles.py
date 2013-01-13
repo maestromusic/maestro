@@ -40,7 +40,7 @@ class ProfileDialog(QtGui.QDialog):
         self.buttonBox = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Close)
         self.buttonBox.rejected.connect(self.accept)
         layout.addWidget(self.buttonBox)
-                         
+
         
 class ProfileConfigurationWidget(QtGui.QStackedWidget):
     """A widget that allows to configure all profiles of a given category. Depending on the number of

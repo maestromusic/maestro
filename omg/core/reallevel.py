@@ -224,13 +224,11 @@ class RealLevel(levels.Level):
             backendFile.readTags()
             fTags = backendFile.tags
             fLength = backendFile.length
-            fPosition = backendFile.position
             if db.idFromUrl(url) is not None:
                 raise RuntimeError("loadFromURLs called on '{}', which is in DB.".format(url))
             id = levels.idFromUrl(url, create=True)
             elem = elements.File(level, id=id, url=url, length=fLength, tags=fTags)
-            if fPosition is not None:
-                elem.filePosition = fPosition            
+            elem.specialTags = backendFile.specialTags           
             level.elements[id] = elem
             result.append(elem)
         return result

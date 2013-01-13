@@ -233,8 +233,8 @@ class File(Element):
                     tags = self.tags.copy(),
                     flags = self.flags[:],
                     data = self.data.copy())
-        if hasattr(self, "filePosition"):
-            copy.filePosition = self.filePosition
+        if hasattr(self, "specialTags"):
+            copy.specialTags = self.specialTags.copy()
         return copy
     
     def isFile(self):
