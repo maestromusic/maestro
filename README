@@ -8,13 +8,15 @@ OMG is copyright of Martin Altmayer <martin.altmayer@web.de> and Michael Helmlin
 
 INSTALLATION
 ==============
-Download the latest release from the homepage. Be sure to have all the dependencies, then run
+Run
 
-# easy_install3 omg-0.3.tar.gz
+# easy_install3 omg
 
 If you want to install OMG as normal user inside your home directory, run
 
-$ easy_install3 --user omg-0.3.tar.gz
+$ easy_install3 --user omg
+
+The exact name of the "easy_install for python3" executable may differ on your system. If you have pip, you can also use that.
 
 DEVELOPMENT
 =============
