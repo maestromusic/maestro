@@ -65,7 +65,7 @@ class StandardGuesser(profiles.Profile):
         if "compilationFlag" in state:
             try:
                 self.compilationFlag = flags.get(state["compilationFlag"])
-            except ValueError:
+            except (KeyError, ValueError):
                 self.compilationFlag = None
         else:
             self.compilationFlag = None
