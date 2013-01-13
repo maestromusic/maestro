@@ -202,16 +202,18 @@ class CoverTableScene(QtGui.QGraphicsScene):
         
         self.loadingPixmap = QtGui.QPixmap(':omg/process-working.png')
         self.loadingTimer = QtCore.QTimer(self)
-        self.loadingTimer.setInterval(50)
+        self.loadingTimer.setInterval(50) # Timer for loading animation
+        self.reloadCoverTimer = QtCore.QTimer(self)
+        self.reloadCoverTimer.setSingleShot(True)
+        self.reloadCoverTimer.setInterval(1000)
+        self.reloadCoverTimer.timeout.connect(self._handleReloadCoverTimer)
         
         self.imageLoader = imageloader.ImageLoader()
 
     def setCovers(self, idsAndPaths):
         self.loadingTimer.stop()
         self.clear()
-        self.coverItems = collections.OrderedDict(
-                        ((id, CoverItem(self, id, covers.getAsync(self.imageLoader, path, self.coverSize)))
-                       for id,path in idsAndPaths))
+        self.coverItems = collections.OrderedDict((id, CoverItem(self, id, path)) for id,path in idsAndPaths)
         for item in self.coverItems.values():
             self.addItem(item)
         self.arrange()
@@ -245,6 +247,10 @@ class CoverTableScene(QtGui.QGraphicsScene):
     def _computeColumnCount(self):
         availableWidth = self.views()[0].viewport().width() - 2*self.outerSpace
         return max(1, (availableWidth+self.innerSpace) // (self.coverSize+self.innerSpace))
+    
+    def _handleReloadCoverTimer(self):
+        for item in self.coverItems.values():
+            item.reload()
         
     def getCoverSize(self):
         return self.coverSize
@@ -254,6 +260,7 @@ class CoverTableScene(QtGui.QGraphicsScene):
         if size != self.coverSize:
             self._setCoverSize(size)
             self.arrange()
+            self.reloadCoverTimer.start()
         for item in self.coverItems.values():
             item.update()
             
@@ -264,7 +271,8 @@ class CoverTableScene(QtGui.QGraphicsScene):
         if not hasattr(self,'shadowOffset') or newShadowOffset != self.shadowOffset:
             self.shadowOffset = newShadowOffset
             for item in self.coverItems.values():
-                item.graphicsEffect().setOffset(newShadowOffset)
+                if item.graphicsEffect() is not None:
+                    item.graphicsEffect().setOffset(newShadowOffset)
             
     def selection(self):
         return selection.Selection.fromElements(levels.real,
@@ -272,21 +280,33 @@ class CoverTableScene(QtGui.QGraphicsScene):
             
 
 class CoverItem(QtGui.QGraphicsItem):
-    def __init__(self, scene, elid, cover):
+    def __init__(self, scene, elid, path):
         super().__init__()
         self.scene = scene
-        self.cover = cover
         self.elid = elid
         self.frame = 1
-        if not cover.loaded:
+        self.cover = None
+        self._oldCover = None
+        self.setCoverPath(path)
+        
+    def setCoverPath(self, path):
+        self.path = path
+        if self.cover is not None and self.cover.loaded:
+            self._oldCover = self.cover
+        self.cover = covers.getAsync(self.scene.imageLoader, path, self.scene.coverSize)
+        if not self.cover.loaded:
             self.scene.loadingTimer.timeout.connect(self._handleTimer)
         else: self._addShadow()
         self.setFlag(QtGui.QGraphicsItem.ItemIsSelectable)
     
+    def reload(self):
+        self.setCoverPath(self.path)
+        
     def _handleTimer(self):
         if self.cover.loaded:
             self.scene.loadingTimer.timeout.disconnect(self._handleTimer)
             self._addShadow()
+            self._oldCover = None
         else:
             self.frame += 1
             if self.frame >= 32:
@@ -294,9 +314,10 @@ class CoverItem(QtGui.QGraphicsItem):
         self.update()
         
     def _addShadow(self):
-        effect = QtGui.QGraphicsDropShadowEffect()
-        effect.setOffset(5)
-        self.setGraphicsEffect(effect)
+        if self.graphicsEffect() is None:
+            effect = QtGui.QGraphicsDropShadowEffect()
+            effect.setOffset(5)
+            self.setGraphicsEffect(effect)
         
     def boundingRect(self):
         return QtCore.QRectF(0, 0, self.scene.coverSize+2, self.scene.coverSize+2)
@@ -304,11 +325,20 @@ class CoverItem(QtGui.QGraphicsItem):
     def paint(self, painter, option, widget):
         if self.cover.loaded:
             painter.drawPixmap(1, 1, self.scene.coverSize, self.scene.coverSize, self.cover.pixmap)
+        elif self._oldCover is not None:
+            painter.drawPixmap(1, 1, self.scene.coverSize, self.scene.coverSize, self._oldCover.pixmap)
         else:
-            destXY = (self.scene.coverSize-32) // 2 + 1 # +1: adjust for border
+            if self.scene.coverSize >= 32:
+                destXY = (self.scene.coverSize-32) // 2 + 1 # +1: adjust for border
+                destSize = 32
+            else:
+                destXY = 0
+                destSize = self.scene.coverSize
             srcX = 32 * (self.frame % 8)
             srcY = 32 * (self.frame // 8)
-            painter.drawPixmap(destXY, destXY, self.scene.loadingPixmap, srcX, srcY, 32, 32)
+            painter.drawPixmap(destXY, destXY, destSize, destSize,
+                               self.scene.loadingPixmap,
+                               srcX, srcY, 32, 32)
         pen = painter.pen()
         if option.state & QtGui.QStyle.State_Selected:
             pen.setColor(QtGui.QColor(0,0,255))
