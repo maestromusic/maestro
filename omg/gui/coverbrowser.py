@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import os.path
+import os.path, collections
 
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
@@ -33,12 +33,15 @@ translate = QtCore.QCoreApplication.translate
 
 class CoverBrowserDock(QtGui.QDockWidget):
     """DockWidget containing the TagEditor."""
-    def __init__(self,parent=None,state=None,location=None):
+    def __init__(self, parent=None, state=None, location=None):
         super().__init__(parent)
         self.setWindowTitle(self.tr("Cover Browser"))
         
-        self.browser = CoverBrowser()
+        self.browser = CoverBrowser(state)
         self.setWidget(self.browser)
+        
+    def saveState(self):
+        return self.widget().saveState()
 
 
 mainwindow.addWidgetData(mainwindow.WidgetData(
@@ -58,7 +61,7 @@ class CoverBrowser(QtGui.QWidget):
     _dialog = None
     _lastDialogTabIndex = 0
     
-    def __init__(self):
+    def __init__(self, state=None):
         super().__init__()
         layout = QtGui.QVBoxLayout(self)
         
@@ -88,9 +91,14 @@ class CoverBrowser(QtGui.QWidget):
         browsermodel.searchEngine.searchFinished.connect(self._handleSearchFinished)
         self.bigResult = browsermodel.searchEngine.createResultTable("browser_big")
         
-        self._imageLoader = imageloader.ImageLoader()
-        #self._imageLoader.loaded.connect(self.coverTable.inner.update)
+        if state is not None:
+            if 'coverSize' in state and state['coverSize'] is not None:
+                self.setCoverSize(state['coverSize'])
+                
         self.load()
+        
+    def saveState(self):
+        return {'coverSize': self.getCoverSize()}
     
     def _handleOptionButton(self):
         """Open the option dialog."""
@@ -149,15 +157,119 @@ class CoverBrowser(QtGui.QWidget):
             WHERE dat.type = 'COVER'
             """.format(db.prefix,self.table))
         
-        self.coverTable.setCovers([(id,covers.getAsync(self._imageLoader, path, self.coverTable.getCoverSize()))
-                                   for id,path in result])
-            
-    def setCoverSize(self,size):
-        self.coverTable.setCoverSize(size)
+        self.coverTable.scene().setCovers(result)
+    
+    def getCoverSize(self):
+        return self.coverTable.scene().getCoverSize()
+    
+    def setCoverSize(self, size):
+        self.coverTable.scene().setCoverSize(size)
         
     def _handleSelectionChanged(self):
         selection.setGlobalSelection(self.coverTable.scene().selection())
+
+
+class CoverInfo:
+    def __init__(self, elid, path):
+        self.elid = elid
+        self.path = path
+        
+        
+class CoverTable(QtGui.QGraphicsView):
+    def __init__(self):
+        super().__init__(CoverTableScene())
+        self.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+        self.setDragMode(QtGui.QGraphicsView.RubberBandDrag)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.scene().handleResize() 
+        
     
+class CoverTableScene(QtGui.QGraphicsScene):
+    def __init__(self):
+        super().__init__()
+        
+        self.coverItems = {}
+        
+        #self.setBackgroundBrush(QtGui.QBrush(QtGui.QColor(50,50,50)))
+        self.paths = []
+        self.availableWidth = 600
+        self.innerSpaceFactor = 3./8.
+        self.shadowFactor = 1./15.
+        self.outerSpace = 15
+        self._setCoverSize(80)
+        
+        self.loadingPixmap = QtGui.QPixmap(':omg/process-working.png')
+        self.loadingTimer = QtCore.QTimer(self)
+        self.loadingTimer.setInterval(50)
+        
+        self.imageLoader = imageloader.ImageLoader()
+
+    def setCovers(self, idsAndPaths):
+        self.loadingTimer.stop()
+        self.clear()
+        self.coverItems = collections.OrderedDict(
+                        ((id, CoverItem(self, id, covers.getAsync(self.imageLoader, path, self.coverSize)))
+                       for id,path in idsAndPaths))
+        for item in self.coverItems.values():
+            self.addItem(item)
+        self.arrange()
+        self.loadingTimer.start()
+        
+    def arrange(self):
+        self.columnCount = self._computeColumnCount()
+        
+        row = column = 0
+        for item in self.coverItems.values():
+            item.setPos(self._getPos(row, column))
+            column += 1
+            if column == self.columnCount:
+                column = 0
+                row += 1
+        totalRows = row+1 if column != 0 else row
+        totalColumns = min(self.columnCount, len(self.coverItems))
+        self.setSceneRect(0, 0,
+                      2*self.outerSpace + totalColumns * (self.coverSize+self.innerSpace) - self.innerSpace,
+                      2*self.outerSpace + totalRows * (self.coverSize+self.innerSpace) - self.innerSpace)
+                
+    def _getPos(self, row, column):
+        x = self.outerSpace + column * (self.coverSize + self.innerSpace)
+        y = self.outerSpace + row * (self.coverSize + self.innerSpace)
+        return QtCore.QPointF(x,y)
+    
+    def handleResize(self):
+        if self.columnCount != self._computeColumnCount():
+            self.arrange()
+            
+    def _computeColumnCount(self):
+        availableWidth = self.views()[0].viewport().width() - 2*self.outerSpace
+        return max(1, (availableWidth+self.innerSpace) // (self.coverSize+self.innerSpace))
+        
+    def getCoverSize(self):
+        return self.coverSize
+    
+    def setCoverSize(self, size):
+        assert size is not None
+        if size != self.coverSize:
+            self._setCoverSize(size)
+            self.arrange()
+        for item in self.coverItems.values():
+            item.update()
+            
+    def _setCoverSize(self, size):
+        self.coverSize = size
+        self.innerSpace = int(self.innerSpaceFactor * size)
+        newShadowOffset = int(round(self.shadowFactor * size))
+        if not hasattr(self,'shadowOffset') or newShadowOffset != self.shadowOffset:
+            self.shadowOffset = newShadowOffset
+            for item in self.coverItems.values():
+                item.graphicsEffect().setOffset(newShadowOffset)
+            
+    def selection(self):
+        return selection.Selection.fromElements(levels.real,
+                                    levels.real.collectMany([item.elid for item in self.selectedItems()]))
+            
 
 class CoverItem(QtGui.QGraphicsItem):
     def __init__(self, scene, elid, cover):
@@ -212,92 +324,6 @@ class CoverItem(QtGui.QGraphicsItem):
             drag.setMimeData(mimeData)
             drag.exec_()
             self.setCursor(Qt.OpenHandCursor)
-        
-        
-class CoverTable(QtGui.QGraphicsView):
-    def __init__(self):
-        super().__init__(CoverTableScene())
-        self.setAlignment(Qt.AlignLeft | Qt.AlignTop)
-        self.setDragMode(QtGui.QGraphicsView.RubberBandDrag)
-        
-    def setCovers(self, covers):
-        self.scene().setCovers(covers)
-    
-    def getCoverSize(self):
-        return self.scene().getCoverSize()
-    
-    def setCoverSize(self, size):
-        self.scene().setCoverSize(size)
-        
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        self.scene().resized() 
-        
-    
-class CoverTableScene(QtGui.QGraphicsScene):
-    def __init__(self):
-        super().__init__()
-        
-        #self.setBackgroundBrush(QtGui.QBrush(QtGui.QColor(50,50,50)))
-        self.paths = []
-        self.coverSize = 80
-        self.availableWidth = 600
-        self.innerSpace = 30
-        self.outerSpace = 15
-        
-        self.loadingPixmap = QtGui.QPixmap(':omg/process-working.png')
-        self.loadingTimer = QtCore.QTimer(self)
-        self.loadingTimer.setInterval(50)
-
-    def setCovers(self, covers):
-        self.covers = covers
-        self._fillScene()
-        
-    def resized(self):
-        if self.columnCount != self._computeColumnCount():
-            self._fillScene()
-            
-    def _computeColumnCount(self):
-        availableWidth = self.views()[0].viewport().width() - 2*self.outerSpace
-        return max(1, (availableWidth+self.innerSpace) // (self.coverSize+self.innerSpace))
-        
-    def _fillScene(self):
-        self.loadingTimer.stop()
-        self.clear()
-        self.columnCount = self._computeColumnCount()
-        
-        row = column = 0
-        for elid, cover in self.covers:
-            item = CoverItem(self, elid, cover)
-            item.setPos(self._getPos(row, column))
-            self.addItem(item)
-            column += 1
-            if column == self.columnCount:
-                column = 0
-                row += 1
-        totalRows = row+1 if column != 0 else row
-        totalColumns = min(self.columnCount, len(self.covers))
-        self.setSceneRect(0, 0,
-                      2*self.outerSpace + totalColumns * (self.coverSize+self.innerSpace) - self.innerSpace,
-                      2*self.outerSpace + totalRows * (self.coverSize+self.innerSpace) - self.innerSpace)
-        self.loadingTimer.start()
-                
-    def _getPos(self, row, column):
-        x = self.outerSpace + column * (self.coverSize + self.innerSpace)
-        y = self.outerSpace + row * (self.coverSize + self.innerSpace)
-        return QtCore.QPointF(x,y)
-    
-    def getCoverSize(self):
-        return self.coverSize
-    
-    def setCoverSize(self, size):
-        if size != self.coverSize:
-            self.coverSize = size
-            self._fillScene()
-            
-    def selection(self):
-        return selection.Selection.fromElements(levels.real,
-                                    levels.real.collectMany([item.elid for item in self.selectedItems()]))
             
             
 class BrowserDialog(browserdialog.AbstractBrowserDialog):
@@ -315,9 +341,9 @@ class BrowserDialog(browserdialog.AbstractBrowserDialog):
         self.sizeSlider = QtGui.QSlider(Qt.Horizontal) 
         self.sizeSlider.setMinimum(20)
         self.sizeSlider.setMaximum(100)
-        self.sizeSlider.setValue(browser.coverTable.getCoverSize())
+        self.sizeSlider.setValue(browser.coverTable.scene().getCoverSize())
         lineLayout.addWidget(self.sizeSlider)
-        sizeLabel = QtGui.QLabel(str(browser.coverTable.getCoverSize()))
+        sizeLabel = QtGui.QLabel(str(browser.coverTable.scene().getCoverSize()))
         self.sizeSlider.valueChanged.connect(lambda x: sizeLabel.setText(str(x)))
         lineLayout.addWidget(sizeLabel)
         self.sizeSlider.valueChanged.connect(browser.setCoverSize)
