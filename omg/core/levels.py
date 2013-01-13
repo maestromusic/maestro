@@ -40,7 +40,7 @@ def init():
     global real,editor
     from . import reallevel
     real = reallevel.RealLevel()
-    editor = Level('EDITOR',real)
+    editor = Level('EDITOR', real)
     
 
 class ElementGetError(RuntimeError):
@@ -225,7 +225,7 @@ class Level(application.ChangeEventDispatcher):
                     level.emit(forwardEvent)
         
     def emitEvent(self, **args):
-        """Simple shortcut to emit an LevelChangedEvent."""
+        """Simple shortcut to emit a LevelChangedEvent."""
         self.emit(LevelChangedEvent(**args))
     
     def __contains__(self, param):

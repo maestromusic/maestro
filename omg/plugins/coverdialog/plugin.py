@@ -502,8 +502,16 @@ class CoverDialog(QtGui.QDialog):
         
     def _handleOpenFromUrl(self):
         """Handle the "Open from URL..." button."""
-        url,ok = QtGui.QInputDialog.getText(self,self.tr("Open cover URL"),
-                                            self.tr("Please enter the URL of the cover:"))
+        clipTexts = [QtGui.qApp.clipboard().text(mode)
+                     for mode in (QtGui.QClipboard.Selection, QtGui.QClipboard.Clipboard) ]
+        dialogText = ""
+        for text in clipTexts:
+            if text.startswith("http") or text.startswith("www"):
+                dialogText = text 
+        url, ok = QtGui.QInputDialog.getText(self,self.tr("Open cover URL"),
+                                            self.tr("Please enter the URL of the cover:"),
+                                            QtGui.QLineEdit.Normal,
+                                            dialogText)
         if not ok: # user canceled the dialog
             return
         
