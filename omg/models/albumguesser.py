@@ -36,7 +36,6 @@ class StandardGuesser(profiles.Profile):
     Optionally, the title of the guessed album is matched against a regular expression in order to
     detect meta-containers."""
     
-    className = "standardGuesser"
     defaultMetaRegex = r" ?[([]?(?:cd|disc|part|teil|disk|vol)[^a-zA-Z]\.? ?([iI0-9]+)[)\]]?"
     def __init__(self, name, type, state):
         """Initialize a guesser profile with the given *name*.

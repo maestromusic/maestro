@@ -71,7 +71,6 @@ class FormatSyntaxError(SyntaxError):
 
 class GrammarRenamer(profiles.Profile):
         
-    className = "GrammarRenamer"
     def levelDefAction(self, s, loc, toks):
         level = int(toks[0])
         return [level]
