@@ -52,15 +52,7 @@ class PhononPlayerBackend(player.PlayerBackend):
         
         # The list of paths in the playlist and the current song are stored directly in the model's tree
         self.playlist = playlist.PlaylistModel(self)
-        if state is None:
-            state = {}
-        if 'playlist' in state:
-            self.playlist.initFromWrapperString(state['playlist'])
-            if 'current' in state:
-                self.playlist.setCurrent(state['current'])
-
-        self._nextSource = None # used in self._handleSourceChanged
-        self.connectionState = player.CONNECTED
+        
         # Initialize Phonon        
         self.mediaObject = phonon.MediaObject()
         self.mediaObject.aboutToFinish.connect(self._handleAboutToFinish)
@@ -69,6 +61,15 @@ class PhononPlayerBackend(player.PlayerBackend):
         self.mediaObject.tick.connect(self._handleTick)
         self.audioOutput = phonon.AudioOutput(phonon.MusicCategory)
         phonon.createPath(self.mediaObject,self.audioOutput)
+        
+        if state is None:
+            state = {}
+        if 'playlist' in state:
+            self.playlist.initFromWrapperString(state['playlist'])
+            self.setCurrent(state['current'], play=False)
+
+        self._nextSource = None # used in self._handleSourceChanged
+        self.connectionState = player.CONNECTED
     
     # Insert etc. are handled by the PlaylistModel. We only have to change the state if necessary.
     def insertIntoPlaylist(self, pos, urls):
@@ -134,13 +135,14 @@ class PhononPlayerBackend(player.PlayerBackend):
             return None
         else: return self.playlist.current.offset()
     
-    def setCurrent(self, offset):
+    def setCurrent(self, offset, play=True):
         if offset != self.currentOffset():
             self.playlist.setCurrent(offset)
             if offset is not None:
                 source = phonon.MediaSource(self._getPath(offset))
                 self.mediaObject.setCurrentSource(source)
-                self.setState(player.PLAY)
+                if play:
+                    self.setState(player.PLAY)
             else:
                 self.setState(player.STOP)
             self.currentChanged.emit(offset)
@@ -148,7 +150,8 @@ class PhononPlayerBackend(player.PlayerBackend):
                 and self._getPath(offset) != self.mediaObject.currentSource().url().toString():
             source = phonon.MediaSource(self._getPath(offset))
             self.mediaObject.setCurrentSource(source)
-            self.mediaObject.play()
+            if play:
+                self.mediaObject.play()
     
     def elapsed(self):
         return self.mediaObject.currentTime() / 1000

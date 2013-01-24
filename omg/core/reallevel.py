@@ -18,10 +18,8 @@
 
 import itertools
 
-from PyQt4 import QtCore
-
 from . import elements, levels, tags, flags
-from .. import database as db, filebackends, logging
+from .. import application, database as db, filebackends, logging
 from ..database import write
 
 logger = logging.getLogger(__name__)
@@ -30,7 +28,43 @@ logger = logging.getLogger(__name__)
 # The ids of all elements that are in the database and have been loaded to some level 
 _dbIds = set()
 
-
+class RealFileEvent(application.ChangeEvent):
+    
+    _attrs = ("modified", "added", "removed", "renamed", "deleted")
+    
+    def __init__(self, **kwargs):
+        super().__init__()
+        for attr, iterable in kwargs.items():
+            if not attr in self._attrs:
+                raise ValueError("Invalid keyword attribute for {}: {}".format(type(self), attr))
+            setattr(self, attr, set(iterable))
+    
+    def __getattr__(self, attr):
+        if attr in self._attrs:
+            return set()
+        raise AttributeError("'{}' has no attribute '{}'".format(type(self), attr))
+    
+    def merge(self, other):
+        if not type(other) is type(self):
+            return False
+        for attr in self._attrs:
+            attrInOther = getattr(other, attr)
+            if len(attrInOther) > 0:
+                if len(getattr(self, attr)) > 0:
+                    getattr(self, attr).update(getattr(other, attr))
+                else:
+                    setattr(self, attr, attrInOther)
+        # transfer renamings to modified and added
+        for ( old, new ) in self.renamed:
+            if old in self.modified:
+                self.modified.add(new)
+                self.modified.remove(old)
+        return True
+    
+    def __str__(self):
+        return "RealFileEvent({})".format(", ".join(("{}={}".format(attr, getattr(self, attr)) for attr in self._attrs)))
+            
+        
 class RealLevel(levels.Level):
     """The real level, comprising the state of database and filesystem.
     
@@ -38,14 +72,14 @@ class RealLevel(levels.Level):
     files are affected, the filesystem state.
     """
     
-    filesRenamed = QtCore.pyqtSignal(object)
-    filesAdded = QtCore.pyqtSignal(list)
-    filesRemoved = QtCore.pyqtSignal(list)
-    filesModified = QtCore.pyqtSignal(list)
-    
     def __init__(self):
         super().__init__('REAL', None)
+        self.filesystemDispatcher = application.ChangeEventDispatcher(self.stack)
     
+    def emitFilesystemEvent(self, **kwArgs):
+        """Simple shortcut to emit a FileSystemEvent."""
+        self.stack.addEvent(self.filesystemDispatcher, RealFileEvent(**kwArgs))
+        
     def collect(self, param):
         self._ensureLoaded([param])
         return self[param]
@@ -176,7 +210,7 @@ class RealLevel(levels.Level):
         
         try:
             return [self.elements[id] for id in idList]
-        except KeyError as e: # probably some ids were not contained in the database
+        except KeyError: # probably some ids were not contained in the database
             raise levels.ElementGetError(self, [id for id in idList if id not in self])
             
     def loadFromUrls(self, urls, level=None):
@@ -190,13 +224,11 @@ class RealLevel(levels.Level):
             backendFile.readTags()
             fTags = backendFile.tags
             fLength = backendFile.length
-            fPosition = backendFile.position
             if db.idFromUrl(url) is not None:
                 raise RuntimeError("loadFromURLs called on '{}', which is in DB.".format(url))
             id = levels.idFromUrl(url, create=True)
             elem = elements.File(level, id=id, url=url, length=fLength, tags=fTags)
-            if fPosition is not None:
-                elem.filePosition = fPosition            
+            elem.specialTags = backendFile.specialTags           
             level.elements[id] = elem
             result.append(elem)
         return result
@@ -291,7 +323,7 @@ class RealLevel(levels.Level):
                           .format(db.prefix),
                           ((element.id, str(element.url), filesystem.getNewfileHash(element.url),
                             element.length) for element in newFiles))
-            self.filesAdded.emit(newFiles)
+            self.emitFilesystemEvent(added=(f for f in newFiles if f.url.scheme == "file"))
         
         contentData = []
         for element in elements:
@@ -325,7 +357,10 @@ class RealLevel(levels.Level):
         db.write.updateToplevelFlags(ids)
         db.query("DELETE FROM {}elements WHERE id IN ({})"
                  .format(db.prefix, db.csList(element.id for element in elements)))
-        
+        removedFiles = [element.url for element in elements if element.isFile()
+                                                            and element.url.scheme == "file"]
+        if len(removedFiles) > 0:
+            self.emitFilesystemEvent(removed=removedFiles)
         self.emit(levels.LevelChangedEvent(dbRemovedIds=[el.id for el in elements]))
         
     def deleteElements(self, elements, fromDisk=False):
@@ -368,13 +403,10 @@ class RealLevel(levels.Level):
                 db.multiQuery("INSERT INTO {}tags (element_id,tag_id,value_id) VALUES (?,?,?)"
                               .format(db.prefix),dbAdditions)
             files = [ (elem.id, ) for elem in dbChanges if elem.isFile() ]
-            fileUrls = [ elem.url for elem in dbChanges if elem.isFile() ]
             if len(files) > 0:
                 db.multiQuery("UPDATE {}files SET verified=CURRENT_TIMESTAMP WHERE element_id=?"
                               .format(db.prefix),files)
             db.commit()
-            if len(files) > 0 and not dbOnly:
-                self.filesModified.emit(fileUrls)
         super()._changeTags(changes)
         
     def _changeFlags(self, changes):
@@ -453,7 +485,7 @@ class RealLevel(levels.Level):
         super()._setContents(parent, contents)
 
     def _insertContents(self, parent, insertions):
-        if not all(element.isInDb() for pos, element in insertions):
+        if not all(element.isInDb() for _, element in insertions):
             raise levels.ConsistencyError("Elements must be in the DB before being added to a container.")
         db.transaction()
         db.multiQuery("INSERT INTO {}contents (container_id, position, element_id) VALUES (?, ?, ?)"
@@ -492,5 +524,4 @@ class RealLevel(levels.Level):
                 newUrl.getBackendFile().rename(oldUrl)
             raise levels.RenameFilesError(oldUrl, newUrl, str(e))
         db.write.changeUrls([ (str(newUrl), element.id) for element, (_, newUrl) in renamings.items() ])
-        self.filesRenamed.emit(renamings)
         super()._renameFiles(renamings)

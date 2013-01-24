@@ -21,7 +21,7 @@ import functools
 from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
-from .. import application, utils, database as db, constants
+from .. import application, utils, database as db
 from ..core import tags
 from .misc import lineedits
 
@@ -367,7 +367,7 @@ class TagValueEditor(QtGui.QWidget):
     tagChanged = QtCore.pyqtSignal(tags.Tag)
     valueChanged = QtCore.pyqtSignal()
     
-    def __init__(self,tag,parent=None,hideEditor=False):
+    def __init__(self, tag, parent=None, hideEditor=False):
         QtGui.QWidget.__init__(self,parent)
         assert tag is not None
         self.setLayout(QtGui.QStackedLayout()) # doesn't matter...we just need a layout for one child widget
@@ -379,7 +379,7 @@ class TagValueEditor(QtGui.QWidget):
         self.setTag(tag)
         application.dispatcher.connect(self._handleDispatcher)
 
-    def canSwitchTag(self,newTag):
+    def canSwitchTag(self, newTag):
         """Return whether the current value is valid for the given tag, i.e. whether it is possible to
         change the tag of this editor to *newTag*."""
         return newTag.conConvert(self.getText())
@@ -710,7 +710,7 @@ class TagValuePropertiesWidget(QtGui.QWidget):
         self.label.setAlignment(Qt.AlignCenter)
         layout.addWidget(self.label, 0, 0, 1, 2)
         self.changeValueCheckbox = QtGui.QCheckBox(self.tr('rename all occurences:'))
-        self.valueEdit = QtGui.QLineEdit()
+        self.valueEdit = TagValueEditor(tags.TITLE)
         self.changeValueCheckbox.toggled.connect(self.valueEdit.setEnabled)
         layout.addWidget(self.changeValueCheckbox, 1, 0)
         layout.addWidget(self.valueEdit, 1, 1)
@@ -733,7 +733,7 @@ class TagValuePropertiesWidget(QtGui.QWidget):
         and exchanging the two parts."""
         if checked:
             if self.origSortValue is None and self.sortEdit.text() == "":
-                names = self.valueEdit.text().rsplit(' ', 1)
+                names = self.valueEdit.getText().rsplit(' ', 1)
                 if len(names) == 2:
                     self.sortEdit.setText(names[1] + ", " + names[0])
                 
@@ -743,9 +743,10 @@ class TagValuePropertiesWidget(QtGui.QWidget):
         self.orig_hidden = db.hidden(tag, valueId)
         self.origSortValue = db.sortValue(tag, valueId)
         self.origValue = db.valueFromId(tag, valueId)
+        self.valueEdit.setTag(tag)
         self.valueEdit.setEnabled(False)
         self.changeValueCheckbox.setChecked(False)
-        self.valueEdit.setText(self.origValue)
+        self.valueEdit.setValue(self.origValue)
         
         self.label.setText(self.tr('editing {0} value: {1}').format(tag, self.origValue))
         if self.origSortValue is None:
@@ -759,7 +760,7 @@ class TagValuePropertiesWidget(QtGui.QWidget):
         self.hiddenCheckbox.setChecked(self.orig_hidden)
     
     def inputAcceptable(self):
-        if self.changeValueCheckbox.isChecked() and self.valueEdit.text().strip() == "":
+        if self.changeValueCheckbox.isChecked() and self.valueEdit.getValue() is None:
             from .dialogs import warning
             warning(self.tr("Invalid Tag Value"),
                     self.tr("Please enter a valid tag value."))
@@ -768,9 +769,9 @@ class TagValuePropertiesWidget(QtGui.QWidget):
 
     def commit(self):
         from ..core import tagcommands
-        if self.changeValueCheckbox.isChecked() and self.valueEdit.text() != self.origValue:
-            tagcommands.renameTagValue(self.tag, self.origValue, self.valueEdit.text())
-            self.origValue = self.valueEdit.text()
+        if self.changeValueCheckbox.isChecked() and self.valueEdit.getValue() != self.origValue:
+            tagcommands.renameTagValue(self.tag, self.origValue, self.valueEdit.getValue())
+            self.origValue = self.valueEdit.getValue()
             self.valueId = db.idFromValue(self.tag, self.origValue)
         if self.sortValueCheckbox.isChecked():
             if self.sortEdit.text() != self.origSortValue:

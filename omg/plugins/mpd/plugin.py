@@ -56,8 +56,6 @@ def disable():
             
 class MPDPlayerBackend(player.PlayerBackend):
     
-    className = "MPD"
-    
     def __init__(self, name, type, state):
         super().__init__(name, type, state)
         self.stack = application.stack.createSubstack()

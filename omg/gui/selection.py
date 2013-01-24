@@ -215,7 +215,6 @@ class MimeData(QtCore.QMimeData):
         self.selection = selection
         
     def __getattr__(self, attr):
-        print("getattr", attr)
         return getattr(self.selection, attr)
         
     def hasFormat(self, format):

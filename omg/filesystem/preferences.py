@@ -52,7 +52,12 @@ class FilesystemSettings(QtGui.QWidget):
         self.setLayout(layout)
     
     def _handleEnableBox(self, state):
-        config.options.filesystem.disable = not state
+        if state:
+            config.options.filesystem.disable = False
+            filesystem.init()
+        else:
+            filesystem.shutdown()
+            config.options.filesystem.disable = True
         
     def _handleRecheckButton(self):
         if filesystem.enabled:

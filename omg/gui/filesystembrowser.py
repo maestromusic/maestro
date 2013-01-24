@@ -75,7 +75,7 @@ class FileSystemBrowserModel(QtGui.QFileSystemModel):
                 dir = relPath(info.absoluteFilePath())
                 if dir == '..':
                     return super().data(index, role)
-                status = filesystem.getFolderState(dir)
+                status = filesystem.folderState(dir)
                 if role == Qt.DecorationRole:
                     return self.folderIcons[status]
                 else:
@@ -83,7 +83,7 @@ class FileSystemBrowserModel(QtGui.QFileSystemModel):
             else:
                 path = relPath(info.absoluteFilePath())
                 url = filebackends.BackendURL.fromString("file:///" + path)
-                status = filesystem.getFileState(url)
+                status = filesystem.fileState(url)
                 if role == Qt.DecorationRole:
                     return self.fileIcons[status]
                 else:

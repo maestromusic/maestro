@@ -160,12 +160,12 @@ class OptionDialog(dialogs.FancyPopup):
         albumGuessLayout.addWidget(self.albumGuessComboBox,1)
         layout.addRow(self.tr("Guess albums"),albumGuessLayout)
         
-        profileType = editordelegate.EditorDelegate.profileType
-        profileChooser = profilesgui.ProfileComboBox(delegates.profiles.category,
-                                                     restrictToType=profileType,
+        delegateType = editordelegate.EditorDelegate.profileType
+        delegateChooser = profilesgui.ProfileComboBox(delegates.profiles.category,
+                                                     restrictToType=delegateType,
                                                      default=self.editor.itemDelegate().profile)
-        profileChooser.profileChosen.connect(self.editor.itemDelegate().setProfile)
-        layout.addRow(self.tr("Item display"),profileChooser)
+        delegateChooser.profileChosen.connect(self.editor.itemDelegate().setProfile)
+        layout.addRow(self.tr("Item display"),delegateChooser)
         
     def _handleAutoExpandBox(self,state):
         """Handle toggling the auto expand checkbox."""

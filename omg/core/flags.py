@@ -33,7 +33,7 @@ _flagsByName = None
 def init():
     """Initialize the flag module loading flags from the database. You must call this method before methods
     like get can be used."""
-    global _flagsById, _flagsByName, flagList
+    global _flagsById, _flagsByName
     _flagsById = {}
     _flagsByName = {}
     for row in db.query("SELECT id,name,icon FROM {}flag_names".format(db.prefix)):

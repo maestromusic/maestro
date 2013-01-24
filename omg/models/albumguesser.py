@@ -22,8 +22,8 @@ from collections import OrderedDict
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from .. import config, logging, profiles
-from ..core import tags
+from .. import config, logging, profiles, utils
+from ..core import flags, tags
 from ..core.elements import ContentList
 
 logger = logging.getLogger(__name__)
@@ -36,8 +36,7 @@ class StandardGuesser(profiles.Profile):
     Optionally, the title of the guessed album is matched against a regular expression in order to
     detect meta-containers."""
     
-    className = "standardGuesser"
-    
+    defaultMetaRegex = r" ?[([]?(?:cd|disc|part|teil|disk|vol)[^a-zA-Z]\.? ?([iI0-9]+)[)\]]?"
     def __init__(self, name, type, state):
         """Initialize a guesser profile with the given *name*.
         
@@ -48,23 +47,34 @@ class StandardGuesser(profiles.Profile):
         same directory.
         *metaRegex* is a regular expression that finds meta-container indicators; if it is None, this
         will be skipped."""
-        super().__init__(name,type,state)
+        super().__init__(name, type, state)
         
         if state is None:
             state = {}
         if 'groupTags' in state:
             self.groupTags = [tags.get(t) for t in state['groupTags']]
-        else: self.groupTags = [tags.get("album")]
+        else:
+            self.groupTags = [tags.get("album")]
         self.albumTag = self.groupTags[0] if len(self.groupTags) > 0 else None
         self.directoryMode = 'directoryMode' in state and state['directoryMode']
         if 'metaRegex' in state:
             self.metaRegex = state['metaRegex']
-        else: self.metaRegex = r" ?[([]?(?:cd|disc|part|teil|disk|vol)\.? ?([iI0-9]+)[)\]]?"
+        else:
+            self.metaRegex = self.defaultMetaRegex
+        if "compilationFlag" in state:
+            try:
+                self.compilationFlag = flags.get(state["compilationFlag"])
+            except (KeyError, ValueError):
+                self.compilationFlag = None
+        else:
+            self.compilationFlag = None
+            
         
     def save(self):
         return {'groupTags': [tag.name for tag in self.groupTags],
                 'directoryMode': self.directoryMode,
-                'metaRegex': self.metaRegex
+                'metaRegex': self.metaRegex,
+                'compilationFlag': None if self.compilationFlag is None else self.compilationFlag.name
                 }
     
     def guessAlbums(self, level, files):
@@ -107,7 +117,8 @@ class StandardGuesser(profiles.Profile):
                 if pureDirMode:
                     key = os.path.dirname(element.url.path)
                 else:
-                    key = tuple( (tuple(element.tags[tag]) if tag in element.tags else None) for tag in self.groupTags)
+                    key = tuple( (tuple(element.tags[tag]) if tag in element.tags else None)
+                                                           for tag in self.groupTags)
                 if key not in byKey:
                     byKey[key] = []
                 byKey[key].append(element)
@@ -118,25 +129,34 @@ class StandardGuesser(profiles.Profile):
         self.albums.extend(existing)
         self.toplevels.update(existing)
         for key, elements in byKey.items():
+            flags = set()
+            if self.compilationFlag is not None:
+                for elem in elements:
+                    if hasattr(elem, "specialTags") and "compilation" in elem.specialTags \
+                                    and elem.specialTags["compilation"][0] not in ("0", ""):
+                        flags.add(self.compilationFlag)
             if pureDirMode or (self.albumTag in elements[0].tags):
-                elementsWithoutPos = { e for e in elements if not hasattr(e,'filePosition') }
-                elementsWithPos = sorted(set(elements) - elementsWithoutPos, key = lambda e: e.filePosition)
+                def position(elem):
+                    if hasattr(elem, "specialTags") and "tracknumber" in elem.specialTags:
+                        return utils.parsePosition(elem.specialTags["tracknumber"][0])
+                    return None
+                elementsWithoutPos = { e for e in elements if position(e) is None }
+                elementsWithPos = sorted(set(elements) - elementsWithoutPos, key = lambda e: position(e))
                 children = {}
                 for element in elementsWithPos:
-                    if element.filePosition in children:
+                    if position(element) in children:
                         from ..gui.dialogs import warning
                         warning(self.tr("Error guessing albums"),
-                                self.tr("position {} appears twice in {}").format(element.filePosition, key))
+                                self.tr("position {} appears twice in {}").format(position(element), key))
                         self.errors.append(elements)
                     else:
-                        children[element.filePosition] = element.id
-                firstFreePosition = elementsWithPos[-1].filePosition+1 if len(elementsWithPos) > 0 else 1
-                for i, element in enumerate(elementsWithoutPos, start = firstFreePosition):
+                        children[position(element)] = element.id
+                firstFreePosition = position(elementsWithPos[-1])+1 if len(elementsWithPos) > 0 else 1
+                for i, element in enumerate(elementsWithoutPos, start=firstFreePosition):
                     children[i] = element.id
                 albumTags = tags.findCommonTags(elements)
                 albumTags[tags.TITLE] = [key] if pureDirMode else elements[0].tags[self.albumTag]
-                container = self.level.createContainer(tags=albumTags,
-                                                       major=True,
+                container = self.level.createContainer(tags=albumTags, flags=list(flags), major=True,
                                                        contents=ContentList.fromPairs(children.items()))
                 self.orders[container] = self.orders[elements[0]]
                 self.albums.append(container)
@@ -261,11 +281,30 @@ guessing. This is useful in most cases, unless you have albums that are split ac
         self.regexCheck = QtGui.QCheckBox(self.tr("Find Meta-Containers"))
         self.regexEdit = QtGui.QLineEdit()
         self.regexCheck.toggled.connect(self.regexEdit.setEnabled)
+        self.resetRegexButton = QtGui.QPushButton(self.tr("default"))
+        self.regexCheck.toggled.connect(self.resetRegexButton.setEnabled)
+        self.resetRegexButton.clicked.connect(self._handleRegexReset)
         regexLayout.addWidget(self.regexCheck)
         regexLayout.addWidget(self.regexEdit)
+        regexLayout.addWidget(self.resetRegexButton)
         mainLayout.addLayout(regexLayout)
-        
+        compilationLayout = QtGui.QHBoxLayout()
+        self.compilationCheck = QtGui.QCheckBox(self.tr("Assing flag to compilations:"))
+        self.compilationFlagChooser = QtGui.QComboBox()
+        self.flagnames = sorted(flag.name for flag in flags.allFlags())
+        self.compilationFlagChooser.addItems(self.flagnames)
+        compilationLayout.addWidget(self.compilationCheck)
+        compilationLayout.addWidget(self.compilationFlagChooser)
+        self.compilationCheck.toggled.connect(self.compilationFlagChooser.setEnabled)
+        saveBox = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Save)
+        saveBox.accepted.connect(self._updateProfile)
+        mainLayout.addLayout(compilationLayout)
+        mainLayout.addWidget(saveBox)   
         self.setCurrentProfile(profile)
+    
+    def _handleRegexReset(self):
+        self.regexCheck.setChecked(True)
+        self.regexEdit.setText(self.profile.defaultMetaRegex)
         
     def setCurrentProfile(self, profile):
         self.profile = profile
@@ -292,20 +331,34 @@ guessing. This is useful in most cases, unless you have albums that are split ac
             else:
                 self.regexCheck.setChecked(False)
                 self.regexEdit.setDisabled(True)
+            if profile.compilationFlag is not None:
+                self.compilationCheck.setChecked(True)
+                self.compilationFlagChooser.setEnabled(True)
+                self.compilationFlagChooser.setCurrentIndex(
+                                    self.flagnames.index(profile.compilationFlag.name))
+            else:
+                self.compilationCheck.setChecked(False)
+                self.compilationFlagChooser.setEnabled(False)
     
-    def currentConfig(self):
-        tags = []
+    def _updateProfile(self, *args):
+        selectedTags = []
         for i in range(self.preview.count()):
             item = self.preview.item(i)
             if item.font().bold():
-                tags.insert(0, item.data(Qt.UserRole))
+                selectedTags.insert(0, tags.get(item.data(Qt.UserRole)))
             else:
-                tags.append(item.data(Qt.UserRole))
-        if self.regexCheck.isChecked():
-            regex = self.regexEdit.text()
+                selectedTags.append(tags.get(item.data(Qt.UserRole)))
+        self.profile.groupTags = selectedTags
+        self.profile.albumTag = selectedTags[0] if len(selectedTags) > 0 else None
+        if self.regexCheck.isChecked() and self.regexEdit.text() != "":
+            self.profile.metaRegex = self.regexEdit.text()
         else:
-            regex = None
-        return tags, self.directoryModeButton.isChecked(), regex
+            self.profile.metaRegex = None
+        self.profile.directoryMode = self.directoryModeButton.isChecked()
+        if self.compilationCheck.isChecked():
+            self.profile.compilationFlag = flags.get(self.compilationFlagChooser.currentText())
+        else:
+            self.profile.compilationFlag = None
     
     def addTag(self, action):
         newItem = QtGui.QListWidgetItem(action.text())

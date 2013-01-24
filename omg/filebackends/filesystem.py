@@ -18,8 +18,8 @@
 
 """This module implements the BackendFile and BackendURL for files on the local filesystem."""
 
+from collections import OrderedDict
 import os.path
-import re
 
 from PyQt4 import QtCore
 
@@ -27,10 +27,15 @@ import taglib
 
 from . import BackendFile, BackendURL, urlTypes
 from .. import logging, utils
-from ..core import tags, levels
+from ..core import tags
 
 logger = logging.getLogger(__name__)
 translate = QtCore.QCoreApplication.translate
+
+def init():
+    # register the file:// URL scheme
+    urlTypes["file"] = FileURL
+
 
 class RealFile(BackendFile):
     """A normal file that is accessed directly on the filesystem."""
@@ -45,36 +50,22 @@ class RealFile(BackendFile):
     def __init__(self, url):
         assert url.scheme == "file"
         super().__init__(url)
-                
+        
+    specialTagNames = "tracknumber", "compilation", "discnumber"
+           
     def readTags(self):
         """Load the tags from disk using pytaglib.
         
-        If the file has a TRACKNUMBER tag, its value is stored in the position attribute of
-        this object, but won't be contained in self.tags. Likewise, discnumber is ignored.
+        Special tags (tracknumber, compilation, discnumber) are stored in the "specialTags" attribute.
         """
         
         self._taglibFile = taglib.File(self.url.absPath, applyID3v2Hack=True) 
         self.tags = tags.Storage()
-        self.ignoredTags = dict()
-        if "TRACKNUMBER" in self._taglibFile.tags:
-            def parsePosition(string):
-                """Parse a string like "7" or "2/5" to a (integer) position.
-                
-                If *string* has the form "2/5", the first number will be returned."""
-                string = string.strip()
-                if string.isdecimal():
-                    return int(string)
-                elif re.match('\d+\s*/\s*\d+$',string):
-                    return int(string.split('/')[0])
-                else:
-                    logger.warning("Cannot parse tracknumber '{}' in file '{}'".format(string, self.url))
-                    return None
-            #  Only consider the first tracknumber ...
-            self.position = parsePosition(self._taglibFile.tags["TRACKNUMBER"][0]) 
+        self.specialTags = OrderedDict()
         for key, values in self._taglibFile.tags.items():
             key = key.lower()
-            if key in ["tracknumber", "discnumber"]:
-                self.ignoredTags[key] = values
+            if key in self.specialTagNames:
+                self.specialTags[key] = values
             elif tags.isValidTagName(key):
                 tag = tags.get(key)
                 validValues = []
@@ -106,10 +97,14 @@ class RealFile(BackendFile):
         if os.path.exists(newUrl.absPath):
             raise OSError("Target exists.")
         os.renames(self.url.absPath, newUrl.absPath)
+        from ..core import levels
+        levels.real.emitFilesystemEvent(renamed=((self.url, newUrl),))
         self.url = newUrl
     
     def delete(self):
         os.remove(self.url.absPath)
+        from ..core import levels
+        levels.real.emitFilesystemEvent(deleted=(self.url,))
         
     def saveTags(self):
         """Save what's in self.tags to the file.
@@ -121,14 +116,15 @@ class RealFile(BackendFile):
         tags/values that remain unsaved will be returned.
         """
         self._taglibFile.tags = dict()
-        for tag, values in self.ignoredTags.items():
+        for tag, values in self.specialTags.items():
             self._taglibFile.tags[tag.upper()] = values
         for tag, values in self.tags.items():
             values = [tag.fileFormat(value) for value in values]
             self._taglibFile.tags[tag.name.upper()] = values
         unsuccessful = self._taglibFile.save()
         ret = {key.upper(): values for key,values in unsuccessful.items()}
-        levels.real.filesModified.emit([self.url])
+        from ..core import levels
+        levels.real.emitFilesystemEvent(modified=(self.url,))
         return ret
 
 
@@ -162,7 +158,3 @@ class FileURL(BackendURL):
     def toQUrl(self):
         """Return a QUrl from this URL. Return None if that is not possible (e.g. weird scheme)."""
         return QtCore.QUrl('file://'+self.absPath)
-
-
-# register the file:// URL scheme
-urlTypes["file"] = FileURL
