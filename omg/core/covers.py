@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import os.path, hashlib, re, time
+import os.path, hashlib, re, time, weakref
 
 from PyQt4 import  QtGui, QtCore
 from PyQt4.QtCore import Qt
@@ -45,6 +45,10 @@ providerClasses = []
 # Whenever a cover is requested in one of the sizes in this list, it will be cached in the corresponding
 # cache_<size>-folder. Use addCacheSize to modify this list.
 cacheSizes = []
+
+# When images are loaded asynchronously and should be cached this dict stores the cachePath until the image
+# is loaded.
+_imagesToCache = {}
 
 
 def init():
@@ -81,7 +85,7 @@ def shutdown():
         config.storage.misc.last_cover_check = int(time.time())
 
     
-def get(path,size=None):
+def get(path, size=None):
     """Return a QPixmap with the cover from the specified path which can be absolute or relative to the
     cover folder. If *size* is given, the result will be scaled to have *size* for width and height.
     If *size* is one of the cached sizes, this method will use the cache to skip the scaling.
@@ -101,23 +105,43 @@ def get(path,size=None):
     if size is not None and (pixmap.width() != size or pixmap.height() != size):
         pixmap = pixmap.scaled(size,size,transformMode=Qt.SmoothTransformation)
         
-    # Store in cache
-    #if size in cacheSizes:
-    #    os.makedirs(os.path.dirname(cachePath),exist_ok=True)
-    #    pixmap.save(cachePath,config.options.misc.cover_extension)
+    if size in cacheSizes:
+        storeInCache(pixmap, cachePath)
         
     return pixmap
 
 def getAsync(imageLoader, path, size=None):
+    """Load a cover asynchronously using the given ImageLoader. Return a imageloader.FutureImage instance.
+    *path* and *size* are used as in 'get'."""
+    cacheImage = False
     if size in cacheSizes:
         cachePath = _cachePath(path, size)
         if os.path.exists(cachePath):
             path = cachePath
-    elif not os.path.isabs(path):
+        else:
+            cacheImage = True
+    if not os.path.isabs(path):
         path = os.path.join(COVER_DIR, path)
-    return imageLoader.loadImage(path, QtCore.QSize(size, size))
+                
+    futureImage = imageLoader.loadImage(path, QtCore.QSize(size, size))
+    if cacheImage:
+        imageLoader.loaded.connect(_handleImageLoader, Qt.UniqueConnection)
+        _imagesToCache[futureImage] = cachePath
+        
+    return futureImage
 
+def _handleImageLoader(image):
+    if image in _imagesToCache:
+        cachePath = _imagesToCache[image]
+        storeInCache(image.pixmap, cachePath)
+        del _imagesToCache[image]
 
+def storeInCache(pixmap, cachePath):
+    """Store the *pixmap* at *cachePath*."""
+    os.makedirs(os.path.dirname(cachePath), exist_ok=True)
+    pixmap.save(cachePath, config.options.misc.cover_extension)
+    
+    
 def addCacheSize(size):
     """Add the given size (size=width=height) to the list of sizes that will be cached. Make sure it is not
     added twice."""
