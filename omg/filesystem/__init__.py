@@ -397,7 +397,7 @@ class FileSystemSynchronizer(QtCore.QObject):
         set.
         """ 
         newDirectories = []
-        missingHashes = []
+        missingHashes = set()
         for elid, urlstring, elhash, verified in db.query(
                        "SELECT element_id, url, hash, verified FROM {}files".format(db.prefix)):
             url = filebackends.BackendURL.fromString(urlstring)
@@ -416,7 +416,8 @@ class FileSystemSynchronizer(QtCore.QObject):
             dir.addTrack(track)
             newDirectories += newDirs
         if len(newDirectories) > 0:
-            logger.debug("Found {} directories which have DB files but are not in the folders table")
+            logger.debug("Found {} directories which have DB files but are not in the folders table"
+                         .format(len(newDirectories)))
             db.multiQuery("INSERT INTO {}folders (path, state) VALUES (?,?)".format(db.prefix),
                           [(dir.path, dir.state) for dir in newDirectories])
         return missingHashes
@@ -684,6 +685,7 @@ class FileSystemSynchronizer(QtCore.QObject):
         if len(self.dbTracks) > 0:
             # still not empty -> some files are lost. Show a dialog and let the user fix this
             self.helper.dialogFinished.clear()
+            logger.debug("requesting lost tracks dialog for {}".format(self.dbTracks))
             self._requestHelper.emit("showLostTracksDialog",
                                      ([self.tracks[url] for url in self.dbTracks],))
             self.helper.dialogFinished.wait()
