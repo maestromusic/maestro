@@ -16,37 +16,35 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-class DataDifference:
-    """Efficiently stores the difference between two data attributes of elements.
-    """
-    
-    def __init__(self, dataA, dataB):
+class StickersDifference:
+    """Efficiently stores the difference between two stickers attributes of elements."""
+    def __init__(self, stickersA, stickersB):
         self.diffs = {}
-        if dataA is None:
-            dataA = {}
-        if dataB is None:
-            dataB = {}
-        for key in set(dataA.keys()) | set(dataB.keys()):
-            a = dataA[key] if key in dataA else None
-            b = dataB[key] if key in dataB else None
+        if stickersA is None:
+            stickersA = {}
+        if stickersB is None:
+            stickersB = {}
+        for key in set(stickersA.keys()) | set(stickersB.keys()):
+            a = stickersA[key] if key in stickersA else None
+            b = stickersB[key] if key in stickersB else None
             if a != b:
                 self.diffs[key] = (a, b)
             
     def apply(self, element):
         for key, (_, b) in self.diffs.items():
             if b is None:
-                del element.data[key]
+                del element.stickers[key]
             else:
-                element.data[key] = b
+                element.stickers[key] = b
                 
     def revert(self, element):
         for key, (a, _) in self.diffs.items():
             if a is None:
-                del element.data[key]
+                del element.stickers[key]
             else:
-                element.data[key] = a
+                element.stickers[key] = a
                 
     def inverse(self):
-        ret = DataDifference(None, None)
+        ret = StickersDifference(None, None)
         ret.diffs = {key:(b, a) for (key, (a, b)) in self.diffs.items() }
         return ret

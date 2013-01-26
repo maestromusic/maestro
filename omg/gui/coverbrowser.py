@@ -152,9 +152,9 @@ class CoverBrowser(QtGui.QWidget):
             
     def reset(self):
         result = db.query("""
-            SELECT el.id,dat.data
-            FROM {1} AS el JOIN {0}data AS dat ON el.id = dat.element_id
-            WHERE dat.type = 'COVER'
+            SELECT el.id, st.data
+            FROM {1} AS el JOIN {0}stickers AS st ON el.id = st.element_id
+            WHERE st.type = 'COVER'
             """.format(db.prefix,self.table))
         
         self.coverTable.scene().setCovers(result)

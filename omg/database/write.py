@@ -195,11 +195,11 @@ def setFlags(elid,flags):
         values = ["({},{})".format(elid,flag.id) for flag in flags]
         db.query("INSERT INTO {}flags (element_id,flag_id) VALUES {}".format(db.prefix,','.join(values)))
 
-def setData(elid, data):
-    """Set *data* on the element with *elid*, removing any previous data."""
-    db.query("DELETE FROM {}data WHERE element_id = ?".format(db.prefix), elid)
-    for type, values in data.items():
-        db.multiQuery("INSERT INTO {}data (element_id, type, sort, data) VALUES (?, ?, ?, ?)"
+def setStickers(elid, stickers):
+    """Set *stickers* on the element with *elid*, removing any previous stickers."""
+    db.query("DELETE FROM {}stickers WHERE element_id = ?".format(db.prefix), elid)
+    for type, values in stickers.items():
+        db.multiQuery("INSERT INTO {}stickers (element_id, type, sort, data) VALUES (?, ?, ?, ?)"
                       .format(db.prefix), [(elid, type, i, val) for i, val in enumerate(values)])
 
 def setMajor(data):

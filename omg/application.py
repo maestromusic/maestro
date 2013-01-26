@@ -140,7 +140,7 @@ def run(cmdConfig=[],type='gui',exitPoint=None):
         app.processEvents()
         
     # Initialize config and logging
-    config.init(cmdConfig,testMode=type=='test')
+    config.init(cmdConfig, testMode=type=='test')
     
     # Initialize logging as early as possible -- but after the config variables have been read.
     logging.init()

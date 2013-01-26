@@ -70,11 +70,11 @@ class Element:
                 for file in self.level.fetch(id).getAllFiles():
                     yield file
     
-    def getData(self, type):
-        if type not in self.data:
+    def getStickers(self, type):
+        if type not in self.stickers:
             return None
         else:
-            result = self.data[type]
+            result = self.stickers[type]
             if len(result) > 0:
                 return result
             else: return None
@@ -82,17 +82,17 @@ class Element:
     def hasCover(self):
         # Warning: hasCover returns True if a cover path is stored in the database.
         # This does not mean that the file exists and is readable etc.
-        return self.getData('COVER') is not None
+        return self.getStickers('COVER') is not None
     
     def getCover(self,size=None):
-        paths = self.getData('COVER')
+        paths = self.getStickers('COVER')
         if paths is None:
             return None
         from . import covers
         return covers.get(paths[0],size)
     
     def getCoverPath(self):
-        paths = self.getData('COVER')
+        paths = self.getStickers('COVER')
         if paths is None:
             return None
         if os.path.isabs(paths[0]):
@@ -114,7 +114,7 @@ class Element:
             return False
         if self.flags != other.flags:
             return False
-        if self.data != other.data:
+        if self.stickers != other.stickers:
             return False
         if self.isContainer():
             if self.contents != other.contents:
@@ -134,7 +134,7 @@ class Container(Element):
     Note that *contents* must be a ContentList.
     """
     def __init__(self, level, id, major,
-                 *, contents=None, parents=None, tags=None, flags=None, data=None):
+                 *, contents=None, parents=None, tags=None, flags=None, stickers=None):
         self.level = level
         self.id = id
         self.level = level
@@ -154,9 +154,9 @@ class Container(Element):
         if flags is not None:
             self.flags = flags
         else: self.flags = []
-        if data is not None:
-            self.data = data
-        else: self.data = {}
+        if stickers is not None:
+            self.stickers = stickers
+        else: self.stickers = {}
     
     def copy(self,level=None):
         """Create a copy of this container. Create copies of all attributes. Because contents are stored as
@@ -173,7 +173,7 @@ class Container(Element):
                          parents = self.parents[:],
                          tags = self.tags.copy(),
                          flags = self.flags[:],
-                         data = self.data.copy())
+                         stickers = self.stickers.copy())
         
     def isContainer(self):
         return True
@@ -196,7 +196,7 @@ class File(Element):
     Keyword-arguments that are not specified will be set to empty lists/tag.Storage instances.
     """
     def __init__(self, level, id, url, length,
-                 *, parents=None, tags=None, flags=None, data=None):
+                 *, parents=None, tags=None, flags=None, stickers=None):
         if not isinstance(id,int) or not isinstance(url, filebackends.BackendURL) \
                 or not isinstance(length,int):
             raise TypeError("Invalid type (id,url,length): ({},{},{}) of types ({},{},{})"
@@ -216,9 +216,9 @@ class File(Element):
         if flags is not None:
             self.flags = flags
         else: self.flags = []
-        if data is not None:
-            self.data = data
-        else: self.data = {}
+        if stickers is not None:
+            self.stickers = stickers
+        else: self.stickers = {}
         
     def copy(self, level=None):
         """Create a copy of this file. Create copies of all attributes. If *level* is not None, the copy
@@ -232,7 +232,7 @@ class File(Element):
                     parents = self.parents[:],
                     tags = self.tags.copy(),
                     flags = self.flags[:],
-                    data = self.data.copy())
+                    stickers = self.stickers.copy())
         if hasattr(self, "specialTags"):
             copy.specialTags = self.specialTags.copy()
         return copy

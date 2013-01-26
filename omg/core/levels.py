@@ -20,7 +20,7 @@ import weakref
 
 from PyQt4 import QtCore, QtGui
 
-from . import data, elements, tags, flags
+from . import elements, tags, flags, stickers
 from .nodes import Wrapper
 from .. import application, filebackends, database as db, logging
 
@@ -81,7 +81,7 @@ class LevelChangedEvent(application.ChangeEvent):
     """Event that is emitted when elements on a level change.
     
     The event stores the ids of changed elements in several sets, grouped by the type of the change:
-        - dataIds: tags, flags, parents, data etc. have changed,
+        - dataIds: tags, flags, parents, stickers etc. have changed,
         - contentIds: contents have changed
         - addedIds, removedIds: have been added to/removed from the level
         - dbAddedIds, dbRemovedIds: have been added to/removed from the database (such events are sent to
@@ -336,7 +336,7 @@ class Level(application.ChangeEventDispatcher):
                                       text=self.tr("Remove elements"))
         self.stack.push(command)
 
-    def createContainer(self, tags=None, flags=None, data=None, major=True, contents=None):
+    def createContainer(self, tags=None, flags=None, stickers=None, major=True, contents=None):
         """Create a new container with the given properties and load it into this level.
         
         Can be undone. Returns the new container.
@@ -346,7 +346,7 @@ class Level(application.ChangeEventDispatcher):
                                        major=major, 
                                        tags=tags,
                                        flags=flags,
-                                       data=data)
+                                       stickers=stickers)
         self.stack.beginMacro(self.tr("Create container"))
         self.addElements([container])
         # addElements on real level does not allow for contents
@@ -367,11 +367,11 @@ class Level(application.ChangeEventDispatcher):
         """Change flags of elements. *changes* maps elements to flags.FlagDifference objects."""
         self._changeSomething(self._changeFlags, changes, self.tr("change flags"))
 
-    def changeData(self, changes):
-        """Change flags of elements. *changes* maps elements to data.DataDifference objects."""
-        self._changeSomething(self._changeData, changes, self.tr("change data"))
+    def changeStickers(self, changes):
+        """Change stickers of elements. *changes* maps elements to stickers.StickersDifference objects."""
+        self._changeSomething(self._changeStickers, changes, self.tr("change stickers"))
     
-    def _changeSomething(self,method,changes,text):
+    def _changeSomething(self, method, changes, text):
         """Helper for changeTags, changeFlags and similar methods which only need to undoably call
         *method* with *changes* (or its inverse). *text* is used as text for the created undocommand."""
         if len(changes) > 0:
@@ -608,7 +608,7 @@ class Level(application.ChangeEventDispatcher):
         contentChanges = {}
         tagChanges = {}
         flagChanges = {}
-        dataChanges = {}
+        stickerChanges = {}
         majorChanges = {}
         urlChanges = {}
         # It is important to copy lists etc. in the following because this level will continue to use 
@@ -620,8 +620,9 @@ class Level(application.ChangeEventDispatcher):
                 tagChanges[inParent] = tags.TagStorageDifference(inParent.tags, element.tags.copy())
             if element.flags != inParent.flags:
                 flagChanges[inParent] = flags.FlagListDifference(inParent.flags, element.flags[:])
-            if element.data != inParent.data:
-                dataChanges[inParent] = data.DataDifference(inParent.data, element.data.copy())
+            if element.stickers != inParent.stickers:
+                stickerChanges[inParent] = stickers.StickersDifference(inParent.stickers,
+                                                                       element.stickers.copy())
             if element.isContainer():
                 if element.contents != inParent.contents:
                     contentChanges[inParent] = element.contents.copy()
@@ -634,7 +635,7 @@ class Level(application.ChangeEventDispatcher):
         self.parent.changeContents(contentChanges)
         self.parent.changeTags(tagChanges)
         self.parent.changeFlags(flagChanges)
-        self.parent.changeData(dataChanges)
+        self.parent.changeStickers(stickerChanges)
         self.parent.setMajorFlags(majorChanges)
         try:
             self.parent.renameFiles(urlChanges)
@@ -672,20 +673,20 @@ class Level(application.ChangeEventDispatcher):
     # On real level these methods are implemented differently
     _changeTags = _applyDiffs
     _changeFlags = _applyDiffs
-    _changeData = _applyDiffs
+    _changeStickers = _applyDiffs
 
-    def _setData(self,type,elementToData):
-        """For each (element, datalist) tuple in *elementToData* change the data of element of type *type*
-        to datalist. Do not change data of other types.
+    def _setStickers(self, type, elementToStickers):
+        """For each (element, stickerList) tuple in *elementToStickers* change the stickers of the given type
+        of the element to stickerList. Do not change stickers of other types.
         """
-        for element,data in elementToData.items():
-            if data is not None:
-                if isinstance(data,tuple):
-                    element.data[type] = data
-                else: element.data[type] = tuple(data)
-            elif type in element.data:
-                del element.data[type]
-        self.emitEvent(dataIds=[element.id for element in elementToData])
+        for element,stickers in elementToStickers.items():
+            if stickers is not None:
+                if isinstance(stickers,tuple):
+                    element.stickers[type] = stickers
+                else: element.stickers[type] = tuple(stickers)
+            elif type in element.stickers:
+                del element.stickers[type]
+        self.emitEvent(dataIds=[element.id for element in elementToStickers])
     
     def _setMajorFlags(self, elemToMajor):
         """Set major of several elements."""

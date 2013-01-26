@@ -182,31 +182,31 @@ class RealLevel(levels.Level):
         for (id, flagId) in result:
             level.elements[id].flags.append(flags.get(flagId))
             
-        # data
+        # stickers
         result = db.query("""
                 SELECT element_id,type,data
-                FROM {}data
+                FROM {}stickers
                 WHERE element_id IN ({})
                 ORDER BY element_id,type,sort
                 """.format(db.prefix, csIdList))
-        # This is a bit complicated because the data should be stored in tuples, not lists
+        # This is a bit complicated because the stickers should be stored in tuples, not lists
         # Changing the lists would break undo/redo
         #TODO: is this really necessary?
         current = None
         buffer = []
-        for (id, type, data) in result:
+        for (id, type, sticker) in result:
             if current is None:
                 current = (id, type)
             elif current != (id, type):
-                level.elements[current[0]].data[current[1]] = tuple(buffer)
+                level.elements[current[0]].stickers[current[1]] = tuple(buffer)
                 current = (id,type)
                 buffer = []
             element = level.elements[id]
-            if element.data is None:
-                element.data = {}
-            buffer.append(data)
+            if element.stickers is None:
+                element.stickers = {}
+            buffer.append(sticker)
         if current is not None:
-            level.elements[current[0]].data[current[1]] = tuple(buffer)
+            level.elements[current[0]].stickers[current[1]] = tuple(buffer)
         
         try:
             return [self.elements[id] for id in idList]
@@ -254,7 +254,8 @@ class RealLevel(levels.Level):
     def _removeElements(self): raise NotImplementedError()
     
     def addToDb(self, elements):
-        """Add the given elements to the database including their tags, flags, data and contents. Remarks:
+        """Add the given elements to the database including their tags, flags, stickers and contents.
+        Remarks:
         
             - element.level must be this level,
             - files must already be loaded on real, containers must not,
@@ -314,7 +315,7 @@ class RealLevel(levels.Level):
         for element in elements:
             db.write.setTags(element.id, element.tags)
             db.write.setFlags(element.id, element.flags)
-            db.write.setData(element.id, element.data)
+            db.write.setStickers(element.id, element.stickers)
                 
         newFiles = [element for element in elements if element.isFile()]
         if len(newFiles) > 0:
@@ -424,35 +425,35 @@ class RealLevel(levels.Level):
         db.commit()
         super()._changeFlags(changes)
             
-    def _changeData(self, changes):
+    def _changeStickers(self, changes):
         if not all(element.isInDb() for element in changes.keys()):
-            raise levels.ConsistencyError("Elements on real must be added to the DB before adding data.")
-        super()._changeData(changes)
+            raise levels.ConsistencyError("Elements on real must be added to the DB before adding stickers.")
+        super()._changeStickers(changes)
         db.transaction()
         for element, diff in changes.items():
             for type, (a, b) in diff.diffs.items():
                 if a is not None:
-                    db.query("DELETE FROM {}data WHERE type=? AND element_id=?"
+                    db.query("DELETE FROM {}stickers WHERE type=? AND element_id=?"
                              .format(db.prefix), type, element.id)
                 if b is not None:
-                    db.multiQuery("INSERT INTO {}data (element_id, type, sort, data) VALUES (?,?,?,?)"
+                    db.multiQuery("INSERT INTO {}stickers (element_id, type, sort, data) VALUES (?,?,?,?)"
                                   .format(db.prefix),
                                   [(element.id, type, i, val) for i, val in enumerate(b)])
         db.commit()
                 
-    def _setData(self, type, elementToData):
-        if not all(element.isInDb() for element in elementToData.keys()):
-            raise levels.ConsistencyError("Elements on real must be added to the DB before adding tags.")
-        super()._setData(type, elementToData)
+    def _setStickers(self, type, elementToStickers):
+        if not all(element.isInDb() for element in elementToStickers.keys()):
+            raise levels.ConsistencyError("Elements on real must be added to the DB before adding stickers.")
+        super()._setStickers(type, elementToStickers)
         values = []
-        for element, data in elementToData.items():
-            if data is not None:
-                values.extend((element.id, type, i, d) for i, d in enumerate(data))
+        for element, stickers in elementToStickers.items():
+            if stickers is not None:
+                values.extend((element.id, type, i, s) for i,s in enumerate(stickers))
         db.transaction()
-        db.query("DELETE FROM {}data WHERE type = ? AND element_id IN ({})"
-                 .format(db.prefix,db.csIdList(elementToData.keys())),type)
+        db.query("DELETE FROM {}stickers WHERE type = ? AND element_id IN ({})"
+                 .format(db.prefix, db.csIdList(elementToStickers.keys())),type)
         if len(values) > 0:
-            db.multiQuery("INSERT INTO {}data (element_id,type,sort,data) VALUES (?,?,?,?)"
+            db.multiQuery("INSERT INTO {}stickers (element_id,type,sort,data) VALUES (?,?,?,?)"
                           .format(db.prefix),values)
         db.commit()
         

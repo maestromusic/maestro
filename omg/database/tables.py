@@ -375,21 +375,21 @@ END
 """.format(db.prefix)
 )
 
-#------#
-# data #
-#------#
+#----------#
+# stickers #
+#----------#
 _addMySQL("""
-CREATE TABLE {0}data (
+CREATE TABLE {0}stickers (
     element_id  MEDIUMINT UNSIGNED  NOT NULL,
     type        VARCHAR(255)        NOT NULL,
     sort        SMALLINT UNSIGNED   NOT NULL,
     data        TEXT                NOT NULL,
-    INDEX data_idx(element_id,type,sort),
+    INDEX stickers_idx(element_id,type,sort),
     FOREIGN KEY(element_id) REFERENCES {0}elements(id) ON DELETE CASCADE
 ) ENGINE InnoDB, CHARACTER SET 'utf8'
 """.format(db.prefix))
 _addSQLite("""
-CREATE TABLE {0}data (
+CREATE TABLE {0}stickers (
     element_id  INTEGER         NOT NULL,
     type        VARCHAR(255)    NOT NULL,
     sort        INTEGER         NOT NULL,
@@ -397,7 +397,7 @@ CREATE TABLE {0}data (
     FOREIGN KEY(element_id) REFERENCES {0}elements(id) ON DELETE CASCADE
 )
 """.format(db.prefix),
-"CREATE INDEX {0}data_idx ON {0}data (element_id,type,sort)".format(db.prefix)
+"CREATE INDEX {0}stickers_idx ON {0}stickers (element_id,type,sort)".format(db.prefix)
 )
 
 tables = [SQLTable(queries) for queries in tables]

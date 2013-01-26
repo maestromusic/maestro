@@ -150,14 +150,14 @@ def addCacheSize(size):
 
 
 def removeUnusedCovers():
-    """Check whether the 'large' folder contains covers that are not used in the data-table and delete
+    """Check whether the 'large' folder contains covers that are not used in the stickers-table and delete
     those covers. Also delete cached versions of those covers.
     """
     if not os.path.exists(os.path.join(COVER_DIR,'large')):
         return
     from .. import database as db
     usedPaths = [path
-                 for path in db.query("SELECT data FROM {}data WHERE type = 'COVER'".format(db.prefix))
+                 for path in db.query("SELECT data FROM {}stickers WHERE type = 'COVER'".format(db.prefix))
                                 .getSingleColumn()
                  if not os.path.isabs(path)] # never remove external covers
     for path in os.listdir(os.path.join(COVER_DIR,'large')):
@@ -230,14 +230,14 @@ class CoverUndoCommand:
                 self.covers[element] = (oldPath,newPath)
         
     def redo(self):
-        elementToData = {element: [paths[1]] if paths[1] is not None else None
-                          for element,paths in self.covers.items()}
-        self.level._setData('COVER',elementToData)
+        elementToSticker = {element: [paths[1]] if paths[1] is not None else None
+                            for element,paths in self.covers.items()}
+        self.level._setStickers('COVER', elementToSticker)
             
     def undo(self):
-        elementToData = {element: [paths[0]] if paths[0] is not None else None
-                          for element,paths in self.covers.items()}
-        self.level._setData('COVER',elementToData)
+        elementToSticker = {element: [paths[0]] if paths[0] is not None else None
+                            for element,paths in self.covers.items()}
+        self.level._setStickers('COVER', elementToSticker)
 
 
 def _cachePath(path,size):
