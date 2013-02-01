@@ -17,7 +17,7 @@
 #
 
 import os.path, subprocess, hashlib, threading
-from datetime import datetime, timezone
+from datetime import datetime, timezone, MINYEAR
 
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
@@ -30,8 +30,7 @@ translate = QtCore.QCoreApplication.translate
 
 synchronizer = None
 enabled = False
-hashingEnabled = True
-null = open(os.devnull) 
+idProvider = None
 
 NO_MUSIC = 0
 HAS_FILES = 1
@@ -39,26 +38,36 @@ HAS_NEW_FILES = 2
 PROBLEM = 4
 
 def init():
-    global synchronizer, notifier, enabled, hashingEnabled
+    global synchronizer, notifier, enabled, idProvider
     import _strptime
+    from . import identification
     if config.options.filesystem.disable:
         return
-    try:
-        subprocess.Popen(
-            ['ffmpeg', '-version'],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
-        )
-    except OSError as e:
-        import errno
-        if e.errno == errno.ENOENT:
-            from ..gui import dialogs
-            dialogs.warning(translate("omg.filesystem", "ffmpeg is missing"),
-                            translate("omg.filesystem", "The 'ffmpeg' binary needed by OMG's file "
-                              "tracking mechanism was not found. Please consider installing ffmpeg "
-                              "for full functionality."))
-            hashingEnabled = False
-    
+    idmethod = config.options.filesystem.id_method
+    if idmethod == "ffmpeg":
+        # check if ffmpeg can be called
+        try:
+            subprocess.Popen(
+                ['ffmpeg', '-version'],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            )
+            idProvider = identification.RawAudioHasher()
+        except OSError as e:
+            import errno
+            if e.errno == errno.ENOENT:
+                from ..gui import dialogs
+                dialogs.warning(translate("omg.filesystem", "ffmpeg is missing"),
+                                translate("omg.filesystem", "The 'ffmpeg' binary needed by OMG's file "
+                                  "tracking mechanism was not found. Please consider installing ffmpeg "
+                                  "for full functionality or switch to a different identification " 
+                                  "method."))
+                idProvider = None
+    elif idmethod == "acoustid":
+        apikey = "8XaBELgH" #TODO: AcoustID test key - we should change this
+        idProvider = identification.AcoustIDIdentifier(apikey)
+         
+        
     synchronizer = FileSystemSynchronizer()
     synchronizer.eventThread.start()
     levels.real.filesystemDispatcher.connect(synchronizer.handleRealFileEvent, Qt.QueuedConnection)
@@ -124,33 +133,6 @@ def getNewfileHash(url):
         except KeyError:
             return None
     return None
-
-
-def computeHash(url):
-    """Compute the audio hash of a single file. This method uses
-    the "ffmpeg" binary ot extract the first 15 seconds in raw
-    PCM format and then creates the MD5 hash of that data. It would
-    be nicer to have this either as a plugin with possibly alternative
-    methods, or even better use something like
-    https://github.com/sampsyo/audioread/tree/master/audioread
-    that determines an available backend automatically."""
-    if config.options.filesystem.dump_method == "ffmpeg":
-        proc = subprocess.Popen(
-            ['ffmpeg', '-i', url.absPath,
-             '-v', 'quiet',
-             '-f', 's16le',
-             '-t', '15',
-             '-'],
-            stdout=subprocess.PIPE,
-            stderr=null
-        )
-    else:
-        raise ValueError('Dump method"{}" not supported'.format(config.options.filesystem.dump_method))
-    data = proc.stdout.readall()
-    proc.wait()
-    hash = hashlib.md5(data).hexdigest()
-    return hash
-
 
 def mTimeStamp(url):
     """Get the modification timestamp of a file given by *url*.
@@ -363,7 +345,6 @@ class FileSystemSynchronizer(QtCore.QObject):
         self.eventThread.timer.timeout.connect(self.scanFilesystem)
         self.tracks = {}           # maps URL->track
         self.directories = {}      # maps (rel) path -> Directory object
-        self.missingHashes = set() # tracks whose hashes need to be computed
         self.dbTracks = set()      # urls in the files or newfiles table
         self.dbDirectories = set() # paths in the folders table
 
@@ -459,17 +440,15 @@ class FileSystemSynchronizer(QtCore.QObject):
         self.loadNewFiles()
         self.initialized.set()
         self.initializationComplete.emit()
-        if len(self.missingHashes) > 0 and hashingEnabled:
+        if len(missingHashes) > 0 and idProvider is not None:
             lenMissing = len(missingHashes)
             for i, track in enumerate(missingHashes):
-                track.hash = computeHash(track.url)
+                track.hash = idProvider(track.url)
                 logger.info("Computing hash of {}/{} unhashed files".format(i, lenMissing))
-                db.query("UPDATE {}files SET hash=? WHERE element_id=?".format(db.prefix),
-                         track.hash, track.id)
                 if self.should_stop.is_set():
                     break
             if lenMissing > 0:
-                self._hashesComputed.emit(missingHashes)
+                self._requestHelper.emit("updateFileHashes", missingHashes)
         self.scanFilesystem()
     
     def getDirectory(self, path):
@@ -503,10 +482,10 @@ class FileSystemSynchronizer(QtCore.QObject):
         if modified <= track.verified:
             return None
         logger.debug('checking track {}...'.format(os.path.basename(track.url.path)))
-        newHash = computeHash(track.url) if hashingEnabled else None
+        newHash = idProvider(track.url) if idProvider is not None else None
         if track.id is None:
             track.verified = modified
-            if not hashingEnabled:
+            if idProvider is None:
                 return
             if newHash != track.hash:
                 logger.debug("  ...just updating hash in newfiles")
@@ -521,12 +500,12 @@ class FileSystemSynchronizer(QtCore.QObject):
             backendFile.readTags()
             if dbTags.withoutPrivateTags() != backendFile.tags:
                 logger.debug('Detected modification on file "{}": tags differ'.format(track.url))
-                if hashingEnabled:
+                if idProvider is not None:
                     track.hash = newHash
                 self.modifiedTags[track] = (dbTags, backendFile.tags)
                 track.problem = True
                 self.fileStateChanged.emit(track.url)
-            elif hashingEnabled:
+            elif idProvider is not None:
                 if newHash != track.hash:
                     logger.debug("audio data modified! {} != {} ".format(newHash, track.hash))
                     track.hash = newHash
@@ -541,7 +520,7 @@ class FileSystemSynchronizer(QtCore.QObject):
         track = Track(url)
         dir.addTrack(track)
         self.tracks[url] = track
-        track.hash = computeHash(url) if hashingEnabled else None
+        track.hash = idProvider(url) if idProvider is not None else None
         track.verified = mTimeStamp(url)
         return track
     
@@ -618,7 +597,7 @@ class FileSystemSynchronizer(QtCore.QObject):
                         modifiedTags[track] = ret
                 else:
                     track = self.addTrack(dir, url)
-                    if hashingEnabled: # no point in adding tracks without hash to nefwfiles
+                    if idProvider is not None: # no point in adding tracks without hash to nefwfiles
                         newTracks.add(track)
                         newTracksInDir += 1
             for modifiedDir in dir.updateState(True, True, True, signal=self.folderStateChanged):
@@ -766,9 +745,9 @@ class FileSystemSynchronizer(QtCore.QObject):
                     logger.error("adding url not in self.tracks: {}".format(url))
                 dir = self.directories[os.path.dirname(url.path)]
                 track = self.tracks[url]
-                if track.hash is None and hashingEnabled:
+                if track.hash is None and idProvider is not None:
                     logger.warning("hash is None in add to db handling {}".format(url))
-                    track.hash = computeHash(url)
+                    track.hash = idProvider(url)
                     newHashes.append(track.hash)
                 track.id = elem.id
                 modifiedDirs += dir.updateState(True, False, True, self.folderStateChanged)
@@ -795,8 +774,10 @@ class FileSystemSynchronizer(QtCore.QObject):
             self.removeTracks(tracks)
         db.commit()
         
-    @QtCore.pyqtSlot()    
-    def recheckAll(self):
+    @QtCore.pyqtSlot(str)
+    def recheck(self, directory):
         for track in self.tracks.values():
-            track.verified = datetime(datetime.MINYEAR, 1, 1, tzinfo=timezone.utc)
+            if directory == "" or track.url.path.startswith(directory+"/"):
+                print('unverifying {}'.format(track))
+                track.verified = datetime(MINYEAR, 1, 1, tzinfo=timezone.utc)
         self.scanFilesystem()
