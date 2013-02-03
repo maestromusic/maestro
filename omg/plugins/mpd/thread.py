@@ -51,7 +51,6 @@ class MPDThread(QtCore.QThread):
         self.outputs = None
         self.shouldConnect = threading.Event()
         self.idler = mpd.MPDClient()
-        self.commander = mpd.MPDClient()
     
     def _seek(self):
         """Helper function to seek to a specific point of a song. We use a timer,
