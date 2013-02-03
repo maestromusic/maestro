@@ -61,7 +61,9 @@ class FilesystemSettings(QtGui.QWidget):
         
     def _handleRecheckButton(self):
         if filesystem.enabled:
-            filesystem.synchronizer.recheckAll, Qt.QueuedConnection
+            QtCore.QMetaObject.invokeMethod(filesystem.synchronizer,
+                                            "recheck", Qt.QueuedConnection,
+                                            QtCore.Q_ARG("QString", ""))
     
     def _handleIntervalChanged(self, val):
         if val == 0:

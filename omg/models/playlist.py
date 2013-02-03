@@ -489,8 +489,9 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
             wrappers = self.level.createWrappers(wrapperString,createFunc=_createFunc)
         except ValueError as e:
             logger.warning(str(e))
-            return
+            return False
         self._setRootContents(wrappers)
+        return True
         
         
 class PlaylistInsertCommand(wrappertreemodel.InsertCommand):

@@ -65,8 +65,8 @@ class PhononPlayerBackend(player.PlayerBackend):
         if state is None:
             state = {}
         if 'playlist' in state:
-            self.playlist.initFromWrapperString(state['playlist'])
-            self.setCurrent(state['current'], play=False)
+            if self.playlist.initFromWrapperString(state['playlist']):
+                self.setCurrent(state['current'], play=False)
 
         self._nextSource = None # used in self._handleSourceChanged
         self.connectionState = player.CONNECTED

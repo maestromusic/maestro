@@ -89,8 +89,12 @@ class FileSystemBrowserModel(QtGui.QFileSystemModel):
                 else:
                     return self.descriptions[status]
         return super().data(index, role) 
-    
+
+
 class FileSystemBrowser(QtGui.QTreeView):
+    
+    rescanRequested = QtCore.pyqtSignal(str)
+    
     def __init__(self, rootDirectory=config.options.main.collection, parent=None):
         QtGui.QTreeView.__init__(self, parent)
         self.setAlternatingRowColors(True)
@@ -101,9 +105,28 @@ class FileSystemBrowser(QtGui.QTreeView):
             filesystem.synchronizer.folderStateChanged.connect(self.model().handleStateChange)
             filesystem.synchronizer.fileStateChanged.connect(self.model().handleStateChange)
             filesystem.synchronizer.initializationComplete.connect(self.model().layoutChanged)
+            self.rescanRequested.connect(filesystem.synchronizer.recheck)
         
         self.setSelectionMode(self.ExtendedSelection)
         self.setDragDropMode(QtGui.QAbstractItemView.DragOnly)
+        
+        self.rescanDirectoryAction = QtGui.QAction(self.tr("rescan"), self)
+        self.addAction(self.rescanDirectoryAction)
+        self.rescanDirectoryAction.triggered.connect(self._handleRescan)
+    
+    def contextMenuEvent(self, event):
+        index = self.indexAt(event.pos())
+        if self.model().isDir(index):
+            menu = QtGui.QMenu(self)
+            menu.addAction(self.rescanDirectoryAction)
+            menu.popup(event.globalPos())
+            event.accept()
+        else:
+            event.ignore()
+            
+    def _handleRescan(self):
+        path = self.model().filePath(self.currentIndex())
+        self.rescanRequested.emit(relPath(path))
         
     def selectionChanged(self, selected, deselected):
         super().selectionChanged(selected, deselected)
@@ -112,6 +135,7 @@ class FileSystemBrowser(QtGui.QTreeView):
         s = FileSystemSelection([p for p in paths if hasKnownExtension(p)])
         if s.hasFiles():
             selection.setGlobalSelection(s) 
+
 
 class FileSystemBrowserDock(QtGui.QDockWidget):
     """A DockWidget wrapper for the FileSystemBrowser."""
