@@ -32,13 +32,13 @@ def formatTime(seconds):
     return "{:0>2d}:{:0>2d}".format(minutes, seconds % 60)
 
 
-class PlaybackWidget(QtGui.QDockWidget):
+class PlaybackWidget(mainwindow.DockWidget):
     """A dock widget providing playback controls for the selected player backend.
     """
     
     def __init__(self, parent=None, state=None, location=None):
         super().__init__(parent)
-        self.setWindowTitle(self.tr('playback controls'))
+        self.setWindowTitle(self.tr('controls'))
         widget = QtGui.QWidget()
         self.setWidget(widget)
 
@@ -50,8 +50,7 @@ class PlaybackWidget(QtGui.QDockWidget):
             backend = None
         topLayout = QtGui.QHBoxLayout()
         self.backendChooser = ProfileComboBox(player.profileCategory, default=backend)
-        topLayout.addWidget(self.backendChooser)
-        
+        self.addTitleWidget(self.backendChooser)        
         
         standardIcon = QtGui.qApp.style().standardIcon
         self.previousButton = QtGui.QPushButton(standardIcon(QtGui.QStyle.SP_MediaSkipBackward), '', self)

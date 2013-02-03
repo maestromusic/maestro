@@ -25,21 +25,25 @@ from .. import application, config, database as db, utils
 from ..core import tags, flags, levels
 from ..core.elements import Element, Container
 from ..search import searchbox, criteria as criteriaModule
-from . import mainwindow, treeview, browserdialog, delegates
+from . import mainwindow, treeactions, treeview, browserdialog, delegates
 from .delegates import browser as browserdelegate
 from ..models import browser as browsermodel
-from . import treeactions
 
 
 translate = QtCore.QCoreApplication.translate
 
 
-class BrowserDock(QtGui.QDockWidget):
+class BrowserDock(mainwindow.DockWidget):
     """DockWidget containing the Browser."""
-    def __init__(self,parent=None,state=None,location=None):
-        QtGui.QDockWidget.__init__(self,parent)
+    def __init__(self,parent=None, state=None, location=None):
+        super().__init__(parent)
         self.setWindowTitle(self.tr("Browser"))
         browser = Browser(self,state)
+        browser.optionButton = QtGui.QToolButton(self)
+        browser.optionButton.setIcon(utils.getIcon('options.png'))
+        browser.optionButton.setIconSize(QtCore.QSize(14, 14))
+        browser.optionButton.clicked.connect(browser._handleOptionButton)
+        self.addTitleWidget(browser.optionButton)
         self.setWidget(browser)
         
     def saveState(self):
@@ -127,19 +131,10 @@ class Browser(QtGui.QWidget):
         layout.setContentsMargins(0,0,0,0)
         self.setLayout(layout)   
         
-        # ControlLine (containing searchBox and optionButton)
-        controlLineLayout = QtGui.QHBoxLayout()
-        layout.addLayout(controlLineLayout)
-        
         self.searchBox = searchbox.SearchBox(self)
         self.searchBox.criteriaChanged.connect(self.search)
-        controlLineLayout.addWidget(self.searchBox)
-        
-        self.optionButton = QtGui.QPushButton(self)
-        self.optionButton.setIcon(utils.getIcon('options.png'))
-        self.optionButton.clicked.connect(self._handleOptionButton)
-        controlLineLayout.addWidget(self.optionButton)
-        
+        layout.addWidget(self.searchBox)
+               
         self.splitter = QtGui.QSplitter(Qt.Vertical,self)
         layout.addWidget(self.splitter)
         

@@ -59,7 +59,7 @@ class EditorTreeView(treeview.DraggingTreeView):
                 self.expand(child)
 
     
-class EditorWidget(QtGui.QDockWidget):
+class EditorWidget(mainwindow.DockWidget):
     """The editor is a dock widget for editing elements and their structure. It provides methods to "guess"
     the album structure of new files that are dropped from the filesystem."""
     def __init__(self, parent=None, state=None, location=None):
@@ -108,10 +108,11 @@ class EditorWidget(QtGui.QDockWidget):
         
         buttonLayout.addStretch()
         
-        self.optionButton = QtGui.QPushButton()
+        self.optionButton = QtGui.QToolButton()
         self.optionButton.setIcon(utils.getIcon('options.png'))
+        self.optionButton.setIconSize(QtCore.QSize(14, 14))
         self.optionButton.clicked.connect(self._handleOptionButton)
-        buttonLayout.addWidget(self.optionButton)
+        self.addTitleWidget(self.optionButton)
 
     def _handleOptionButton(self):
         """Open the option dialog."""

@@ -212,6 +212,12 @@ class MainWindow(QtGui.QMainWindow):
         aboutAction.triggered.connect(self.showAboutDialog)
         self.menus['help'].addAction(aboutAction)
         
+        hideTitleBarsAction = QtGui.QAction(self)
+        hideTitleBarsAction.setText(self.tr("Hide title bars"))
+        hideTitleBarsAction.setCheckable(True)
+        hideTitleBarsAction.setChecked(False)
+        self.hideTitleBarsAction = hideTitleBarsAction
+        
         fullscreenAction = QtGui.QAction(self)
         fullscreenAction.setText(self.tr("&Fullscreen"))
         fullscreenAction.setCheckable(True)
@@ -265,6 +271,7 @@ class MainWindow(QtGui.QMainWindow):
                 self.menus['dockwidgets'].addAction(action)
         
         self.menus['view'].addSeparator()
+        self.menus['view'].addAction(self.hideTitleBarsAction)
         self.menus['view'].addAction(self.fullscreenAction)
                 
     def _toggleCentralWidget(self,data,checked):
@@ -535,6 +542,53 @@ class MainWindow(QtGui.QMainWindow):
                 event.ignore()
                 return
         event.accept()
+
+class DockWidgetTitleBar(QtGui.QFrame):
+    """Custom class for title bars of QDockWidgets that can have additional GUI elements."""
+    
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.label = QtGui.QLabel(self.parent().windowTitle())
+        self.closeButton = QtGui.QToolButton(self)
+        self.closeButton.setIcon(QtGui.qApp.style().standardIcon(QtGui.QStyle.SP_TitleBarCloseButton))
+        self.closeButton.setIconSize(QtCore.QSize(14, 14))
+        self.closeButton.clicked.connect(self.parent().close)
+        
+        layout = QtGui.QHBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(1)
+        layout.addWidget(self.label)
+        layout.addStretch()
+        layout.addSpacing(8)
+        layout.addWidget(self.closeButton)
+        self.setLayout(layout)
+        self.setFrameStyle(QtGui.QFrame.Box | QtGui.QFrame.Sunken)
+        self.setLineWidth(0)
+        self.setMidLineWidth(1)
+        
+
+class DockWidget(QtGui.QDockWidget):
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.tbWidget = DockWidgetTitleBar(self)
+        self.setTitleBarWidget(self.tbWidget)
+        mainWindow.hideTitleBarsAction.toggled.connect(self._handleHideAction)
+        
+    def setWindowTitle(self, title):
+        super().setWindowTitle(title)
+        self.tbWidget.label.setText(title)
+        
+    def addTitleWidget(self, widget):
+        layout = self.tbWidget.layout()
+        layout.insertWidget(layout.count()-2, widget)
+        
+    def _handleHideAction(self, checked):
+        if checked:
+            self.setTitleBarWidget(QtGui.QWidget())
+        else:
+            self.setTitleBarWidget(self.tbWidget)
+
 
 class Location:
     """This small class stores location information for dockwidgets when the layout is saved/restored. Note

@@ -135,14 +135,24 @@ class FileSystemBrowser(QtGui.QTreeView):
         s = FileSystemSelection([p for p in paths if hasKnownExtension(p)])
         if s.hasFiles():
             selection.setGlobalSelection(s) 
-
-
-class FileSystemBrowserDock(QtGui.QDockWidget):
+    
+        
+class FileSystemBrowserDock(mainwindow.DockWidget):
     """A DockWidget wrapper for the FileSystemBrowser."""
     def __init__(self,parent=None,location=None):
-        QtGui.QDockWidget.__init__(self, parent)
-        self.setWindowTitle(translate("FileSystemBrowserDock", "Filesystem: {}").format(config.options.main.collection))
+        super().__init__(parent)
+        self.setWindowTitle(translate("FileSystemBrowserDock", "Filesystem: {}")
+                            .format(config.options.main.collection))
+        self.confButton = QtGui.QToolButton()
+        self.confButton.setIcon(getIcon('options.png'))
+        self.confButton.setIconSize(QtCore.QSize(14, 14))
+        self.confButton.clicked.connect(self._handleConf)
+        self.addTitleWidget(self.confButton)
         self.setWidget(FileSystemBrowser())
+        
+    def _handleConf(self):
+        from . import preferences
+        preferences.show("main/filesystem")
         
 
 class FileSystemSelection(selection.Selection):

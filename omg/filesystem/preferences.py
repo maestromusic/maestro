@@ -32,6 +32,12 @@ class FilesystemSettings(QtGui.QWidget):
         self.enableBox = QtGui.QCheckBox(self.tr("Enable file system monitoring"))
         self.enableBox.toggled.connect(self.recheckButton.setEnabled)
         self.enableBox.toggled.connect(self._handleEnableBox)
+        self.idMethodBox = QtGui.QComboBox()
+        self.idMethodBox.addItem("AcoustID fingerprint")
+        self.idMethodBox.addItem("Raw PCM Hash")
+        if config.options.filesystem.id_method == "ffmpeg":
+            self.idMethodBox.setCurrentIndex(1)
+        self.idMethodBox.currentIndexChanged.connect(self._handleIdMethodChange)
         self.scanIntervalBox = QtGui.QSpinBox()
         self.scanIntervalBox.setMinimum(0)
         self.scanIntervalBox.setMaximum(24*3600)
@@ -46,6 +52,12 @@ class FilesystemSettings(QtGui.QWidget):
         intervalLayout = QtGui.QHBoxLayout()
         intervalLayout.addWidget(self.scanIntervalBox)
         intervalLayout.addWidget(self.scanIntervalLabel)
+        
+        idMethodLayout = QtGui.QHBoxLayout()
+        idMethodLayout.addWidget(self.idMethodBox)
+        idMethodLabel = QtGui.QLabel(self.tr("select file identification method (needs restart to take effect"))
+        idMethodLayout.addWidget(idMethodLabel)
+        layout.addLayout(idMethodLayout)
         layout.addLayout(intervalLayout)
         layout.addWidget(self.recheckButton)
         layout.addStretch()        
@@ -58,7 +70,13 @@ class FilesystemSettings(QtGui.QWidget):
         else:
             filesystem.shutdown()
             config.options.filesystem.disable = True
-        
+    
+    def _handleIdMethodChange(self, index):
+        if index == 0:
+            config.options.filesystem.id_method = "acoustid"
+        else:
+            config.options.filesystem.id_method = "ffmpeg"
+    
     def _handleRecheckButton(self):
         if filesystem.enabled:
             QtCore.QMetaObject.invokeMethod(filesystem.synchronizer,

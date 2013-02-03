@@ -89,7 +89,7 @@ class PlaylistTreeView(treeview.DraggingTreeView):
         self.model().removeMany(self.selectedRanges())
 
 
-class PlaylistWidget(QtGui.QDockWidget):
+class PlaylistWidget(mainwindow.DockWidget):
     def __init__(self, parent=None, state=None, location=None):
         super().__init__(parent)
         self.setWindowTitle(self.tr('Playlist'))
@@ -116,23 +116,16 @@ class PlaylistWidget(QtGui.QDockWidget):
         layout.setSpacing(0)
         layout.setContentsMargins(0,0,0,0)
         
-        # TODO Move stuff into a popup.    
-        buttonLayout = QtGui.QHBoxLayout()
-        # Spacings and margins are inherited. Reset the spacing
-        style = QtGui.QApplication.style()
-        buttonLayout.setSpacing(style.pixelMetric(style.PM_LayoutHorizontalSpacing))
-        layout.addLayout(buttonLayout)
         self.backendChooser = profilesgui.ProfileComboBox(player.profileCategory, default=backend)
         self.backendChooser.profileChosen.connect(self.setBackend)
-        buttonLayout.addWidget(self.backendChooser)
+        self.addTitleWidget(self.backendChooser)
         
-        buttonLayout.addWidget(QtGui.QLabel(self.tr("Item Display:")))
+        self.addTitleWidget(QtGui.QLabel(self.tr("Item Display:")))
         profileChooser = profilesgui.ProfileComboBox(delegates.profiles.category,
                                                      restrictToType=profileType,
                                                      default=delegateProfile)
         profileChooser.profileChosen.connect(self.treeview.itemDelegate().setProfile)
-        buttonLayout.addWidget(profileChooser)
-        buttonLayout.addStretch()
+        self.addTitleWidget(profileChooser)
 
         layout.addWidget(self.treeview)
         self.errorLabel = QtGui.QLabel()
