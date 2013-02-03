@@ -102,7 +102,7 @@ def connect(**kwargs):
     if threadId in connections:
         logger.warning(
             "database.connect has been called although a connection for this thread was already open.")
-        return connections[threadId]
+        return ConnectionContextManager()
     global type, prefix
     type = config.options.database.type
     prefix = config.options.database.prefix
