@@ -21,7 +21,7 @@ import functools
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
-from .. import application, config, database as db, utils
+from .. import application, config, database as db, logging, utils
 from ..core import tags, flags, levels
 from ..core.elements import Element, Container
 from ..search import searchbox, criteria as criteriaModule
@@ -31,6 +31,8 @@ from ..models import browser as browsermodel
 
 
 translate = QtCore.QCoreApplication.translate
+
+logger = logging.getLogger(__name__)
 
 
 class BrowserDock(mainwindow.DockWidget):
@@ -384,10 +386,15 @@ class BrowserTreeView(treeview.TreeView):
         if event.modifiers() & Qt.ControlModifier:
             model.stack.beginMacro(self.tr("Replace Playlist"))
             model.clear()
+        insertOffset = model.root.fileCount()
         model.insert(model.root, len(model.root.contents), wrappers)
         if event.modifiers() & Qt.ControlModifier:
-            model.backend.play()
+            model.backend.play()            
             model.stack.endMacro()
+        elif model.backend.state() is player.STOP:
+            model.backend.setCurrent(insertOffset)
+            model.backend.play()
+            
         
        
 class Optimizer(QtCore.QObject):
