@@ -41,9 +41,8 @@ logger = logging.getLogger(__name__)
 
 
 def enable():
-    player.profileCategory.addType(profiles.ProfileType('mpd',
-                                                        translate('MPDPlayerBackend','MPD'),
-                                                        MPDPlayerBackend))
+    player.profileCategory.addType(profiles.ProfileType(
+                'mpd', translate('MPDPlayerBackend','MPD'), MPDPlayerBackend))
     from omg import filebackends
     filebackends.urlTypes["mpd"] = mpdfilebackend.MPDURL
 
@@ -55,6 +54,13 @@ def disable():
 
             
 class MPDPlayerBackend(player.PlayerBackend):
+    """Player backend to control an MPD server.
+    
+    The MPD backend currently uses two connections: A "commander", running in the event thread,
+    sets off commands issued by user interaction (playback control, playlist manipulation, ...).
+    The "idler", running in a seperate thread, listens for changes reported by OMG, such as
+    state changes, playlist changes done with other programs, etc.
+    """
     
     def __init__(self, name, type, state):
         super().__init__(name, type, state)
@@ -93,8 +99,17 @@ class MPDPlayerBackend(player.PlayerBackend):
         self.seekTimer.setInterval(25)
         self.seekTimer.timeout.connect(self._seek)
         
-        self.atomicOp = threading.Lock()
-        self.mpdthread.atomicOp = self.atomicOp
+        # this lock is used when the main thread changes the playlist information of the idler,
+        # which is done when the user manipulates the playlist in order to avoid that the idler
+        # reports that same change.
+        self.playlistLock = threading.RLock()
+        self.mpdthread.playlistLock = self.playlistLock
+    
+    def save(self):
+        return {'host': self.mpdthread.host,
+                'port': self.mpdthread.port,
+                'password': self.mpdthread.password
+                }
     
     def setConnectionParameters(self, host, port, password):
         #TODO reconnect
@@ -111,14 +126,9 @@ class MPDPlayerBackend(player.PlayerBackend):
             
         player.profileCategory.profileChanged.emit(self)
         
-    def save(self):
-        return {'host': self.mpdthread.host,
-                'port': self.mpdthread.port,
-                'password': self.mpdthread.password
-                }
-    
     @contextlib.contextmanager
     def prepareCommander(self):
+        """Context manager to ensure that the commander is connected."""
         if self.commander._sock is None:
             self.commander.connect(self.mpdthread.host, self.mpdthread.port)
         try:
@@ -126,7 +136,6 @@ class MPDPlayerBackend(player.PlayerBackend):
         except (mpd.ConnectionError, socket.error):
             self.commander.connect(self.mpdthread.host, self.mpdthread.port)
         
-
     def state(self):
         return self._state
     
@@ -170,7 +179,6 @@ class MPDPlayerBackend(player.PlayerBackend):
         return time.time() - self._currentStart
     
     def setElapsed(self, elapsed):
-        
         self.seekRequest = elapsed
         self.seekTimer.start(20)
     
@@ -198,11 +206,13 @@ class MPDPlayerBackend(player.PlayerBackend):
                 self.commander.update()
     
     def makeUrl(self, path):
+        """Create an MPD type URL for the given path."""
         mpdurl = mpdfilebackend.MPDURL("mpd://" + self.name + "/" + path)
         return mpdurl.getBackendFile().url
     
     @QtCore.pyqtSlot(str, object)
     def _handleMPDChange(self, what, how):
+        """React on changes reported by the idler thread."""
         if what == 'connect':
             paths, self._current, self._currentLength, self._currentStart, \
                 self._state, self._volume, self._outputs = how
@@ -249,11 +259,12 @@ class MPDPlayerBackend(player.PlayerBackend):
             for pos, url in urlified:
                 self.urls[pos:pos] = [ url ]
         elif what == 'playlist':
-            self.playlist.resetFromUrls([self.makeUrl(path) for path in how])
+            self.playlist.resetFromUrls([self.makeUrl(path) for path in how],
+                                        updateBackend='onundoredo')
         elif what == 'outputs':
             self._outputs = how
         else:
-            print('WHAT? {}'.format(what))
+            raise ValueError("Unknown change message from idler thread: {}".format(what))
                     
     def treeActions(self):
         yield self.separator
@@ -277,11 +288,11 @@ class MPDPlayerBackend(player.PlayerBackend):
     
     def setPlaylist(self, urls):
         with self.prepareCommander():
-            with self.atomicOp:
+            with self.playlistLock:
                 self.commander.clear()
                 self.mpdthread.playlistVersion += 1
                 self.mpdthread.mpd_playlist = []
-        self.insertIntoPlaylist(0, urls)
+                self.insertIntoPlaylist(0, urls)
     
     def insertIntoPlaylist(self, pos, urls):
         """Insert *urls* into the MPD playlist at position *pos*.
@@ -293,14 +304,14 @@ class MPDPlayerBackend(player.PlayerBackend):
         with self.prepareCommander():
             inserted = []
             try:
-                with self.atomicOp:
+                with self.playlistLock:
                     isEnd = (pos == len(self.mpdthread.mpd_playlist))
                     for position, url in enumerate(urls, start=pos):
                         if isEnd:
                             self.commander.add(url.path)
                             self.mpdthread.playlistVersion += 1
                         else:
-                            self.commander.addid(url.path, position)
+                            self.commander.add(url.path, position)
                             self.mpdthread.playlistVersion += 2
                         self.mpdthread.mpd_playlist[position:position] = [url.path]
                         inserted.append(url)
@@ -309,18 +320,17 @@ class MPDPlayerBackend(player.PlayerBackend):
     
     def removeFromPlaylist(self, begin, end):
         with self.prepareCommander():
-            with self.atomicOp:
-                self.mpdthread.playlistVersion += end-begin
+            with self.playlistLock:
                 del self.mpdthread.mpd_playlist[begin:end]
-                for _ in range(end-begin):
-                    self.commander.delete(begin)
+                self.commander.delete("{}:{}".format(begin,end))
+                self.mpdthread.playlistVersion += 1
         
     def move(self,fromOffset,toOffset):
         
         if fromOffset == toOffset:
             return
         with self.prepareCommander():
-            with self.atomicOp:
+            with self.playlistLock:
                 path = self.mpdthread.mpd_playlist.pop(fromOffset)
                 self.mpdthread.mpd_playlist.insert(toOffset, path)
                 self.commander.move(fromOffset, toOffset)
