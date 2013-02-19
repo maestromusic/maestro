@@ -311,7 +311,7 @@ class MPDPlayerBackend(player.PlayerBackend):
                             self.commander.add(url.path)
                             self.mpdthread.playlistVersion += 1
                         else:
-                            self.commander.add(url.path, position)
+                            self.commander.addid(url.path, position)
                             self.mpdthread.playlistVersion += 2
                         self.mpdthread.mpd_playlist[position:position] = [url.path]
                         inserted.append(url)
@@ -325,7 +325,7 @@ class MPDPlayerBackend(player.PlayerBackend):
                 self.commander.delete("{}:{}".format(begin,end))
                 self.mpdthread.playlistVersion += 1
         
-    def move(self,fromOffset,toOffset):
+    def move(self, fromOffset, toOffset):
         
         if fromOffset == toOffset:
             return
