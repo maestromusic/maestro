@@ -90,8 +90,10 @@ class Sql(AbstractSql):
         transactionLock.release()
         
     def getDate(self,value):
+        if value.endswith('+00:00'):
+            value = value[:-6]
         return datetime.datetime.strptime(value,"%Y-%m-%d %H:%M:%S").replace(tzinfo=datetime.timezone.utc)
-
+            
 
 class SqlResult(AbstractSqlResult):
     def __init__(self,cursor,multi):

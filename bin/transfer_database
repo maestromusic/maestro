@@ -1,0 +1,99 @@
+#!/usr/bin/python3
+# -*- coding: utf-8 -*-
+# OMG Music Manager  -  http://omg.mathematik.uni-kl.de
+# Copyright (C) 2009-2013 Martin Altmayer, Michael Helmling
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+"""Convenience script to reset the database (drop all tables and create them again)."""
+
+import argparse, sys, threading
+
+from omg import application, config, database
+
+parser = argparse.ArgumentParser()
+parser.add_argument("source", choices=['mysql', 'sqlite'])
+parser.add_argument("target", choices=['mysql', 'sqlite'])
+parser.add_argument("--config", "-c", action='append')
+parser.add_argument("--sourcePrefix", default=None)
+parser.add_argument("--targetPrefix", default='')
+    
+args = parser.parse_args()
+if args.source == args.target:
+    print("Error: Source equals target.")
+    sys.exit()
+
+application.init(args.config, exitPoint="config")
+
+if args.sourcePrefix is None:
+    args.sourcePrefix = config.options.database.prefix
+config.options.database.prefix = args.targetPrefix
+    
+config.options.database.type = args.source
+source = database.connect().connection
+# make the database module believe that we did not connect to the database yet
+del database.connections[threading.current_thread().ident]
+
+config.options.database.type = args.target
+database.connect()
+target = database
+
+tables = [
+('elements', 'id,file,toplevel,elements,major', True, []),
+('contents', 'container_id,position,element_id', False, []),          
+('files', 'element_id,url,hash,verified,length', False, [3]),
+('tagids', 'id,tagname,tagtype,title,icon,private,sort', True, []),
+('tags', 'element_id,tag_id,value_id', False, []),
+('values_varchar', 'id,tag_id,value,sort_value,hide', False, []),
+('values_text', 'id,tag_id,value', False, []),
+('values_date', 'id,tag_id,value', False, []),
+('flags', 'element_id,flag_id', False, []),
+('flag_names', 'id,name,icon', True, []),
+('folders', 'path,state', False, []),
+('newfiles', 'url,hash,verified', False, [2]),
+('stickers', 'element_id,type,sort,data', False, [])
+]
+tableNames = [table[0] for table in tables]
+
+# Make sure tables exist and are empty
+if len(target.listTables()) > 0:
+    for table in target.listTables():
+        if table in tableNames and target.query("SELECT COUNT(*) FROM "+table).getSingle() > 0:
+            print("Error: Table '{}' is not empty. Please reset target database first.".format(table))
+            print("WARNING: Depending on config.options.database.type reset_database might reset your source database.")
+            sys.exit()
+
+print("Create tables...")
+target.transaction()
+target.createTables(ignoreExisting=True)
+
+def copyTable(table, columns, dateColumns):
+    print("Copy {}...".format(table))
+    result = source.query("SELECT {} FROM {}{}".format(columns, args.sourcePrefix, table))
+    for row in result:
+        row = [None if source.isNull(v) else v for v in row]
+        for i in dateColumns:
+            row[i] = source.getDate(row[i])
+        target.query("INSERT INTO {}{} ({}) VALUES ({})".format(args.targetPrefix, table, columns,
+                                                                ','.join(['?']*len(columns.split(',')))),
+                     *row)
+    
+for table, columns, referenced, dateColumns in tables:
+    if referenced:
+        copyTable(table, columns, dateColumns)
+for table, columns, referenced, dateColumns in tables:
+    if not referenced:
+        copyTable(table, columns, dateColumns)
+        
+target.commit()

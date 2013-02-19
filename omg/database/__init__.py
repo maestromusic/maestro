@@ -88,6 +88,11 @@ class ConnectionContextManager:
     def __exit__(self,exc_type, exc_value, traceback):
         close()
         return False # If the suite was stopped by an exception, don't stop that exception
+    
+    @property
+    def connection(self):
+        """The connection of the current thread."""
+        return connections[threading.current_thread().ident]
 
 
 def connect(**kwargs):
