@@ -19,23 +19,25 @@
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from . import searchparser
+from . import criteria
 from .. import utils
 from ..gui.misc.lineedits import IconLineEdit
 
 
 class SearchBox(IconLineEdit):
-    criteriaChanged = QtCore.pyqtSignal()
+    criterionChanged = QtCore.pyqtSignal()
 
-    def __init__(self,parent=None):
-        IconLineEdit.__init__(self,utils.getIcon("clear.png"),parent)
+    def __init__(self, text=''):
+        IconLineEdit.__init__(self, utils.getIcon("clear.png"))
+        self.setText(text)
         self.button.clicked.connect(self.clear)
         self.textChanged.connect(self._handleTextChanged)
         self.instant = True
-        self._criteria = []
+        self._criterion = None
 
-    def getCriteria(self):
-        return self._criteria
+    @property
+    def criterion(self):
+        return self._criterion
 
     def getInstantSearch(self):
         return self.instant
@@ -43,17 +45,17 @@ class SearchBox(IconLineEdit):
     def setInstantSearch(self,instant):
         self.instant = instant
 
-    def _handleTextChanged(self,text):
+    def _handleTextChanged(self, text):
         if self.instant:
-            criteria = searchparser.parseSearchString(text)
-            if criteria != self._criteria:
-                self._criteria = criteria
-                self.criteriaChanged.emit()
+            criterion = criteria.parse(text)
+            if criterion != self._criterion:
+                self._criterion = criterion
+                self.criterionChanged.emit()
                 
     def keyPressEvent(self,event):
         QtGui.QLineEdit.keyPressEvent(self,event)
         if event.key() in (Qt.Key_Return,Qt.Key_Enter):
-            criteria = searchparser.parseSearchString(self.text())
-            if criteria != self._criteria:
-                self._criteria = criteria
-                self.criteriaChanged.emit()
+            criterion = criteria.parse(self.text())
+            if criterion != self._criterion:
+                self._criterion = criterion
+                self.criterionChanged.emit()

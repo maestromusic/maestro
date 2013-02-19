@@ -24,7 +24,7 @@ from PyQt4.QtCore import Qt
 from .. import application, config, database as db, utils
 from ..core import tags, flags, levels
 from ..core.elements import Element, Container
-from ..search import searchbox, criteria as criteriaModule
+from ..search import searchbox, criteria
 from . import mainwindow, treeactions, treeview, browserdialog, delegates
 from .delegates import browser as browserdelegate
 from ..models import browser as browsermodel
@@ -64,7 +64,7 @@ mainwindow.addWidgetData(mainwindow.WidgetData(
 class Browser(QtGui.QWidget):
     """Browser to search the music collection. The browser contains a searchbox, a button to open the
     configuration-dialog and one or more views. Depending on whether search value is entered and/or a
-    criterionFilter is set or not, the browser displays results from its bigResult-table or 'elements'
+    filterCriterion is set or not, the browser displays results from its bigResult-table or 'elements'
     (the table currently used is stored in self.table). Each view has a list of tag-sets ('layers') and will
     group the contents of self.table according to the layers: For each tag-set the view will contain a level
     of ValueNodes ('taglayer') that contain only elements with this value. After these taglayers the browser
@@ -115,8 +115,8 @@ class Browser(QtGui.QWidget):
     def __init__(self,parent = None,state = None):
         """Initialize a new Browser with the given parent."""
         QtGui.QWidget.__init__(self,parent)
-        self.criterionFilter = []
-        self.searchCriteria = []
+        self.filterCriterion = None
+        self.searchCriterion = None
         self.views = []
         
         if browsermodel.searchEngine is None:
@@ -131,8 +131,8 @@ class Browser(QtGui.QWidget):
         layout.setContentsMargins(0,0,0,0)
         self.setLayout(layout)   
         
-        self.searchBox = searchbox.SearchBox(self)
-        self.searchBox.criteriaChanged.connect(self.search)
+        self.searchBox = searchbox.SearchBox()
+        self.searchBox.criterionChanged.connect(self.search)
         layout.addWidget(self.searchBox)
                
         self.splitter = QtGui.QSplitter(Qt.Vertical,self)
@@ -152,7 +152,7 @@ class Browser(QtGui.QWidget):
             if 'flags' in state:
                 flagList = [flags.get(name) for name in state['flags'] if flags.exists(name)]
                 if len(flagList) > 0:
-                    self.criterionFilter.append(criteriaModule.FlagsCriterion(flagList))
+                    self.filterCriterion = criteria.FlagsCriterion(flagList)
             if 'delegate' in state:
                 self.delegateProfile = delegates.profiles.category.getFromStorage(
                                                             state.get('delegate'),
@@ -178,15 +178,11 @@ class Browser(QtGui.QWidget):
         # Get the flags from self.criterionFilter
         # When a general criterionfilter is implemented we will store the filter itself as string
         # (e.g. '{flag:piano} Concert') instead of a list of flags.
-        flags = []
-        for criterion in self.criterionFilter:
-            if isinstance(criterion,criteriaModule.FlagsCriterion):
-                flags.extend(criterion.flags)
+        #TODO
         state = {
             'instant': self.searchBox.getInstantSearch(),
             'showHiddenValues': self.showHiddenValues,
             'views': utils.mapRecursively(lambda tag: tag.name,[view.model().layers for view in self.views]),
-            'flags': [flagType.name for flagType in flags],
             'sortTags': {tag.name: [t.name for t in sortTags] for tag,sortTags in self.sortTags.items()}
         }
         if self.delegateProfile is not None:
@@ -194,22 +190,29 @@ class Browser(QtGui.QWidget):
         return state
     
     def load(self,restoreExpanded=False):
-        """Load contents into the browser, based on the current criterionFilter and searchCriteria. If a
+        """Load contents into the browser, based on the current filterCriterion and searchCriterion. If a
         search is necessary this will only start a search and actual loading will be done in
         _handleSearchFinished. If *restoreExpanded* is True all views will store the expanded nodes and try
         to restore them again after reloading.
         """
-        criteria = self.criterionFilter + self.searchCriteria
         # This will effectively stop any request from being processed
         if self.searchRequest is not None:
             self.searchRequest.stop()
             self.searchRequest = None
+            
+        if self.filterCriterion is not None and self.searchCriterion is not None:
+            criterion = self.filterCriterion and self.searchCriterion
+        elif self.filterCriterion is not None:
+            criterion = self.filterCriterion
+        elif self.searchCriterion is not None:
+            criterion = self.searchCriterion
+        else: criterion = None
 
-        if len(criteria) > 0:
+        if criterion is not None:
             self.table = self.bigResult
             self.searchRequest = browsermodel.searchEngine.search(fromTable = db.prefix+"elements",
                                                                   resultTable = self.bigResult,
-                                                                  criteria = criteria,
+                                                                  criterion = criterion,
                                                                   data = restoreExpanded
                                                                 )
             # view.resetToTable will be called when the search is finished
@@ -223,7 +226,7 @@ class Browser(QtGui.QWidget):
     def search(self):
         """Search for the value in the search-box. If it is empty, display all values."""
         #TODO: restoreExpanded if new criteria are narrower than the old ones?
-        self.searchCriteria = self.searchBox.getCriteria()
+        self.searchCriterion = self.searchBox.criterion
         self.load()
     
     def createViews(self,layersList):
@@ -253,11 +256,11 @@ class Browser(QtGui.QWidget):
         for view in self.views:
             view.model().setShowHiddenValues(showHiddenValues)
     
-    def setCriterionFilter(self,criteria):
-        """Set the criterion filter. This is a list of criteria that will be prepended to the search criteria
-        from the searchbox and thus form a permanent filter."""
-        if criteria != self.criterionFilter:
-            self.criterionFilter = criteria[:]
+    def setFilterCriterion(self, criterion):
+        """Set a single criterion that will be added to all other criteria from the searchbox (using AND)
+        and thus form a permanent filter."""
+        if criterion != self.filterCriterion:
+            self.filterCriterion = criterion
             self.load()
             
     def _handleOptionButton(self):

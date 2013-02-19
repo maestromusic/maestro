@@ -65,7 +65,7 @@ class SearchRequest:
         - ''fromTable'': table name where you want to search
         - ''resultTable'': table name where the results should be stored. This table must be created by the
             SearchEngine's createResultTable method.
-        - ''criteria'': The criteria the search results must match. Consider the criteria module.
+        - ''criterion'': The criterion the search results must match. See the criteria module.
         - ''data'': This is also not used and may contain any other data needed to process the searchFinished
             signal.
         - ''lockTable'': If True the resultTable will be locked after the search and every other search to
@@ -82,46 +82,31 @@ class SearchRequest:
     # True the engine's _finishedEvent is set instead (threading.Event). This is only used by searchAndWait.
     _fireEvent = False
     
-    def __init__(self,engine,fromTable,resultTable,criteria,data=None,lockTable=False):
+    def __init__(self, engine, fromTable, criterion):
         self.engine = engine
         self.fromTable = fromTable
-        self.resultTable = resultTable
-        self.criteria = criteria
-        self.data = data
-        self.lockTable = lockTable
-        
-    def copy(self):
-        """Return a copy of this request with the same data. The new request won't be stopped even if this
-        request is.
-        """
-        request = SearchRequest(self.engine,self.fromTable,self.resultTable,self.criteria,
-                                self.data,self.lockTable)
-        return request
-        
-    def isStopped(self):
-        """Determines whether this request has been stopped."""
-        return self._stopped
-    
+        self.result = None
+        self.criterion = criterion
+        self.stopped = False
+            
     def stop(self):
-        """Stop this request."""
-        with self.engine._thread.lock:
-            if not self._stopped:
-                #logger.debug("Search: Stopping request {}".format(self))
-                self._stopped = True
-                self.engine._thread.searchEvent.set()
+        """Stop this request. Stopped requests will not be processed further and should be ignored by all
+        receivers of the searchFinished signal (it might happen that the request is stopped when the event
+        is already emitted, but not processed yet)."""
+        self.stopped = True
+        self.engine._thread.searchEvent.set()
 
     def releaseTable(self):
         """Release the table of this request if it is locked by this request.""" 
         with self.engine._thread.lock:
             if self.resultTable in self.engine._thread.lockedTables \
                     and self.engine._thread.lockedTables[self.resultTable] is self:
-                #logger.debug("Releasing table {}".format(self.resultTable))
+                logger.debug("Releasing table {}".format(self.resultTable))
                 del self.engine._thread.lockedTables[self.resultTable]
                 self.engine._thread.searchEvent.set()
-            
+                
     def __str__(self):
-        return "<SearchRequest: {}->{} for [{}] | ({},{})".format(self.fromTable,
-                 self.resultTable,",".join(str(c) for c in self.criteria),self.data,self.lockTable)
+        return "<SearchRequest in {}: {}".format(self.fromTable, self.criterion)
         
 
 class SearchEngine(QtCore.QObject):
@@ -146,53 +131,7 @@ class SearchEngine(QtCore.QObject):
         self._thread.start()
         self._finishedEvent = threading.Event()
         engines.append(self)
-        
-
-    def createResultTable(self,part,customColumns=""):
-        """Create a MySQL table that can hold search results and return its (unique) name. The table will be
-        created in memory. *part* will be a part of the table name and may be used to remember who created the
-        table.
-        
-        All tables created with this method belong to this engine and will be dropped when it is shut down.
-        """
-        if len(customColumns) > 0 and customColumns[-1] != ',':
-            customColumns = customColumns + ','
-        tableName = "{}tmp_search_{}".format(db.prefix,part)
-        with SearchEngine._resultTableLock:
-            i = 1
-            while "{}_{}".format(tableName,i) in db.listTables():
-                i += 1
-            tableName = "{}_{}".format(tableName,i)
-            if db.type == 'mysql':
-                # Do not create a temporary table, because such a table can only be accessed from the thread
-                # that created it. Use ENGINE MEMORY instead.
-                createQuery = """
-                    CREATE TABLE {} (
-                        id MEDIUMINT UNSIGNED NOT NULL,
-                        {}
-                        file BOOLEAN NOT NULL DEFAULT 0,
-                        toplevel BOOLEAN NOT NULL DEFAULT 0,
-                        direct BOOLEAN NOT NULL DEFAULT 1,
-                        major BOOLEAN NOT NULL DEFAULT 0,
-                        new BOOLEAN NOT NULL DEFAULT 0,
-                        PRIMARY KEY(id))
-                        ENGINE MEMORY;
-                    """.format(tableName,customColumns)
-            else:
-                createQuery = """
-                    CREATE TABLE {} (
-                        id INTEGER PRIMARY KEY,
-                        {}
-                        file BOOLEAN NOT NULL DEFAULT 0,
-                        toplevel BOOLEAN NOT NULL DEFAULT 0,
-                        direct BOOLEAN NOT NULL DEFAULT 1,
-                        major BOOLEAN NOT NULL DEFAULT 0,
-                        new BOOLEAN NOT NULL DEFAULT 0)
-                    """.format(tableName,customColumns)
-            db.query(createQuery)
-        self._thread.tables[tableName] = None
-        return tableName
-        
+               
     def search(self,*args,**kargs):
         """Perform a search. The arguments are the same as in SearchRequest.__init__ except that the engine
         parameter must not be given (it is set to this engine). Return the generated SearchRequest.
@@ -217,9 +156,9 @@ class SearchEngine(QtCore.QObject):
         """Search for *request*."""
         assert request.engine is self
         with self._thread.lock:
-            if request in self._thread.requests or request.isStopped():
+            if request in self._thread.requests or request.stopped:
                 return
-            #logger.debug("Search: Got new request {}".format(request))
+            logger.debug("Search: Got new request {}".format(request))
             self._thread.requests.append(request)
         self._thread.searchEvent.set()
 
@@ -228,15 +167,15 @@ class SearchEngine(QtCore.QObject):
         associated with this engine.
         """
         engines.remove(self)
-        with self._thread.lock:
-            self._thread.quit = True
+        self._thread.quit = True
         # Wake up the thread to tell it to shut down
         self._thread.searchEvent.set()
-        # Wait for the thread to finish before dropping the tables
         self._thread.join()
-        for table in self._thread.tables:
-           db.query("DROP TABLE {}".format(table))
         self._thread = None
+
+
+class StopRequestException(Exception):
+    pass
 
 
 class SearchThread(threading.Thread):
@@ -280,140 +219,82 @@ class SearchThread(threading.Thread):
         self.requests = []
         self.lockedTables = {}
 
-    def run(self):
-        """This method contains the search algorithm. It works like this::
-        
-            while True: (LOOP_START)
-                
-                - acquire the lock
-                
-                - if quit: terminate
-                
-                - tidy up some variables (remove stopped requests and release their result tables)
-                
-                - if len(requests) == 0: wait for something to do (then goto LOOP_START)
-                - if requests[0].resultTable is locked: wait until it is released (then goto LOOP_START)
-
-                - release the lock
-                
-                - decide whether we have to truncate resultTable to perform the search for criteria or whether
-                  the set of elements matching all criteria is a subset of the elements in resultTable
-                  (e.g. if criteria are 'beethoven' and resultTable already contains all results matching
-                  'beeth').
-                
-                - if any criterion is invalid (e.g. date:Foo): search finished with no search results;
-                  goto LOOP_START
-                
-                - remove redundant criteria
-                
-                - no criteria left: search finished; goto LOOP_START
-                
-                - process the first criterion
-                    
-        """        
+    def run(self):      
         logger.debug('Search connecting with thread {}'.format(QtCore.QThread.currentThreadId()))
 
         with db.connect():
             if db.type == 'mysql':
                 createQuery = """
                     CREATE TEMPORARY TABLE IF NOT EXISTS {} (
-                        id MEDIUMINT UNSIGNED NOT NULL,
-                        value MEDIUMINT UNSIGNED NULL)
+                        value_id MEDIUMINT UNSIGNED NOT NULL,
+                        tag_id MEDIUMINT UNSIGNED NULL)
                         CHARACTER SET 'utf8'
                     """.format(TT_HELP)
             else:
                 createQuery = """
                     CREATE TEMPORARY TABLE IF NOT EXISTS {} (
-                        id  MEDIUMINT UNSIGNED NOT NULL,
-                        value MEDIUMINT UNSIGNED NULL)
+                        value_id  MEDIUMINT UNSIGNED NOT NULL,
+                        tag_id MEDIUMINT UNSIGNED NULL)
                     """.format(TT_HELP)
             db.query(createQuery)
         
             while True:
-                self.lock.acquire()
                 if self.quit:
-                    self.lock.release()
-                    return # Terminate the search thread
+                    break # Terminate the search thread
                 
-                # Tidy up
-                # (Remove stopped requests and release tables whose locking request was stopped).
-                currentRequest = None
-                while len(self.requests) > 0 and self.requests[0].isStopped():
+                self.lock.acquire()
+                while len(self.requests) > 0 and self.requests[0].stopped:
                     self.requests.pop(0)
-                releaseTables = [table for table,request in self.lockedTables.items() if request.isStopped()]
-                for table in releaseTables:
-                    #logger.debug("Releasing table {}".format(table))
-                    del self.lockedTables[table]
                     
-                if len(self.requests) == 0 or self.requests[0].resultTable in self.lockedTables:
+                if len(self.requests) == 0:# or self.requests[0].resultTable in self.lockedTables:
                     # Wait for something to do or until the result table is not locked anymore
-                    #logger.debug("Waiting{}".format(" (no requests)" if len(self.requests) == 0 
-                    #                                                  else " (table locked)"))
+                    logger.debug("Waiting {}".format("(no requests)" if len(self.requests) == 0 
+                                                                     else "(table locked)"))
                     self.lock.release()
                     self.searchEvent.wait()
                     self.searchEvent.clear()
                     continue # start from above (maybe quit is now true or the result table is still locked.)
                 
-                currentRequest = self.requests[0]
-                # Stopped requests are removed above
-                assert not currentRequest.isStopped()
-                
+                request = self.requests.pop(0)
                 self.lock.release()
                 
-                # Copy the data in handy variables
-                fromTable = currentRequest.fromTable
-                resultTable = currentRequest.resultTable
-                assert resultTable in self.tables
-                assert resultTable.startswith("{}tmp_search_".format(db.prefix))
-                criteria = currentRequest.criteria
-                
-                # Check the status of the result table
-                if self.tables[resultTable] is None or fromTable != self.tables[resultTable][0]:
-                    # This is a new search to a new table or to a table that already contains search results,
-                    # but from a different fromTable.
-                    truncate(resultTable)
-                    self.tables[resultTable] = [fromTable,[] ]
-                else:
-                    # Check whether the result table contains results that we can use or if we have to
-                    # truncate it. 
-                    if not criteriaModule.isNarrower(criteria,self.tables[resultTable][1]):
-                        truncate(resultTable)
-                        self.tables[resultTable] = [fromTable,[] ]
-                
-                # Invalid criteria like 'date:foo' do not have results. Calling criterion.getQuery will fail.
-                if any(c.isInvalid() for c in criteria):
-                    #logger.debug("Invalid criterion")
-                    truncate(resultTable)                                                                    
-                    self.tables[resultTable][1] = []  
-                    self.finishRequest(currentRequest)
+                try:
+                    result = None
+                    for criterion in request.criterion.getCriteriaDepthFirst():
+                        logger.debug("Processing criterion: ".format(criterion))
+                        if not isinstance(criterion, criteria.MultiCriterion):
+                            for queryData in criterion.getQueries(request.fromTable):
+                                print(queryData)
+                                if isinstance(queryData, str):
+                                    result = db.query(queryData)
+                                else: result = db.query(*queryData)
+                                #print(list(db.query("SELECT value FROM new_values_varchar WHERE id IN (SELECT value_id FROM tmp_help)").getSingleColumn()))
+                                self._check(request)
+                            criterion.result = set(result.getSingleColumn())
+                        else:
+                            first = criterion.criteria[0]
+                            method = first.intersection if criterion.junction == 'AND' else first.union
+                            criterion.result = method(*criterion.criteria[1:])
+                            self._check(request)
+    
+                    logger.debug("Request finished")
+                    request.result = criterion.result
+                    self.engine.searchFinished.emit(request)
+                except StopRequestException:
+                    logger.debug("StopRequestException")
                     continue
-                    
-                # Remove redundant criteria
-                criterion = criteriaModule.getNonRedundantCriterion(criteria,self.tables[resultTable][1])
                 
-                if criterion is None:
-                    # This happens if we finished the search in the last loop or if reduce finds that
-                    # all remaining criteria are redundant.
-                    #logger.debug("Starting post-processing...")
-                    self.postProcessing(resultTable)
-                    # After post processing forget the data we collected about this table.
-                    # Any other search going to this table must first truncate it.
-                    self.tables[resultTable] = None
-                    self.finishRequest(currentRequest)
-                    continue
- 
-                # Finally do some work and process a criterion:
-                self.processCriterion(fromTable,resultTable,criterion)
-                self.tables[resultTable][1].append(criterion)
-                # Maybe the search is finished now. But instead of emitting the signal directly, we start the
-                # loop again and check for changed criteria. If the criteria did indeed change (e.g. the user
-                # types fast), then emitting the signal would just make the main thread do unnecessary work
-                # blocking the search.
+            for table in self.tables:
+               db.query("DROP TABLE {}".format(table))
+                
+    def _check(self, request):
+        if self.quit or request.stopped:
+            raise StopRequestException()
     
     def finishRequest(self,request):
         """Finish *request*: lock the table, emit the signal..."""
         with self.lock:
-            if not request.isStopped():
+            if not request.stopped:
                 if request.lockTable:
                     #logger.debug("Add to locked tables: {}".format(request.resultTable))
                     self.lockedTables[request.resultTable] = request

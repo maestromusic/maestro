@@ -22,8 +22,9 @@ table without any fancy grouping as the browser does (it will add titles, though
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
+from ...core import tags
 from ... import search, config, application, database as db, constants, utils
-from ...search import searchbox, criteria as criteriaModule
+from ...search import searchbox, criteria
 from ...gui import mainwindow, dialogs
 
 
@@ -84,8 +85,6 @@ class SearchAnalyzer(QtGui.QDialog):
 
         self.engine = search.SearchEngine()
         self.engine.searchFinished.connect(self._handleSearchFinished)
-        self.resultTable = self.engine.createResultTable("analyzer",
-                "name VARCHAR({}) NULL".format(constants.TAG_VARCHAR_LENGTH))
         
         self.flagFilter = []
         
@@ -94,8 +93,8 @@ class SearchAnalyzer(QtGui.QDialog):
         topLayout = QtGui.QHBoxLayout()
         self.layout().addLayout(topLayout)
 
-        self.searchBox = searchbox.SearchBox()
-        self.searchBox.criteriaChanged.connect(self._handleCriteriaChanged)
+        self.searchBox = searchbox.SearchBox('{id=2000-2010}')
+        self.searchBox.criterionChanged.connect(self._handleCriterionChanged)
         topLayout.addWidget(self.searchBox)
 
         self.optionButton = QtGui.QToolButton(self)
@@ -104,7 +103,8 @@ class SearchAnalyzer(QtGui.QDialog):
         topLayout.addWidget(self.optionButton)
         
         self.instantSearchBox = QtGui.QCheckBox(self.tr("Instant search"))
-        self.instantSearchBox.setChecked(True)
+        #self.instantSearchBox.setChecked(True)
+        self.searchBox.setInstantSearch(False)
         self.instantSearchBox.clicked.connect(self.searchBox.setInstantSearch)
         topLayout.addWidget(self.instantSearchBox)
         topLayout.addStretch(1)
@@ -122,27 +122,25 @@ class SearchAnalyzer(QtGui.QDialog):
         
     def _handleSearchFinished(self,searchRequest):
         """If the search was successful, update the result list."""
-        if searchRequest is self.searchRequest and not searchRequest.isStopped():
+        if searchRequest is self.searchRequest and not searchRequest.stopped:
             self.updateTable()
 
     def updateTable(self):
         """Update the result table (in the GUI) with data from the result table (in the database)."""
         self.table.clear()
+        self.table.setRowCount(len(self.searchRequest.result))
+        if len(self.searchRequest.result) == 0:
+            return
         # Add the titles. If there are more than one title, concatenate them.
-        db.query("""
-            UPDATE {1} AS res JOIN 
-                (SELECT el.id AS id, GROUP_CONCAT(v.value SEPARATOR ', ') AS value
+        result = db.query("""
+                SELECT el.id AS id, GROUP_CONCAT(v.value SEPARATOR ', ') AS value
                 FROM {0}elements AS el
-                            JOIN {0}tags AS t ON el.id = t.element_id
-                            JOIN {0}values_varchar AS v ON t.tag_id = v.tag_id AND t.value_id = v.id
-                WHERE v.tag_id = 4
-                GROUP BY el.id) AS sub
-            ON res.id = sub.id
-            SET res.name = sub.value
-            """.format(db.prefix,self.resultTable))
-        result = db.query("SELECT * FROM {}".format(self.resultTable))
-        self.table.setRowCount(len(result))
-        for i,row in enumerate(result):
+                            LEFT JOIN {0}tags AS t ON el.id = t.element_id AND t.tag_id = {1}
+                            LEFT JOIN {0}values_varchar AS v ON t.tag_id = v.tag_id AND t.value_id = v.id
+                WHERE el.id IN ({2})
+                GROUP BY el.id
+                """.format(db.prefix, tags.TITLE.id, ','.join(str(id) for id in self.searchRequest.result)))
+        for i, row in enumerate(result):
             if i == 0:
                 self.table.setColumnCount(len(row))
             for j,data in enumerate(row):
@@ -150,32 +148,29 @@ class SearchAnalyzer(QtGui.QDialog):
                     data = None
                 item = QtGui.QTableWidgetItem(str(data))
                 item.setFlags(Qt.ItemIsEnabled)
-                self.table.setItem(i,j,item)
+                self.table.setItem(i, j, item)
         self.table.resizeColumnsToContents()
         self.table.setEnabled(True)
             
-    def _handleCriteriaChanged(self):
-        """Reload search criteria. If there are criteria, then start search. Otherwise clear the
+    def _handleCriterionChanged(self):
+        """Reload search criterion. If there is a search criterion, then start search. Otherwise clear the
         result table."""
-        criteria = list(self.searchBox.getCriteria())
-        if len(self.flagFilter) > 0:
-            criteria.insert(0,criteriaModule.FlagsCriterion(self.flagFilter))
-        if len(criteria) == 0:
+        if self.searchRequest is not None:
             self.searchRequest.stop()
             self.table.clear()
             self.table.setRowCount(0)
             self.table.setColumnCount(0)
             self.table.setEnabled(True)
-        else:
-            self.table.setEnabled(False)
-            self.searchRequest = self.engine.search("{}elements".format(db.prefix),self.resultTable,criteria)
+        
+        self.table.setEnabled(False)
+        self.searchRequest = self.engine.search("{}elements".format(db.prefix), self.searchBox.criterion)
     
     def setFlags(self,flagTypes):
         """Set the flag filter. Only elements that have all flags in *flagTypes* will be displayed as search
         results."""
         if set(flagTypes) != set(self.flagFilter):
             self.flagFilter = list(flagTypes)
-            self._handleCriteriaChanged()
+            self._handleCriterionChanged()
         
     def _handleOptionButton(self):
         """Open the option popup."""

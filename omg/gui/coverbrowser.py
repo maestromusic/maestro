@@ -69,8 +69,8 @@ class CoverBrowser(QtGui.QWidget):
         controlLineLayout = QtGui.QHBoxLayout()
         layout.addLayout(controlLineLayout)
         
-        self.searchBox = searchbox.SearchBox(self)
-        self.searchBox.criteriaChanged.connect(self.search)
+        self.searchBox = searchbox.SearchBox()
+        self.searchBox.criterionChanged.connect(self.search)
         controlLineLayout.addWidget(self.searchBox)
         
         self.optionButton = QtGui.QPushButton(self)
@@ -82,8 +82,8 @@ class CoverBrowser(QtGui.QWidget):
         self.coverTable.scene().selectionChanged.connect(self._handleSelectionChanged)
         layout.addWidget(self.coverTable,1)
         
-        self.criterionFilter = []
-        self.searchCriteria = []
+        self.filterCriterion = None
+        self.searchCriterion = None
         self.searchRequest = None
         
         if browsermodel.searchEngine is None:
@@ -113,29 +113,36 @@ class CoverBrowser(QtGui.QWidget):
             self._lastDialogTabIndex = self._dialog.tabWidget.currentIndex()
             self._dialog = None
         
-    def setCriterionFilter(self,criteria):
-        """Set the criterion filter. This is a list of criteria that will be prepended to the search criteria
-        from the searchbox and thus form a permanent filter."""
-        if criteria != self.criterionFilter:
-            self.criterionFilter = criteria[:]
+    def setFilterCriterion(self, criterion):
+        """Set a single criterion that will be added to all other criteria from the searchbox (using AND)
+        and thus form a permanent filter."""
+        if criterion != self.filterCriterion:
+            self.filterCriterion = criterion
             self.load()
             
     def search(self):
-        self.searchCriteria = self.searchBox.getCriteria()
+        self.searchCriterion = self.searchBox.criterion
         self.load()
         
     def load(self):
-        criteria = self.criterionFilter + self.searchCriteria
-        # This will effectively stop any request from being processed
+         # This will effectively stop any request from being processed
         if self.searchRequest is not None:
             self.searchRequest.stop()
             self.searchRequest = None
+            
+        if self.filterCriterion is not None and self.searchCriterion is not None:
+            criterion = self.filterCriterion and self.searchCriterion
+        elif self.filterCriterion is not None:
+            criterion = self.filterCriterion
+        elif self.searchCriterion is not None:
+            criterion = self.searchCriterion
+        else: criterion = None
 
-        if len(criteria) > 0:
+        if criterion is not None:
             self.table = self.bigResult
             self.searchRequest = browsermodel.searchEngine.search(fromTable = db.prefix+"elements",
                                                                   resultTable = self.bigResult,
-                                                                  criteria = criteria
+                                                                  criterion = criterion
                                                                 )
             # self.reset will be called when the search is finished
         else:

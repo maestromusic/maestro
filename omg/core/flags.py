@@ -30,6 +30,10 @@ _flagsById = None
 _flagsByName = None
 
 
+# This separator is used to separate flag names from each other. It must not be part of a flag name.
+FLAG_SEPARATOR = '|'
+
+
 def init():
     """Initialize the flag module loading flags from the database. You must call this method before methods
     like get can be used."""
@@ -91,11 +95,11 @@ class Flag:
 def get(identifier):
     """Return a flagtype. *identifier* may be an int (the flag's id), a string (its name) or a flagtype (in
     this case it is simply returned)."""
-    if isinstance(identifier,int):
+    if isinstance(identifier, int):
         return _flagsById[identifier]
-    elif isinstance(identifier,str):
+    elif isinstance(identifier, str):
         return _flagsByName[identifier]
-    elif isinstance(identifier,Flag):
+    elif isinstance(identifier, Flag):
         return identifier
     else: raise ValueError("identifier must be either int or string or FlagType.")
 
@@ -107,7 +111,8 @@ def exists(name):
 
 def isValidFlagname(name):
     """Return whether *name* is a valid name for a flagtype."""
-    return 0 < len(name.encode()) <= constants.FLAG_VARCHAR_LENGTH and not name.isspace()
+    return 0 < len(name.encode()) <= constants.FLAG_VARCHAR_LENGTH \
+                and not name.isspace() and FLAG_SEPARATOR not in name 
 
 
 def allFlags():
@@ -115,14 +120,14 @@ def allFlags():
     return _flagsById.values()
 
 
-def addFlagType(name,**data):
+def addFlagType(name, **data):
     """Add a new flagtype with the given name to the database. *data* may be used to set attributes. 
     Currently only 'iconPath' is supported."""
     if exists(name):
         raise ValueError("There is already a flag with name '{}'.".format(name))
     if not isValidFlagname(name):
         raise ValueError("'{}' is not a valid flagname.".format(name))
-    command = FlagTypeUndoCommand(ADD,name=name,**data)
+    command = FlagTypeUndoCommand(ADD, name=name, **data)
     application.stack.push(command)
     return command.flagType
     
