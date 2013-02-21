@@ -86,6 +86,7 @@ class SearchRequest:
         self.engine = engine
         self.fromTable = fromTable
         self.result = None
+        assert isinstance(criterion, criteria.Criterion)
         self.criterion = criterion
         self.stopped = False
             
@@ -224,19 +225,20 @@ class SearchThread(threading.Thread):
 
         with db.connect():
             if db.type == 'mysql':
-                createQuery = """
-                    CREATE TEMPORARY TABLE IF NOT EXISTS {} (
+                db.query("""
+                    CREATE TABLE IF NOT EXISTS {} (
                         value_id MEDIUMINT UNSIGNED NOT NULL,
-                        tag_id MEDIUMINT UNSIGNED NULL)
+                        tag_id MEDIUMINT UNSIGNED NULL,
+                        INDEX(value_id, tag_id))
                         CHARACTER SET 'utf8'
-                    """.format(TT_HELP)
+                    """.format(TT_HELP))
             else:
-                createQuery = """
+                db.query("""
                     CREATE TEMPORARY TABLE IF NOT EXISTS {} (
                         value_id  MEDIUMINT UNSIGNED NOT NULL,
                         tag_id MEDIUMINT UNSIGNED NULL)
-                    """.format(TT_HELP)
-            db.query(createQuery)
+                    """.format(TT_HELP))
+                db.query("CREATE INDEX {0}_idx ON {0} (value_id, tag_id)".format(TT_HELP))
         
             while True:
                 if self.quit:
@@ -264,7 +266,7 @@ class SearchThread(threading.Thread):
                         logger.debug("Processing criterion: ".format(criterion))
                         if not isinstance(criterion, criteria.MultiCriterion):
                             for queryData in criterion.getQueries(request.fromTable):
-                                print(queryData)
+                                #print(queryData)
                                 if isinstance(queryData, str):
                                     result = db.query(queryData)
                                 else: result = db.query(*queryData)
@@ -272,9 +274,10 @@ class SearchThread(threading.Thread):
                                 self._check(request)
                             criterion.result = set(result.getSingleColumn())
                         else:
-                            first = criterion.criteria[0]
-                            method = first.intersection if criterion.junction == 'AND' else first.union
-                            criterion.result = method(*criterion.criteria[1:])
+                            if criterion.junction == 'AND':
+                                method = criterion.criteria[0].result.intersection
+                            else: method = criterion.criteria[0].result.union
+                            criterion.result = method(*[crit.result for crit in criterion.criteria[1:]])
                             self._check(request)
     
                     logger.debug("Request finished")

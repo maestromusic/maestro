@@ -40,7 +40,8 @@ def enable():
     mainwindow.addWidgetData(mainwindow.WidgetData(
         "searchanalyzer",
         QtGui.QApplication.translate("SearchAnalyzer","Search Analyzer"),
-        SearchAnalyzer,True,False,False))
+        SearchAnalyzer,
+        True, False, False))
 
 
 def mainWindowInit():
@@ -80,7 +81,7 @@ class SearchAnalyzer(QtGui.QDialog):
     """Display search result tables and allow the user to search the database."""
     searchRequest = None
     
-    def __init__(self,parent=None,dialog=False):
+    def __init__(self, parent=None, dialog=False):
         QtGui.QDialog.__init__(self,parent)
 
         self.engine = search.SearchEngine()
@@ -93,7 +94,7 @@ class SearchAnalyzer(QtGui.QDialog):
         topLayout = QtGui.QHBoxLayout()
         self.layout().addLayout(topLayout)
 
-        self.searchBox = searchbox.SearchBox('{id=2000-2010}')
+        self.searchBox = searchbox.SearchBox()
         self.searchBox.criterionChanged.connect(self._handleCriterionChanged)
         topLayout.addWidget(self.searchBox)
 
@@ -103,8 +104,8 @@ class SearchAnalyzer(QtGui.QDialog):
         topLayout.addWidget(self.optionButton)
         
         self.instantSearchBox = QtGui.QCheckBox(self.tr("Instant search"))
-        #self.instantSearchBox.setChecked(True)
-        self.searchBox.setInstantSearch(False)
+        self.instantSearchBox.setChecked(True)
+        #self.searchBox.setInstantSearch(False)
         self.instantSearchBox.clicked.connect(self.searchBox.setInstantSearch)
         topLayout.addWidget(self.instantSearchBox)
         topLayout.addStretch(1)
@@ -128,18 +129,22 @@ class SearchAnalyzer(QtGui.QDialog):
     def updateTable(self):
         """Update the result table (in the GUI) with data from the result table (in the database)."""
         self.table.clear()
-        self.table.setRowCount(len(self.searchRequest.result))
-        if len(self.searchRequest.result) == 0:
+        rowCount = 0 if self.searchRequest is None else len(self.searchRequest.result)
+        self.table.setRowCount(rowCount)
+        if rowCount == 0:
             return
         # Add the titles. If there are more than one title, concatenate them.
         result = db.query("""
-                SELECT el.id AS id, GROUP_CONCAT(v.value SEPARATOR ', ') AS value
+                SELECT el.id AS id, GROUP_CONCAT(v.value {separator} ', ') AS value
                 FROM {0}elements AS el
-                            LEFT JOIN {0}tags AS t ON el.id = t.element_id AND t.tag_id = {1}
+                            LEFT JOIN {0}tags AS t ON el.id = t.element_id AND t.tag_id = {titleTag}
                             LEFT JOIN {0}values_varchar AS v ON t.tag_id = v.tag_id AND t.value_id = v.id
-                WHERE el.id IN ({2})
+                WHERE el.id IN ({ids})
                 GROUP BY el.id
-                """.format(db.prefix, tags.TITLE.id, ','.join(str(id) for id in self.searchRequest.result)))
+                """.format(db.prefix,
+                           separator='SEPARATOR' if db.type == 'mysql' else ',',
+                           titleTag=tags.TITLE.id,
+                           ids=','.join(str(id) for id in self.searchRequest.result)))
         for i, row in enumerate(result):
             if i == 0:
                 self.table.setColumnCount(len(row))
@@ -163,7 +168,11 @@ class SearchAnalyzer(QtGui.QDialog):
             self.table.setEnabled(True)
         
         self.table.setEnabled(False)
-        self.searchRequest = self.engine.search("{}elements".format(db.prefix), self.searchBox.criterion)
+        if self.searchBox.criterion is not None:
+            self.searchRequest = self.engine.search("{}elements".format(db.prefix), self.searchBox.criterion)
+        else:
+            self.searchRequest = None
+            self.updateTable()
     
     def setFlags(self,flagTypes):
         """Set the flag filter. Only elements that have all flags in *flagTypes* will be displayed as search
