@@ -18,6 +18,7 @@
 
 import contextlib
 import socket, threading, time
+import re
 try:
     import mpd
 except ImportError:
@@ -31,7 +32,8 @@ if mpd_version < [0,4,4]:
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from omg import application, player, logging, profiles
+from omg import application, filebackends, player, logging, profiles
+from omg.filebackends.filesystem import FileURL
 from omg.core import tags
 from omg.models import playlist
 from . import filebackend as mpdfilebackend
@@ -206,8 +208,20 @@ class MPDPlayerBackend(player.PlayerBackend):
                 self.commander.update()
     
     def makeUrl(self, path):
-        """Create an MPD type URL for the given path."""
+        """Create an OMG URL for the given path reported by MPD.
+        
+        If the MPD path has the form of a non-default URL (i.e. proto://path), it is tried to load
+        an appropriate URL using BackendURL.fromString().
+        Otherwise, if *path* refers to a normal file in MPDs database, an MPDURL is created.
+        If the file is also found on the local filesystem, then a normal FileURL is returned.
+        """
+        if re.match("[a-zA-Z]{2,5}://", path) is not None:
+            try:
+                return filebackends.BackendURL.fromString(path)
+            except KeyError:
+                logger.warning("Unsupported MPD URL type: {}".format(path))
         mpdurl = mpdfilebackend.MPDURL("mpd://" + self.name + "/" + path)
+        # this will convert the URL to a local file URL if it exists
         return mpdurl.getBackendFile().url
     
     @QtCore.pyqtSlot(str, object)

@@ -17,6 +17,7 @@
 #
 
 import os.path
+from collections import OrderedDict
 
 from PyQt4 import QtCore
 
@@ -60,8 +61,9 @@ class BackendURL:
     
     Note that individual files may still be readOnly although CAN_RENAME is True.
     """
+    
     CAN_DELETE = False
-    """Class constant indicating whether this URL type supports deleting files."""
+    """Class constant indicating whether this URL type supports deleting files.""" 
     
     def __init__(self, urlString):
         #  constructor should only be used from subclasses
@@ -128,6 +130,10 @@ class BackendURL:
 class BackendFile:
     """Abstract base for a file representation in a specific backend."""
     
+        
+    DUMMY_TAGS = False
+    """If a backend class has DUMMY_TAGS=True, no tags will be read or written to this file."""
+    
     @staticmethod
     def tryLoad(url):
         """If the class can load *url*, return an object; otherwise return None."""
@@ -136,13 +142,14 @@ class BackendFile:
     def __init__(self, url):
         """Initialize the backend file, but don't read any tags etc."""
         self.url = url
+        self.specialTags = OrderedDict()
         
     def readTags(self):
         """Read the tags which will be available in the *tags* attribute afterwards."""
         raise NotImplementedError()
     
     def saveTags(self):
-        """Store any changes made to the tags."""
+        """Store any changes made to the tags. May return a sub-storage of failures."""
         raise NotImplementedError()
     
     def rename(self, newPath):
@@ -181,6 +188,7 @@ class TagWriteError(RuntimeError):
 
 def changeTags(changes):
     """Change tags of files. If an error occurs, all changes are undone and a TagWriteError is raised.
+    
     *changes* is a dict mapping elements or BackendFiles to TagDifferences. If the dict contains elements
     only the corresponding BackendFiles will be changed! This method does not touch the element instances
     or the database. Containers will be skipped.
@@ -191,14 +199,16 @@ def changeTags(changes):
     rollback = False
     problems = None
     for elementOrFile, diff in changes.items():
-        if isinstance(elementOrFile,elements.Element):
+        if isinstance(elementOrFile, elements.Element):
             if not elementOrFile.isFile():
                 continue
             backendFile = elementOrFile.url.getBackendFile()
             backendFile.readTags()
         else:
             backendFile = elementOrFile
-            
+        
+        if backendFile.DUMMY_TAGS:
+            continue
         if backendFile.readOnly:
             problemUrl = backendFile.url
             rollback = True
@@ -208,7 +218,7 @@ def changeTags(changes):
         diff.apply(backendFile, withoutPrivateTags=True)
         #logger.debug('changing tags of {}: {}'.format(backendFile.url, diff))
         problems = backendFile.saveTags()
-        if len(problems) > 0:
+        if problems:
             problemUrl = backendFile.url
             backendFile.tags = currentFileTags
             backendFile.saveTags()

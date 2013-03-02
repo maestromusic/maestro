@@ -134,11 +134,15 @@ class MPDThread(QtCore.QThread):
                 self.changeFromMPD.emit('elapsed', self.calculateStart(self.elapsed))
         else:
             self.elapsed = None
+        
         if current != self.current:
             self.current = current
             if current != None:
                 self.mpd_current = self.idler.currentsong()
-                self.currentLength = int(self.mpd_current["time"])
+                if "time" in self.mpd_current:
+                    self.currentLength = int(self.mpd_current["time"])
+                else:
+                    self.currentLength = -1
             else:
                 self.currentLength = 0 # no current song
             if emit:

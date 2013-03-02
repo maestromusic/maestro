@@ -95,8 +95,13 @@ class PlaybackWidget(mainwindow.DockWidget):
     
     def updateSeekLabel(self, value):
         """Display elapsed and total time on the seek label."""
-        self.seekLabel.setText("{}-{}".format(formatTime(value),
-                                              formatTime(self.seekSlider.maximum())))
+        if self.current is None:
+            text = ""
+        elif self.current.element.length > 0:
+            text = "{}-{}".format(formatTime(value), formatTime(self.seekSlider.maximum()))
+        else:
+            text = formatTime(value)
+        self.seekLabel.setText(text)
         
     def updateSlider(self, current):
         """Update the slider when the elapsed time has changed."""
@@ -112,9 +117,9 @@ class PlaybackWidget(mainwindow.DockWidget):
     
     def updateTitleLabel(self, pos):
         """Display the title of the currently playing song or "stopped" on the title label."""
-        current = self.backend.current()
-        if current is not None:
-            self.titleLabel.setText("<i>{}</i>".format(current.getTitle()))
+        self.current = self.backend.current()
+        if self.current is not None:
+            self.titleLabel.setText("<i>{}</i>".format(self.current.getTitle()))
         else:
             self.titleLabel.setText(self.tr('stopped'))
     

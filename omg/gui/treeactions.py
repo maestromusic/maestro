@@ -152,7 +152,8 @@ class DeleteAction(TreeAction):
     
     def doAction(self):
         selection = self.parent().selection
-        files = [wrap.element for wrap in selection.fileWrappers()]
+        files = [wrap.element for wrap in selection.fileWrappers()
+                              if wrap.element.url.CAN_DELETE]
         self.level().deleteElements(selection.elements())
         if self.allowDisk and len(files) > 0:
             dialog = DeleteDialog(files,self.parent())
