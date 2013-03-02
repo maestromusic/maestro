@@ -176,6 +176,7 @@ class PhononPlayerBackend(player.PlayerBackend):
     def _handleSourceChanged(self, newSource):
         if newSource == self._nextSource:
             self.playlist.setCurrent(self.currentOffset() + 1)
+            self.currentChanged.emit(self.currentOffset())
             self._nextSource = None
         
     def _handleTick(self,pos):
