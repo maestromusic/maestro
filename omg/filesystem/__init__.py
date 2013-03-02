@@ -448,7 +448,7 @@ class FileSystemSynchronizer(QtCore.QObject):
                 if self.should_stop.is_set():
                     break
             if lenMissing > 0:
-                self._requestHelper.emit("updateFileHashes", missingHashes)
+                self._requestHelper.emit("updateFileHashes", (missingHashes,))
         self.scanFilesystem()
     
     def getDirectory(self, path):
@@ -743,6 +743,7 @@ class FileSystemSynchronizer(QtCore.QObject):
                 url = elem.url
                 if url not in self.tracks:
                     logger.error("adding url not in self.tracks: {}".format(url))
+                    continue
                 dir = self.directories[os.path.dirname(url.path)]
                 track = self.tracks[url]
                 if track.hash is None and idProvider is not None:

@@ -25,33 +25,6 @@ import sys
 from .. import logging
 logger = logging.getLogger(__name__)
 
-
-class RawAudioHasher:
-    """A simple file identification provider computing a hash over the raw audio data.
-    
-    The current implementation uses ffmpeg to output the first 15 seconds of raw pcm audio and then
-    creates the MD5 hash of that data.
-    """
-     
-    def __init__(self):
-        self.null = open(os.devnull)
-        
-    def __call__(self, url):
-        """Compute the audio hash of a single file using ffmpeg to dump the audio.
-        
-        This method uses the "ffmpeg" binary ot extract the first 15 seconds in raw PCM format and
-        then creates the MD5 hash of that data.
-        """
-        proc = subprocess.Popen(['ffmpeg', '-i', url.absPath, '-v', 'quiet',
-                                 '-f', 's16le', '-t', '15', '-'],
-                                stdout=subprocess.PIPE,
-                                stderr=self.null)
-        data = proc.stdout.readall()
-        proc.wait()
-        hash = hashlib.md5(data).hexdigest()
-        return hash
-
-
 class AcoustIDIdentifier:
     """An identification provider using the AcoustID fingerprinter and web service.
     
@@ -65,30 +38,55 @@ class AcoustIDIdentifier:
     
     def __init__(self, apikey):
         self.apikey = apikey
+        self.null = open(os.devnull)
         
     def __call__(self, url):    
         try:
             data = subprocess.check_output(['fpcalc', url.absPath])
         except subprocess.CalledProcessError as e:
             logger.warning(e)
-            return None
+            return self.fallbackHash(url)
         data = data.decode(sys.getfilesystemencoding())
         if len(data) == 0:
-            return None
+            logger.warning("fpcalc did not return any data")
+            return self.fallbackHash(url)
         duration, fingerprint = (line.split("=", 1)[1] for line in data.splitlines()[1:] )
-        import urllib.request, json
-        req = urllib.request.urlopen(self.requestURL.format(self.apikey, duration, fingerprint))
+        import urllib.request, urllib.error, json
+        try:
+            req = urllib.request.urlopen(self.requestURL.format(self.apikey, duration, fingerprint))
+        except urllib.error.HTTPError as e:
+            logger.warning(e)
+            logger.warning(self.requestURL.format(self.apikey, duration, fingerprint))
+            return self.fallbackHash(url)
         ans = req.readall().decode("utf-8")
         req.close()
         ans = json.loads(ans)
         if ans['status'] != 'ok':
-            return None
+            logger.warning("Error retrieving AcoustID fingerprint")
+            return self.fallbackHash(url)
         results = ans['results']
         if len(results) == 0:
-            return None
+            logger.warning("No AcoustID fingerprint found")
+            return self.fallbackHash(url)
         bestResult = max(results, key=lambda x: x['score'])
         if "recordings" in bestResult and len(bestResult["recordings"]) > 0:
             ans = "mbid:{}".format(bestResult["recordings"][0]["id"])
         else:
             ans = "acoustid:{}".format(bestResult["id"])
         return ans
+
+    def fallbackHash(self, url):
+        """Compute the audio hash of a single file using ffmpeg to dump the audio.
+        
+        This method uses the "ffmpeg" binary ot extract the first 15 seconds in raw PCM format and
+        then creates the MD5 hash of that data.
+        """
+        logger.warning("Using fallback FFMPEG method")
+        proc = subprocess.Popen(['ffmpeg', '-i', url.absPath, '-v', 'quiet',
+                                 '-f', 's16le', '-t', '15', '-'],
+                                stdout=subprocess.PIPE,
+                                stderr=self.null)
+        data = proc.stdout.readall()
+        proc.wait()
+        hash = hashlib.md5(data).hexdigest()
+        return hash
