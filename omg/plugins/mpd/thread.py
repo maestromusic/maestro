@@ -109,11 +109,18 @@ class MPDThread(QtCore.QThread):
             logger.warning('no changes???')
             return
         # other cases: update self.mpd_playlist and emit a generic "playlist" change message.
+        reallyChange = False
         for pos, file in sorted(changes):
             if pos < len(self.mpd_playlist):
+                if self.mpd_playlist[pos] != file:
+                    reallyChange = True
                 self.mpd_playlist[pos] = file
             else:
+                reallyChange = True
                 self.mpd_playlist.append(file)
+        if not reallyChange:
+            # this happens e.g. when a stream is updated
+            return
         self.changeFromMPD.emit('playlist', self.mpd_playlist[:])
     
     def updateMixer(self):
