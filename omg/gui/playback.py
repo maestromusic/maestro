@@ -101,6 +101,7 @@ class PlaybackWidget(mainwindow.DockWidget):
             text = "{}-{}".format(formatTime(value), formatTime(self.seekSlider.maximum()))
         else:
             text = formatTime(value)
+            self.seekSlider.setEnabled(False)
         self.seekLabel.setText(text)
         
     def updateSlider(self, current):
