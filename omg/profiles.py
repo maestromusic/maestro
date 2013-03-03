@@ -225,7 +225,7 @@ class TypedProfileCategory(ProfileCategory):
                 return type
         return None
         
-    def addType(self,type):
+    def addType(self, type):
         """Add a type to the category. Load all profiles of this type from the storage file and add them
         to the category."""
         if type not in self.types:
