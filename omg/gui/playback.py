@@ -190,7 +190,6 @@ class PlaybackWidget(mainwindow.DockWidget):
         else:
             self.handleConnectionChange(player.DISCONNECTED)
         self.handlePlaylistChange()
-        self.backend.connectionStateChanged.connect(self.handleConnectionChange)
         
     def saveState(self):
         return self.backend.name if self.backend is not None else None
