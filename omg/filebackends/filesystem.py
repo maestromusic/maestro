@@ -102,7 +102,11 @@ class RealFile(BackendFile):
         self.url = newUrl
     
     def delete(self):
+        """Deletes this file from disk. Also removes empty directories."""
         os.remove(self.url.absPath)
+        directory = os.path.dirname(self.url.absPath)
+        if len(os.listdir(directory)) == 0:
+            os.removedirs(directory)
         from ..core import levels
         levels.real.emitFilesystemEvent(deleted=(self.url,))
         
@@ -150,7 +154,7 @@ class FileURL(BackendURL):
     @property
     def absPath(self):
         return utils.absPath(self.path)
-       
+    
     def renamed(self, newPath):
         """Return a new FileURL with the given *newPath* as path."""
         return FileURL("file:///" + newPath)
