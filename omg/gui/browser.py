@@ -21,7 +21,7 @@ import functools
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
-from .. import application, config, database as db, utils
+from .. import application, config, database as db, utils, logging
 from ..core import tags, flags, levels
 from ..core.elements import Element, Container
 from ..search import searchbox, criteria
@@ -31,6 +31,7 @@ from ..models import browser as browsermodel
 
 
 translate = QtCore.QCoreApplication.translate
+logger = logging.getLogger(__name__)
 
 
 class BrowserDock(mainwindow.DockWidget):
@@ -116,14 +117,16 @@ class Browser(QtGui.QWidget):
         """Initialize a new Browser with the given parent."""
         QtGui.QWidget.__init__(self,parent)
         self.filterCriterion = None
+        self.flagsCriterion = None
         self.searchCriterion = None
         self.views = []
-        
+                
         if browsermodel.searchEngine is None:
             browsermodel.initSearchEngine()
+        
+        self.resultTable = browsermodel.searchEngine.createResultTable('browser')
             
         browsermodel.searchEngine.searchFinished.connect(self._handleSearchFinished)
-        self.bigResult = browsermodel.searchEngine.createResultTable("browser_big")
         
         # Layout
         layout = QtGui.QVBoxLayout(self)
@@ -139,57 +142,62 @@ class Browser(QtGui.QWidget):
         layout.addWidget(self.splitter)
         
         # Restore state
-        viewsToRestore = config.storage.browser.views
+        viewsToRestore = []#TODO
         self.delegateProfile = browserdelegate.BrowserDelegate.profileType.default()
         self.sortTags = {}
-        if state is not None and isinstance(state,dict):
+        if state is not None and isinstance(state, dict):
             if 'instant' in state:
                 self.searchBox.setInstantSearch(state['instant'])
-            if 'showHiddenValues' in state:
-                self.showHiddenValues = state['showHiddenValues']
-            if 'views' in state:
-                viewsToRestore = state['views']
+#            if 'showHiddenValues' in state:
+#                self.showHiddenValues = state['showHiddenValues']
+#            if 'views' in state:
+#                viewsToRestore = state['views']
             if 'flags' in state:
                 flagList = [flags.get(name) for name in state['flags'] if flags.exists(name)]
                 if len(flagList) > 0:
                     self.filterCriterion = criteria.FlagsCriterion(flagList)
+            if 'filter' in state:
+                try:
+                    self.filterCriterion = criteria.parse(state['filter'])
+                except criteria.ParseException as e:
+                    logger.warning("Could not parse the browser's filter criterion: {}".format(e))
             if 'delegate' in state:
                 self.delegateProfile = delegates.profiles.category.getFromStorage(
                                                             state.get('delegate'),
                                                             browserdelegate.BrowserDelegate.profileType)
-            if 'sortTags' in state:
-                for tagName,tagList in state['sortTags'].items():
-                    if tags.exists(tagName):
-                        tagList = [tags.get(name) for name in tagList if tags.exists(name)]
-                        if len(tagList) > 0:
-                            self.sortTags[tags.get(tagName)] = tagList
-            elif tags.exists('artist') and tags.exists('date'):
-                # Load a reasonable default
-                self.sortTags = {tags.get('artist'): [tags.get('date')]}
+#            if 'sortTags' in state:
+#                for tagName,tagList in state['sortTags'].items():
+#                    if tags.isInDb(tagName):
+#                        tagList = [tags.get(name) for name in tagList if tags.isInDb(name)]
+#                        if len(tagList) > 0:
+#                            self.sortTags[tags.get(tagName)] = tagList
+#            elif tags.isInDb('artist') and tags.isInDb('date'):
+#                # Load a reasonable default
+#                self.sortTags = {tags.get('artist'): [tags.get('date')]}
             
         application.dispatcher.connect(self._handleDispatcher)
         levels.real.connect(self._handleLevelChange)
         
         # Convert tag names to tags, leaving the nested list structure unchanged.
         # This will in particular call self.load
-        self.createViews(utils.mapRecursively(tags.get,viewsToRestore))
+        self.createViews(viewsToRestore)
 
     def saveState(self):
-        # Get the flags from self.criterionFilter
-        # When a general criterionfilter is implemented we will store the filter itself as string
-        # (e.g. '{flag:piano} Concert') instead of a list of flags.
-        #TODO
         state = {
             'instant': self.searchBox.getInstantSearch(),
-            'showHiddenValues': self.showHiddenValues,
-            'views': utils.mapRecursively(lambda tag: tag.name,[view.model().layers for view in self.views]),
-            'sortTags': {tag.name: [t.name for t in sortTags] for tag,sortTags in self.sortTags.items()}
+            #'showHiddenValues': self.showHiddenValues,
+            #'views': utils.mapRecursively(lambda tag: tag.name,[view.model().layers for view in self.views]),
+            #'sortTags': {tag.name: [t.name for t in sortTags] for tag,sortTags in self.sortTags.items()}
         }
         if self.delegateProfile is not None:
             state['delegate'] = self.delegateProfile.name
+        if self.filterCriterion is not None:
+            state['filter'] = repr(self.filterCriterion)
+        if self.flagsCriterion is not None:
+            state['flags'] = [flag.name for flag in self.flagsCriterion.flags]
         return state
     
-    def load(self,restoreExpanded=False):
+    def load(self, restoreExpanded=False):
         """Load contents into the browser, based on the current filterCriterion and searchCriterion. If a
         search is necessary this will only start a search and actual loading will be done in
         _handleSearchFinished. If *restoreExpanded* is True all views will store the expanded nodes and try
@@ -199,28 +207,22 @@ class Browser(QtGui.QWidget):
         if self.searchRequest is not None:
             self.searchRequest.stop()
             self.searchRequest = None
-            
-        if self.filterCriterion is not None and self.searchCriterion is not None:
-            criterion = self.filterCriterion and self.searchCriterion
-        elif self.filterCriterion is not None:
-            criterion = self.filterCriterion
-        elif self.searchCriterion is not None:
-            criterion = self.searchCriterion
-        else: criterion = None
+           
+        criterion = criteria.combine('AND',
+                            [c for c in (self.filterCriterion, self.flagsCriterion, self.searchBox.criterion)
+                             if c is not None])
 
         if criterion is not None:
-            self.table = self.bigResult
-            self.searchRequest = browsermodel.searchEngine.search(fromTable = db.prefix+"elements",
-                                                                  resultTable = self.bigResult,
-                                                                  criterion = criterion,
-                                                                  data = restoreExpanded
-                                                                )
+            self.table = self.resultTable
+            self.searchRequest = browsermodel.searchEngine.search(fromTable=db.prefix+"elements",
+                                                                  resultTable=self.resultTable,
+                                                                  criterion=criterion)
             # view.resetToTable will be called when the search is finished
         else:
             self.table = db.prefix + "elements"
             self.searchRequest = None
             for view in self.views:
-                view.resetToTable(self.table,restoreExpanded=restoreExpanded,
+                view.resetToTable(self.table, restoreExpanded=restoreExpanded,
                                   expandVisible=not restoreExpanded)
 
     def search(self):
@@ -229,7 +231,7 @@ class Browser(QtGui.QWidget):
         self.searchCriterion = self.searchBox.criterion
         self.load()
     
-    def createViews(self,layersList):
+    def createViews(self, subviews):
         """Destroy all existing views and create views according to *layersList*: For each entry of
         *layersList* a BrowserTreeView using the entry as layers is created. Therefore each entry of
         *layersList* must be a list of tag-lists (confer BrowserTreeView.__init__).
@@ -237,11 +239,12 @@ class Browser(QtGui.QWidget):
         for view in self.views:
             view.setParent(None)
         self.views = []
-        for layers in layersList:
-            newView = BrowserTreeView(self,layers,self.sortTags,self.delegateProfile)
+        subviews = [1] #TODO
+        for subview in subviews:
+            newView = BrowserTreeView(self, self.delegateProfile)
             self.views.append(newView)
             newView.selectionModel().selectionChanged.connect(
-                                    functools.partial(self.selectionChanged.emit,newView.selectionModel()))
+                                    functools.partial(self.selectionChanged.emit, newView.selectionModel()))
             self.splitter.addWidget(newView)
         self.load()
 
@@ -278,7 +281,7 @@ class Browser(QtGui.QWidget):
             self._dialog = None
         
     def _handleSearchFinished(self,request):
-        """React to searchFinished signals: Set the table to self.bigResult and reset the model."""
+        """React to searchFinished signals: Set the table to self.resultTable and reset the model."""
         if request is self.searchRequest:
             self.searchRequest = None
             # Whether the view should restore expanded nodes after the search is stored in request.data.
@@ -323,13 +326,13 @@ class BrowserTreeView(treeview.TreeView):
     actionConfig.addActionDefinition(((sect, 'position+'),), treeactions.ChangePositionAction, mode="+1")
     actionConfig.addActionDefinition(((sect, 'position-'),), treeactions.ChangePositionAction, mode="-1") 
     
-    def __init__(self,parent,layers,sortTags,delegateProfile):
-        super().__init__(levels.real,parent)
-        self.setModel(browsermodel.BrowserModel(layers,sortTags))
+    def __init__(self, parent, delegateProfile):
+        super().__init__(levels.real, parent)
+        self.setModel(browsermodel.BrowserModel([browsermodel.TagLayer([tags.get('artist'),tags.get('composer'),tags.get('performer')])]))
         self.setRootIsDecorated(self.model().hasContents())
         self.model().hasContentsChanged.connect(self.setRootIsDecorated)
         self.header().sectionResized.connect(self.model().layoutChanged)
-        self.setItemDelegate(browserdelegate.BrowserDelegate(self,delegateProfile))
+        self.setItemDelegate(browserdelegate.BrowserDelegate(self, delegateProfile))
         self._optimizers = []
         #self.doubleClicked.connect(self._handleDoubleClicked)
     
@@ -338,26 +341,25 @@ class BrowserTreeView(treeview.TreeView):
         True, try to restore expanded nodes after reloading. If *expandVisible* is True, automatically 
         expand as much layers as are possible without vertical scrollbar.
         """
-        if len(self._optimizers) > 0:
-            # Disconnect or otherwise the next optimizer will be started via the finished signal.
-            self._optimizers[-1].finished.disconnect(self._handleOptimizerFinished)
-            self._optimizers[-1].stop()
-        self._optimizers = []
+        #if len(self._optimizers) > 0:
+        #    # Disconnect or otherwise the next optimizer will be started via the finished signal.
+        #    self._optimizers[-1].finished.disconnect(self._handleOptimizerFinished)
+        #    self._optimizers[-1].stop()
+        #self._optimizers = []
         
         # The order of the optimizers is very important!
-        if restoreExpanded:
-            self._optimizers.append(RestoreExpandedOptimizer(self))
-        if expandVisible:
-            self._optimizers.append(ExpandVisibleOptimizer(self))
-        self._optimizers.append(ExpandSingleOptimizer(self))
-        #self._optimizers.append(MergeValueNodesOptimizer(self))
+        #if restoreExpanded:
+        #    self._optimizers.append(RestoreExpandedOptimizer(self))
+        #if expandVisible:
+        #    self._optimizers.append(ExpandVisibleOptimizer(self))
+        #self._optimizers.append(ExpandSingleOptimizer(self))
         
         self.model().reset(table)
         
-        if len(self._optimizers) > 0:
-            for optimizer in self._optimizers:
-                optimizer.finished.connect(self._handleOptimizerFinished)
-            self._optimizers[0].start()
+        #if len(self._optimizers) > 0:
+        #    for optimizer in self._optimizers:
+        #        optimizer.finished.connect(self._handleOptimizerFinished)
+        #    self._optimizers[0].start()
         
     def _handleOptimizerFinished(self):
         """Handle the finished-signal from the current optimizer."""
@@ -451,7 +453,7 @@ class RestoreExpandedOptimizer(Optimizer):
                 child = model.data(childIndex,Qt.EditRole)
                 # Get an identifier for this node, which is unique among all siblings and will be the same
                 # for an equivalent node after reloading the model.
-                if isinstance(child,browsermodel.ValueNode):
+                if isinstance(child, browsermodel.CriterionNode):
                     key = child.getKey()
                 elif isinstance(child, Element):
                     key = child.id    
@@ -486,7 +488,7 @@ class RestoreExpandedOptimizer(Optimizer):
                 continue
             key,expanded = currentDict.popitem()
             for child in currentNode.getContents():
-                if (isinstance(child,browsermodel.ValueNode) and child.getKey() == key) \
+                if (isinstance(child, browsermodel.CriterionNode) and child.getKey() == key) \
                             or (isinstance(child,Container) and child.id == key) \
                             or (key == (child.__class__,)):
                     if len(expanded) > 0:
@@ -494,7 +496,7 @@ class RestoreExpandedOptimizer(Optimizer):
                         listOfDicts.append(expanded)
                         listOfNodes.append(child)
                     # If this is a CriterionNode expanding the node will start a search and we have to wait.
-                    mustSearch = isinstance(child,browsermodel.CriterionNode) and not child.hasLoaded()
+                    mustSearch = isinstance(child, browsermodel.CriterionNode) and not child.hasLoaded()
                     self.view.expand(model.getIndex(child))
                     if mustSearch:
                         yield child

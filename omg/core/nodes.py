@@ -34,14 +34,9 @@ class Node:
         # This is a default implementation and does not mean that every node has a contents-attribute
         return self.contents
     
-    def getContentsCount(self,recursive=False):
-        """Return the number of contents (that is direct children) of this node. If *recursive* is True,
-        return the number of descendants."""
-        if not recursive:
-            return len(self.getContents())
-        else:
-            # Add the children themselves: +1
-            return sum(child.getContentsCount(True)+1 for child in self.getContents())   
+    def getContentsCount(self):
+        """Return the number of contents (that is direct children) of this node."""
+        return len(self.getContents())   
 
     def setContents(self,contents):
         """Set the list of contents of this container to *contents*. Note that the list won't be copied but
@@ -68,7 +63,7 @@ class Node:
         isFile as e.g. rootnodes are neither."""
         return False
     
-    def getParents(self,includeSelf=False):
+    def getParents(self, includeSelf=False):
         """Returns a generator yielding all parents of this node in the current tree structure, from the
         direct parent to the root-node.
         

@@ -124,6 +124,8 @@ def _negatingGenerator(aList):
 def combine(junction, criteriaList):
     """Return a MultiCriterion using the specified *junction* and criteria. If *criteriaList* contains only a
     single criterion, return it instead."""
+    if len(criteriaList) == 0:
+        return None
     if len(criteriaList) == 1:
         return criteriaList[0]
     else: return MultiCriterion(junction, criteriaList)
@@ -605,7 +607,40 @@ class DateCriterion(TagCriterion):
     
     def __repr__(self):
         return _negHelper(self, self.interval.__repr__())
+      
         
+class TagIdCriterion(Criterion):
+    """A TagIdCriterion contains a list of (tag, value-id) tuples. It matches elements which have at
+    least one of these tags. TagIdCriteria are faster than most other criteria because the search only needs
+    the tags-table for lookup.
+    """
+    def __init__(self, tagPairs):
+        assert isinstance(tagPairs, list)
+        self.tagPairs = tagPairs
+        
+    def getQueries(self, fromTable):
+        whereClause = " OR ".join("(t.tag_id = {} AND t.value_id = {})".format(*p) for p in self.tagPairs)
+        if fromTable == db.prefix + 'elements':
+            return ["SELECT DISTINCT element_id FROM {}tags AS t WHERE {}".format(db.prefix, whereClause)]
+        else:
+            return ["""
+                SELECT DISTINCT el.id
+                FROM {} AS el JOIN {}tags AS t ON el.id = t.element_id
+                WHERE {}
+                """.format(fromTable, db.prefix, whereClause)]
+
+    def isUsingTag(self, tag):
+        return tag in self.valueIds
+
+    def __eq__(self,other):
+        return isinstance(other,TagIdCriterion) and other.tagPairs == self.tagPairs
+
+    def __ne__(self,other):
+        return not self.__eq__(other)
+
+    def __repr__(self):
+        return "<TagIdCriterion {}>".format(self.tagPairs)
+    
 
 def parseBracedCriterion(string):
     """Parser function for criteria enclosed in braces. It will split words like '{id=2000}' into a

@@ -365,8 +365,8 @@ class TagValueAction(TreeAction):
     
     def initialize(self, selection):
         node = self.parent().currentNode()
-        from ..models.browser import ValueNode
-        if not isinstance(node, ValueNode):
+        from ..models.browser import TagNode
+        if not isinstance(node, TagNode):
             self.setText(self.tr('Edit tagvalue'))
             self.setEnabled(False)
             return

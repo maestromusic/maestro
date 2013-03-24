@@ -275,7 +275,7 @@ class StandardDelegate(AbstractDelegate):
         
     def getTagValues(self,tagType,wrapper):
         """Return all values of the tag *tagType* in *element* excluding values that appear in parent nodes.
-        Values from ValueNode-ancestors will also be removed."""
+        Values from TagNode-ancestors will also be removed."""
         if tagType not in wrapper.element.tags:
             return []
         values = list(wrapper.element.tags[tagType]) # copy!
@@ -289,7 +289,7 @@ class StandardDelegate(AbstractDelegate):
                 else: parentValues = []
             elif isinstance(parent,RootNode):
                 break
-            elif isinstance(parent,browsermodel.ValueNode):
+            elif isinstance(parent, browsermodel.TagNode):
                 parentValues = parent.values
             else:
                 parentValues = []

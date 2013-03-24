@@ -55,10 +55,8 @@ class AbstractBrowserDialog(dialogs.FancyTabbedPopup):
         self.flagTab.setLayout(QtGui.QVBoxLayout())
         self.tabWidget.addTab(self.flagTab,self.tr("Flags"))
         
-        flagList = []
-        for criterion in browser.criterionFilter:
-            if isinstance(criterion,criteriaModule.FlagsCriterion):
-                flagList.extend(criterion.flags)
+        flagList = browser.flagsCriterion.flags if browser.flagsCriterion is not None else []
+        
         self.flagView = FlagView(flagList)
         self.flagView.selectionChanged.connect(self._handleSelectionChanged)
         self.flagTab.layout().addWidget(self.flagView)
@@ -108,6 +106,13 @@ class BrowserDialog(AbstractBrowserDialog):
         hideInBrowserBox.clicked.connect(self.browser.setShowHiddenValues)
         optionLayout.addWidget(hideInBrowserBox)
         
+        filterCriterionLayout = QtGui.QHBoxLayout()
+        filterCriterionLayout.addWidget(QtGui.QLabel(self.tr("Filter:")))
+        text = repr(self.browser.filterCriterion) if self.browser.filterCriterion is not None else ''
+        filterCriterionLine = QtGui.QLineEdit(text)
+        filterCriterionLayout.addWidget(filterCriterionLine)
+        optionLayout.addLayout(filterCriterionLayout)
+        
         viewConfigButton = QtGui.QPushButton(self.tr("Configure Views..."))
         viewConfigButton.clicked.connect(lambda: ViewConfigurationDialog(self.browser).exec_())
         viewConfigButton.setSizePolicy(QtGui.QSizePolicy(QtGui.QSizePolicy.Fixed,QtGui.QSizePolicy.Fixed))
@@ -123,7 +128,7 @@ class BrowserDialog(AbstractBrowserDialog):
 class FlagView(QtGui.QTableWidget):
     selectionChanged = QtCore.pyqtSignal(list)
     
-    def __init__(self,selectedFlagTypes,parent=None):
+    def __init__(self, selectedFlagTypes, parent=None):
         QtGui.QTableWidget.__init__(self,parent)
         self.verticalHeader().hide()
         self.horizontalHeader().hide()
