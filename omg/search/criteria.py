@@ -178,9 +178,18 @@ class MultiCriterion(Criterion):
         self.criteria = criteria
             
     def __repr__(self):
-        parts = (str(crit) for crit in self.criteria)
+        parts = []
+        # Note that this method only encloses the criterion in parentheses if it is negated: "!(a b)"
+        # Therefore we have to enclose child-MultiCriteria here
+        for criterion in self.criteria:
+            if not isinstance(criterion, MultiCriterion) or criterion.negated:
+                parts.append(repr(criterion))
+            else: parts.append('({})'.format(repr(criterion)))
+        
         separator = ' ' if self.junction == 'AND' else ' | '
-        return _negHelper(self, '({})'.format(separator.join(parts)))
+        if self.negate:
+            return PREFIX_NEGATE + '({})'.format(separator.join(parts))
+        else: return separator.join(parts)
     
     def __eq__(self, other):
         return isinstance(other, MultiCriterion) and other.junction == self.junction \
@@ -350,7 +359,7 @@ class TagCriterion(Criterion):
         
     def __repr__(self):
         if self.value is not None and self.tagList == SEARCH_TAGS: 
-            return _negHelper(self, _quote(self.value)) # use the short notation for this common case
+            return _negHelper(self, _quoteIfNecessary(self.value)) # use short notation for this common case
         else:
             assert len(self.tagList) > 0
             tagNames = ','.join(tag.name for tag in self.tagList)
@@ -362,7 +371,7 @@ class TagCriterion(Criterion):
                     prefixes += PREFIX_SINGLE_WORD
                 if self.caseSensitive:
                     prefixes += PREFIX_CASE_SENSITIVE
-                return _negHelper(self, '{tag='+tagNames+'='+prefixes+_quote(self.value)+'}')
+                return _negHelper(self, '{tag='+tagNames+'='+prefixes+_quoteIfNecessary(self.value)+'}')
             
     def __eq__(self, other):
         return isinstance(other, TagCriterion) and other.value == self.value\
@@ -837,13 +846,20 @@ def _splitList(token, theList):
     yield result
 
 
+def _quoteIfNecessary(string):
+    """Wrap a string in double quotes unless it is a single word of alphanumeric characters."""
+    if string.isalnum():
+        return string
+    else: return _quote(string)
+    
+    
 def _quote(string):
     """Safely wrap a string in double quotes."""
     return '"{}"'.format(string.replace('"','\\"'))
 
 
 def _unquote(string):
-    """Restore a string quoted with _unquote: Remove double quotes except if they are escaped. Unescape
+    """Restore a string quoted with _quote: Remove double quotes except if they are escaped. Unescape
     the latter."""
     parts = string.split('"')
     for i, part in enumerate(parts[:-1]):

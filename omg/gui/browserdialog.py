@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from functools import partial
+import functools
 
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
@@ -24,13 +24,14 @@ from PyQt4.QtCore import Qt
 from . import dialogs, profiles as profilesgui, delegates
 from .. import config, utils, database as db
 from ..core import tags, flags
-from ..search import criteria as criteriaModule
+from ..search import criteria
 from .delegates import browser as browserdelegate
+from .misc import lineedits
 
 
 # Layers that can be selected in BrowserDialog's comboboxes. Each item in the list is a list containing for
 # each layer a list of the tagnames in that layer.
-selectableLayers = utils.mapRecursively(partial(tags.get,addDialogIfNew=True),[
+selectableLayers = utils.mapRecursively(functools.partial(tags.get, addDialogIfNew=True), [
      [['composer','artist','performer']],
      [['genre'],['composer','artist','performer']],
      [['composer','artist','performer'],['album']],
@@ -55,7 +56,7 @@ class AbstractBrowserDialog(dialogs.FancyTabbedPopup):
         self.flagTab.setLayout(QtGui.QVBoxLayout())
         self.tabWidget.addTab(self.flagTab,self.tr("Flags"))
         
-        flagList = browser.flagsCriterion.flags if browser.flagsCriterion is not None else []
+        flagList = browser.flagCriterion.flags if browser.flagCriterion is not None else []
         
         self.flagView = FlagView(flagList)
         self.flagView.selectionChanged.connect(self._handleSelectionChanged)
@@ -76,9 +77,7 @@ class AbstractBrowserDialog(dialogs.FancyTabbedPopup):
         super().close()
         
     def _handleSelectionChanged(self):
-        if len(self.flagView.selectedFlagTypes) > 0:
-            self.browser.setCriterionFilter([criteriaModule.FlagsCriterion(self.flagView.selectedFlagTypes)])
-        else: self.browser.setCriterionFilter([])
+        self.browser.setFlagFilter(self.flagView.selectedFlagTypes)
           
           
 class BrowserDialog(AbstractBrowserDialog):
@@ -108,19 +107,20 @@ class BrowserDialog(AbstractBrowserDialog):
         
         filterCriterionLayout = QtGui.QHBoxLayout()
         filterCriterionLayout.addWidget(QtGui.QLabel(self.tr("Filter:")))
-        text = repr(self.browser.filterCriterion) if self.browser.filterCriterion is not None else ''
-        filterCriterionLine = QtGui.QLineEdit(text)
+        filterCriterionLine = CriterionLineEdit(self.browser.filterCriterion)
+        filterCriterionLine.criterionChanged.connect(self.browser.setFilterCriterion)
+        filterCriterionLine.criterionCleared.connect(functools.partial(self.browser.setFilterCriterion,None))
         filterCriterionLayout.addWidget(filterCriterionLine)
         optionLayout.addLayout(filterCriterionLayout)
         
         viewConfigButton = QtGui.QPushButton(self.tr("Configure Views..."))
         viewConfigButton.clicked.connect(lambda: ViewConfigurationDialog(self.browser).exec_())
-        viewConfigButton.setSizePolicy(QtGui.QSizePolicy(QtGui.QSizePolicy.Fixed,QtGui.QSizePolicy.Fixed))
+        viewConfigButton.setSizePolicy(QtGui.QSizePolicy(QtGui.QSizePolicy.Fixed, QtGui.QSizePolicy.Fixed))
         optionLayout.addWidget(viewConfigButton)
         
         optionLayout.addStretch(1)          
         
-    def _handleProfileChosen(self,profile):
+    def _handleProfileChosen(self, profile):
         for view in self.browser.views:
             view.itemDelegate().setProfile(profile)
             
@@ -197,7 +197,42 @@ class FlagView(QtGui.QTableWidget):
                 if item is not None and item.data(Qt.UserRole) == flagType:
                     return item
         return None
+
+
+class CriterionLineEdit(lineedits.IconLineEdit):
+    criterionChanged = QtCore.pyqtSignal(criteria.Criterion)
+    criterionCleared = QtCore.pyqtSignal()
+    
+    def __init__(self, criterion):
+        super().__init__(utils.getIcon("clear.png"))
+        self.button.clicked.connect(self.clear)
+        self.button.clicked.connect(self._handleChange)
+        if criterion is not None:
+            self.setText(repr(criterion))
+        self.criterion = criterion
+        self.returnPressed.connect(self._handleChange)
         
+    def focusOutEvent(self, event):
+        super().focusOutEvent(event)
+        self._handleChange()
+        
+    def _handleChange(self):
+        text = self.text().strip()
+        try:
+            if len(text) == 0:
+                criterion = None
+            else: criterion = criteria.parse(text)
+        except criteria.ParseException:
+            self.setStyleSheet("QLineEdit { background-color : #FF7094 }")
+        else:
+            self.setStyleSheet('')
+            if criterion != self.criterion:
+                self.criterion = criterion
+                if criterion is not None:
+                    self.criterionChanged.emit(criterion)
+                else: self.criterionCleared.emit()
+            
+            
         
 class ViewConfigurationDialog(QtGui.QDialog):
     """The BrowserDialog allows you to configure the views of a browser and their layers."""

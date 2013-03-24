@@ -28,11 +28,10 @@ class IconLineEdit(QtGui.QLineEdit):
         iconLineEdit.button.clicked.connect(iconLineEdit.clear)
     
     If the property ''hideIconWhenEmpty'' is set (default), the button will only be displayed, if the
-    lineedit is not empty.""" 
-    hideIconWhenEmpty = None
-    
-    def __init__(self,icon,parent = None):
-        QtGui.QLineEdit.__init__(self,parent)
+    lineedit is not empty.
+    """ 
+    def __init__(self, icon, parent = None):
+        QtGui.QLineEdit.__init__(self, parent)
         self.button = QtGui.QToolButton(self)
         self.button.setIcon(QtGui.QIcon(icon))
         self.button.setCursor(Qt.ArrowCursor)
@@ -48,6 +47,7 @@ class IconLineEdit(QtGui.QLineEdit):
         self.setMinimumSize(max(min.width(), self.button.sizeHint().height() + 2),
                             max(min.height(), self.button.sizeHint().height() + 2))
                             
+        self.hideIconWhenEmpty = None
         self.setHideIconWhenEmpty(True)
 
     def getHideIconWhenEmpty(self):
@@ -71,7 +71,7 @@ class IconLineEdit(QtGui.QLineEdit):
         
     def resizeEvent(self,resizeEvent):
         sizeHint = self.button.sizeHint()
-        self.button.move(self.rect().right() - sizeHint.width(),self.rect().bottom() - sizeHint.height())
+        self.button.move(self.rect().right() - sizeHint.width(), self.rect().bottom() - sizeHint.height())
 
 
 class LineEditWithHint(QtGui.QLineEdit):

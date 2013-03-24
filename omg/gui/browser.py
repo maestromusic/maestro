@@ -117,7 +117,7 @@ class Browser(QtGui.QWidget):
         """Initialize a new Browser with the given parent."""
         QtGui.QWidget.__init__(self,parent)
         self.filterCriterion = None
-        self.flagsCriterion = None
+        self.flagCriterion = None
         self.searchCriterion = None
         self.views = []
                 
@@ -155,7 +155,7 @@ class Browser(QtGui.QWidget):
             if 'flags' in state:
                 flagList = [flags.get(name) for name in state['flags'] if flags.exists(name)]
                 if len(flagList) > 0:
-                    self.filterCriterion = criteria.FlagsCriterion(flagList)
+                    self.filterCriterion = criteria.FlagCriterion(flagList)
             if 'filter' in state:
                 try:
                     self.filterCriterion = criteria.parse(state['filter'])
@@ -193,8 +193,8 @@ class Browser(QtGui.QWidget):
             state['delegate'] = self.delegateProfile.name
         if self.filterCriterion is not None:
             state['filter'] = repr(self.filterCriterion)
-        if self.flagsCriterion is not None:
-            state['flags'] = [flag.name for flag in self.flagsCriterion.flags]
+        if self.flagCriterion is not None:
+            state['flags'] = [flag.name for flag in self.flagCriterion.flags]
         return state
     
     def load(self, restoreExpanded=False):
@@ -209,7 +209,7 @@ class Browser(QtGui.QWidget):
             self.searchRequest = None
            
         criterion = criteria.combine('AND',
-                            [c for c in (self.filterCriterion, self.flagsCriterion, self.searchBox.criterion)
+                            [c for c in (self.filterCriterion, self.flagCriterion, self.searchBox.criterion)
                              if c is not None])
 
         if criterion is not None:
@@ -247,6 +247,23 @@ class Browser(QtGui.QWidget):
                                     functools.partial(self.selectionChanged.emit, newView.selectionModel()))
             self.splitter.addWidget(newView)
         self.load()
+        
+    def setFlagFilter(self, flags):
+        if len(flags) == 0:
+            if self.flagCriterion is not None:
+                self.flagCriterion = None
+                self.load()
+        else:
+            if self.flagCriterion is None or self.flagCriterion.flags != flags:
+                self.flagCriterion = criteria.FlagCriterion(flags)
+                self.load()
+        
+    def setFilterCriterion(self, criterion):
+        """Set a single criterion that will be added to all other criteria from the searchbox (using AND)
+        and thus form a permanent filter."""
+        if criterion != self.filterCriterion:
+            self.filterCriterion = criterion
+            self.load()
 
     def getShowHiddenValues(self):
         """Return whether this browser should display ValueNodes where the hidden-flag in values_varchar is
@@ -258,13 +275,6 @@ class Browser(QtGui.QWidget):
         self.showHiddenValues = showHiddenValues
         for view in self.views:
             view.model().setShowHiddenValues(showHiddenValues)
-    
-    def setFilterCriterion(self, criterion):
-        """Set a single criterion that will be added to all other criteria from the searchbox (using AND)
-        and thus form a permanent filter."""
-        if criterion != self.filterCriterion:
-            self.filterCriterion = criterion
-            self.load()
             
     def _handleOptionButton(self):
         """Open the option dialog."""
