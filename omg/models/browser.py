@@ -446,7 +446,9 @@ class VariousNode(CriterionNode):
         self.tagSet = tagSet
 
     def getCriterion(self):
-        return search.criteria.MissingTagCriterion(self.tagSet)
+        criterion = search.criteria.TagCriterion(value=None, tagList=list(self.tagSet))
+        criterion.negate = True
+        return criterion
     
     def __repr__(self):
         return "<VariousNode>"

@@ -372,19 +372,19 @@ class TagValueAction(TreeAction):
             return
         self.setEnabled(True)
         self.value = node.values[0]
-        self.tagValueSpec = { tags.get(tagId): valueId for tagId, valueId in node.valueIds.items() }
+        self.tagPairs = node.tagPairs
         self.setText(self.tr('Edit tagvalue "{}"').format(self.value))
     
     def doAction(self):
         from ..gui.tagwidgets import TagValuePropertiesWidget
-        if len(self.tagValueSpec) > 1:
-            items = list(map(str, self.tagValueSpec.keys()))
-            ans, ok = QtGui.QInputDialog.getItem(self.parent(), self.tr("Choose tag mode"),
-                                       self.tr('Tag:'), items)
+        if len(self.tagPairs) > 1:
+            tagNames = [tags.get(tagId).name for tagId, valueId in self.tagPairs]
+            answer, ok = QtGui.QInputDialog.getItem(self.parent(), self.tr("Choose tag mode"),
+                                                    self.tr('Tag:'), items)
             if not ok:
                 return
             else:
-                tag = tags.get(ans)
+                tagName, valueId = self.tagPairs[tagNames.index(answer)]
         else:
-            tag = next(iter(self.tagValueSpec))
-        TagValuePropertiesWidget.showDialog(tag, self.tagValueSpec[tag])
+            tagName, valueId = self.tagPairs[0]
+        TagValuePropertiesWidget.showDialog(tags.get(tagName), valueId)
