@@ -149,9 +149,6 @@ storage = OrderedDict((
     'central_tab_index': -1,
     'delegates': [],
 }),
-("SECTION:browser", {
-    'views': [[['composer','artist','performer']],[['genre'],['composer','artist','performer']]],
-}),
 ("SECTION:player", {
     'profiles': [],
 }),

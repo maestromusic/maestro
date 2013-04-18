@@ -113,7 +113,7 @@ class Browser(QtGui.QWidget):
     selectionChanged = QtCore.pyqtSignal(QtGui.QItemSelectionModel,
                                          QtGui.QItemSelection, QtGui.QItemSelection)
     
-    def __init__(self,parent = None,state = None):
+    def __init__(self, parent=None, state=None):
         """Initialize a new Browser with the given parent."""
         QtGui.QWidget.__init__(self,parent)
         self.filterCriterion = None
@@ -142,7 +142,7 @@ class Browser(QtGui.QWidget):
         layout.addWidget(self.splitter)
         
         # Restore state
-        viewsToRestore = []#TODO
+        layersForViews = [self.defaultLayers()]
         self.delegateProfile = browserdelegate.BrowserDelegate.profileType.default()
         self.sortTags = {}
         if state is not None and isinstance(state, dict):
@@ -150,8 +150,21 @@ class Browser(QtGui.QWidget):
                 self.searchBox.setInstantSearch(state['instant'])
 #            if 'showHiddenValues' in state:
 #                self.showHiddenValues = state['showHiddenValues']
-#            if 'views' in state:
-#                viewsToRestore = state['views']
+            if 'views' in state:
+                layersForViews = []
+                for layersConfig in state['views']:
+                    layers = []
+                    layersForViews.append(layers)
+                    for layerConfig in layersConfig: 
+                       try:
+                           className, layerState = layerConfig
+                           if className in browsermodel.layerClasses:
+                               theClass = browsermodel.layerClasses[className][1]
+                               layer = theClass(state=layerState)
+                               layers.append(layer)
+                       except Exception as e:
+                           logger.warning("Could not parse a layer of the browser: {}".format(e))
+                viewsToRestore = state['views']
             if 'flags' in state:
                 flagList = [flags.get(name) for name in state['flags'] if flags.exists(name)]
                 if len(flagList) > 0:
@@ -180,7 +193,8 @@ class Browser(QtGui.QWidget):
         
         # Convert tag names to tags, leaving the nested list structure unchanged.
         # This will in particular call self.load
-        self.createViews(viewsToRestore)
+        self.createViews(layersForViews)
+        self.load()
 
     def saveState(self):
         state = {
@@ -189,6 +203,9 @@ class Browser(QtGui.QWidget):
             #'views': utils.mapRecursively(lambda tag: tag.name,[view.model().layers for view in self.views]),
             #'sortTags': {tag.name: [t.name for t in sortTags] for tag,sortTags in self.sortTags.items()}
         }
+        if len(self.views) > 0:
+            state['views'] = [[(layer.className, layer.state()) for layer in view.model().layers]
+                                 for view in self.views]
         if self.delegateProfile is not None:
             state['delegate'] = self.delegateProfile.name
         if self.filterCriterion is not None:
@@ -231,7 +248,7 @@ class Browser(QtGui.QWidget):
         self.searchCriterion = self.searchBox.criterion
         self.load()
     
-    def createViews(self, subviews):
+    def createViews(self, layersForViews):
         """Destroy all existing views and create views according to *layersList*: For each entry of
         *layersList* a BrowserTreeView using the entry as layers is created. Therefore each entry of
         *layersList* must be a list of tag-lists (confer BrowserTreeView.__init__).
@@ -239,14 +256,32 @@ class Browser(QtGui.QWidget):
         for view in self.views:
             view.setParent(None)
         self.views = []
-        subviews = [1] #TODO
-        for subview in subviews:
-            newView = BrowserTreeView(self, self.delegateProfile)
-            self.views.append(newView)
-            newView.selectionModel().selectionChanged.connect(
-                                    functools.partial(self.selectionChanged.emit, newView.selectionModel()))
-            self.splitter.addWidget(newView)
-        self.load()
+        for layers in layersForViews:
+            self.addView(layers)
+        
+    def addView(self, layers=None):
+        if layers is None:
+            layers = self.defaultLayers()
+        return self.insertView(len(self.views), layers)
+    
+    def insertView(self, index, layers):
+        newView = BrowserTreeView(self, layers, self.delegateProfile)
+        self.views.insert(index, newView)
+        newView.selectionModel().selectionChanged.connect(
+                                functools.partial(self.selectionChanged.emit, newView.selectionModel()))
+        self.splitter.insertWidget(index, newView)
+        return newView
+        
+    def removeView(self, index):
+        view = self.views[index]
+        del self.views[index]
+        view.setParent(None)
+    
+    def moveView(self, fromIndex, toIndex):
+        movingView = self.views[fromIndex]
+        del self.views[fromIndex]
+        self.views.insert(toIndex, movingView)
+        self.splitter.insertWidget(toIndex, movingView) # will be removed from old position automatically
         
     def setFlagFilter(self, flags):
         if len(flags) == 0:
@@ -307,6 +342,13 @@ class Browser(QtGui.QWidget):
     def _handleLevelChange(self,event):
         self.load(restoreExpanded = True)
         pass
+              
+    @staticmethod
+    def defaultLayers():
+        tagList = browsermodel.TagLayer.defaultTagList()
+        if len(tagList) > 0:
+            return [browsermodel.TagLayer(tagList)]
+        else: return []
 
 
 class BrowserTreeView(treeview.TreeView):
@@ -336,9 +378,9 @@ class BrowserTreeView(treeview.TreeView):
     actionConfig.addActionDefinition(((sect, 'position+'),), treeactions.ChangePositionAction, mode="+1")
     actionConfig.addActionDefinition(((sect, 'position-'),), treeactions.ChangePositionAction, mode="-1") 
     
-    def __init__(self, parent, delegateProfile):
+    def __init__(self, parent, layers, delegateProfile):
         super().__init__(levels.real, parent)
-        self.setModel(browsermodel.BrowserModel([browsermodel.TagLayer([tags.get('artist'),tags.get('composer'),tags.get('performer')])]))
+        self.setModel(browsermodel.BrowserModel(layers))
         self.setRootIsDecorated(self.model().hasContents())
         self.model().hasContentsChanged.connect(self.setRootIsDecorated)
         self.header().sectionResized.connect(self.model().layoutChanged)
@@ -660,4 +702,3 @@ class MergeValueNodesOptimizer(Optimizer):
         if loaded:
             return contentIds
         else: return None
-          

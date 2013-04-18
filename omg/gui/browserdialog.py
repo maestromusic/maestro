@@ -24,9 +24,12 @@ from PyQt4.QtCore import Qt
 from . import dialogs, profiles as profilesgui, delegates
 from .. import config, utils, database as db
 from ..core import tags, flags
+from ..models import browser as browsermodel
 from ..search import criteria
 from .delegates import browser as browserdelegate
 from .misc import lineedits
+
+MAX_SUB_BROWSERS = 5
 
 
 # Layers that can be selected in BrowserDialog's comboboxes. Each item in the list is a list containing for
@@ -48,19 +51,28 @@ selectableLayers = utils.mapRecursively(functools.partial(tags.get, addDialogIfN
 class AbstractBrowserDialog(dialogs.FancyTabbedPopup):
     """Popup dialog that allows to configure the Browser."""
     def __init__(self, browser):
-        super().__init__(browser.optionButton, 300, 170)
+        super().__init__(browser.optionButton, 300, 200)
         self.browser = browser
         self.viewConfigurations = []
                 
-        self.flagTab = QtGui.QWidget()
-        self.flagTab.setLayout(QtGui.QVBoxLayout())
-        self.tabWidget.addTab(self.flagTab,self.tr("Flags"))
+        filterTab = QtGui.QWidget()
+        filterTab.setLayout(QtGui.QVBoxLayout())
+        self.tabWidget.addTab(filterTab, self.tr("Filter"))
         
+        filterTab.layout().addWidget(QtGui.QLabel(self.tr("Flags:")))
         flagList = browser.flagCriterion.flags if browser.flagCriterion is not None else []
         
         self.flagView = FlagView(flagList)
         self.flagView.selectionChanged.connect(self._handleSelectionChanged)
-        self.flagTab.layout().addWidget(self.flagView)
+        filterTab.layout().addWidget(self.flagView)
+        
+        filterCriterionLayout = QtGui.QHBoxLayout()
+        filterCriterionLayout.addWidget(QtGui.QLabel(self.tr("General:")))
+        filterCriterionLine = CriterionLineEdit(self.browser.filterCriterion)
+        filterCriterionLine.criterionChanged.connect(self.browser.setFilterCriterion)
+        filterCriterionLine.criterionCleared.connect(functools.partial(self.browser.setFilterCriterion,None))
+        filterCriterionLayout.addWidget(filterCriterionLine)
+        filterTab.layout().addLayout(filterCriterionLayout)
         
         self.optionTab = QtGui.QWidget()
         self.optionTab.setLayout(QtGui.QVBoxLayout())
@@ -104,14 +116,6 @@ class BrowserDialog(AbstractBrowserDialog):
         hideInBrowserBox.setChecked(self.browser.getShowHiddenValues())
         hideInBrowserBox.clicked.connect(self.browser.setShowHiddenValues)
         optionLayout.addWidget(hideInBrowserBox)
-        
-        filterCriterionLayout = QtGui.QHBoxLayout()
-        filterCriterionLayout.addWidget(QtGui.QLabel(self.tr("Filter:")))
-        filterCriterionLine = CriterionLineEdit(self.browser.filterCriterion)
-        filterCriterionLine.criterionChanged.connect(self.browser.setFilterCriterion)
-        filterCriterionLine.criterionCleared.connect(functools.partial(self.browser.setFilterCriterion,None))
-        filterCriterionLayout.addWidget(filterCriterionLine)
-        optionLayout.addLayout(filterCriterionLayout)
         
         viewConfigButton = QtGui.QPushButton(self.tr("Configure Views..."))
         viewConfigButton.clicked.connect(lambda: ViewConfigurationDialog(self.browser).exec_())
@@ -232,98 +236,134 @@ class CriterionLineEdit(lineedits.IconLineEdit):
                     self.criterionChanged.emit(criterion)
                 else: self.criterionCleared.emit()
             
-            
         
 class ViewConfigurationDialog(QtGui.QDialog):
     """The BrowserDialog allows you to configure the views of a browser and their layers."""
-    def __init__(self,parent):
+    def __init__(self, browser):
         """Initialize with the given parent, which must be the browser to configure."""
-        QtGui.QDialog.__init__(self,parent)
+        QtGui.QDialog.__init__(self)
         self.setWindowTitle(self.tr("Browser configuration"))
-        self.browser = parent
+        self.resize(450, 300)
+        self.browser = browser
         
-        self.viewConfigurations = []
+        layout = QtGui.QVBoxLayout(self)
         
-        # GUI
-        layout = QtGui.QVBoxLayout()
-        self.setLayout(layout)
-        
-        topLayout = QtGui.QHBoxLayout()
-        topLayout.addWidget(QtGui.QLabel(self.tr("Number of views: ")))
-        spinBox = QtGui.QSpinBox()
-        spinBox.setRange(1,config.options.gui.browser.max_view_count)
-        spinBox.setValue(len(self.browser.views))
-        spinBox.valueChanged.connect(self._handleValueChanged)
-        topLayout.addWidget(spinBox)
-        topLayout.addStretch(1)
-        
-        layout.addLayout(topLayout)
-        
-        self.viewConfLayout = QtGui.QVBoxLayout()
-        layout.addLayout(self.viewConfLayout)
-        
-        layout.addStretch(1)
-        
-        bottomLayout = QtGui.QHBoxLayout()
-        layout.addLayout(bottomLayout)
-        
-        bottomLayout.addStretch(1)
-        abortButton = QtGui.QPushButton(self.tr("Cancel"))
-        abortButton.clicked.connect(self.close)
-        bottomLayout.addWidget(abortButton)
-        okButton = QtGui.QPushButton(self.tr("OK"))
-        okButton.clicked.connect(self._handleOk)
-        bottomLayout.addWidget(okButton)
-        
-        self._handleValueChanged(len(self.browser.views))
-        for i in range(0,len(self.browser.views)):
-            self.viewConfigurations[i].setLayers(self.browser.views[i].model().layers)
-        
-    def _handleValueChanged(self,value):
-        if value < len(self.viewConfigurations):
-            for viewConf in self.viewConfigurations[value:]:
-                self.viewConfLayout.removeWidget(viewConf)
-                viewConf.setParent(None)
-            del self.viewConfigurations[value:]
-            self.adjustSize()
-        elif value > len(self.viewConfigurations):
-            for i in range(len(self.viewConfigurations),value):
-                newViewConfiguration = ViewConfiguration(self,i)
-                self.viewConfigurations.append(newViewConfiguration)
-                self.viewConfLayout.addWidget(newViewConfiguration)
-                
-    def _handleOk(self):
-        self.browser.createViews([viewConf.getLayers() for viewConf in self.viewConfigurations])
-        self.close()
-
-
-class ViewConfiguration(QtGui.QWidget):
-    """A row in BrowserDialog which allows to configure a single view."""
-    def __init__(self,parent,index):
-        """Initialize this ViewConfiguration with the given parent and the label "View *index+1*: "."""
-        QtGui.QWidget.__init__(self,parent)
-        
-        # GUI
-        layout = QtGui.QHBoxLayout()
-        self.setLayout(layout)
-        
-        layout.addWidget(QtGui.QLabel(self.tr("View {}: ").format(index+1),self))
-        self.comboBox = QtGui.QComboBox(self)
-        for layers in selectableLayers:
-            self.comboBox.addItem(str(utils.mapRecursively(str,layers)),layers)
-        layout.addWidget(self.comboBox)
-        
-    def setLayers(self,layers):
-        """Set the currently selected layers to <layers>. If this is not contained in
-        browserdialog.selectableLayers, nothing is selected.
-        """
-        try:
-            self.comboBox.setCurrentIndex(selectableLayers.index(layers))
-        except ValueError:
-            self.comboBox.setCurrentIndex(-1)
+        self.addButton = QtGui.QPushButton(utils.getIcon('add.png'), '')
+        self.addButton.setEnabled(len(self.browser.views) < MAX_SUB_BROWSERS)
+        self.addButton.clicked.connect(self._handleAddButton)
+               
+        self.tabWidget = QtGui.QTabWidget()
+        self.tabWidget.setCornerWidget(self.addButton)
+        self.tabWidget.setMovable(True)
+        self.tabWidget.setTabsClosable(True)
+        self.tabWidget.tabCloseRequested.connect(self._handleTabCloseRequested)
+        self.tabWidget.tabBar().tabMoved.connect(self._handleTabMoved)
+        layout.addWidget(self.tabWidget)
+                    
+        for index, view in enumerate(self.browser.views, start=1):
+            self.tabWidget.addTab(SingleViewConfiguration(view), self.tr("Browser {}").format(index))
             
-    def getLayers(self):
-        """Return the currently selected layers."""
-        if self.comboBox.currentIndex() == -1:
-            return None
-        else: return self.comboBox.itemData(self.comboBox.currentIndex())
+    def _handleAddButton(self):
+        view = self.browser.addView()
+        self.tabWidget.addTab(SingleViewConfiguration(view),
+                              self.tr("Browser {}").format(self.tabWidget.count()))
+        self.addButton.setEnabled(len(self.browser.views) < MAX_SUB_BROWSERS)
+    
+    def _handleTabCloseRequested(self, index):
+        if len(self.browser.views) <= 1:
+            return
+        self.browser.removeView(index)
+        tab = self.tabWidget.widget(index)
+        self.tabWidget.removeTab(index)
+        tab.setParent(None)
+        self._setTabTitles()
+    
+    def _handleTabMoved(self, fromIndex, toIndex):
+        self.browser.moveView(fromIndex, toIndex)
+        self._setTabTitles()
+        
+    def _setTabTitles(self):
+        for index in range(self.tabWidget.count()):
+            self.tabWidget.setTabText(index, self.tr("Browser {}").format(index+1))
+    
+    
+class SingleViewConfiguration(QtGui.QWidget):
+    def __init__(self, view):
+        super().__init__()
+        self.model = view.model()
+        layout = QtGui.QVBoxLayout(self)
+        
+        self.table = QtGui.QTableWidget()
+        self.table.horizontalHeader().setVisible(False)
+        #TODO: Does not work
+        self.table.horizontalHeader().setResizeMode(0, QtGui.QHeaderView.Stretch)
+        self.table.horizontalHeader().setResizeMode(1, QtGui.QHeaderView.Fixed)
+        self.table.verticalHeader().setMovable(True)
+        self.table.verticalHeader().sectionMoved.connect(self._handleSectionMoved)
+        # Note: only the first column contains an item
+        self.table.itemDoubleClicked.connect(lambda item: self._handleEditButton(item.row()))
+        layout.addWidget(self.table)
+        
+        bottomLine = QtGui.QHBoxLayout()
+        bottomLine.addWidget(QtGui.QLabel(self.tr("Add layer:")))
+        self.layerTypeBox = QtGui.QComboBox()
+        for name, (title, theClass) in browsermodel.layerClasses.items():
+            self.layerTypeBox.addItem(title, name)
+        bottomLine.addWidget(self.layerTypeBox)
+        self.addLayerButton = QtGui.QPushButton(utils.getIcon('add.png'), '')
+        self.addLayerButton.clicked.connect(self._handleAddLayerButton)
+        bottomLine.addWidget(self.addLayerButton)
+        
+        bottomLine.addStretch()
+        closeButton = QtGui.QPushButton(self.tr("Close"))
+        closeButton.clicked.connect(self._close)
+        bottomLine.addWidget(closeButton)
+        layout.addLayout(bottomLine)
+        
+        self.updateLayerView()
+    
+    def updateLayerView(self):
+        self.table.setRowCount(len(self.model.layers))
+        self.table.setColumnCount(2)
+        for i, layer in enumerate(self.model.layers):
+            item = QtGui.QTableWidgetItem(layer.text())
+            item.setFlags(Qt.ItemIsEnabled)
+            self.table.setItem(i, 0, item)
+            buttonWidget = QtGui.QWidget()
+            buttonLayout = QtGui.QHBoxLayout(buttonWidget)
+            buttonLayout.setContentsMargins(0, 0, 0, 0)
+            editButton = QtGui.QPushButton(utils.getIcon('pencil.png'), '')
+            editButton.clicked.connect(functools.partial(self._handleEditButton, i))
+            buttonLayout.addWidget(editButton)
+            removeButton = QtGui.QPushButton(utils.getIcon('remove.png'), '')
+            removeButton.clicked.connect(functools.partial(self._handleRemoveButton, i))
+            buttonLayout.addWidget(removeButton)
+            self.table.setIndexWidget(self.table.model().index(i, 1), buttonWidget)
+        self.table.resizeColumnsToContents()
+        
+    def _handleSectionMoved(self, logicalIndex, oldVisualIndex, newVisualIndex):
+        self.model.moveLayer(oldVisualIndex, newVisualIndex)
+        self.table.setRowCount(0) # event QTableView.clear does not reset visual indexes to logical indexes
+        self.updateLayerView() # this will ensure that logical indices equal visual indices
+        
+    def _close(self):
+        self.window().close()
+        
+    def _handleAddLayerButton(self):
+        layerName = self.layerTypeBox.itemData(self.layerTypeBox.currentIndex())
+        theClass = browsermodel.layerClasses[layerName][1]
+        layer = theClass.openDialog(self)
+        if layer is not None:
+            self.model.addLayer(layer)
+            self.updateLayerView()
+    
+    def _handleEditButton(self, index):
+        layer = self.model.layers[index]
+        newLayer = layer.openDialog(self, layer)
+        if newLayer is not None:
+            self.model.changeLayer(layer, newLayer)
+            self.updateLayerView()
+    
+    def _handleRemoveButton(self, index):
+        self.model.removeLayer(index)
+        self.updateLayerView()

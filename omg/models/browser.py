@@ -33,7 +33,13 @@ logger = logging.getLogger(__name__)
 
 searchEngine = None # The search engine used by all browsers
 
+# Registered layer classes. Maps names -> (title, class)
+layerClasses = collections.OrderedDict()
 
+def addLayerClass(name, title, theClass):
+    theClass.className = name
+    layerClasses[name] = (title, theClass)
+    
 
 def initSearchEngine():
     """Initialize the single search engine used by all browsers. This is called automatically, when the first
@@ -55,13 +61,46 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
         self.table = None
         self.level = levels.real
         self.layers = layers
-        self.layers.append(ContainerLayer(sorting=Sorting([tags.TITLE])))
+        self.containerLayer = ContainerLayer(sorting=Sorting([tags.TITLE]))
         self._searchRequests = []
         
         if searchEngine is None:
             initSearchEngine()
         searchEngine.searchFinished.connect(self._handleSearchFinished)
     
+    def getLayer(self, index):
+        assert index >= 0
+        if index < len(self.layers):
+            return self.layers[index]
+        else: return self.containerLayer
+        
+    def setLayers(self, layers):
+        self.layers = layers
+        self.reset()
+        
+    def addLayer(self, layer):
+        self.insertLayer(len(self.layers), layer)
+    
+    def insertLayer(self, index, layer):
+        self.layers.insert(index, layer)
+        self.reset()
+    
+    def changeLayer(self, layer, newLayer):
+        self.layers[self.layers.index(layer)] = newLayer
+        self.reset()
+        
+    def moveLayer(self, fromIndex, toIndex):
+        if toIndex in (fromIndex, fromIndex+1):
+            return # no change
+        layer = self.layers[fromIndex]
+        del self.layers[fromIndex]
+        self.layers.insert(toIndex, layer)
+        self.reset()
+        
+    def removeLayer(self, index):
+        del self.layers[index]
+        self.reset()
+        
     def hasContents(self):
         """Return whether the current model contains elements."""
         # A textnode is only used in empty models to display e.g. "no search results"
@@ -78,7 +117,7 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
             self.table = table
         if self.table is not None:
             self._startLoading(self.root)
-            rootedtreemodel.RootedTreeModel.reset(self)
+            super().reset()
     
     def setShowHiddenValues(self, showHiddenValues):
         """Show or hide ValueNodes where the hidden-flag in values_varchar is set."""
@@ -112,7 +151,7 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
         if node == self.root:
             oldHasContents = self.hasContents()
             # No need to search...load directly
-            layer = self.layers[0]
+            layer = self.getLayer(0)
             self.load(layer, node, ElementSource(table=self.table))
             if len(self.root.contents) == 0:
                 if self.table == 'elements':
@@ -127,7 +166,7 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
             if self.hasContents() != oldHasContents:
                 self.hasContentsChanged.emit(self.hasContents())
         else:
-            layer = self.layers[self._getLayerIndex(node) + 1]
+            layer = self.getLayer(self._getLayerIndex(node) + 1)
             criteria = [p.getCriterion() for p in node.getParents(includeSelf=True)
                         if isinstance(p, CriterionNode)]
             method = searchEngine.search if not wait else searchEngine.searchAndWait
@@ -136,8 +175,8 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
                 self._searchRequests.append(searchRequest)
                 
     def _getLayerIndex(self, node):
-        if isinstance(node, Wrapper): # always use the container layer self.layers[-1]
-            return -1
+        if isinstance(node, Wrapper): 
+            return len(self.layers) # always use containerLayer
         elif node.parent is self.root:
             return 0
         elif hasattr(node, 'layer'):
@@ -195,12 +234,25 @@ class Sorting:
 
 
 class TagLayer:
-    def __init__(self, tagList):
+    def __init__(self, tagList=None, state=None):
+        if tagList is None:
+            assert state is not None
+            tagList = [tags.get(name) for name in state]
         if any(tag.type != tags.TYPE_VARCHAR for tag in tagList):
             logger.warning("Only tags of type varchar are permitted in the browser's layers.")
             tagList = {tag for tag in tagList if tag.type == tags.TYPE_VARCHAR}
         self.tagList = tagList
         self.showHiddenValues = False
+        
+    def text(self):
+        return '{}: {}'.format(translate("BrowserModel", "Tag layer"),
+                               ', '.join(tag.title for tag in self.tagList))
+    
+    def state(self):
+        return [tag.name for tag in self.tagList]
+    
+    def __repr__(self):
+        return "<TagLayer: {}>".format(', '.join(tag.name for tag in self.tagList))
         
     def load(self, node, elementSource):
         # Get all values and corresponding ids of the given tag appearing in at least one toplevel result.
@@ -270,11 +322,43 @@ class TagLayer:
             nodes.append(HiddenValuesNode(node, hiddenNodes))
         
         return nodes
+    
+    @staticmethod
+    def defaultTagList():
+        tagList = [tags.get(name) for name in ('artist', 'composer', 'performer')]
+        return [tag for tag in tagList if tag.isInDb() and tag.type == tags.TYPE_VARCHAR]
+    
+    @staticmethod
+    def openDialog(parent, layer=None):
+        from PyQt4 import QtGui
+        tagList = layer.tagList if layer is not None else TagLayer.defaultTagList()
+        text, ok = QtGui.QInputDialog.getText(parent, translate("TagLayer", "Configure tag layer"),
+                        translate("TagLayer", "Enter the names/titles of the tags that should "
+                                  "be used to group elements."),
+                        text=', '.join(tag.title for tag in tagList))
+        if ok:
+            try:
+                tagList = [tags.fromTitle(name.strip()) for name in text.split(',')]
+                if len(tagList) == 0 \
+                        or not all(tag.isInDb() and tag.type == tags.TYPE_VARCHAR for tag in tagList):
+                    raise ValueError()
+            except:
+                QtGui.QMessageBox.error(parent, translate("TagLayer", "Invalid value"),
+                        translate("TagLayer", "Only varchar-tags registered in the database may be used."))
+            else:
+                return TagLayer(tagList)
+        return None
+
+
+addLayerClass('taglayer', translate("BrowserModel", "Tag layer"), TagLayer)
 
 
 class ContainerLayer:
     def __init__(self, sorting):
         self.sorting = sorting
+        
+    def text(self):
+        return translate("BrowserModel", "Container layer")
         
     def load(self, node, elementSource):
         """Load the contents of *node* into a container-layer, using toplevel elements from *table*. Note that

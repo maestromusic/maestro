@@ -431,7 +431,7 @@ def isTitle(title):
 
 def fromTitle(title):
     """Return the tag of the given title (comparison is case-insensitive!). If no such tag
-    exists, invoke get to return a tag. Use this method to get a tag from user input, especially when using
+    exists, invoke 'get' to return a tag. Use this method to get a tag from user input, especially when using
     combo-boxes with predefined values containing tag titles.
     """
     title = title.lower()
