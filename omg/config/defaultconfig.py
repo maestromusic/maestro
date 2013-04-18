@@ -89,7 +89,6 @@ defaults = OrderedDict((
 }),
 ("filesystem", {
     "scan_interval": (int,1800,"Interval (in seconds) in which the filesystem will be rescanned for changes"),
-    "id_method": (str,"ffmpeg", "Method used to identify audio files. 'ffmpeg' or 'acoustid'"),
     "disable":(bool,False,"completely disable filesystem synchronization"),
 }),
 ("misc", {

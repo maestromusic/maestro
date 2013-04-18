@@ -204,21 +204,17 @@ class StandardGuesser(profiles.Profile):
         return GuessProfileConfigWidget(self)
 
 
-class ProfileCategory(profiles.ProfileCategory):
-    """Subclass of ProfileCategory that loads a default profile if no profile was loaded from the storage
-    file."""
-    
-    def loadProfiles(self):
-        super().loadProfiles()
-        if len(self.profiles) == 0:
-            self.addProfile(translate("Albumguesser","Default"))
+profileCategory = profiles.TypedProfileCategory('albumguesser',
+                                                translate('Albumguesser','Album guesser'),
+                                                config.storageObject.editor.albumguesser_profiles)
 
-
-profileCategory = ProfileCategory("albumguesser",
-                                  translate("Albumguesser","Album guesser"),
-                                  config.storageObject.editor.albumguesser_profiles,
-                                  profileClass=StandardGuesser)
+profileCategory.addType(profiles.ProfileType('standard',
+                                             translate('Albumguesser', 'standard guesser'),
+                                             StandardGuesser))
 profiles.manager.addCategory(profileCategory)
+if len(profileCategory.profiles) == 0:
+    profileCategory.addProfile(translate("Albumguesser", "Default"),
+                               profileCategory.getType('standard'))
 
 
 class GuessProfileConfigWidget(QtGui.QWidget):

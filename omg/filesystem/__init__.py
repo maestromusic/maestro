@@ -43,29 +43,8 @@ def init():
     from . import identification
     if config.options.filesystem.disable:
         return
-    idmethod = config.options.filesystem.id_method
-    if idmethod == "ffmpeg":
-        # check if ffmpeg can be called
-        try:
-            subprocess.Popen(
-                ['ffmpeg', '-version'],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
-            )
-            idProvider = identification.RawAudioHasher()
-        except OSError as e:
-            import errno
-            if e.errno == errno.ENOENT:
-                from ..gui import dialogs
-                dialogs.warning(translate("omg.filesystem", "ffmpeg is missing"),
-                                translate("omg.filesystem", "The 'ffmpeg' binary needed by OMG's file "
-                                  "tracking mechanism was not found. Please consider installing ffmpeg "
-                                  "for full functionality or switch to a different identification " 
-                                  "method."))
-                idProvider = None
-    elif idmethod == "acoustid":
-        apikey = "8XaBELgH" #TODO: AcoustID test key - we should change this
-        idProvider = identification.AcoustIDIdentifier(apikey)
+    apikey = "8XaBELgH" #TODO: AcoustID test key - we should change this
+    idProvider = identification.AcoustIDIdentifier(apikey)
          
         
     synchronizer = FileSystemSynchronizer()
@@ -448,7 +427,7 @@ class FileSystemSynchronizer(QtCore.QObject):
                 if self.should_stop.is_set():
                     break
             if lenMissing > 0:
-                self._requestHelper.emit("updateFileHashes", missingHashes)
+                self._requestHelper.emit("updateFileHashes", (missingHashes,))
         self.scanFilesystem()
     
     def getDirectory(self, path):
@@ -743,6 +722,7 @@ class FileSystemSynchronizer(QtCore.QObject):
                 url = elem.url
                 if url not in self.tracks:
                     logger.error("adding url not in self.tracks: {}".format(url))
+                    continue
                 dir = self.directories[os.path.dirname(url.path)]
                 track = self.tracks[url]
                 if track.hash is None and idProvider is not None:

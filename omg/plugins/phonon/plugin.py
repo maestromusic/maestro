@@ -26,6 +26,8 @@ except ImportError as e:
     raise ImportError("PyQt4-phonon is not installed.")
 
 from ... import player, profiles, utils
+from ...filebackends.filesystem import FileURL
+from ...filebackends.stream import HTTPStreamURL
 from ...models import playlist
         
 translate = QtCore.QCoreApplication.translate
@@ -75,7 +77,9 @@ class PhononPlayerBackend(player.PlayerBackend):
     def insertIntoPlaylist(self, pos, urls):
         urls = list(urls)
         for i, url in enumerate(urls):
-            if not os.path.exists(url.absPath):
+            if not (isinstance(url, FileURL) or isinstance(url, HTTPStreamURL)):
+                raise player.InsertError("URL type {} not supported".format(type(url)))
+            if isinstance(url, FileURL) and not os.path.exists(url.absPath):
                 raise player.InsertError(self.tr("Can not play '{}': File does not exist.")
                                          .format(url), urls[:i])
             
@@ -107,7 +111,7 @@ class PhononPlayerBackend(player.PlayerBackend):
                 if self.current() is None:
                     self.setCurrent(0) # this starts playing
                 else: self.mediaObject.play()
-                QtCore.QTimer.singleShot(500, self.checkPlaying)
+                QtCore.QTimer.singleShot(2000, self.checkPlaying)
             else: self.mediaObject.pause()
             self.stateChanged.emit(state)
             
@@ -176,15 +180,20 @@ class PhononPlayerBackend(player.PlayerBackend):
     def _handleSourceChanged(self, newSource):
         if newSource == self._nextSource:
             self.playlist.setCurrent(self.currentOffset() + 1)
+            self.currentChanged.emit(self.currentOffset())
             self._nextSource = None
         
     def _handleTick(self,pos):
         self.elapsedChanged.emit(pos / 1000)
     
-    def _getPath(self,offset):
+    def _getPath(self, offset):
         """Return the absolute path of the file at the given offset."""
-        #TODO: do something if element.url is not a FileURL
-        return utils.absPath(self.playlist.root.fileAtOffset(offset).element.url.path)
+        url = self.playlist.root.fileAtOffset(offset).element.url
+        if isinstance(url, FileURL):
+            return utils.absPath(url.path)
+        if isinstance(url, HTTPStreamURL):
+            return url.toQUrl()
+        raise ValueError("Phonon can not play file {} of URL type {}".format(url, type(url)))
     
     def save(self):
         if self.playlist.current is not None:

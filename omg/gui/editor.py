@@ -105,8 +105,10 @@ class EditorWidget(mainwindow.DockWidget):
         
         self.toolbar.addAction(self.editor.treeActions["commit"])
         buttonLayout.addWidget(self.toolbar)
-        
         buttonLayout.addStretch()
+        self.newStreamButton = QtGui.QPushButton("HTTP")
+        buttonLayout.addWidget(self.newStreamButton)
+        self.newStreamButton.clicked.connect(self._handleNewStreamButton)
         
         self.optionButton = QtGui.QToolButton()
         self.optionButton.setIcon(utils.getIcon('options.png'))
@@ -114,6 +116,16 @@ class EditorWidget(mainwindow.DockWidget):
         self.optionButton.clicked.connect(self._handleOptionButton)
         self.addTitleWidget(self.optionButton)
 
+    def _handleNewStreamButton(self):
+        url, ok = QtGui.QInputDialog.getText(self, "stream", "URL:")
+        if not ok or not url.startswith("http://"):
+            return
+        from ..filebackends import BackendURL
+        url = BackendURL.fromString(url)
+        elem = self.editor.level.collect(url)
+        model = self.editor.model()
+        model.insertElements(model.root, len(model.root.contents), [elem])
+    
     def _handleOptionButton(self):
         """Open the option dialog."""
         dialog = OptionDialog(self.optionButton,self.editor)
