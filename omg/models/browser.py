@@ -303,10 +303,10 @@ class TagLayer:
     
         # Check whether a VariousNode is necessary
         result = db.query("""
-            SELECT t.value_id
+            SELECT res.id
             FROM {1} AS res LEFT JOIN {0}tags AS t
-                                ON res.id = t.element_id AND t.tag_id IN ({2}) AND {3}
-            WHERE t.value_id IS NULL
+                                ON res.id = t.element_id AND t.tag_id IN ({2})
+            WHERE {3} AND t.value_id IS NULL
             LIMIT 1
             """.format(db.prefix, table, tagFilter, idFilter))
 
@@ -316,7 +316,7 @@ class TagLayer:
         if len(hiddenNodes) > 0:
             # If hidden nodes are present this layer needs two actual levels in the tree structure
             # Since this interferes with the algorithm to determine the layer of a node, we have to store
-            # that layer. See BrowserModel._getLayerIndex
+            # that layer index. See BrowserModel._getLayerIndex
             for node in hiddenNodes:
                 node.layer = self
             nodes.append(HiddenValuesNode(node, hiddenNodes))
