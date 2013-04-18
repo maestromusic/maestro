@@ -266,7 +266,7 @@ class ViewConfigurationDialog(QtGui.QDialog):
     def _handleAddButton(self):
         view = self.browser.addView()
         self.tabWidget.addTab(SingleViewConfiguration(view),
-                              self.tr("Browser {}").format(self.tabWidget.count()))
+                              self.tr("Browser {}").format(self.tabWidget.count()+1))
         self.addButton.setEnabled(len(self.browser.views) < MAX_SUB_BROWSERS)
     
     def _handleTabCloseRequested(self, index):

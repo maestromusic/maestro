@@ -257,19 +257,21 @@ class Browser(QtGui.QWidget):
             view.setParent(None)
         self.views = []
         for layers in layersForViews:
-            self.addView(layers)
+            self.addView(layers, reset=False)
         
-    def addView(self, layers=None):
+    def addView(self, layers=None, reset=True):
         if layers is None:
             layers = self.defaultLayers()
-        return self.insertView(len(self.views), layers)
+        return self.insertView(len(self.views), layers, reset)
     
-    def insertView(self, index, layers):
+    def insertView(self, index, layers, reset=True):
         newView = BrowserTreeView(self, layers, self.delegateProfile)
         self.views.insert(index, newView)
         newView.selectionModel().selectionChanged.connect(
                                 functools.partial(self.selectionChanged.emit, newView.selectionModel()))
         self.splitter.insertWidget(index, newView)
+        if reset:
+            newView.resetToTable(self.table, False, False)#TODO remove unnecessary arguments
         return newView
         
     def removeView(self, index):
