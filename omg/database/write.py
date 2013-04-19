@@ -19,64 +19,6 @@
 from .. import database as db
 from ..core import tags
 
-def createElements(data):
-    """Creates elements in the database and returns their IDs.
-    
-    The argument *data* must be a list of
-        (file, type, elementcount)
-    tuples specifying the new elements.
-    """
-    if len(data) == 0:
-        return
-    ids = db.nextIds(len(data))
-    createElementsWithIds((id,)+d for id,d in zip(ids,data))
-    return ids
-
-
-def createElementsWithIds(data):
-    """Creates elements in the database with predefined IDs.
-    
-    The argument *data* must be a list of
-        (id, file, type, elementcount)
-    tuples that specify the elements.
-    """
-    if len(data) > 0:
-        db.multiQuery("INSERT INTO {}elements (id, file, type, elements) VALUES (?,?,?,?)"
-                      .format(db.prefix), data)                       
-
-
-def addFiles(data):
-    """Adds entries to the files table.
-    
-    The files to add are specified by *data*, a list of
-        (id, urlString, hash, length)
-    tuples.
-    """
-    if len(data) > 0:
-        db.multiQuery("INSERT INTO {}files (element_id, url, hash, length) VALUES(?,?,?,?)"
-                      .format(db.prefix), data)
-
-
-def deleteElements(ids):
-    """Delete the elements with the given ids from the database.
-    
-    Also updates element counters. Due to the foreign keys in the database,
-    this will delete all tag, flag and content relations of the deleted elements.
-    """
-    if len(ids) > 0:
-        parentIds = db.parents(ids)
-        contentsIds = db.contents(ids)
-        db.query("DELETE FROM {}elements WHERE id IN ({})".format(db.prefix, db.csList(ids)))
-        updateElementsCounter(parentIds)
-
-
-def setContents(elid, contents):
-    """Set contents of element with id *elid* to *contents* (instance of elements.ContentList)."""
-    db.query("DELETE FROM {}contents WHERE container_id = ?".format(db.prefix), elid)
-    db.multiQuery("INSERT INTO {}contents (container_id, position, element_id) VALUES(?,?,?)"
-             .format(db.prefix), [(elid, pos, id) for (pos, id) in contents.items() ]) 
-
-
 def changePositions(parentID, changes):
     """Change the positions of children of the element with ID *parentID*.
     
@@ -118,31 +60,6 @@ def changeUrls(data):
     db.multiQuery("UPDATE {}files SET url=? WHERE element_id=?".format(db.prefix), data)
 
 
-def makeValueIDs(data):
-    """Ensures that tag values are present in values_* tables.
-    
-    *data* must be a list of (*tag*, *value*) tuples.
-    """
-    valuesToAdd = {}
-    for tag, value in data:
-        try:
-            db.idFromValue(tag, value)
-        except KeyError:
-            if tag.type not in valuesToAdd:
-                valuesToAdd[tag.type] = set()
-            valuesToAdd[tag.type].add((tag.id, tag.type.sqlFormat(value)))
-    for valueType, values in valuesToAdd.items():
-        values = list(values)
-        queryString = "INSERT INTO {}values_{} (tag_id, value) VALUES (?,?)".format(db.prefix,valueType.name)
-        if len(values) > 1:
-            db.multiQuery(queryString, values[:-1])
-        lastId = db.query(queryString, *(values[-1])).insertId()
-
-        # Update cache
-        if valueType == tags.TYPE_VARCHAR:
-            for id, (tagId, value) in enumerate(values,start=lastId-len(values)+1):
-                db._idToValue[tags.get(tagId)][id] = value
-                db._valueToId[tags.get(tagId)][value] = id
 
 
 def setTags(elid,tags):
@@ -154,18 +71,6 @@ def setTags(elid,tags):
         db.multiQuery("INSERT INTO {}tags (element_id,tag_id,value_id) VALUES (?,?,?)".format(db.prefix),
                       [(elid,tag.id,db.idFromValue(tag,value,insert=True)) for value in tags[tag]])
 
-
-def setSortValue(tag, valueId, sortValue):
-    """Set the sort-value of the value of *tag* with id *valueId* to *sortValue*."""
-    db.query("UPDATE {}values_{} SET sort_value = ? WHERE tag_id = ? AND id = ?".
-             format(db.prefix, tag.type), sortValue, tag.id, valueId)
-
-
-def setHidden(tagSpec, valueId, state):
-    """Set the given tag value's "hidden" attribute to *state*."""
-    tag = tags.get(tagSpec)
-    db.query("UPDATE {}values_{} SET hide = ? WHERE tag_id = ? AND id = ?".format(db.prefix, tag.type),
-             state, tag.id, valueId) 
 
 # Used in CreateDBElementsCommand
 def setFlags(elid,flags):
@@ -181,10 +86,3 @@ def setStickers(elid, stickers):
     for type, values in stickers.items():
         db.multiQuery("INSERT INTO {}stickers (element_id, type, sort, data) VALUES (?, ?, ?, ?)"
                       .format(db.prefix), [(elid, type, i, val) for i, val in enumerate(values)])
-
-def setType(data):
-    """Changes the type of elements. *data* is a list of (id, type) tuples."""
-    if len(data) > 0:
-        db.multiQuery("UPDATE {}elements SET type = ? WHERE id = ?"
-                      .format(db.prefix), ((b,a) for a,b in data))
-    
