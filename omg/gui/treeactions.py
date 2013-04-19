@@ -311,25 +311,25 @@ class MatchTagsFromFilenamesAction(TreeAction):
                                                self.parent())
         dialog.exec_()
 
-class ToggleMajorAction(TreeAction):
-    """This action toggles the "major" attribute of an element."""
-    
-    def __init__(self, parent):
-        super().__init__(parent, shortcut = "Ctrl+M")
-        self.setText(self.tr('Major?'))
-        self.setCheckable(True)
-        
-    def initialize(self, selection):
-        self.setEnabled(selection.hasContainers())
-        self.setChecked(all(elem.major for elem in selection.elements() if elem.isContainer()))
-        self.state = self.isChecked()
-        self.selection = selection
-        
-    def doAction(self):
-        changes = {el:(not self.state) for el in self.selection.elements()
-                                       if el.isContainer() and el.major == self.state}
-        self.level().setMajorFlags(changes)
-        self.toggle()
+#class ToggleMajorAction(TreeAction):
+#    """This action toggles the "major" attribute of an element."""
+#    
+#    def __init__(self, parent):
+#        super().__init__(parent, shortcut = "Ctrl+M")
+#        self.setText(self.tr('Major?'))
+#        self.setCheckable(True)
+#        
+#    def initialize(self, selection):
+#        self.setEnabled(selection.hasContainers())
+#        self.setChecked(all(elem.major for elem in selection.elements() if elem.isContainer()))
+#        self.state = self.isChecked()
+#        self.selection = selection
+#        
+#    def doAction(self):
+#        changes = {el:(not self.state) for el in self.selection.elements()
+#                                       if el.isContainer() and el.major == self.state}
+#        self.level().setMajorFlags(changes)
+#        self.toggle()
 
 
 class RemoveFromPlaylistAction(TreeAction):

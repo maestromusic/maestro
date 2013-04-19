@@ -43,6 +43,9 @@
         <file>icons/recursive.png</file>
         <file>omg_square.svg</file>
         <file>icons/pencil.png</file>
+        <file>icons/cd.png</file>
+        <file>icons/cdbox.png</file>
+        <file>icons/work.png</file>
     </qresource>
     <qresource prefix="/omg/flags">
         <file alias="creative-commons.png">flags/fugue/creative-commons.png</file>

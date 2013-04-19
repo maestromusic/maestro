@@ -85,6 +85,7 @@ class SearchRequest:
             else: criterion = criteria.MultiCriterion('AND', criterion)
         self.criterion = criterion
         self.resultTable = resultTable
+        assert postProcessing is None or hasattr(postProcessing, '__iter__')
         self.postProcessing = postProcessing
         self.callback = callback
         self.data = data
@@ -174,7 +175,6 @@ class SearchEngine(QtCore.QObject):
                     CREATE TABLE {} (
                         id MEDIUMINT UNSIGNED NOT NULL,
                         {}
-                        toplevel BOOLEAN NOT NULL DEFAULT 0,
                         PRIMARY KEY(id))
                         ENGINE MEMORY;
                     """.format(tableName, customColumns)
@@ -182,8 +182,7 @@ class SearchEngine(QtCore.QObject):
                 createQuery = """
                     CREATE TABLE {} (
                         id INTEGER PRIMARY KEY,
-                        {}
-                        toplevel BOOLEAN NOT NULL DEFAULT 0)
+                        {})
                     """.format(tableName, customColumns)
             db.query(createQuery)
             self._tables.append(tableName)
@@ -270,7 +269,8 @@ class SearchThread(threading.Thread):
                                     result = db.query(queryData)
                                 else: result = db.query(*queryData)
                                 #print(list(db.query("SELECT value FROM new_values_varchar WHERE id IN (SELECT value_id FROM tmp_help)").getSingleColumn()))
-                                self._check(request)
+                                if self.quit or request.stopped:
+                                    raise StopRequestException()
                             criterion.result = set(result.getSingleColumn())
                         else:
                             #TODO: implement MultiCriterions more efficiently
@@ -284,176 +284,38 @@ class SearchThread(threading.Thread):
                                 allElements = set(db.query("SELECT id FROM {}elements".format(db.prefix))
                                                   .getSingleColumn())
                                 criterion.result = allElements - criterion.result
-                            self._check(request)
+                            if self.quit or request.stopped:
+                                raise StopRequestException()
     
                     logger.debug("Request finished")
                     request.result = criterion.result
-                    if len(request.result) > 0:
-                        children = set(db.query("SELECT element_id FROM {}contents WHERE container_id IN ({})"
-                                            .format(db.prefix, db.csList(request.result))).getSingleColumn())
-                        request.toplevel = set(request.result) - children
-                    else: request.toplevel = set()
                     if request.postProcessing is not None:
-                        request.postProcessing(request)
+                        for method in request.postProcessing:
+                            method(request)
                     if request.resultTable is not None:
-                        assert request.resultTable != db.prefix+'elements'
+                        if request.resultTable == db.prefix+'elements': # don't clear elements accidentally
+                            raise RuntimeError("result table must not be elements") 
                         db.transaction()
                         db.query("DELETE FROM {}".format(request.resultTable))
                         if len(request.result) > 0:
-                            db.multiQuery("INSERT INTO {} (id, toplevel) VALUES (?,?)"
-                                          .format(request.resultTable),
-                                          ((id, int(id in request.toplevel)) for id in request.result))
+                            db.multiQuery("INSERT INTO {} (id) VALUES (?)"
+                                          .format(request.resultTable), ((id,) for id in request.result))
                         db.commit()
                     self.engine._searchFinished.emit(request)
                 except StopRequestException:
                     logger.debug("StopRequestException")
                     continue
-                
-    def _check(self, request):
-        if self.quit or request.stopped:
-            raise StopRequestException()
-    
-    def finishRequest(self,request):
-        """Finish *request*: lock the table, emit the signal..."""
-        assert False
-        with self.lock:
-            if not request.stopped:
-                if request.lockTable:
-                    #logger.debug("Add to locked tables: {}".format(request.resultTable))
-                    self.lockedTables[request.resultTable] = request
-                self.requests.remove(request)
-                #logger.debug("Finished request {}".format(request))
-                if request._fireEvent:
-                    self.engine._finishedEvent.set()
-                else: self.engine.searchFinished.emit(request)
-            
-    def processCriterion(self,fromTable,resultTable,criterion):
-        """Process a criterion. This is where the actual search happens."""
-        #logger.debug("processing criterion {}".format(criterion))
-        if len(self.tables[resultTable][1]) == 0:
-            # We firstly search for the direct results of the first query... 
-            #logger.debug("Starting search...")
-            truncate(resultTable)
-            queryData = criterion.getQuery(fromTable,columns=('id','file','major'))
-            # Prepend the returned query with INSERT INTO...
-            queryData[0] = "INSERT INTO {0} (id,file,major) {1}".format(resultTable,queryData[0])
-            #print(*queryData)
-            db.query(*queryData)
-        else:
-            # ...and afterwards delete those entries which do not match the other queries
-            # As we cannot modify a table of which we select from, we have to store the direct
-            # search results in TT_HELP. Then we remove everything from the result table that is
-            # not contained in TT_HELP.
-            truncate(TT_HELP)
-            queryData = criterion.getQuery(resultTable,columns=('id',))
-            queryData[0] = "INSERT INTO {0} (id) {1}".format(TT_HELP,queryData[0])
-            #print(*queryData)
-            db.query(*queryData)
-            db.query("DELETE FROM {0} WHERE id NOT IN (SELECT id FROM {1})"
-                       .format(resultTable,TT_HELP))
-                       
-    @staticmethod
-    def _procContainer(processedIds,id):
-        """This is a help function for post processing. It will check if the container with id *id* has to be
-        added to the search result because it is major or has a major parent. It will return the result and
-        additionally store it in the dict *processedIds*. This dict will be used as cache to avoid doing the
-        computation twice for the same id. The dict maps the ids of processed containers to a tuple containing
-        the result (haveToAdd) in the first component and -- only if haveToAdd is true -- another tuple
-        (id,file,major) in the second component (This will be used by the post processing later."""
-        parents = db.parents(id)
-        haveToAdd = False
-        for pid in parents:
-            # If we have to add the parent, we also have to add this node.
-            if pid not in processedIds:
-                if SearchThread._procContainer(processedIds,pid):
-                    haveToAdd = True
-            elif processedIds[pid][0]:
-                haveToAdd = True
+
+
+def findExtendedToplevel(request):
+    from ..core import elements
+    if len(request.result) == 0:
+        request.extendedToplevel = set()
+        return
+    majorContainers = set(db.query(
+                            "SELECT id FROM {}elements WHERE file = 0 AND type NOT IN ({}) AND id IN ({})"
+                            .format(db.prefix,
+                                    db.csList(elements.MAJOR_TYPES),
+                                    db.csList(request.result))).getSingleColumn())
+    request.extendedToplevel = request.result.difference(db.contents(majorContainers, recursive=True))
         
-        major = db.isMajor(id)
-        if major:
-            haveToAdd = True
-            
-        processedIds[id] = (haveToAdd,(id,db.isFile(id),major) if haveToAdd else None)
-        return haveToAdd
-    
-    def postProcessing(self,resultTable):
-        """Currently post processing...
-        
-            - adds to the search result all parents of search results which are major or have a major parent 
-            - and sets the toplevel flags correctly.
-        
-        \ """
-        result = db.query("""
-                SELECT DISTINCT {0}contents.container_id
-                FROM {1} JOIN {0}contents ON {1}.id = {0}contents.element_id
-                """.format(db.prefix,resultTable))
-        
-        if result.size() > 0:
-            processedIds = {}
-            for id in result.getSingleColumn():
-                if not id in processedIds:
-                    SearchThread._procContainer(processedIds, id)
-            args = [data for haveToAdd,data in processedIds.values() if haveToAdd]
-            if len(args) > 0:
-                command = 'INSERT IGNORE' if db.type == 'mysql' else 'INSERT OR IGNORE' 
-                db.multiQuery(
-                    "{} INTO {} (id,file,major,direct) VALUES (?,?,?,0)"
-                    .format(command, resultTable),args)
-        
-        setTopLevelFlags(resultTable)
-        # Always include all children of direct results => select from elements
-        addChildren(resultTable)
-
-
-def addChildren(resultTable):
-    """Add to *resultTable* all descendants of direct results."""
-    # In the first step select direct results which have children, in the other steps select new results.
-    attribute = 'direct'
-    while True:
-        truncate(TT_HELP)
-        result = db.query("""
-            INSERT INTO {2} (id)
-                SELECT res.id
-                FROM {1} AS res JOIN {0}elements USING(id)
-                WHERE res.{3} = 1 AND {0}elements.elements > 0
-            """.format(db.prefix,resultTable,TT_HELP,attribute))
-        if result.affectedRows() == 0:
-            return
-        db.query("UPDATE {} SET new = 0".format(resultTable))
-        db.query("""
-            REPLACE INTO {1} (id,file,toplevel,direct,major,new)
-                SELECT       c.element_id,el.file,0,0,el.major,1
-                FROM {2} AS p JOIN {0}contents AS c ON p.id = c.container_id
-                              JOIN {0}elements AS el ON el.id = c.element_id
-                GROUP BY c.element_id
-                """.format(db.prefix,resultTable,TT_HELP))
-        attribute = 'new'
-
-
-def setTopLevelFlags(table):
-    """Set the toplevel flags in *table* to 1 if and only if the element has no parent in *table*. Of course
-    *table* must have at least the columns ''id'' and ''toplevel''."""
-    truncate(TT_HELP)
-    if table == db.prefix + "elements":
-        db.query("""
-            INSERT INTO {1} (id)
-                SELECT DISTINCT {0}contents.element_id
-            """.format(db.prefix,TT_HELP))
-    else:
-        # in this case make sure the results as well as their parents are contained in table
-        db.query("""
-            INSERT INTO {1} (id)
-                SELECT DISTINCT c.element_id
-                FROM {0}contents AS c JOIN {2} AS parents ON c.container_id = parents.id
-                                      JOIN {2} AS children ON c.element_id = children.id
-                """.format(db.prefix,TT_HELP,table))
-
-    db.query("UPDATE {} SET toplevel = id NOT in (SELECT id FROM {})".format(table,TT_HELP))
-
-
-def truncate(tableName):
-    if db.type == 'mysql':
-        # truncate may be much faster than delete
-        db.query('TRUNCATE {}'.format(tableName))
-    else: db.query('DELETE FROM {}'.format(tableName))

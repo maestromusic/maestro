@@ -32,7 +32,7 @@ class EditorDelegate(StandardDelegate):
             leftData  = ['t:album','t:composer','t:artist','t:performer'],
             rightData = ['t:date','t:genre','t:conductor'],
             overwrite = {'showPaths': True,
-                         'showMajor': True,
+                         'showType': True,
                          'appendRemainingTags': True,
                          'showAllAncestors': True}
     )

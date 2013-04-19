@@ -22,8 +22,8 @@ from PyQt4 import QtCore
 from PyQt4.QtCore import Qt
 
 from . import rootedtreemodel
-from .. import config, search, database as db, logging, utils
-from ..core import tags, levels
+from .. import config, search, database as db, logging, utils, search as searchmodule
+from ..core import tags, levels, elements
 from ..core.elements import Element
 from ..core.nodes import Node, RootNode, Wrapper, TextNode
 from ..gui import selection
@@ -170,7 +170,8 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
             criteria = [p.getCriterion() for p in node.getParents(includeSelf=True)
                         if isinstance(p, CriterionNode)]
             method = searchEngine.search if not wait else searchEngine.searchAndWait
-            searchRequest = method(self.table, criteria, data=(layer, node))
+            searchRequest = method(self.table, criteria, data=(layer, node),
+                                   postProcessing=[searchmodule.findExtendedToplevel])
             if not wait:
                 self._searchRequests.append(searchRequest)
                 
@@ -190,7 +191,7 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
         if searchRequest in self._searchRequests:
             layer, node = searchRequest.data
             self._searchRequests.remove(searchRequest)
-            self.load(layer, node, ElementSource(ids=searchRequest.result, toplevel=searchRequest.toplevel))
+            self.load(layer, node, ElementSource(request=searchRequest))
     
     def load(self, layer, node, elementSource):
         contents = layer.load(node, elementSource)
@@ -211,11 +212,31 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
 
 
 class ElementSource:
-    def __init__(self, ids=None, toplevel=None, table=None):
-        assert table is not None or (ids is not None and toplevel is not None)
-        self.ids = ids
-        self.toplevel = toplevel
-        self.table = table
+    def __init__(self, table=None, request=None):
+        assert table is not None or request is not None
+        if table is not None:
+            self.table = table
+            self.ids = None
+            if self.table == db.prefix + 'elements':
+                majorContainers = db.query("SELECT id FROM {}elements WHERE file = 0 AND type IN ({})"
+                                           .format(db.prefix, db.csList(elements.MAJOR_TYPES)))\
+                                           .getSingleColumn()
+            else:
+                majorContainers = db.query("""
+                            SELECT el.id
+                            FROM {}elements AS el JOIN {} AS res ON el.id = res.id
+                            WHERE el.file = 0 AND el.type IN ({})
+                            """.format(db.prefix, table, db.csList(elements.MAJOR_TYPES))).getSingleColumn()
+            descendantsOfMajor = db.csList(db.contents(majorContainers, recursive=True))
+            if len(descendantsOfMajor):
+                self.extendedToplevel = set(db.query("SELECT id FROM {} WHERE id NOT IN  ({})"
+                                                     .format(table, descendantsOfMajor)).getSingleColumn())
+            else:
+                self.extendedToplevel = set(db.query("SELECT id FROM {}".format(table)).getSingleColumn())
+        else:
+            self.table = None
+            self.ids = request.result
+            self.extendedToplevel = request.extendedToplevel
         
         
 class Sorting:
@@ -255,17 +276,16 @@ class TagLayer:
         return "<TagLayer: {}>".format(', '.join(tag.name for tag in self.tagList))
         
     def load(self, node, elementSource):
-        # Get all values and corresponding ids of the given tag appearing in at least one toplevel result.
+        # Get all tag values that should appear in TagNodes 
+        
         if elementSource.table is not None:
             table = elementSource.table
-            idFilter = 'res.toplevel = 1'
-        else:
-            table = db.prefix+'elements'
-            idFilter = ' res.id IN ({}) '.format(db.csList(elementSource.toplevel))
+        else: table = db.prefix+'elements'
+        if len(elementSource.extendedToplevel) > 0:
+            idFilter = 'res.id IN ({}) '.format(db.csList(elementSource.extendedToplevel))
+        else: idFilter = '1' # for use in AND-clauses
         tagFilter = db.csIdList(self.tagList)
         
-        # Get all tag values that should appear in TagNodes 
-        #TODO toplevel is wrong in case of id list
         if db.type == 'sqlite':
             collate = 'COLLATE NOCASE'
         else: collate = ''
@@ -286,7 +306,7 @@ class TagLayer:
             if db.isNull(sortValue):
                 sortValue = None
                 
-            if self.showHiddenValues or not hide:
+            if not hide or self.showHiddenValues:
                 theList = nodes
             else: theList = hiddenNodes
             
@@ -367,7 +387,12 @@ class ContainerLayer:
         """
         if elementSource.table is None:
             allIds = elementSource.ids
-            toplevel = elementSource.toplevel
+            if len(allIds) == 0:
+                toplevel = []
+            else:
+                toplevel = elementSource.extendedToplevel.difference(
+                             db.query("SELECT element_id FROM {}contents WHERE container_id IN ({})"
+                                      .format(db.prefix, db.csList(allIds))).getSingleColumn())
         else:
            raise NotImplementedError()
 
@@ -391,7 +416,7 @@ class ContainerLayer:
                     result = True
                     cDict[pid].append(id)
                     toplevel.discard(id)
-                elif levels.real[pid].major:
+                elif levels.real[pid].isMajor():
                     result = True
                     cDict[pid].append(id)
                     toplevel.discard(id)

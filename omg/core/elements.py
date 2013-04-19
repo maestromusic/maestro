@@ -25,6 +25,10 @@ from . import tags as tagsModule
 from .. import config, filebackends
 
 
+TYPE_NONE, TYPE_ALBUM, TYPE_WORK, TYPE_COLLECTION = 0,1,2,3
+MAJOR_TYPES = (TYPE_ALBUM, TYPE_WORK)
+
+
 class Element:
     """Abstract base class for elements (files or containers)."""   
     def __init__(self):
@@ -42,6 +46,10 @@ class Element:
         """Return whether this element (or rather its version on real level) is stored in the database."""
         from . import reallevel
         return self.id in reallevel._dbIds
+    
+    def isMajor(self):
+        """Return whether the type of this element implies the 'major'-property."""
+        return self.type in MAJOR_TYPES
         
     def getTitle(self,usePath=True):
         """Return the title of this element or some dummy title, if the element does not have a title tag.
@@ -110,6 +118,8 @@ class Element:
     
     def equalsButLevel(self, other):
         """Return True if this element equals *other* in all aspects but possibly the level."""
+        if self.type != other.type:
+            return False
         if self.tags != other.tags:
             return False
         if self.flags != other.flags:
@@ -119,8 +129,6 @@ class Element:
         if self.isContainer():
             if self.contents != other.contents:
                 return False
-            if self.major != other.major:
-                return False
         else:
             if self.url != other.url:
                 return False
@@ -129,34 +137,24 @@ class Element:
 
 
 class Container(Element):
-    """Element-subclass for containers. You must specify the level and id and whether this Container is
-    major. Keyword-arguments that are not specified will be set to empty lists/tag.Storage instances.
-    Note that *contents* must be a ContentList.
+    """Element-subclass for containers. You must specify the level and id and may define additional
+    properties using keyword-arguments. Otherwise default values (empty lists etc.) will be used.
+    Valid keyword-arguments are type, contents (which must be a ContentList), parents, tags, flags,
+    stickers.
     """
-    def __init__(self, level, id, major,
-                 *, contents=None, parents=None, tags=None, flags=None, stickers=None):
+    def __init__(self, level, id, **kwargs):
         self.level = level
         self.id = id
         self.level = level
-        self.major = major
         
-        if contents is not None:
-            if type(contents) is not ContentList:
-                raise TypeError("contents must be a ContentList")
-            self.contents = contents
-        else: self.contents = ContentList()
-        if parents is not None:
-            self.parents = parents
-        else: self.parents = []
-        if tags is not None:
-            self.tags = tags
-        else: self.tags = tagsModule.Storage()
-        if flags is not None:
-            self.flags = flags
-        else: self.flags = []
-        if stickers is not None:
-            self.stickers = stickers
-        else: self.stickers = {}
+        self.type = kwargs.get('type', TYPE_NONE)
+        self.contents = kwargs.get('contents', ContentList())
+        if not isinstance(self.contents, ContentList):
+            raise TypeError("contents must be a ContentList")
+        self.parents = kwargs.get('parents', [])
+        self.tags = kwargs.get('tags', tagsModule.Storage())
+        self.flags = kwargs.get('flags', [])
+        self.stickers = kwargs.get('stickers', {})
     
     def copy(self,level=None):
         """Create a copy of this container. Create copies of all attributes. Because contents are stored as
@@ -168,7 +166,7 @@ class Container(Element):
         """
         return Container(level = self.level if level is None else level,
                          id = self.id,
-                         major = self.major,
+                         type = self.type,
                          contents = self.contents.copy(),
                          parents = self.parents[:],
                          tags = self.tags.copy(),
@@ -193,10 +191,10 @@ class Container(Element):
 
 class File(Element):
     """Element-subclass for files. You must specify the level, id, url and length in seconds of the file.
-    Keyword-arguments that are not specified will be set to empty lists/tag.Storage instances.
+    You may define additional properties using keyword-arguments. Otherwise default values (empty lists etc.)
+    will be used. Valid keyword-arguments are type, parents, tags, flags, stickers.
     """
-    def __init__(self, level, id, url, length,
-                 *, parents=None, tags=None, flags=None, stickers=None):
+    def __init__(self, level, id, url, length, **kwargs):
         if not isinstance(id,int) or not isinstance(url, filebackends.BackendURL) \
                 or not isinstance(length,int):
             raise TypeError("Invalid type (id,url,length): ({},{},{}) of types ({},{},{})"
@@ -207,18 +205,11 @@ class File(Element):
         self.url = url
         self.length = length
         
-        if parents is not None:
-            self.parents = parents
-        else: self.parents = []
-        if tags is not None:
-            self.tags = tags
-        else: self.tags = tagsModule.Storage()
-        if flags is not None:
-            self.flags = flags
-        else: self.flags = []
-        if stickers is not None:
-            self.stickers = stickers
-        else: self.stickers = {}
+        self.type = kwargs.get('type', TYPE_NONE)
+        self.parents = kwargs.get('parents', [])
+        self.tags = kwargs.get('tags', tagsModule.Storage())
+        self.flags = kwargs.get('flags', [])
+        self.stickers = kwargs.get('stickers', {})
         
     def copy(self, level=None):
         """Create a copy of this file. Create copies of all attributes. If *level* is not None, the copy
@@ -229,6 +220,7 @@ class File(Element):
                     id = self.id,
                     url = self.url,
                     length = self.length,
+                    type = self.type,
                     parents = self.parents[:],
                     tags = self.tags.copy(),
                     flags = self.flags[:],

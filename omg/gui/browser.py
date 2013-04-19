@@ -21,7 +21,7 @@ import functools
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
-from .. import application, config, database as db, logging, utils
+from .. import application, config, database as db, logging, utils, search as searchmodule
 from ..core import tags, flags, levels
 from ..core.elements import Element, Container
 from ..search import searchbox, criteria
@@ -231,16 +231,17 @@ class Browser(QtGui.QWidget):
 
         if criterion is not None:
             self.table = self.resultTable
-            self.searchRequest = browsermodel.searchEngine.search(fromTable=db.prefix+"elements",
-                                                                  resultTable=self.resultTable,
-                                                                  criterion=criterion)
+            self.searchRequest = browsermodel.searchEngine.search(
+                                                  fromTable = db.prefix+"elements",
+                                                  resultTable = self.resultTable,
+                                                  postProcessing = [searchmodule.findExtendedToplevel],
+                                                  criterion = criterion)
             # view.resetToTable will be called when the search is finished
         else:
             self.table = db.prefix + "elements"
             self.searchRequest = None
             for view in self.views:
-                view.resetToTable(self.table, restoreExpanded=restoreExpanded,
-                                  expandVisible=not restoreExpanded)
+                view.resetToTable(self.table)
 
     def search(self):
         """Search for the value in the search-box. If it is empty, display all values."""
@@ -271,7 +272,7 @@ class Browser(QtGui.QWidget):
                                 functools.partial(self.selectionChanged.emit, newView.selectionModel()))
         self.splitter.insertWidget(index, newView)
         if reset:
-            newView.resetToTable(self.table, False, False)#TODO remove unnecessary arguments
+            newView.resetToTable(self.table)
         return newView
         
     def removeView(self, index):
@@ -334,7 +335,7 @@ class Browser(QtGui.QWidget):
             # Whether the view should restore expanded nodes after the search is stored in request.data.
             restore = request.data
             for view in self.views:
-                view.resetToTable(self.table,restoreExpanded=restore,expandVisible=not restore)
+                view.resetToTable(self.table)
                 
     def _handleDispatcher(self,event):
         """Handle a change event."""
@@ -376,7 +377,7 @@ class BrowserTreeView(treeview.TreeView):
     actionConfig.addActionDefinition(((sect, 'delete'),), treeactions.DeleteAction,
                                      text=translate("BrowserTreeView", "delete from OMG"))
     actionConfig.addActionDefinition(((sect, 'merge'),), treeactions.MergeAction)
-    actionConfig.addActionDefinition(((sect, 'major?'),), treeactions.ToggleMajorAction)
+    #actionConfig.addActionDefinition(((sect, 'major?'),), treeactions.ToggleMajorAction)
     actionConfig.addActionDefinition(((sect, 'position+'),), treeactions.ChangePositionAction, mode="+1")
     actionConfig.addActionDefinition(((sect, 'position-'),), treeactions.ChangePositionAction, mode="-1") 
     
@@ -390,7 +391,7 @@ class BrowserTreeView(treeview.TreeView):
         self._optimizers = []
         #self.doubleClicked.connect(self._handleDoubleClicked)
     
-    def resetToTable(self,table,restoreExpanded,expandVisible):
+    def resetToTable(self,table):
         """Reset the view and its model so that it displays elements from *table*. If *restoreExpanded* is
         True, try to restore expanded nodes after reloading. If *expandVisible* is True, automatically 
         expand as much layers as are possible without vertical scrollbar.
