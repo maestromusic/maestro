@@ -23,7 +23,7 @@ def createElements(data):
     """Creates elements in the database and returns their IDs.
     
     The argument *data* must be a list of
-        (file, toplevel, elementcount, major)
+        (file, type, elementcount)
     tuples specifying the new elements.
     """
     if len(data) == 0:
@@ -37,11 +37,12 @@ def createElementsWithIds(data):
     """Creates elements in the database with predefined IDs.
     
     The argument *data* must be a list of
-        (id, file, toplevel, elementcount, major)
+        (id, file, type, elementcount)
     tuples that specify the elements.
     """
-    db.multiQuery("INSERT INTO {}elements (id, file,toplevel, elements, major)\
-                          VALUES (?,?,?,?,?)".format(db.prefix), data)                       
+    if len(data) > 0:
+        db.multiQuery("INSERT INTO {}elements (id, file, type, elements) VALUES (?,?,?,?)"
+                      .format(db.prefix), data)                       
 
 
 def addFiles(data):
@@ -51,25 +52,23 @@ def addFiles(data):
         (id, urlString, hash, length)
     tuples.
     """
-    if len(data) == 0:
-        return
-    db.multiQuery("INSERT INTO {}files (element_id, url, hash, length) VALUES(?,?,?,?)"
-                  .format(db.prefix), data)
+    if len(data) > 0:
+        db.multiQuery("INSERT INTO {}files (element_id, url, hash, length) VALUES(?,?,?,?)"
+                      .format(db.prefix), data)
 
 
 def deleteElements(ids):
     """Delete the elements with the given ids from the database.
     
-    Also updates element counters and toplevel flags. Due to the foreign keys in the database,
+    Also updates element counters. Due to the foreign keys in the database,
     this will delete all tag, flag and content relations of the deleted elements.
     """
-    if len(ids) == 0:
-        return
-    parentIds = db.parents(ids)
-    contentsIds = db.contents(ids)
-    db.query("DELETE FROM {}elements WHERE id IN ({})".format(db.prefix, db.csList(ids)))
-    updateElementsCounter(parentIds)
-    updateToplevelFlags(contentsIds)
+    if len(ids) > 0:
+        parentIds = db.parents(ids)
+        contentsIds = db.contents(ids)
+        db.query("DELETE FROM {}elements WHERE id IN ({})".format(db.prefix, db.csList(ids)))
+        updateElementsCounter(parentIds)
+
 
 def setContents(elid, contents):
     """Set contents of element with id *elid* to *contents* (instance of elements.ContentList)."""
@@ -113,25 +112,6 @@ def updateElementsCounter(elids=None):
         {1}
         """.format(db.prefix, whereClause))
         
-        
-def updateToplevelFlags(elids=None):
-    """Update the toplevel flags.
-    
-    If *elids* is a list of elements-ids, the flags of those elements will be updated. If *elids*
-    is None, all flags will be set to their correct value.
-    """
-    if elids is not None:
-        cslist = db.csList(elids)
-        if cslist == '':
-            return
-        whereClause = "WHERE id IN ({})".format(cslist)
-    else: whereClause = '' 
-    db.query("""
-        UPDATE {0}elements
-        SET toplevel = (NOT id IN (SELECT element_id FROM {0}contents))
-        {1}
-        """.format(db.prefix,whereClause))
-
 
 def changeUrls(data):
     """Change the urls of files by the (urlString, id) list *data*."""
@@ -202,7 +182,9 @@ def setStickers(elid, stickers):
         db.multiQuery("INSERT INTO {}stickers (element_id, type, sort, data) VALUES (?, ?, ?, ?)"
                       .format(db.prefix), [(elid, type, i, val) for i, val in enumerate(values)])
 
-def setMajor(data):
-    """Changes the "major" flag of elements. *data* is a list of (id, newMajor) tuples."""
-    db.multiQuery("UPDATE {}elements SET major = ? WHERE id = ?".format(db.prefix), [(b,a) for a,b in data])
+def setType(data):
+    """Changes the type of elements. *data* is a list of (id, type) tuples."""
+    if len(data) > 0:
+        db.multiQuery("UPDATE {}elements SET type = ? WHERE id = ?"
+                      .format(db.prefix), ((b,a) for a,b in data))
     

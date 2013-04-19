@@ -287,34 +287,39 @@ def _contentsParentsHelper(elids,recursive,selectColumn,whereColumn):
             """.format(selectColumn,prefix,whereColumn,csList(newSet))).getSingleColumn())
         if not recursive:
             return newSet
-        newSet = newSet - resultSet
+        newSet -= resultSet
         resultSet = resultSet.union(newSet)
 
-    return(resultSet)
+    return resultSet
 
 
 # elements-table
 #=======================================================================
 def isFile(elid):
-    """Return whether the element with id <elid> exists and is a file."""
+    """Return whether the element with id *elid* exists and is a file."""
     return query("SELECT file FROM {}elements WHERE id = ?".format(prefix),elid).getSingle() == 1
 
 def isContainer(elid):
-    """Return whether the element with id <elid> exists and is a container."""
+    """Return whether the element with id *elid* exists and is a container."""
     return query("SELECT file FROM {}elements WHERE id = ?".format(prefix),elid).getSingle() == 0
 
-def isMajor(elid):
-    """Return whether the element with id *elid* is a major element (it should be a container then)."""
-    return query("SELECT major FROM {}elements WHERE id = ?".format(prefix),elid).getSingle() == 1
-
 def isToplevel(elid):
-    """Return whether the element with id <elid> exists and is toplevel element."""
-    return query("SELECT toplevel FROM {}elements WHERE id = ?".format(prefix),elid).getSingle() == 1
+    """Return whether the element with id *elid* exists and is a toplevel element."""
+    return bool(query("""
+        SELECT COUNT(*)
+        FROM {0}elements AS el LEFT JOIN {0}contents AS c ON el.id = c.element_id
+        WHERE el.id = ? AND c.element_id IS NULL
+        """.format(prefix), elid).getSingle())
     
 def elementCount(elid):
-    """Return the number of children of the element with id <elid> or raise an sql.EmptyResultException if
+    """Return the number of children of the element with id *elid* or raise an sql.EmptyResultException if
     that element does not exist."""
-    return query("SELECT elements FROM {}elements WHERE id  ?".format(prefix),elid).getSingle()
+    return query("SELECT elements FROM {}elements WHERE id = ?".format(prefix), elid).getSingle()
+
+def elementType(elid):
+    """Return the type of the element with id *elid* or raise an sql.EmptyResultException if
+    that element does not exist."""
+    return query("SELECT type FROM {}elements WHERE id = ?".format(prefix), elid).getSingle()
 
 
 # Files-Table
