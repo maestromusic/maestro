@@ -388,7 +388,7 @@ class Level(application.ChangeEventDispatcher):
         their desired type.
         """
         if len(elementTypes) > 0:
-            oldTypes = {element: element.type for elid in elementTypes}
+            oldTypes = {element: element.type for element in elementTypes}
             command = GenericLevelCommand(redoMethod=self._setTypes,
                                           redoArgs={"elementTypes" : elementTypes},
                                           undoMethod=self._setTypes,
@@ -686,7 +686,7 @@ class Level(application.ChangeEventDispatcher):
                 del element.stickers[type]
         self.emitEvent(dataIds=[element.id for element in elementToStickers])
     
-    def setTypes(self, elementTypes):
+    def _setTypes(self, elementTypes):
         """Set the type of elements. *elementTypes* must map elements to their desired type."""
         for element, type in elementTypes.items():
             element.type = type

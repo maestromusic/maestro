@@ -22,11 +22,38 @@ from PyQt4 import QtCore
 translate = QtCore.QCoreApplication.translate
 
 from . import tags as tagsModule
-from .. import config, filebackends
+from .. import config, filebackends, utils
 
-
-TYPE_NONE, TYPE_ALBUM, TYPE_WORK, TYPE_COLLECTION = 0,1,2,3
+ELEMENT_TYPES = range(4)
+TYPE_NONE, TYPE_ALBUM, TYPE_WORK, TYPE_COLLECTION = ELEMENT_TYPES
 MAJOR_TYPES = (TYPE_ALBUM, TYPE_WORK)
+
+def getTypeTitle(type):
+    """Return the human-readable and translated title for the given type."""
+    return {
+            TYPE_NONE: translate("Elements", "<None>"),
+            TYPE_ALBUM: translate("Elements", "Album"),
+            TYPE_WORK: translate("Elements", "Work"),
+            TYPE_COLLECTION: translate("Elements", "Collection")
+    }[type]
+
+_typeIcons = {
+    TYPE_ALBUM: 'cd.png',
+    TYPE_WORK: 'work.png',
+    TYPE_COLLECTION: 'cdbox.png'              
+}
+
+def getTypeIcon(type):
+    """Return an icon as QIcon for the given element type. Return None for TYPE_NONE."""
+    if type in _typeIcons:
+        return utils.getIcon(_typeIcons[type])
+    else: return None
+
+def getTypePixmap(type):
+    """Return an icon as QPixmap for the given element type. Return None for TYPE_NONE."""
+    if type in _typeIcons:
+        return utils.getPixmap(_typeIcons[type])
+    else: return None
 
 
 class Element:

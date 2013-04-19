@@ -426,7 +426,6 @@ class RealLevel(levels.Level):
     def _changeStickers(self, changes):
         if not all(element.isInDb() for element in changes.keys()):
             raise levels.ConsistencyError("Elements on real must be added to the DB before adding stickers.")
-        super()._changeStickers(changes)
         db.transaction()
         for element, diff in changes.items():
             for type, (a, b) in diff.diffs.items():
@@ -438,11 +437,11 @@ class RealLevel(levels.Level):
                                   .format(db.prefix),
                                   [(element.id, type, i, val) for i, val in enumerate(b)])
         db.commit()
+        super()._changeStickers(changes)
                 
     def _setStickers(self, type, elementToStickers):
         if not all(element.isInDb() for element in elementToStickers.keys()):
             raise levels.ConsistencyError("Elements on real must be added to the DB before adding stickers.")
-        super()._setStickers(type, elementToStickers)
         values = []
         for element, stickers in elementToStickers.items():
             if stickers is not None:
@@ -454,12 +453,13 @@ class RealLevel(levels.Level):
             db.multiQuery("INSERT INTO {}stickers (element_id,type,sort,data) VALUES (?,?,?,?)"
                           .format(db.prefix),values)
         db.commit()
+        super()._setStickers(type, elementToStickers)
         
     def _setTypes(self, elementTypes):
         if len(elementTypes) > 0:
-            super()._setTypes(elementTypes)
             db.multiQuery("UPDATE {}elements SET type = ? WHERE id = ?"
                           .format(db.prefix), ((type, elem.id) for elem, type in elementTypes.items()))
+            super()._setTypes(elementTypes)
     
     def _setContents(self, parent, contents):
         db.transaction()

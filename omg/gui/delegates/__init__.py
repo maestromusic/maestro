@@ -28,12 +28,6 @@ from ...core.nodes import RootNode, Wrapper, TextNode
 from ...models import browser as browsermodel
 from . import profiles
 
-_typeIcons = {
-    elements.TYPE_ALBUM: 'cd.png',
-    elements.TYPE_WORK: 'work.png',
-    elements.TYPE_COLLECTION: 'cdbox.png'              
-}
-
 
 class StandardDelegate(AbstractDelegate):
     """While still abstract, this class implements almost all of the features used by the usual delegates in
@@ -96,8 +90,10 @@ class StandardDelegate(AbstractDelegate):
             self.addCenter(ColorBarItem(QtGui.QColor(255,255,0),5,titleItem.sizeHint(self)[1]))
         if urlWarning is not None:
             self.addCenter(urlWarning)
-        if self.profile.options['showType'] and element.type in _typeIcons:
-            self.addCenter(ImageItem(utils.getPixmap(_typeIcons[element.type])))
+        if self.profile.options['showType']:
+            pixmap = elements.getTypePixmap(element.type)
+            if pixmap is not None:
+                self.addCenter(ImageItem(pixmap))
         self.addCenter(titleItem)
         
         # showInTitleRow

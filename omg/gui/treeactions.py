@@ -20,7 +20,7 @@ from PyQt4 import QtGui
 from PyQt4.QtCore import Qt
 
 from .. import application, utils, filebackends
-from ..core import levels, tags
+from ..core import levels, tags, elements
 from ..core.nodes import RootNode, Wrapper
 from ..models import leveltreemodel
 from ..models.browser import BrowserModel
@@ -311,25 +311,59 @@ class MatchTagsFromFilenamesAction(TreeAction):
                                                self.parent())
         dialog.exec_()
 
-#class ToggleMajorAction(TreeAction):
-#    """This action toggles the "major" attribute of an element."""
-#    
-#    def __init__(self, parent):
-#        super().__init__(parent, shortcut = "Ctrl+M")
-#        self.setText(self.tr('Major?'))
-#        self.setCheckable(True)
-#        
-#    def initialize(self, selection):
-#        self.setEnabled(selection.hasContainers())
-#        self.setChecked(all(elem.major for elem in selection.elements() if elem.isContainer()))
-#        self.state = self.isChecked()
-#        self.selection = selection
-#        
-#    def doAction(self):
-#        changes = {el:(not self.state) for el in self.selection.elements()
-#                                       if el.isContainer() and el.major == self.state}
-#        self.level().setMajorFlags(changes)
-#        self.toggle()
+
+class ChangeElementTypeAction(TreeAction):
+    """This action allows to change the element type."""
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.setText(self.tr("Change type"))
+        
+    def initialize(self, selection):
+        self.selection = selection
+        self.setEnabled(selection.hasContainers())
+    
+    def doAction(self):
+        ChangeTypeDialog(self.level(), list(self.selection.containers())).exec_()
+        
+
+class ChangeTypeDialog(QtGui.QDialog):
+    """Small dialog to change the element type of the given containers on *level*."""
+    def __init__(self, level, containers):
+        super().__init__()
+        self.level = level
+        self.containers = containers
+        layout = QtGui.QVBoxLayout(self)
+        layout.addWidget(QtGui.QLabel(self.tr("Choose the type for %n container(s):", '',
+                                              len(containers))))
+        currentType = containers[0].type
+        if any(container.type != currentType for container in containers):
+            currentType = None
+            
+        self.typeBox = QtGui.QComboBox()
+        if currentType is None:
+            self.typeBox.addItem('')
+        for type in elements.ELEMENT_TYPES:
+            title = elements.getTypeTitle(type)
+            icon = elements.getTypeIcon(type)
+            if icon is not None:
+                self.typeBox.addItem(icon, title, type)
+            else: self.typeBox.addItem(title, type)
+            if type == currentType:
+                self.typeBox.setCurrentIndex(self.typeBox.count() - 1)
+        layout.addWidget(self.typeBox)
+        
+        buttonBox = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Ok | QtGui.QDialogButtonBox.Cancel)
+        buttonBox.accepted.connect(self._handleOk)
+        buttonBox.rejected.connect(self.close)
+        layout.addWidget(buttonBox)
+    
+    def _handleOk(self):
+        """Save the chosen type and close the dialog."""
+        if self.typeBox.currentIndex() == 0:
+            return
+        type = self.typeBox.itemData(self.typeBox.currentIndex())
+        self.level.setTypes({container: type for container in self.containers})
+        self.close()
 
 
 class RemoveFromPlaylistAction(TreeAction):

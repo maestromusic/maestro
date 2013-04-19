@@ -377,7 +377,7 @@ class BrowserTreeView(treeview.TreeView):
     actionConfig.addActionDefinition(((sect, 'delete'),), treeactions.DeleteAction,
                                      text=translate("BrowserTreeView", "delete from OMG"))
     actionConfig.addActionDefinition(((sect, 'merge'),), treeactions.MergeAction)
-    #actionConfig.addActionDefinition(((sect, 'major?'),), treeactions.ToggleMajorAction)
+    actionConfig.addActionDefinition(((sect, 'elementType'),), treeactions.ChangeElementTypeAction)
     actionConfig.addActionDefinition(((sect, 'position+'),), treeactions.ChangePositionAction, mode="+1")
     actionConfig.addActionDefinition(((sect, 'position-'),), treeactions.ChangePositionAction, mode="-1") 
     

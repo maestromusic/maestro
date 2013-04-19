@@ -134,6 +134,11 @@ class Selection:
         selected in several wrappers."""
         return (element for element in self.elements(recursive) if element.isFile())
 
+    def containers(self, recursive=False):
+        """Return all containers (not container wrappers!) that are selected. Remove duplicates
+        (elements might be selected in several wrappers."""
+        return (element for element in self.elements(recursive) if element.isContainer())
+    
     def hasWrappers(self):
         """True iff at least one wrapper is selected."""
         return len(self.wrappers()) > 0
