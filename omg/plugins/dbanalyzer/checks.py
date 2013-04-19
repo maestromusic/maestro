@@ -95,31 +95,6 @@ class ElementCounterCheck(Check):
 
     def _fix(self):
         db.write.updateElementsCounter()
-
-
-class ToplevelFlagCheck(Check):
-    """Check for broken toplevel flags in the elements table. The toplevel flag should be true if and only
-    if the element does not appear as a child in the contents table."""
-    _columnHeaders = (translate("DBAnalyzerChecks","ID"),translate("DBAnalyzerChecks","Name"),
-                     translate("DBAnalyzerChecks","In DB"),translate("DBAnalyzerChecks","Real"))
-                     
-    _name = translate("DBAnalyzerChecks","Toplevel flags")
-
-    def check(self,data):
-        if not data:
-            return db.query("""
-                    SELECT COUNT(*) FROM {0}elements
-                    WHERE toplevel != (NOT id IN (SELECT element_id FROM {0}contents))
-                    """.format(db.prefix)).getSingle()
-        else:
-            result = db.query("""
-                    SELECT id,toplevel FROM {0}elements
-                    WHERE toplevel != (NOT id IN (SELECT element_id FROM {0}contents))
-                    """.format(db.prefix))
-            return [(row[0],getTitle(row[0]),row[1],(row[1] + 1) % 2) for row in result]
-
-    def _fix(self):
-        db.write.updateToplevelFlags()
             
 
 class FileFlagCheck(Check):
