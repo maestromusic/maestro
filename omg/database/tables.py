@@ -91,7 +91,7 @@ CREATE TABLE {}elements (
     id          INTEGER PRIMARY KEY,
     file        BOOLEAN             NOT NULL DEFAULT 0,
     type        INTEGER             NOT NULL DEFAULT 0,
-    elements    SMALLINT  UNSIGNED  NOT NULL DEFAULT 0,
+    elements    INTEGER             NOT NULL DEFAULT 0
 )
 """.format(db.prefix))
 

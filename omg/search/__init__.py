@@ -181,9 +181,9 @@ class SearchEngine(QtCore.QObject):
             else:
                 createQuery = """
                     CREATE TABLE {} (
-                        id INTEGER PRIMARY KEY,
+                        id INTEGER PRIMARY KEY
                         {})
-                    """.format(tableName, customColumns)
+                    """.format(tableName, ','+customColumns if len(customColumns) > 0 else '')
             db.query(createQuery)
             self._tables.append(tableName)
         return tableName
