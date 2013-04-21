@@ -155,7 +155,7 @@ class FlexiDate:
             self.month = None
             if day is not None and day != 0:
                 raise ValueError("Cannot store a day if month is None.")
-        elif 1 <= month <= 12:
+        elif 1 <= int(month) <= 12:
             self.month = int(month)
         else: raise ValueError("Invalid month given.")
         

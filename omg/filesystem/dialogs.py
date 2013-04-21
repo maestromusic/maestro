@@ -108,7 +108,7 @@ class RemoveMissingFilesAction(treeactions.TreeAction):
     
     def doAction(self):
         model = self.parent().model()
-        selection = self.parent().nodeSelection
+        selection = self.parent().selection
         belowRoot = [wrap.parent.index(wrap) for wrap in selection.wrappers()
                      if wrap.parent is self.parent().model().root]
         self.removedURLs.extend(wrapper.element.url for wrapper in selection.fileWrappers())
