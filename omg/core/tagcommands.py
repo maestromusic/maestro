@@ -48,7 +48,8 @@ class ChangeSortValueCommand:
         self.setSortValue(self.tag,self.valueId,self.oldSort,self.newSort)
     
     def setSortValue(self, new, old):
-        dbWrite.setSortValue(self.tag, self.valueId, new)
+        db.query("UPDATE {}values_{} SET sort_value = ? WHERE tag_id = ? AND id = ?"
+                 .format(db.prefix, self.tag.type), new, self.tag.id, self.valueId)
         application.dispatcher.emit(SortValueChangeEvent(self.tag, self.valueId, old, new))
 
 
