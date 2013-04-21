@@ -182,7 +182,7 @@ class MultiCriterion(Criterion):
         # Note that this method only encloses the criterion in parentheses if it is negated: "!(a b)"
         # Therefore we have to enclose child-MultiCriteria here
         for criterion in self.criteria:
-            if not isinstance(criterion, MultiCriterion) or criterion.negated:
+            if not isinstance(criterion, MultiCriterion) or criterion.negate:
                 parts.append(repr(criterion))
             else: parts.append('({})'.format(repr(criterion)))
         
@@ -250,8 +250,8 @@ class IdCriterion(Criterion):
     def __init__(self, interval=None, idList=None):
         if interval is not None:
             assert idList is None
-            if not isinstance(interval, Interval) or not interval.isValid() or interval.isEmpty():
-                raise ValueError("IdCriterion: interval argument must be a non-empty Interval-instance.")
+            if not isinstance(interval, Interval) or not interval.isValid():
+                raise ValueError("IdCriterion: interval argument must be a valid Interval-instance.")
         else:
             assert idList is not None
             if len(idList) == 0:
@@ -288,9 +288,9 @@ class IdCriterion(Criterion):
             if data is not None:
                 interval = Interval.parse(data)
                 if interval is not None:
-                    if interval.isValid() and not interval.isEmpty():
+                    if interval.isValid():
                         return IdCriterion(interval=interval)
-                    else: raise ParseException("IdCriterion's interval must be valid and non-empty.")
+                    else: raise ParseException("IdCriterion's interval must be valid.")
                 else:
                     try:
                         idList = [int(v) for v in data.split(',')]

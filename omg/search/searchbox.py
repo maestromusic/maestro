@@ -20,8 +20,10 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from . import criteria
-from .. import utils
+from .. import utils, logging
 from ..gui.misc.lineedits import IconLineEdit
+
+logger = logging.getLogger(__name__)
 
 
 class SearchBox(IconLineEdit):
@@ -55,7 +57,11 @@ class SearchBox(IconLineEdit):
     def keyPressEvent(self,event):
         QtGui.QLineEdit.keyPressEvent(self,event)
         if event.key() in (Qt.Key_Return,Qt.Key_Enter):
-            criterion = criteria.parse(self.text())
+            try:
+                criterion = criteria.parse(self.text())
+            except criteria.ParseException as e:
+                logger.info(str(e))
+                return
             if criterion != self._criterion:
                 self._criterion = criterion
                 self.criterionChanged.emit()
