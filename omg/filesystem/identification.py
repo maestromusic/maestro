@@ -40,7 +40,7 @@ class AcoustIDIdentifier:
         self.apikey = apikey
         self.null = open(os.devnull)
         
-    def __call__(self, url):    
+    def __call__(self, url):
         try:
             data = subprocess.check_output(['fpcalc', url.absPath])
         except subprocess.CalledProcessError as e:
@@ -62,17 +62,19 @@ class AcoustIDIdentifier:
         req.close()
         ans = json.loads(ans)
         if ans['status'] != 'ok':
-            logger.warning("Error retrieving AcoustID fingerprint")
+            logger.warning("Error retrieving AcoustID fingerprint for {}".format(url))
             return self.fallbackHash(url)
         results = ans['results']
         if len(results) == 0:
-            logger.warning("No AcoustID fingerprint found")
+            logger.warning("No AcoustID fingerprint found for {}".format(url))
             return self.fallbackHash(url)
         bestResult = max(results, key=lambda x: x['score'])
         if "recordings" in bestResult and len(bestResult["recordings"]) > 0:
             ans = "mbid:{}".format(bestResult["recordings"][0]["id"])
+            logger.debug("found mbid={} for {}".format(ans, url))
         else:
             ans = "acoustid:{}".format(bestResult["id"])
+            logger.debug("found acoustid={} for {}".format(ans, url))
         return ans
 
     def fallbackHash(self, url):
@@ -86,7 +88,7 @@ class AcoustIDIdentifier:
                                  '-f', 's16le', '-t', '15', '-'],
                                 stdout=subprocess.PIPE,
                                 stderr=self.null)
-        data = proc.stdout.readall()
+        data = proc.stdout.read()
         proc.wait()
         hash = hashlib.md5(data).hexdigest()
         return hash
