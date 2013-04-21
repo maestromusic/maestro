@@ -336,14 +336,14 @@ class Level(application.ChangeEventDispatcher):
                                       text=self.tr("Remove elements"))
         self.stack.push(command)
 
-    def createContainer(self, tags=None, flags=None, stickers=None, major=True, contents=None):
+    def createContainer(self, tags=None, flags=None, stickers=None, type=None, contents=None):
         """Create a new container with the given properties and load it into this level.
         
         Can be undone. Returns the new container.
         """ 
         container = elements.Container(level=self,
                                        id=db.nextId(),
-                                       major=major, 
+                                       type=type, 
                                        tags=tags,
                                        flags=flags,
                                        stickers=stickers)
@@ -375,14 +375,27 @@ class Level(application.ChangeEventDispatcher):
         """Helper for changeTags, changeFlags and similar methods which only need to undoably call
         *method* with *changes* (or its inverse). *text* is used as text for the created undocommand."""
         if len(changes) > 0:
-            inverseChanges = {elem:diff.inverse() for elem,diff in changes.items()}
+            inverseChanges = {elem: diff.inverse() for elem, diff in changes.items()}
             command = GenericLevelCommand(redoMethod=method,
                                           redoArgs={"changes" : changes},
                                           undoMethod=method,
                                           undoArgs={"changes": inverseChanges},
                                           text=text)
             self.stack.push(command)
-        
+    
+    def setTypes(self, elementTypes):
+        """Set the type of one or more elements. The action can be undone. *elementTypes* maps elements to
+        their desired type.
+        """
+        if len(elementTypes) > 0:
+            oldTypes = {element: element.type for element in elementTypes}
+            command = GenericLevelCommand(redoMethod=self._setTypes,
+                                          redoArgs={"elementTypes" : elementTypes},
+                                          undoMethod=self._setTypes,
+                                          undoArgs={"elementTypes": oldTypes},
+                                          text=self.tr("change element types"))
+            self.stack.push(command)
+            
     def setCovers(self, coverDict):
         """Set the covers for one or more elements.
         
@@ -391,21 +404,6 @@ class Level(application.ChangeEventDispatcher):
         """
         from . import covers
         self.stack.push(covers.CoverUndoCommand(self, coverDict))
-    
-    def setMajorFlags(self, elemToMajor):
-        """Set the major flags of one or more containers.
-        
-        The action can be undone. *elemToMajor* maps elements to boolean values indicating the
-        desired major state.
-        """
-        if len(elemToMajor) > 0:
-            inverseChanges = {elem: (not major) for (elem, major) in elemToMajor.items()}
-            command = GenericLevelCommand(redoMethod=self._setMajorFlags,
-                                          redoArgs={"elemToMajor" : elemToMajor},
-                                          undoMethod=self._setMajorFlags,
-                                          undoArgs={"elemToMajor" : inverseChanges},
-                                          text=self.tr("change major property"))
-            self.stack.push(command)
     
     def changeContents(self, contentDict):
         """Set contents according to *contentDict* which maps parents to content lists."""
@@ -605,16 +603,18 @@ class Level(application.ChangeEventDispatcher):
         
         # 5. Change other stuff
         oldElements = (element for element in elements if element.id in self.parent)
+        elementTypes = {}
         contentChanges = {}
         tagChanges = {}
         flagChanges = {}
         stickerChanges = {}
-        majorChanges = {}
         urlChanges = {}
         # It is important to copy lists etc. in the following because this level will continue to use 
         # the old elements.
         for element in oldElements:
             inParent = self.parent[element.id]
+            if element.type != inParent.type:
+                elementTypes[element] = element.type
             # Tag changes have been done already if parent is real
             if self.parent is not real and element.tags != inParent.tags:
                 tagChanges[inParent] = tags.TagStorageDifference(inParent.tags, element.tags.copy())
@@ -626,17 +626,15 @@ class Level(application.ChangeEventDispatcher):
             if element.isContainer():
                 if element.contents != inParent.contents:
                     contentChanges[inParent] = element.contents.copy()
-                if element.major != inParent.major:
-                    majorChanges[inParent] = element.major
             else:
                 if element.url != inParent.url:
                     urlChanges[inParent] = (inParent.url, element.url)
                 
+        self.parent.setTypes(elementTypes)
         self.parent.changeContents(contentChanges)
         self.parent.changeTags(tagChanges)
         self.parent.changeFlags(flagChanges)
         self.parent.changeStickers(stickerChanges)
-        self.parent.setMajorFlags(majorChanges)
         try:
             self.parent.renameFiles(urlChanges)
         except RenameFilesError as e:
@@ -688,11 +686,11 @@ class Level(application.ChangeEventDispatcher):
                 del element.stickers[type]
         self.emitEvent(dataIds=[element.id for element in elementToStickers])
     
-    def _setMajorFlags(self, elemToMajor):
-        """Set major of several elements."""
-        for elem, major in elemToMajor.items():
-            elem.major = major
-        self.emitEvent(dataIds=[elem.id for elem in elemToMajor])
+    def _setTypes(self, elementTypes):
+        """Set the type of elements. *elementTypes* must map elements to their desired type."""
+        for element, type in elementTypes.items():
+            element.type = type
+        self.emitEvent(dataIds=[element.id for element in elementTypes])
     
     def _changeContents(self, contentDict):
         """Set contents according to *contentDict* which maps parents to content lists."""

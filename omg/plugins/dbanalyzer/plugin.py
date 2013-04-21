@@ -276,9 +276,16 @@ class DBAnalyzerDialog(QtGui.QDialog):
             (self.tr("Containers"),db.query(
                     "SELECT COUNT(*) FROM {}elements WHERE file = 0"
                         .format(db.prefix)).getSingle()),
-            (self.tr("Toplevel elements"),db.query(
-                    "SELECT COUNT(*) FROM {}elements WHERE toplevel = 1"
-                        .format(db.prefix)).getSingle()),
+            (self.tr("Toplevel elements"),db.query("""
+                    SELECT COUNT(*)
+                    FROM {0}elements AS el LEFT JOIN {0}contents AS c ON el.id = c.element_id
+                    WHERE c.element_id IS NULL
+                    """.format(db.prefix)).getSingle()),
+            (self.tr("Toplevel files"),db.query("""
+                    SELECT COUNT(*)
+                    FROM {0}elements AS el LEFT JOIN {0}contents AS c ON el.id = c.element_id
+                    WHERE el.file = 1 AND c.element_id IS NULL
+                    """.format(db.prefix)).getSingle()),
             (self.tr("Content relations"),db.query(
                     "SELECT COUNT(*) FROM {}contents"
                         .format(db.prefix)).getSingle()),
@@ -296,7 +303,7 @@ class DBAnalyzerDialog(QtGui.QDialog):
     def getTags(self):
         """Gather and return the data for the tags table."""
         tags = []
-        result = db.query("SELECT id,tagname,tagtype,private FROM {}tagids ORDER BY id".format(db.prefix))
+        result = db.query("SELECT id, tagname, tagtype, private FROM {}tagids ORDER BY id".format(db.prefix))
         for id,name,type,private in result:
             tuple = (id,name,type,private,
                 db.query("SELECT COUNT(*) FROM {}values_{} WHERE tag_id={}"

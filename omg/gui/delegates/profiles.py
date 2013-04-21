@@ -357,20 +357,20 @@ class DelegateOption:
  
 # List of available options for delegates. This list in particular defines the default values.
 defaultOptions = [DelegateOption(*data) for data in [                                            
-        ("fontSize",translate("Delegates","Fontsize"),"int",8),
-        ("showMajorAncestors",translate("Delegates","Display major parent containers which are not in the tree."),"bool",False),
-        ("showAllAncestors",translate("Delegates","Display all parent containers which are not in the tree."),"bool",False),
-        ("showMajor",translate("Delegates","Display major flag"),"bool",False),
-        ("showPositions",translate("Delegates","Display position numbers"),"bool",True),
-        ("showPaths",translate("Delegates","Display paths"),"bool",False),
-        ("showFlagIcons",translate("Delegates","Display flag icons"),"bool",True),
-        ("removeParentFlags",translate("Delegates","Remove flags which appear in ancestor elements"),"bool",True),
-        ("fitInTitleRowData",translate("Delegates","This datapiece will be displayed next to the title if it fits"),"datapiece",None),
-        ("appendRemainingTags",translate("Delegates","Append all tags that are not listed above"),"bool",False),
+        ("fontSize", translate("Delegates", "Fontsize"), "int", 8),
+        ("showMajorAncestors", translate("Delegates", "Mention major parent containers which are not in the tree."), "bool", False),
+        ("showAllAncestors", translate("Delegates", "Mention all parent containers which are not in the tree."), "bool", False),
+        ("showType", translate("Delegates", "Display element type"), "bool", False),
+        ("showPositions", translate("Delegates", "Display position numbers"), "bool", True),
+        ("showPaths", translate("Delegates", "Display paths"), "bool", False),
+        ("showFlagIcons", translate("Delegates", "Display flag icons"), "bool", True),
+        ("removeParentFlags", translate("Delegates", "Remove flags which appear in ancestor elements"), "bool", True),
+        ("fitInTitleRowData", translate("Delegates", "This datapiece will be displayed next to the title if it fits"), "datapiece", None),
+        ("appendRemainingTags", translate("Delegates", "Append all tags that are not listed above"), "bool", False),
         #("hideParentFlags",translate("Delegates","Hide flags that appear in parent elements"),"bool",True),
         #("maxRowsTag",translate("Delegates","Maximal number of rows per tag"),"int",4),
         #("maxRowsElement",translate("Delegates","Maximal number of rows per element"),"int",50),
-        ("coverSize",translate("Delegates","Size of covers"),"int",40)
+        ("coverSize", translate("Delegates", "Size of covers"), "int", 40)
     ]]
 
 # This type is useful to create profiles which are not configurable

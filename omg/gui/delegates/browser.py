@@ -50,7 +50,7 @@ class BrowserDelegate(StandardDelegate):
     def layout(self,index,availableWidth):
         node = self.model.data(index)
         
-        if isinstance(node,browsermodel.ValueNode):
+        if isinstance(node, browsermodel.TagNode):
             valueList = node.sortValues if self.profile.options['showSortValues'] else node.values
             for value in valueList:
                 self.addCenter(TextItem(value))

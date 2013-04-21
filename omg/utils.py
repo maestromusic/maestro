@@ -260,7 +260,7 @@ class FlexiDate:
             format = format[index]
         return format.format(Y=self.year, m=self.month, d=self.day)
         
-    def toSql(self,maximum=False):
+    def toSql(self, maximum=False):
         """Convert this FlexiDate to an int as used to store it in the database."""
         result = 10000*self.year
         if self.month is not None:

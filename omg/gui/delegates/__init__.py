@@ -23,7 +23,7 @@ from PyQt4.QtCore import Qt
 
 from .abstractdelegate import *
 from ... import config, strutils, database as db, utils
-from ...core import tags, levels
+from ...core import tags, levels, elements
 from ...core.nodes import RootNode, Wrapper, TextNode
 from ...models import browser as browsermodel
 from . import profiles
@@ -74,7 +74,7 @@ class StandardDelegate(AbstractDelegate):
             self.addLeft(ImageItem(element.getCover(coverSize)))
             availableWidth -= coverSize + self.hSpace
         
-        # Title and Major
+        # Title and type
         preTitleItem = self.getPreTitleItem(wrapper)
         if preTitleItem is not None:
             self.addCenter(preTitleItem)
@@ -86,12 +86,14 @@ class StandardDelegate(AbstractDelegate):
                              BOLD_STYLE if element.isContainer() else STD_STYLE,
                              minHeight=IconBarItem.iconSize if len(flagIcons) > 0 else 0)
         
-        if self.profile.options['showMajor'] and element.isContainer() and element.major:
-            self.addCenter(ColorBarItem(QtGui.QColor(255,0,0),5,titleItem.sizeHint(self)[1]))
         if not element.isInDb():
             self.addCenter(ColorBarItem(QtGui.QColor(255,255,0),5,titleItem.sizeHint(self)[1]))
         if urlWarning is not None:
             self.addCenter(urlWarning)
+        if self.profile.options['showType']:
+            pixmap = elements.getTypePixmap(element.type)
+            if pixmap is not None:
+                self.addCenter(ImageItem(pixmap))
         self.addCenter(titleItem)
         
         # showInTitleRow
@@ -189,7 +191,7 @@ class StandardDelegate(AbstractDelegate):
             self.newRow()
             self.addCenter(TextItem(element.url.path, ITALIC_STYLE))
         
-    def appendAncestors(self,element,ancestors,ancestorIds,filter,onlyMajor):
+    def appendAncestors(self, element, ancestors, ancestorIds, filter, onlyMajor):
         """Recursively add all ancestors of *element* to the list *ancestors* and their ids to the list
         *ancestorIds*. Do not add elements if their id is already contained in *ancestorIds* or if their
         id is in the list *filter*. If *onlyMajor* is True, add only major containers.
@@ -204,12 +206,12 @@ class StandardDelegate(AbstractDelegate):
                 ancestor = element.level.fetch(id)
             except levels.ElementGetError: # this may happen if the parent has just been deleted
                 continue
-            if not onlyMajor or ancestor.major:
+            if not onlyMajor or ancestor.isMajor():
                 ancestorIds.append(id)
                 ancestors.append(ancestor)
             # Search for ancestors recursively even if the current ancestor is not major. It might have
             # a major parent.
-            self.appendAncestors(ancestor,ancestors,ancestorIds,filter,onlyMajor)
+            self.appendAncestors(ancestor, ancestors, ancestorIds, filter, onlyMajor)
     
     def prepareColumns(self,wrapper,exclude=[]):
         """Collect the texts displayed in both columns based on the configured datapieces. Exclude datapieces
@@ -275,7 +277,7 @@ class StandardDelegate(AbstractDelegate):
         
     def getTagValues(self,tagType,wrapper):
         """Return all values of the tag *tagType* in *element* excluding values that appear in parent nodes.
-        Values from ValueNode-ancestors will also be removed."""
+        Values from TagNode-ancestors will also be removed."""
         if tagType not in wrapper.element.tags:
             return []
         values = list(wrapper.element.tags[tagType]) # copy!
@@ -289,7 +291,7 @@ class StandardDelegate(AbstractDelegate):
                 else: parentValues = []
             elif isinstance(parent,RootNode):
                 break
-            elif isinstance(parent,browsermodel.ValueNode):
+            elif isinstance(parent, browsermodel.TagNode):
                 parentValues = parent.values
             else:
                 parentValues = []

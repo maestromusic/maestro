@@ -131,18 +131,19 @@ class RealLevel(levels.Level):
         
         # bare elements
         result = db.query("""
-                SELECT el.id, el.file, el.major, f.url, f.length
+                SELECT el.id, el.file, el.type, f.url, f.length
                 FROM {0}elements AS el LEFT JOIN {0}files AS f ON el.id = f.element_id
                 WHERE el.id IN ({1})
                 """.format(db.prefix, csIdList))
-        for (id, file, major, url, length) in result:
+        for id, file, elementType, url, length in result:
             _dbIds.add(id)
             if file:
                 level.elements[id] = elements.File(level, id,
-                                                   url=filebackends.BackendURL.fromString(url),
-                                                   length=length)
+                                                   url = filebackends.BackendURL.fromString(url),
+                                                   length = length,
+                                                   type = elementType)
             else:
-                level.elements[id] = elements.Container(level, id, major=major)
+                level.elements[id] = elements.Container(level, id, type=elementType)
                 
         # contents
         result = db.query("""
@@ -151,7 +152,7 @@ class RealLevel(levels.Level):
                 WHERE el.id IN ({1})
                 ORDER BY position
                 """.format(db.prefix, csIdList))
-        for (id, pos, contentId) in result:
+        for id, pos, contentId in result:
             level.elements[id].contents.insert(pos, contentId)
             
         # parents
@@ -160,7 +161,7 @@ class RealLevel(levels.Level):
                 FROM {0}elements AS el JOIN {0}contents AS c ON el.id = c.element_id
                 WHERE el.id IN ({1})
                 """.format(db.prefix, csIdList))
-        for (id, contentId) in result:
+        for id, contentId in result:
             level.elements[id].parents.append(contentId)
             
         # tags
@@ -169,7 +170,7 @@ class RealLevel(levels.Level):
                 FROM {0}elements AS el JOIN {0}tags AS t ON el.id = t.element_id
                 WHERE el.id IN ({1})
                 """.format(db.prefix, csIdList))
-        for (id,tagId,valueId) in result:
+        for id, tagId, valueId in result:
             tag = tags.get(tagId)
             level.elements[id].tags.add(tag, db.valueFromId(tag, valueId))
             
@@ -179,7 +180,7 @@ class RealLevel(levels.Level):
                 FROM {0}elements AS el JOIN {0}flags AS f ON el.id = f.element_id
                 WHERE el.id IN ({1})
                 """.format(db.prefix, csIdList))
-        for (id, flagId) in result:
+        for id, flagId in result:
             level.elements[id].flags.append(flags.get(flagId))
             
         # stickers
@@ -302,12 +303,11 @@ class RealLevel(levels.Level):
         
         data = [(element.id,
                  element.isFile(),
-                 element.major if element.isContainer() else False,
-                 len(element.parents) == 0,
+                 element.type,
                  len(element.contents) if element.isContainer() else 0)
                         for element in elements]
-        db.multiQuery("INSERT INTO {}elements (id, file, major, toplevel, elements)\
-                       VALUES (?,?,?,?,?)".format(db.prefix), data)
+        db.multiQuery("INSERT INTO {}elements (id, file, type, elements)\
+                       VALUES (?,?,?,?)".format(db.prefix), data)
 
         # Do this early, otherwise e.g. setFlags might raise a ConsistencyError)
         _dbIds.update(element.id for element in elements)
@@ -337,7 +337,6 @@ class RealLevel(levels.Level):
         if len(contentData) > 0:
             db.multiQuery("INSERT INTO {}contents (container_id, position, element_id) VALUES (?,?,?)"
                           .format(db.prefix), contentData)
-            db.write.updateToplevelFlags(data[2] for data in contentData)
                                       
         db.commit()
         self.emit(levels.LevelChangedEvent(dbAddedIds=[el.id for el in elements]))
@@ -355,7 +354,6 @@ class RealLevel(levels.Level):
         # Rely on foreign keys to delete all tags, flags etc. from the database
         ids = itertools.chain.from_iterable(element.contents for element in elements
                                                              if element.isContainer())
-        db.write.updateToplevelFlags(ids)
         db.query("DELETE FROM {}elements WHERE id IN ({})"
                  .format(db.prefix, db.csList(element.id for element in elements)))
         removedFiles = [element.url for element in elements if element.isFile()
@@ -428,7 +426,6 @@ class RealLevel(levels.Level):
     def _changeStickers(self, changes):
         if not all(element.isInDb() for element in changes.keys()):
             raise levels.ConsistencyError("Elements on real must be added to the DB before adding stickers.")
-        super()._changeStickers(changes)
         db.transaction()
         for element, diff in changes.items():
             for type, (a, b) in diff.diffs.items():
@@ -440,11 +437,11 @@ class RealLevel(levels.Level):
                                   .format(db.prefix),
                                   [(element.id, type, i, val) for i, val in enumerate(b)])
         db.commit()
+        super()._changeStickers(changes)
                 
     def _setStickers(self, type, elementToStickers):
         if not all(element.isInDb() for element in elementToStickers.keys()):
             raise levels.ConsistencyError("Elements on real must be added to the DB before adding stickers.")
-        super()._setStickers(type, elementToStickers)
         values = []
         for element, stickers in elementToStickers.items():
             if stickers is not None:
@@ -456,17 +453,16 @@ class RealLevel(levels.Level):
             db.multiQuery("INSERT INTO {}stickers (element_id,type,sort,data) VALUES (?,?,?,?)"
                           .format(db.prefix),values)
         db.commit()
+        super()._setStickers(type, elementToStickers)
         
-    def _setMajorFlags(self, elemToMajor):
-        if not all(element.isContainer() for element in elemToMajor):
-            raise ValueError("Only containers may have the major flag.")
-        super()._setMajorFlags(elemToMajor)
-        db.write.setMajor((el.id,major) for (el, major) in elemToMajor.items() )
+    def _setTypes(self, elementTypes):
+        if len(elementTypes) > 0:
+            db.multiQuery("UPDATE {}elements SET type = ? WHERE id = ?"
+                          .format(db.prefix), ((type, elem.id) for elem, type in elementTypes.items()))
+            super()._setTypes(elementTypes)
     
     def _setContents(self, parent, contents):
         db.transaction()
-        changedChildIds = set(id for id in contents if id not in parent.contents)\
-                                .union(id for id in parent.contents if id not in contents)
         db.query("DELETE FROM {}contents WHERE container_id = ?".format(db.prefix), parent.id)
         #Note: This checks skips elements which are not loaded on real. This should rarely happen and
         # due to foreign key constraints...
@@ -480,8 +476,6 @@ class RealLevel(levels.Level):
                           .format(db.prefix),
                           [(parent.id, pos, childId) for pos, childId in contents.items()])
         db.write.updateElementsCounter((parent.id,))
-        if len(changedChildIds) > 0:
-            db.write.updateToplevelFlags(changedChildIds)
         db.commit()
         super()._setContents(parent, contents)
 
@@ -493,17 +487,14 @@ class RealLevel(levels.Level):
                       .format(db.prefix),
                       [(parent.id, pos, child.id) for pos, child in insertions])
         db.write.updateElementsCounter((parent.id,))
-        db.write.updateToplevelFlags(child.id for _,child in insertions)
         db.commit()
         super()._insertContents(parent, insertions)
         
     def _removeContents(self, parent, positions):
         db.transaction()
-        childIds = [parent.contents.at(pos) for pos in positions]
         db.multiQuery("DELETE FROM {}contents WHERE container_id=? AND position=?"
                    .format(db.prefix), [(parent.id, pos) for pos in positions])
         db.write.updateElementsCounter((parent.id,))
-        db.write.updateToplevelFlags(childIds)
         db.commit()
         super()._removeContents(parent, positions)
     
