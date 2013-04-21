@@ -245,26 +245,40 @@ class ElementTypeCriterion(Criterion):
     
     
 class IdCriterion(Criterion):
-    """Matches elements whose id is in the given interval."""
-    def __init__(self, interval):
-        assert isinstance(interval, Interval)
+    """Matches elements whose id is in the given interval or list of ids. Exactly one argument must be given.
+    """
+    def __init__(self, interval=None, idList=None):
+        if interval is not None:
+            assert idList is None
+            if not isinstance(interval, Interval) or not interval.isValid() or interval.isEmpty():
+                raise ValueError("IdCriterion: interval argument must be a non-empty Interval-instance.")
+        else:
+            assert idList is not None
+            if len(idList) == 0:
+                raise ValueError("IdCriterion: idList must be non-empty")
         self.interval = interval
+        self.idList = idList
         
     def __repr__(self):
-        return _negHelper(self, '{id='+str(self.interval)+'}')
+        if self.interval is not None:
+            idSpec = str(self.interval)
+        else: idSpec = ','.join(str(id) for id in self.idList)
+        return _negHelper(self, '{id='+idSpec+'}')
     
     def __eq__(self, other):
         return isinstance(other, IdCriterion) and other.interval == self.interval \
-                and other.negate == self.negate
+                and other.idList == self.idList and other.negate == self.negate
     
     def __ne__(self, other):
         return not self.__eq__(other)
     
     def getQueries(self, fromTable):
-        if not self.negate:
-            query = "SELECT id FROM {} WHERE id {}"
-        else: query = "SELECT id FROM {} WHERE NOT (id {})"
-        return [query.format(fromTable, self.interval.queryPart())]
+        if self.interval is not None:
+            whereClause = '(id {})'.format(self.interval.queryPart())
+        else: whereClause = 'id IN ({})'.format(db.csList(self.idList))
+        if self.negate:
+            whereClause = 'NOT '+whereClause
+        return ["SELECT id FROM {} WHERE {}".format(fromTable, whereClause)]
     
     @staticmethod
     def parse(key, data):
@@ -273,10 +287,17 @@ class IdCriterion(Criterion):
         if key == 'id':
             if data is not None:
                 interval = Interval.parse(data)
-            else: interval = None
-            if interval is None or not interval.isValid():
-                raise ParseException("IdCriterion needs a valid interval.")
-            return IdCriterion(interval)
+                if interval is not None:
+                    if interval.isValid() and not interval.isEmpty():
+                        return IdCriterion(interval=interval)
+                    else: raise ParseException("IdCriterion's interval must be valid and non-empty.")
+                else:
+                    try:
+                        idList = [int(v) for v in data.split(',')]
+                    except ValueError:
+                        pass
+                    else: return IdCriterion(idList=idList)        
+            raise ParseException("IdCriterion needs a valid interval or id-list.")
         else: return None
         
         
