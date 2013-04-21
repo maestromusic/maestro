@@ -78,7 +78,8 @@ class HiddenAttributeCommand:
         self.setHidden(not self.newState)
         
     def setHidden(self, newState):
-        dbWrite.setHidden(self.tag, self.valueId, newState)
+        db.query("UPDATE {}values_{} SET hide = ? WHERE tag_id = ? AND id = ?"
+                 .format(db.prefix, self.tag.type), newState, self.tag.id, self.valueId)
         application.dispatcher.emit(HiddenAttributeChangeEvent(self.tag, self.valueId, newState))
 
 
