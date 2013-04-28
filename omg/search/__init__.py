@@ -95,7 +95,8 @@ class SearchRequest:
         receivers of the searchFinished signal (it might happen that the request is stopped when the event
         is already emitted, but not processed yet)."""
         self.stopped = True
-        self.result = None
+        # do not set the result to None here, because the search thread might access this variable
+        # self.result = None
         self.engine._thread.searchEvent.set()
                 
     def __str__(self):
@@ -256,6 +257,7 @@ class SearchThread(threading.Thread):
                 
                 request = self.requests.get()
                 if request.stopped:
+                    request.result = None
                     continue
                 
                 try:
@@ -288,6 +290,7 @@ class SearchThread(threading.Thread):
                                 raise StopRequestException()
     
                     logger.debug("Request finished")
+                    assert criterion.result is not None
                     request.result = criterion.result
                     if request.postProcessing is not None:
                         for method in request.postProcessing:
