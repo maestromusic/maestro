@@ -24,7 +24,7 @@ from PyQt4.QtCore import Qt
 
 from .. import config, logging, profiles, utils
 from ..core import flags, tags
-from ..core.elements import ContentList
+from ..core.elements import ContentList, TYPE_ALBUM
 
 logger = logging.getLogger(__name__)
 translate = QtCore.QCoreApplication.translate
@@ -155,7 +155,7 @@ class StandardGuesser(profiles.Profile):
                     children[i] = element.id
                 albumTags = tags.findCommonTags(elements)
                 albumTags[tags.TITLE] = [key] if pureDirMode else elements[0].tags[self.albumTag]
-                container = self.level.createContainer(tags=albumTags, flags=list(flags), major=True,
+                container = self.level.createContainer(tags=albumTags, flags=list(flags), type=TYPE_ALBUM,
                                                        contents=ContentList.fromPairs(children.items()))
                 self.orders[container] = self.orders[elements[0]]
                 self.albums.append(container)
