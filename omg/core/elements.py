@@ -169,19 +169,32 @@ class Container(Element):
     Valid keyword-arguments are type, contents (which must be a ContentList), parents, tags, flags,
     stickers.
     """
-    def __init__(self, level, id, **kwargs):
+    def __init__(self, level, id, type=None, contents=None, parents=None, tags=None, flags=None,
+                 stickers=None):
         self.level = level
         self.id = id
         self.level = level
         
-        self.type = kwargs.get('type', TYPE_NONE)
-        self.contents = kwargs.get('contents', ContentList())
+        if type is None:
+            type = TYPE_NONE
+        self.type = type
+        if contents is None:
+            contents = ContentList()
+        self.contents = contents
         if not isinstance(self.contents, ContentList):
             raise TypeError("contents must be a ContentList")
-        self.parents = kwargs.get('parents', [])
-        self.tags = kwargs.get('tags', tagsModule.Storage())
-        self.flags = kwargs.get('flags', [])
-        self.stickers = kwargs.get('stickers', {})
+        if parents is None:
+            parents = []
+        self.parents = parents
+        if tags is None:
+            tags = tagsModule.Storage()
+        self.tags = tags
+        if flags is None:
+            flags = []
+        self.flags = flags
+        if stickers is None:
+            stickers = {}
+        self.stickers = stickers
     
     def copy(self,level=None):
         """Create a copy of this container. Create copies of all attributes. Because contents are stored as
