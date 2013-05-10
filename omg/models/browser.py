@@ -297,7 +297,7 @@ class TagLayer:
 
         result = db.query("""
             SELECT DISTINCT t.tag_id, v.id, v.value, v.hide, v.sort_value
-            FROM {1} AS res JOIN {0}tags AS t ON res.id = t.element_id
+            FROM {1} AS res JOIN {0}tags AS t ON +res.id = t.element_id
                      JOIN {0}values_varchar AS v ON t.tag_id = v.tag_id AND t.value_id = v.id
             WHERE t.tag_id IN ({2}) AND {3}
             ORDER BY COALESCE(v.sort_value, v.value) {4}
