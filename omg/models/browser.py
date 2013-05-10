@@ -36,7 +36,9 @@ searchEngine = None # The search engine used by all browsers
 # Registered layer classes. Maps names -> (title, class)
 layerClasses = collections.OrderedDict()
 
+
 def addLayerClass(name, title, theClass):
+    """Register a class that can be used for the browser's layers under the given name."""
     theClass.className = name
     layerClasses[name] = (title, theClass)
     
@@ -56,12 +58,13 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
     nodeLoaded = QtCore.pyqtSignal(Node)
     hasContentsChanged = QtCore.pyqtSignal(bool)
     
-    def __init__(self, layers):
+    def __init__(self, view, layers):
         super().__init__()
         self.table = None
         self.level = levels.real
         self.layers = layers
-        self.containerLayer = ContainerLayer(sorting=Sorting([tags.TITLE]))
+        self.view = view
+        self.containerLayer = ContainerLayer()
         self._searchRequests = []
         
         if searchEngine is None:
@@ -194,7 +197,7 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
             self.load(layer, node, ElementSource(request=searchRequest))
     
     def load(self, layer, node, elementSource):
-        contents = layer.load(node, elementSource)
+        contents = layer.load(self, node, elementSource)
         if node.contents is not None:
             # Only use beginRemoveRows and friends if there are already contents. If we are going to add the
             # first contents to node (this happens thanks to the directload shortcut), we must not call
@@ -208,6 +211,7 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
             self.endInsertRows()
         else:
             node.setContents(contents)
+        
         self.nodeLoaded.emit(node)
 
 
@@ -237,24 +241,25 @@ class ElementSource:
             self.table = None
             self.ids = request.result
             self.extendedToplevel = request.extendedToplevel
+            
+    def computeToplevel(self):
+        self.toplevel = set(db.query("""
+                    SELECT res.id
+                    FROM {} AS res LEFT JOIN {}contents AS c ON res.id = c.element_id
+                    WHERE c.element_id IS NULL 
+                    """.format(self.table, db.prefix)).getSingleColumn())
         
-        
-class Sorting:
-    def __init__(self, sortTags):
-        self.sortTags = sortTags
-        
-    def sort(self, elements):
-        for tag in reversed(self.sortTags):
-            reverse = tag.type == tags.TYPE_DATE
-            p = utils.PointAtInfinity(not reverse)
-            elements.sort(
-                # TODO: respect sortvalues for e.g. composers
-                key = lambda wr: wr.element.tags[tag][0] if tag in wr.element.tags else p,
-                reverse = reverse
-            )        
-
 
 class TagLayer:
+    """
+        More features:
+    
+        - Hidden values: Values from values_varchar with the hidden flag are stuffed into HiddenValueNodes
+          (unless the showHiddenValues option is set to True).
+        - Elements that don't have a value in any of the tags used in a taglayer are stuffed into a
+          VariousNode (if a container has no artist-tag the reason is most likely that its children have
+          different artists).
+          """
     def __init__(self, tagList=None, state=None):
         if tagList is None:
             assert state is not None
@@ -275,7 +280,7 @@ class TagLayer:
     def __repr__(self):
         return "<TagLayer: {}>".format(', '.join(tag.name for tag in self.tagList))
         
-    def load(self, node, elementSource):
+    def load(self, model, node, elementSource):
         # Get all tag values that should appear in TagNodes 
         
         if elementSource.table is not None:
@@ -289,6 +294,7 @@ class TagLayer:
         if db.type == 'sqlite':
             collate = 'COLLATE NOCASE'
         else: collate = ''
+
         result = db.query("""
             SELECT DISTINCT t.tag_id, v.id, v.value, v.hide, v.sort_value
             FROM {1} AS res JOIN {0}tags AS t ON res.id = t.element_id
@@ -321,6 +327,45 @@ class TagLayer:
                         aNode.tagPairs.append((tagId, valueId))
                         break
     
+        if 2 <= len(nodes) <= 10 and 1 <= len(elementSource.extendedToplevel) <= 250:
+            valuePart = ' OR '.join('(tag_id={} AND value_id={})'
+                                    .format(*node.tagPairs[0]) for node in nodes)
+            result = db.query("""
+                        SELECT element_id, tag_id, value_id
+                        FROM {}tags
+                        WHERE element_id IN ({}) AND ({})
+                        """.format(db.prefix, db.csList(elementSource.extendedToplevel), valuePart))
+            elementDict = {}
+            for node in nodes:
+                theSet = set() # use the same set for each tagPair of one node
+                for tagId, valueId in node.tagPairs:
+                    elementDict[(tagId, valueId)] = theSet
+                    
+            for elid, tid, vid in result:
+                elementDict[(tid, vid)].add(elid)
+            hashs = {}
+            for node in nodes[:]:
+                elementSet = elementDict[node.tagPairs[0]]
+                h = hash(frozenset(elementSet))
+                if h not in hashs:
+                    hashs[h] = node
+                else:
+                    hashs[h].addValues(node)
+                    nodes.remove(node)
+            composerTag = tags.get("composer")
+            if composerTag.isInDb():
+                composers = [pair for pair in elementDict.keys() if pair[0] == composerTag.id]
+                if len(composers) <= 3:
+                    inComposers = set().union(*[elementDict[c] for c in composers])
+                    if len(inComposers) == len(elementSource.extendedToplevel):
+                        for node in nodes[:]:
+                            if not any(pair[0] == composerTag.id for pair in node.tagPairs):
+                                nodes.remove(node)
+
+                
+            #nodeDict maps value -> set of element ids
+            # is their a pair of nodes with the same set of element ids? If so, combine their tagnodes
+            
         # Check whether a VariousNode is necessary
         result = db.query("""
             SELECT res.id
@@ -374,13 +419,7 @@ addLayerClass('taglayer', translate("BrowserModel", "Tag layer"), TagLayer)
 
 
 class ContainerLayer:
-    def __init__(self, sorting):
-        self.sorting = sorting
-        
-    def text(self):
-        return translate("BrowserModel", "Container layer")
-        
-    def load(self, node, elementSource):
+    def load(self, model, node, elementSource):
         """Load the contents of *node* into a container-layer, using toplevel elements from *table*. Note that
         this creates all children of *node* and not only the next level of the tree-structure as _loadTagLayer
         does. For performance reasons this method does not load the data (''Element.fromId(loadData=False)'').
@@ -394,7 +433,8 @@ class ContainerLayer:
                              db.query("SELECT element_id FROM {}contents WHERE container_id IN ({})"
                                       .format(db.prefix, db.csList(allIds))).getSingleColumn())
         else:
-           raise NotImplementedError()
+            elementSource.computeToplevel()
+            toplevel = elementSource.toplevel
 
         # Load all toplevel elements and all of their ancestors
         newIds = toplevel
@@ -439,8 +479,18 @@ class ContainerLayer:
                 return BrowserWrapper(element) # a wrapper that will load its contents when needed
         
         contents = [createWrapper(id) for id in toplevel]
-        self.sorting.sort(contents)
+        
+        contents.sort(key=self.sortFunction)
         return contents
+    
+    def sortFunction(self, wrapper):
+        element = wrapper.element
+        date = 0
+        if element.type == elements.TYPE_ALBUM:
+            dateTag = tags.get("date")
+            if dateTag.type == tags.TYPE_DATE and dateTag in element.tags: 
+                date = -element.tags[dateTag][0].toSql() # minus leads to descending sort
+        return (date, element.getTitle())
 
 
 class CriterionNode(Node):
@@ -452,7 +502,6 @@ class CriterionNode(Node):
         self.parent = parent
         self.contents = None
 
-    
     def getCriterion(self):
         """Return the criterion of this node."""
         assert False # implemented in subclasses
@@ -536,6 +585,9 @@ class TagNode(CriterionNode):
     def __repr__(self):
         return "<ValueNode {} {}>".format(self.values, self.tagPairs)
     
+    def getKey(self):
+        return "tag:"+str(self.tagPairs)
+    
     def toolTipText(self):
         if config.options.misc.show_ids: # Display the value-ids
             lines = ["[{}]".format(", ".join("{}->{}".format(tags.get(tagId).name, valueId)
@@ -617,6 +669,9 @@ class LoadingNode(TextNode):
     """
     def __init__(self):
         super().__init__(translate("BrowserModel", "Loading..."))
+        
+    def __repr__(self):
+        return "<Loading>"
         
 
 class BrowserMimeData(selection.MimeData):

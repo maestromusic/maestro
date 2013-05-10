@@ -44,6 +44,7 @@ class BrowserDock(mainwindow.DockWidget):
         browser.optionButton.setIcon(utils.getIcon('options.png'))
         browser.optionButton.setIconSize(QtCore.QSize(14, 14))
         browser.optionButton.clicked.connect(browser._handleOptionButton)
+        #browser.optionButton.clicked.connect(browser._handleLevelChange)
         self.addTitleWidget(browser.optionButton)
         self.setWidget(browser)
         
@@ -64,39 +65,28 @@ mainwindow.addWidgetData(mainwindow.WidgetData(
 
 class Browser(QtGui.QWidget):
     """Browser to search the music collection. The browser contains a searchbox, a button to open the
-    configuration-dialog and one or more views. Depending on whether search value is entered and/or a
-    filterCriterion is set or not, the browser displays results from its bigResult-table or 'elements'
-    (the table currently used is stored in self.table). Each view has a list of tag-sets ('layers') and will
-    group the contents of self.table according to the layers: For each tag-set the view will contain a level
-    of ValueNodes ('taglayer') that contain only elements with this value. After these taglayers the browser
-    displays the contents in the usual tree structure ('container layer'). Currently only tags of type
-    varchar may be used in the taglayers.
+    configuration-dialog and one or more views. Depending on whether a search value is entered and/or a
+    filterCriterion is set or not, the browser displays results from its search result table or from
+    'elements' (the table currently used is stored in self.table).
+    Each view has a list of layers that decide how to group the contents of the table. Typically each layer
+    generates one level in the final tree structure. The contents of each node on this layer will then be
+    grouped by the next layer. The last layer is always a ContainerLayer, that displays nodes in their tree
+    structure.
     
-    ValueNodes will load their contents only when they are requested for the first time and to do so they
-    will need to search from self.table to the smallResult-table used by all browsermodels together.
-    
-    More features:
-    
-        - Hidden values: Values from values_varchar with the hidden flag are stuffed into HiddenValueNodes
-          (unless the showHiddenValues option is set to True).
-        - Elements that don't have a value in any of the tags used in a taglayer are stuffed into a
-          VariousNode (if a container has no artist-tag the reason is most likely that its children have
-          different artists).
-    
+    Usually layers create CriterionNodes to group elements (a CriterionNode contains those element of the
+    set of elements displayed in the browser which match an additional search criterion). The contents of
+    such a node will only be loaded when they are requested for the first time and to do so a search needs
+    to be performed.
+       
     Some of the more fancy features that only affect how nodes are displayed, include
 
-         - RestoreExpandedOptimizer: When the browser reloads its contents after a ChangeEvent it will try
-           to restore previously expanded nodes.
-         - ExpandVisible: As long as the next level of (still unexpanded and not visible) nodes fits into the
-           view, they are loaded automatically. If the whole next level fits into the view, it is expanded.
-         - DirectLoad Shortcut: If a layer of ValueNodes happens to have only one value, this value is
-           directly expanded without doing a new search (would give the same search results anyway)'
-         - Merge ValueNodes Optimization: After AutoExpand (we need the contents to be loaded at least to the
-           first layer of Elements) check whether there are ValueNodes containing the same elements and merge
-           them.  
+         - Restore expanded: When the browser reloads its contents after a ChangeEvent it will try to restore
+           previously expanded nodes.
+         - Expand visible levels: The browser tries to expand as many full (tree structure) levels as
+           possible. For this it will load (but not yet expand) nodes and compute their sizes until it is
+           either clear, that the next level does not fit into the view or it can be expanded.
  
-    \ """
-    views = None # List of BrowserTreeViews
+    """
     table = db.prefix + "elements" # The MySQL-table whose contents are currently displayed
 
     # Whether or not hidden values should be displayed.
@@ -116,14 +106,20 @@ class Browser(QtGui.QWidget):
     def __init__(self, parent=None, state=None):
         """Initialize a new Browser with the given parent."""
         QtGui.QWidget.__init__(self,parent)
-        self.filterCriterion = None
-        self.flagCriterion = None
-        self.searchCriterion = None
-        self.views = []
+        
+        self.views = [] # List of treeviews
+        
+        # These three criteria determine the set of elements displayed in the browser. They are combined
+        # using AND.
+        self.filterCriterion = None  # Used by the 'filter'-line edit in the option dialog 
+        self.flagCriterion = None    # Used by the flags filter in the option dialog
+        self.searchCriterion = None  # Used by the search box
                 
         if browsermodel.searchEngine is None:
             browsermodel.initSearchEngine()
         
+        # If one of above criteria is not None, this table contains the elements that should be displayed
+        # and is used instead of 'elements'.
         self.resultTable = browsermodel.searchEngine.createResultTable('browser')
             
         browsermodel.searchEngine.searchFinished.connect(self._handleSearchFinished)
@@ -178,21 +174,10 @@ class Browser(QtGui.QWidget):
                 self.delegateProfile = delegates.profiles.category.getFromStorage(
                                                             state.get('delegate'),
                                                             browserdelegate.BrowserDelegate.profileType)
-#            if 'sortTags' in state:
-#                for tagName,tagList in state['sortTags'].items():
-#                    if tags.isInDb(tagName):
-#                        tagList = [tags.get(name) for name in tagList if tags.isInDb(name)]
-#                        if len(tagList) > 0:
-#                            self.sortTags[tags.get(tagName)] = tagList
-#            elif tags.isInDb('artist') and tags.isInDb('date'):
-#                # Load a reasonable default
-#                self.sortTags = {tags.get('artist'): [tags.get('date')]}
             
-        application.dispatcher.connect(self._handleDispatcher)
-        levels.real.connect(self._handleLevelChange)
-        
-        # Convert tag names to tags, leaving the nested list structure unchanged.
-        # This will in particular call self.load
+        application.dispatcher.connect(self._handleChangeEvent)
+        levels.real.connect(self._handleChangeEvent)
+
         self.createViews(layersForViews)
         self.load()
 
@@ -200,8 +185,6 @@ class Browser(QtGui.QWidget):
         state = {
             'instant': self.searchBox.getInstantSearch(),
             #'showHiddenValues': self.showHiddenValues,
-            #'views': utils.mapRecursively(lambda tag: tag.name,[view.model().layers for view in self.views]),
-            #'sortTags': {tag.name: [t.name for t in sortTags] for tag,sortTags in self.sortTags.items()}
         }
         if len(self.views) > 0:
             state['views'] = [[(layer.className, layer.state()) for layer in view.model().layers]
@@ -214,17 +197,56 @@ class Browser(QtGui.QWidget):
             state['flags'] = [flag.name for flag in self.flagCriterion.flags]
         return state
     
-    def load(self, restoreExpanded=False):
-        """Load contents into the browser, based on the current filterCriterion and searchCriterion. If a
-        search is necessary this will only start a search and actual loading will be done in
-        _handleSearchFinished. If *restoreExpanded* is True all views will store the expanded nodes and try
-        to restore them again after reloading.
+    def createViews(self, layersForViews):
+        """Destroy all existing views and create views according to *layersForViews*: Each entry must be
+        a list of layers for the corresponding view.
         """
-        # This will effectively stop any request from being processed
+        for view in self.views:
+            view.setParent(None)
+        self.views = []
+        for layers in layersForViews:
+            self.addView(layers, reset=False)
+    
+    def addView(self, layers=None, reset=True):
+        """Add a view with the given layers."""
+        if layers is None:
+            layers = self.defaultLayers()
+        return self.insertView(len(self.views), layers, reset)
+    
+    def insertView(self, index, layers, reset=True):
+        """Insert a view with the given layers at position *index*."""
+        newView = BrowserTreeView(self, layers, self.delegateProfile)
+        self.views.insert(index, newView)
+        newView.selectionModel().selectionChanged.connect(
+                                functools.partial(self.selectionChanged.emit, newView.selectionModel()))
+        self.splitter.insertWidget(index, newView)
+        if reset:
+            newView.resetToTable(self.table)
+        return newView
+        
+    def removeView(self, index):
+        """Remove the view with position *index* from the browser."""
+        view = self.views[index]
+        del self.views[index]
+        view.setParent(None)
+    
+    def moveView(self, fromIndex, toIndex):
+        """Move a view between two positions."""
+        movingView = self.views[fromIndex]
+        del self.views[fromIndex]
+        self.views.insert(toIndex, movingView)
+        self.splitter.insertWidget(toIndex, movingView) # will be removed from old position automatically
+        
+    def load(self):
+        """Load contents into the browser, based on the current filterCriterion, flagCriterion and
+        searchCriterion. If a search is necessary this will only start a search and actual loading will
+        be done in _handleSearchFinished.
+        """
         if self.searchRequest is not None:
             self.searchRequest.stop()
             self.searchRequest = None
-           
+            
+        # Combine returns None if all input criteria are None
         criterion = criteria.combine('AND',
                             [c for c in (self.filterCriterion, self.flagCriterion, self.searchBox.criterion)
                              if c is not None])
@@ -239,7 +261,6 @@ class Browser(QtGui.QWidget):
             # view.resetToTable will be called when the search is finished
         else:
             self.table = db.prefix + "elements"
-            self.searchRequest = None
             for view in self.views:
                 view.resetToTable(self.table)
 
@@ -248,45 +269,9 @@ class Browser(QtGui.QWidget):
         #TODO: restoreExpanded if new criteria are narrower than the old ones?
         self.searchCriterion = self.searchBox.criterion
         self.load()
-    
-    def createViews(self, layersForViews):
-        """Destroy all existing views and create views according to *layersList*: For each entry of
-        *layersList* a BrowserTreeView using the entry as layers is created. Therefore each entry of
-        *layersList* must be a list of tag-lists (confer BrowserTreeView.__init__).
-        """
-        for view in self.views:
-            view.setParent(None)
-        self.views = []
-        for layers in layersForViews:
-            self.addView(layers, reset=False)
-        
-    def addView(self, layers=None, reset=True):
-        if layers is None:
-            layers = self.defaultLayers()
-        return self.insertView(len(self.views), layers, reset)
-    
-    def insertView(self, index, layers, reset=True):
-        newView = BrowserTreeView(self, layers, self.delegateProfile)
-        self.views.insert(index, newView)
-        newView.selectionModel().selectionChanged.connect(
-                                functools.partial(self.selectionChanged.emit, newView.selectionModel()))
-        self.splitter.insertWidget(index, newView)
-        if reset:
-            newView.resetToTable(self.table)
-        return newView
-        
-    def removeView(self, index):
-        view = self.views[index]
-        del self.views[index]
-        view.setParent(None)
-    
-    def moveView(self, fromIndex, toIndex):
-        movingView = self.views[fromIndex]
-        del self.views[fromIndex]
-        self.views.insert(toIndex, movingView)
-        self.splitter.insertWidget(toIndex, movingView) # will be removed from old position automatically
         
     def setFlagFilter(self, flags):
+        """Set the browser's flag filter to the given list of flags."""
         if len(flags) == 0:
             if self.flagCriterion is not None:
                 self.flagCriterion = None
@@ -335,19 +320,19 @@ class Browser(QtGui.QWidget):
             # Whether the view should restore expanded nodes after the search is stored in request.data.
             restore = request.data
             for view in self.views:
+                view.expander = VisibleLevelsExpander(view)
                 view.resetToTable(self.table)
                 
-    def _handleDispatcher(self,event):
-        """Handle a change event."""
+    def _handleChangeEvent(self, event):
+        """Handle a change event from the application's dispatcher or the real level."""
         #TODO: Optimize some cases in which we do not have to start a new search and reload everything.
-        self.load(restoreExpanded = True)
-    
-    def _handleLevelChange(self,event):
-        self.load(restoreExpanded = True)
-        pass
+        for view in self.views:
+            view.expander = RestoreExpander(view)
+        self.load()
               
     @staticmethod
     def defaultLayers():
+        """Return the default list of layers for a view."""
         tagList = browsermodel.TagLayer.defaultTagList()
         if len(tagList) > 0:
             return [browsermodel.TagLayer(tagList)]
@@ -357,15 +342,8 @@ class Browser(QtGui.QWidget):
 class BrowserTreeView(treeview.TreeView):
     """TreeView for the Browser. A browser may contain more than one view each using its own model. *parent*
     must be the browser-widget of this view. The *layers*-parameter determines how elements are grouped in
-    this browser: It must be a list of tag-lists. For each entry in *layers* a tag-layer using the entry's
-    tags is created. A BrowserTreeView initialized with
-        [[tags.get('genre')],[tags.get('artist'),tags.get('composer')]]
-    will group result first into different genres and then into different artist/composer-values, before
-    finally displaying the elements itself."""
-    
-    # List of optimizers which will improve the display after reloading.
-    _optimizers = None
-    
+    this browser, see BrowserModel. *delegateProfile* is the profile passed to the BrowserDelegate instance.
+    """
     actionConfig = treeview.TreeActionConfiguration()
     sect = translate("BrowserTreeView", "browser")
     actionConfig.addActionDefinition(((sect, 'value'),), treeactions.TagValueAction)
@@ -383,51 +361,40 @@ class BrowserTreeView(treeview.TreeView):
     
     def __init__(self, parent, layers, delegateProfile):
         super().__init__(levels.real, parent)
-        self.setModel(browsermodel.BrowserModel(layers))
+        self.setModel(browsermodel.BrowserModel(self, layers))
+        self.header().sectionResized.connect(self.model().layoutChanged)
+        
+        # If there are no contents, the browser model contains a help message (e.g. "no search results"),
+        # which should not be decorated.
         self.setRootIsDecorated(self.model().hasContents())
         self.model().hasContentsChanged.connect(self.setRootIsDecorated)
-        self.header().sectionResized.connect(self.model().layoutChanged)
+        
+        # Queued connection is necessary so that the model has really finished loading, when the view reacts.
+        self.model().nodeLoaded.connect(self._handleNodeLoaded, Qt.QueuedConnection)
+        
         self.setItemDelegate(browserdelegate.BrowserDelegate(self, delegateProfile))
-        self._optimizers = []
-        #self.doubleClicked.connect(self._handleDoubleClicked)
-    
-    def resetToTable(self,table):
-        """Reset the view and its model so that it displays elements from *table*. If *restoreExpanded* is
-        True, try to restore expanded nodes after reloading. If *expandVisible* is True, automatically 
-        expand as much layers as are possible without vertical scrollbar.
-        """
-        #if len(self._optimizers) > 0:
-        #    # Disconnect or otherwise the next optimizer will be started via the finished signal.
-        #    self._optimizers[-1].finished.disconnect(self._handleOptimizerFinished)
-        #    self._optimizers[-1].stop()
-        #self._optimizers = []
         
-        # The order of the optimizers is very important!
-        #if restoreExpanded:
-        #    self._optimizers.append(RestoreExpandedOptimizer(self))
-        #if expandVisible:
-        #    self._optimizers.append(ExpandVisibleOptimizer(self))
-        #self._optimizers.append(ExpandSingleOptimizer(self))
+        # The expander will decide which nodes to load/expand after the view is reset. Because each loading
+        # might perform a search, Expanders work asynchronously.
+        self.expander = None
         
+    def resetToTable(self, table):
+        """Reset the view and its model so that it displays elements from *table*."""
         self.model().reset(table)
-        
-        #if len(self._optimizers) > 0:
-        #    for optimizer in self._optimizers:
-        #        optimizer.finished.connect(self._handleOptimizerFinished)
-        #    self._optimizers[0].start()
-        
-    def _handleOptimizerFinished(self):
-        """Handle the finished-signal from the current optimizer."""
-        if len(self._optimizers) == 0:
-            # This happens when resetToTable is called and the optimizers are cleared
-            # before the already emitted signal is processed.
-            return
-        optimizer = self._optimizers.pop(0)
-        optimizer.finished.disconnect(self._handleOptimizerFinished)
-        if len(self._optimizers) > 0:
-            self._optimizers[0].start()
+    
+    def _handleNodeLoaded(self, node):
+        """When a node has loaded in the model, allow the expander to expand it or load another node."""
+        # Call the current expander so that it can decide what nodes should be loaded (or even expanded)
+        if self.expander is not None:
+            if not self.expander.next():
+                self.expander = None
+        # Always expand nodes with a single children (except RestoreExpander is active)
+        if node.getContentsCount() == 1 and not isinstance(self.expander, RestoreExpander):
+            print(node)
+            self.expand(self.model().getIndex(node.contents[0]))
     
     def mouseDoubleClickEvent(self, event):
+        # Because the must access modifiers, mouseDoubleClickEvent is used instead of the equivalent signal.
         index = self.indexAt(event.pos())
         if not index.isValid():
             return
@@ -453,91 +420,59 @@ class BrowserTreeView(treeview.TreeView):
             model.backend.setCurrent(insertOffset)
             model.backend.play()
             
-        
-       
-class Optimizer(QtCore.QObject):
-    """Optimizers improve the display of a BrowserTreeView after its nodes have been loaded. They are 
-    created before the model is reset and thus may store information as currently expanded nodes. After
-    the nodes have been loaded, ''start'' is called."""
-    finished = QtCore.pyqtSignal()
-    
-    def __init__(self,view):
-        super().__init__(view)
+
+
+class RestoreExpander:
+    """Expander that will store the current list of expanded nodes in *view* and expand them again bit by bit,
+    whenever next is called (until next returns False). Expanded nodes will be stored by their data and not
+    by reference/model index/persistent model index. Thus the expander also works if all nodes have been
+    deleted and replaced by new instances with the same data.
+    """ 
+    def __init__(self, view):
         self.view = view
-
-    def start(self):
-        pass
-    
-    def stop(self):
-        pass
- 
- 
-class ExpandSingleOptimizer(Optimizer):
-    """Optimizer which expands single nodes and stops when a level contains more than one node. Note that
-    this is not necessarily done by the ExpandVisibleOptimizer because it might make a vertical scrollbar
-    necessary. Thanks to the DirectLoad-shortcut of BrowserModel, this optimizer does not have to load
-    nodes and can thus finish immediately."""
-    def start(self):
-        node = self.view.model().getRoot()
-        while (not isinstance(node,browsermodel.CriterionNode) or node.hasLoaded()) \
-                and node.getContentsCount() == 1:
-            node = node.getContents()[0]
-            self.view.expand(self.view.model().getIndex(node))
-
-        self.finished.emit()
-
-
-class RestoreExpandedOptimizer(Optimizer):
-    def __init__(self,view):
-        super().__init__(view)
-        self._expanded = self._getExpandedNodes(QtCore.QModelIndex())
-        self._stopped = True
-    
-    def start(self):
-        self.view.model().nodeLoaded.connect(self._handleNodeLoaded)
-        self._generator = self._expandedNodesGenerator()
-        self._stopped = False
-        self._handleNodeLoaded(None)
-        
-    def stop(self):
-        self._stopped = True            
-        self.view.model().nodeLoaded.disconnect(self._handleNodeLoaded)
-        self.finished.emit()
+        self.expanded = self.getExpandedNodes(QtCore.QModelIndex())
+        self.generator = self.expandedNodesGenerator()
                 
-    def _getExpandedNodes(self,index):
+    def getExpandedNodes(self, index):
+        """Return all expanded nodes under the given model index in a dict mapping the key of an expanded
+        node (see getKey) to a (recursive) dict of expanded nodes under that node.
+        """
         model = self.view.model()
         result = {}
         for i in range(model.rowCount(index)):
             childIndex = model.index(i,0,index)
             if self.view.isExpanded(childIndex):
                 child = model.data(childIndex,Qt.EditRole)
-                # Get an identifier for this node, which is unique among all siblings and will be the same
-                # for an equivalent node after reloading the model.
-                if isinstance(child, browsermodel.CriterionNode):
-                    key = child.getKey()
-                elif isinstance(child, Element):
-                    key = child.id    
-                else: 
-                    # This works for nodeclasses of which not more than one instance has the same parent.
-                    # (e.g. HiddenValuesNode).
-                    key = (child.__class__,)
-                result[key] = self._getExpandedNodes(childIndex)
+                result[self.getKey(child)] = self.getExpandedNodes(childIndex)
         return result
     
-    def _handleNodeLoaded(self,node=None):
-        if self._stopped:
-            return
+    def next(self):
+        """Expand the next node and return True, or return False if all nodes have already been expanded."""
         try:
-            next(self._generator)
+            next(self.generator)
             # Reaching this point means a node was expanded, that had not already loaded its contents.
             # Thus we have to wait until the search finishes and the signal is emitted again.
-            return
+            return True
         except StopIteration:
-            self.stop()
-    
-    def _expandedNodesGenerator(self):
+            return False
+        
+    def getKey(self, node):
+        """Get an identifier for *node*, which is unique among all siblings and will be the same for an
+        equivalent node after reloading the model."""
+        if isinstance(child, browsermodel.CriterionNode) and hasattr(node, 'getKey'):
+            return node.getKey()
+        elif isinstance(node, Element):
+            return node.id    
+        else: 
+            # This works for nodeclasses of which not more than one instance has the same parent.
+            # (e.g. HiddenValuesNode).
+            return (node.__class__,)
+        
+    def expandedNodesGenerator(self):
+        """Based on self.expanded, yield nodes that should be expanded."""
         model = self.view.model()
-        listOfDicts = [self._expanded] # No need to copy although this will be modified below.
+        #TODO: wtf is going on here
+        listOfDicts = [self.expanded] # No need to copy although this will be modified below.
         listOfNodes = [model.getRoot()]
         while len(listOfDicts):
             currentDict = listOfDicts[-1]
@@ -546,11 +481,9 @@ class RestoreExpandedOptimizer(Optimizer):
                 listOfDicts.pop()
                 listOfNodes.pop()
                 continue
-            key,expanded = currentDict.popitem()
+            key, expanded = currentDict.popitem()
             for child in currentNode.getContents():
-                if (isinstance(child, browsermodel.CriterionNode) and child.getKey() == key) \
-                            or (isinstance(child,Container) and child.id == key) \
-                            or (key == (child.__class__,)):
+                if key == self.getKey(child):
                     if len(expanded) > 0:
                         # After expanding this node, process expanded nodes below this one
                         listOfDicts.append(expanded)
@@ -562,151 +495,79 @@ class RestoreExpandedOptimizer(Optimizer):
                         yield child
                     break
             
-    
-class ExpandVisibleOptimizer(Optimizer):
-    def start(self):
-        """Start AutoExpand: Calculate the height of all nodes with depth 1. If they fit into the view and
-        there is still place left, load the contents of those nodes (using the AutoLoad feature of
-        BrowserModel) until all nodes of depth 2 are loaded or the height of the loaded nodes together with
-        all nodes of depth 1 exceeds the height of the view. In the first case expand all nodes of depth 1
-        and continue with the next level. In the second case it is clear that we cannot display all nodes of
-        depth 2, so stop AutoExpand and AutoLoad.
-        
-        Because loading contents involves searches the _autoExpand-method needs to be called repeatedly after
-        each search.
-        """
-        self._autoExpandDepth = 0
+
+class VisibleLevelsExpander:
+    """Expands whole (tree structure) levels at once as long as they fit into the view. Whenever the 'next'
+    method is called, this expander will load (but not yet expand) a node on the next level that is not yet
+    completely expanded. Then it computes the size of all contents. If they are too big to fit into the view,
+    the expander stops. But if all contents have been loaded and fit, their parents will be expanded.
+    """
+    def __init__(self, view):
+        self.view = view
+        self._depthHeights = None
+            
+    def next(self):
+        """Load the next node. Possibly expand a whole (tree structure) level."""
         maxHeight = self.view.maximumViewportSize().height()
-        # Calculate the height of the first level
-        height = self._getHeightOfDepth(self.view.model().getRoot(),1,maxHeight)
-        if height is None or height < maxHeight:
-            self._depthHeights = [height]
-            self.view.model().nodeLoaded.connect(self._handleNodeLoaded)
-            self._handleNodeLoaded()
-        else:
-            self.finished.emit()
-            
-    def stop(self):
-        self.view.model().nodeLoaded.disconnect(self._handleNodeLoaded)
-        self.finished.emit()
-            
-    def _handleNodeLoaded(self):
-        """This is called at the start of AutoExpand and (by the model) whenever the contents of a node has
-        been loaded. The method will calculate the height of all nodes of the visible depths and of the
-        nodes whose contents are already loaded on the next level and
+        if self._depthHeights is None:
+            # Calculate the height of the first level
+            height = self._getHeightOfDepth(self.view.model().getRoot(), 1, maxHeight)
+            if height is None or height < maxHeight:
+                self._depthHeights = [height]
+            else:
+                # first level doesn't fit
+                return False
         
-            - stop AutoExpand and AutoLoad if the next level doesn't fit into the view
-            - expand to the next level if all nodes are loaded and it does fit
-            - load a node if the next level may fit into the view and we need the contents to find out.
-              autoExpand will be called again from BrowserModel._handleSearchFinished.
-            
-        \ """
-        maxHeight = self.view.maximumViewportSize().height()
         while True:
             # this is at least 2, since depthHeights is initialized with the height of depth 1 in
             # startAutoExpand. 
             depth = len(self._depthHeights)+1
             height = self._getHeightOfDepth(self.view.model().getRoot(),
-                                            depth,maxHeight-sum(self._depthHeights))
+                                            depth,
+                                            maxHeight - sum(self._depthHeights))
             if height is None:
-                return # a node is not loaded yet, so wait for the next call
+                return True # a node is not loaded yet, so wait for the next call
             if height == 0: # We have reached the last level
-                self.stop()
-                return
+                return False
             self._depthHeights.append(height)
             if sum(self._depthHeights) <= maxHeight:
-                self._autoExpandDepth = depth
-                #print("Expanding to depth {}".format(depth-2))
-                # If two levels fit in the view, we want to expand up to depth 1. Qt counts from 0, thus -2.
-                self.view.expandToDepth(depth-2)
+                # If two levels fit in the view, we want to expand up to depth 1.
+                self.expandToDepth(depth-1)
             else:
-                self.stop()
-                return
+                return False
     
-    def _getHeightOfDepth(self,node,depth,maxHeight):
+    def _getHeightOfDepth(self, node, depth, maxHeight):
         """Caculate the height of all nodes of depth *depth* relative to their ancestor *node*. Stop when
         *maxHeight* is exceeded. If a node has not loaded its contents yet, start loading the contents and
         return None.
         """
         if not node.hasContents():
             return 0
-        if isinstance(node,browsermodel.CriterionNode) and not node.hasLoaded():
+        if isinstance(node, browsermodel.CriterionNode) and not node.hasLoaded():
             node.loadContents()
             return None
         height = 0
         for child in node.getContents():
             if depth == 1:
-                height += self.view.itemDelegate().sizeHint(None,self.view.model().getIndex(child)).height()
+                height += self.view.itemDelegate().sizeHint(None, self.view.model().getIndex(child)).height()
             else:
-                if node.hasContents():
-                    newHeight = self._getHeightOfDepth(child, depth-1,maxHeight-height)
+                if node.hasContents() and not isinstance(node, browsermodel.HiddenValuesNode):
+                    newHeight = self._getHeightOfDepth(child, depth-1, maxHeight-height)
                     if newHeight is None:
                         return None # A node is not loaded yet
                     else: height += newHeight
             if height > maxHeight:
                 break
         return height
-
-
-class MergeValueNodesOptimizer(Optimizer):
-    """After AutoExpand (we need the contents to be loaded at least to the first layer of Elements) check
-    whether there are ValueNodes containing the same elements and merge them.
-    
-    This method optimizes the ValueNodes below *node* and returns the toplevel element contents of *node*
-    as set. If any node below *node* has not loaded its contents, this method returns None.
-    """
-    def start(self):
-        self._optimize(self.view.model().getRoot())
-        self.finished.emit()
-        
-    def _optimize(self,node):
-        model = self.view.model()
-        
-        # Later this set will contain the element-ids of all toplevel elements that are recursively
-        # contained in this node (it will only contain elements whose direct parent is a ValueNode).
-        contentIds = set()
-        
-        # This maps hashes of contents (ordered tuples of contentIds to be precise) to the child of *node*
-        # containing those contents.
-        contentDict = {}
-        
-        # Set to false if a child has not fully loaded its contents.
-        loaded = True
-        
-        # Copy the list as contents may change.
-        for child in node.getContents()[:]: 
-            if isinstance(child,Element):
-                contentIds.add(child.id)
-                continue
-            if not isinstance(child,browsermodel.ValueNode):
-                # TODO: Handle VariousNodes, HiddenValuesNodes
-                continue
-            if not child.hasLoaded():
-                loaded = False
-                continue
             
-            # First optimize the nodes below child and get the contents
-            subContentIds = self._optimize(child)
-            if subContentIds is None: # child has not fully loaded its contents
-                loaded = False
-                continue
-                
-            # Calculate the hash used to compare contents. It is important to sort the ids because often the
-            # children are sorted differently depending on the value of node (e.g. when using a layer with
-            # artist and composer tags, having sorttags date for artist and title for composer).
-            contentHash = hash(tuple(sorted(subContentIds)))
-            
-            if contentHash not in contentDict:
-                contentDict[contentHash] = child
-                contentIds.update(subContentIds)
-            else:
-                # Yeah! We found two children with the same contents
-                contentDict[contentHash].addValues(child)
-                position = node.index(child)
-                model.beginRemoveRows(model.getIndex(node),position,position)
-                del node.contents[position]
-                model.endRemoveRows()
-            
-        if loaded:
-            return contentIds
-        else: return None
+    def expandToDepth(self, depth, parent=None):
+        """Expand all nodes up to *depth*. The root node is on depth 0, so *depth* should be at least 1.
+        If *parent* is given, it is considered as root node, and only the tree below *parent* is affected.
+        """
+        if parent is None:
+            parent = self.view.model().getRoot()
+        for node in parent.contents:
+            if node.hasContents() and not isinstance(node, browsermodel.HiddenValuesNode):
+                self.view.expand(self.view.model().getIndex(node))
+                if depth > 1:
+                    self.expandToDepth(depth-1, parent=node)
