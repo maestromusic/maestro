@@ -58,7 +58,6 @@ if exists(join(dirname(__file__), '.git')):
                 try:
                     subprocess.check_call(["lrelease", proFile])
                 except Exception as e:
-                    print(e)
                     try:
                         subprocess.check_call(["lrelease-qt4", proFile])
                     except Exception as e:
