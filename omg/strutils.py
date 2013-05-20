@@ -77,8 +77,11 @@ def commonPrefix(strings):
     if len(strings) == 0:
         return ''
     i = 0
-    while i < len(strings[0]) and all(strings[0][i] == string[i] for string in strings[1:]):
-        i = i + 1
+    try:
+        while i < len(strings[0]) and all(strings[0][i] == string[i] for string in strings[1:]):
+            i = i + 1
+    except IndexError:
+        pass
     return strings[0][:i]
 
         

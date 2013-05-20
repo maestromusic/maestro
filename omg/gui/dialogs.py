@@ -257,7 +257,7 @@ class MergeDialog(QtGui.QDialog):
         containerTags[mergeTag] = [ self.valueEdit.text() ]
         contents = elements.ContentList.fromPairs(enumerate(self.elements, start=1))
         container = self.level.createContainer(tags=containerTags, flags=containerFlags,
-                                               major=False, contents=contents)
+                                               contents=contents)
         if self.removePrefixBox.isChecked():
             childChanges = {}
             prefix = self.removeEdit.text()
