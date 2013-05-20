@@ -459,7 +459,7 @@ class RestoreExpander:
     def getKey(self, node):
         """Get an identifier for *node*, which is unique among all siblings and will be the same for an
         equivalent node after reloading the model."""
-        if isinstance(child, browsermodel.CriterionNode) and hasattr(node, 'getKey'):
+        if isinstance(node, browsermodel.CriterionNode) and hasattr(node, 'getKey'):
             return node.getKey()
         elif isinstance(node, Element):
             return node.id    
