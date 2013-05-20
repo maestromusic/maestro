@@ -113,7 +113,7 @@ if exists(join(dirname(__file__), '.git')):
     test.test.run = wrapped_test_run
 
 setup(name='omg',
-      version='0.4-currentgit',
+      version='0.4.0',
       description='OMG music manager and player',
       author='Martin Altmayer, Michael Helmling',
       author_email='{altmayer,helmling}@mathematik.uni-kl.de',
