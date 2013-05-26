@@ -281,6 +281,7 @@ def run(cmdConfig=[],type='gui',exitPoint=None):
     plugins.shutdown()
     covers.shutdown()
     profiles.manager.save()
+    database.close()
     config.shutdown()
     logging.shutdown()
     sys.exit(returnValue)

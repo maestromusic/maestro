@@ -23,10 +23,9 @@ code.
 
 Currently the following drivers are supported:
 
-* `qtsql`: uses the QtSql-Module of PyQt4 (http://doc.trolltech.com/latest/qtsql.html)
-* `myconnpy`: uses MySQL Connector/Python (https://launchpad.net/myconnpy)
-* `pymysql`: uses PyMySQL (https://github.com/petehunt/PyMySQL/)
 * `sqlite`: uses the built-in sqlite3 module
+* `mysql`: uses the official MySQL Connector/Python (http://dev.mysql.com/doc/relnotes/connector-python/en/)
+* `qtsql`: uses the QtSql-Module of PyQt4 (http://doc.trolltech.com/latest/qtsql.html)
 
 The following example shows basic usage of the module::
 

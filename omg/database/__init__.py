@@ -120,7 +120,7 @@ def connect(**kwargs):
         contextManager = _connect(['sqlite'],[path], **kwargs)
     else: 
         authValues = [config.options.database["mysql_"+key] for key in sql.AUTH_OPTIONS]
-        contextManager = _connect(config.options.database.mysql_drivers,authValues)
+        contextManager = _connect(config.options.database.mysql_drivers, authValues)
     
     # Initialize nextId-stuff when the first connection is created
     with _nextIdLock:

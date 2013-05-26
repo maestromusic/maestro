@@ -13,43 +13,53 @@
 # GNU General Public License for more details.
 # 
 # You should have received a copy of the GNU General Public License
-# along with this program. If not, see <http://www.gnu.org/licenses/>.
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import pymysql
+"""Database connector using the official MySQL/Python Connector
+http://dev.mysql.com/doc/relnotes/connector-python/en/
+"""
+
+import mysql.connector
 from . import AbstractSql, AbstractSqlResult, DBException, EmptyResultException
 from ... import utils
 
+
 class Sql(AbstractSql):
-    def connect(self,username,password,database,host="localhost",port=3306,**kwargs):
+    def connect(self, username, password, database, host="localhost", port=3306, **kwargs):
         try:
-            self._db = pymysql.connect(db=database,user=username,passwd=password,
-                                       host=host,port=port,use_unicode=True,charset='utf8')
-        except pymysql.err.Error as e:
+            self._db = mysql.connector.connect(database=database, user=username, password=password,
+                                               host=host, port=port, buffered=True)
+        except mysql.connector.errors.Error as e:
             raise DBException("DB-connection failed: {}".format(str(e)))
 
     def close(self):
         self._db.close()
-            
-    def query(self,queryString,*args):
+                    
+    def query(self, queryString, *args):
         if args:
             queryString = queryString.replace('?','%s')
-            args = [a.toSql() if isinstance(a,utils.FlexiDate) else a for a in args]
+            args = [a.toSql() if isinstance(a, utils.FlexiDate) else a for a in args]
         try:
             cursor = self._db.cursor()
-            cursor.execute(queryString,args)
-        except pymysql.err.Error as e:
-            raise DBException(str(e),queryString,args)
-        return SqlResult(cursor,False)
+            cursor.execute(queryString, args)
+        except mysql.connector.errors.Error as e:
+            raise DBException(str(e), queryString, args)
+        return SqlResult(cursor, False)
     
-    def multiQuery(self,queryString,argSets):
+    def multiQuery(self, queryString, argSets):
+        if not isinstance(argSets, (list,tuple)):
+            # Usually this means that argSets is some other iterable object,
+            # but mysql connector will complain.
+            argSets = list(argSets)
         queryString = queryString.replace('?','%s')
-        argSets = [[a.toSql() if isinstance(a,utils.FlexiDate) else a for a in argSet] for argSet in argSets]
+        argSets = [[a.toSql() if isinstance(a, utils.FlexiDate) else a for a in argSet]
+                   for argSet in argSets]
         try:
             cursor = self._db.cursor()
-            cursor.executemany(queryString,argSets)
-        except pymysql.err.Error as e:
-            raise DBException(str(e),queryString,argSets)
+            cursor.executemany(queryString, argSets)
+        except mysql.connector.errors.Error as e:
+            raise DBException(str(e), queryString, argSets)
         return SqlResult(cursor,True)
         
     def transaction(self):
@@ -87,7 +97,7 @@ class SqlResult(AbstractSqlResult):
         return self._cursor.fetchone()
         
     def executedQuery(self):
-        return self._cursor._executed
+        return self._cursor._executed.decode('utf-8')
         
     def affectedRows(self):
         if self._multi:
