@@ -53,15 +53,13 @@ class FancyPopup(QtGui.QFrame):
     unless the popup is entered within a short timespan.
     """
     
-    # Whether the mouse was inside this widget, its children or its parent at the last mouseMoveEvent.
-    _mouseInside = False
     # Whether a timer is active that will close this widget (to prevent starting more than one timer)
     _timerActive = False
     
     # A set of parents whose popup is open (static). Confer isActive
     _activeParents = set()
     
-    def __init__(self,parent,width=300,height=170):
+    def __init__(self, parent, width=300, height=170):
         super().__init__(parent)
         self.setWindowFlags(self.windowFlags() | Qt.Popup)
         FancyPopup._activeParents.add(parent)
@@ -110,23 +108,20 @@ class FancyPopup(QtGui.QFrame):
         super().showEvent(event)
         self._moveToScreen()
     
-    def mouseMoveEvent(self,event):
+    def mouseMoveEvent(self, event):
         super().mouseMoveEvent(event)
         pos = self.mapToGlobal(event.pos())
         widget = QtGui.QApplication.widgetAt(pos)
-        if widget is not None and (widget is self.parent() or self.isAncestorOf(widget)):
-            self._mouseInside = True
-        else:
-            self._mouseInside = False
-            if not self._timerActive:
-                QtCore.QTimer.singleShot(100,self._handleTimer)
-                self._timerActive = True
-                
+        if widget is not None and widget is not self.parent() and not self.isAncestorOf(widget)\
+                 and not self._timerActive:
+            QtCore.QTimer.singleShot(150, self._handleTimer)
+            self._timerActive = True
+        
     def _handleTimer(self):
         """Close the window shortly after the parent has been left by the cursor unless the cursor has
         entered the popup in the meantime."""
         self._timerActive = False
-        if not self._mouseInside:
+        if not self.underMouse():
             self.close()
     
     @staticmethod
