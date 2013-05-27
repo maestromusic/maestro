@@ -19,8 +19,7 @@
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from . import mainwindow
-from .profiles import ProfileComboBox
+from . import mainwindow, dialogs, profiles as profilesgui, dockwidget
 from .. import player, utils, logging
 
 translate = QtCore.QCoreApplication.translate
@@ -32,12 +31,12 @@ def formatTime(seconds):
     return "{:0>2d}:{:0>2d}".format(minutes, seconds % 60)
 
 
-class PlaybackWidget(mainwindow.DockWidget):
+class PlaybackWidget(dockwidget.DockWidget):
     """A dock widget providing playback controls for the selected player backend.
     """
     
     def __init__(self, parent=None, state=None, location=None):
-        super().__init__(parent)
+        super().__init__(parent, optionButton=True)
         self.setWindowTitle(self.tr('controls'))
         widget = QtGui.QWidget()
         self.setWidget(widget)
@@ -46,11 +45,8 @@ class PlaybackWidget(mainwindow.DockWidget):
             backend = player.profileCategory.get(state) # may be None
         elif len(player.profileCategory.profiles) > 0:
             backend = player.profileCategory.profiles[0]
-        else:
-            backend = None
-        topLayout = QtGui.QHBoxLayout()
-        self.backendChooser = ProfileComboBox(player.profileCategory, default=backend)
-        self.addTitleWidget(self.backendChooser)        
+        else: backend = None
+        topLayout = QtGui.QHBoxLayout()       
         
         standardIcon = QtGui.qApp.style().standardIcon
         self.previousButton = QtGui.QPushButton(standardIcon(QtGui.QStyle.SP_MediaSkipBackward), '', self)
@@ -64,7 +60,7 @@ class PlaybackWidget(mainwindow.DockWidget):
         self.volumeLabel = VolumeLabel(self)
         policy = QtGui.QSizePolicy()
         policy.setHorizontalPolicy(QtGui.QSizePolicy.Fixed)
-        for w in (self.backendChooser, self.previousButton, self.ppButton,
+        for w in (self.previousButton, self.ppButton,
                        self.stopButton, self.nextButton, self.volumeLabel):
             w.setSizePolicy(policy)
             
@@ -87,11 +83,13 @@ class PlaybackWidget(mainwindow.DockWidget):
         mainLayout = QtGui.QVBoxLayout(widget)
         mainLayout.addLayout(topLayout)
         mainLayout.addLayout(bottomLayout)
-        self.backendChooser.profileChosen.connect(self.setBackend)
         self.seekSlider.sliderMoved.connect(self.updateSeekLabel)
         
         self.backend = None
         self.setBackend(backend)
+        
+    def createOptionDialog(self, parent):
+        return OptionDialog(parent, self)
     
     def updateSeekLabel(self, value):
         """Display elapsed and total time on the seek label."""
@@ -305,3 +303,14 @@ class VolumeLabel(QtGui.QLabel):
             req = 0
         self.changeRequest = req
         self.emitTimer.start(25)
+
+
+class OptionDialog(dialogs.FancyPopup):
+    """Dialog for the option button in the playlist's (dock widget) title bar.""" 
+    def __init__(self, parent, playback):
+        super().__init__(parent)
+        layout = QtGui.QFormLayout(self)
+        backendChooser = profilesgui.ProfileComboBox(player.profileCategory, default=playback.backend)
+        backendChooser.profileChosen.connect(playback.setBackend)
+        layout.addRow(self.tr("Backend:"), backendChooser)
+        

@@ -20,6 +20,7 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from . import treeview, mainwindow, treeactions, playerwidgets, profiles as profilesgui, delegates
+from . import dockwidget
 from ..core import levels, nodes
 from .delegates import playlist as playlistdelegate
 from .treeactions import *
@@ -89,9 +90,9 @@ class PlaylistTreeView(treeview.DraggingTreeView):
         self.model().removeMany(self.selectedRanges())
 
 
-class PlaylistWidget(mainwindow.DockWidget):
+class PlaylistWidget(dockwidget.DockWidget):
     def __init__(self, parent=None, state=None, location=None):
-        super().__init__(parent)
+        super().__init__(parent, optionButton=True)
         self.setWindowTitle(self.tr('Playlist'))
         
         # Read state
@@ -116,17 +117,6 @@ class PlaylistWidget(mainwindow.DockWidget):
         layout.setSpacing(0)
         layout.setContentsMargins(0,0,0,0)
         
-        self.backendChooser = profilesgui.ProfileComboBox(player.profileCategory, default=backend)
-        self.backendChooser.profileChosen.connect(self.setBackend)
-        self.addTitleWidget(self.backendChooser)
-        
-        self.addTitleWidget(QtGui.QLabel(self.tr("Item Display:")))
-        profileChooser = profilesgui.ProfileComboBox(delegates.profiles.category,
-                                                     restrictToType=profileType,
-                                                     default=delegateProfile)
-        profileChooser.profileChosen.connect(self.treeview.itemDelegate().setProfile)
-        self.addTitleWidget(profileChooser)
-
         layout.addWidget(self.treeview)
         self.errorLabel = QtGui.QLabel()
         self.errorLabel.setAlignment(Qt.AlignVCenter | Qt.AlignHCenter)
@@ -167,6 +157,9 @@ class PlaylistWidget(mainwindow.DockWidget):
             self.errorLabel.setText(self.tr("No connection"))
             self.mainLayout.insertWidget(self.mainWidgetIndex, self.errorLabel)
             self.errorLabel.show()
+            
+    def createOptionDialog(self, parent):
+        return OptionDialog(parent, self)
         
         
 mainwindow.addWidgetData(mainwindow.WidgetData(
@@ -174,3 +167,19 @@ mainwindow.addWidgetData(mainwindow.WidgetData(
                     theClass=PlaylistWidget,
                     central=True, dock=True, default=True, unique=False,
                     preferredDockArea=Qt.RightDockWidgetArea))
+
+
+class OptionDialog(dialogs.FancyPopup):
+    """Dialog for the option button in the playlist's (dock widget) title bar.""" 
+    def __init__(self, parent, playlist):
+        super().__init__(parent)
+        layout = QtGui.QFormLayout(self)
+        backendChooser = profilesgui.ProfileComboBox(player.profileCategory, default=playlist.backend)
+        backendChooser.profileChosen.connect(playlist.setBackend)
+        layout.addRow(self.tr("Backend:"), backendChooser)
+        profileChooser = profilesgui.ProfileComboBox(
+                                         delegates.profiles.category,
+                                         restrictToType=playlistdelegate.PlaylistDelegate.profileType,
+                                         default=playlist.treeview.itemDelegate().profile)
+        profileChooser.profileChosen.connect(playlist.treeview.itemDelegate().setProfile)
+        layout.addRow(self.tr("Item view:"), profileChooser)

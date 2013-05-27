@@ -25,7 +25,7 @@ from .. import application, config, database as db, logging, utils, search as se
 from ..core import tags, flags, levels
 from ..core.elements import Element, Container
 from ..search import searchbox, criteria
-from . import mainwindow, treeactions, treeview, browserdialog, delegates
+from . import mainwindow, treeactions, treeview, browserdialog, delegates, dockwidget
 from .delegates import browser as browserdelegate
 from ..models import browser as browsermodel
 
@@ -34,22 +34,20 @@ translate = QtCore.QCoreApplication.translate
 logger = logging.getLogger(__name__)
 
 
-class BrowserDock(mainwindow.DockWidget):
+class BrowserDock(dockwidget.DockWidget):
     """DockWidget containing the Browser."""
-    def __init__(self,parent=None, state=None, location=None):
-        super().__init__(parent)
+    
+    def __init__(self, parent=None, state=None, location=None):
+        super().__init__(parent, optionButton=True)
         self.setWindowTitle(self.tr("Browser"))
-        browser = Browser(self,state)
-        browser.optionButton = QtGui.QToolButton(self)
-        browser.optionButton.setIcon(utils.getIcon('options.png'))
-        browser.optionButton.setIconSize(QtCore.QSize(14, 14))
-        browser.optionButton.clicked.connect(browser._handleOptionButton)
-        #browser.optionButton.clicked.connect(browser._handleLevelChange)
-        self.addTitleWidget(browser.optionButton)
-        self.setWidget(browser)
+        self.browser = Browser(self, state)
+        self.setWidget(self.browser)
         
     def saveState(self):
         return self.widget().saveState()
+    
+    def createOptionDialog(self, parent):
+        return browserdialog.BrowserDialog(parent, self.browser)
             
 
 mainwindow.addWidgetData(mainwindow.WidgetData(
@@ -91,10 +89,6 @@ class Browser(QtGui.QWidget):
 
     # Whether or not hidden values should be displayed.
     showHiddenValues = False
-    
-    # The option dialog if it is open, and the index of the tab that was active when the dialog was closed.
-    _dialog = None
-    _lastDialogTabIndex = 0
     
     # The current search request
     searchRequest = None
@@ -298,20 +292,6 @@ class Browser(QtGui.QWidget):
         self.showHiddenValues = showHiddenValues
         for view in self.views:
             view.model().setShowHiddenValues(showHiddenValues)
-            
-    def _handleOptionButton(self):
-        """Open the option dialog."""
-        if self._dialog is None:
-            self._dialog = browserdialog.BrowserDialog(self)
-            self._dialog.tabWidget.setCurrentIndex(self._lastDialogTabIndex)
-            self._dialog.show()
-    
-    def _handleDialogClosed(self):
-        """Close the option dialog."""
-        # Note: This is called by the dialog and not by a signal
-        if self._dialog is not None:
-            self._lastDialogTabIndex = self._dialog.tabWidget.currentIndex()
-            self._dialog = None
         
     def _handleSearchFinished(self,request):
         """React to searchFinished signals: Set the table to self.resultTable and reset the model."""

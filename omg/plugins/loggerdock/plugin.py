@@ -16,10 +16,12 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+import logging
+
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt 
-from omg.gui import mainwindow
-import logging
+
+from omg.gui import mainwindow, dockwidget
 from omg import logging as omglogging
 
 _signaller = None
@@ -45,7 +47,7 @@ class StreamSignaller(QtCore.QObject):
     def flush(self):
         pass
     
-class LoggerDock(QtGui.QDockWidget):
+class LoggerDock(dockwidget.DockWidget):
     def __init__(self, parent=None, location=None):
         super().__init__(parent)
         

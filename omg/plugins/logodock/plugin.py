@@ -22,20 +22,24 @@ OMG's widget system."""
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from ...gui import mainwindow
+from ...gui import mainwindow, dockwidget
 
 
 def enable():
     mainwindow.addWidgetData(mainwindow.WidgetData(
-        "logodock",QtGui.QApplication.translate("LogoDock","Logo"),LogoDock,False,True,False,
+        id = "logodock",
+        name = QtGui.QApplication.translate("LogoDock","Logo"),
+        theClass = LogoDock,
+        central = False,
+        dock = True,
+        default = False,
         preferredDockArea=Qt.RightDockWidgetArea))
-
 
 def disable():
     mainwindow.removeWidgetData("logodock")
 
 
-class LogoDock(QtGui.QDockWidget):
+class LogoDock(dockwidget.DockWidget):
     def __init__(self,parent=None,location=None):
         super().__init__(parent)
         label = QtGui.QLabel()

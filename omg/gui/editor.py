@@ -21,6 +21,7 @@ from PyQt4.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
 from . import treeactions, treeview, mainwindow, tagwidgets, dialogs, profiles as profilesgui, delegates
+from . import dockwidget
 from .. import utils
 from ..core import levels, tags
 from ..models import albumguesser
@@ -59,11 +60,11 @@ class EditorTreeView(treeview.DraggingTreeView):
                 self.expand(child)
 
     
-class EditorWidget(mainwindow.DockWidget):
+class EditorWidget(dockwidget.DockWidget):
     """The editor is a dock widget for editing elements and their structure. It provides methods to "guess"
     the album structure of new files that are dropped from the filesystem."""
     def __init__(self, parent=None, state=None, location=None):
-        super().__init__(parent)
+        super().__init__(parent, optionButton=True)
         self.setWindowTitle(self.tr('Editor'))
         widget = QtGui.QWidget()
         self.setWidget(widget)
@@ -109,12 +110,6 @@ class EditorWidget(mainwindow.DockWidget):
         self.newStreamButton = QtGui.QPushButton("HTTP")
         buttonLayout.addWidget(self.newStreamButton)
         self.newStreamButton.clicked.connect(self._handleNewStreamButton)
-        
-        self.optionButton = QtGui.QToolButton()
-        self.optionButton.setIcon(utils.getIcon('options.png'))
-        self.optionButton.setIconSize(QtCore.QSize(14, 14))
-        self.optionButton.clicked.connect(self._handleOptionButton)
-        self.addTitleWidget(self.optionButton)
 
     def _handleNewStreamButton(self):
         url, ok = QtGui.QInputDialog.getText(self, "stream", "URL:")
@@ -126,10 +121,9 @@ class EditorWidget(mainwindow.DockWidget):
         model = self.editor.model()
         model.insertElements(model.root, len(model.root.contents), [elem])
     
-    def _handleOptionButton(self):
+    def createOptionDialog(self, parent):
         """Open the option dialog."""
-        dialog = OptionDialog(self.optionButton,self.editor)
-        dialog.show()
+        return OptionDialog(parent, self.editor)
         
     def saveState(self):
         guessProfile = self.editor.model().guessProfile
@@ -148,7 +142,7 @@ class EditorWidget(mainwindow.DockWidget):
 
 class OptionDialog(dialogs.FancyPopup):
     """Option dialog for an Editor."""
-    def __init__(self,parent,editor):
+    def __init__(self, parent, editor):
         super().__init__(parent)
         self.editor = editor
         layout = QtGui.QFormLayout(self)

@@ -24,15 +24,15 @@ from PyQt4.QtCore import Qt
 from .. import strutils, utils, config, logging, application, filebackends
 from ..core import tags, levels
 from ..models import tageditor as tageditormodel, simplelistmodel, flageditor as flageditormodel
-from ..gui import singletageditor, tagwidgets, treeactions, mainwindow, flageditor, dialogs
-from ..gui.misc import widgetlist
+from . import singletageditor, tagwidgets, treeactions, mainwindow, flageditor, dialogs, dockwidget
+from .misc import widgetlist
 
 
 translate = QtCore.QCoreApplication.translate
 logger = logging.getLogger(__name__)
 
 
-class TagEditorDock(QtGui.QDockWidget):
+class TagEditorDock(dockwidget.DockWidget):
     """DockWidget containing the TagEditor."""
     def __init__(self, parent=None, state=None, location=None):
         super().__init__(parent)

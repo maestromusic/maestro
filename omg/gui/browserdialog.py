@@ -50,8 +50,8 @@ selectableLayers = utils.mapRecursively(functools.partial(tags.get, addDialogIfN
 
 class AbstractBrowserDialog(dialogs.FancyTabbedPopup):
     """Popup dialog that allows to configure the Browser."""
-    def __init__(self, browser):
-        super().__init__(browser.optionButton, 300, 200)
+    def __init__(self, parent, browser):
+        super().__init__(parent, 300, 200)
         self.browser = browser
         self.viewConfigurations = []
                 
@@ -60,7 +60,7 @@ class AbstractBrowserDialog(dialogs.FancyTabbedPopup):
         self.tabWidget.addTab(filterTab, self.tr("Filter"))
         
         filterTab.layout().addWidget(QtGui.QLabel(self.tr("Flags:")))
-        flagList = browser.flagCriterion.flags if browser.flagCriterion is not None else []
+        flagList = self.browser.flagCriterion.flags if self.browser.flagCriterion is not None else []
         
         self.flagView = FlagView(flagList)
         self.flagView.selectionChanged.connect(self._handleSelectionChanged)
@@ -80,21 +80,13 @@ class AbstractBrowserDialog(dialogs.FancyTabbedPopup):
         
         # Option tab is filled in subclasses
         
-    def hideEvent(self,event):
-        super().hideEvent(event)
-        self.close()
-        
-    def close(self):
-        self.browser._handleDialogClosed()
-        super().close()
-        
     def _handleSelectionChanged(self):
         self.browser.setFlagFilter(self.flagView.selectedFlagTypes)
           
           
 class BrowserDialog(AbstractBrowserDialog):
-    def __init__(self, browser):
-        super().__init__(browser)
+    def __init__(self, parent, browser):
+        super().__init__(parent, browser)
         optionLayout = self.optionTab.layout()
         lineLayout = QtGui.QHBoxLayout()
         optionLayout.addLayout(lineLayout)

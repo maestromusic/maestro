@@ -21,7 +21,7 @@ import os.path, collections
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from . import mainwindow, browserdialog, selection
+from . import mainwindow, browserdialog, selection, dockwidget
 from .misc import busyindicator
 from ..models import browser as browsermodel
 from .. import database as db, utils, imageloader, config
@@ -31,7 +31,7 @@ from ..search import searchbox
 translate = QtCore.QCoreApplication.translate
 
 
-class CoverBrowserDock(QtGui.QDockWidget):
+class CoverBrowserDock(dockwidget.DockWidget):
     """DockWidget containing the TagEditor."""
     def __init__(self, parent=None, state=None, location=None):
         super().__init__(parent)

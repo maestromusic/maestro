@@ -21,7 +21,7 @@ import os
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
-from . import mainwindow, selection
+from . import mainwindow, selection, dockwidget
 from .. import filebackends, filesystem, config
 from ..utils import relPath, getIcon, hasKnownExtension
 from ..core import levels
@@ -137,20 +137,15 @@ class FileSystemBrowser(QtGui.QTreeView):
             selection.setGlobalSelection(s) 
     
         
-class FileSystemBrowserDock(mainwindow.DockWidget):
+class FileSystemBrowserDock(dockwidget.DockWidget):
     """A DockWidget wrapper for the FileSystemBrowser."""
     def __init__(self,parent=None,location=None):
-        super().__init__(parent)
+        super().__init__(parent, optionButton=True)
         self.setWindowTitle(translate("FileSystemBrowserDock", "Filesystem: {}")
                             .format(config.options.main.collection))
-        self.confButton = QtGui.QToolButton()
-        self.confButton.setIcon(getIcon('options.png'))
-        self.confButton.setIconSize(QtCore.QSize(14, 14))
-        self.confButton.clicked.connect(self._handleConf)
-        self.addTitleWidget(self.confButton)
         self.setWidget(FileSystemBrowser())
         
-    def _handleConf(self):
+    def createOptionDialog(self, parent):
         from . import preferences
         preferences.show("main/filesystem")
         
