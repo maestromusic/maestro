@@ -34,30 +34,7 @@ translate = QtCore.QCoreApplication.translate
 logger = logging.getLogger(__name__)
 
 
-class BrowserDock(dockwidget.DockWidget):
-    """DockWidget containing the Browser."""
-    def __init__(self, parent=None, state=None, **args):
-        super().__init__(parent, **args)
-        self.browser = Browser(self, state)
-        self.setWidget(self.browser)
-        
-    def saveState(self):
-        return self.widget().saveState()
-    
-    def createOptionDialog(self, parent):
-        return browserdialog.BrowserDialog(parent, self.browser)
-            
-
-mainwindow.addWidgetData(mainwindow.WidgetData(
-        id = "browser",
-        name = translate("Browser","Browser"),
-        icon = utils.getIcon('widgets/browser.png'),
-        theClass = BrowserDock,
-        central = False,
-        preferredDockArea = Qt.LeftDockWidgetArea))
-
-
-class Browser(QtGui.QWidget):
+class Browser(dockwidget.DockWidget):
     """Browser to search the music collection. The browser contains a searchbox, a button to open the
     configuration-dialog and one or more views. Depending on whether a search value is entered and/or a
     filterCriterion is set or not, the browser displays results from its search result table or from
@@ -93,9 +70,11 @@ class Browser(QtGui.QWidget):
     selectionChanged = QtCore.pyqtSignal(QtGui.QItemSelectionModel,
                                          QtGui.QItemSelection, QtGui.QItemSelection)
     
-    def __init__(self, parent=None, state=None):
+    def __init__(self, parent=None, state=None, **args):
         """Initialize a new Browser with the given parent."""
-        QtGui.QWidget.__init__(self,parent)
+        super().__init__(parent, **args)
+        widget = QtGui.QWidget()
+        self.setWidget(widget)
         
         self.views = [] # List of treeviews
         
@@ -115,14 +94,22 @@ class Browser(QtGui.QWidget):
         browsermodel.searchEngine.searchFinished.connect(self._handleSearchFinished)
         
         # Layout
-        layout = QtGui.QVBoxLayout(self)
+        layout = QtGui.QVBoxLayout(widget)
         layout.setSpacing(0)
         layout.setContentsMargins(0,0,0,0)
-        self.setLayout(layout)   
         
+        controlLineLayout = QtGui.QHBoxLayout()
         self.searchBox = searchbox.SearchBox()
         self.searchBox.criterionChanged.connect(self.search)
-        layout.addWidget(self.searchBox)
+        controlLineLayout.addWidget(self.searchBox)
+        
+        # This option button is only used when dock widget title bars are hidden (otherwise the dock widget
+        # title bar contains an analogous button).
+        self.optionButton = dockwidget.DockWidgetTitleButton('options')
+        self.optionButton.clicked.connect(functools.partial(self.openOptionDialog, self.optionButton))
+        controlLineLayout.addWidget(self.optionButton)
+        self.optionButton.setVisible(mainwindow.mainWindow.hideTitleBarsAction.isChecked())
+        layout.addLayout(controlLineLayout)
                
         self.splitter = QtGui.QSplitter(Qt.Vertical,self)
         layout.addWidget(self.splitter)
@@ -305,6 +292,13 @@ class Browser(QtGui.QWidget):
         for view in self.views:
             view.expander = RestoreExpander(view)
         self.load()
+    
+    def createOptionDialog(self, parent):
+        return browserdialog.BrowserDialog(parent, self)
+    
+    def _handleHideTitleBarAction(self, checked):
+        super()._handleHideTitleBarAction(checked)
+        self.optionButton.setVisible(checked)
               
     @staticmethod
     def defaultLayers():
@@ -313,6 +307,15 @@ class Browser(QtGui.QWidget):
         if len(tagList) > 0:
             return [browsermodel.TagLayer(tagList)]
         else: return []
+
+
+mainwindow.addWidgetData(mainwindow.WidgetData(
+        id = "browser",
+        name = translate("Browser","Browser"),
+        icon = utils.getIcon('widgets/browser.png'),
+        theClass = Browser,
+        central = False,
+        preferredDockArea = Qt.LeftDockWidgetArea))
 
 
 class BrowserTreeView(treeview.TreeView):

@@ -449,7 +449,6 @@ class MainWindow(QtGui.QMainWindow):
         """Enable/disable the menu actions for a unique widget type. *id* is the id of a registered
         WidgetData-instance having the 'unique'-flag.
         """
-        print("_setUnique", id, enabled)
         for menuId in 'centralwidgets', 'dockwidgets':
             action = self.menus[menuId].findChild(QtGui.QAction, id)
             if action is not None:
@@ -508,10 +507,20 @@ class CentralTabWidget(QtGui.QTabWidget):
         self.tabBar().tabMoved.connect(self._handleTabMoved)
         self._lastDialogTabIndexes = {}
         self.currentChanged.connect(self._handleCurrentChanged)
+        
+        # Create corner widget
         from . import dockwidget
-        self.setCornerWidget(dockwidget.DockWidgetButtons(self, optionButton=True))
-        self.cornerWidget().optionButton.clicked.connect(self._handleOptionButton)
-        self.cornerWidget().closeButton.clicked.connect(self._handleCloseButton)
+        cornerWidget = QtGui.QWidget()
+        cornerLayout = QtGui.QHBoxLayout(cornerWidget)
+        cornerLayout.setContentsMargins(2, 0, 0, 0)
+        cornerLayout.setSpacing(0)
+        self.optionButton = dockwidget.DockWidgetTitleButton('options')
+        self.optionButton.clicked.connect(self._handleOptionButton)
+        cornerLayout.addWidget(self.optionButton)
+        self.closeButton = dockwidget.DockWidgetTitleButton('close')
+        self.closeButton.clicked.connect(self._handleCloseButton)
+        cornerLayout.addWidget(self.closeButton)
+        self.setCornerWidget(cornerWidget)
                 
     def minimumSizeHint(self):
         return QtCore.QSize(0,0)
@@ -523,7 +532,7 @@ class CentralTabWidget(QtGui.QTabWidget):
     def _handleCurrentChanged(self):
         widget = self.currentWidget()
         hasOptionDialog = hasattr(widget, 'hasOptionDialog') and widget.hasOptionDialog()
-        self.cornerWidget().optionButton.setEnabled(hasOptionDialog)
+        self.optionButton.setEnabled(hasOptionDialog)
         
     def _handleCloseButton(self):
         """React to the corner widget's close button: Close the current tab."""
@@ -533,7 +542,7 @@ class CentralTabWidget(QtGui.QTabWidget):
         
     def _handleOptionButton(self):
         """React to the corner widget's option button: Open the option dialog of the current widget."""
-        self._dialog = self.currentWidget().createOptionDialog(self.cornerWidget().optionButton)
+        self._dialog = self.currentWidget().createOptionDialog(self.optionButton)
         if self._dialog is not None:
             self._dialog.installEventFilter(self)
             if isinstance(self._dialog, dialogs.FancyTabbedPopup) \

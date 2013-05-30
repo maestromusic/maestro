@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import os.path, collections
+import os.path, collections, functools
 
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
@@ -31,40 +31,30 @@ from ..search import searchbox, criteria
 translate = QtCore.QCoreApplication.translate
 
 
-class CoverBrowserDock(dockwidget.DockWidget):
-    """DockWidget containing the TagEditor."""
-    def __init__(self, parent=None, state=None, **args):
-        super().__init__(parent, **args)        
-        self.browser = CoverBrowser(state)
-        self.setWidget(self.browser)
-        
-    def saveState(self):
-        return self.widget().saveState()
-    
-    def createOptionDialog(self, parent):
-        return BrowserDialog(parent, self.browser)
-
-
-mainwindow.addWidgetData(mainwindow.WidgetData(
-        id = "coverbrowser",
-        name = translate("CoverBrowser","Cover Browser"),
-        icon = utils.getIcon('widgets/coverbrowser.png'),
-        theClass = CoverBrowserDock,
-        preferredDockArea = Qt.RightDockWidgetArea))
-
-
-class CoverBrowser(QtGui.QWidget):
+class CoverBrowser(dockwidget.DockWidget):
     # The option dialog if it is open, and the index of the tab that was active when the dialog was closed.
     _dialog = None
     _lastDialogTabIndex = 0
     
-    def __init__(self, state=None):
-        super().__init__()
-        layout = QtGui.QVBoxLayout(self)
+    def __init__(self, parent=None, state=None, **args):
+        super().__init__(parent, **args)
+        widget = QtGui.QWidget()
+        self.setWidget(widget)
         
+        layout = QtGui.QVBoxLayout(widget)
+        
+        controlLineLayout = QtGui.QHBoxLayout()
         self.searchBox = searchbox.SearchBox()
         self.searchBox.criterionChanged.connect(self.search)
-        layout.addWidget(self.searchBox)
+        controlLineLayout.addWidget(self.searchBox)
+        
+        # This option button is only used when dock widget title bars are hidden (otherwise the dock widget
+        # title bar contains an analogous button).
+        self.optionButton = dockwidget.DockWidgetTitleButton('options')
+        self.optionButton.clicked.connect(functools.partial(self.openOptionDialog, self.optionButton))
+        controlLineLayout.addWidget(self.optionButton)
+        self.optionButton.setVisible(mainwindow.mainWindow.hideTitleBarsAction.isChecked())
+        layout.addLayout(controlLineLayout)
         
         self.coverTable = CoverTable()
         self.coverTable.scene().selectionChanged.connect(self._handleSelectionChanged)
@@ -160,7 +150,22 @@ class CoverBrowser(QtGui.QWidget):
     def _handleSelectionChanged(self):
         selection.setGlobalSelection(self.coverTable.scene().selection())
         
+    def createOptionDialog(self, parent):
+        return BrowserDialog(parent, self)
+    
+    def _handleHideTitleBarAction(self, checked):
+        super()._handleHideTitleBarAction(checked)
+        self.optionButton.setVisible(checked)
         
+
+mainwindow.addWidgetData(mainwindow.WidgetData(
+        id = "coverbrowser",
+        name = translate("CoverBrowser","Cover Browser"),
+        icon = utils.getIcon('widgets/coverbrowser.png'),
+        theClass = CoverBrowser,
+        preferredDockArea = Qt.RightDockWidgetArea))
+
+
 class CoverTable(QtGui.QGraphicsView):
     """QGraphicsView for the CoverBrowser."""
     def __init__(self):
