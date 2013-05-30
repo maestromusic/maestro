@@ -34,9 +34,8 @@ logger = logging.getLogger(__name__)
 
 class TagEditorDock(dockwidget.DockWidget):
     """DockWidget containing the TagEditor."""
-    def __init__(self, parent=None, state=None, location=None):
-        super().__init__(parent)
-        self.setWindowTitle(self.tr("Tageditor"))
+    def __init__(self, parent=None, state=None, location=None, **args):
+        super().__init__(parent, location=location, **args)
         if location is not None:
             vertical = location.floating or location.area in [Qt.LeftDockWidgetArea,Qt.RightDockWidgetArea]
         else: vertical = False # Should not happen
@@ -103,14 +102,15 @@ class TagEditorDock(dockwidget.DockWidget):
         
         
 mainwindow.addWidgetData(mainwindow.WidgetData(
-        id="tageditor",
-        name=translate("Tageditor","Tageditor"),
+        id = "tageditor",
+        name = translate("Tageditor","Tageditor"),
+        icon = utils.getIcon('widgets/tageditor.png'),
         theClass = TagEditorDock,
-        central=False,
-        dock=True,
-        default=True,
-        unique=True,
-        preferredDockArea=Qt.BottomDockWidgetArea))
+        central = False,
+        dock = True,
+        default = True,
+        unique = True,
+        preferredDockArea = Qt.BottomDockWidgetArea))
     
     
 class TagEditorDialog(QtGui.QDialog):

@@ -36,10 +36,8 @@ logger = logging.getLogger(__name__)
 
 class BrowserDock(dockwidget.DockWidget):
     """DockWidget containing the Browser."""
-    
-    def __init__(self, parent=None, state=None, location=None):
-        super().__init__(parent, optionButton=True)
-        self.setWindowTitle(self.tr("Browser"))
+    def __init__(self, parent=None, state=None, **args):
+        super().__init__(parent, optionButton=True, **args)
         self.browser = Browser(self, state)
         self.setWidget(self.browser)
         
@@ -51,8 +49,9 @@ class BrowserDock(dockwidget.DockWidget):
             
 
 mainwindow.addWidgetData(mainwindow.WidgetData(
-        id="browser",
-        name=translate("Browser","Browser"),
+        id = "browser",
+        name = translate("Browser","Browser"),
+        icon = utils.getIcon('widgets/browser.png'),
         theClass = BrowserDock,
         central=False,
         dock=True,

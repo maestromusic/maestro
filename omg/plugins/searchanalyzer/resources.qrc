@@ -1,0 +1,5 @@
+<RCC>
+    <qresource prefix="/omg/plugins/searchanalyzer">
+        <file>searchanalyzer.png</file>
+    </qresource>
+</RCC>

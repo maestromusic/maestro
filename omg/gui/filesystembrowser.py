@@ -139,8 +139,8 @@ class FileSystemBrowser(QtGui.QTreeView):
         
 class FileSystemBrowserDock(dockwidget.DockWidget):
     """A DockWidget wrapper for the FileSystemBrowser."""
-    def __init__(self,parent=None,location=None):
-        super().__init__(parent, optionButton=True)
+    def __init__(self, parent=None, **args):
+        super().__init__(parent, optionButton=True, **args)
         self.setWindowTitle(translate("FileSystemBrowserDock", "Filesystem: {}")
                             .format(config.options.main.collection))
         self.setWidget(FileSystemBrowser())
@@ -171,12 +171,13 @@ class FileSystemSelection(selection.Selection):
         
         
 # register this widget in the main application
-data = mainwindow.WidgetData(id = "filesystembrowser",
-                             name = translate("FileSystemBrowser","File System Browser"),
-                             theClass = FileSystemBrowserDock,
-                             central = False,
-                             dock = True,
-                             default = True,
-                             unique = False,
-                             preferredDockArea = QtCore.Qt.RightDockWidgetArea)
-mainwindow.addWidgetData(data)
+widgetData = mainwindow.WidgetData(id = "filesystembrowser",
+                                   name = translate("FileSystemBrowser", "File System Browser"),
+                                   icon = getIcon('widgets/filesystembrowser.png'),
+                                   theClass = FileSystemBrowserDock,
+                                   central = False,
+                                   dock = True,
+                                   default = True,
+                                   unique = False,
+                                   preferredDockArea = QtCore.Qt.RightDockWidgetArea)
+mainwindow.addWidgetData(widgetData)

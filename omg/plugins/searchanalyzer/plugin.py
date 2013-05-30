@@ -26,6 +26,7 @@ from ...core import tags
 from ... import search, config, application, database as db, constants, utils
 from ...search import searchbox, criteria
 from ...gui import mainwindow, dialogs
+from . import resources
 
 
 _action = None # the action that is inserted into the Extras menu
@@ -38,10 +39,13 @@ def enable():
     _action.setText(QtGui.QApplication.translate("SearchAnalyzer","Search Analyzer"))
     _action.triggered.connect(_openDialog)
     mainwindow.addWidgetData(mainwindow.WidgetData(
-        "searchanalyzer",
-        QtGui.QApplication.translate("SearchAnalyzer","Search Analyzer"),
-        SearchAnalyzer,
-        True, False, False))
+        id = "searchanalyzer",
+        name = QtGui.QApplication.translate("SearchAnalyzer","Search Analyzer"),
+        icon = QtGui.QIcon(":/omg/plugins/searchanalyzer/searchanalyzer.png"),
+        theClass = SearchAnalyzer,
+        central = True,
+        dock = False,
+        default = False))
 
 
 def mainWindowInit():

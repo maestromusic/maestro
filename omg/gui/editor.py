@@ -63,9 +63,8 @@ class EditorTreeView(treeview.DraggingTreeView):
 class EditorWidget(dockwidget.DockWidget):
     """The editor is a dock widget for editing elements and their structure. It provides methods to "guess"
     the album structure of new files that are dropped from the filesystem."""
-    def __init__(self, parent=None, state=None, location=None):
-        super().__init__(parent, optionButton=True)
-        self.setWindowTitle(self.tr('Editor'))
+    def __init__(self, parent=None, state=None, **args):
+        super().__init__(parent, optionButton=True, **args)
         widget = QtGui.QWidget()
         self.setWidget(widget)
         layout = QtGui.QVBoxLayout(widget)
@@ -270,6 +269,7 @@ class ExternalTagsWidget(QtGui.QScrollArea):
 # register this widget in the main application
 widgetData = mainwindow.WidgetData(id = "editor",
                              name = translate("Editor","editor"),
+                             icon = utils.getIcon('widgets/editor.png'),
                              theClass = EditorWidget,
                              central = True,
                              dock = True,

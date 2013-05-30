@@ -22,26 +22,32 @@ OMG's widget system."""
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
+from ... import utils
 from ...gui import mainwindow, dockwidget
+from . import resources
 
 
 def enable():
     mainwindow.addWidgetData(mainwindow.WidgetData(
         id = "logodock",
         name = QtGui.QApplication.translate("LogoDock","Logo"),
+        icon = QtGui.QIcon(":/omg/plugins/logodock/omg.png"),
         theClass = LogoDock,
         central = False,
         dock = True,
         default = False,
         preferredDockArea=Qt.RightDockWidgetArea))
 
+
 def disable():
     mainwindow.removeWidgetData("logodock")
 
 
 class LogoDock(dockwidget.DockWidget):
-    def __init__(self,parent=None,location=None):
-        super().__init__(parent)
+    def __init__(self, parent=None, **args):
+        super().__init__(parent, **args)
+        self.setWindowTitle('')  # Do not show a title and icon in the title bar of this dock widget.
+        self.setWindowIcon(None)
         label = QtGui.QLabel()
         label.setPixmap(QtGui.QPixmap(':/omg/omg.png'))
         label.setAlignment(Qt.AlignCenter)

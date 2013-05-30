@@ -35,12 +35,16 @@ _widget = None # the dialog widget must be stored in a variable or it will vanis
 def enable():
     global _action
     _action = QtGui.QAction(application.mainWindow)
-    _action.setText(QtGui.QApplication.translate("DBAnalyzerDialog","DB Analyzer"))
+    _action.setText(QtGui.QApplication.translate("DBAnalyzerDialog", "DB Analyzer"))
     _action.triggered.connect(_openDialog)
     mainwindow.addWidgetData(mainwindow.WidgetData(
-        "dbanalyzer",QtGui.QApplication.translate("DBAnalyzerDialog","DB Analyzer"),DBAnalyzerDialog,
-        True,False,False,
-        icon=QtGui.QIcon(":/omg/plugins/dbanalyzer/dbanalyzer.png")))
+        id = "dbanalyzer",
+        name = QtGui.QApplication.translate("DBAnalyzerDialog", "DB Analyzer"),
+        theClass = DBAnalyzerDialog,
+        central = True,
+        dock = False,
+        default = False,
+        icon = QtGui.QIcon(":/omg/plugins/dbanalyzer/dbanalyzer.png")))
 
 
 def mainWindowInit():

@@ -25,6 +25,7 @@ from .. import player, utils, logging
 translate = QtCore.QCoreApplication.translate
 logger = logging.getLogger(__name__)
 
+
 def formatTime(seconds):
     seconds = int(seconds)
     minutes = seconds // 60
@@ -34,10 +35,8 @@ def formatTime(seconds):
 class PlaybackWidget(dockwidget.DockWidget):
     """A dock widget providing playback controls for the selected player backend.
     """
-    
-    def __init__(self, parent=None, state=None, location=None):
-        super().__init__(parent, optionButton=True)
-        self.setWindowTitle(self.tr('controls'))
+    def __init__(self, parent=None, state=None, **args):
+        super().__init__(parent, optionButton=True, **args)
         widget = QtGui.QWidget()
         self.setWidget(widget)
 
@@ -195,6 +194,7 @@ class PlaybackWidget(dockwidget.DockWidget):
     
 data = mainwindow.WidgetData(id="playback",
                              name=translate("Playback","playback"),
+                             icon=utils.getIcon('widgets/playback.png'),
                              theClass=PlaybackWidget,
                              central=False,
                              dock=True,

@@ -1,0 +1,5 @@
+<RCC>
+    <qresource prefix="/omg/plugins/loggerdock">
+        <file>loggerdock.png</file>
+    </qresource>
+</RCC>

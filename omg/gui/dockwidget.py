@@ -30,16 +30,39 @@ class DockWidget(QtGui.QDockWidget):
     button is clicked. It receives a reference to the button as argument (use this to place popup dialogs).
     It must return either a FancyPopup dialog, which will be shown/hidden by the DockWidget, or None in
     which case *parent* must show/hide the dialog itself.
+    
+    *title* and *icon* are used for the dockwidget's title bar. They are set automatically by the widget
+    system (based on the corresponding mainwindow.WidgetData instance). Of course, subclasses can change
+    title and icon using setWindowTitle/setWindowIcon.
+    
+    In subclasses which implement 'saveState' the parameter *state* is set to whatever was returned by
+    'saveState' when the application closed last time. 
+    
+    *location* is set to a mainwindow.Location-instance representing the place where the widget will be
+    displayed. Subclasses may use this for example to change between a horizontal and a vertical layout.
     """
-    def __init__(self, parent=None, optionButton=False):
+    def __init__(self, parent=None, optionButton=False, title='', icon=None, state=None, location=None):
         super().__init__(parent)
         self.titleBarWidget = DockWidgetTitleBar(self, optionButton)
+        self.setWindowTitle(title)
+        self.setWindowIcon(icon)
         self.setTitleBarWidget(self.titleBarWidget)
         mainwindow.mainWindow.hideTitleBarsAction.toggled.connect(self._handleHideAction)
         
     def setWindowTitle(self, title):
+        """Set the title displayed in the title bar of this dock widget."""
         super().setWindowTitle(title)
-        self.titleBarWidget.label.setText(title)
+        self.titleBarWidget.titleLabel.setText(title)
+        
+    def setWindowIcon(self, icon):
+        """Set the icon displayed in the title bar of this dock widget. If *icon* is None, the icon will be
+        hidden."""
+        if icon is not None:
+            self.titleBarWidget.iconLabel.setPixmap(icon.pixmap(16, 16))
+            self.titleBarWidget.iconLabel.show()
+        else:
+            self.titleBarWidget.iconLabel.setPixmap(QtGui.QPixmap())
+            self.titleBarWidget.iconLabel.hide()
         
     def _handleHideAction(self, checked):
         if checked:
@@ -62,8 +85,12 @@ class DockWidgetTitleBar(QtGui.QFrame):
         layout.setContentsMargins(2, 0, 0, 0)
         layout.setSpacing(0)
         
-        self.label = QtGui.QLabel(self.parent().windowTitle())
-        layout.addWidget(self.label)
+        self.iconLabel = QtGui.QLabel()
+        layout.addWidget(self.iconLabel)
+        layout.addSpacing(3)
+        self.titleLabel = QtGui.QLabel(self.parent().windowTitle())
+        self.titleLabel.setStyleSheet('QLabel { font-weight: bold}')
+        layout.addWidget(self.titleLabel)
         layout.addStretch()
         layout.addSpacing(8)
         

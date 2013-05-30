@@ -1,6 +1,6 @@
 <RCC>
     <qresource prefix="/omg/plugins/dbanalyzer">
-        <file>dbanalyzer.png</file>
         <file>edit-clear.png</file>
+        <file>dbanalyzer.png</file>
     </qresource>
 </RCC>

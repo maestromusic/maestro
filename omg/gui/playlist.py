@@ -91,9 +91,8 @@ class PlaylistTreeView(treeview.DraggingTreeView):
 
 
 class PlaylistWidget(dockwidget.DockWidget):
-    def __init__(self, parent=None, state=None, location=None):
-        super().__init__(parent, optionButton=True)
-        self.setWindowTitle(self.tr('Playlist'))
+    def __init__(self, parent=None, state=None, **args):
+        super().__init__(parent, optionButton=True, **args)
         
         # Read state
         profileType = playlistdelegate.PlaylistDelegate.profileType
@@ -106,7 +105,7 @@ class PlaylistWidget(dockwidget.DockWidget):
             delegateProfile = profileType.default()
         else:
             backend = player.profileCategory.getFromStorage(state['backend'])
-            delegateProfile = delegates.profiles.category.getFromStorage(state.get('delegate'),profileType)
+            delegateProfile = delegates.profiles.category.getFromStorage(state.get('delegate'), profileType)
         
         self.treeview = PlaylistTreeView(delegateProfile)
  
@@ -163,10 +162,15 @@ class PlaylistWidget(dockwidget.DockWidget):
         
         
 mainwindow.addWidgetData(mainwindow.WidgetData(
-                    id="playlist", name=translate("Playlist", "Playlist"),
-                    theClass=PlaylistWidget,
-                    central=True, dock=True, default=True, unique=False,
-                    preferredDockArea=Qt.RightDockWidgetArea))
+                    id = "playlist",
+                    name = translate("Playlist", "Playlist"),
+                    icon = utils.getIcon('widgets/playlist.png'),
+                    theClass = PlaylistWidget,
+                    central = True,
+                    dock = True,
+                    default = True,
+                    unique = False,
+                    preferredDockArea = Qt.RightDockWidgetArea))
 
 
 class OptionDialog(dialogs.FancyPopup):

@@ -337,9 +337,12 @@ class MainWindow(QtGui.QMainWindow):
                     i += 1
                 objectName = data.id + str(i)
         
+        args = {'location': location, 'title': data.name}
         if hasattr(data.theClass, 'saveState'):
-            widget = data.theClass(self, state=state, location=location)
-        else: widget = data.theClass(self, location=location)
+            args['state'] = state
+        if data.icon is not None:
+            args['icon'] = data.icon
+        widget = data.theClass(self, **args)
         
         widget.setObjectName(objectName)
         self._dockWidgets[data].append(widget)

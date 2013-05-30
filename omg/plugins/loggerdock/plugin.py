@@ -21,24 +21,32 @@ import logging
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt 
 
-from omg.gui import mainwindow, dockwidget
-from omg import logging as omglogging
+from ... import logging as omglogging
+from ...gui import mainwindow, dockwidget
+from . import resources
 
 _signaller = None
+
 
 def enable():
     global _signaller    
     _signaller = StreamSignaller()
     mainwindow.addWidgetData(mainwindow.WidgetData(
-        "loggerdock",QtGui.QApplication.translate("LoggerDock","Logger"),LoggerDock,False,True,False,
-        preferredDockArea=Qt.BottomDockWidgetArea))
+        id = "loggerdock",
+        name = QtGui.QApplication.translate("LoggerDock","Logger"),
+        icon = QtGui.QIcon(":/omg/plugins/loggerdock/loggerdock.png"),
+        theClass = LoggerDock,
+        central = False,
+        dock = True,
+        default = False,
+        preferredDockArea = Qt.BottomDockWidgetArea))
 
 
 def disable():
     mainwindow.removeWidgetData("loggerdock")
 
+
 class StreamSignaller(QtCore.QObject):
-    
     textReceived = QtCore.pyqtSignal(str)
     
     def write(self, msg):
@@ -46,10 +54,11 @@ class StreamSignaller(QtCore.QObject):
         
     def flush(self):
         pass
-    
+
+
 class LoggerDock(dockwidget.DockWidget):
-    def __init__(self, parent=None, location=None):
-        super().__init__(parent)
+    def __init__(self, parent=None, **args):
+        super().__init__(parent, **args)
         
         layout = QtGui.QVBoxLayout()
         area = QtGui.QTextBrowser(self)
@@ -59,7 +68,8 @@ class LoggerDock(dockwidget.DockWidget):
         formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
         self.handler.setFormatter(formatter)
         omglogging.addHandler(self.handler)
-        dropdown.activated[str].connect(lambda levelStr : self.handler.setLevel(getattr(logging, levelStr.upper())))
+        dropdown.activated[str].connect(
+                                lambda levelStr : self.handler.setLevel(getattr(logging, levelStr.upper())))
         self.handler.setLevel(logging.DEBUG)
         layout.addWidget(dropdown)
         layout.addWidget(area)
