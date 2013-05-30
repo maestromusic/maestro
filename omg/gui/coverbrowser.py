@@ -26,7 +26,7 @@ from .misc import busyindicator
 from ..models import browser as browsermodel
 from .. import database as db, utils, imageloader, config
 from ..core import covers, levels, nodes
-from ..search import searchbox
+from ..search import searchbox, criteria
 
 translate = QtCore.QCoreApplication.translate
 
@@ -34,12 +34,15 @@ translate = QtCore.QCoreApplication.translate
 class CoverBrowserDock(dockwidget.DockWidget):
     """DockWidget containing the TagEditor."""
     def __init__(self, parent=None, state=None, **args):
-        super().__init__(parent, **args)        
+        super().__init__(parent, optionButton=True, **args)        
         self.browser = CoverBrowser(state)
         self.setWidget(self.browser)
         
     def saveState(self):
         return self.widget().saveState()
+    
+    def createOptionDialog(self, parent):
+        return BrowserDialog(parent, self.browser)
 
 
 mainwindow.addWidgetData(mainwindow.WidgetData(
@@ -54,8 +57,7 @@ mainwindow.addWidgetData(mainwindow.WidgetData(
         preferredDockArea = Qt.RightDockWidgetArea))
 
 
-class CoverBrowser(QtGui.QWidget):   
-    
+class CoverBrowser(QtGui.QWidget):
     # The option dialog if it is open, and the index of the tab that was active when the dialog was closed.
     _dialog = None
     _lastDialogTabIndex = 0
@@ -64,23 +66,15 @@ class CoverBrowser(QtGui.QWidget):
         super().__init__()
         layout = QtGui.QVBoxLayout(self)
         
-        # ControlLine (containing searchBox and optionButton)
-        controlLineLayout = QtGui.QHBoxLayout()
-        layout.addLayout(controlLineLayout)
-        
         self.searchBox = searchbox.SearchBox()
         self.searchBox.criterionChanged.connect(self.search)
-        controlLineLayout.addWidget(self.searchBox)
-        
-        self.optionButton = QtGui.QPushButton(self)
-        self.optionButton.setIcon(utils.getIcon('options.png'))
-        self.optionButton.clicked.connect(self._handleOptionButton)
-        controlLineLayout.addWidget(self.optionButton)
+        layout.addWidget(self.searchBox)
         
         self.coverTable = CoverTable()
         self.coverTable.scene().selectionChanged.connect(self._handleSelectionChanged)
         layout.addWidget(self.coverTable,1)
         
+        self.flagCriterion = None
         self.filterCriterion = None
         self.searchCriterion = None
         self.searchRequest = None
@@ -88,7 +82,7 @@ class CoverBrowser(QtGui.QWidget):
         if browsermodel.searchEngine is None:
             browsermodel.initSearchEngine()
         browsermodel.searchEngine.searchFinished.connect(self._handleSearchFinished)
-        self.bigResult = browsermodel.searchEngine.createResultTable("browser_big")
+        self.resultTable = browsermodel.searchEngine.createResultTable("coverbrowser")
         
         if state is not None:
             if 'coverSize' in state and state['coverSize'] is not None:
@@ -98,19 +92,17 @@ class CoverBrowser(QtGui.QWidget):
         
     def saveState(self):
         return {'coverSize': self.getCoverSize()}
-    
-    def _handleOptionButton(self):
-        """Open the option dialog."""
-        self._dialog = BrowserDialog(self)
-        self._dialog.tabWidget.setCurrentIndex(self._lastDialogTabIndex)
-        self._dialog.show()
-    
-    def _handleDialogClosed(self):
-        """Close the option dialog."""
-        # Note: This is called by the dialog and not by a signal
-        if self._dialog is not None:
-            self._lastDialogTabIndex = self._dialog.tabWidget.currentIndex()
-            self._dialog = None
+        
+    def setFlagFilter(self, flags):
+        """Set the browser's flag filter to the given list of flags."""
+        if len(flags) == 0:
+            if self.flagCriterion is not None:
+                self.flagCriterion = None
+                self.load()
+        else:
+            if self.flagCriterion is None or self.flagCriterion.flags != flags:
+                self.flagCriterion = criteria.FlagCriterion(flags)
+                self.load()
         
     def setFilterCriterion(self, criterion):
         """Set a single criterion that will be added to all other criteria from the searchbox (using AND)
@@ -124,33 +116,31 @@ class CoverBrowser(QtGui.QWidget):
         self.load()
         
     def load(self):
-         # This will effectively stop any request from being processed
+        """Load contents into the cover browser, based on the current filterCriterion, flagCriterion and
+        searchCriterion. If a search is necessary this will only start a search and actual loading will
+        be done in _handleSearchFinished.
+        """
         if self.searchRequest is not None:
             self.searchRequest.stop()
             self.searchRequest = None
             
-        if self.filterCriterion is not None and self.searchCriterion is not None:
-            criterion = self.filterCriterion and self.searchCriterion
-        elif self.filterCriterion is not None:
-            criterion = self.filterCriterion
-        elif self.searchCriterion is not None:
-            criterion = self.searchCriterion
-        else: criterion = None
+        # Combine returns None if all input criteria are None
+        criterion = criteria.combine('AND',
+                            [c for c in (self.filterCriterion, self.flagCriterion, self.searchBox.criterion)
+                             if c is not None])
 
         if criterion is not None:
-            self.table = self.bigResult
-            self.searchRequest = browsermodel.searchEngine.search(fromTable = db.prefix+"elements",
-                                                                  resultTable = self.bigResult,
-                                                                  criterion = criterion
-                                                                )
-            # self.reset will be called when the search is finished
+            self.table = self.resultTable
+            self.searchRequest = browsermodel.searchEngine.search(
+                                                  fromTable = db.prefix+"elements",
+                                                  resultTable = self.resultTable,
+                                                  criterion = criterion)
         else:
             self.table = db.prefix + "elements"
-            self.searchRequest = None
             self.reset()
             
     def _handleSearchFinished(self,request):
-        """React to searchFinished signals: Set the table to self.bigResult and reset the model."""
+        """React to searchFinished signals."""
         if request is self.searchRequest:
             self.searchRequest = None
             #print("FINISHED")
@@ -161,7 +151,7 @@ class CoverBrowser(QtGui.QWidget):
             SELECT el.id, st.data
             FROM {1} AS el JOIN {0}stickers AS st ON el.id = st.element_id
             WHERE st.type = 'COVER'
-            """.format(db.prefix,self.table))
+            """.format(db.prefix, self.table))
         
         self.coverTable.scene().setCovers(result)
     
@@ -374,8 +364,8 @@ class CoverItem(QtGui.QGraphicsItem):
             
             
 class BrowserDialog(browserdialog.AbstractBrowserDialog):
-    def __init__(self, browser):
-        super().__init__(browser)
+    def __init__(self, parent, browser):
+        super().__init__(parent, browser)
         optionLayout = self.optionTab.layout()
                 
         instantSearchBox = QtGui.QCheckBox(self.tr("Instant search"))
