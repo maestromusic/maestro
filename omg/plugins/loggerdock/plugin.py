@@ -36,9 +36,6 @@ def enable():
         name = QtGui.QApplication.translate("LoggerDock","Logger"),
         icon = QtGui.QIcon(":/omg/plugins/loggerdock/loggerdock.png"),
         theClass = LoggerDock,
-        central = False,
-        dock = True,
-        default = False,
         preferredDockArea = Qt.BottomDockWidgetArea))
 
 

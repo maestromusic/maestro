@@ -34,7 +34,7 @@ translate = QtCore.QCoreApplication.translate
 class CoverBrowserDock(dockwidget.DockWidget):
     """DockWidget containing the TagEditor."""
     def __init__(self, parent=None, state=None, **args):
-        super().__init__(parent, optionButton=True, **args)        
+        super().__init__(parent, **args)        
         self.browser = CoverBrowser(state)
         self.setWidget(self.browser)
         
@@ -50,10 +50,6 @@ mainwindow.addWidgetData(mainwindow.WidgetData(
         name = translate("CoverBrowser","Cover Browser"),
         icon = utils.getIcon('widgets/coverbrowser.png'),
         theClass = CoverBrowserDock,
-        central = True,
-        dock = True,
-        default = False,
-        unique = False,
         preferredDockArea = Qt.RightDockWidgetArea))
 
 

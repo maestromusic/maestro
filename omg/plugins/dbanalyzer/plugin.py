@@ -41,9 +41,7 @@ def enable():
         id = "dbanalyzer",
         name = QtGui.QApplication.translate("DBAnalyzerDialog", "DB Analyzer"),
         theClass = DBAnalyzerDialog,
-        central = True,
         dock = False,
-        default = False,
         icon = QtGui.QIcon(":/omg/plugins/dbanalyzer/dbanalyzer.png")))
 
 

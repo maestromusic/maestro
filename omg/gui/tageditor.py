@@ -38,9 +38,10 @@ class TagEditorDock(dockwidget.DockWidget):
         super().__init__(parent, location=location, **args)
         if location is not None:
             vertical = location.floating or location.area in [Qt.LeftDockWidgetArea,Qt.RightDockWidgetArea]
-        else: vertical = False # Should not happen
-        self.dockLocationChanged.connect(self._handleLocationChanged)
-        self.topLevelChanged.connect(self._handleLocationChanged)
+            self.dockLocationChanged.connect(self._handleLocationChanged)
+            self.topLevelChanged.connect(self._handleLocationChanged)
+        else:
+            vertical = True # no dock location => tag editor is used as central widget
             
         self.setAcceptDrops(True)
         
@@ -106,9 +107,6 @@ mainwindow.addWidgetData(mainwindow.WidgetData(
         name = translate("Tageditor","Tageditor"),
         icon = utils.getIcon('widgets/tageditor.png'),
         theClass = TagEditorDock,
-        central = False,
-        dock = True,
-        default = True,
         unique = True,
         preferredDockArea = Qt.BottomDockWidgetArea))
     
@@ -277,11 +275,6 @@ class TagEditorWidget(QtGui.QWidget):
         self.topLayout.addWidget(self.horizontalFlagEditor, 1)
         # This stretch will be activated in vertical mode to fill the place of the horizontal flageditor
         self.topLayout.addStretch(0)
-        
-        #self.optionButton = QtGui.QPushButton()
-        #self.optionButton.setIcon(utils.getIcon('options.png'))
-        #self.optionButton.clicked.connect(self._handleOptionButton)
-        #self.topLayout.addWidget(self.optionButton)
         
         scrollArea = QtGui.QScrollArea()
         scrollArea.setWidgetResizable(True)
@@ -620,11 +613,6 @@ class TagEditorWidget(QtGui.QWidget):
         return [editor.getRecord() for editor in self.selectionManager.getSelectedWidgets()
                                 # Filter out ExpandLines and hidden records
                                 if isinstance(editor,singletageditor.RecordEditor) and editor.isVisible()]
-        
-    def _handleOptionButton(self):
-        """Open the option dialog."""
-        dialog = OptionDialog(self.optionButton,self)
-        dialog.show()
 
     @property
     def includeContents(self):
@@ -753,17 +741,7 @@ class SmallTagTypeBox(tagwidgets.TagTypeBox):
     def setIconOnly(self,iconOnly):
         """Set whether the label should use its iconOnly-mode. Confer TagLabel.setIconOnly."""
         self.label.setIconOnly(iconOnly)
-        
-        
-#class OptionDialog(dialogs.FancyPopup):
-#    """Option dialog for a TagEditorWidget."""
-#    def __init__(self,parent,tagEditor):
-#        super().__init__(parent)
-#        self.tagEditor = tagEditor
-#        layout = QtGui.QVBoxLayout(self)
-#
-#        layout.addStretch(1)
-        
+              
 
 class TagEditorLayout(QtGui.QLayout):
     """Layout for the TagEditor. It may contain several columns each of which contain several pairs

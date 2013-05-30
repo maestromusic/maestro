@@ -42,10 +42,7 @@ def enable():
         id = "searchanalyzer",
         name = QtGui.QApplication.translate("SearchAnalyzer","Search Analyzer"),
         icon = QtGui.QIcon(":/omg/plugins/searchanalyzer/searchanalyzer.png"),
-        theClass = SearchAnalyzer,
-        central = True,
-        dock = False,
-        default = False))
+        theClass = SearchAnalyzer))
 
 
 def mainWindowInit():

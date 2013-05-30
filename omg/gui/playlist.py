@@ -55,7 +55,21 @@ class PlaylistTreeView(treeview.DraggingTreeView):
         self.emptyModel.root.setContents([nodes.TextNode(
                                         self.tr("Please configure and choose a backend to play music."),
                                         wordWrap=True)])
-
+        
+# EXPERIMENTAL: These lines can be used to set a background image 
+#        self.setStyleSheet("""
+#                QTreeView {
+#                background-color: #EBEBEB;
+#                background-image: url('');
+#                background-position: bottom right; 
+#                background-repeat: no-repeat;} 
+#            """)
+#        
+#    def drawRow(self, painter, option, index):
+#        option.palette.setColor(QtGui.QPalette.Background, QtGui.QColor(255, 255, 255, 100))
+#        option.palette.setColor(QtGui.QPalette.AlternateBase, QtGui.QColor(230, 230, 230, 100))
+#        super().drawRow(painter, option, index)
+        
     @property
     def stack(self):
         return self.model().stack
@@ -90,9 +104,10 @@ class PlaylistTreeView(treeview.DraggingTreeView):
         self.model().removeMany(self.selectedRanges())
 
 
+
 class PlaylistWidget(dockwidget.DockWidget):
     def __init__(self, parent=None, state=None, **args):
-        super().__init__(parent, optionButton=True, **args)
+        super().__init__(parent, **args)
         
         # Read state
         profileType = playlistdelegate.PlaylistDelegate.profileType
@@ -166,10 +181,6 @@ mainwindow.addWidgetData(mainwindow.WidgetData(
                     name = translate("Playlist", "Playlist"),
                     icon = utils.getIcon('widgets/playlist.png'),
                     theClass = PlaylistWidget,
-                    central = True,
-                    dock = True,
-                    default = True,
-                    unique = False,
                     preferredDockArea = Qt.RightDockWidgetArea))
 
 

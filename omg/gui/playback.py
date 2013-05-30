@@ -36,7 +36,7 @@ class PlaybackWidget(dockwidget.DockWidget):
     """A dock widget providing playback controls for the selected player backend.
     """
     def __init__(self, parent=None, state=None, **args):
-        super().__init__(parent, optionButton=True, **args)
+        super().__init__(parent, **args)
         widget = QtGui.QWidget()
         self.setWidget(widget)
 
@@ -197,9 +197,6 @@ data = mainwindow.WidgetData(id="playback",
                              icon=utils.getIcon('widgets/playback.png'),
                              theClass=PlaybackWidget,
                              central=False,
-                             dock=True,
-                             default=True,
-                             unique=False,
                              preferredDockArea=Qt.TopDockWidgetArea)
 mainwindow.addWidgetData(data)
 

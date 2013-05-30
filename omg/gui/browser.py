@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 class BrowserDock(dockwidget.DockWidget):
     """DockWidget containing the Browser."""
     def __init__(self, parent=None, state=None, **args):
-        super().__init__(parent, optionButton=True, **args)
+        super().__init__(parent, **args)
         self.browser = Browser(self, state)
         self.setWidget(self.browser)
         
@@ -53,11 +53,8 @@ mainwindow.addWidgetData(mainwindow.WidgetData(
         name = translate("Browser","Browser"),
         icon = utils.getIcon('widgets/browser.png'),
         theClass = BrowserDock,
-        central=False,
-        dock=True,
-        default=True,
-        unique=False,
-        preferredDockArea=Qt.LeftDockWidgetArea))
+        central = False,
+        preferredDockArea = Qt.LeftDockWidgetArea))
 
 
 class Browser(QtGui.QWidget):

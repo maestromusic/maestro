@@ -64,7 +64,7 @@ class EditorWidget(dockwidget.DockWidget):
     """The editor is a dock widget for editing elements and their structure. It provides methods to "guess"
     the album structure of new files that are dropped from the filesystem."""
     def __init__(self, parent=None, state=None, **args):
-        super().__init__(parent, optionButton=True, **args)
+        super().__init__(parent, **args)
         widget = QtGui.QWidget()
         self.setWidget(widget)
         layout = QtGui.QVBoxLayout(widget)
@@ -271,9 +271,5 @@ widgetData = mainwindow.WidgetData(id = "editor",
                              name = translate("Editor","editor"),
                              icon = utils.getIcon('widgets/editor.png'),
                              theClass = EditorWidget,
-                             central = True,
-                             dock = True,
-                             default = True,
-                             unique = False,
                              preferredDockArea = Qt.RightDockWidgetArea)
 mainwindow.addWidgetData(widgetData)

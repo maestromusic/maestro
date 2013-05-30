@@ -34,8 +34,6 @@ def enable():
         icon = QtGui.QIcon(":/omg/plugins/logodock/omg.png"),
         theClass = LogoDock,
         central = False,
-        dock = True,
-        default = False,
         preferredDockArea=Qt.RightDockWidgetArea))
 
 

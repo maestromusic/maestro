@@ -26,10 +26,11 @@ from .. import utils
 class DockWidget(QtGui.QDockWidget):
     """QDockWidget subclass that uses our custom DockWidgetTitleBar and respects the 'Hide title bars'
     option.
-    If *optionButton* is true, *parent* must have a method 'createOptionDialog' which is called, when the
-    button is clicked. It receives a reference to the button as argument (use this to place popup dialogs).
-    It must return either a FancyPopup dialog, which will be shown/hidden by the DockWidget, or None in
-    which case *parent* must show/hide the dialog itself.
+    
+    To get an option button into the title bar, subclasses must implement the method 'createOptionDialog'.
+    It receives a reference to the button as argument (use this to place popup dialogs). It must return
+    either a FancyPopup dialog, which will be shown (and later hidden) by the DockWidget, or None in which
+    case 'createOptionDialog' must show/hide the dialog itself.
     
     *title* and *icon* are used for the dockwidget's title bar. They are set automatically by the widget
     system (based on the corresponding mainwindow.WidgetData instance). Of course, subclasses can change
@@ -38,38 +39,74 @@ class DockWidget(QtGui.QDockWidget):
     In subclasses which implement 'saveState' the parameter *state* is set to whatever was returned by
     'saveState' when the application closed last time. 
     
-    *location* is set to a mainwindow.Location-instance representing the place where the widget will be
+    *location* is set to a mainwindow.DockLocation-instance representing the place where the widget will be
     displayed. Subclasses may use this for example to change between a horizontal and a vertical layout.
+    If *location* is None, this means that the widget is used in the central tab widget.
     """
-    def __init__(self, parent=None, optionButton=False, title='', icon=None, state=None, location=None):
+    def __init__(self, parent=None, title='', icon=None, state=None, location=None):
         super().__init__(parent)
-        self.titleBarWidget = DockWidgetTitleBar(self, optionButton)
-        self.setWindowTitle(title)
-        self.setWindowIcon(icon)
-        self.setTitleBarWidget(self.titleBarWidget)
-        mainwindow.mainWindow.hideTitleBarsAction.toggled.connect(self._handleHideAction)
+        if location is not None:
+            self.tbWidget = DockWidgetTitleBar(self)
+            self.setWindowTitle(title)
+            self.setWindowIcon(icon)
+            self.setTitleBarWidget(self.tbWidget)
+            mainwindow.mainWindow.hideTitleBarsAction.toggled.connect(self._handleHideTitleBarAction)
+        else:
+            self.tbWidget = None
+            self.setTitleBarWidget(QtGui.QWidget())
+            
+    def hasOptionDialog(self):
+        """Return whether this dock widget has a configuration dialog. If yes, the widget's title bar will
+        display a button to open that dialog. When clicked, the method 'createOptionDialog' will be called.
+        """
+        return hasattr(self, 'createOptionDialog')
         
     def setWindowTitle(self, title):
         """Set the title displayed in the title bar of this dock widget."""
         super().setWindowTitle(title)
-        self.titleBarWidget.titleLabel.setText(title)
+        if self.tbWidget is not None:
+            self.tbWidget.titleLabel.setText(title)
         
     def setWindowIcon(self, icon):
         """Set the icon displayed in the title bar of this dock widget. If *icon* is None, the icon will be
         hidden."""
+        if self.tbWidget is None:
+            return
         if icon is not None:
-            self.titleBarWidget.iconLabel.setPixmap(icon.pixmap(16, 16))
-            self.titleBarWidget.iconLabel.show()
+            self.tbWidget.iconLabel.setPixmap(icon.pixmap(16, 16))
+            self.tbWidget.iconLabel.show()
         else:
-            self.titleBarWidget.iconLabel.setPixmap(QtGui.QPixmap())
-            self.titleBarWidget.iconLabel.hide()
-        
-    def _handleHideAction(self, checked):
+            self.tbWidget.iconLabel.setPixmap(QtGui.QPixmap())
+            self.tbWidget.iconLabel.hide()
+            
+    def _handleHideTitleBarAction(self, checked):
+        """Set whether the title bar is visible."""
         if checked:
             self.setTitleBarWidget(QtGui.QWidget())
-        else: self.setTitleBarWidget(self.titleBarWidget)
+        else: self.setTitleBarWidget(self.tbWidget)
             
-            
+
+class DockWidgetButtons(QtGui.QWidget):
+    """Small widget that wraps an option-button (if *optionButton* is True) and a close-button and is used
+    in the title bar of dock widgets and as corner widget in the central tab widget."""
+    def __init__(self, parent, optionButton):
+        super().__init__(parent)
+        layout = QtGui.QHBoxLayout(self)
+        layout.setContentsMargins(2, 0, 0, 0)
+        layout.setSpacing(0)
+        if optionButton:
+            if self.style().objectName() == 'oxygen':
+                optionButtonIcon = 'dockwidgetarrow_oxygen.png'
+            #elif self.style().objectName() == 'gtk+':
+            #TODO: add more styles
+            else: optionButtonIcon = 'dockwidgetarrow_gtk.png'
+            self.optionButton = DockWidgetTitleButton(utils.getIcon(optionButtonIcon))
+            layout.addWidget(self.optionButton)
+        self.closeButton = DockWidgetTitleButton(
+                                        QtGui.qApp.style().standardIcon(QtGui.QStyle.SP_TitleBarCloseButton))
+        layout.addWidget(self.closeButton)
+        
+        
 class DockWidgetTitleBar(QtGui.QFrame):
     """Custom class for title bars of QDockWidgets. Compared with Qt's standard title bar, the 'float' button
     has been removed, but an 'options' button may be added."""
@@ -78,7 +115,7 @@ class DockWidgetTitleBar(QtGui.QFrame):
     _dialog = None
     _lastDialogTabIndex = 0
     
-    def __init__(self, parent, optionButton=False):
+    def __init__(self, parent):
         super().__init__(parent)
         
         layout = QtGui.QHBoxLayout(self)
@@ -88,40 +125,27 @@ class DockWidgetTitleBar(QtGui.QFrame):
         self.iconLabel = QtGui.QLabel()
         layout.addWidget(self.iconLabel)
         layout.addSpacing(3)
-        self.titleLabel = QtGui.QLabel(self.parent().windowTitle())
+        self.titleLabel = QtGui.QLabel()
         self.titleLabel.setStyleSheet('QLabel { font-weight: bold}')
         layout.addWidget(self.titleLabel)
         layout.addStretch()
         layout.addSpacing(8)
         
-        if optionButton:
-            if self.style().objectName() == 'oxygen':
-                optionButtonIcon = 'dockwidgetarrow_oxygen.png'
-            #elif self.style().objectName() == 'gtk+':
-            #TODO: add more styles
-            else: optionButtonIcon = 'dockwidgetarrow_gtk.png'
-            self.optionButton = DockWidgetTitleButton(utils.getIcon(optionButtonIcon))
-            self.optionButton.clicked.connect(self._handleOptionButton)
-            layout.addWidget(self.optionButton)
-        
-        self.closeButton = DockWidgetTitleButton(
-                                        QtGui.qApp.style().standardIcon(QtGui.QStyle.SP_TitleBarCloseButton))
-        self.closeButton.clicked.connect(self.parent().close)
-        layout.addWidget(self.closeButton)
+        self.buttons = DockWidgetButtons(self, optionButton=parent.hasOptionDialog())
+        layout.addWidget(self.buttons)
+        if parent.hasOptionDialog():
+            self.buttons.optionButton.clicked.connect(self._handleOptionButton)
+        self.buttons.closeButton.clicked.connect(self.parent().close)
             
     def _handleOptionButton(self):
         """Open the option dialog."""
         if self._dialog is None:
-            self._dialog = self.parent().createOptionDialog(self.optionButton)
+            self._dialog = self.parent().createOptionDialog(self.buttons.optionButton)
             if self._dialog is not None:
                 self._dialog.installEventFilter(self)
                 if isinstance(self._dialog, dialogs.FancyTabbedPopup):
                     self._dialog.tabWidget.setCurrentIndex(self._lastDialogTabIndex)
                 self._dialog.show()
-    
-    def _handleDialogClosed(self):
-        """Close the option dialog."""
-        # Note: This is called by the dialog and not by a signal (there is no 'closed' signal)
             
     def eventFilter(self, object, event):
         if event.type() == QtCore.QEvent.Close and self._dialog is not None:

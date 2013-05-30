@@ -143,10 +143,9 @@ class FancyTabbedPopup(FancyPopup):
         self.tabWidget.setDocumentMode(True)
         self.layout().addWidget(self.tabWidget)
         
-        closeButton = QtGui.QToolButton()
-        closeButton.setIcon(utils.getIcon('close_button.png'))
-        closeButton.setStyleSheet(
-            "QToolButton { border: None; margin-bottom: 1px; } QToolButton:hover { border: 1px solid white; }")
+        from . import dockwidget
+        closeButton = dockwidget.DockWidgetTitleButton(
+                                        QtGui.qApp.style().standardIcon(QtGui.QStyle.SP_TitleBarCloseButton))
         closeButton.clicked.connect(self.close)
         self.tabWidget.setCornerWidget(closeButton)
         
