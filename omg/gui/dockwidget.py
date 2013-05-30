@@ -55,7 +55,7 @@ class DockWidget(QtGui.QDockWidget):
             self.tbWidget = DockWidgetTitleBar(self)
             self.setWindowTitle(title)
             self.setWindowIcon(icon)
-            self.setTitleBarWidget(self.tbWidget)
+            self._handleHideTitleBarAction(mainwindow.mainWindow.hideTitleBarsAction.isChecked())
             mainwindow.mainWindow.hideTitleBarsAction.toggled.connect(self._handleHideTitleBarAction)
         else:
             self.tbWidget = None
@@ -109,7 +109,10 @@ class DockWidget(QtGui.QDockWidget):
         """Set whether the title bar is visible."""
         if checked:
             self.setTitleBarWidget(QtGui.QWidget())
-        else: self.setTitleBarWidget(self.tbWidget)
+            self.tbWidget.hide()
+        else:
+            self.setTitleBarWidget(self.tbWidget)
+            self.tbWidget.show()
 
 
 class DockWidgetTitleBar(QtGui.QFrame):

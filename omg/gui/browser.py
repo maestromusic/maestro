@@ -298,7 +298,8 @@ class Browser(dockwidget.DockWidget):
     
     def _handleHideTitleBarAction(self, checked):
         super()._handleHideTitleBarAction(checked)
-        self.optionButton.setVisible(checked)
+        if hasattr(self, 'optionButton'): # false during construction
+            self.optionButton.setVisible(checked)
               
     @staticmethod
     def defaultLayers():

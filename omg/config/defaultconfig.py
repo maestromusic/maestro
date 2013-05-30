@@ -146,6 +146,7 @@ storage = OrderedDict((
     'central_widgets': [],
     'dock_widgets': [],
     'central_tab_index': -1,
+    'hide_title_bars': False,
     'delegates': [],
 }),
 ("SECTION:player", {

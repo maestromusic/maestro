@@ -207,7 +207,7 @@ class MainWindow(QtGui.QMainWindow):
         hideTitleBarsAction = QtGui.QAction(self)
         hideTitleBarsAction.setText(self.tr("Hide title bars"))
         hideTitleBarsAction.setCheckable(True)
-        hideTitleBarsAction.setChecked(False)
+        hideTitleBarsAction.setChecked(config.storage.gui.hide_title_bars)
         self.hideTitleBarsAction = hideTitleBarsAction
         
         fullscreenAction = QtGui.QAction(self)
@@ -390,6 +390,8 @@ class MainWindow(QtGui.QMainWindow):
             location = (self.dockWidgetArea(widget), widget.isFloating())
             dockWidgetList.append((data.id, widget.objectName(), location, state))
         config.storage.gui.dock_widgets = dockWidgetList
+        
+        config.storage.gui.hide_title_bars = self.hideTitleBarsAction.isChecked()
         
         # Copy the bytearrays to avoid memory access errors
         config.binary["mainwindow_maximized"] = self.isMaximized()
