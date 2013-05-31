@@ -145,8 +145,8 @@ class MainWindow(QtGui.QMainWindow):
         
         # List of (widgetData, widget) pairs storing the widgets inside the central tab widget / dockwidgets.
         # Will be initialized in self.restoreLayout
-        self._centralWidgets = None
-        self._dockWidgets = None
+        self._centralWidgets = []
+        self._dockWidgets = []
         
         self.setDockNestingEnabled(True)
         self.setWindowTitle(self.tr('OMG version {}').format(constants.VERSION))
@@ -157,17 +157,44 @@ class MainWindow(QtGui.QMainWindow):
         global mainWindow
         mainWindow = self
         
+        # Resize and move the widget to the size and position it had when the program was closed
+        if "mainwindow_geometry" in config.binary \
+              and isinstance(config.binary["mainwindow_geometry"], bytearray):
+            success = self.restoreGeometry(config.binary["mainwindow_geometry"])
+        else: success = False
+        if not success: # Default geometry
+            self.resize(1000, 800)
+            # Center the window
+            screen = QtGui.QDesktopWidget().screenGeometry()
+            size = self.geometry()
+            self.move((screen.width()-size.width())/2, (screen.height()-size.height())/2)
+                
+        
         self.setCentralWidget(CentralTabWidget())
         self.initMenus()
-        self.statusBar()
-        self.restoreLayout()
-        self.setStatusBar(None)
-        self.updateViewMenu()
+        if '' in config.storage.gui.layouts:
+            try:
+                self.restoreLayout()
+            except Exception as e:
+                logger.exception(e)
+                self.createDefaultWidgets()
+        else: self.createDefaultWidgets()
+        self.updateViewMenu() # view menu can only be initialized after all widgets have been created TODO check
         
         #TODO: Replace this hack by something clever.
         browserShortcut = QtGui.QShortcut(QtGui.QKeySequence(self.tr("Ctrl+F")), self,
                                           self._handleBrowserShortcut)
+        
+        # Restore maximized state
+        if "mainwindow_maximized" in config.binary and config.binary["mainwindow_maximized"]:
+            self.showMaximized()
 
+    def close(self):
+        self.saveLayout()
+        config.binary["mainwindow_maximized"] = self.isMaximized()
+        config.binary["mainwindow_geometry"] = bytearray(self.saveGeometry())
+        super().close()
+        
     def initMenus(self):
         """Initialize menus except the view menu which cannot be initialized before all widgets have been
         loaded."""
@@ -207,7 +234,6 @@ class MainWindow(QtGui.QMainWindow):
         hideTitleBarsAction = QtGui.QAction(self)
         hideTitleBarsAction.setText(self.tr("Hide title bars"))
         hideTitleBarsAction.setCheckable(True)
-        hideTitleBarsAction.setChecked(config.storage.gui.hide_title_bars)
         self.hideTitleBarsAction = hideTitleBarsAction
         
         fullscreenAction = QtGui.QAction(self)
@@ -315,60 +341,43 @@ class MainWindow(QtGui.QMainWindow):
         widget.installEventFilter(self)
         return widget
         
-    def restoreLayout(self):
+    def restoreLayout(self, name=''):
         """Restore the geometry and state of the main window and the central widgets and dock widgets on
         application start."""
-        # Resize and move the widget to the size and position it had when the program was closed
-        if "mainwindow_geometry" in config.binary \
-              and isinstance(config.binary["mainwindow_geometry"], bytearray):
-            success = self.restoreGeometry(config.binary["mainwindow_geometry"])
-        else: success = False
-        if not success: # Default geometry
-            self.resize(1000, 800)
-            # Center the window
-            screen = QtGui.QDesktopWidget().screenGeometry()
-            size = self.geometry()
-            self.move((screen.width()-size.width())/2, (screen.height()-size.height())/2)
-        
-        # Restore maximized state
-        if "mainwindow_maximized" in config.binary and config.binary["mainwindow_maximized"]:
-            self.showMaximized()
-                
-        self._centralWidgets = []
-        self._dockWidgets = []
-        if len(config.storage.gui.central_widgets) == 0 and len(config.storage.gui.dock_widgets) == 0:
-            self.createDefaultWidgets()
-            return
+        #TODO: remove old widgets
+        layout = config.storage.gui.layouts[name]
         
         # Restore central widgets
-        for id, state in config.storage.gui.central_widgets:
+        for id, state in layout['central']:
             data = WidgetData.fromId(id)
             # It may happen that data is None (for example if it belongs to a widget from a plugin and this
             # plugin has been removed since the last application shutdown). Simply do not load this widget
             if data is not None:
                 widget = self.addCentralWidget(data, state)
             else: logger.info("Could not load central widget '{}'".format(data))
-        if config.storage.gui.central_tab_index < self.centralWidget().count():
-            self.centralWidget().setCurrentIndex(config.storage.gui.central_tab_index)
+        if layout['centralTabIndex'] < self.centralWidget().count():
+            self.centralWidget().setCurrentIndex(layout['centralTabIndex'])
             
         # Restore dock widgets (create them with correct object names and use QMainWindow.restoreState)
-        for id, objectName, location, state in config.storage.gui.dock_widgets:
+        for id, objectName, location, state in layout['dock']:
             data = WidgetData.fromId(id)
             if data is not None: # As above it may happen that data is None.
                 widget = self._createDockWidget(data, DockLocation(*location), objectName, state)
             else: logger.info("Could not load dock widget '{}' with object name '{}'"
                               .format(data, objectName))
             
+        self.hideTitleBarsAction.setChecked(layout['hideTitleBars'])
+            
         # Restore dock widget positions
-        if "mainwindow_state" in config.binary and isinstance(config.binary["mainwindow_state"], bytearray):
-            success = self.restoreState(config.binary["mainwindow_state"])
-        else: success = False
+        success = False
+        if 'mainwindow_state' in config.binary and name in config.binary['mainwindow_state']:
+            success = self.restoreState(config.binary['mainwindow_state'][name])
         if not success:
             for data, widgets in self._dockWidgets.items():
                 for widget in widgets:
                     super().addDockWidget(data.preferredDockArea, widget)
             
-    def saveLayout(self):
+    def saveLayout(self, name=''):
         """Save the geometry and state of the main window and the central widgets and dock widgets which are
         not hidden at application end."""
         # Store central widgets
@@ -378,8 +387,6 @@ class MainWindow(QtGui.QMainWindow):
                 state = widget.saveState()
             else: state = None
             centralWidgetList.append((data.id, state))
-        config.storage.gui.central_widgets = centralWidgetList
-        config.storage.gui.central_tab_index = self.centralWidget().currentIndex()
 
         # Store dock widgets that are visible and remove the rest so saveState won't store their position
         dockWidgetList = []
@@ -389,14 +396,19 @@ class MainWindow(QtGui.QMainWindow):
             else: state = None
             location = (self.dockWidgetArea(widget), widget.isFloating())
             dockWidgetList.append((data.id, widget.objectName(), location, state))
-        config.storage.gui.dock_widgets = dockWidgetList
+            
+        layout = {'central': centralWidgetList,
+                  'dock': dockWidgetList,
+                  'centralTabIndex': self.centralWidget().currentIndex(),
+                  'hideTitleBars': self.hideTitleBarsAction.isChecked()
+                  }
         
-        config.storage.gui.hide_title_bars = self.hideTitleBarsAction.isChecked()
+        config.storage.gui.layouts[name] = layout
         
-        # Copy the bytearrays to avoid memory access errors
-        config.binary["mainwindow_maximized"] = self.isMaximized()
-        config.binary["mainwindow_geometry"] = bytearray(self.saveGeometry())
-        config.binary["mainwindow_state"] = bytearray(self.saveState())
+        # Copy the bytearray to avoid memory access errors
+        if 'mainwindow_state' not in config.binary:
+            config.binary['mainwindow_state'] = {}
+        config.binary['mainwindow_state'][name] = bytearray(self.saveState())
         
     def createDefaultWidgets(self):
         """Create the default set of central and dock widgets. Use this method if no widgets can be loaded

@@ -143,10 +143,7 @@ storage = OrderedDict((
     'albumguesser_profiles': [],
 }),
 ("SECTION:gui", {
-    'central_widgets': [],
-    'dock_widgets': [],
-    'central_tab_index': -1,
-    'hide_title_bars': False,
+    'layouts': {},
     'delegates': [],
 }),
 ("SECTION:player", {

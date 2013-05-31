@@ -277,7 +277,7 @@ def run(cmdConfig=[],type='gui',exitPoint=None):
     logger.debug('main application quit')
     filesystem.shutdown()
     search.shutdown()
-    mainWindow.saveLayout()
+    mainWindow.close()
     plugins.shutdown()
     covers.shutdown()
     profiles.manager.save()
