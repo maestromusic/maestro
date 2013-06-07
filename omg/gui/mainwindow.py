@@ -330,7 +330,6 @@ class MainWindow(QtGui.QMainWindow):
         # The difference between _createDockWidget and addDockWidget is that the latter really adds the
         # widget to the MainWindow. The former is also used by restoreLayout and there dockwidgets are added
         # by QMainWindow.restoreState.
-        assert False
         widget = self._createDockWidget(data, DockLocation(data.preferredDockArea, False))
         super().addDockWidget(data.preferredDockArea, widget)
 
@@ -348,7 +347,7 @@ class MainWindow(QtGui.QMainWindow):
             if data.unique:
                 objectName = data.id
             else:
-                existingNames = [widget.objectName() for d, widget in self.dockWidgets()]
+                existingNames = [widget.objectName() for widget in self.dockWidgets()]
                 i = 1
                 while data.id + str(i) in existingNames:
                     i += 1
