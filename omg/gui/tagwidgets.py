@@ -733,9 +733,13 @@ class TagValuePropertiesWidget(QtGui.QWidget):
         and exchanging the two parts."""
         if checked:
             if self.origSortValue is None and self.sortEdit.text() == "":
-                names = self.valueEdit.getText().rsplit(' ', 1)
-                if len(names) == 2:
-                    self.sortEdit.setText(names[1] + ", " + names[0])
+                names = self.valueEdit.getText().rsplit(' ')
+                if len(names) >= 2:
+                    if names[0].lower() == "the":
+                        guess = " ".join(names[1:]) + ", " + names[0]
+                    else:
+                        guess = names[-1] + ", " + " ".join(names[:-1])
+                    self.sortEdit.setText(guess)
                 
     def setValue(self, tag, valueId):
         self.tag = tag

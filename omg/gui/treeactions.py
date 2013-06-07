@@ -415,7 +415,7 @@ class TagValueAction(TreeAction):
         if len(self.tagPairs) > 1:
             tagNames = [tags.get(tagId).name for tagId, valueId in self.tagPairs]
             answer, ok = QtGui.QInputDialog.getItem(self.parent(), self.tr("Choose tag mode"),
-                                                    self.tr('Tag:'), items)
+                                                    self.tr('Tag:'), tagNames)
             if not ok:
                 return
             else:
