@@ -51,6 +51,7 @@ class DockWidget(QtGui.QDockWidget):
     
     def __init__(self, parent=None, title='', icon=None, state=None, location=None):
         super().__init__(parent)
+        self.setAttribute(Qt.WA_DeleteOnClose)
         if location is not None:
             self.tbWidget = DockWidgetTitleBar(self)
             self.setWindowTitle(title)
