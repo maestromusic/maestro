@@ -447,7 +447,8 @@ class MainWindow(QtGui.QMainWindow):
         config.storage.gui.perspectives[name] = perspective
         
         # Copy the bytearray to avoid memory access errors
-        if 'mainwindow_state' not in config.binary:
+        if 'mainwindow_state' not in config.binary \
+                    or not isinstance(config.binary["mainwindow_state"], dict):
             config.binary['mainwindow_state'] = {}
         config.binary['mainwindow_state'][name] = bytearray(self.saveState())
         
@@ -521,11 +522,11 @@ class MainWindow(QtGui.QMainWindow):
         """ 
         browserDocks = self.getWidgets('browser')
         for i, browserDock in enumerate(browserDocks):
-            if browserDock.widget().searchBox.hasFocus():
+            if browserDock.searchBox.hasFocus():
                 nextIndex = (i+1) % len(browserDocks)
                 browserDocks[nextIndex].widget().searchBox.setFocus(Qt.OtherFocusReason)
                 return
-        browserDocks[0].widget().searchBox.setFocus(Qt.ShortcutFocusReason)
+        browserDocks[0].searchBox.setFocus(Qt.ShortcutFocusReason)
     
     def getWidgets(self, id):
         """Given the id of a WidgetData-instance, return all widgets (central and dock) of that WidgetData."""
