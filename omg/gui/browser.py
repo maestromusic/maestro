@@ -370,7 +370,6 @@ class BrowserTreeView(treeview.TreeView):
                 self.expander = None
         # Always expand nodes with a single children (except RestoreExpander is active)
         if node.getContentsCount() == 1 and not isinstance(self.expander, RestoreExpander):
-            print(node)
             self.expand(self.model().getIndex(node.contents[0]))
     
     def mouseDoubleClickEvent(self, event):
