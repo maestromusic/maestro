@@ -129,15 +129,15 @@ class Browser(dockwidget.DockWidget):
                     layers = []
                     layersForViews.append(layers)
                     for layerConfig in layersConfig: 
-                       try:
-                           className, layerState = layerConfig
-                           if className in browsermodel.layerClasses:
-                               theClass = browsermodel.layerClasses[className][1]
-                               layer = theClass(state=layerState)
-                               layers.append(layer)
-                       except Exception as e:
-                           logger.warning("Could not parse a layer of the browser: {}".format(e))
-                viewsToRestore = state['views']
+                        try:
+                            className, layerState = layerConfig
+                            if className in browsermodel.layerClasses:
+                                theClass = browsermodel.layerClasses[className][1]
+                                layer = theClass(state=layerState)
+                                layers.append(layer)
+                        except Exception as e:
+                            logger.warning("Could not parse a layer of the browser: {}".format(e))
+                    viewsToRestore = state['views'] # TODO: unused variable?
             if 'flags' in state:
                 flagList = [flags.get(name) for name in state['flags'] if flags.exists(name)]
                 if len(flagList) > 0:
