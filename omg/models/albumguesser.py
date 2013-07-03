@@ -212,7 +212,7 @@ profileCategory.addType(profiles.ProfileType('standard',
                                              translate('Albumguesser', 'standard guesser'),
                                              StandardGuesser))
 profiles.manager.addCategory(profileCategory)
-if len(profileCategory.profiles) == 0:
+if len(profileCategory.profiles()) == 0:
     profileCategory.addProfile(translate("Albumguesser", "Default"),
                                profileCategory.getType('standard'))
 

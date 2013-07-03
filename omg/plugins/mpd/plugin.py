@@ -405,7 +405,9 @@ class MPDPlayerBackend(player.PlayerBackend):
 
 
 class MPDConfigWidget(QtGui.QWidget):
-    """Widget to configure playback profiles of type MPD."""    
+    """Widget to configure playback profiles of type MPD."""
+    modified = QtCore.pyqtSignal(bool)
+    
     def __init__(self, profile=None):
         super().__init__()
         layout = QtGui.QVBoxLayout(self)
@@ -413,28 +415,22 @@ class MPDConfigWidget(QtGui.QWidget):
         layout.addLayout(formLayout,1)
         
         self.hostEdit = QtGui.QLineEdit()
+        self.hostEdit.textChanged.connect(lambda text: self.modified.emit(True))
         formLayout.addRow(self.tr("Host:"),self.hostEdit)
         
         self.portEdit = QtGui.QLineEdit()
         self.portEdit.setValidator(QtGui.QIntValidator(0, 65535, self))
+        self.portEdit.textChanged.connect(lambda text: self.modified.emit(True))
         formLayout.addRow(self.tr("Port:"),self.portEdit)
         
         self.passwordEdit = QtGui.QLineEdit()
+        self.passwordEdit.textChanged.connect(lambda text: self.modified.emit(True))
         formLayout.addRow(self.tr("Password:"),self.passwordEdit)
         
         self.passwordVisibleBox = QtGui.QCheckBox()
         self.passwordVisibleBox.toggled.connect(self._handlePasswordVisibleBox)
         formLayout.addRow(self.tr("Password visible?"),self.passwordVisibleBox)
         
-        buttonLayout = QtGui.QHBoxLayout()
-        layout.addLayout(buttonLayout)
-        saveButton = QtGui.QPushButton(self.tr("Save"))
-        saveButton.clicked.connect(self._handleSave)
-        buttonLayout.addWidget(saveButton)
-        resetButton = QtGui.QPushButton(self.tr("Reset"))
-        resetButton.clicked.connect(self._handleReset)
-        buttonLayout.addWidget(resetButton)
-        buttonLayout.addStretch(1)
         self.setProfile(profile)
     
     def setProfile(self, profile):
@@ -446,17 +442,20 @@ class MPDConfigWidget(QtGui.QWidget):
         self.passwordEdit.setText(profile.mpdthread.password)
         self.passwordVisibleBox.setChecked(len(profile.mpdthread.password) == 0)
     
-    def _handleSave(self):
+    def isModified(self):
+        host = self.hostEdit.text()
+        port = int(self.portEdit.text())
+        password = self.passwordEdit.text()
+        mpdThread = self.profile.mpdthread
+        return [host, port, password] != [mpdThread.host, mpdThread.port, mpdThread.password]
+        
+    def save(self):
         """Really change the profile."""
         host = self.hostEdit.text()
         port = int(self.portEdit.text())
         password = self.passwordEdit.text()
         self.profile.setConnectionParameters(host, port, password)
         player.profileCategory.save()
-        
-    def _handleReset(self):
-        """Reset the form to the stored values."""
-        self.setProfile(self.profile)
     
     def _handlePasswordVisibleBox(self,checked):
         """Change whether the password is visible in self.passwordEdit."""

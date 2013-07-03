@@ -42,8 +42,8 @@ class PlaybackWidget(dockwidget.DockWidget):
 
         if state is not None:
             backend = player.profileCategory.get(state) # may be None
-        elif len(player.profileCategory.profiles) > 0:
-            backend = player.profileCategory.profiles[0]
+        elif len(player.profileCategory.profiles()) > 0:
+            backend = player.profileCategory.profiles()[0]
         else: backend = None
         topLayout = QtGui.QHBoxLayout()       
         

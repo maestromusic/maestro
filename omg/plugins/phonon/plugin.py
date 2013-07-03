@@ -34,9 +34,17 @@ translate = QtCore.QCoreApplication.translate
 
 
 def enable():
-    player.profileCategory.addType(profiles.ProfileType('phonon',
-                                                        translate('PhononPlayerBackend','Phonon'),
-                                                        PhononPlayerBackend))
+    profileType = profiles.ProfileType('phonon',
+                                       translate("PhononPlayerBackend","Phonon"),
+                                       PhononPlayerBackend)
+    player.profileCategory.addType(profileType)
+    # addType loads stored profiles of this type from storage
+    # If no profile was loaded, create a default one.
+    return
+    if len(player.profileCategory.profiles(profileType)) == 0:
+        name = translate("PhononPlayerBackend", "Local playback (Phonon)")
+        if player.profileCategory.get(name) is None:
+            player.profileCategory.addProfile(name, profileType)
 
 def disable():
     player.profileCategory.removeType('phonon')
@@ -114,7 +122,6 @@ class PhononPlayerBackend(player.PlayerBackend):
                 QtCore.QTimer.singleShot(2000, self.checkPlaying)
             else: self.mediaObject.pause()
             self.stateChanged.emit(state)
-            
     
     def checkPlaying(self):
         if self.state() != player.PLAY:

@@ -180,7 +180,7 @@ class OptionDialog(dialogs.FancyPopup):
     def _handleAlbumGuessCheckBox(self,checked):
         """Handle toggling of the guess checkbox."""
         self.editor.model().guessingEnabled = checked
-        if len(albumguesser.profileCategory.profiles) > 0:
+        if len(albumguesser.profileCategory.profiles()) > 0:
             self.albumGuessComboBox.setEnabled(checked)
         else: self.albumGuessComboBox.setEnabled(True) # the box contains only 'Configure...'
         

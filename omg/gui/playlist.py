@@ -112,11 +112,9 @@ class PlaylistWidget(dockwidget.DockWidget):
         # Read state
         profileType = playlistdelegate.PlaylistDelegate.profileType
         if state is None:
-            try:
-                # fetch first available profile by default
-                backend = player.profileCategory.profiles[0]
-            except IndexError:
-                backend = None
+            if len(player.profileCategory.profiles()) > 0:
+                backend = player.profileCategory.profiles()[0]
+            else: backend=None
             delegateProfile = profileType.default()
         else:
             backend = player.profileCategory.getFromStorage(state['backend'])

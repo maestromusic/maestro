@@ -327,6 +327,7 @@ class TagLayer:
                         aNode.tagPairs.append((tagId, valueId))
                         break
     
+        # If there are not too many nodes, combine nodes with the same contents.
         if 2 <= len(nodes) <= 10 and 1 <= len(elementSource.extendedToplevel) <= 250:
             valuePart = ' OR '.join('(tag_id={} AND value_id={})'
                                     .format(*node.tagPairs[0]) for node in nodes)
@@ -340,18 +341,10 @@ class TagLayer:
                 theSet = set() # use the same set for each tagPair of one node
                 for tagId, valueId in node.tagPairs:
                     elementDict[(tagId, valueId)] = theSet
-                    
             for elid, tid, vid in result:
-                elementDict[(tid, vid)].add(elid)
-            hashs = {}
-            for node in nodes[:]:
-                elementSet = elementDict[node.tagPairs[0]]
-                h = hash(frozenset(elementSet))
-                if h not in hashs:
-                    hashs[h] = node
-                else:
-                    hashs[h].addValues(node)
-                    nodes.remove(node)
+                elementDict[(tid, vid)].add(elid)   
+            
+            # EXPERIMENTAL: If there are only a few composers, use them as tagnodes
             composerTag = tags.get("composer")
             if composerTag.isInDb():
                 composers = [pair for pair in elementDict.keys() if pair[0] == composerTag.id]
@@ -361,11 +354,18 @@ class TagLayer:
                         for node in nodes[:]:
                             if not any(pair[0] == composerTag.id for pair in node.tagPairs):
                                 nodes.remove(node)
-
+                              
+            # Combine nodes with the same contents.
+            hashs = {}
+            for node in nodes[:]:
+                elementSet = elementDict[node.tagPairs[0]]
+                h = hash(frozenset(elementSet))
+                if h not in hashs:
+                    hashs[h] = node
+                else:
+                    hashs[h].addValues(node)
+                    nodes.remove(node)
                 
-            #nodeDict maps value -> set of element ids
-            # is their a pair of nodes with the same set of element ids? If so, combine their tagnodes
-            
         # Check whether a VariousNode is necessary
         result = db.query("""
             SELECT res.id

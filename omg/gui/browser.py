@@ -400,7 +400,6 @@ class BrowserTreeView(treeview.TreeView):
             model.backend.play()
             
 
-
 class RestoreExpander:
     """Expander that will store the current list of expanded nodes in *view* and expand them again bit by bit,
     whenever next is called (until next returns False). Expanded nodes will be stored by their data and not

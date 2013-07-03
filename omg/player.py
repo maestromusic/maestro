@@ -30,17 +30,22 @@ _runningBackends = {}
 
 profileCategory = profiles.TypedProfileCategory('playback',
                                                 translate('PlayerBackend','Playback'),
-                                                config.storageObject.player.profiles)
+                                                config.storageObject.player.profiles,
+                                                infoText=translate('PlayerBackend', "OMG can control more than one audio backend. To easily switch between them, their configuration is stored in profiles."),
+                                                saveImmediately=False)
 profiles.manager.addCategory(profileCategory)
+
 
 class BackendError(Exception):
     pass
+
 
 class InsertError(BackendError):
     
     def __init__(self, msg, successfulURLs=[]):
         super().__init__(msg)
         self.successfulURLs = successfulURLs
+
 
 class PlayerBackend(profiles.Profile):
     """This is the base class for modules that implement connection to a backend
