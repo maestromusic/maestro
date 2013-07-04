@@ -16,11 +16,11 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from PyQt4 import QtCore, QtGui
+from PyQt4 import QtCore, QtGui, QtSvg
 from PyQt4.QtCore import Qt
 
 from . import mainwindow, dialogs, profiles as profilesgui, dockwidget
-from .. import player, utils, logging
+from .. import player, utils, logging, strutils
 
 translate = QtCore.QCoreApplication.translate
 logger = logging.getLogger(__name__)
@@ -73,8 +73,7 @@ class PlaybackWidget(dockwidget.DockWidget):
             
         bottomLayout = QtGui.QHBoxLayout()
         self.seekLabel = QtGui.QLabel("", self)
-        self.seekSlider = PlaybackSlider(Qt.Horizontal, self)
-        self.seekSlider.setRange(0, 1000)
+        self.seekSlider = SeekSlider(self)
         bottomLayout.addWidget(self.seekSlider)
         bottomLayout.addWidget(self.seekLabel)
         mainLayout = QtGui.QVBoxLayout(widget)
@@ -177,6 +176,7 @@ class PlaybackWidget(dockwidget.DockWidget):
             self.backend = None
             return
         self.backend = backend
+        self.seekSlider.backend = backend
         for source, sink in PlaybackWidget.signals:
             eval(source).connect(eval(sink))
         self.backend.registerFrontend(self)
@@ -199,15 +199,16 @@ data = mainwindow.WidgetData(id="playback",
 mainwindow.addWidgetData(data)
 
 
-class PlaybackSlider(QtGui.QSlider):
-    def mouseReleaseEvent(self, event):
-        if not self.isSliderDown():
-            val = QtGui.QStyle.sliderValueFromPosition(self.minimum(),
-                    self.maximum(), event.x(), self.width())
-            self.sliderMoved.emit(val)
-        return super().mouseReleaseEvent(event)
-
-
+class OptionDialog(dialogs.FancyPopup):
+    """Dialog for the option button in the playlist's (dock widget) title bar.""" 
+    def __init__(self, parent, playback):
+        super().__init__(parent)
+        layout = QtGui.QFormLayout(self)
+        backendChooser = profilesgui.ProfileComboBox(player.profileCategory, default=playback.backend)
+        backendChooser.profileChosen.connect(playback.setBackend)
+        layout.addRow(self.tr("Backend:"), backendChooser)
+        
+        
 class PlayPauseButton(QtGui.QToolButton):
     """Special button with two states. Depending on the state different signals (play and pause)
     are emitted when the button is clicked and the button shows different icons."""
@@ -357,8 +358,7 @@ class VolumeSlider(QtGui.QSlider):
     """Special slider used in the menu of VolumeButton."""
     def __init__(self, parent=None):
         super().__init__(Qt.Vertical, parent)
-        self.setMinimum(0)
-        self.setMaximum(100)
+        self.setRange(0, 100)
         
     def contextMenuEvent(self, event):
         menu = QtGui.QMenu()
@@ -369,12 +369,83 @@ class VolumeSlider(QtGui.QSlider):
             self.setValue(action.data())
 
 
-class OptionDialog(dialogs.FancyPopup):
-    """Dialog for the option button in the playlist's (dock widget) title bar.""" 
-    def __init__(self, parent, playback):
-        super().__init__(parent)
-        layout = QtGui.QFormLayout(self)
-        backendChooser = profilesgui.ProfileComboBox(player.profileCategory, default=playback.backend)
-        backendChooser.profileChosen.connect(playback.setBackend)
-        layout.addRow(self.tr("Backend:"), backendChooser)
+class SeekSlider(QtGui.QSlider):
+    """Fancy seek slider. This is a Python port of the TimeSlider from Amarok 2.7.1."""
+    sliderHeight = 14
+    knobSize = 14
+    
+    def __init__(self, parent=None):
+        super().__init__(Qt.Horizontal, parent)
+        self.setRange(0, 1000)
+        self.setFocusPolicy(Qt.NoFocus)
+        self._renderer = QtSvg.QSvgRenderer("/media/daten/Projekte/music/images/slider.svg")
+        self.backend = None # backend is necessary to get current track
         
+    def mouseReleaseEvent(self, event):
+        if not self.isSliderDown():
+            val = QtGui.QStyle.sliderValueFromPosition(self.minimum(),
+                    self.maximum(), event.x(), self.width())
+            self.sliderMoved.emit(val)
+        return super().mouseReleaseEvent(event)
+    
+    def _loadSvgAsPixmap(self, name, width, height):
+        """Load the object with the given name from slider.svg and render it into a pixmap of the given
+        dimensions. Return that pixmap."""
+        pixmap = QtGui.QPixmap(width, height)
+        pixmap.fill(Qt.transparent)
+        painter = QtGui.QPainter(pixmap)
+        self._renderer.render(painter, name)
+        painter.end()
+        return pixmap
+    
+    def paintEvent(self, event):
+        p = QtGui.QPainter(self)
+        p.setClipRegion(event.region())
+        
+        left = int(round((self.width() - self.knobSize) * self.value() / self.maximum()))
+        top = (self.height() - self.sliderHeight) // 2
+        knobRect = QtCore.QRect(left, top+1, self.knobSize, self.knobSize)
+        
+        pt = QtCore.QPoint(0, top)
+        p.drawPixmap(pt, self._loadSvgAsPixmap("progress_slider_left", self.sliderHeight, self.sliderHeight))
+
+        pt = QtCore.QPoint(self.sliderHeight, top)
+        midRect = QtCore.QRect(pt, QtCore.QSize(self.width() - self.sliderHeight*2, self.sliderHeight))
+        p.drawTiledPixmap(midRect, self._loadSvgAsPixmap("progress_slider_mid", 32, self.sliderHeight))
+        
+        pt = midRect.topRight() + QtCore.QPoint(1, 0)
+        p.drawPixmap(pt, self._loadSvgAsPixmap("progress_slider_right", self.sliderHeight, self.sliderHeight))
+
+        # draw the played background.
+        playedBarHeight = self.sliderHeight - 6
+
+        sizeOfLeftPlayed = max(0, min(knobRect.x()-2, playedBarHeight))
+
+        if sizeOfLeftPlayed > 0:
+            tl = QtCore.QPoint(3, top+4)
+            br = QtCore.QPoint(knobRect.x() + 5, tl.y() + playedBarHeight - 1)
+            p.drawPixmap(tl.x(), tl.y(),
+                         self._loadSvgAsPixmap("progress_slider_played_left",
+                                               playedBarHeight, playedBarHeight),
+                         0, 0, sizeOfLeftPlayed + 3, playedBarHeight) 
+            tl = QtCore.QPoint(tl.x() + playedBarHeight, tl.y())
+            if sizeOfLeftPlayed >= playedBarHeight:
+                p.drawTiledPixmap(QtCore.QRect(tl, br),
+                                  self._loadSvgAsPixmap("progress_slider_played_mid", 32, playedBarHeight))
+
+        if self.isEnabled():
+            # Draw the knob (handle)
+            if self.underMouse() and knobRect.contains(self.mapFromGlobal(QtGui.QCursor.pos())):
+                file = "slider_knob_200911_active"
+            else: file = "slider_knob_200911"
+            p.drawPixmap(knobRect.topLeft(),
+                         self._loadSvgAsPixmap(file, knobRect.width(), knobRect.height()))
+
+        p.end()
+        
+    def event(self, event):
+        if event.type() == QtCore.QEvent.ToolTip and self.backend is not None:
+            seconds = int(event.x() / self.width() * self.backend.current().element.length)
+            self.setToolTip(self.tr("Jump to {}").format(strutils.formatLength(seconds)))
+            
+        return super().event(event)
