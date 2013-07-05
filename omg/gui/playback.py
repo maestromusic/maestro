@@ -60,12 +60,12 @@ class PlaybackWidget(dockwidget.DockWidget):
         topLayout.addWidget(self.titleLabel)   
         
         self.previousButton = QtGui.QToolButton()
-        self.previousButton.setIcon(QtGui.QIcon(renderPixmap("media_skip_backward_blue", ICON_SIZE, 10)))
+        self.previousButton.setIcon(QtGui.QIcon(renderPixmap("media_skip_backward", ICON_SIZE, 10)))
         self.ppButton = PlayPauseButton(self)
         self.stopButton = QtGui.QToolButton()
-        self.stopButton.setIcon(QtGui.QIcon(renderPixmap("media_playback_stop_blue", ICON_SIZE, ICON_SIZE)))
+        self.stopButton.setIcon(QtGui.QIcon(renderPixmap("media_playback_stop", ICON_SIZE, ICON_SIZE)))
         self.nextButton = QtGui.QToolButton()
-        self.nextButton.setIcon(QtGui.QIcon(renderPixmap("media_skip_forward_blue", ICON_SIZE, 10)))
+        self.nextButton.setIcon(QtGui.QIcon(renderPixmap("media_skip_forward", ICON_SIZE, 10)))
         self.volumeButton = VolumeButton()
         
         for button in (self.previousButton, self.ppButton, self.stopButton,
@@ -218,8 +218,8 @@ class PlayPauseButton(QtGui.QToolButton):
     # Signals and icons used for the two states
     play = QtCore.pyqtSignal()
     pause = QtCore.pyqtSignal()
-    playIcon = QtGui.QIcon(renderPixmap("media_playback_start_blue", ICON_SIZE, ICON_SIZE))
-    pauseIcon = QtGui.QIcon(renderPixmap("media_playback_pause_blue", ICON_SIZE, ICON_SIZE))
+    playIcon = QtGui.QIcon(renderPixmap("media_playback_start", ICON_SIZE, ICON_SIZE))
+    pauseIcon = QtGui.QIcon(renderPixmap("media_playback_pause", ICON_SIZE, ICON_SIZE))
     stateChanged = QtCore.pyqtSignal(int)
     
     def __init__(self, parent=None):
@@ -227,12 +227,12 @@ class PlayPauseButton(QtGui.QToolButton):
         super().__init__(parent)
         self.setIcon(self.playIcon)
         self.playing = False
-        self.clicked.connect(lambda : self.pause.emit() if self.playing else self.play.emit() )
-        self.pause.connect(lambda : self.stateChanged.emit(player.PAUSE))
-        self.play.connect(lambda : self.stateChanged.emit(player.PLAY))
+        self.clicked.connect(lambda: self.pause.emit() if self.playing else self.play.emit() )
+        self.pause.connect(lambda: self.stateChanged.emit(player.PAUSE))
+        self.play.connect(lambda: self.stateChanged.emit(player.PLAY))
 
     def setPlaying(self, playing):
-        """Set the state of this button to play if <playing> is true or pause otherwise."""
+        """Set the state of this button to play if *playing* is true or pause otherwise."""
         if playing != self.playing:
             self.playing = playing
             self.setIcon(self.pauseIcon if playing else self.playIcon)
@@ -246,10 +246,10 @@ class VolumeButton(QtGui.QToolButton):
     # Inspired by the VolumePopupButton from Amarok 2.7.1
     volumeChanged = QtCore.pyqtSignal(int)
     
-    mutedIcon = utils.getIcon('volume_muted.png')
-    lowIcon = utils.getIcon('volume_low.png')
-    mediumIcon = utils.getIcon('volume_medium.png')
-    highIcon = utils.getIcon('volume_high.png')
+    mutedIcon = utils.getIcon("audio_volume_muted")
+    lowIcon = utils.getIcon("audio_volume_low")
+    mediumIcon = utils.getIcon("audio_volume_medium")
+    highIcon = utils.getIcon("audio_volume_high")
     
     def __init__(self, parent=None):
         super().__init__(parent)
