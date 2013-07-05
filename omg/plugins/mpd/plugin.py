@@ -21,6 +21,8 @@ import socket, threading, time
 import re
 try:
     import mpd
+    # Disable the 'Calling <this or that>' messages
+    mpd.logger.setLevel('INFO')
 except ImportError:
     raise ImportError("python-mpd2 not installed.")
 
@@ -155,7 +157,10 @@ class MPDPlayerBackend(player.PlayerBackend):
     
     def setVolume(self, volume):
         with self.prepareCommander():
-            self.commander.setvol(volume)
+            try:
+                self.commander.setvol(volume)
+            except mpd.CommandError:
+                logger.error("Problems setting volume. Maybe MPD does not allow setting the volume.")
     
     def current(self):
         return self.playlist.current
