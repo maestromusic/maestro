@@ -104,5 +104,6 @@
         <file alias="weather_rain.png">flags/silk/weather_rain.png</file>
         <file alias="weather_sun.png">flags/silk/weather_sun.png</file>
         <file alias="world.png">flags/silk/world.png</file>
+        <file>playback.svg</file>
     </qresource>
 </RCC>

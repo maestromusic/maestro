@@ -24,12 +24,19 @@ from .. import player, utils, logging, strutils
 
 translate = QtCore.QCoreApplication.translate
 logger = logging.getLogger(__name__)
+renderer = QtSvg.QSvgRenderer(":omg/playback.svg")
 
+ICON_SIZE = 16
 
-def formatTime(seconds):
-    seconds = int(seconds)
-    minutes = seconds // 60
-    return "{:0>2d}:{:0>2d}".format(minutes, seconds % 60)
+def renderPixmap(name, width, height):
+    """Load the object with the given name from slider.svg and render it into a pixmap of the given
+    dimensions. Return that pixmap."""
+    pixmap = QtGui.QPixmap(width, height)
+    pixmap.fill(Qt.transparent)
+    painter = QtGui.QPainter(pixmap)
+    renderer.render(painter, name)
+    painter.end()
+    return pixmap
 
 
 class PlaybackWidget(dockwidget.DockWidget):
@@ -52,24 +59,19 @@ class PlaybackWidget(dockwidget.DockWidget):
         self.titleLabel.setWordWrap(True)
         topLayout.addWidget(self.titleLabel)   
         
-        toolBar = QtGui.QToolBar()
-        toolBar.setIconSize(QtCore.QSize(16, 16))
-        standardIcon = QtGui.qApp.style().standardIcon
         self.previousButton = QtGui.QToolButton()
-        self.previousButton.setIcon(standardIcon(QtGui.QStyle.SP_MediaSkipBackward))
+        self.previousButton.setIcon(QtGui.QIcon(renderPixmap("media_skip_backward_blue", ICON_SIZE, 10)))
         self.ppButton = PlayPauseButton(self)
         self.stopButton = QtGui.QToolButton()
-        self.stopButton.setIcon(standardIcon(QtGui.QStyle.SP_MediaStop))
+        self.stopButton.setIcon(QtGui.QIcon(renderPixmap("media_playback_stop_blue", ICON_SIZE, ICON_SIZE)))
         self.nextButton = QtGui.QToolButton()
-        self.nextButton.setIcon(standardIcon(QtGui.QStyle.SP_MediaSkipForward))
+        self.nextButton.setIcon(QtGui.QIcon(renderPixmap("media_skip_forward_blue", ICON_SIZE, 10)))
         self.volumeButton = VolumeButton()
-        toolBar.addWidget(self.previousButton)
-        toolBar.addWidget(self.ppButton)
-        toolBar.addWidget(self.stopButton)
-        toolBar.addWidget(self.nextButton)
-        topLayout.addWidget(toolBar)
-        # Keep the volume button outside the toolbar to allow for a slightly bigger icon
-        topLayout.addWidget(self.volumeButton)
+        
+        for button in (self.previousButton, self.ppButton, self.stopButton,
+                       self.nextButton, self.volumeButton):
+            button.setAutoRaise(True)
+            topLayout.addWidget(button)
             
         bottomLayout = QtGui.QHBoxLayout()
         self.seekLabel = QtGui.QLabel("", self)
@@ -92,7 +94,8 @@ class PlaybackWidget(dockwidget.DockWidget):
         if self.current is None:
             text = ""
         elif self.current.element.length > 0:
-            text = "{}-{}".format(formatTime(value), formatTime(self.seekSlider.maximum()))
+            text = "{} - {}".format(strutils.formatLength(value),
+                                  strutils.formatLength(self.seekSlider.maximum()))
         else:
             text = formatTime(value)
             self.seekSlider.setEnabled(False)
@@ -114,9 +117,8 @@ class PlaybackWidget(dockwidget.DockWidget):
         """Display the title of the currently playing song or "stopped" on the title label."""
         self.current = self.backend.current()
         if self.current is not None:
-            self.titleLabel.setText("<i>{}</i>".format(self.current.getTitle()))
-        else:
-            self.titleLabel.setText(self.tr('stopped'))
+            self.titleLabel.setText(self.current.getTitle())
+        else: self.titleLabel.setText('')
     
     def handleStateChange(self, state):
         """Update labels, buttons etc. when the playback state has changed."""
@@ -191,7 +193,7 @@ class PlaybackWidget(dockwidget.DockWidget):
     
     
 data = mainwindow.WidgetData(id="playback",
-                             name=translate("Playback","playback"),
+                             name=translate("Playback", "playback"),
                              icon=utils.getIcon('widgets/playback.png'),
                              theClass=PlaybackWidget,
                              central=False,
@@ -216,8 +218,8 @@ class PlayPauseButton(QtGui.QToolButton):
     # Signals and icons used for the two states
     play = QtCore.pyqtSignal()
     pause = QtCore.pyqtSignal()
-    playIcon = QtGui.qApp.style().standardIcon(QtGui.QStyle.SP_MediaPlay)
-    pauseIcon = QtGui.qApp.style().standardIcon(QtGui.QStyle.SP_MediaPause)
+    playIcon = QtGui.QIcon(renderPixmap("media_playback_start_blue", ICON_SIZE, ICON_SIZE))
+    pauseIcon = QtGui.QIcon(renderPixmap("media_playback_pause_blue", ICON_SIZE, ICON_SIZE))
     stateChanged = QtCore.pyqtSignal(int)
     
     def __init__(self, parent=None):
@@ -229,7 +231,7 @@ class PlayPauseButton(QtGui.QToolButton):
         self.pause.connect(lambda : self.stateChanged.emit(player.PAUSE))
         self.play.connect(lambda : self.stateChanged.emit(player.PLAY))
 
-    def setPlaying(self,playing):
+    def setPlaying(self, playing):
         """Set the state of this button to play if <playing> is true or pause otherwise."""
         if playing != self.playing:
             self.playing = playing
@@ -253,7 +255,6 @@ class VolumeButton(QtGui.QToolButton):
         super().__init__(parent)
         self.setIconSize(QtCore.QSize(24, 24))
         self.setContentsMargins(0,0,0,0)
-        self.setAutoRaise(True)
         
         self.popup = QtGui.QWidget()
         layout = QtGui.QVBoxLayout(self.popup)
@@ -295,7 +296,7 @@ class VolumeButton(QtGui.QToolButton):
     def setVolume(self, volume):
         """Set the volume of this widget and emit volumeChanged."""
         if volume != self.volume:
-            self.setEnabled(volume != -1)
+            #self.setEnabled(volume != -1)
             self.setIcon(self.volumeIcon(volume))
             if volume == 0:
                 self.lastVolume = self.volume
@@ -378,7 +379,6 @@ class SeekSlider(QtGui.QSlider):
         super().__init__(Qt.Horizontal, parent)
         self.setRange(0, 1000)
         self.setFocusPolicy(Qt.NoFocus)
-        self._renderer = QtSvg.QSvgRenderer("/media/daten/Projekte/music/images/slider.svg")
         self.backend = None # backend is necessary to get current track
         
     def mouseReleaseEvent(self, event):
@@ -388,33 +388,24 @@ class SeekSlider(QtGui.QSlider):
             self.sliderMoved.emit(val)
         return super().mouseReleaseEvent(event)
     
-    def _loadSvgAsPixmap(self, name, width, height):
-        """Load the object with the given name from slider.svg and render it into a pixmap of the given
-        dimensions. Return that pixmap."""
-        pixmap = QtGui.QPixmap(width, height)
-        pixmap.fill(Qt.transparent)
-        painter = QtGui.QPainter(pixmap)
-        self._renderer.render(painter, name)
-        painter.end()
-        return pixmap
-    
     def paintEvent(self, event):
         p = QtGui.QPainter(self)
         p.setClipRegion(event.region())
         
-        left = int(round((self.width() - self.knobSize) * self.value() / self.maximum()))
+        fraction = self.value() / self.maximum() if self.maximum() > 0 else 0
+        left = int(round((self.width() - self.knobSize) * fraction))
         top = (self.height() - self.sliderHeight) // 2
         knobRect = QtCore.QRect(left, top+1, self.knobSize, self.knobSize)
         
         pt = QtCore.QPoint(0, top)
-        p.drawPixmap(pt, self._loadSvgAsPixmap("progress_slider_left", self.sliderHeight, self.sliderHeight))
+        p.drawPixmap(pt, renderPixmap("progress_slider_left", self.sliderHeight, self.sliderHeight))
 
         pt = QtCore.QPoint(self.sliderHeight, top)
         midRect = QtCore.QRect(pt, QtCore.QSize(self.width() - self.sliderHeight*2, self.sliderHeight))
-        p.drawTiledPixmap(midRect, self._loadSvgAsPixmap("progress_slider_mid", 32, self.sliderHeight))
+        p.drawTiledPixmap(midRect, renderPixmap("progress_slider_mid", 32, self.sliderHeight))
         
         pt = midRect.topRight() + QtCore.QPoint(1, 0)
-        p.drawPixmap(pt, self._loadSvgAsPixmap("progress_slider_right", self.sliderHeight, self.sliderHeight))
+        p.drawPixmap(pt, renderPixmap("progress_slider_right", self.sliderHeight, self.sliderHeight))
 
         # draw the played background.
         playedBarHeight = self.sliderHeight - 6
@@ -425,13 +416,12 @@ class SeekSlider(QtGui.QSlider):
             tl = QtCore.QPoint(3, top+4)
             br = QtCore.QPoint(knobRect.x() + 5, tl.y() + playedBarHeight - 1)
             p.drawPixmap(tl.x(), tl.y(),
-                         self._loadSvgAsPixmap("progress_slider_played_left",
-                                               playedBarHeight, playedBarHeight),
+                         renderPixmap("progress_slider_played_left", playedBarHeight, playedBarHeight),
                          0, 0, sizeOfLeftPlayed + 3, playedBarHeight) 
             tl = QtCore.QPoint(tl.x() + playedBarHeight, tl.y())
             if sizeOfLeftPlayed >= playedBarHeight:
                 p.drawTiledPixmap(QtCore.QRect(tl, br),
-                                  self._loadSvgAsPixmap("progress_slider_played_mid", 32, playedBarHeight))
+                                  renderPixmap("progress_slider_played_mid", 32, playedBarHeight))
 
         if self.isEnabled():
             # Draw the knob (handle)
@@ -439,12 +429,13 @@ class SeekSlider(QtGui.QSlider):
                 file = "slider_knob_200911_active"
             else: file = "slider_knob_200911"
             p.drawPixmap(knobRect.topLeft(),
-                         self._loadSvgAsPixmap(file, knobRect.width(), knobRect.height()))
+                         renderPixmap(file, knobRect.width(), knobRect.height()))
 
         p.end()
         
     def event(self, event):
-        if event.type() == QtCore.QEvent.ToolTip and self.backend is not None:
+        if event.type() == QtCore.QEvent.ToolTip and self.backend is not None \
+                and self.backend.current() is not None:
             seconds = int(event.x() / self.width() * self.backend.current().element.length)
             self.setToolTip(self.tr("Jump to {}").format(strutils.formatLength(seconds)))
             
