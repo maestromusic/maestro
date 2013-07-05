@@ -29,7 +29,7 @@ renderer = QtSvg.QSvgRenderer(":omg/playback.svg")
 ICON_SIZE = 16
 
 def renderPixmap(name, width, height):
-    """Load the object with the given name from slider.svg and render it into a pixmap of the given
+    """Load the object with the given name from playback.svg and render it into a pixmap of the given
     dimensions. Return that pixmap."""
     pixmap = QtGui.QPixmap(width, height)
     pixmap.fill(Qt.transparent)
@@ -55,21 +55,20 @@ class PlaybackWidget(dockwidget.DockWidget):
         
         topLayout = QtGui.QHBoxLayout()    
         self.titleLabel = QtGui.QLabel(self)
-        self.titleLabel.setTextFormat(Qt.AutoText)
-        self.titleLabel.setWordWrap(True)
+        self.titleLabel.setSizePolicy(QtGui.QSizePolicy.Ignored, QtGui.QSizePolicy.Ignored)
         topLayout.addWidget(self.titleLabel)   
         
-        self.previousButton = QtGui.QToolButton()
-        self.previousButton.setIcon(QtGui.QIcon(renderPixmap("media_skip_backward", ICON_SIZE, 10)))
+        self.skipBackwardButton = QtGui.QToolButton()
+        self.skipBackwardButton.setIcon(QtGui.QIcon(renderPixmap("media_skip_backward", ICON_SIZE, 10)))
         self.ppButton = PlayPauseButton(self)
         self.stopButton = QtGui.QToolButton()
         self.stopButton.setIcon(QtGui.QIcon(renderPixmap("media_playback_stop", ICON_SIZE, ICON_SIZE)))
-        self.nextButton = QtGui.QToolButton()
-        self.nextButton.setIcon(QtGui.QIcon(renderPixmap("media_skip_forward", ICON_SIZE, 10)))
+        self.skipForwardButton = QtGui.QToolButton()
+        self.skipForwardButton.setIcon(QtGui.QIcon(renderPixmap("media_skip_forward", ICON_SIZE, 10)))
         self.volumeButton = VolumeButton()
         
-        for button in (self.previousButton, self.ppButton, self.stopButton,
-                       self.nextButton, self.volumeButton):
+        for button in (self.skipBackwardButton, self.ppButton, self.stopButton,
+                       self.skipForwardButton, self.volumeButton):
             button.setAutoRaise(True)
             topLayout.addWidget(button)
             
@@ -132,8 +131,8 @@ class PlaybackWidget(dockwidget.DockWidget):
     
     def handleConnectionChange(self, state):
         """Update GUI elements when the connection state has changed."""
-        for item in self.previousButton, self.ppButton, self.stopButton, \
-                    self.nextButton, self.seekSlider, self.seekLabel, self.volumeButton:
+        for item in self.skipBackwardButton, self.ppButton, self.stopButton, \
+                    self.skipForwardButton, self.seekSlider, self.seekLabel, self.volumeButton:
             item.setEnabled(state is player.CONNECTED)
         if state == player.CONNECTING:
             self.titleLabel.setText(self.tr("connecting..."))
@@ -161,8 +160,8 @@ class PlaybackWidget(dockwidget.DockWidget):
                 ("self.ppButton.stateChanged", "self.backend.setState"),
                 ("self.stopButton.clicked", "self.backend.stop"),
                 ("self.seekSlider.sliderMoved", "self.backend.setElapsed"),
-                ("self.previousButton.clicked", "self.backend.previousSong"),
-                ("self.nextButton.clicked", "self.backend.nextSong")]
+                ("self.skipBackwardButton.clicked", "self.backend.skipBackward"),
+                ("self.skipForwardButton.clicked", "self.backend.skipForward")]
     
     def setBackend(self, backend):
         """Set or change the player backend of this playback widget.
@@ -205,10 +204,25 @@ class OptionDialog(dialogs.FancyPopup):
     """Dialog for the option button in the playlist's (dock widget) title bar.""" 
     def __init__(self, parent, playback):
         super().__init__(parent)
-        layout = QtGui.QFormLayout(self)
+        self.playback = playback
+        layout = QtGui.QVBoxLayout(self)
+        hLayout = QtGui.QHBoxLayout()
+        layout.addLayout(hLayout)
+        hLayout.addWidget(QtGui.QLabel(self.tr("Backend:")))
         backendChooser = profilesgui.ProfileComboBox(player.profileCategory, default=playback.backend)
         backendChooser.profileChosen.connect(playback.setBackend)
-        layout.addRow(self.tr("Backend:"), backendChooser)
+        hLayout.addWidget(backendChooser)
+        hLayout.addStretch()
+        
+        repeatBox = QtGui.QCheckBox(self.tr("Repeat playlist"))
+        repeatBox.setChecked(playback.backend.isRepeating())
+        # Don't connect to backend directly, as the backend might change.
+        repeatBox.toggled.connect(self._handleRepeatBox)
+        layout.addWidget(repeatBox)
+        layout.addStretch()
+        
+    def _handleRepeatBox(self, repeat):
+        self.playback.backend.setRepeating(repeat)
         
         
 class PlayPauseButton(QtGui.QToolButton):

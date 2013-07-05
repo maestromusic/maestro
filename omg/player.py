@@ -26,6 +26,8 @@ logger = logging.getLogger(__name__)
 STOP, PLAY, PAUSE = range(3)
 DISCONNECTED, CONNECTING, CONNECTED = range(3)
 
+FLAG_REPEATING = 1
+
 _runningBackends = {}
 
 profileCategory = profiles.TypedProfileCategory('playback',
@@ -41,7 +43,6 @@ class BackendError(Exception):
 
 
 class InsertError(BackendError):
-    
     def __init__(self, msg, successfulURLs=[]):
         super().__init__(msg)
         self.successfulURLs = successfulURLs
@@ -56,6 +57,7 @@ class PlayerBackend(profiles.Profile):
     currentChanged = QtCore.pyqtSignal(int)
     elapsedChanged = QtCore.pyqtSignal(float)
     connectionStateChanged = QtCore.pyqtSignal(int)
+    flagsChanged = QtCore.pyqtSignal(int)
     
     def __init__(self, name, type, state):
         super().__init__(name, type, state)
@@ -107,12 +109,12 @@ class PlayerBackend(profiles.Profile):
         is a float."""
         raise NotImplementedError()
     
-    def nextSong(self):
+    def skipForward(self):
         """Jump to the next song in the playlist. If the playlist is stopped or at the last 
         song, this is ignored."""
         raise NotImplementedError()
     
-    def previousSong(self):
+    def skipBackward(self):
         """Jump to the previous song in the playlist. If the playlist is stopped or at the
         first song, this is ignored."""
         raise NotImplementedError()
@@ -153,3 +155,22 @@ class PlayerBackend(profiles.Profile):
         This may be used to stop time-consuming backend operations as soon as nobody is using
         it anymore."""
         pass
+    
+    def flags(self):
+        """Return a bitwise-OR of the currently set flags (see the FLAG_*-constants defined in this module).
+        """
+        return 0
+    
+    def setFlags(self, flags):
+        """Set flags using a bitwise-OR of the FLAG_*-constants defined in this module."""
+        pass
+    
+    def isRepeating(self):
+        """Return whether the player will restart the playlist when it is finished."""
+        return FLAG_REPEATING & self.flags()
+    
+    def setRepeating(self, repeating):
+        """Set whether the player should restart the playlist when it is finished."""
+        if repeating:
+            self.setFlags(self.flags() | FLAG_REPEATING)
+        else: self.setFlags(self.flags() & ~FLAG_REPEATING)

@@ -74,14 +74,15 @@ class MPDPlayerBackend(player.PlayerBackend):
 
         if state is None:
             state = {}
-        host = state['host'] if 'host' in state else 'localhost'
-        port = state['port'] if 'port' in state else 6600
-        password = state['password'] if 'password' in state else ''
+        host = state.get('host', 'localhost')
+        port = state.get('port', 6600)
+        password = state.get('password', '')
 
         from .thread import MPDThread
         self.mpdthread = MPDThread(self, host, port, password)
         self.mpdthread.changeFromMPD.connect(self._handleMPDChange, Qt.QueuedConnection)
         self._numFrontends = 0
+        self._flags = 0
         
         self.commander = mpd.MPDClient()
         
@@ -169,11 +170,11 @@ class MPDPlayerBackend(player.PlayerBackend):
         with self.prepareCommander():
             self.commander.play(index if index is not None else -1)
     
-    def nextSong(self):
+    def skipForward(self):
         with self.prepareCommander():
             self.commander.next()
         
-    def previousSong(self):
+    def skipBackward(self):
         with self.prepareCommander():
             self.commander.previous()
     
@@ -282,6 +283,9 @@ class MPDPlayerBackend(player.PlayerBackend):
                                         updateBackend='onundoredo')
         elif what == 'outputs':
             self._outputs = how
+        elif what == 'flags':
+            self._flags = how
+            self.flagsChanged.emit(how)
         else:
             raise ValueError("Unknown change message from idler thread: {}".format(what))
                     
@@ -408,6 +412,15 @@ class MPDPlayerBackend(player.PlayerBackend):
     def __str__(self):
         return "MPDPlayerBackend({})".format(self.name)
 
+    def flags(self):
+        return self._flags
+    
+    def setFlags(self, flags):
+        if flags != self._flags:
+            with self.prepareCommander():
+                self.commander.repeat(flags & player.FLAG_REPEATING)
+            # self._flags will be updated when a change in MPD's status is detected
+    
 
 class MPDConfigWidget(QtGui.QWidget):
     """Widget to configure playback profiles of type MPD."""

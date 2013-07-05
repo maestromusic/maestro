@@ -178,6 +178,11 @@ class MPDThread(QtCore.QThread):
             self.changeFromMPD.emit('outputs', outputs)
         self.outputs = outputs
         
+    def updateFlags(self, emit=True):
+        flags = player.FLAG_REPEATING & (self.mpd_status['repeat'] == '1')
+        if emit:
+            self.changeFromMPD.emit('flags', flags)
+        
     def connect(self):
         self.idler.connect(self.host, self.port, CONNECTION_TIMEOUT)
         self.mpd_status = self.idler.status()
@@ -185,6 +190,7 @@ class MPDThread(QtCore.QThread):
         self.updatePlaylist()
         self.updatePlayer(False)
         self.updateOutputs(False)
+        self.updateFlags()
         self.changeFromMPD.emit('connect', (self.mpd_playlist[:], self.current,
                                             self.currentLength, self.calculateStart(self.elapsed),
                                             self.state, self.volume, self.outputs))
@@ -194,9 +200,11 @@ class MPDThread(QtCore.QThread):
         if not self.connected:
             return
         self.connected = False
-        self.idler.noidle()
-        self.idler.disconnect()
-        
+        try:
+            self.idler.noidle()
+            self.idler.disconnect()
+        except (mpd.CommandError, mpd.ConnectionError) as e:
+            logger.exception(e)
         logger.debug('mpd thread disconnected')
         self.changeFromMPD.emit('disconnect', None)
         
@@ -237,8 +245,11 @@ class MPDThread(QtCore.QThread):
                     changed.remove('player')
                 if 'update' in changed:
                     changed.remove('update')
-                elif 'output' in changed:
+                if 'output' in changed:
                     self.updateOutputs()
                     changed.remove('output')
+                if 'options' in changed:
+                    self.updateFlags()
+                    changed.remove('options')
                 if len(changed) > 0:
                     logger.warning('unhandled MPD changes: {}'.format(changed))

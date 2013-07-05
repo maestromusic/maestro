@@ -59,6 +59,7 @@ def defaultStorage():
 class PhononPlayerBackend(player.PlayerBackend):
     def __init__(self, name, type, state):
         super().__init__(name, type, state)
+        self._flags = 0
         
         # The list of paths in the playlist and the current song are stored directly in the model's tree
         self.playlist = playlist.PlaylistModel(self)
@@ -77,6 +78,8 @@ class PhononPlayerBackend(player.PlayerBackend):
         if 'playlist' in state:
             if self.playlist.initFromWrapperString(state['playlist']):
                 self.setCurrent(state['current'], play=False)
+        if 'flags' in state:
+            self._flags = int(state['flags'])
 
         self._nextSource = None # used in self._handleSourceChanged
         self.connectionState = player.CONNECTED
@@ -90,7 +93,7 @@ class PhononPlayerBackend(player.PlayerBackend):
             if isinstance(url, FileURL) and not os.path.exists(url.absPath):
                 raise player.InsertError(self.tr("Can not play '{}': File does not exist.")
                                          .format(url), urls[:i])
-            
+             
     def move(self,fromOffset,toOffset): pass
     
     def removeFromPlaylist(self,begin,end):
@@ -171,24 +174,31 @@ class PhononPlayerBackend(player.PlayerBackend):
         self.mediaObject.seek(int(seconds * 1000))
         self.elapsedChanged.emit(seconds)
     
-    def nextSong(self):
+    def skipForward(self):
         if self.state() != player.STOP and self.currentOffset() < self.playlist.root.fileCount() - 1:
             self.setCurrent(self.currentOffset()+1)
     
-    def previousSong(self):
+    def skipBackward(self):
         if self.state() != player.STOP and self.currentOffset() > 0:
             self.setCurrent(self.currentOffset()-1)
     
     def _handleAboutToFinish(self):
-        if self.currentOffset() < self.playlist.root.fileCount() - 1:
+        fileCount = self.playlist.root.fileCount()
+        if self.currentOffset() < fileCount - 1:
             self._nextSource = phonon.MediaSource(self._getPath(self.currentOffset()+1))
+            self._nextOffset = self.currentOffset()+1
+            self.mediaObject.enqueue(self._nextSource)
+        elif self.isRepeating() and fileCount > 0: 
+            self._nextSource = phonon.MediaSource(self._getPath(0))
+            self._nextOffset = 0
             self.mediaObject.enqueue(self._nextSource)
             
     def _handleSourceChanged(self, newSource):
         if newSource == self._nextSource:
-            self.playlist.setCurrent(self.currentOffset() + 1)
+            self.playlist.setCurrent(self._nextOffset)
             self.currentChanged.emit(self.currentOffset())
             self._nextSource = None
+            self._nextOffset = None
         
     def _handleTick(self,pos):
         self.elapsedChanged.emit(pos / 1000)
@@ -203,10 +213,23 @@ class PhononPlayerBackend(player.PlayerBackend):
         raise ValueError("Phonon can not play file {} of URL type {}".format(url, type(url)))
     
     def save(self):
+        result = {}
+        playlist = self.playlist.wrapperString()
+        if len(playlist):
+            result['playlist'] = playlist
         if self.playlist.current is not None:
-            current = self.playlist.current.offset()
-        else: current = None
-        return {'playlist': self.playlist.wrapperString(), 'current': current}
+            result['current'] = self.playlist.current.offset()
+        if self._flags != 0:
+            result['flags'] = self._flags
+        return result
         
     def __str__(self):
         return "PhononAudioBackend({})".format(self.name)
+    
+    def flags(self):
+        return self._flags
+    
+    def setFlags(self, flags):
+        if flags != self._flags:
+            self._flags = flags
+            self.flagsChanged.emit(flags)
