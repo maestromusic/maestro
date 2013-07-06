@@ -164,7 +164,7 @@ class NoProfileYetWidget(QtGui.QWidget):
         layout.addLayout(buttonLayout)
         buttonLayout.addStretch()
         closeButton = QtGui.QPushButton(self.tr("Close"))
-        closeButton.clicked.connect(parent.close)
+        closeButton.clicked.connect(lambda: self.window().close())
         buttonLayout.addWidget(closeButton)
         
 
