@@ -243,7 +243,8 @@ class PhononPlayerBackend(player.PlayerBackend):
             if removeFromRandomList:
                 return self._randomList.pop()
             else: return self._randomList[-1] 
-        
+        elif self.currentOffset() is None:
+            return 0
         elif self.currentOffset() < fileCount - 1:
             return self.currentOffset()+1
         elif self.isRepeating(): 
