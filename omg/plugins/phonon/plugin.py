@@ -46,8 +46,10 @@ def enable():
         if player.profileCategory.get(name) is None:
             player.profileCategory.addProfile(name, profileType)
 
+
 def disable():
     player.profileCategory.removeType('phonon')
+    
     
 def defaultStorage():
     return {"SECTION:phonon": {
@@ -79,11 +81,15 @@ class PhononPlayerBackend(player.PlayerBackend):
             if self.playlist.initFromWrapperString(state['playlist']):
                 self.setCurrent(state.get('current', None), play=False)
         self._flags = state.get('flags', 0)
+        self.setVolume(state.get('volume', 100))
+        if self.getRandom() != player.RANDOM_OFF:
+            self._createRandomList()
 
         self._nextSource = None # used in self._handleSourceChanged
         self.connectionState = player.CONNECTED
     
-    # Insert etc. are handled by the PlaylistModel. We only have to change the state if necessary.
+    # Insert etc. are handled by the PlaylistModel.
+    # We only have to change the state and random listif necessary.
     def insertIntoPlaylist(self, pos, urls):
         urls = list(urls)
         for i, url in enumerate(urls):
@@ -92,16 +98,45 @@ class PhononPlayerBackend(player.PlayerBackend):
             if isinstance(url, FileURL) and not os.path.exists(url.absPath):
                 raise player.InsertError(self.tr("Can not play '{}': File does not exist.")
                                          .format(url), urls[:i])
+        if self.getRandom() != player.RANDOM_OFF:
+            # update the old offsets
+            numberInserted = i+1
+            for i, offset in enumerate(self._randomList):
+                if offset >= pos:
+                    self._randomList[i] += numberInserted
+            # and insert the new ones
+            self._randomList.extend(range(pos, pos+numberInserted))
+            import random
+            random.shuffle(self._randomList)
              
-    def move(self,fromOffset,toOffset): pass
+    def move(self, fromOffset, toOffset):
+        if self.getRandom() != player.RANDOM_OFF:
+            if fromOffset < toOffset:
+                for i, offset in enumerate(self._randomList):
+                    if fromOffset < offset <= toOffset:
+                        self._randomList[i] -= 1
+                    elif offset == fromOffset:
+                        self._randomList[i] = toOffset
+            elif fromOffset > toOffset:
+                for i, offset in enumerate(self._randomList):
+                    if toOffset <= offset < fromOffset:
+                        self._randomList[i] += 1
+                    elif offset == fromOffset:
+                        self._randomList[i] = toOffset
     
-    def removeFromPlaylist(self,begin,end):
+    def removeFromPlaylist(self, begin, end):
         if self.playlist.current is None:
             self.setState(player.STOP)
+        if self.getRandom() != player.RANDOM_OFF:
+            numRemoved = end - begin
+            self._randomList = [o if o < begin else o-numRemoved
+                                for o in self._randomList if not begin <= o < end]
             
     def setPlaylist(self, urls):
         if self.playlist.current is None:
             self.setState(player.STOP)
+        if self.getRandom() != player.RANDOM_OFF:
+            self._createRandomList()
     
     phononToStateMap = { phonon.LoadingState: player.STOP,
                          phonon.StoppedState: player.STOP,
@@ -119,7 +154,9 @@ class PhononPlayerBackend(player.PlayerBackend):
                 self.mediaObject.stop()
             elif state == player.PLAY:
                 if self.current() is None:
-                    self.setCurrent(0) # this starts playing
+                    offset = self._nextOffset()
+                    if offset is not None:
+                        self.setCurrent(offset) # this starts playing
                 else: self.mediaObject.play()
                 QtCore.QTimer.singleShot(2000, self.checkPlaying)
             else: self.mediaObject.pause()
@@ -174,30 +211,62 @@ class PhononPlayerBackend(player.PlayerBackend):
         self.elapsedChanged.emit(seconds)
     
     def skipForward(self):
-        if self.state() != player.STOP and self.currentOffset() < self.playlist.root.fileCount() - 1:
-            self.setCurrent(self.currentOffset()+1)
+        if self.state() != player.STOP:
+            offset = self._nextOffset()
+            if offset is not None:
+                self.setCurrent(offset)
     
     def skipBackward(self):
-        if self.state() != player.STOP and self.currentOffset() > 0:
-            self.setCurrent(self.currentOffset()-1)
+        #TODO: Is there a reasonable way to handle random mode in this method?
+        if self.state() != player.STOP:
+            if self.currentOffset() > 0:
+                self.setCurrent(self.currentOffset()-1)
+            elif self.isRepeating():
+                fileCount = self.playlist.getRoot().fileCount()
+                self.setCurrent(fileCount-1)
+    
+    def _createRandomList(self):
+        import random
+        self._randomList = list(range(self.playlist.getRoot().fileCount()))
+        random.shuffle(self._randomList)
+    
+    def _nextOffset(self, removeFromRandomList=True):
+        """Get the next offset that will be played."""
+        fileCount = self.playlist.getRoot().fileCount()
+        if fileCount == 0:
+            return None
+        elif self.getRandom() != player.RANDOM_OFF:
+            if len(self._randomList) == 0:
+                if self.isRepeating():
+                    self._createRandomList()
+                else: return None
+            if removeFromRandomList:
+                return self._randomList.pop()
+            else: return self._randomList[-1] 
+        
+        elif self.currentOffset() < fileCount - 1:
+            return self.currentOffset()+1
+        elif self.isRepeating(): 
+            return 0
+        return None
     
     def _handleAboutToFinish(self):
-        fileCount = self.playlist.root.fileCount()
-        if self.currentOffset() < fileCount - 1:
-            self._nextSource = phonon.MediaSource(self._getPath(self.currentOffset()+1))
-            self._nextOffset = self.currentOffset()+1
-            self.mediaObject.enqueue(self._nextSource)
-        elif self.isRepeating() and fileCount > 0: 
-            self._nextSource = phonon.MediaSource(self._getPath(0))
-            self._nextOffset = 0
+        # do not remove the offset from _randomList directly because this method is called in
+        # _handleAboutToFinish. If the user seeks backward or skips, _nextOffset might be called
+        # another time before the source is actually changed.
+        self._no = self._nextOffset(removeFromRandomList=False)
+        if self._no is not None:
+            self._nextSource = phonon.MediaSource(self._getPath(self._no))
             self.mediaObject.enqueue(self._nextSource)
             
     def _handleSourceChanged(self, newSource):
         if newSource == self._nextSource:
-            self.playlist.setCurrent(self._nextOffset)
+            self.playlist.setCurrent(self._no)
+            if self.getRandom() != player.RANDOM_OFF and self._no in self._randomList:
+                self._randomList.remove(self._no)
             self.currentChanged.emit(self.currentOffset())
             self._nextSource = None
-            self._nextOffset = None
+            self._no = None
         
     def _handleTick(self,pos):
         self.elapsedChanged.emit(pos / 1000)
@@ -216,10 +285,12 @@ class PhononPlayerBackend(player.PlayerBackend):
         playlist = self.playlist.wrapperString()
         if len(playlist):
             result['playlist'] = playlist
-        if self.playlist.current is not None:
+        if self.playlist.current is not None and self.getRandom() == player.RANDOM_OFF:
             result['current'] = self.playlist.current.offset()
         if self._flags != 0:
             result['flags'] = self._flags
+        if self.volume() != 100:
+            result['volume'] = self.volume()
         return result
         
     def __str__(self):
@@ -230,5 +301,9 @@ class PhononPlayerBackend(player.PlayerBackend):
     
     def setFlags(self, flags):
         if flags != self._flags:
+            if player.FLAG_RANDOM & self._flags and not player.FLAG_RANDOM & flags:
+                self._randomList = None
+            elif not player.FLAG_RANDOM & self._flags and player.FLAG_RANDOM & flags:
+                self._createRandomList()
             self._flags = flags
             self.flagsChanged.emit(flags)

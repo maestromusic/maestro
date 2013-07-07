@@ -87,12 +87,12 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         for node in oldPlayingNodes:
             if node not in self.currentlyPlayingNodes and node in self:
                 index = self.getIndex(node)
-                self.dataChanged.emit(index,index)
+                self.dataChanged.emit(index, index)
                 
         for node in self.currentlyPlayingNodes:
             if node not in oldPlayingNodes:
                 index = self.getIndex(node)
-                self.dataChanged.emit(index,index)
+                self.dataChanged.emit(index, index)
 
     def _buildWrappersFromUrls(self, urls):
         """Build wrappers for the given urls and if possible add containers.
@@ -118,7 +118,7 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         """Clear the playlist."""
         self.stack.push(PlaylistChangeCommand(self, [], updateBackend))
     
-    def _handleLevelChanged(self,event):
+    def _handleLevelChanged(self, event):
         if not isinstance(event, levels.LevelChangedEvent):
             return
         dataIds = event.dataIds
@@ -168,7 +168,7 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
             self._dnd_removeTuples.append((parent, row, row+count-1))
             return False
         
-    def dropMimeData(self,mimeData,action,row,column,parentIndex):
+    def dropMimeData(self, mimeData, action, row, column, parentIndex):
         # Compute drop position
         parent = self.data(parentIndex, Qt.EditRole)
         if parent.isFile(): # Drop onto a file => drop behind it
@@ -185,14 +185,14 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         if action == Qt.MoveAction and isinstance(self.dndSource, QtGui.QTreeView) \
                 and isinstance(self.dndSource.model(), PlaylistModel) \
                 and self.dndSource.model().backend == self.backend:
-            return self.move(list(mimeData.wrappers()),parent,position)
+            return self.move(list(mimeData.wrappers()), parent, position)
  
         self.stack.beginMacro(self.tr("Drop elements"))
         
         # Create wrappers
         if mimeData.hasFormat(config.options.gui.mime):
             # Do not simply copy wrappers from other levels as they might be invalid on real level
-            if hasattr(mimeData,'level') and mimeData.level == self.level:
+            if hasattr(mimeData, 'level') and mimeData.level == self.level:
                 wrappers = [wrapper.copy() for wrapper in mimeData.wrappers()]
             else:
                 wrappers = [Wrapper(self.level.collect(wrapper.element.id))
@@ -210,7 +210,7 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
             return True
         else: return False # macro has been aborted
     
-    def _getPrePostWrappers(self,parent,position):
+    def _getPrePostWrappers(self, parent, position):
         """From the subtree below *parent* return the last leaf in parent.contents[:position] and the first
         leaf from parent.contents[position:]. Return None for leaves that do not exist."""
         if position > 0:
@@ -242,15 +242,15 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         self.stack.beginMacro(self.tr("Insert elements"))
         
         # Build a tree
-        preWrapper, postWrapper = self._getPrePostWrappers(parent,position)
-        wrappers = treebuilder.buildTree(self.level,origWrappers,parent,preWrapper,postWrapper)
+        preWrapper, postWrapper = self._getPrePostWrappers(parent, position)
+        wrappers = treebuilder.buildTree(self.level, origWrappers, parent, preWrapper, postWrapper)
         
         # Check whether we have to split the parent because some wrappers do not fit into parent
         # It might be necessary to split several parents
         while parent is not self.root:
             if any(w.element.id not in parent.element.contents for w in wrappers):
                 if position > 0:
-                    self.split(parent,position)
+                    self.split(parent, position)
                     # Now insert behind the first of the two parent nodes after the split. 
                     position = parent.parent.index(parent) + 1
                 else: position = parent.parent.index(parent)
@@ -275,7 +275,7 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
                 if postSibling.element.id == wrappers[-1].element.id:
                     # Last wrapper will be glued with postSibling => keep its parents
                     endPos -= 1
-            for i in range(startPos,endPos):
+            for i in range(startPos, endPos):
                 while wrappers[i].getContentsCount() == 1 and wrappers[i] not in origWrappers:
                     wrappers[i] = wrappers[i].contents[0]
         
@@ -293,8 +293,8 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
                 return False
             
         # Glue at the edges
-        self.glue(parent,position+len(wrappers))
-        self.glue(parent,position)
+        self.glue(parent, position+len(wrappers))
+        self.glue(parent, position)
         
         self.stack.endMacro()
         return True
@@ -311,7 +311,7 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
             position = parent.index(file)
         self.insert(parent, position, wrappers, updateBackend)
     
-    def move(self,wrappers,parent,position):
+    def move(self, wrappers, parent, position):
         """Move *wrappers* at *position* into *parent*. If the current song is moved, keep the player
         unchanged (contrary to removing and inserting the wrappers again).
         
@@ -327,7 +327,7 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         # First change the backend
         # We use a special command to really move songs within the backend (contrary to removing and
         # inserting them). This keeps the status of the current song intact even if it is moved.
-        self.stack.push(PlaylistMoveInBackendCommand(self,wrappers,parent,position))
+        self.stack.push(PlaylistMoveInBackendCommand(self, wrappers, parent, position))
         
         # Remove wrappers.
         # This might change the insert position for several reasons:
@@ -343,7 +343,7 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         # behind it.
         marker = Wrapper(wrappers[0].element)
         super().insert(parent, position, [marker])
-        self._dontGlueAway = [parent,marker]
+        self._dontGlueAway = [parent, marker]
         self.removeWrappers(wrappers, updateBackend='never')
         position = parent.index(marker)
         super().removeMany([(parent, position, position)])
@@ -353,15 +353,15 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         self.stack.endMacro()
         return True
     
-    def remove(self,parent,first,last, updateBackend='always'):
+    def remove(self, parent, first, last, updateBackend='always'):
         """See WrapperTreeModel.remove."""
-        self.removeMany([(parent,first,last)], updateBackend)
+        self.removeMany([(parent, first, last)], updateBackend)
         
     def removeByOffset(self, offset, count, updateBackend='always'):
         """Remove *count* files beginning at *offset* from the playlist."""
         # TODO: This is very inefficient
         ranges = []
-        for offset in range(offset,offset+count):
+        for offset in range(offset, offset+count):
             file = self.root.fileAtOffset(offset)
             parent = file.parent
             index = parent.index(file)
@@ -377,12 +377,12 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         self.stack.push(command)
         
         # Process gaps in reversed order to keep indexes below the same parent intact
-        for parent,gap in reversed(command.getGaps()):
-            self.glue(parent,gap)
+        for parent, gap in reversed(command.getGaps()):
+            self.glue(parent, gap)
         
         self.stack.endMacro()
         
-    def merge(self,first,second,firstIntoSecond):
+    def merge(self, first, second, firstIntoSecond):
         """If *firstIntoSecond* is True, copy the contents of *first* into *second* (insert them at the
         beginning) and remove *first*. Otherwise do it vice versa but insert at the end.
         *first* and *second* must store the same element and must be adjacent (without having the same
@@ -390,29 +390,29 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         """
         assert first.element.id == second.element.id
         if firstIntoSecond:
-            source,target,insertPos = first,second,0
-        else: source,target,insertPos = second,first,len(first.contents)
+            source, target, insertPos = first, second, 0
+        else: source, target, insertPos = second, first, len(first.contents)
         wrappers = list(source.contents)
         # See self.split for the reason for changing self.__class__
         self.__class__ = PlaylistModel.__bases__[0]
-        self.remove(source,0,len(wrappers)-1)
+        self.remove(source, 0, len(wrappers)-1)
         pos = source.parent.index(source)
-        self.remove(source.parent,pos,pos)
-        self.insert(target,insertPos,wrappers)
+        self.remove(source.parent, pos, pos)
+        self.insert(target, insertPos, wrappers)
         self.__class__ = PlaylistModel
         
-    def _getParentsUpTo(self,wrapper,parent):
+    def _getParentsUpTo(self, wrapper, parent):
         """Return a tuple containing firstly all ancestors of *wrapper* up to but not including *parent*
         and secondly the ids of those ancestors.""" 
-        parents, ids = [],[]
+        parents, ids = [], []
         for p in wrapper.getParents():
             if p != parent:
                 parents.append(p)
                 ids.append(p.element.id)
             else: break
-        return parents,ids
+        return parents, ids
     
-    def glue(self,parent,position):
+    def glue(self, parent, position):
         """Glue nodes at *position* in *parent*: Look at the files before and after the position and at
         their ancestors up to *parent*. Merge wrappers with the same element. Example: Assume the playlist
         contains an album A with some songs, then a different album B and finally again album A. When B is
@@ -426,34 +426,34 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         """
         if position == 0 or position == parent.getContentsCount():
             return # nothing to glue here
-        preWrapper,postWrapper = self._getPrePostWrappers(parent,position)
+        preWrapper, postWrapper = self._getPrePostWrappers(parent, position)
         assert preWrapper is not None and postWrapper is not None
-        preParents,preParentIds = self._getParentsUpTo(preWrapper,parent)
-        postParents,postParentIds = self._getParentsUpTo(postWrapper,parent)
+        preParents, preParentIds = self._getParentsUpTo(preWrapper, parent)
+        postParents, postParentIds = self._getParentsUpTo(postWrapper, parent)
         
         while len(postParentIds) and len(preParentIds):
-            pos = utils.rfind(postParentIds,preParentIds[-1])
+            pos = utils.rfind(postParentIds, preParentIds[-1])
             if pos >= 0 and (self._dontGlueAway is None or preParents[-1] not in self._dontGlueAway):
-                self.merge(preParents[-1],postParents[pos],firstIntoSecond=True)
+                self.merge(preParents[-1], postParents[pos], firstIntoSecond=True)
                 del preParentIds[-1]
                 del preParents[-1]
                 del postParentIds[pos:]
                 continue
-            pos = utils.rfind(preParentIds,postParentIds[-1])
+            pos = utils.rfind(preParentIds, postParentIds[-1])
             if pos >= 0 and (self._dontGlueAway is None or postParents[-1] not in self._dontGlueAway):
-                self.merge(preParents[pos],postParents[-1],firstIntoSecond=False)
+                self.merge(preParents[pos], postParents[-1], firstIntoSecond=False)
                 del preParentIds[pos:]
                 del postParentIds[-1]
                 del postParents[-1]
                 continue
             break # no glue possible
         
-    def split(self,parent,position):
+    def split(self, parent, position):
         # Call the implementation of the base class but ensure that it uses the base class implementations
         # of insert and remove. Those implementations don't do fancy stuff (e.g. treebuilder) and do not
         # change the backend's playlist (split does not change the flat playlist). 
         self.__class__ = PlaylistModel.__bases__[0]
-        self.split(parent,position)
+        self.split(parent, position)
         self.__class__ = PlaylistModel
     
     def wrapperString(self):
@@ -473,10 +473,10 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
             
         return self.root.wrapperString(strFunc=_strFunc)
     
-    def initFromWrapperString(self,wrapperString):
+    def initFromWrapperString(self, wrapperString):
         """Initialize the playlist from a wrapperstring created with PlaylistModel.getWrapperString."""
         # Helper functions for playlist<->wrapperstring conversion
-        def _createFunc(parent,token):
+        def _createFunc(parent, token):
             """This is used as createFunc-argument for Level.createWrappers."""
             if token.startswith('EXT:'):
                 url = urllib.parse.unquote(token[4:]) # remove "EXT:"
@@ -484,9 +484,9 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
                 element = self.level.collect(url)
             else:
                 element = self.level.collect(int(token))
-            return Wrapper(element,parent=parent)
+            return Wrapper(element, parent=parent)
         try:
-            wrappers = self.level.createWrappers(wrapperString,createFunc=_createFunc)
+            wrappers = self.level.createWrappers(wrapperString, createFunc=_createFunc)
         except ValueError as e:
             logger.warning(str(e))
             return False
@@ -513,7 +513,7 @@ class PlaylistInsertCommand(wrappertreemodel.InsertCommand):
                 offset = predecessor.offset() + predecessor.fileCount()
             files = itertools.chain.from_iterable(w.getAllFiles() for w in self.wrappers)
             try:
-                self.model.backend.insertIntoPlaylist(offset,(f.element.url for f in files))
+                self.model.backend.insertIntoPlaylist(offset, (f.element.url for f in files))
             except player.BackendError as error:
                 self.error = error
                 if not firstRedo:
@@ -544,43 +544,43 @@ class PlaylistInsertCommand(wrappertreemodel.InsertCommand):
             return # this may happen due to the filtering in redo
         if self._updateBackend != 'never':
             offset = self.parent.contents[self.position].offset()
-            self.model.backend.removeFromPlaylist(offset,offset+self._count)
+            self.model.backend.removeFromPlaylist(offset, offset+self._count)
         super().undo()
         
     def __str__(self):
-        return "<PlaylistInsertCommand {} {} {}>".format(self.parent,self.position,self.wrappers)
+        return "<PlaylistInsertCommand {} {} {}>".format(self.parent, self.position, self.wrappers)
         
         
 class PlaylistRemoveCommand(wrappertreemodel.RemoveCommand):
     """Subclass of RemoveCommand that additionally changes the backend."""
     def __init__(self, model, ranges, updateBackend, removeEmptyParents=True):
         assert all(range[2] >= range[1] for range in ranges)
-        super().__init__(model,ranges,removeEmptyParents)
+        super().__init__(model, ranges, removeEmptyParents)
         if not updateBackend in ('always', 'never', 'onundoredo'):
             raise ValueError("Invalid value for 'updateBackend' argument: {}".format(updateBackend))
         self._updateBackend = updateBackend
         self._playlistEntries = None
         
     def redo(self):
-        for parent,start,end in reversed(self.ranges):
+        for parent, start, end in reversed(self.ranges):
             if self._updateBackend == 'always':
                 startOffset = parent.contents[start].offset()
                 endOffset = parent.contents[end].offset() + parent.contents[end].fileCount()
                 if self.model.current is not None and startOffset <= self.model.current.offset() < endOffset:
                     self.model.setCurrent(None)
-                self.model.backend.removeFromPlaylist(startOffset,endOffset)
+                self.model.backend.removeFromPlaylist(startOffset, endOffset)
             elif self._updateBackend == 'onundoredo':
                 self._updateBackend = 'always' # from now on
-            self.model._remove(parent,start,end)
+            self.model._remove(parent, start, end)
         self.model._updateCurrentlyPlayingNodes()
             
     def undo(self):
-        for parent,pos,wrappers in self.insertions:
-            self.model._insert(parent,pos,wrappers)
+        for parent, pos, wrappers in self.insertions:
+            self.model._insert(parent, pos, wrappers)
             if self._updateBackend != 'never':
                 offset = parent.contents[pos].offset()
                 files = itertools.chain.from_iterable(w.getAllFiles() for w in wrappers)
-                self.model.backend.insertIntoPlaylist(offset,(f.element.url for f in files))
+                self.model.backend.insertIntoPlaylist(offset, (f.element.url for f in files))
     
     def __str__(self):
         return "<PlaylistRemoveCommand {}>".format(self.ranges)
@@ -589,7 +589,7 @@ class PlaylistRemoveCommand(wrappertreemodel.RemoveCommand):
 class PlaylistChangeCommand(wrappertreemodel.ChangeCommand):
     """Subclass of ChangeCommand that additionally changes the backend."""
     def __init__(self, model, newContents, updateBackend):
-        super().__init__(model,newContents)
+        super().__init__(model, newContents)
         if not updateBackend in ('always', 'never', 'onundoredo'):
             raise ValueError("Invalid value for 'updateBackend' argument: {}".format(updateBackend))
         self._updateBackend = updateBackend
@@ -630,17 +630,17 @@ class PlaylistMoveInBackendCommand:
         #   Note that the insert position remains unchanged.
         # - Whenever we move a file after (or at) the insert position, the insert position increases by 1.
         # The first correction is stored in i, the second one in j
-        i,j = 0,0
+        i, j = 0, 0
         for file in itertools.chain.from_iterable(w.getAllFiles() for w in wrappers):
             fileOffset = file.offset()
             if fileOffset < insertOffset:
                 # The second entry of a move-tuple stores the offset which the element will have after the
                 # move. For elements before the insert position this is insertOffset-1:
-                self.moves.append((fileOffset-i,insertOffset-1))
+                self.moves.append((fileOffset-i, insertOffset-1))
                 i += 1
             else:
                 if fileOffset > insertOffset: # Don't move a file that is already at the correct position
-                    self.moves.append((fileOffset,insertOffset+j))
+                    self.moves.append((fileOffset, insertOffset+j))
                 j += 1
         
     def redo(self):
@@ -649,4 +649,4 @@ class PlaylistMoveInBackendCommand:
             
     def undo(self):
         for move in reversed(self.moves):
-            self.model.backend.move(move[1],move[0])
+            self.model.backend.move(move[1], move[0])

@@ -27,6 +27,14 @@ STOP, PLAY, PAUSE = range(3)
 DISCONNECTED, CONNECTING, CONNECTED = range(3)
 
 FLAG_REPEATING = 1
+FLAG_RANDOM = 2
+FLAG_RANDOM_WORKS = 4
+
+# Return values for getRandom, setRandom
+RANDOM_OFF = 0
+RANDOM_ON = FLAG_RANDOM
+RANDOM_WORKS = FLAG_RANDOM_WORKS
+
 
 _runningBackends = {}
 
@@ -174,3 +182,22 @@ class PlayerBackend(profiles.Profile):
         if repeating:
             self.setFlags(self.flags() | FLAG_REPEATING)
         else: self.setFlags(self.flags() & ~FLAG_REPEATING)
+        
+    def getRandom(self):
+        """Return random mode from {RANDOM_OFF, RANDOM_ON, RANDOM_WORKS}."""
+        if FLAG_RANDOM_WORKS & self.flags():
+            return RANDOM_WORKS
+        elif FLAG_RANDOM & self.flags():
+            return RANDOM_ON
+        else: return RANDOM_OFF
+    
+    def setRandom(self, random):
+        """Set random mode to one of RANDOM_OFF, RANDOM_ON, RANDOM_WORKS."""
+        if random == RANDOM_OFF:
+            self.setFlags(self.flags() & ~FLAG_RANDOM & ~FLAG_RANDOM_WORKS)
+        elif random == RANDOM_ON:
+            self.setFlags(self.flags() | FLAG_RANDOM)
+        elif random == RANDOM_WORKS:
+            self.setFlags(self.flags() | FLAG_RANDOM | FLAG_RANDOM_WORKS)
+        else:
+            raise ValueError("Invalid value for argument *random*: {}".format(random))
