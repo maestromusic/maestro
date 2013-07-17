@@ -550,6 +550,7 @@ class CentralTabWidget(QtGui.QTabWidget):
     def __init__(self):
         super().__init__()
         self.setMovable(True)
+        self.setTabBar(CentralTabBar())
         self._lastDialogTabIndexes = {}
         self.currentChanged.connect(self._handleCurrentChanged)
         
@@ -609,6 +610,19 @@ class CentralTabWidget(QtGui.QTabWidget):
             self._dialog = None
         return False # do not filter the event out
     
+    
+class CentralTabBar(QtGui.QTabBar):
+    """This tabbar makes a tab active when a drag enters its tabbutton.""" 
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setAcceptDrops(True) # no dragEnterEvents with this line
+
+    def dragEnterEvent(self, event):
+        tabIndex = self.tabAt(event.pos())
+        if tabIndex != -1 and tabIndex != self.currentIndex():
+            self.setCurrentIndex(tabIndex)
+        return super().dragEnterEvent(event)
+
 
 class DockLocation:
     """This small class stores location information for dockwidgets when the layout is saved/restored. Note
