@@ -145,6 +145,7 @@ storage = OrderedDict((
 ("SECTION:gui", {
     'perspectives': {},
     'delegates': [],
+    'layoutFrozen': False,
 }),
 ("SECTION:player", {
     'profiles': [],

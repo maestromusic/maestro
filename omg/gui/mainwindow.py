@@ -46,6 +46,7 @@ import functools, itertools, collections
 
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
+QWIDGETSIZE_MAX = 16777215
 
 from .. import application, config, constants, logging
 from . import selection, dialogs
@@ -229,20 +230,25 @@ class MainWindow(QtGui.QMainWindow):
         self.menus['dockwidgets'] = self.menus['view'].addMenu(self.tr("New dock widget"))
         self.menus['perspectives'] = self.menus['view'].addMenu(self.tr("Perspective"))
         self.updatePerspectiveMenu()
+        self.menus['view'].addSeparator()
         
         self.hideTitleBarsAction = QtGui.QAction(self.tr("Hide title bars"), self)
         self.hideTitleBarsAction.setCheckable(True)
+        self.menus['view'].addAction(self.hideTitleBarsAction)
+        
+        self.freezeLayoutAction = QtGui.QAction(self.tr("Freeze layout"), self)
+        self.freezeLayoutAction.setCheckable(True)
+        self.freezeLayoutAction.setChecked(self.isLayoutFrozen())
+        self.freezeLayoutAction.toggled.connect(self.setLayoutFrozen)
+        self.menus['view'].addAction(self.freezeLayoutAction)
         
         self.fullscreenAction = QtGui.QAction(self.tr("&Fullscreen"), self)
         self.fullscreenAction.setCheckable(True)
         self.fullscreenAction.setChecked(False)
         self.fullscreenAction.setShortcut(self.tr("F12"))
         self.fullscreenAction.toggled.connect(self._handleFullscreen)
-
-        self.menus['view'].addSeparator()
-        self.menus['view'].addAction(self.hideTitleBarsAction)
         self.menus['view'].addAction(self.fullscreenAction)
-        
+
         # EXTRAS
         self.menus['extras'] = self.menuBar().addMenu(self.tr("&Extras"))
         
@@ -266,6 +272,24 @@ class MainWindow(QtGui.QMainWindow):
         if state:
             self.showFullScreen()
         else: self.showNormal()
+    
+    def isLayoutFrozen(self):
+        """When the layout is frozen, it is impossible to resize the window or dockwidgets. Also, it is
+        impossible to move or close dockwidgets."""
+        return config.storage.gui.layoutFrozen
+    
+    def setLayoutFrozen(self, frozen, force=False):
+        """Freeze/unfreeze layout. When the layout is frozen, it is impossible to resize the window or
+        dockwidgets. Also, it is impossible to move or close dockwidgets."""
+        frozen = bool(frozen)
+        if force or frozen != config.storage.gui.layoutFrozen:
+            config.storage.gui.layoutFrozen = frozen
+            if frozen:
+                self.setFixedSize(self.size())
+            else: self.setFixedSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX)
+            self.centralWidget().closeButton.setVisible(not frozen)
+            for widget in self.dockWidgets():
+                widget.setFrozen(frozen)
         
     def updateWidgetMenus(self):
         """Update the central/dock widget menus whenever the list of registered widgets has changed."""
@@ -324,14 +348,20 @@ class MainWindow(QtGui.QMainWindow):
             widget.installEventFilter(self)
         return widget
 
-    def addDockWidget(self, data, objectName=None):
+    def addDockWidget(self, data):
         """Add a dock widget corresponding to the given WidgetData and return it."""
         # The difference between _createDockWidget and addDockWidget is that the latter really adds the
         # widget to the MainWindow. The former is also used by restoreLayout and there dockwidgets are added
         # by QMainWindow.restoreState.
+        frozen = self.isLayoutFrozen()
+        if frozen:
+            self.setLayoutFrozen(False)
         widget = self._createDockWidget(data, DockLocation(data.preferredDockArea, False))
         super().addDockWidget(data.preferredDockArea, widget)
-
+        if frozen:
+            # Wait until updated dockwidgets sizes are available
+            QtCore.QTimer.singleShot(0, functools.partial(self.setLayoutFrozen, True))
+        
     def _createDockWidget(self, data, location, objectName=None, state=None):
         """Create a new dock widget for the given WidgetData and set its objectName to *objectName*. If that
         is None, compute an unused objectName."""
@@ -416,7 +446,11 @@ class MainWindow(QtGui.QMainWindow):
         if not success:
             for widgets in dockWidgets:
                 super().addDockWidget(widget.widgetData.preferredDockArea, widget)
-            
+                
+        if self.isLayoutFrozen():
+            # self.dockWidgets() does not work until event queue is reentered.
+            QtCore.QTimer.singleShot(0, functools.partial(self.setLayoutFrozen, True, force=True))
+        
     def savePerspective(self, name=DEFAULT_PERSPECTIVE):
         """Save the layout and state of all central and dock widgets. If no *name* is given, the default
         perspective will be overwritten.""" 
@@ -454,6 +488,7 @@ class MainWindow(QtGui.QMainWindow):
     def createDefaultWidgets(self):
         """Create the default set of central and dock widgets. Use this method if no widgets can be loaded
         from the storage file."""
+        self.setLayoutFrozen(False)
         for id in 'playlist', 'editor':
             data = WidgetData.fromId(id)
             self.addCentralWidget(data)
