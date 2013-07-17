@@ -156,18 +156,21 @@ class MainWindow(QtGui.QMainWindow):
         mainWindow = self
         
         # Resize and move the widget to the size and position it had when the program was closed
-        if "mainwindow_geometry" in config.binary \
-              and isinstance(config.binary["mainwindow_geometry"], bytearray):
-            success = self.restoreGeometry(config.binary["mainwindow_geometry"])
-        else: success = False
-        if not success: # Default geometry
-            self.resize(1000, 800)
-            # Center the window
-            screen = QtGui.QDesktopWidget().screenGeometry()
-            size = self.geometry()
-            self.move((screen.width()-size.width())/2, (screen.height()-size.height())/2)
+        if "mainwindow_maximized" in config.binary and config.binary["mainwindow_maximized"]:
+            self.setWindowState(self.windowState() | Qt.WindowMaximized)
+        else:
+            if "mainwindow_geometry" in config.binary \
+                  and isinstance(config.binary["mainwindow_geometry"], bytearray):
+                success = self.restoreGeometry(config.binary["mainwindow_geometry"])
+            else: success = False
+            if not success: # Default geometry
+                screen = QtGui.QDesktopWidget().availableGeometry()
+                self.resize(min(1000, screen.width()), min(800, screen.height()))
+                # Center the window
+                screen = QtGui.QDesktopWidget().screenGeometry()
+                size = self.geometry()
+                self.move((screen.width()-size.width())/2, (screen.height()-size.height())/2)
                 
-        
         self.setCentralWidget(CentralTabWidget())
         self.initMenus()
         if DEFAULT_PERSPECTIVE in config.storage.gui.perspectives:
@@ -182,10 +185,6 @@ class MainWindow(QtGui.QMainWindow):
         #TODO: Replace this hack by something clever.
         browserShortcut = QtGui.QShortcut(QtGui.QKeySequence(self.tr("Ctrl+F")), self,
                                           self._handleBrowserShortcut)
-        
-        # Restore maximized state
-        if "mainwindow_maximized" in config.binary and config.binary["mainwindow_maximized"]:
-            self.showMaximized()
             
     def centralWidgets(self):
         return [self.centralWidget().widget(i) for i in range(self.centralWidget().count())]
