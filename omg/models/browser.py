@@ -145,11 +145,11 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
     def mimeData(self, indexes):
         return BrowserMimeData.fromIndexes(self, indexes)
 
-    def _startLoading(self, node, wait=False):
+    def _startLoading(self, node, block=False):
         """Start loading the contents of *node*, which must be either root or a CriterionNode (The contents of
         containers are loaded via Container.loadContents). If *node* is a CriterionNode, start a search for
         the contents. The actual loading will be done in the searchFinished event. Only the rootnode is
-        loaded directly. If *wait* is True this method will wait until the node is loaded. 
+        loaded directly. If *block* is True this method will block until the node is loaded. 
         """
         if node == self.root:
             oldHasContents = self.hasContents()
@@ -172,11 +172,19 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
             layer = self.getLayer(self._getLayerIndex(node) + 1)
             criteria = [p.getCriterion() for p in node.getParents(includeSelf=True)
                         if isinstance(p, CriterionNode)]
-            method = searchEngine.search if not wait else searchEngine.searchAndWait
+            method = searchEngine.search if not block else searchEngine.searchAndBlock
             searchRequest = method(self.table, criteria, data=(layer, node),
                                    postProcessing=[searchmodule.findExtendedToplevel])
-            if not wait:
+            if not block:
                 self._searchRequests.append(searchRequest)
+                # further loading is done when the search is finished
+            else:
+                # Load directly
+                layer, node = searchRequest.data
+                self.load(layer, node, ElementSource(request=searchRequest), _loadContainersRecursively=True)
+                for child in node.getContents():
+                    if isinstance(child, CriterionNode):
+                        self._startLoading(child, block=True)
                 
     def _getLayerIndex(self, node):
         if isinstance(node, Wrapper): 
@@ -196,8 +204,10 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
             self._searchRequests.remove(searchRequest)
             self.load(layer, node, ElementSource(request=searchRequest))
     
-    def load(self, layer, node, elementSource):
-        contents = layer.load(self, node, elementSource)
+    def load(self, layer, node, elementSource, _loadContainersRecursively=False):
+        if isinstance(layer, ContainerLayer):
+            contents = layer.load(self, node, elementSource, recursive=_loadContainersRecursively)
+        else: contents = layer.load(self, node, elementSource)
         if node.contents is not None:
             # Only use beginRemoveRows and friends if there are already contents. If we are going to add the
             # first contents to node (this happens thanks to the directload shortcut), we must not call
@@ -232,7 +242,7 @@ class ElementSource:
                             WHERE el.file = 0 AND el.type IN ({})
                             """.format(db.prefix, table, db.csList(elements.MAJOR_TYPES))).getSingleColumn()
             descendantsOfMajor = db.csList(db.contents(majorContainers, recursive=True))
-            if len(descendantsOfMajor):
+            if len(descendantsOfMajor) > 0:
                 self.extendedToplevel = set(db.query("SELECT id FROM {} WHERE id NOT IN  ({})"
                                                      .format(table, descendantsOfMajor)).getSingleColumn())
             else:
@@ -344,7 +354,7 @@ class TagLayer:
             for elid, tid, vid in result:
                 elementDict[(tid, vid)].add(elid)   
             
-            # EXPERIMENTAL: If there are only a few composers, use them as tagnodes
+            # EXPERIMENTAL: If there are only a few composers, use them as tag nodes (no artists etc.)
             composerTag = tags.get("composer")
             if composerTag.isInDb():
                 composers = [pair for pair in elementDict.keys() if pair[0] == composerTag.id]
@@ -419,10 +429,10 @@ addLayerClass('taglayer', translate("BrowserModel", "Tag layer"), TagLayer)
 
 
 class ContainerLayer:
-    def load(self, model, node, elementSource):
+    def load(self, model, node, elementSource, recursive=False):
         """Load the contents of *node* into a container-layer, using toplevel elements from *table*. Note that
         this creates all children of *node* and not only the next level of the tree-structure as _loadTagLayer
-        does. For performance reasons this method does not load the data (''Element.fromId(loadData=False)'').
+        does.
         """
         if elementSource.table is None:
             allIds = elementSource.ids
@@ -446,28 +456,42 @@ class ContainerLayer:
             newIds = nextIds
 
         # Collect all parents in cDict (mapping parent id -> list of children ids)
-        # Only add elements which are not direct search results
+        # Parents contained as key in this dict, will only contain part of their element's contants in
+        # the browser. The part is given by the corresponding value (a list) in this dict.
+        # The dict must not contain direct search results as keys, as they should always show all their
+        # contents.
         cDict = collections.defaultdict(list)
             
         def processNode(id):
+            """Check whether the element with the given id has major parents that need to be added to the 
+            browser's tree. If such a parent is found, update cDict and toplevel and return True.
+            """
             result = False
             for pid in levels.real[id].parents:
-                if pid in cDict or pid in allIds or processNode(pid):
+                if pid in cDict: # We've already added this parent
                     result = True
                     cDict[pid].append(id)
                     toplevel.discard(id)
-                elif levels.real[pid].isMajor():
+                elif pid in allIds: # This parent belongs to the direct search result
+                    result = True
+                    toplevel.discard(id)
+                elif processNode(pid): # We must add this parent, because it has a major ancestor.
+                    result = True
+                    cDict[pid].append(id)
+                    toplevel.discard(id)
+                elif levels.real[pid].isMajor(): # This is a major parent. Add it to toplevel
                     result = True
                     cDict[pid].append(id)
                     toplevel.discard(id)
                     toplevel.add(pid)
-                
             return result
         
         for id in list(toplevel): # copy!
             processNode(id)
         
         def createWrapper(id):
+            """Create a wrapper to be inserted in the browser. If the wrapper should contain all of its
+            element's contents, create a BrowserWrapper, that will load the contents """
             element = levels.real[id]
             if id in cDict:
                 wrapper = Wrapper(element)
@@ -475,8 +499,12 @@ class ContainerLayer:
                 return wrapper
             elif element.isFile() or len(element.contents) == 0:
                 return Wrapper(element)
+            elif recursive:
+                w = Wrapper(element)
+                w.loadContents(recursive=True)
+                return w
             else:
-                return BrowserWrapper(element) # a wrapper that will load its contents when needed
+                return BrowserWrapper(element) # a wrapper that will load all its contents when needed
         
         contents = [createWrapper(id) for id in toplevel]
         
@@ -534,9 +562,9 @@ class CriterionNode(Node):
         return self.contents is not None and (len(self.contents) != 1 
                                                or not isinstance(self.contents[0], LoadingNode))
                                                
-    def loadContents(self, wait=False):
+    def loadContents(self, block=False):
         """If they are not loaded yet, start to load the contents of this node. The actual loading is done
-        by the model when it reacts to the searchFinished event. If *wait* is True, the contents are loaded
+        by the model when it reacts to the searchFinished event. If *block* is True, the contents are loaded
         directly, i.e. the method waits for the search to finish.
         """
         if self.contents is None:
@@ -545,13 +573,12 @@ class CriterionNode(Node):
             while parent.parent is not None:
                 parent = parent.parent
             model = parent.model
-            if not wait:
+            if not block:
                 self.setContents([LoadingNode()])
-                
                 model._startLoading(self)
                 # The contents will be added in BrowserModel.searchFinished
             else:
-                model._startLoading(self, wait=True) # block until the contents are loaded
+                model._startLoading(self, block=True)
 
 
 class TagNode(CriterionNode):
@@ -686,18 +713,23 @@ class BrowserMimeData(selection.MimeData):
         if not self._wrappersLoaded:
             # self.nodes() may contain CriterionNodes or (unlikely) LoadingNodes.
             self._wrappers = list(itertools.chain.from_iterable(self._getElementsInstantly(node)
-                                                                   for node in self.nodes()))
+                                                                for node in self.nodes(onlyToplevel=True)))
+            #assert self._wrappers[0].contents is not None
             self._wrappersLoaded = True
         return self._wrappers
                                           
-    def _getElementsInstantly(self,node):
+    def _getElementsInstantly(self, node):
         """If *node* is a CriterionNode return all (toplevel) elements contained in it. If contents have to
-        be loaded, wait for the search to finish. If *node* is an element return ''[node]''.
+        be loaded, block until the search is finished. If *node* is an element return ''[node]''.
         """
         if isinstance(node, Wrapper):
             return [node]
-        if isinstance(node,CriterionNode):
-            node.loadContents(wait=True) # This does not load element data
+        if isinstance(node, CriterionNode):
+            if node.contents is None:
+                node.loadContents(block=True)
+                if node.contents is None: # should never be the case
+                    logger.debug("Could not load contents of node instantly: {}".format(node))
+                    return []
             return itertools.chain.from_iterable(self._getElementsInstantly(child)
-                                                    for child in node.getContents())
+                                                 for child in node.contents)
         else: return [] # Should be a LoadingNode

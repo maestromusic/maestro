@@ -60,6 +60,7 @@ class Selection:
     """
     def __init__(self, level, nodes, onlyWrappers=False):
         self.level = level
+        assert nodes is not None
         self._nodes = nodes
         
         if onlyWrappers or all(isinstance(node, Wrapper) for node in self._nodes):

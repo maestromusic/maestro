@@ -107,8 +107,9 @@ class SearchEngine(QtCore.QObject):
     """A SearchEngine controls a worker thread that can perform searches in the database. If you want to
     search, create a SearchEngine, use createResultTable and then use search.
     """
+    # Emitted when an event is completely finished (even after callbacks have been called)
     searchFinished = QtCore.pyqtSignal(SearchRequest)
-    _searchFinished = QtCore.pyqtSignal(SearchRequest)
+    _searchFinished = QtCore.pyqtSignal(SearchRequest) # Internal
     
     # Static! This lock is used to create unique names for result tables across different search engines.
     _resultTableLock = threading.Lock()
@@ -130,8 +131,8 @@ class SearchEngine(QtCore.QObject):
         self.addRequest(request)
         return request
 
-    def searchAndWait(self, *args, **kargs):
-        """Perform a search and wait until it is finished. The arguments are the same as in
+    def searchAndBlock(self, *args, **kargs):
+        """Perform a search and block until it is finished. The arguments are the same as in
         SearchRequest.__init__ except that the engine parameter must not be given (it is set to this engine).
         Return the generated SearchRequest.
         """
@@ -305,8 +306,12 @@ class SearchThread(threading.Thread):
                                           .format(request.resultTable), ((id,) for id in request.result))
                         db.commit()
                     self.engine._searchFinished.emit(request)
+                    if request._fireEvent:
+                        self.engine._finishedEvent.set()
                 except StopRequestException:
                     logger.debug("StopRequestException")
+                    if request._fireEvent:
+                        self.engine._finishedEvent.set()
                     continue
 
 
