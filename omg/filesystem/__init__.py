@@ -539,13 +539,12 @@ class FileSystemSynchronizer(QtCore.QObject):
     def scanFilesystem(self):
         """Walks through the collection, updating folders and searching for new files.
         """
-        
         #  updates on directories and tracks are collected  and then commited batch-wise
         #  to improve database performance. 
         newDirectories, modifiedDirectories, newTracks = set(), set(), set()
-        THRESHOLD = 100  # number of updates bevor database is called
+        THRESHOLD = 100  # number of updates before database is called
         self.eventThread.timer.stop()
-        modifiedTags = {}
+        self.modifiedTags = {}
         
         # run through the filesystem. Any directories or tracks being found that are also in
         # self.dbDirectories or self.dbTracks, respectively, will be removed there. Thus, any
@@ -573,7 +572,7 @@ class FileSystemSynchronizer(QtCore.QObject):
                     track = self.tracks[url]
                     ret = self.checkTrack(track)
                     if ret is not None:
-                        modifiedTags[track] = ret
+                        self.modifiedTags[track] = ret
                 else:
                     track = self.addTrack(dir, url)
                     if idProvider is not None: # no point in adding tracks without hash to nefwfiles
@@ -599,11 +598,11 @@ class FileSystemSynchronizer(QtCore.QObject):
         db.commit()
         if self.should_stop.is_set():
             return
-        self.analyzeScanResults(modifiedTags)
+        self.analyzeScanResults()
         self.eventThread.timer.start()
         logger.debug("filesystem scan complete")
       
-    def analyzeScanResults(self, modifiedTags):
+    def analyzeScanResults(self):
         """Called after scanFilesystem to detect discrepancies between DB and filesystem.
         
         *modifiedTags* is a dict mapping Tracks to (dbTags, fileTags) pairs. If it is nonempty,
@@ -614,7 +613,7 @@ class FileSystemSynchronizer(QtCore.QObject):
         In case commited files are missing, we first try to detect moves by searching theiry hash
         in self.tracks. Otherwise a LostFilesDialog is requested from the helper.
         """
-        if len(modifiedTags) > 0:
+        if len(self.modifiedTags) > 0:
             logger.debug("files with modified tags: {}".format(self.modifiedTags,))
             self.helper.dialogFinished.clear()
             self._requestHelper.emit("showModifiedTagsDialog", (self.modifiedTags,))
