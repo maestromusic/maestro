@@ -25,6 +25,8 @@ import sys
 from .. import logging
 logger = logging.getLogger(__name__)
 
+_logOSError = True
+
 class AcoustIDIdentifier:
     """An identification provider using the AcoustID fingerprinter and web service.
     
@@ -43,6 +45,12 @@ class AcoustIDIdentifier:
     def __call__(self, url):
         try:
             data = subprocess.check_output(['fpcalc', url.absPath])
+        except OSError as e: # fpcalc not found, not executable etc.
+            global _logOSError
+            if _logOSError:
+                _logOSError = False # This error will probably occurr for all files. Don't print it again.
+                logger.warning(e)
+            return self.fallbackHash(url)
         except subprocess.CalledProcessError as e:
             logger.warning(e)
             return self.fallbackHash(url)
