@@ -29,6 +29,7 @@ from ... import player, profiles, utils
 from ...filebackends.filesystem import FileURL
 from ...filebackends.stream import HTTPStreamURL
 from ...models import playlist
+from ...core import elements
         
 translate = QtCore.QCoreApplication.translate
 
@@ -40,7 +41,6 @@ def enable():
     player.profileCategory.addType(profileType)
     # addType loads stored profiles of this type from storage
     # If no profile was loaded, create a default one.
-    return
     if len(player.profileCategory.profiles(profileType)) == 0:
         name = translate("PhononPlayerBackend", "Local playback (Phonon)")
         if player.profileCategory.get(name) is None:
@@ -60,20 +60,25 @@ def defaultStorage():
 
 class PhononPlayerBackend(player.PlayerBackend):
     def __init__(self, name, type, state):
+        print("CREATING phonon", name)
         super().__init__(name, type, state)
         self._flags = 0
         
+        # Phonon backends are created when the application starts (profiles!).
+        # To increase performance the mediaObject is not created until it is needed.
+        self.mediaObject = None
+        
         # The list of paths in the playlist and the current song are stored directly in the model's tree
         self.playlist = playlist.PlaylistModel(self)
-        
-        # Initialize Phonon        
+            
+        # Initialize Phonon       
         self.mediaObject = phonon.MediaObject()
         self.mediaObject.aboutToFinish.connect(self._handleAboutToFinish)
         self.mediaObject.currentSourceChanged.connect(self._handleSourceChanged)
         self.mediaObject.setTickInterval(200)
         self.mediaObject.tick.connect(self._handleTick)
         self.audioOutput = phonon.AudioOutput(phonon.MusicCategory)
-        phonon.createPath(self.mediaObject,self.audioOutput)
+        phonon.createPath(self.mediaObject,self.audioOutput) 
         
         if state is None:
             state = {}
@@ -89,14 +94,14 @@ class PhononPlayerBackend(player.PlayerBackend):
         self.connectionState = player.CONNECTED
     
     # Insert etc. are handled by the PlaylistModel.
-    # We only have to change the state and random listif necessary.
+    # We only have to change the state and random list if necessary.
     def insertIntoPlaylist(self, pos, urls):
         urls = list(urls)
         for i, url in enumerate(urls):
-            if not (isinstance(url, FileURL) or isinstance(url, HTTPStreamURL)):
+            if not isinstance(url, (FileURL, HTTPStreamURL)):
                 raise player.InsertError("URL type {} not supported".format(type(url)))
             if isinstance(url, FileURL) and not os.path.exists(url.absPath):
-                raise player.InsertError(self.tr("Can not play '{}': File does not exist.")
+                raise player.InsertError(self.tr("Cannot play '{}': File does not exist.")
                                          .format(url), urls[:i])
         if self.getRandom() != player.RANDOM_OFF:
             # update the old offsets
@@ -212,9 +217,8 @@ class PhononPlayerBackend(player.PlayerBackend):
     
     def skipForward(self):
         if self.state() != player.STOP:
-            offset = self._nextOffset()
-            if offset is not None:
-                self.setCurrent(offset)
+            # This may be None in which case playback is stopped
+            self.setCurrent( self._nextOffset())
     
     def skipBackward(self):
         #TODO: Is there a reasonable way to handle random mode in this method?
@@ -226,30 +230,65 @@ class PhononPlayerBackend(player.PlayerBackend):
                 self.setCurrent(fileCount-1)
     
     def _createRandomList(self):
+        """Create the list of offsets that is used in random mode in order to jump to a random song."""
+        if self.getRandom() == player.RANDOM_OFF:
+            self._randomList = None
+            return
+        if self.getRandom() == player.RANDOM_ON:
+            self._randomList = list(range(self.playlist.getRoot().fileCount()))
+        elif self.getRandom() == player.RANDOM_WORKS:
+            self._randomList = []
+            # Go through all nodes and add the first node of each work to the list. Then skip the rest
+            # of the same work. Files that are not contained in any work are also added to the list.
+            generator = self.playlist.root.getAllNodes(skipSelf=True)
+            offset = 0
+            descend = None # send must be invoked with None first
+            try:
+                while True:
+                    node = generator.send(descend)
+                    if node.isFile() or node.element.type == elements.TYPE_WORK:
+                        self._randomList.append(offset)
+                        offset += node.fileCount()
+                        descend = node.isFile() 
+            except StopIteration: pass
+            
         import random
-        self._randomList = list(range(self.playlist.getRoot().fileCount()))
         random.shuffle(self._randomList)
     
     def _nextOffset(self, removeFromRandomList=True):
         """Get the next offset that will be played."""
-        fileCount = self.playlist.getRoot().fileCount()
-        if fileCount == 0:
+        if not self.playlist.root.hasContents():
             return None
-        elif self.getRandom() != player.RANDOM_OFF:
-            if len(self._randomList) == 0:
-                if self.isRepeating():
-                    self._createRandomList()
-                else: return None
-            if removeFromRandomList:
-                return self._randomList.pop()
-            else: return self._randomList[-1] 
-        elif self.currentOffset() is None:
-            return 0
-        elif self.currentOffset() < fileCount - 1:
-            return self.currentOffset()+1
-        elif self.isRepeating(): 
-            return 0
-        return None
+        
+        if self.getRandom() == player.RANDOM_OFF:
+            if self.currentOffset() is None:
+                return 0
+            elif self.current().nextLeaf() is not None:
+                return self.currentOffset()+1
+            elif self.isRepeating(): 
+                return 0
+            return None
+        
+        # First handle the case that separates RANDOM_WORKS from RANDOM_ON:
+        # the next song belongs to the same work as this song
+        if self.getRandom() == player.RANDOM_WORKS and self.currentOffset() is not None\
+                 and self.current().nextLeaf() is not None:
+            currentWork = None
+            for parent in self.current().getParents(excludeRootNode=True):
+                if parent.element.type == elements.TYPE_WORK:
+                    currentWork = parent
+            if currentWork is not None and currentWork.isAncestorOf(self.current().nextLeaf()):
+                return self.currentOffset() + 1 # next piece belongs to the same work
+            # else choose a random work like in RANDOM_ON mode
+            
+        # Return a random element from random list
+        if len(self._randomList) == 0:
+            if self.isRepeating():
+                self._createRandomList()
+            else: return None
+        elif removeFromRandomList:
+            return self._randomList.pop()
+        else: return self._randomList[-1] 
     
     def _handleAboutToFinish(self):
         # do not remove the offset from _randomList directly because this method is called in
@@ -302,9 +341,8 @@ class PhononPlayerBackend(player.PlayerBackend):
     
     def setFlags(self, flags):
         if flags != self._flags:
-            if player.FLAG_RANDOM & self._flags and not player.FLAG_RANDOM & flags:
-                self._randomList = None
-            elif not player.FLAG_RANDOM & self._flags and player.FLAG_RANDOM & flags:
-                self._createRandomList()
+            oldRandom = self.getRandom()
             self._flags = flags
+            if self.getRandom() != oldRandom:
+                self._createRandomList()
             self.flagsChanged.emit(flags)

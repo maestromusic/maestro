@@ -118,6 +118,10 @@ class PlaybackWidget(dockwidget.DockWidget):
     
     def updateTitleLabel(self):
         """Display the title of the currently playing song."""
+        if self.backend.connectionState == player.DISCONNECTED:
+            return self.tr("No connection")
+        elif self.backend.connectionState == player.CONNECTING:
+            return self.tr("Connecting...")
         self.current = self.backend.current()
         if self.current is not None:
             self.titleLabel.setText(self.current.getTitle())

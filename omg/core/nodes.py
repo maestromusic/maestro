@@ -63,18 +63,23 @@ class Node:
         isFile as e.g. rootnodes are neither."""
         return False
     
-    def getParents(self, includeSelf=False):
+    def getParents(self, includeSelf=False, excludeRootNode=False):
         """Returns a generator yielding all parents of this node in the current tree structure, from the
         direct parent to the root-node.
         
         If *includeSelf* is True, the node itself is yielded before its ancestors.
+        If *excludeRootNode* is True, nodes of type RootNode are not returned.
         """
         if includeSelf:
             yield self
         parent = self.parent
-        while parent is not None:
+        while parent is not None and not (excludeRootNode and isinstance(parent, RootNode)): 
             yield parent
             parent = parent.parent
+            
+    def isAncestorOf(self, node):
+        """Return whether this is an ancestor of *node*. A node is considered an ancestor of itself."""
+        return node == self or self in node.getParents()
     
     def depth(self):
         """Return the depth of this node in the current tree structure. The root node has level 0."""
@@ -111,9 +116,9 @@ class Node:
         to the contents of the last node:
         
             generator = model.getAllNodes()
+            descend = None # send must be invoked with None first
             try:
                 while True:
-                    descend = None # send must be invoked with None first
                     node = generator.send(descend)
                     descend = ... # decide whether the generator should yield the contents of node
                                   # If descend is set to False, the generator will skip the contents and
@@ -165,7 +170,7 @@ class Node:
                     yield container
             if contentsFirst != reverse:
                 yield self
-                    
+                  
     def fileCount(self):
         """Return the number of files contained in this element or in descendants of it. If this node
         is a file, return 1."""
@@ -262,7 +267,25 @@ class Node:
         if self.hasContents():
             return self.getContents()[-1].lastLeaf(allowSelf=True)
         else: return self if allowSelf else None
-            
+    
+    def nextLeaf(self):
+        """Return the next leaf in the whole tree after the subtree below this node. E.g.:
+        A
+            B        A.nextLeaf() == C.nextLeaf() == E
+            C
+        D
+            E
+        Return None if no such leaf exists.
+        """
+        if self.parent is None:
+            return None
+        siblings = self.parent.getContents()
+        pos = siblings.index(self)
+        if pos < len(siblings) - 1:
+            return siblings[pos+1].firstLeaf(allowSelf=True)
+        else:
+            return self.parent.nextLeaf()
+                    
     def wrapperString(self,includeSelf=False,strFunc=None):
         """Return a string that stores the tree structure below this node. If this string is submitted to
         Level.createWrappers the same tree will be created again. There are some limitations though:
