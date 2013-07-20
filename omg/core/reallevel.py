@@ -455,11 +455,11 @@ class RealLevel(levels.Level):
         db.commit()
         super()._setStickers(type, elementToStickers)
         
-    def _setTypes(self, elementTypes):
-        if len(elementTypes) > 0:
+    def _setTypes(self, containerTypes):
+        if len(containerTypes) > 0:
             db.multiQuery("UPDATE {}elements SET type = ? WHERE id = ?"
-                          .format(db.prefix), ((type, elem.id) for elem, type in elementTypes.items()))
-            super()._setTypes(elementTypes)
+                          .format(db.prefix), ((type, c.id) for c, type in containerTypes.items()))
+            super()._setTypes(containerTypes)
     
     def _setContents(self, parent, contents):
         db.transaction()

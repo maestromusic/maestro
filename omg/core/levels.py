@@ -383,17 +383,18 @@ class Level(application.ChangeEventDispatcher):
                                           text=text)
             self.stack.push(command)
     
-    def setTypes(self, elementTypes):
-        """Set the type of one or more elements. The action can be undone. *elementTypes* maps elements to
-        their desired type.
+    def setTypes(self, containerTypes):
+        """Set the type of one or more containers. The action can be undone. *containerTypes* maps containers
+        to their desired type.
         """
-        if len(elementTypes) > 0:
-            oldTypes = {element: element.type for element in elementTypes}
+        print(containerTypes)
+        if len(containerTypes) > 0:
+            oldTypes = {container: container.type for container in containerTypes}
             command = GenericLevelCommand(redoMethod=self._setTypes,
-                                          redoArgs={"elementTypes" : elementTypes},
+                                          redoArgs={"containerTypes" : containerTypes},
                                           undoMethod=self._setTypes,
-                                          undoArgs={"elementTypes": oldTypes},
-                                          text=self.tr("change element types"))
+                                          undoArgs={"containerTypes": oldTypes},
+                                          text=self.tr("change container types"))
             self.stack.push(command)
             
     def setCovers(self, coverDict):
@@ -686,11 +687,11 @@ class Level(application.ChangeEventDispatcher):
                 del element.stickers[type]
         self.emitEvent(dataIds=[element.id for element in elementToStickers])
     
-    def _setTypes(self, elementTypes):
-        """Set the type of elements. *elementTypes* must map elements to their desired type."""
-        for element, type in elementTypes.items():
-            element.type = type
-        self.emitEvent(dataIds=[element.id for element in elementTypes])
+    def _setTypes(self, containerTypes):
+        """Set the type of containers. *containerTypes* must map containers to their desired type."""
+        for container, type in containerTypes.items():
+            container.type = type
+        self.emitEvent(dataIds=[container.id for container in containerTypes])
     
     def _changeContents(self, contentDict):
         """Set contents according to *contentDict* which maps parents to content lists."""

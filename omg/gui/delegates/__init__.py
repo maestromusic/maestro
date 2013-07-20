@@ -90,7 +90,7 @@ class StandardDelegate(AbstractDelegate):
             self.addCenter(ColorBarItem(QtGui.QColor(255,255,0),5,titleItem.sizeHint(self)[1]))
         if urlWarning is not None:
             self.addCenter(urlWarning)
-        if self.profile.options['showType']:
+        if self.profile.options['showType'] and element.isContainer():
             pixmap = elements.getTypePixmap(element.type)
             if pixmap is not None:
                 self.addCenter(ImageItem(pixmap))

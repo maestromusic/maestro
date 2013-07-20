@@ -342,8 +342,10 @@ class ChangeTypeDialog(QtGui.QDialog):
         self.typeBox = QtGui.QComboBox()
         if currentType is None:
             self.typeBox.addItem('')
-        for type in elements.ELEMENT_TYPES:
-            title = elements.getTypeTitle(type)
+        for type in elements.CONTAINER_TYPES:
+            if type == elements.TYPE_CONTAINER:
+                title = self.tr("(General) container")
+            else: title = elements.getTypeTitle(type)
             icon = elements.getTypeIcon(type)
             if icon is not None:
                 self.typeBox.addItem(icon, title, type)
@@ -359,8 +361,6 @@ class ChangeTypeDialog(QtGui.QDialog):
     
     def _handleOk(self):
         """Save the chosen type and close the dialog."""
-        if self.typeBox.currentIndex() == 0:
-            return
         type = self.typeBox.itemData(self.typeBox.currentIndex())
         self.level.setTypes({container: type for container in self.containers})
         self.close()

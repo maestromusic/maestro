@@ -24,14 +24,14 @@ translate = QtCore.QCoreApplication.translate
 from . import tags as tagsModule
 from .. import config, filebackends, utils
 
-ELEMENT_TYPES = range(4)
-TYPE_NONE, TYPE_ALBUM, TYPE_WORK, TYPE_COLLECTION = ELEMENT_TYPES
+CONTAINER_TYPES = range(4)
+TYPE_CONTAINER, TYPE_ALBUM, TYPE_WORK, TYPE_COLLECTION = CONTAINER_TYPES
 MAJOR_TYPES = (TYPE_ALBUM, TYPE_WORK)
 
 def getTypeTitle(type):
     """Return the human-readable and translated title for the given type."""
     return {
-            TYPE_NONE: translate("Elements", "<None>"),
+            TYPE_CONTAINER: translate("Elements", "Container"),
             TYPE_ALBUM: translate("Elements", "Album"),
             TYPE_WORK: translate("Elements", "Work"),
             TYPE_COLLECTION: translate("Elements", "Collection")
@@ -44,13 +44,13 @@ _typeIcons = {
 }
 
 def getTypeIcon(type):
-    """Return an icon as QIcon for the given element type. Return None for TYPE_NONE."""
+    """Return an icon as QIcon for the given container type. Return None for TYPE_CONTAINER."""
     if type in _typeIcons:
         return utils.getIcon(_typeIcons[type])
     else: return None
 
 def getTypePixmap(type):
-    """Return an icon as QPixmap for the given element type. Return None for TYPE_NONE."""
+    """Return an icon as QPixmap for the given container type. Return None for TYPE_CONTAINER."""
     if type in _typeIcons:
         return utils.getPixmap(_typeIcons[type])
     else: return None
@@ -76,9 +76,9 @@ class Element:
     
     def isMajor(self):
         """Return whether the type of this element implies the 'major'-property."""
-        return self.type in MAJOR_TYPES
+        return self.isContainer() and self.type in MAJOR_TYPES
         
-    def getTitle(self,usePath=True):
+    def getTitle(self, usePath=True):
         """Return the title of this element or some dummy title, if the element does not have a title tag.
         If config.options.misc.show_ids is True, the title will be prepended by the element's id.
         If *usePath* is True, the url will be used as title for files without a title tag.
@@ -106,6 +106,8 @@ class Element:
                     yield file
     
     def getStickers(self, type):
+        """Return a list of all stickers of the given type or None if this element does not have a sticker
+        of thist type."""
         if type not in self.stickers:
             return None
         else:
@@ -115,18 +117,26 @@ class Element:
             else: return None
             
     def hasCover(self):
-        # Warning: hasCover returns True if a cover path is stored in the database.
-        # This does not mean that the file exists and is readable etc.
+        """Return whether this element has a cover.
+        Warning: hasCover returns True if a cover path is stored in the database. This does not mean that
+        the file exists and is readable etc..
+        """
         return self.getStickers('COVER') is not None
     
-    def getCover(self,size=None):
+    def getCover(self, size=None):
+        """Return a QPixmap containing the cover of this element. If *size* is given, a version scaled
+        to <size>x<size> pixels will be returned (using the cover cache if possible).
+        
+        Return None, if the element does not have a cover.
+        """
         paths = self.getStickers('COVER')
         if paths is None:
             return None
         from . import covers
-        return covers.get(paths[0],size)
+        return covers.get(paths[0], size)
     
     def getCoverPath(self):
+        """Return the absolute path to the elements cover or None if it does not have a cover."""
         paths = self.getStickers('COVER')
         if paths is None:
             return None
@@ -134,9 +144,24 @@ class Element:
             return paths[0]
         else:
             from . import covers
-            return os.path.join(covers.COVER_DIR,paths[0])
+            return os.path.join(covers.COVER_DIR, paths[0])
+        
+    def getCoverHTML(self, size=None, attributes=''):
+        """Return an <img>-tag containing the elements cover or None if it does not have a cover. If
+        *size* is given, the cover will be scaled to <size>x<size> pixels. The optional argument 
+        *attributes* may contain additional HTML-attributes and is simply inserted into the tag.
+        
+        Note: The <img>-tag might contain the image as data-URI and thus be rather large. See covers.getHTML.
+        """ 
+        paths = self.getStickers('COVER')
+        if paths is None:
+            return None
+        from . import covers
+        return covers.getHTML(paths[0], size, attributes)
         
     def inParentLevel(self):
+        """If this element is also loaded in the parent level of this element's level, return its version
+        there."""
         if self.level.parent is None:
             return None
         elif self.id not in self.level.parent:
@@ -145,7 +170,7 @@ class Element:
     
     def equalsButLevel(self, other):
         """Return True if this element equals *other* in all aspects but possibly the level."""
-        if self.type != other.type:
+        if self.id != other.id:
             return False
         if self.tags != other.tags:
             return False
@@ -154,13 +179,14 @@ class Element:
         if self.stickers != other.stickers:
             return False
         if self.isContainer():
+            if self.type != other.type:
+                return False
             if self.contents != other.contents:
                 return False
         else:
             if self.url != other.url:
                 return False
         return True
-
 
 
 class Container(Element):
@@ -173,10 +199,9 @@ class Container(Element):
                  stickers=None):
         self.level = level
         self.id = id
-        self.level = level
         
         if type is None:
-            type = TYPE_NONE
+            type = TYPE_CONTAINER
         self.type = type
         if contents is None:
             contents = ContentList()
@@ -232,7 +257,7 @@ class Container(Element):
 class File(Element):
     """Element-subclass for files. You must specify the level, id, url and length in seconds of the file.
     You may define additional properties using keyword-arguments. Otherwise default values (empty lists etc.)
-    will be used. Valid keyword-arguments are type, parents, tags, flags, stickers.
+    will be used. Valid keyword-arguments are parents, tags, flags, stickers.
     """
     def __init__(self, level, id, url, length, **kwargs):
         if not isinstance(id,int) or not isinstance(url, filebackends.BackendURL) \
@@ -241,11 +266,9 @@ class File(Element):
                             .format(id,url,length,type(id),type(url),type(length)))
         self.level = level
         self.id = id
-        self.level = level
         self.url = url
         self.length = length
         
-        self.type = kwargs.get('type', TYPE_NONE)
         self.parents = kwargs.get('parents', [])
         self.tags = kwargs.get('tags', tagsModule.Storage())
         self.flags = kwargs.get('flags', [])
@@ -260,7 +283,6 @@ class File(Element):
                     id = self.id,
                     url = self.url,
                     length = self.length,
-                    type = self.type,
                     parents = self.parents[:],
                     tags = self.tags.copy(),
                     flags = self.flags[:],
