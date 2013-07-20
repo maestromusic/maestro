@@ -129,11 +129,18 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
             parents.sort(key=elements.Element.getTitle)
             lines.extend(self.tr("#{} in {}").format(p.contents.positionOf(el.id), p.getTitle())
                          for p in parents)
-    
+        
+        # Escape tags for use in HTML
+        import cgi
+        lines = '<br/>'.join(cgi.escape(line) for line in lines)
+        
         if coverSize is not None and el.hasCover():
             imgTag = el.getCoverHTML(coverSize, 'style="float: left"')
-            return imgTag + '<div style="margin-left: {}">'.format(coverSize+5) + '<br/>'.join(lines) + '</div>'
-        else: return '\n'.join(lines)
+            return imgTag + '<div style="margin-left: {}">{}</div>'.format(coverSize+5, lines)
+        else:
+            # enclose in a div so that Qt formats this as rich text.
+            # Otherwise HTML escapes would be printed as plain text.
+            return '<div>{}</div>'.format(lines)
             
     def hasChildren(self,index):
         if not index.isValid():

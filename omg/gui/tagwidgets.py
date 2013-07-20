@@ -642,6 +642,7 @@ class EnhancedTextEdit(QtGui.QTextEdit):
     def __init__(self,parent=None):
         QtGui.QTextEdit.__init__(self,parent)
         self.changed = False
+        self.setAcceptRichText(False)
         self.textChanged.connect(self._handleTextChanged)
 
     def _handleTextChanged(self):

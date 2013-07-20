@@ -26,7 +26,6 @@ class HiddenEditor(QtGui.QStackedWidget):
     but when the user clicks on it, the editor appears and the value can be edited. When the editor looses
     focus, the label reappears.
     """
-
     valueChanged = QtCore.pyqtSignal()
     label = None
     editor = None
@@ -39,13 +38,13 @@ class HiddenEditor(QtGui.QStackedWidget):
     # again. You may still use showEditor or showLabel to switch programmatically, though.
     fixed = False 
     
-    def __init__(self,label=None,editor=None,parent=None,shrink=False):
+    def __init__(self, label=None, editor=None, parent=None, shrink=False):
         """Create a new HiddenEditor. You may specify a label, an editor and a parent. By default a QLabel
         and an empty QLineEdit are created. If *shrink* is True the HiddenEditor will only occupy the space
         of the currently visible widget. This is useful if a big editor (e.g. QTextEdit) contains only a
         short text, so that the label is small.
         """
-        QtGui.QStackedWidget.__init__(self,parent)
+        QtGui.QStackedWidget.__init__(self, parent)
         self.shrink = shrink
         self.setLabel(label)
         self.setEditor(editor)
@@ -55,25 +54,28 @@ class HiddenEditor(QtGui.QStackedWidget):
         """Return the label used in this HiddenEditor."""
         return self.label
     
-    def setLabel(self,label):
+    def setLabel(self, label=None):
         """Set the label used in this HiddenEditor. The label will be updated to hold the editor's value. If
-        label is None, a QLabel is created and used."""
+        label is None, a default QLabel is created and used."""
         if self.label is not None:
             self.removeWidget(self.label)
-        self.label = label if label is not None else QtGui.QLabel()
-        self.label.setIndent(2)
+        if label is None:
+            label = QtGui.QLabel()
+            label.setTextFormat(Qt.PlainText)
+            label.setIndent(2)
+        self.label = label
         # Keep at least the height of an QLineEdit. TODO: Improve this hack. 
         if self.shrink:
             self.label.setMinimumHeight(26)
         if self.editor is not None:
             self.label.setText(self._editorText())
-        self.insertWidget(0,self.label)
+        self.insertWidget(0, self.label)
 
     def isFixed(self):
         """Return whether this HiddenEditor is fixed, i.e. it does not switch between label and editor."""
         return self.fixed
 
-    def setFixed(self,fixed):
+    def setFixed(self, fixed):
         """Set whether this HiddenEditor is fixed, i.e. it does not switch between label and editor."""
         self.fixed = fixed
         
@@ -81,32 +83,32 @@ class HiddenEditor(QtGui.QStackedWidget):
         """Return the editor used in this HiddenEditor."""
         return self.editor
     
-    def setEditor(self,editor):
+    def setEditor(self, editor):
         """Set the editor used in this HiddenEditor. The editor must either be a QLineEdit or a QComboBox or
         a QTextEdit or None in which case an empty QLineEdit is created. The label will be updated to hold
         the editor's value.
         """
         assert (editor is None
-                    or isinstance(editor,QtGui.QLineEdit)
-                    or isinstance(editor,QtGui.QComboBox)
-                    or isinstance(editor,QtGui.QTextEdit))
+                    or isinstance(editor, QtGui.QLineEdit)
+                    or isinstance(editor, QtGui.QComboBox)
+                    or isinstance(editor, QtGui.QTextEdit))
         if self.editor is not None:
             self.removeWidget(self.editor)
             self.editor.removeEventFilter(self)
-            if isinstance(self.editor,QtGui.QTextEdit):
+            if isinstance(self.editor, QtGui.QTextEdit):
                 self.editor.viewport().removeEventFilter(self)
         self.editor = editor if editor is not None else QtGui.QLineEdit()
         self.editor.installEventFilter(self)
-        if isinstance(self.editor,QtGui.QTextEdit):
+        if isinstance(self.editor, QtGui.QTextEdit):
             self.editor.viewport().installEventFilter(self)
-        self.insertWidget(1,self.editor)
+        self.insertWidget(1, self.editor)
         self.setValue(self._editorText())
 
     def _editorText(self):
         """Return the text contained in the editor."""
-        if isinstance(self.editor,QtGui.QLineEdit):
+        if isinstance(self.editor, QtGui.QLineEdit):
             return self.editor.text()
-        elif isinstance(self.editor,QtGui.QTextEdit):
+        elif isinstance(self.editor, QtGui.QTextEdit):
             return self.editor.toPlainText()
         else: return self.editor.currentText()
         
@@ -121,33 +123,33 @@ class HiddenEditor(QtGui.QStackedWidget):
         if self.editor is not None:
             self.setCurrentWidget(self.editor)
             self.setFocusProxy(self.editor)
-            if hasattr(self.editor,'selectAll'):
+            if hasattr(self.editor, 'selectAll'):
                 self.editor.selectAll()
 
     def getValue(self):
         """Return the value contained in this HiddenEditor."""
         return self._editorText()
 
-    def setValue(self,value):
+    def setValue(self, value):
         """Set the value contained in this HiddenEditor."""
         if value != self._editorText():
-            if isinstance(self.editor,QtGui.QLineEdit):
+            if isinstance(self.editor, QtGui.QLineEdit):
                 self.editor.setText(value)
-            elif isinstance(self.editor,QtGui.QTextEdit):
+            elif isinstance(self.editor, QtGui.QTextEdit):
                 self.editor.setPlainText(value)
             else: self.editor.setEditText(value)
         if value != self.label.text():
             self.label.setText(value)
             self.valueChanged.emit()
         
-    def focusInEvent(self,focusEvent):
+    def focusInEvent(self, focusEvent):
         # focusInEvents are used to switch to the editor.
         if not self.fixed and self.currentWidget() == self.label:
             self.showEditor()
             self.editor.setFocus(focusEvent.reason())
-        QtGui.QStackedWidget.focusInEvent(self,focusEvent)
+        QtGui.QStackedWidget.focusInEvent(self, focusEvent)
     
-    def eventFilter(self,object,event):
+    def eventFilter(self, object, event):
         # We have to filter several events from the editor:
         # - FocusOut: Hide the editor and show the label...except the focus switched to the editor's
         #   context-menu or item-view (if the editor is a combobox).
@@ -159,7 +161,7 @@ class HiddenEditor(QtGui.QStackedWidget):
         if object == self.editor:
             if event.type() == QtCore.QEvent.FocusOut:
                 if (self.popup is None # No context-menu...so check for the view of a combobox
-                        and not (isinstance(self.editor,QtGui.QComboBox)
+                        and not (isinstance(self.editor, QtGui.QComboBox)
                         and self.editor.view().isVisible())):
                     self.setValue(self._editorText())
                     if not self.fixed:
@@ -168,7 +170,7 @@ class HiddenEditor(QtGui.QStackedWidget):
                 return False
             elif event.type() == QtCore.QEvent.ContextMenu:
                 # See below for QTextEdit
-                if not isinstance(self.editor,QtGui.QComboBox):
+                if not isinstance(self.editor, QtGui.QComboBox):
                     self.popup = self.editor.createStandardContextMenu()
                 else: self.popup = self.editor.lineEdit().createStandardContextMenu()
                 action = self.popup.exec_(event.globalPos())
@@ -177,7 +179,7 @@ class HiddenEditor(QtGui.QStackedWidget):
             elif event.type() == QtCore.QEvent.KeyPress:
                 if event.key() == Qt.Key_Return or event.key() == Qt.Key_Enter:
                     # Allow Shift+Enter in a QTextEdit
-                    if isinstance(self.editor,QtGui.QTextEdit) and Qt.ShiftModifier & event.modifiers():
+                    if isinstance(self.editor, QtGui.QTextEdit) and Qt.ShiftModifier & event.modifiers():
                         return False
                     self.setValue(self._editorText())
                     if not self.fixed:
@@ -188,7 +190,7 @@ class HiddenEditor(QtGui.QStackedWidget):
                     if not self.fixed:
                         self.showLabel()
                     return True
-        elif (isinstance(self.editor,QtGui.QTextEdit)
+        elif (isinstance(self.editor, QtGui.QTextEdit)
                     and object == self.editor.viewport()
                     and event.type() == QtCore.QEvent.ContextMenu):
             # QTextEdit does not send ContextMenuEvents itself, but its viewport does. Therefore we
