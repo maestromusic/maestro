@@ -391,21 +391,6 @@ class Wrapper(Node):
             return "{} - {}".format(self.position,title)
         else: return title
         
-    def toolTipText(self):
-        """Return a text to use as tooltip over this wrapper."""
-        parts = []
-        if self.element.tags is not None:
-            parts.append('\n'.join('{}: {}'.format(tag.title,', '.join(map(str,values)))
-                                    for tag,values in self.element.tags.items()))
-        if self.element.flags is not None and len(self.element.flags) > 0:
-            parts.append(translate('Wrapper','Flags: {}').format(
-                                                        ', '.join(flag.name for flag in self.element.flags)))
-        if self.element.isFile():
-            parts.append(translate('Wrapper','URL: {}').format(self.element.url))
-        if len(parts) > 0:
-            return '\n'.join(parts)
-        else: return str(self)
-        
     def getLength(self):
         """Return the length of this element, i.e. the sum of the lengths of all contents."""
         if self.isFile():

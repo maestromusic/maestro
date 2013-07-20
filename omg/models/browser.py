@@ -145,6 +145,11 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
     def mimeData(self, indexes):
         return BrowserMimeData.fromIndexes(self, indexes)
 
+    def createWrapperToolTip(self, wrapper, showFileNumber=False, **kwargs):
+        # disable filenumbers because containers in the browser often do not contain all of their element's
+        # contents. Also BrowserWrappers might not have loaded their contents yet.
+        return super().createWrapperToolTip(wrapper, showFileNumber=showFileNumber, **kwargs)
+        
     def _startLoading(self, node, block=False):
         """Start loading the contents of *node*, which must be either root or a CriterionNode (The contents of
         containers are loaded via Container.loadContents). If *node* is a CriterionNode, start a search for
@@ -514,7 +519,7 @@ class ContainerLayer:
     def sortFunction(self, wrapper):
         element = wrapper.element
         date = 0
-        if element.type == elements.TYPE_ALBUM:
+        if element.isContainer() and element.type == elements.TYPE_ALBUM:
             dateTag = tags.get("date")
             if dateTag.type == tags.TYPE_DATE and dateTag in element.tags: 
                 date = -element.tags[dateTag][0].toSql() # minus leads to descending sort

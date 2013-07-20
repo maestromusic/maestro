@@ -57,7 +57,7 @@ def init():
     coverPath = config.options.misc.cover_path
     if os.path.isabs(coverPath):
         COVER_DIR = coverPath
-    else: COVER_DIR = os.path.normpath(os.path.join(config.CONFDIR,coverPath))
+    else: COVER_DIR = os.path.normpath(os.path.join(config.CONFDIR, coverPath))
     
     # Make sure that this directory exists
     if not os.path.isdir(COVER_DIR):
@@ -70,12 +70,12 @@ def shutdown():
     
     # Delete cached covers in sizes that have not been added to cacheSizes in this application run
     for folder in os.listdir(COVER_DIR):
-        if re.match('cache_\d+$',folder) is not None:
+        if re.match('cache_\d+$', folder) is not None:
             size = int(folder[len('cache_'):])
             if size not in cacheSizes:
-                absFolder = os.path.join(COVER_DIR,folder)
+                absFolder = os.path.join(COVER_DIR, folder)
                 for file in os.listdir(absFolder):
-                    os.remove(os.path.join(absFolder,file))
+                    os.remove(os.path.join(absFolder, file))
                 os.rmdir(absFolder)
                 
     # From time to time remove unused covers
@@ -92,23 +92,66 @@ def get(path, size=None):
     """
     # First try to return from cache
     if size in cacheSizes:
-        cachePath = _cachePath(path,size)
+        cachePath = _cachePath(path, size)
         if os.path.exists(cachePath):
             return QtGui.QPixmap(cachePath)
         
     # Read the file
     if not os.path.isabs(path):
-        path = os.path.join(COVER_DIR,path)
+        path = os.path.join(COVER_DIR, path)
     pixmap = QtGui.QPixmap(path)
     if pixmap.isNull():
         return None
     if size is not None and (pixmap.width() != size or pixmap.height() != size):
-        pixmap = pixmap.scaled(size,size,transformMode=Qt.SmoothTransformation)
+        pixmap = pixmap.scaled(size, size, transformMode=Qt.SmoothTransformation)
         
     if size in cacheSizes:
         storeInCache(pixmap, cachePath)
         
     return pixmap
+
+
+def getHTML(path, size=None, attributes=''):
+    """Return a <img>-tag containing the cover at *path* which can be absolute or relative to the cover
+    folder. If *size* is given, the <img>-tag will contain a scaled version of the cover. The optional
+    argument *attributes* may contain additional HTML-attributes and is simply inserted into the tag.
+    
+    Note: If *size* is given and not a cached size, the <img>-tag cannot refer to a scaled image on the
+    filesystem. Instead, the scaled image is inserted directly into the <img>-tag, making the tag rather
+    large.
+    """ 
+    def makeImgTag(source):
+        return '<img width="{0}" height="{0}" {1} src="{2}"/>'.format(size, attributes, source)
+    
+    if size is None:
+        if not os.path.isabs(path):
+            path = os.path.join(COVER_DIR, path)
+        return makeImgTag(path)
+    
+    if size in cacheSizes:
+        cachePath = _cachePath(path, size)
+        if not os.path.exists(cachePath):
+            get(path, size)
+        return makeImgTag(path)
+    
+    # Neither the 'large' cover nor any cached size is requested. Do not create a file on disk.
+    # Instead embed the image into HTML using a data-URI
+    # https://en.wikipedia.org/wiki/Data_URI_scheme
+    if not os.path.isabs(path):
+        path = os.path.join(COVER_DIR, path)
+    pixmap = QtGui.QPixmap(path)
+    if pixmap.isNull():
+        return None
+    if pixmap.width() != size or pixmap.height() != size:
+        pixmap = pixmap.scaled(size, size, transformMode=Qt.SmoothTransformation)
+
+    buffer = QtCore.QBuffer()
+    buffer.open(QtCore.QIODevice.WriteOnly)
+    pixmap.save(buffer, "PNG")
+    string = bytes(buffer.buffer().toBase64()).decode('ascii')
+    buffer.close()
+    return makeImgTag("data:image/png;base64,"+string)
+
 
 def getAsync(imageLoader, path, size=None):
     """Load a cover asynchronously using the given ImageLoader. Return a imageloader.FutureImage instance.
@@ -130,11 +173,14 @@ def getAsync(imageLoader, path, size=None):
         
     return futureImage
 
+
 def _handleImageLoader(image):
+    """If necessary, cache images loaded by the image loader."""
     if image in _imagesToCache:
         cachePath = _imagesToCache[image]
         storeInCache(image.pixmap, cachePath)
         del _imagesToCache[image]
+
 
 def storeInCache(pixmap, cachePath):
     """Store the *pixmap* at *cachePath*."""
@@ -153,22 +199,22 @@ def removeUnusedCovers():
     """Check whether the 'large' folder contains covers that are not used in the stickers-table and delete
     those covers. Also delete cached versions of those covers.
     """
-    if not os.path.exists(os.path.join(COVER_DIR,'large')):
+    if not os.path.exists(os.path.join(COVER_DIR, 'large')):
         return
     from .. import database as db
     usedPaths = [path
                  for path in db.query("SELECT data FROM {}stickers WHERE type = 'COVER'".format(db.prefix))
                                 .getSingleColumn()
                  if not os.path.isabs(path)] # never remove external covers
-    for path in os.listdir(os.path.join(COVER_DIR,'large')):
-        path = os.path.join('large',path)
+    for path in os.listdir(os.path.join(COVER_DIR, 'large')):
+        path = os.path.join('large', path)
         if path not in usedPaths:
-            os.remove(os.path.join(COVER_DIR,path))
-            cacheFile = _cachePath(path,None)
+            os.remove(os.path.join(COVER_DIR, path))
+            cacheFile = _cachePath(path, None)
             for folder in os.listdir(COVER_DIR):
-                if re.match('cache_\d+$',folder) is not None:
-                    if os.path.exists(os.path.join(COVER_DIR,folder,cacheFile)):
-                        os.remove(os.path.join(COVER_DIR,folder,cacheFile))
+                if re.match('cache_\d+$', folder) is not None:
+                    if os.path.exists(os.path.join(COVER_DIR, folder, cacheFile)):
+                        os.remove(os.path.join(COVER_DIR, folder, cacheFile))
     
         
 class AbstractCoverProvider(QtCore.QObject):
@@ -179,7 +225,7 @@ class AbstractCoverProvider(QtCore.QObject):
     
     # This signal is emitted whenever a cover has been loaded. The signal contains the element and the loaded
     # QPixmap as parameters
-    loaded = QtCore.pyqtSignal(Element,QtGui.QPixmap)
+    loaded = QtCore.pyqtSignal(Element, QtGui.QPixmap)
     # This signal is emitted when an error occurs. Typically these are network errors
     error = QtCore.pyqtSignal(str)
     # This signal is emitted when the provider finishes processing an element, i.e. after the loaded-signal
@@ -196,7 +242,7 @@ class AbstractCoverProvider(QtCore.QObject):
         """Return an icon that represents this provider class."""
         return QtGui.QIcon()
     
-    def fetch(self,elements):
+    def fetch(self, elements):
         """Start fetching covers for the given elements asynchronously."""
         raise NotImplementedError()
     
@@ -212,35 +258,35 @@ class CoverUndoCommand:
         self.level = level
         self.covers = {}
         self.text = translate("CoverUndoCommand", "change covers")
-        for element,coverOrPath in covers.items():
+        for element, coverOrPath in covers.items():
             oldPath = element.getCoverPath()
             
-            if isinstance(coverOrPath,QtGui.QPixmap):
+            if isinstance(coverOrPath, QtGui.QPixmap):
                 pixmap = coverOrPath
-                newPath,absPath = _makeFilePath(element)
-                os.makedirs(os.path.dirname(absPath),exist_ok=True)
+                newPath, absPath = _makeFilePath(element)
+                os.makedirs(os.path.dirname(absPath), exist_ok=True)
                 if not pixmap.save(absPath):
-                    newPath,absPath = _makeFilePath(element,forceAscii=True)
-                    pixmap.save(absPath) #TODO do something if this goes wrong
-            elif isinstance(coverOrPath,str) or coverOrPath is None:
+                    newPath, absPath = _makeFilePath(element, forceAscii=True)
+                    pixmap.save(absPath) #TODO do something if this doesn't work
+            elif isinstance(coverOrPath, str) or coverOrPath is None:
                 newPath = coverOrPath
             else: raise TypeError("Values of 'covers' must be either QPixmap or str or None")
 
             if oldPath != newPath:
-                self.covers[element] = (oldPath,newPath)
+                self.covers[element] = (oldPath, newPath)
         
     def redo(self):
         elementToSticker = {element: [paths[1]] if paths[1] is not None else None
-                            for element,paths in self.covers.items()}
+                            for element, paths in self.covers.items()}
         self.level._setStickers('COVER', elementToSticker)
             
     def undo(self):
         elementToSticker = {element: [paths[0]] if paths[0] is not None else None
-                            for element,paths in self.covers.items()}
+                            for element, paths in self.covers.items()}
         self.level._setStickers('COVER', elementToSticker)
 
 
-def _cachePath(path,size):
+def _cachePath(path, size):
     """Return the filename that is used for the cached versions of the cover at *path*. Of course, it would
     be best to use the same filenames as in *path*. But then external files might collide with internal ones.
     Hence this method uses hashes.
@@ -249,11 +295,11 @@ def _cachePath(path,size):
     """
     md5 = hashlib.md5(path.encode()).hexdigest()
     if size is not None:
-        return os.path.join(COVER_DIR,'cache_{}'.format(size),md5)
+        return os.path.join(COVER_DIR, 'cache_{}'.format(size), md5)
     else: return md5
     
         
-def _makeFilePath(element,forceAscii=False):
+def _makeFilePath(element, forceAscii=False):
     """Return a file path that can be used to save the large cover of the given element. The path should be
     based on the element's artist-tags and title-tags. If *forceAscii* is True, the result will only contain
     ASCII characters. Otherwise the result might contain all unicode letters, but not all unicode characters.
@@ -277,13 +323,13 @@ def _makeFilePath(element,forceAscii=False):
         # unicodedata.normalize('NFKD') represents characters like e.g. 'á' in its decomposed form '´a'.
         # Since the accent is a 'combining accent' it will be combined with the letter automatically and
         # you won't see the difference unless you check the length of the string.
-        # encode('ascii','ignore') throws all those scary characters away.
+        # encode('ascii', 'ignore') throws all those scary characters away.
         import unicodedata
-        fileName = unicodedata.normalize('NFKD',fileName).encode('ascii','ignore').decode()
+        fileName = unicodedata.normalize('NFKD', fileName).encode('ascii', 'ignore').decode()
     
     # Remove weird characters and weird use of whitespace
-    fileName = re.sub('[^\w\s_-]','',fileName).strip()
-    fileName = re.sub('\s+',' ',fileName)
+    fileName = re.sub('[^\w\s_-]', '', fileName).strip()
+    fileName = re.sub('\s+', ' ', fileName)
     
     # In the easiest form, the following simply adds the extension and returns the path.
     # Actually it deals with two problems that may arise:
@@ -297,16 +343,16 @@ def _makeFilePath(element,forceAscii=False):
     currentExt = extension # currentExt is the suffix together with the extension
     while True:
         i += 1
-        currentExt = extension if i == 0 else '_{}{}'.format(i,extension)
+        currentExt = extension if i == 0 else '_{}{}'.format(i, extension)
         if len(fileName.encode()) + len(currentExt.encode()) > MAX_FILENAME_LENGTH:
             length = MAX_FILENAME_LENGTH - len(currentExt.encode())
             # ignore errors that may arise from cropping the string inside a multibyte character
-            fileName = fileName.encode()[:length].decode('utf-8','ignore')
+            fileName = fileName.encode()[:length].decode('utf-8', 'ignore')
             continue
         
-        path = os.path.join(COVER_DIR,'large',fileName+currentExt)
+        path = os.path.join(COVER_DIR, 'large', fileName+currentExt)
         if os.path.exists(path):
             continue
         
-        return os.path.join('large',fileName+currentExt),path
+        return os.path.join('large', fileName+currentExt), path
     

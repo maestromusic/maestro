@@ -16,12 +16,15 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+import os.path
+
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from ..gui import selection
 from .. import logging, config
-from ..core.nodes import Node, RootNode
+from ..core.nodes import Node, RootNode, Wrapper
+from ..core import elements, levels, tags
 
 
 logger = logging.getLogger(__name__)
@@ -73,18 +76,64 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
         return None
     
     def mimeTypes(self):
-        return (config.options.gui.mime,"text/uri-list")
+        return (config.options.gui.mime, "text/uri-list")
     
     def mimeData(self,indexes):
         return selection.MimeData.fromIndexes(self, indexes)
     
     def toolTipText(self, index):
+        """Return a tooltip for the node at the given index. If no tooltip is available, return None.
+        
+        To implement tool tips in models inheriting RootedTreeModel it is usually sufficient to
+        
+            - implement the method 'toolTipText' in custom node classes used by the model. If a node
+              has this method, it is used to create its tooltip.
+            - reimplement 'createWrapperToolTip' to customize tooltips of Wrapper nodes.
+
+        """
         if index:
             node = index.internalPointer()
             if hasattr(node, "toolTipText"):
                 return node.toolTipText()
-            else:
-                return str(node)
+            elif isinstance(node, Wrapper):
+                return self.createWrapperToolTip(node)
+        return None
+    
+    def createWrapperToolTip(self, wrapper, coverSize=120,
+                             showTags=True, showFlags=False, showParents=False, showFileNumber=True):
+        """Return a tooltip for *wrapper*. Using the optional arguments of this method various parts of the
+        tooltip can be enabled/disabled. Subclasses that wish to customize tooltips often only need to
+        reimplement this method, only changing its default arguments.
+        """
+        el = wrapper.element
+        lines = [el.getTitle()]
+        if el.isFile() and el.url is not None:
+            lines.append(str(el.url))
+        elif el.isContainer():
+            if showFileNumber:
+                lines.append(self.tr("{} with {} pieces").format(elements.getTypeTitle(el.type),
+                                                                 wrapper.fileCount()))
+            else: lines.append(elements.getTypeTitle(el.type))
+        if showTags and el.tags is not None:
+            lines.extend("{}: {}".format(tag.title, ', '.join(map(str, values)))
+                         for tag, values in el.tags.items() if tag != tags.TITLE)
+        
+        if showFlags and el.tags is not None and len(el.flags) > 0:
+            lines.append(self.tr("Flags: ")+','.join(flag.name for flag in el.flags))
+            
+        if showParents and el.parents is not None:
+            parentIds = list(el.parents)
+            if isinstance(wrapper.parent, Wrapper) and wrapper.parent.element.id in parentIds:
+                parentIds.remove(wrapper.parent.element.id)
+            parents = levels.real.collectMany(parentIds)
+            parents.sort(key=elements.Element.getTitle)
+            lines.extend(self.tr("#{} in {}").format(p.contents.positionOf(el.id), p.getTitle())
+                         for p in parents)
+    
+        if coverSize is not None and el.hasCover():
+            imgTag = el.getCoverHTML(coverSize, 'style="float: left"')
+            return imgTag + '<div style="margin-left: {}">'.format(coverSize+5) + '<br/>'.join(lines) + '</div>'
+        else: return '\n'.join(lines)
             
     def hasChildren(self,index):
         if not index.isValid():
