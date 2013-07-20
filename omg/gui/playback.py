@@ -21,6 +21,7 @@ from PyQt4.QtCore import Qt
 
 from . import mainwindow, dialogs, profiles as profilesgui, dockwidget
 from .. import player, utils, logging, strutils
+from ..core import levels
 
 translate = QtCore.QCoreApplication.translate
 logger = logging.getLogger(__name__)
@@ -55,6 +56,7 @@ class PlaybackWidget(dockwidget.DockWidget):
         
         topLayout = QtGui.QHBoxLayout()    
         self.titleLabel = QtGui.QLabel(self)
+        self.titleLabel.setTextFormat(Qt.PlainText)
         self.titleLabel.setSizePolicy(QtGui.QSizePolicy.Ignored, QtGui.QSizePolicy.Ignored)
         topLayout.addWidget(self.titleLabel)   
         
@@ -85,6 +87,8 @@ class PlaybackWidget(dockwidget.DockWidget):
         self.backend = None
         self.setBackend(backend)
         
+        levels.real.connect(self.handleLevelChange)
+        
     def createOptionDialog(self, parent):
         return OptionDialog(parent, self)
     
@@ -112,8 +116,8 @@ class PlaybackWidget(dockwidget.DockWidget):
             self.seekSlider.setValue(current)
         self.updateSeekLabel(current)
     
-    def updateTitleLabel(self, pos):
-        """Display the title of the currently playing song or "stopped" on the title label."""
+    def updateTitleLabel(self):
+        """Display the title of the currently playing song."""
         self.current = self.backend.current()
         if self.current is not None:
             self.titleLabel.setText(self.current.getTitle())
@@ -139,14 +143,21 @@ class PlaybackWidget(dockwidget.DockWidget):
         elif state == player.DISCONNECTED:
             self.titleLabel.setText(self.tr("unable to connect"))
         else:
-            self.updateTitleLabel(self.backend.current())
+            self.updateTitleLabel()
             self.handleStateChange(self.backend.state())
             self.volumeButton.setVolume(self.backend.volume())
     
     def handleFlagsChange(self, flags=None):
+        """React to changes of the backend's flags."""
         # In random mode, there is no reasonable meaning for this button
         self.skipBackwardButton.setEnabled(self.backend.getRandom() == player.RANDOM_OFF)
         
+    def handleLevelChange(self, event):
+        """Handle changes of the real-level."""
+        self.current = self.backend.current()
+        if self.current is not None and self.current.element.id in event.dataIds:
+            self.updateTitleLabel() # title may have changed
+            
     def handlePlaylistChange(self, *args):
         """Enable or disable play and stop buttons when the playlist becomes empty / is filled."""
         playlistEmpty = len(self.backend.playlist.root.contents) == 0
