@@ -17,9 +17,9 @@
 
 
 """This module provides a system to manage configuration profiles in OMG. Profiles are organized in
-categories (e.g. delegates, playback). Profiles of one category may have different types (e.g. MPD playback,
-Phonon playback). Profiles and types are managed by their category. Categories are managed by the
-ProfileManager.""" 
+categories (e.g. delegates, playback). Profiles of one category may have different types (e.g. MPD
+playback, Phonon playback). Profiles and types are managed by their category. Categories are
+managed by the ProfileManager.""" 
 
 from PyQt4 import QtCore
 
@@ -28,14 +28,15 @@ from . import config, logging
 logger = logging.getLogger(__name__)
 
 
-class Profile(QtCore.QObject): # to allow subclasses to have signals
+class Profile(QtCore.QObject):
     """A profile stores the configuration of some object. Profiles are stored persistently in the
     storage file.
     
-    A profile has a name and optionally a type. The constructor variable *state* contains the data read 
-    from the storage file. Because profiles are generally created by the user, there is no distinction
-    between name and title (as for profile types and profile categories).
+    A profile has a name and optionally a type. The constructor variable *state* contains the data
+    read from the storage file. Because profiles are generally created by the user, there is no
+    distinction between name and title (as for profile types and profile categories).
     """
+    
     builtIn = False # built-in profiles cannot be renamed or deleted
     
     def __init__(self, name, type=None, state=None):
@@ -73,6 +74,7 @@ class ProfileType:
     *name* is the internal name of the profile. *title* is displayed to the user. *profileClass* is the
     (sub)class of Profile that will be used for profiles of this type.
     """ 
+    
     def __init__(self, name, title, profileClass=Profile, defaultProfileName=None):
         self.name = name
         self.title = title
