@@ -343,6 +343,7 @@ class MainWindow(QtGui.QMainWindow):
         if data.icon is not None:
             self.centralWidget().addTab(widget, data.icon, data.name)
         else: self.centralWidget().addTab(widget, data.name)
+        self.centralWidget().setCurrentWidget(widget)
         if data.unique:
             self._setUniqueWidgetActionEnabled(data.id, False)
             widget.installEventFilter(self)
