@@ -22,18 +22,20 @@ from omg.core import tags
 
 class AudioCDURL(filebackends.BackendURL):
     
-    scheme = "audiocd"
-    CAN_RENAME = False
+    CAN_RENAME = True
     IMPLEMENTATIONS = []
     
     def __init__(self, urlString):
         super().__init__(urlString)
-        self.discid = self.parsedUrl.netloc
-        self.tracknr = int(self.parsedUrl.path[1:])
+        self.discid, self.tracknr = self.parsedUrl.netloc.split(".")
+        self.targetPath = self.parsedUrl.path[1:]
     
     @property
     def path(self):
-        return str(self.parsedUrl)
+        return self.targetPath
+    
+    def renamed(self, newPath):
+        return AudioCDURL("audiocd://{}/{}".format(self.parsedUrl.netloc, newPath))
     
     def toQUrl(self):
         return None
@@ -54,5 +56,14 @@ class AudioCDTrack(filebackends.BackendFile):
         
     def readTags(self):
         self.tags, self.length = tags.Storage(), 0
+    
+    def saveTags(self):
+        pass
+    
+    def rename(self, newPath):
+        pass
+    
+    def delete(self):
+        pass
         
 AudioCDURL.IMPLEMENTATIONS = [AudioCDTrack]

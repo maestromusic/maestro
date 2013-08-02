@@ -63,21 +63,37 @@ class CDROMDelegate(delegates.StandardDelegate):
 
 class ReleaseSelectionDialog(QtGui.QDialog):
     
-    def __init__(self, releases):
+    def __init__(self, releases, discid):
         super().__init__(mainwindow.mainWindow)
         self.setModal(True)
-        
         self.listW = QtGui.QListWidget()
+        self.listW.setAlternatingRowColors(True)
         lay = QtGui.QVBoxLayout()
-        self.setLayout(lay)
         for release in releases:
-            self.listW.addItem(QtGui.QListWidgetItem(release.pprint()))
-        self.listW.doubleClicked.connect(self.accept)
-        lay.addWidget(self.listW)
-        btbx = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Ok & QtGui.QDialogButtonBox.Cancel)
-        btbx.accepted.connect(self.accept)
+            text = ""
+            if len(release.children) > 1:
+                text = "[Disc {} of {} in] ".format(release.mediumForDiscid(discid),
+                                                   len(release.children))
+            text += release.tags["title"][0] + "\nby {}".format(release.tags["artist"][0])
+            if "date" in release.tags:
+                text += "\nreleased {}".format(release.tags["date"][0])
+                if "country" in release.tags:
+                    text += " ({})".format(release.tags["country"][0])
+                if "barcode" in release.tags:
+                    text +=", barcode={}".format(release.tags["barcode"][0])
+            but = QtGui.QPushButton(text)
+            but.setStyleSheet("text-align: left")
+            but.clicked.connect(lambda : self._handleClick(release))
+            lay.addWidget(but)
+        #lay.addWidget(self.listW)
+        btbx = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Cancel)
         btbx.rejected.connect(self.reject)
         lay.addWidget(btbx)
+        self.setLayout(lay)
+    
+    def _handleClick(self, release):
+        self.selectedRelease = release
+        self.accept()
 
 
 class CDROMDock(DockWidget):
@@ -113,17 +129,17 @@ class CDROMDock(DockWidget):
             except discid.disc.DiscError:
                 warning("No disc found")
                 return False
-            discid = disc.id
+            theDiscid = disc.id
         from omg.plugins.musicbrainz import xmlapi
-        releases = xmlapi.findReleasesForDiscid(discid)
+        releases = xmlapi.findReleasesForDiscid(theDiscid)
         if len(releases) > 1:
-            dialog = ReleaseSelectionDialog(releases)
+            dialog = ReleaseSelectionDialog(releases, theDiscid)
             if dialog.exec_():
-                release = dialog.listW.currentIndex()
+                release = dialog.selectedRelease
             else:
                 return
             
-        container = xmlapi.makeReleaseContainer(releases[release], discid, levels.editor)
+        container = xmlapi.makeReleaseContainer(release, theDiscid, levels.editor)
         self.model._insertContents(QtCore.QModelIndex(), 0, [container.id])
 
         

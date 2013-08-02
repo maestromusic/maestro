@@ -68,6 +68,12 @@ class MBTagStorage(dict):
             self[key].append(value)
         else:
             self[key] = [value]
+            
+    def asOMGTags(self):
+        ret = tags.Storage()
+        for key, values in self.items():
+            ret[tags.get(key)] = [ str(v) if isinstance(v, MBArtist) else v for v in values ]
+        return ret
 
 class MBArtist:
     
@@ -77,7 +83,7 @@ class MBArtist:
         self.sortName = node.findtext("sort-name")
 
     def __str__(self):
-        return "MBArtist({})".format(self.canonicalName)
+        return self.name
 
 
 class MBTreeItem:
@@ -90,6 +96,11 @@ class MBTreeItem:
         self.pos = None
         
     def insertChild(self, pos, child):
+        if pos is None:
+            if len(self.children) == 0:
+                pos = 1
+            else:
+                pos = max(self.children.keys()) + 1
         self.children[pos] = child
         child.pos = pos
         child.parent = self
@@ -97,17 +108,19 @@ class MBTreeItem:
     def __str__(self):
         return "{}(mbid={})".format(self.__class__.__name__, self.mbid)
     
+    def __eq__(self, other):
+        return self.mbid == other.mbid
+    
     def makeElements(self, level):
         if not isinstance(self, Recording):
-            #contentList = elements.ContentList
-            elements = []
+            contentList = elements.ContentList()
             for pos, child in self.children.items():
                 element = child.makeElements(level)            
-                elements.append(element)
-            element = level.createContainer(tags=makeOMGTags(self.tags), contents=elements)
+                contentList.insert(pos, element.id)
+            element = level.createContainer(tags=self.tags.asOMGTags(), contents=contentList)
         else:
             element = level.collect(self.backendUrl)
-            diff = tags.TagStorageDifference(None, makeOMGTags(self.tags))
+            diff = tags.TagStorageDifference(None, self.tags.asOMGTags())
             level.changeTags({element: diff})        
         return element
 
@@ -115,6 +128,14 @@ class MBTreeItem:
 class Release(MBTreeItem):
     """A release is the top-level container structure in MusicBrainz that we care about.
     """
+    
+    def mediumForDiscid(self, discid):
+        """Return the position of the medium in this release with given *discid*, if such exists.
+        """
+        for pos, child in self.children.items():
+            if discid in child.discids:
+                return pos
+
 
 class Medium(MBTreeItem):
     """A medium inside a release. Usually has one or more discids associated to it."""
@@ -132,24 +153,33 @@ class Medium(MBTreeItem):
         if not title:
             title = "Disc {}".format(pos)
         self.tags.add("title", title)
-        self.discids = []
+        self.discids = set(discids)
     
     def insertWorks(self):
         """Inserts superworks as intermediate level between the medium and its recording.
         
         This method assumes that all childs of *self* are Recording instances.
         """
-        last = None
-        for pos in sorted(self.children.keys()):
-            child = self.children[pos]
+        newChildren = []
+        posOffset = 0
+        for pos, child in sorted(self.children.items()):
             if child.parentWork:
-                if last and self.children[last] is child.parentWork:
-                    self.children[last].insertChild(child.workpos, child)
-                    del self.children[pos]
+                if len(newChildren) and newChildren[-1][1] == child.parentWork:
+                    newChildren[-1][1].insertChild(None, child)
+                    
+                    posOffset -= 1
                 else:
-                    self.insertChild(pos, child.parentWork)
-                    child.parentWork.children[child.workpos] = child
-                    last = pos
+                    newChildren.append((child.pos + posOffset, child.parentWork))
+                    child.parentWork.insertChild(None, child)
+                child.parentWork = None
+            else:
+                newChildren.append((child.pos + posOffset, child))
+        self.children.clear()
+        for pos, child in newChildren:
+            self.insertChild(pos, child)
+    
+    def __eq__(self, other):
+        return self is other
 
 
 class Recording(MBTreeItem):
@@ -168,7 +198,7 @@ class Recording(MBTreeItem):
         super().__init__(recordingid)
         parent.insertChild(pos, self)
         self.tracknumber = tracknumber
-        self.work = None # associated Work instance (if any)
+        self.parentWork = None
         
     def lookupInfo(self):
         """Queries MusicBrainz for tag information and potential related works."""
@@ -214,23 +244,21 @@ class Recording(MBTreeItem):
                 continue
             self.tags.add(tag, artist)
         
-        for relation in recording.iterfind('relation-list[@target-type="work"]/relation'):
+        for i, relation in enumerate(recording.iterfind('relation-list[@target-type="work"]/relation')):
+            if i > 0:
+                logger.warning("more than one work relation in recording {}".format(self.mbid))
             if relation.get("type") == "performance":
                 workid = relation.findtext("target")
                 work = Work(workid)
-                self.work = work
-                work.recording = self
                 work.lookupInfo()
+                self.mergeWork(work)
             else:
                 logger.warning("unknown work relation '{}' in recording '{}'"
                                .format(relation.get("type"), self.mbid))
         
-    def mergeWork(self):
-        if self.work is None:
-            self.parentWork = None
-            return
-        self.workid = self.work.mbid
-        for tag, values in self.work.tags.items():
+    def mergeWork(self, work):
+        self.workid = work.mbid
+        for tag, values in work.tags.items():
             if tag in self.tags:
                 if tag == "title":
                     self.tags[tag] = values[:]
@@ -238,11 +266,7 @@ class Recording(MBTreeItem):
                     self.tags[tag].extend(values)
             else:
                 self.tags[tag] = values
-        self.parentWork = self.work.parentWork
-        if self.parentWork:
-            self.parentWork.children[self.work.pos] = self
-            self.workpos = self.work.pos
-        self.work = None
+        self.parentWork = work.parentWork
 
     def __str__(self):
         ret = super().__str__()
@@ -259,46 +283,29 @@ class Work(MBTreeItem):
 
     def lookupInfo(self):
         work = query("work", self.mbid, ("work-rels", "artist-rels")).find("work")
-        addTag(self.tags, "title", work.findtext("title"))
+        self.tags.add("title", work.findtext("title"))
         for relation in work.iterfind('relation-list[@target-type="artist"]/relation'):
-            if relation.get("type") == "composer":
-                addTag(self.tags, "composer", relation.findtext('artist/name'))
-            elif relation.get("type") == "lyricist":
-                addTag(self.tags, "lyricist", relation.findtext('artist/name'))
-            elif relation.get("type") == "orchestrator":
-                addTag(self.tags, "lyricist", relation.findtext('artist/name'))
+            easyRelations = { "composer" : "composer",
+                              "lyricist" : "lyricist",
+                              "orchestrator" : "orchestrator"
+                            }
+            reltype = relation.get("type")
+            artist = MBArtist(relation.find('artist'))
+            if reltype in easyRelations:
+                self.tags.add(easyRelations[reltype], artist)
             else:
                 logger.warning("unknown work-artist relation {} in work {}"
-                               .format(relation.get("type"), self.mbid))
+                               .format(reltype, self.mbid))
+        
         for relation in work.iterfind('relation-list[@target-type="work"]/relation'):
             if relation.get("type") == "parts":
                 assert relation.findtext("direction") == "backward"
                 assert self.parentWork is None
                 parentWorkId = relation.find('work').get('id')
-                # check if previous sibling has the same parent work
-                try:
-                    recParent = self.recording.parent
-                    prevPos = max(pos for pos in recParent.children if pos < self.recording.pos)
-                    prevChild = recParent.children[prevPos].work
-                    if prevChild and prevChild.parentWork and prevChild.parentWork.mbid == parentWorkId:
-                        self.parentWork = prevChild.parentWork
-                        self.parentWork.insertChild(len(self.parentWork.children)+1, self)
-                except ValueError:
-                    pass
-                if self.parentWork is None:
-                    self.parentWork = Work(parentWorkId)
-                    self.parentWork.tags["title"] = [relation.findtext('work/title')]
-                    self.parentWork.insertChild(1, self)
+                self.parentWork = Work(parentWorkId)
+                self.parentWork.tags["title"] = [relation.findtext('work/title')]
             else:
                 logger.debug("unknown work-work relation {} in {}".format(relation.get("type"), self.mbid))
-        
-    def __str__(self):
-        if self.parentWork:
-            return "{} [Pt. {} in {}]".format(self.tags['title'], self.pos, self.parentWork.tags['title'])
-        return super().__str__()
-
-        
-
 
 
 def findReleasesForDiscid(discid):
@@ -311,57 +318,52 @@ def findReleasesForDiscid(discid):
     releases = []
     for release in root.iter("release"):
         mbit = Release(release.get("id"))
-        title = release.find('title').text
+        title = release.findtext('title')
         for medium in release.iterfind('medium-list/medium'):
             pos = int(medium.findtext('position'))
             disctitle = medium.findtext('title')
             discids = [disc.get("id") for disc in medium.iterfind('disc-list/disc')]
-            theMedium = Medium(pos, mbit, discids, [disctitle] if disctitle else None)
-        mbit.tags['title'] = [title]
-        mbit.tags['status'] = [release.findtext('status')]
-        artists = release.iterfind('artist-credit/name-credit/artist/name')
+            Medium(pos, mbit, discids, disctitle if disctitle else None)
+        mbit.tags.add('title', title)
+        artists = release.iterfind('artist-credit/name-credit/artist')
         if artists:
-            mbit.tags["artist"] = [art.text for art in artists]
+            mbit.tags["artist"] = [MBArtist(art) for art in artists]
         if release.find('date') is not None:
-            mbit.tags["date"] = [release.findtext('date')]
+            mbit.tags.add("date", FlexiDate(*release.findtext('date').split('-')))
         if release.find('country') is not None:
-            mbit.tags["country"] = [release.findtext('country')]
+            mbit.tags.add("country", release.findtext('country'))
         if release.find('barcode') is not None:
-            mbit.tags["barcode"] = [release.findtext('barcode')]
+            mbit.tags.add("barcode", release.findtext('barcode'))
         releases.append(mbit)
     return releases
-        
-def makeOMGTags(mbtags):
-    tag = tags.Storage()
-    for key, values in mbtags.items():
-        tag[tags.get(key)] = values
-    return tag
+
     
 def makeReleaseContainer(MBrelease, discid, level):
-    release = query("release", MBrelease.mbid, ("recordings", "artists")).find("release")
-    for pos, MBmedium in MBrelease.children.items():
-        if discid in MBmedium.discids:
-            break
+    release = query("release", MBrelease.mbid, ("recordings",)).find("release")
+    
+    # find the correct medium
+    pos = MBrelease.mediumForDiscid(discid)
+    MBmedium = MBrelease.children[pos]
+    
     for medium in release.iterfind('medium-list/medium'):
-        print('hurra')
         if int(medium.findtext('position')) == pos:
             break
     for i, track in enumerate(medium.iterfind('track-list/track')):
         recording = track.find('recording')
         MBrec = Recording(recording.get("id"), int(track.findtext("position")), MBmedium, i)
-        MBrec.tags["title"] = [recording.findtext("title")]
-        MBrec.backendUrl = BackendURL.fromString("audiocd://{}/{}".format(discid, i))
-    # check if recordings are performances of works
+        MBrec.tags.add("title", recording.findtext("title"))
+        MBrec.backendUrl = BackendURL.fromString("audiocd://{0}.{1}/ripped/{0}/{1}.flac"
+                                                 .format(discid, i))
     for _, MBrec in sorted(MBmedium.children.items()):
         MBrec.lookupInfo()
-    for _, MBrec in sorted(MBmedium.children.items()):
-        MBrec.mergeWork()
     MBmedium.insertWorks()
     
     if len(MBrelease.children) == 1:
         del MBrelease.children[pos]
         for p, child in MBmedium.children.items():
             MBrelease.insertChild(p, child)
-    print(MBmedium.pprint())
+    for p in list(MBrelease.children.keys()):
+        if p != pos:
+            del MBrelease.children[p] 
     return MBrelease.makeElements(level)
             
