@@ -614,8 +614,6 @@ class Level(application.ChangeEventDispatcher):
         # the old elements.
         for element in oldElements:
             inParent = self.parent[element.id]
-            if element.type != inParent.type:
-                elementTypes[element] = element.type
             # Tag changes have been done already if parent is real
             if self.parent is not real and element.tags != inParent.tags:
                 tagChanges[inParent] = tags.TagStorageDifference(inParent.tags, element.tags.copy())
@@ -625,6 +623,8 @@ class Level(application.ChangeEventDispatcher):
                 stickerChanges[inParent] = stickers.StickersDifference(inParent.stickers,
                                                                        element.stickers.copy())
             if element.isContainer():
+                if element.type != inParent.type:
+                    elementTypes[element] = element.type
                 if element.contents != inParent.contents:
                     contentChanges[inParent] = element.contents.copy()
             else:

@@ -131,8 +131,8 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
                          for p in parents)
         
         # Escape tags for use in HTML
-        import cgi
-        lines = '<br/>'.join(cgi.escape(line) for line in lines)
+        import html
+        lines = '<br/>'.join(html.escape(line) for line in lines)
         
         if coverSize is not None and el.hasCover():
             imgTag = el.getCoverHTML(coverSize, 'style="float: left"')

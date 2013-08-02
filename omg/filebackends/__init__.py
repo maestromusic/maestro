@@ -94,7 +94,7 @@ class BackendURL:
         return None
     
     def renamed(self, newPath):
-        """Return a new URL object with path h*newPath*, while all other attributes are unchanged."""
+        """Return a new URL object with path *newPath*, while all other attributes are unchanged."""
         raise NotImplementedError()
     
     def toQUrl(self):
@@ -156,10 +156,6 @@ class BackendFile:
         raise NotImplementedError()
     
     def delete(self):
-        raise NotImplementedError()
-    
-    def computeHash(self):
-        """Compute a hash suitable for identifying this file even when tags have changed."""
         raise NotImplementedError()
     
     readOnly = False
