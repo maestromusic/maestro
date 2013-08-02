@@ -56,9 +56,9 @@ def query(resource, mbid, includes=[]):
 
 
 class MBTagStorage(dict):
+    """A simplified version of tags.Storage that allows arbitrary str keys and MBArtist values."""
     
-    def __setitem__(self, key, value):
-        
+    def __setitem__(self, key, value):        
         if isinstance(value, str) or isinstance(value, MBArtist):
             value = [value]
         super().__setitem__(key, value)
@@ -75,9 +75,15 @@ class MBTagStorage(dict):
             ret[tags.get(key)] = [ str(v) if isinstance(v, MBArtist) else v for v in values ]
         return ret
 
+
 class MBArtist:
+    """An artist in the MusicBrainz database. Hase an ID, canonical name, and sort name.
+    
+    It may be queried for (localized) aliases as well.
+    """
     
     def __init__(self, node):
+        """Init the MBArtist from the given lxml *node* as appearing in webservice results."""
         self.mbid = node.get("id")
         self.name = node.findtext("name")
         self.sortName = node.findtext("sort-name")
@@ -171,6 +177,7 @@ class Medium(MBTreeItem):
                 else:
                     newChildren.append((child.pos + posOffset, child.parentWork))
                     child.parentWork.insertChild(None, child)
+                    child.parentWork.lookupInfo(False)
                 child.parentWork = None
             else:
                 newChildren.append((child.pos + posOffset, child))
@@ -281,8 +288,9 @@ class Work(MBTreeItem):
         super().__init__(workid)
         self.parentWork = None
 
-    def lookupInfo(self):
-        work = query("work", self.mbid, ("work-rels", "artist-rels")).find("work")
+    def lookupInfo(self, works=True):
+        incs =  ["artist-rels"] + (["work-rels"] if works else [])
+        work = query("work", self.mbid, incs).find("work")
         self.tags.add("title", work.findtext("title"))
         for relation in work.iterfind('relation-list[@target-type="artist"]/relation'):
             easyRelations = { "composer" : "composer",
