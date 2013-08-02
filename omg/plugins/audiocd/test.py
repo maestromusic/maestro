@@ -21,6 +21,7 @@ discid = "ivDUEtXkT85jToKhK0uyAfLGIco-" # rhapsody
 
 from omg.plugins.musicbrainz import xmlapi
 from omg import application
+from omg.core import levels
 application.run(type='console')
 
 releases = xmlapi.findReleasesForDiscid(discid)
@@ -32,5 +33,5 @@ ans = 1
 #ans = int(input("Which one to follow? "))
 
 release = releases[ans]
-container = xmlapi.makeReleaseContainer(release, discid, None)
-print(container.pprint())
+container = xmlapi.makeReleaseContainer(release, discid, levels.editor)
+print(container)

@@ -30,10 +30,12 @@ def enable():
                                        translate('musicbrainz', 'MusicBrainz profile'),
                                        MusicBrainzGuesser)
     albumguesser.profileCategory.addType(profileType)
-    print('enabled')
     db.query("CREATE TABLE IF NOT EXISTS {}musicbrainzqueries ("
              "url VARCHAR(256), "
              "xml TEXT)".format(db.prefix))
+    db.query("CREATE TABLE IF NOT EXISTS {}musicbrainzaliases ("
+             "mbid VARCHAR(128), "
+             "alias VARCHAR(256))".format(db.prefix))
     
 def disable():
     albumguesser.profileCategory.removeType('musicbrainz')

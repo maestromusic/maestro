@@ -30,7 +30,11 @@ class AudioCDURL(filebackends.BackendURL):
         super().__init__(urlString)
         self.discid = self.parsedUrl.netloc
         self.tracknr = int(self.parsedUrl.path[1:])
-        
+    
+    @property
+    def path(self):
+        return str(self.parsedUrl)
+    
     def toQUrl(self):
         return None
 

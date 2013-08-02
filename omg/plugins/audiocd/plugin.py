@@ -21,12 +21,12 @@ import subprocess
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from omg.gui.mainwindow import DockWidget, WidgetData
+from omg.gui.dockwidget import DockWidget
 from omg.gui import mainwindow
 from omg.gui.dialogs import warning
 from omg.gui.treeview import TreeView
 from omg.models.leveltreemodel import LevelTreeModel
-from omg.core import levels, tags
+from omg.core import levels
 from omg.gui import delegates
 from omg import filebackends
 
@@ -61,9 +61,28 @@ class CDROMDelegate(delegates.StandardDelegate):
         super().__init__(view, self.profile)
 
 
+class ReleaseSelectionDialog(QtGui.QDialog):
+    
+    def __init__(self, releases):
+        super().__init__(mainwindow.mainWindow)
+        self.setModal(True)
+        
+        self.listW = QtGui.QListWidget()
+        lay = QtGui.QVBoxLayout()
+        self.setLayout(lay)
+        for release in releases:
+            self.listW.addItem(QtGui.QListWidgetItem(release.pprint()))
+        self.listW.doubleClicked.connect(self.accept)
+        lay.addWidget(self.listW)
+        btbx = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Ok & QtGui.QDialogButtonBox.Cancel)
+        btbx.accepted.connect(self.accept)
+        btbx.rejected.connect(self.reject)
+        lay.addWidget(btbx)
+
+
 class CDROMDock(DockWidget):
-    def __init__(self, parent=None, state=None, location=None):
-        super().__init__(parent)
+    def __init__(self, parent, *args, **kwargs):
+        super().__init__(parent, *args, **kwargs)
         self.setWindowTitle(self.tr('CD-ROM'))
         self.combo = QtGui.QComboBox()
         self.combo.addItems(drives)
@@ -73,9 +92,8 @@ class CDROMDock(DockWidget):
         widget = QtGui.QWidget()
         layout = QtGui.QVBoxLayout()
         
-        self.level = levels.Level(name="CDROM", parent=levels.editor)
-        self.model = LevelTreeModel(self.level)
-        self.tree = TreeView(self.level, affectGlobalSelection=False)
+        self.model = LevelTreeModel(levels.editor)
+        self.tree = TreeView(levels.editor, affectGlobalSelection=False)
         self.tree.setModel(self.model)
         self.tree.setItemDelegate(CDROMDelegate(self.tree))
         
@@ -88,13 +106,6 @@ class CDROMDock(DockWidget):
     def checkDrive(self):
         drive = self.combo.currentText()
         import discid
-        progress = QtGui.QProgressDialog(mainwindow.mainWindow)
-        progress.setLabelText("reading disc ...")
-        progress.setWindowModality(Qt.WindowModal)
-        progress.setRange(0,2)
-        progress.setMinimumDuration(0)
-        progress.setValue(0)
-        progress.show()
         QtGui.qApp.processEvents()
         with discid.read() as disc:
             try:
@@ -103,14 +114,19 @@ class CDROMDock(DockWidget):
                 warning("No disc found")
                 return False
             discid = disc.id
-        progress.setLabelText("Looking up disc id ...")
-        progress.setValue(1)
         from omg.plugins.musicbrainz import xmlapi
-        containers = xmlapi.makeReleaseTree(discid, self.level)
-        print(containers)
-        self.model._insertContents(QtCore.QModelIndex(), 0, containers)
-        progress.reset()
+        releases = xmlapi.findReleasesForDiscid(discid)
+        if len(releases) > 1:
+            dialog = ReleaseSelectionDialog(releases)
+            if dialog.exec_():
+                release = dialog.listW.currentIndex()
+            else:
+                return
+            
+        container = xmlapi.makeReleaseContainer(releases[release], discid, levels.editor)
+        self.model._insertContents(QtCore.QModelIndex(), 0, [container.id])
+
         
-wData = WidgetData(id="cdrom", name=translate("CD-ROM","cdrom"), theClass=CDROMDock,
-                   central=False, dock=True, default=False, unique=False,
-                   preferredDockArea=Qt.RightDockWidgetArea)
+wData = mainwindow.WidgetData(id="cdrom", name=translate("CD-ROM","cdrom"),
+                              theClass=CDROMDock, central=False, dock=True, unique=False,
+                              preferredDockArea=Qt.RightDockWidgetArea)

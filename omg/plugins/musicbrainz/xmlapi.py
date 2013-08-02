@@ -20,20 +20,71 @@ from lxml import etree
 import urllib.request as req
 
 from omg import database as db
+from omg.core import elements, tags
 from omg.utils import FlexiDate
+from omg.filebackends import BackendURL
 from omg import logging
 
 logger = logging.getLogger("musicbrainz.xmlapi")
 
-ns = "{http://musicbrainz.org/ns/mmd-2.0#}"
-baseUrl = "http://musicbrainz.org/ws/2"
+wsURL = "http://musicbrainz.org/ws/2"
 
-class MusicBrainzItem:
+
+def query(resource, mbid, includes=[]):
+    """Queries MusicBrainz' web service for *resource* with *mbid* and the given list of includes.
     
-    def __init__(self, itemtype, mbid):
+    Returns an LXML ElementTree root node. All namespaces are removed from the result.
+    """
+    
+    url = "{}/{}/{}".format(wsURL, resource, mbid)
+    if len(includes) > 0:
+        url += "?inc={}".format("+".join(includes))
+    ans = db.query("SELECT xml FROM {}musicbrainzqueries WHERE url=?".format(db.prefix), url)
+    if len(ans):
+        logger.debug("found cached MB URL {}".format(url))
+        data = ans.getSingle()
+    else:
+        logger.debug("Querying MB URL {}".format(url))
+        with req.urlopen(url) as response:
+            data = response.readall()
+        db.query("INSERT INTO {}musicbrainzqueries (url, xml) VALUES (?,?)".format(db.prefix), url, data)
+    root = etree.fromstring(data)
+    for node in root.iter(): # remove namespaces
+        if node.tag.startswith('{'):
+            node.tag = node.tag.rsplit('}', 1)[-1]
+    return root
+
+
+class MBTagStorage(dict):
+    
+    def __setitem__(self, key, value):
+        
+        if isinstance(value, str) or isinstance(value, MBArtist):
+            value = [value]
+        super().__setitem__(key, value)
+        
+    def add(self, key, value):
+        if key in self:
+            self[key].append(value)
+        else:
+            self[key] = [value]
+
+class MBArtist:
+    
+    def __init__(self, node):
+        self.mbid = node.get("id")
+        self.name = node.findtext("name")
+        self.sortName = node.findtext("sort-name")
+
+    def __str__(self):
+        return "MBArtist({})".format(self.canonicalName)
+
+
+class MBTreeItem:
+    
+    def __init__(self, mbid):
         self.mbid = mbid
-        self.itemtype = itemtype
-        self.tags = {}
+        self.tags = MBTagStorage()
         self.children = {}
         self.parent = None
         self.pos = None
@@ -44,36 +95,50 @@ class MusicBrainzItem:
         child.parent = self
     
     def __str__(self):
-        return "{}<id={}>".format(self.itemtype, self.mbid)
+        return "{}(mbid={})".format(self.__class__.__name__, self.mbid)
     
-    def textOut(self, indent=0):
-        lines = [str(self)]
-        for tname, tvals in self.tags.items():
-            lines.append("{} = {}".format(tname, ", ".join(tvals)))
-        for pos, child in self.children.items():
-            lines.append("  {}.".format(pos))
-            lines.extend(child.textOut(indent+2))
-        return [" "*indent + line for line in lines]
+    def makeElements(self, level):
+        if not isinstance(self, Recording):
+            #contentList = elements.ContentList
+            elements = []
+            for pos, child in self.children.items():
+                element = child.makeElements(level)            
+                elements.append(element)
+            element = level.createContainer(tags=makeOMGTags(self.tags), contents=elements)
+        else:
+            element = level.collect(self.backendUrl)
+            diff = tags.TagStorageDifference(None, makeOMGTags(self.tags))
+            level.changeTags({element: diff})        
+        return element
 
-    def pprint(self):
-        return "\n".join(self.textOut())
     
-class Release(MusicBrainzItem):
-    
-    def __init__(self, releaseid):
-        super().__init__("release", releaseid)
+class Release(MBTreeItem):
+    """A release is the top-level container structure in MusicBrainz that we care about.
+    """
 
-class Medium(MusicBrainzItem):
+class Medium(MBTreeItem):
+    """A medium inside a release. Usually has one or more discids associated to it."""
     
-    def __init__(self, pos, release, title=None):
-        super().__init__("medium", None)
+    def __init__(self, pos, release, discids, title=None):
+        """Create the medium with associated *discids* as position *pos* in *release*.
+        
+        It will be inserted into *release* at the given position. *discids* is a list of disc
+        IDs associated to that medium.
+        If the medium has a title, that may be given as will. It will be inserted into the
+        medium's tags as "title".
+        """
+        super().__init__(mbid=None)
         release.insertChild(pos, self)
         if not title:
-            title = ["Disc {}".format(pos)]
-        self.tags["title"] = title
+            title = "Disc {}".format(pos)
+        self.tags.add("title", title)
         self.discids = []
     
     def insertWorks(self):
+        """Inserts superworks as intermediate level between the medium and its recording.
+        
+        This method assumes that all childs of *self* are Recording instances.
+        """
         last = None
         for pos in sorted(self.children.keys()):
             child = self.children[pos]
@@ -84,67 +149,78 @@ class Medium(MusicBrainzItem):
                 else:
                     self.insertChild(pos, child.parentWork)
                     child.parentWork.children[child.workpos] = child
-            last = pos
-            
-
-def addTag(dct, key, val):
-    if key not in dct:
-        dct[key] = [val]
-    else:
-        dct[key].append(val)   
+                    last = pos
 
 
-class Recording(MusicBrainzItem):
+class Recording(MBTreeItem):
+    """A recording is a unique piece of recorded audio.
     
-    def __init__(self, recordingid, pos, parent):
-        super().__init__("recording", recordingid)
+    Every track on a CD is associated to exactly one recording. Since we don't care about tracks,
+    we immediately insert Recordings as children of media.
+    """
+    
+    def __init__(self, recordingid, pos, parent, tracknumber):
+        """Create recording with the given id and insert it at *pos* under *parent*.
+        
+        Since the MusicBrainz position could theoretically be different from the tracknumber, the
+        latter is needed as well.
+        """
+        super().__init__(recordingid)
         parent.insertChild(pos, self)
-        self.work = None
-    
+        self.tracknumber = tracknumber
+        self.work = None # associated Work instance (if any)
+        
     def lookupInfo(self):
-        logger.debug("querying recording {}".format(self.mbid))
-        recording = query("recording", self.mbid, ("artist-rels", "work-rels", "artists")).find("recording")
-        for artist in recording.iterfind("artist-credit/name-credit/artist/name"):
-            addTag(self.tags, "artist", artist.text)
+        """Queries MusicBrainz for tag information and potential related works."""
+        recording = query("recording",
+                          self.mbid,
+                          ("artist-rels", "work-rels", "artists")
+                         ).find("recording")
+        for artistcredit in recording.iterfind("artist-credit"):
+            for child in artistcredit:
+                if child.tag == "name-credit":
+                    self.tags.add("artist", MBArtist(child.find("artist")))
+                else:
+                    logger.warning("unknown artist-credit {} in recording {}"
+                                   .format(child.tag, self.mbid))
+        
         for relation in recording.iterfind('relation-list[@target-type="artist"]/relation'):
-            artist = relation.findtext("artist/name")
+            artist = MBArtist(relation.find("artist"))
             reltype = relation.get("type")
+            simpleTags = {"conductor" : "conductor",
+                          "performing orchestra" : "performer:orchestra",
+                          "arranger" : "arranger",
+                          "chorus master" : "chorusmaster",
+                          "performer" : "performer"}
+            
             if reltype == "instrument":
                 instrument = relation.findtext("attribute-list/attribute")
                 tag = "performer:"+instrument
-            elif reltype == "conductor":
-                tag = "conductor"
-            elif reltype == "performing orchestra":
-                tag = "performer:orchestra"
-            elif reltype == "arranger":
-                tag = "arranger"
-            elif reltype == "chorus master":
-                tag = "chorusmaster"
+            elif reltype in simpleTags:
+                tag = simpleTags[reltype]
             elif reltype == "vocal":
                 voice = relation.findtext("attribute-list/attribute")
-                if voice.startswith("soprano"):
-                    tag = "performer:soprano"
-                elif voice.startswith("mezzo-soprano"):
-                    tag = "performer:mezzo-soprano"
-                elif voice.startswith("tenor"):
-                    tag = "performer:tenor"
-                elif voice.startswith("baritone"):
-                    tag = "performer:baritone"
-                elif voice == "choir vocals":
+                for vtype in "soprano", "mezzo-soprano", "tenor", "baritone":
+                    if voice.startswith(vtype):
+                        tag = "performer:" + vtype
+                        continue
+                if voice == "choir vocals":
                     tag = "performer:choir"
                 else:
                     logger.warning("unknown voice: {} in {}".format(voice, self.mbid))
-            elif reltype == "performer":
-                tag = "performer"
             else:
                 logger.warning("unknown artist relation '{}' in recording '{}'"
                                .format(relation.get("type"), self.mbid))
                 continue
-            addTag(self.tags, tag, artist)
+            self.tags.add(tag, artist)
+        
         for relation in recording.iterfind('relation-list[@target-type="work"]/relation'):
             if relation.get("type") == "performance":
                 workid = relation.findtext("target")
-                Work(workid, self).lookupInfo()
+                work = Work(workid)
+                self.work = work
+                work.recording = self
+                work.lookupInfo()
             else:
                 logger.warning("unknown work relation '{}' in recording '{}'"
                                .format(relation.get("type"), self.mbid))
@@ -175,14 +251,11 @@ class Recording(MusicBrainzItem):
         return ret
         
 
-class Work(MusicBrainzItem):
+class Work(MBTreeItem):
     
-    def __init__(self, workid, recording=None):
-        super().__init__("work", workid)
+    def __init__(self, workid,):
+        super().__init__(workid)
         self.parentWork = None
-        if recording:
-            self.recording = recording
-            recording.work = self
 
     def lookupInfo(self):
         work = query("work", self.mbid, ("work-rels", "artist-rels")).find("work")
@@ -225,28 +298,15 @@ class Work(MusicBrainzItem):
         return super().__str__()
 
         
-def query(resource, mbid, includes=[]):
-    
-    url = "{}/{}/{}".format(baseUrl, resource, mbid)
-    if len(includes) > 0:
-        url += "?inc={}".format("+".join(includes))
-    ans = db.query("SELECT xml FROM {}musicbrainzqueries WHERE url=?".format(db.prefix), url)
-    if len(ans):
-        logger.debug("found cached MB URL {}".format(url))
-        data = ans.getSingle()
-    else:
-        logger.debug("Querying MB URL {}".format(url))
-        with req.urlopen(url) as response:
-            data = response.readall()
-        db.query("INSERT INTO {}musicbrainzqueries (url, xml) VALUES (?,?)".format(db.prefix), url, data)
-    root = etree.fromstring(data)
-    for node in root.iter(): # remove namespaces
-        if node.tag.startswith('{'):
-            node.tag = node.tag.rsplit('}', 1)[-1]
-    return root
+
 
 
 def findReleasesForDiscid(discid):
+    """Finds releases containing specified disc using MusicBrainz.
+    
+    Returns a list of Release objects, containing Medium objects but no
+    recordings.
+    """
     root = query("discid", discid, ("artists",))
     releases = []
     for release in root.iter("release"):
@@ -255,8 +315,8 @@ def findReleasesForDiscid(discid):
         for medium in release.iterfind('medium-list/medium'):
             pos = int(medium.findtext('position'))
             disctitle = medium.findtext('title')
-            theMedium = Medium(pos, mbit, [disctitle] if disctitle else None)
-            theMedium.discids = [disc.get("id") for disc in medium.iterfind('disc-list/disc')]
+            discids = [disc.get("id") for disc in medium.iterfind('disc-list/disc')]
+            theMedium = Medium(pos, mbit, discids, [disctitle] if disctitle else None)
         mbit.tags['title'] = [title]
         mbit.tags['status'] = [release.findtext('status')]
         artists = release.iterfind('artist-credit/name-credit/artist/name')
@@ -271,6 +331,12 @@ def findReleasesForDiscid(discid):
         releases.append(mbit)
     return releases
         
+def makeOMGTags(mbtags):
+    tag = tags.Storage()
+    for key, values in mbtags.items():
+        tag[tags.get(key)] = values
+    return tag
+    
 def makeReleaseContainer(MBrelease, discid, level):
     release = query("release", MBrelease.mbid, ("recordings", "artists")).find("release")
     for pos, MBmedium in MBrelease.children.items():
@@ -280,50 +346,22 @@ def makeReleaseContainer(MBrelease, discid, level):
         print('hurra')
         if int(medium.findtext('position')) == pos:
             break
-    for track in medium.iterfind('track-list/track'):
+    for i, track in enumerate(medium.iterfind('track-list/track')):
         recording = track.find('recording')
-        MBrec = Recording(recording.get("id"), int(track.findtext("position")), MBmedium)
+        MBrec = Recording(recording.get("id"), int(track.findtext("position")), MBmedium, i)
         MBrec.tags["title"] = [recording.findtext("title")]
+        MBrec.backendUrl = BackendURL.fromString("audiocd://{}/{}".format(discid, i))
     # check if recordings are performances of works
     for _, MBrec in sorted(MBmedium.children.items()):
         MBrec.lookupInfo()
-    for pos, MBrec in sorted(MBmedium.children.items()):
+    for _, MBrec in sorted(MBmedium.children.items()):
         MBrec.mergeWork()
     MBmedium.insertWorks()
-    return MBrelease
-            
     
-def findReleases(recordingId):
-    """Given a recording id, return the IDs of all releases that contain the denoted recording."""
-    root = query("recording", recordingId, ("releases",))
-    return [release.get("id") for release in root.iter("{}release".format(ns))]
-
-
-def lookupRelease(releaseId):
-    root = query("release", releaseId, ("artists", "release-groups", "recordings"))
-    release = root.find(ns+"release")
-    titles = [title.text for title in release.findall(ns+"title")]
-    artists = [nc.find(ns+"artist").find(ns+"name").text
-               for nc in release.find(ns+"artist-credit").findall(ns+"name-credit")]
-    date = FlexiDate(*release.find(ns+"date").text.split("-"))
-    ml = release.find(ns+"medium-list")
-    tracks = {}
-    for medium in ml.findall(ns+"medium"):
-        discnum = int(medium.find(ns+"position").text)
-        if discnum not in tracks:
-            tracks[discnum] = {}
-        tracklist = medium.find(ns+"track-list")
-        for track in tracklist.findall(ns+"track"):
-            position = int(track.find(ns+"position").text)
-            recording = track.find(ns+"recording")
-            tracks[discnum][position] = recording.get("id")
-    print("*** found a release ***")
-    print("titles={}".format(titles))
-    print("artists={}".format(artists))
-    print("date={}".format(date))
-    print("tracks:")
-    for discnum, contents in tracks.items():
-        print("disc {}".format(discnum))
-        for pos, recid in contents.items():
-            print("  track {}: {}".format(pos, recid)) 
-    return root
+    if len(MBrelease.children) == 1:
+        del MBrelease.children[pos]
+        for p, child in MBmedium.children.items():
+            MBrelease.insertChild(p, child)
+    print(MBmedium.pprint())
+    return MBrelease.makeElements(level)
+            
