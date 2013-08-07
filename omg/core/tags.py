@@ -1006,7 +1006,7 @@ class TagStorageDifference(TagDifference):
         self.oldTags = oldTags
         self.newTags = newTags
         
-    def apply(self,element, withoutPrivateTags=False):
+    def apply(self, element, withoutPrivateTags=False):
         # element may also be a FileBackend
         if self.newTags is None:
             element.tags = Storage()
@@ -1014,9 +1014,9 @@ class TagStorageDifference(TagDifference):
             element.tags = self.newTags.withoutPrivateTags(copy=True)
         else: element.tags = self.newTags.copy()
         
-    def revert(self,element, withoutPrivateTags=False):
+    def revert(self, element, withoutPrivateTags=False):
         # element may also be a FileBackend
-        if self.newTags is None:
+        if self.oldTags is None:
             element.tags = Storage()
         elif withoutPrivateTags:
             element.tags = self.oldTags.withoutPrivateTags(copy=True)
