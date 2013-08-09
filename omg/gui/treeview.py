@@ -205,6 +205,9 @@ class TreeView(QtGui.QTreeView):
                     action.initialize(self.selection)
         
     def contextMenuEvent(self, event):
+        if len(self.treeActions) == 0:
+            event.ignore()
+            return
         menu = self.actionConfig.createMenu(self, self.treeActions)
         for action in self.localActions:
             menu.addAction(action)
