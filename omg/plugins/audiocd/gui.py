@@ -16,11 +16,13 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+from itertools import chain
+
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 from PyQt4.QtGui import QDialogButtonBox
 
-from omg.core import levels
+from omg.core import levels, tags
 from omg.gui import delegates, mainwindow, treeview
 from omg.gui.treeactions import TreeAction
 from omg.gui.dialogs import warning
@@ -104,15 +106,15 @@ class AliasComboDelegate(QtGui.QStyledItemDelegate):
         self.box = box
         
     def paint(self, painter, option, index):
-        if index.row() > 0:
-            alias = self.box.entity.aliases[index.row()-1]
-            if alias.primary:
-                option.font.setBold(True)
+        alias = self.box.entity.aliases[index.row()]
+        if alias.primary:
+            option.font.setBold(True)
         super().paint(painter, option, index)
-        if index.row() > 0 and alias.primary:
-            option.font.setBold(False)
+        option.font.setBold(False)
         
 class AliasComboBox(QtGui.QComboBox):
+    
+    aliasChanged = QtCore.pyqtSignal(object)
     
     def __init__(self, entity, sortNameItem):
         super().__init__()
@@ -122,12 +124,12 @@ class AliasComboBox(QtGui.QComboBox):
         self.sortNameItem = sortNameItem
         self.setItemDelegate(AliasComboDelegate(self))
         self.activated.connect(self._handleActivate)
+        self.editTextChanged.connect(self._handleEditTextChanged)
     
     def showPopup(self):
-        if self.entity.aliases is None:
+        if not self.entity.loaded:
             self.entity.loadAliases()
-            for alias in self.entity.aliases:
-                print("alias={}".format(alias))
+            for alias in self.entity.aliases[1:]:
                 self.addItem(alias.name)
                 if alias.locale:
                     self.setItemData(self.count()-1, ("primary " if alias.primary else "") + "alias for locale {}".format(alias.locale), Qt.ToolTipRole)
@@ -135,16 +137,22 @@ class AliasComboBox(QtGui.QComboBox):
         return super().showPopup()
     
     def _handleActivate(self, index):
-        if index == 0:
-            sortname = self.entity.sortName or self.entity.name
-        else:
-            alias = self.entity.aliases[index-1]
-            sortname = alias.sortName or alias.name
+        alias = self.entity.aliases[index]
+        sortname = alias.sortName
         self.sortNameItem.setText(sortname)
-            
+        if self.currentText() != self.entity.name:
+            self.entity.selectAlias(index)
+            self.aliasChanged.emit(self.entity)
+    
+    def _handleEditTextChanged(self, text):
+        self.entity.name = text
+        self.aliasChanged.emit(self.entity)
+        
 
         
 class AliasWidget(QtGui.QTableWidget):
+    
+    aliasChanged = QtCore.pyqtSignal(object)
     
     def __init__(self, entities):
         super().__init__()
@@ -163,11 +171,16 @@ class AliasWidget(QtGui.QTableWidget):
             label = QtGui.QTableWidgetItem(", ".join(ent.asTag))
             label.setFlags(Qt.ItemIsEnabled)
             self.setItem(row, 0, label)
+            
             label = QtGui.QLabel('<a href="{}">{}</a>'.format(ent.url(), self.tr("view online")))
             label.setOpenExternalLinks(True)
             self.setCellWidget(row, 1, label)
+            
             sortNameItem = QtGui.QTableWidgetItem(ent.sortName)
-            self.setCellWidget(row, 2, AliasComboBox(ent, sortNameItem))
+            combo = AliasComboBox(ent, sortNameItem)
+            combo.aliasChanged.connect(self.aliasChanged)
+            self.setCellWidget(row, 2, combo)
+            
             self.setItem(row, 3, sortNameItem)
 
     def updateDisabledTags(self, lst):
@@ -238,6 +251,7 @@ class ImportAudioCDDialog(QtGui.QDialog):
         self.level = level
         level.stack.beginMacro(self.tr("Create Elements from Audio CD"))
         container = xmlapi.makeReleaseContainer(release, discid, level)
+        self.release = release
         self.model = leveltreemodel.LevelTreeModel(level, [container])
         level.stack.endMacro()
         
@@ -246,6 +260,7 @@ class ImportAudioCDDialog(QtGui.QDialog):
         self.view.setItemDelegate(CDROMDelegate(self.view))
         
         self.aliasWidget = AliasWidget(container.mbItem.collectAliasEntities())
+        self.aliasWidget.aliasChanged.connect(self._handleAliasChange)
         
         self.newTagWidget = NewTagWidget(container.mbItem.collectExternalTags())
         self.newTagWidget.disabledTagsChanged.connect(self.aliasWidget.updateDisabledTags)
@@ -263,4 +278,13 @@ class ImportAudioCDDialog(QtGui.QDialog):
         self.setLayout(lay)
         self.resize(mainwindow.mainWindow.width()*0.8, mainwindow.mainWindow.height()*0.8)
         
-        
+    def _handleAliasChange(self, entity):
+        for item in self.release.walk():
+            rebuild = False
+            for val in chain.from_iterable(item.tags.values()):
+                if isinstance(val, xmlapi.AliasEntity) and val == entity:
+                    rebuild = True
+            if rebuild:
+                t = item.tags.asOMGTags()
+                self.level.changeTags({item.element: tags.TagStorageDifference(item.element.tags, t)})
+            

@@ -41,22 +41,22 @@ def query(resource, mbid, includes=[]):
         url += "?inc={}".format("+".join(includes))
     ans = db.query("SELECT xml FROM {}musicbrainzqueries WHERE url=?".format(db.prefix), url)
     if len(ans):
-        logger.debug("found cached MB URL {}".format(url))
         data = ans.getSingle()
     else:
-        logger.debug("Querying MB URL {}".format(url))
         with req.urlopen(url) as response:
             data = response.readall()
-        db.query("INSERT INTO {}musicbrainzqueries (url, xml) VALUES (?,?)".format(db.prefix), url, data)
+        db.query("INSERT INTO {}musicbrainzqueries (url, xml) VALUES (?,?)"
+                 .format(db.prefix), url, data)
     root = etree.fromstring(data)
-    for node in root.iter(): # remove namespaces
+    # remove namespace tags
+    for node in root.iter(): 
         if node.tag.startswith('{'):
             node.tag = node.tag.rsplit('}', 1)[-1]
     return root
 
 
 class MBTagStorage(dict):
-    """A simplified version of tags.Storage that allows arbitrary str keys and MBArtist values."""
+    """A basic tag storage. In contrast to tags.Storage it allows AliasEntity values."""
     
     def __setitem__(self, key, value):        
         if isinstance(value, str) or isinstance(value, AliasEntity):
@@ -77,13 +77,25 @@ class MBTagStorage(dict):
 
 
 class Alias:
+    """An alias for a MusicBrainz entry.
+    
+    Has the following attributes:
+    - name: the actual alias
+    - sortName: value used for sorting; may be None
+    - primary: either True or False; at most one primary alias per locale
+    - locale: describes the locale for which the alias is valid
+    """
+    
     def __init__(self, name, sortName, primary=False, locale=None):
         self.name = name
+        if sortName is None:
+            sortName = name
         self.sortName = sortName
         self.primary = primary
         self.locale = locale
     
     def __gt__(self, other):
+        """Compares lexicographically but primaries and aliases with locales are at the front."""
         if self.primary > other.primary:
             return False
         if self.primary < other.primary:
@@ -99,26 +111,35 @@ class Alias:
         
 class AliasEntity:
     """A musicbrainz entity that may have aliases, i.e., artists and work titles.
-    
-    It may be queried for (localized) aliases as well.
     """
     
     def __init__(self, node):
         """Init the entity from the given lxml *node* as appearing in webservice results."""
         self.type = node.tag
         self.mbid = node.get("id")
-        self.name = node.findtext("name") if node.tag == "artist" else node.findtext("title")
-        self.sortName = node.findtext("sort-name") or self.name
-        self.aliases = None
-        self.selectedAlias = -1
+        name = node.findtext("name") if node.tag == "artist" else node.findtext("title")
+        sortName = node.findtext("sort-name")
+        self.aliases = [Alias(name, sortName)]
         self.asTag = set()
+        self.selectAlias(0)
+        self.loaded = False
     
+    def selectAlias(self, index):
+        self.name = self.aliases[index].name
+        self.sortName = self.aliases[index].sortName
+
     def loadAliases(self):
+        """Queries the MusicBrainz web service for aliases."""
+        if self.loaded:
+            return
         result = query(self.type, self.mbid, ("aliases",))
-        self.aliases = []
+        newaliases = []
         for alias in result.iter("alias"):
-            self.aliases.append(Alias(alias.text, alias.get("sort-name"), True if alias.get("primary") else False, alias.get("locale")))
-        self.aliases.sort()
+            alias = Alias(alias.text, alias.get("sort-name"),
+                          bool(alias.get("primary")), alias.get("locale"))
+            newaliases.append(alias)
+        self.aliases.extend(sorted(newaliases))
+        self.loaded = True
         return self.aliases
 
     def __str__(self):
@@ -159,6 +180,11 @@ class MBTreeItem:
     def __eq__(self, other):
         return self.mbid == other.mbid
     
+    def walk(self):
+        yield self
+        for child in self.children.values():
+            yield from child.walk()
+     
     def makeElements(self, level):
         if not isinstance(self, Recording):
             contentList = elements.ContentList()
@@ -170,27 +196,25 @@ class MBTreeItem:
             element = level.collect(self.backendUrl)
             diff = tags.TagStorageDifference(None, self.tags.asOMGTags())
             level.changeTags({element: diff})
-        element.mbItem = self  
+        element.mbItem = self
+        self.element = element
         return element
         
     def collectAliasEntities(self):
         entities = set()
-        for vals in self.tags.values():
-            for val in vals:
+        import itertools
+        for item in self.walk():
+            for val in itertools.chain.from_iterable(item.tags.values()):
                 if isinstance(val, AliasEntity):
                     entities.add(val)
-        for child in self.children.values():
-            entities.update(child.collectAliasEntities())
         return entities
 
     def collectExternalTags(self):
         etags = set()
-        for tag in self.tags:
-            omgTag = tags.get(tag)
-            if not omgTag.isInDb():
-                etags.add(omgTag)
-        for child in self.children.values():
-            etags.update(child.collectExternalTags())
+        for item in self.walk():
+            for tag in item.element.tags:
+                if not tag.isInDb():
+                    etags.add(tag)
         return etags
     
 class Release(MBTreeItem):

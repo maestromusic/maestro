@@ -18,55 +18,69 @@
 
 from PyQt4 import QtCore, QtGui
 
-from omg import database as db, filesystem
-from omg import profiles
-import omg.models.albumguesser as albumguesser
-import urllib.request as req
-import xml.etree.ElementTree as ET
+from omg import database as db
+from omg import config
 translate = QtCore.QCoreApplication.translate
 
+def defaultStorage():
+    return {"SECTION:musicbrainz": {'profiles': [],
+                                'current_profile': None
+                                }
+            }
+
+def defaultConfig():
+    return {"musicbrainz": {
+            "queryCacheDays": (int, 7, "Number of days after which cached web service calls expire.")
+        }}
+
 def enable():
-    profileType = profiles.ProfileType('musicbrainz',
-                                       translate('musicbrainz', 'MusicBrainz profile'),
-                                       MusicBrainzGuesser)
-    albumguesser.profileCategory.addType(profileType)
+    #profileType = profiles.ProfileType('musicbrainz',
+    #                                   translate('musicbrainz', 'MusicBrainz profile'),
+    #                                   MusicBrainzGuesser)
+    #albumguesser.profileCategory.addType(profileType) needs to be rewritten
     db.query("CREATE TABLE IF NOT EXISTS {}musicbrainzqueries ("
              "url VARCHAR(256), "
+             "verified TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "
              "xml TEXT)".format(db.prefix))
+    db.query("DELETE FROM {}musicbrainzqueries WHERE "
+             "datetime('now', '-{} days') >= verified"
+             .format(db.prefix, config.options.musicbrainz.queryCacheDays))
     db.query("CREATE TABLE IF NOT EXISTS {}musicbrainzaliases ("
+             "entity VARCHAR(16), "
              "mbid VARCHAR(128), "
              "alias VARCHAR(256))".format(db.prefix))
     
 def disable():
-    albumguesser.profileCategory.removeType('musicbrainz')
+    pass
+    #albumguesser.profileCategory.removeType('musicbrainz')
 
-class MusicBrainzGuesser(profiles.Profile):
-    
-    def __init__(self, name, type, state):
-        super().__init__(name, type, state)
-    
-    def guessAlbums(self, level, files):
-        self.toplevels = []
-        for dirname, elements in files.items():
-            hashes = {elem: db.hash(elem.id) if elem.isInDb() else filesystem.getNewfileHash(elem.url)
-                      for elem in elements}
-            if all(hash.startswith("mbid") for hash in hashes.values()):
-                print('good')
-            else:
-                print('bad')
-                self.toplevels.extend(elements)
-                continue
-            releases = {}
-            for elem, hash in hashes.items():
-                response = req.urlopen("http://musicbrainz.org/ws/2/recording/{}?inc=releases".format(hash[5:]))
-                data = response.readall()
-                root = ET.fromstring(data)
-                release = next(root.iter("{http://musicbrainz.org/ns/mmd-2.0#}release")).attrib["id"]
-                if release not in releases:
-                    releases[release] = []
-                releases[release].append(elem)
-            for release, elements in releases.items():
-                print("release {}".format(release))
-                for elem in elements:
-                    print("  {}".format(elem.url))
-            self.toplevels.extend(elements)
+# class MusicBrainzGuesser(profiles.Profile):
+#     
+#     def __init__(self, name, type, state):
+#         super().__init__(name, type, state)
+#     
+#     def guessAlbums(self, level, files):
+#         self.toplevels = []
+#         for dirname, elements in files.items():
+#             hashes = {elem: db.hash(elem.id) if elem.isInDb() else filesystem.getNewfileHash(elem.url)
+#                       for elem in elements}
+#             if all(hash.startswith("mbid") for hash in hashes.values()):
+#                 print('good')
+#             else:
+#                 print('bad')
+#                 self.toplevels.extend(elements)
+#                 continue
+#             releases = {}
+#             for elem, hash in hashes.items():
+#                 response = req.urlopen("http://musicbrainz.org/ws/2/recording/{}?inc=releases".format(hash[5:]))
+#                 data = response.readall()
+#                 root = ET.fromstring(data)
+#                 release = next(root.iter("{http://musicbrainz.org/ns/mmd-2.0#}release")).attrib["id"]
+#                 if release not in releases:
+#                     releases[release] = []
+#                 releases[release].append(elem)
+#             for release, elements in releases.items():
+#                 print("release {}".format(release))
+#                 for elem in elements:
+#                     print("  {}".format(elem.url))
+#             self.toplevels.extend(elements)
