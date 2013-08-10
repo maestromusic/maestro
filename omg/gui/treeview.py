@@ -141,7 +141,7 @@ class TreeView(QtGui.QTreeView):
     
     actionConfig = TreeActionConfiguration()
     
-    def __init__(self,level,parent=None,affectGlobalSelection=True):
+    def __init__(self,level, parent=None, affectGlobalSelection=True):
         super().__init__(parent)
         self.level = level
         self.affectGlobalSelection = affectGlobalSelection
