@@ -190,7 +190,7 @@ class TagTypeBox(QtGui.QStackedWidget):
 
         if editable:
             self.box.editingFinished.connect(self._handleEditingFinished)
-        else: self.box.currentIndexChanged.connect(self._handleEditingFinished)
+        self.box.currentIndexChanged.connect(self._handleEditingFinished)
         
         self.addWidget(self.box)
         

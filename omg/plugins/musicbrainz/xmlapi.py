@@ -69,10 +69,17 @@ class MBTagStorage(dict):
         else:
             self[key] = [value]
             
-    def asOMGTags(self):
+    def asOMGTags(self, mapping=None):
         ret = tags.Storage()
         for key, values in self.items():
-            ret[tags.get(key)] = [ str(v) if isinstance(v, AliasEntity) else v for v in values ]
+            if mapping and key in mapping:
+                if mapping[key] is None:
+                    continue
+                else:
+                    tag = mapping[key]
+            else:
+                tag = tags.get(key)
+            ret[tag] = [ str(v) if isinstance(v, AliasEntity) else v for v in values ]
         return ret
 
 
@@ -112,13 +119,25 @@ class Alias:
 class AliasEntity:
     """A musicbrainz entity that may have aliases, i.e., artists and work titles.
     """
+    _entities = {}
     
-    def __init__(self, node):
-        """Init the entity from the given lxml *node* as appearing in webservice results."""
-        self.type = node.tag
-        self.mbid = node.get("id")
+    @staticmethod
+    def get(node):
+        mbid = node.get("id")
+        if mbid in AliasEntity._entities:
+            return AliasEntity._entities[mbid]
+        type = node.tag
         name = node.findtext("name") if node.tag == "artist" else node.findtext("title")
         sortName = node.findtext("sort-name")
+        ent = AliasEntity(type, mbid, name, sortName)
+        AliasEntity._entities[mbid] = ent
+        return ent
+        
+    
+    def __init__(self, type, mbid, name, sortName):
+        self.type = type
+        self.mbid = mbid
+        self.name = name
         self.aliases = [Alias(name, sortName)]
         self.asTag = set()
         self.selectAlias(0)
@@ -290,6 +309,7 @@ class Recording(MBTreeItem):
         """
         super().__init__(recordingid)
         parent.insertChild(pos, self)
+        self.tags.add("musicbrainz_recordingid", self.mbid)
         self.tracknumber = tracknumber
         self.parentWork = self.workid = None
         
@@ -302,7 +322,7 @@ class Recording(MBTreeItem):
         for artistcredit in recording.iterfind("artist-credit"):
             for child in artistcredit:
                 if child.tag == "name-credit":
-                    ent = AliasEntity(child.find("artist"))
+                    ent = AliasEntity.get(child.find("artist"))
                     ent.asTag.add("artist")
                     self.tags.add("artist", ent)
                 else:
@@ -310,7 +330,7 @@ class Recording(MBTreeItem):
                                    .format(child.tag, self.mbid))
         
         for relation in recording.iterfind('relation-list[@target-type="artist"]/relation'):
-            artist = AliasEntity(relation.find("artist"))
+            artist = AliasEntity.get(relation.find("artist"))
             reltype = relation.get("type")
             simpleTags = {"conductor" : "conductor",
                           "performing orchestra" : "performer:orchestra",
@@ -341,7 +361,6 @@ class Recording(MBTreeItem):
                 continue
             self.tags.add(tag, artist)
             artist.asTag.add(tag)
-        
         for i, relation in enumerate(recording.iterfind('relation-list[@target-type="work"]/relation')):
             if i > 0:
                 logger.warning("more than one work relation in recording {}".format(self.mbid))
@@ -367,24 +386,19 @@ class Recording(MBTreeItem):
             else:
                 self.tags[tag] = values
         self.parentWork = work.parentWork
-
-    def __str__(self):
-        ret = super().__str__()
-        if self.work:
-            ret += "->recording of: {}".format(self.work)
-        return ret
         
 
 class Work(MBTreeItem):
     
-    def __init__(self, workid,):
+    def __init__(self, workid):
         super().__init__(workid)
         self.parentWork = None
+        self.tags.add("musicbrainz_workid", self.mbid)
 
     def lookupInfo(self, works=True):
         incs =  ["artist-rels"] + (["work-rels"] if works else [])
         work = query("work", self.mbid, incs).find("work")
-        ent = AliasEntity(work)
+        ent = AliasEntity.get(work)
         ent.asTag.add("title")
         self.tags.add("title", ent)
         for relation in work.iterfind('relation-list[@target-type="artist"]/relation'):
@@ -393,7 +407,7 @@ class Work(MBTreeItem):
                               "orchestrator" : "orchestrator"
                             }
             reltype = relation.get("type")
-            artist = AliasEntity(relation.find('artist'))
+            artist = AliasEntity.get(relation.find('artist'))
             if reltype in easyRelations:
                 artist.asTag.add(easyRelations[reltype])
                 self.tags.add(easyRelations[reltype], artist)
@@ -430,10 +444,11 @@ def findReleasesForDiscid(discid):
             discids = [disc.get("id") for disc in medium.iterfind('disc-list/disc')]
             Medium(pos, mbit, discids, disctitle if disctitle else None)
         mbit.tags.add('title', title)
+        mbit.tags.add('musicbrainz_releasid', mbit.mbid)
         artists = release.iterfind('artist-credit/name-credit/artist')
         if artists:
             for art in artists:
-                ent = AliasEntity(art)
+                ent = AliasEntity.get(art)
                 ent.asTag.add("artist")
                 mbit.tags.add("artist", ent)
         if release.find('date') is not None:

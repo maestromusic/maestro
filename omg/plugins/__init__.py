@@ -95,13 +95,13 @@ class Plugin(object):
     def __str__(self):
         return self.package.NAME
 
+plugins = None
+loadedPlugins = None
 
 def init():
-    global plugins, loadedPlugins, enabledPlugins
+    global plugins, loadedPlugins
     # Dict mapping plugin-names to loaded modules. Contains all plugin-modules which have been loaded
     loadedPlugins = {}
-    # List of all plugin-names that are currently enabled
-    enabledPlugins = []
     plugins = {}
 
     from pkg_resources import resource_listdir, resource_exists, resource_isdir
