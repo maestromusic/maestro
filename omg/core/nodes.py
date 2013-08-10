@@ -38,10 +38,10 @@ class Node:
         """Return the number of contents (that is direct children) of this node."""
         return len(self.getContents())   
 
-    def setContents(self,contents):
+    def setContents(self, contents):
         """Set the list of contents of this container to *contents*. Note that the list won't be copied but
         in fact altered: the parents will be set to this node."""
-        assert isinstance(contents,list)
+        assert isinstance(contents, list)
         self.contents = contents
         for element in self.contents:
             element.parent = self
@@ -93,17 +93,17 @@ class Node:
             return 1 + max(node.maxDepth() for node in self.getContents())
         else: return 0
 
-    def index(self,node):
+    def index(self, node):
         """Return the index of *node* in this node's contents or raise a ValueError if *node* is not found.
          See also find."""
-        for i,n in enumerate(self.getContents()):
+        for i, n in enumerate(self.getContents()):
             if n == node:
                 return i
-        raise ValueError("Node.index: Node {} is not contained in element {}.".format(node,self))
+        raise ValueError("Node.index: Node {} is not contained in element {}.".format(node, self))
         
-    def find(self,node):
+    def find(self, node):
         """Return the index of *node* in this node's contents or -1 if *node* is not found. See also index."""
-        for i,n in enumerate(self.contents):
+        for i, n in enumerate(self.contents):
             if n == node:
                 return i
         return -1
@@ -166,7 +166,7 @@ class Node:
             if contentsFirst == reverse: # both True or both False
                 yield self
             for element in self.getContents() if not reverse else reversed(self.getContents()):
-                for container in element.getAllContainers(contentsFirst,reverse):
+                for container in element.getAllContainers(contentsFirst, reverse):
                     yield container
             if contentsFirst != reverse:
                 yield self
@@ -194,9 +194,9 @@ class Node:
                     return offset
                 else: offset += child.fileCount()
             raise ValueError("Node.getOffset: Node {} is not contained in its parent {}."
-                                .format(self,self.parent))
+                                .format(self, self.parent))
     
-    def fileAtOffset(self,offset,allowFileCount=False):
+    def fileAtOffset(self, offset, allowFileCount=False):
         """Return the file at the given *offset*. Note that *offset* is relative to this node, so only the
         tree below this node will be searched.
         
@@ -204,10 +204,12 @@ class Node:
         *offset* may equal self.fileCount(). In that case None is returned, as the offset points behind all
         files (that position is usually only interesting for insert operations).
         """
+        if not isinstance(offset, int):
+            raise TypeError("Offset must be an integer; I got: {}".format(offset))
         if offset == 0 and self.isFile():
             return self
         else: 
-            child,innerOffset = self.childAtOffset(offset)
+            child, innerOffset = self.childAtOffset(offset)
             if child is None: # offset == self.fileCount()
                 if allowFileCount:
                     return None
@@ -216,43 +218,43 @@ class Node:
                 return child
             else: return child.fileAtOffset(innerOffset)
         
-    def childIndexAtOffset(self,offset):
+    def childIndexAtOffset(self, offset):
         """Return a tuple: the index of the child C that contains the file F with the given offset (relative
         to this element) and the offset of F relative to C ("inner offset").
         For example: If this element is the rootnode of a playlist tree containing an album with 13 songs and
-        a second one with 12 songs, then getChildIndexAtOffset(17) will return (1,3), since the 18th file in
+        a second one with 12 songs, then getChildIndexAtOffset(17) will return (1, 3), since the 18th file in
         the playlist (i.e. with offset 17), is contained in the second child (i.e with index 1) and it is the
         4th song in that child (i.e. it has offset 3 relative to the album).
         
         If *offset* points to the last position inside this node (in other words offset == self.fileCount()),
-        then (None,None) is returned.
+        then (None, None) is returned.
         """
         if offset < 0:
             raise IndexError("Offset {} is out of bounds".format(offset))
         cOffset = 0
-        for i in range(0,self.getContentsCount()):
+        for i in range(0, self.getContentsCount()):
             fileCount = self.contents[i].fileCount()
             if offset < cOffset + fileCount: # offset points to a file somewhere in self.contents[i]
-                return i,offset-cOffset 
+                return i, offset-cOffset 
             else: cOffset += fileCount
         if offset == cOffset: # offset points to the end of the list of files below self
-            return None,None
+            return None, None
         raise IndexError("Offset {} is out of bounds".format(offset))
     
-    def childAtOffset(self,offset):
+    def childAtOffset(self, offset):
         """Return the child containing the file with the given (relative) offset, and the offset of that file
         relative to the child. This is a convenience-method for
         getContents()[getChildIndexAtOffset(offset)[0]]. Confer getChildIndexAtOffset.
         
         If *offset* points to the last position inside this node (in other words offset == self.fileCount()),
-        then (None,None) is returned.
+        then (None, None) is returned.
         """
-        index,innerOffset = self.childIndexAtOffset(offset)
+        index, innerOffset = self.childIndexAtOffset(offset)
         if index is None:
-            return None,None
-        else: return self.getContents()[index],innerOffset
+            return None, None
+        else: return self.getContents()[index], innerOffset
     
-    def firstLeaf(self,allowSelf=False):
+    def firstLeaf(self, allowSelf=False):
         """Return the first leaf below this node (i.e. the node without children with the lowest offset). If
         this node does not have children, return None or, if *allowSelf* is True, return the node itself.
         """
@@ -260,7 +262,7 @@ class Node:
             return self.getContents()[0].firstLeaf(allowSelf=True)
         else: return self if allowSelf else None
         
-    def lastLeaf(self,allowSelf=False):
+    def lastLeaf(self, allowSelf=False):
         """Return the last leaf below this node (i.e. the node without children with the highest offset). If
         this node does not have children, return None or, if *allowSelf* is True, return the node itself.
         """
@@ -286,7 +288,7 @@ class Node:
         else:
             return self.parent.nextLeaf()
                     
-    def wrapperString(self,includeSelf=False,strFunc=None):
+    def wrapperString(self, includeSelf=False, strFunc=None):
         """Return a string that stores the tree structure below this node. If this string is submitted to
         Level.createWrappers the same tree will be created again. There are some limitations though:
         
@@ -299,12 +301,12 @@ class Node:
         contain the characters ',[]'.
         """
         if includeSelf:
-            if strFunc is None and not isinstance(self,Wrapper):
+            if strFunc is None and not isinstance(self, Wrapper):
                 raise ValueError('wrapperString: Tree must contain only Wrappers if *strFunc* is None')
             selfString = str(self.element.id) if strFunc is None else strFunc(self)
             
         if self.hasContents():
-            childrenString = ','.join(c.wrapperString(includeSelf=True,strFunc=strFunc)
+            childrenString = ','.join(c.wrapperString(includeSelf=True, strFunc=strFunc)
                                       for c in self.getContents())
             if includeSelf:
                 return selfString+'['+childrenString+']'
@@ -351,7 +353,7 @@ class Wrapper(Node):
         *parent*: the parent (usually another wrapper or a rootnode)
         
     """
-    def __init__(self,element,*,contents=None,position=None,parent=None):
+    def __init__(self, element, *, contents=None, position=None, parent=None):
         self.element = element
         self.position = position
         self.parent = parent
@@ -364,7 +366,7 @@ class Wrapper(Node):
                 raise ValueError("contents must be None for a File-wrapper")
             self.contents = None
         
-    def copy(self,contents=None,level=None):
+    def copy(self, contents=None, level=None):
         """Return a copy of this wrapper. Because a flat copy of the contents is not possible (parent
         pointers would be wrong) all contents are copied recursively. Instead of this you can optionally
         specify a list of contents that will be put into the copy regardless of the original's contents.
@@ -400,18 +402,18 @@ class Wrapper(Node):
         load the contents of all children in the same way."""
         if self.element.isContainer():
             self.setContents([Wrapper(self.element.level.collect(id), position = pos)
-                                    for pos,id in self.element.contents.items()])
+                                    for pos, id in self.element.contents.items()])
             if recursive:
                 for child in self.contents:
                     child.loadContents(recursive)
     
-    def getTitle(self,prependPosition=False,usePath=True):
+    def getTitle(self, prependPosition=False, usePath=True):
         """Return the title of the wrapped element. If *prependPosition* is True and this wrapper has a
         position, prepend it to the title. See also Element.getTitle.
         """
         title = self.element.getTitle(usePath)
         if prependPosition and self.position is not None:
-            return "{} - {}".format(self.position,title)
+            return "{} - {}".format(self.position, title)
         else: return title
         
     def getLength(self):

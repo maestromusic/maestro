@@ -40,11 +40,11 @@ def init():
     global _flagsById, _flagsByName
     _flagsById = {}
     _flagsByName = {}
-    for row in db.query("SELECT id,name,icon FROM {}flag_names".format(db.prefix)):
-        id,name,iconPath = row
+    for row in db.query("SELECT id, name, icon FROM {}flag_names".format(db.prefix)):
+        id, name, iconPath = row
         if db.isNull(iconPath):
             iconPath = None
-        flagType = Flag(id,name,iconPath)
+        flagType = Flag(id, name, iconPath)
         _flagsById[flagType.id] = flagType
         _flagsByName[flagType.name] = flagType
 
@@ -62,7 +62,7 @@ class Flag:
     your own instances. If you use the common instance, it will get automatically updated on
     FlagTypeChangeEvents.
     """
-    def __init__(self,id=None,name=None,iconPath=None):
+    def __init__(self, id=None, name=None, iconPath=None):
         self.id = id
         self.name = name
         self.iconPath = iconPath
@@ -72,7 +72,7 @@ class Flag:
         return self._iconPath
 
     @iconPath.setter
-    def iconPath(self,iconPath):
+    def iconPath(self, iconPath):
         """Set the flag's iconPath and load the icon."""
         self._iconPath = iconPath
         if iconPath is not None:
@@ -82,11 +82,11 @@ class Flag:
     def __str__(self):
         return self.name
     
-    def __eq__(self,other):
-        return isinstance(other,Flag) and self.id == other.id
+    def __eq__(self, other):
+        return isinstance(other, Flag) and self.id == other.id
     
-    def __ne__(self,other):
-        return not isinstance(other,Flag) or self.id != other.id
+    def __ne__(self, other):
+        return not isinstance(other, Flag) or self.id != other.id
     
     def __hash__(self):
         return self.id
@@ -143,28 +143,28 @@ def _addFlagType(**data):
     """
     if 'flagType' in data:
         flagType = data['flagType']
-        data = (flagType.id,flagType.name,flagType.iconPath)
+        data = (flagType.id, flagType.name, flagType.iconPath)
         db.query(
-            "INSERT INTO {}flag_names (id,name,icon) VALUES (?,?,?)"
-              .format(db.prefix),*data)
+            "INSERT INTO {}flag_names (id, name, icon) VALUES (?,?,?)"
+              .format(db.prefix), *data)
     else:
         # The difference to the if-part is that we have to get the id from the database
         flagType = Flag(**data)
-        data = (flagType.name,flagType.iconPath)
+        data = (flagType.name, flagType.iconPath)
         flagType.id = db.query(
-            "INSERT INTO {}flag_names (name,icon) VALUES (?,?)"
-              .format(db.prefix),*data).insertId()
+            "INSERT INTO {}flag_names (name, icon) VALUES (?,?)"
+              .format(db.prefix), *data).insertId()
     logger.info("Added new flag '{}'".format(flagType.name))
     
     _flagsById[flagType.id] = flagType
     _flagsByName[flagType.name] = flagType
-    application.dispatcher.emit(FlagTypeChangedEvent(ADDED,flagType))
+    application.dispatcher.emit(FlagTypeChangedEvent(ADDED, flagType))
     return flagType
 
 
 def deleteFlagType(flagType):
     """Delete a flagtype from the database."""
-    application.stack.push(FlagTypeUndoCommand(DELETE,flagType))
+    application.stack.push(FlagTypeUndoCommand(DELETE, flagType))
     
     
 def _deleteFlagType(flagType):
@@ -173,23 +173,23 @@ def _deleteFlagType(flagType):
         raise ValueError("Cannot remove flagtype '{}' because it does not exist.".format(flagType))
     
     logger.info("Removing flag '{}'.".format(flagType))
-    db.query("DELETE FROM {}flag_names WHERE id = ?".format(db.prefix),flagType.id)
+    db.query("DELETE FROM {}flag_names WHERE id = ?".format(db.prefix), flagType.id)
     del _flagsById[flagType.id]
     del _flagsByName[flagType.name]
-    application.dispatcher.emit(FlagTypeChangedEvent(DELETED,flagType))
+    application.dispatcher.emit(FlagTypeChangedEvent(DELETED, flagType))
 
 
-def changeFlagType(flagType,**data):
+def changeFlagType(flagType, **data):
     """Change a flagtype. The attributes that should be changed must be specified by keyword arguments.
     Supported are 'name' and 'iconPath':
 
-        changeFlagType(flagType,name='Great',iconPath=None)
+        changeFlagType(flagType, name='Great', iconPath=None)
     
     """
-    application.stack.push(FlagTypeUndoCommand(CHANGE,flagType,**data))
+    application.stack.push(FlagTypeUndoCommand(CHANGE, flagType, **data))
     
     
-def _changeFlagType(flagType,**data):
+def _changeFlagType(flagType, **data):
     """Like changeFlagType but not undoable."""
     # Below we will build a query like UPDATE flag_names SET ... using the list of assignments (e.g. (name=?).
     # The parameters will be sent with the query to replace the questionmarks.
@@ -201,7 +201,7 @@ def _changeFlagType(flagType,**data):
         if name != flagType.name:
             if exists(name):
                 raise ValueError("There is already a flag named '{}'.".format(name))
-            logger.info("Changing flag name '{}' to '{}'.".format(flagType.name,name))
+            logger.info("Changing flag name '{}' to '{}'.".format(flagType.name, name))
             assignments.append('name = ?')
             params.append(name)
             del _flagsByName[flagType.name]
@@ -215,8 +215,8 @@ def _changeFlagType(flagType,**data):
     
     if len(assignments) > 0:
         params.append(flagType.id) # for the where clause
-        db.query("UPDATE {}flag_names SET {} WHERE id = ?".format(db.prefix,','.join(assignments)),*params)
-        application.dispatcher.emit(FlagTypeChangedEvent(CHANGED,flagType))
+        db.query("UPDATE {}flag_names SET {} WHERE id = ?".format(db.prefix, ','.join(assignments)), *params)
+        application.dispatcher.emit(FlagTypeChangedEvent(CHANGED, flagType))
 
 
 class FlagTypeUndoCommand:
@@ -224,10 +224,10 @@ class FlagTypeUndoCommand:
     first argument *action*. Use the methods addFlagType, deleteFlagType and changeFlagType instead of
     creating a command directly.
     """
-    def __init__(self,action,flagType=None,**data):
-        self.text = {ADD:   translate("FlagTypeUndoCommand","Add flagType"),
-                     DELETE: translate("FlagTypeUndoCommand","Delete flagType"),
-                     CHANGE: translate("FlagTypeUndoCommand","Change flagType")
+    def __init__(self, action, flagType=None, **data):
+        self.text = {ADD:   translate("FlagTypeUndoCommand", "Add flagType"),
+                     DELETE: translate("FlagTypeUndoCommand", "Delete flagType"),
+                     CHANGE: translate("FlagTypeUndoCommand", "Change flagType")
                     }[action]
         self.action = action
         if self.action == ADD:
@@ -237,7 +237,7 @@ class FlagTypeUndoCommand:
             self.flagType = flagType
         else:
             self.flagType = flagType
-            self.oldData = {'name': flagType.name,'iconPath': flagType.iconPath}
+            self.oldData = {'name': flagType.name, 'iconPath': flagType.iconPath}
             self.newData = data
         
     def redo(self):
@@ -251,7 +251,7 @@ class FlagTypeUndoCommand:
                 _addFlagType(flagType=self.flagType)
         elif self.action == DELETE:
             _deleteFlagType(self.flagType)
-        else: _changeFlagType(self.flagType,**self.newData)
+        else: _changeFlagType(self.flagType, **self.newData)
 
     def undo(self):
         if self.action == ADD:
@@ -260,12 +260,12 @@ class FlagTypeUndoCommand:
             # Ensure that the same object is recreated, because it might be used in many elements
             # within the undohistory.
             _addFlagType(flagType=self.flagType)
-        else: _changeFlagType(self.flagType,**self.oldData)
+        else: _changeFlagType(self.flagType, **self.oldData)
 
 
 class FlagTypeChangedEvent(ChangeEvent):
     """FlagTypeChangedEvent are used when a flagtype is added, changed or deleted."""
-    def __init__(self,action,flagType):
+    def __init__(self, action, flagType):
         assert action in constants.CHANGE_TYPES
         self.action = action
         self.flagType = flagType
@@ -312,7 +312,7 @@ class FlagDifference:
 class FlagListDifference(FlagDifference):
     """Subclass of FlagDifference that simply takes two lists of flags (old and new) and figures out
     additions/removals by itself."""
-    def __init__(self,oldFlags,newFlags):
+    def __init__(self, oldFlags, newFlags):
         self.oldFlags = oldFlags
         self.newFlags = newFlags
                 

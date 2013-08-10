@@ -37,7 +37,7 @@ editor = None
 
 def init():
     """Initialize the level module. Creates the real and editor levels."""
-    global real,editor
+    global real, editor
     from . import reallevel
     real = reallevel.RealLevel()
     editor = Level('EDITOR', real)
@@ -521,7 +521,7 @@ class Level(application.ChangeEventDispatcher):
                                                 "changes" : changes},
                                       undoMethod=self._changePositions,
                                       undoArgs={"parent" : parent,
-                                                "changes" : {b:a for a,b in changes.items()}
+                                                "changes" : {b: a for a, b in changes.items()}
                                                 },
                                       text=self.tr("change positions"))
         self.stack.push(command)
@@ -678,9 +678,9 @@ class Level(application.ChangeEventDispatcher):
         """For each (element, stickerList) tuple in *elementToStickers* change the stickers of the given type
         of the element to stickerList. Do not change stickers of other types.
         """
-        for element,stickers in elementToStickers.items():
+        for element, stickers in elementToStickers.items():
             if stickers is not None:
-                if isinstance(stickers,tuple):
+                if isinstance(stickers, tuple):
                     element.stickers[type] = stickers
                 else: element.stickers[type] = tuple(stickers)
             elif type in element.stickers:
@@ -788,7 +788,7 @@ class Level(application.ChangeEventDispatcher):
             last = 0
             i = 0
             while i < len(s):
-                if s[i] in (',','[',']'):
+                if s[i] in (',', '[', ']'):
                     if last != i:
                         yield s[last:i]
                     last = i+1
@@ -821,7 +821,7 @@ class Level(application.ChangeEventDispatcher):
                         if currentWrapper is not None:
                             wrapper.parent = currentWrapper
                     else:
-                        wrapper = createFunc(currentWrapper,token) # may raise ValueError
+                        wrapper = createFunc(currentWrapper, token) # may raise ValueError
                 
                     if currentWrapper is not None and wrapper.element.id not in currentWrapper.element.contents:
                         raise ValueError("Invalid wrapper string: {} is not contained in {}."
