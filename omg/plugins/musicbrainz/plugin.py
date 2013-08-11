@@ -20,11 +20,11 @@ from PyQt4 import QtCore, QtGui
 
 from omg import database as db
 from omg import config
+from omg.core import tags
 translate = QtCore.QCoreApplication.translate
 
 def defaultStorage():
-    return {"SECTION:musicbrainz": {'profiles': [],
-                                'current_profile': None
+    return {"SECTION:musicbrainz": {'tagmap': {},
                                 }
             }
 
@@ -32,6 +32,8 @@ def defaultConfig():
     return {"musicbrainz": {
             "queryCacheDays": (int, 7, "Number of days after which cached web service calls expire.")
         }}
+
+tagMap = {}
 
 def enable():
     #profileType = profiles.ProfileType('musicbrainz',
@@ -48,12 +50,28 @@ def enable():
     db.query("CREATE TABLE IF NOT EXISTS {}musicbrainzaliases ("
              "entity VARCHAR(16), "
              "mbid VARCHAR(128), "
-             "alias VARCHAR(256))".format(db.prefix))
+             "alias VARCHAR(256), "
+             "sortname VARCHAR(256))".format(db.prefix))
+
+    global tagMap
+    confMap = config.storage.musicbrainz.tagmap
+    for mbtag, omgname in confMap.items():
+        omgtag = tags.get(omgname)
+        if omgtag.isInDb():
+            tagMap[mbtag] = omgtag
     
 def disable():
-    pass
+    global tagMap
+    tagMap = {}
     #albumguesser.profileCategory.removeType('musicbrainz')
 
+def aliasFromDB(entity, mbid):
+    try:
+        return db.query("SELECT alias, sortname FROM {}musicbrainzaliases "
+                        "WHERE entity=? AND mbid=?".format(db.prefix),
+                        entity, mbid).getSingleRow()
+    except db.sql.EmptyResultException:
+        return None
 # class MusicBrainzGuesser(profiles.Profile):
 #     
 #     def __init__(self, name, type, state):

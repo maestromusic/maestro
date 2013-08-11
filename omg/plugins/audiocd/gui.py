@@ -16,8 +16,6 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from itertools import chain
-
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 from PyQt4.QtGui import QDialogButtonBox
@@ -55,9 +53,6 @@ class ImportAudioCDAction(TreeAction):
         level = levels.Level("audiocd", self.level(), stack=stack)
         dialog = ImportAudioCDDialog(level, release, theDiscid)
         if dialog.exec_():
-            for element in level.elements.values():
-                del element.mbItem
-            level.commit()
             model = self.parent().model()
             model.insertElements(model.root, len(model.root.contents), [dialog.container])
         stack.close()
@@ -280,7 +275,7 @@ class ImportAudioCDDialog(QtGui.QDialog):
         self.newTagWidget.tagConfigChanged.connect(self.updateTags)
         
         btbx = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        btbx.accepted.connect(self.accept)
+        btbx.accepted.connect(self.finalize)
         btbx.rejected.connect(self.reject)
         
         lay = QtGui.QVBoxLayout()
@@ -289,20 +284,15 @@ class ImportAudioCDDialog(QtGui.QDialog):
         lay.addWidget(self.aliasWidget, 1)
         lay.addWidget(QtGui.QLabel(self.tr("New tagtypes:")))
         lay.addWidget(self.newTagWidget, 1)
-#         from omg.plugins import plugins
-#         if "renamer" in plugins and plugins["renamer"].enabled:
-#             rlay = QtGui.QHBoxLayout()
-#             check = QtGui.QCheckBox("apply renamer profile")
-#             rlay.addWidget(check, 0)
-#             combo = QtGui.QComboBox()
-#             from omg.plugins.renamer.plugin import profileCategory
-#             for pro in profileCategory.profiles():
-#                 combo.addItem(pro.name)
-#             rlay.addWidget(combo, 1)
-#             lay.addLayout(rlay)
-#         lay.addWidget(btbx, 1)
+        lay.addWidget(btbx, 1)
         self.setLayout(lay)
         self.resize(mainwindow.mainWindow.width()*0.8, mainwindow.mainWindow.height()*0.8)
+    
+    def finalize(self):
+        for item in self.release.walk():
+            del item.element.mbItem
+        self.level.commit()
+        self.accepted.emit()
     
     def updateTags(self):
         changes = {}

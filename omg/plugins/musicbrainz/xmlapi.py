@@ -16,14 +16,18 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from lxml import etree
+from functools import reduce
 import urllib.request as req
 
-from omg import database as db
+from lxml import etree
+
+from omg import config, database as db
 from omg.core import elements, tags
 from omg.utils import FlexiDate
 from omg.filebackends import BackendURL
 from omg import logging
+
+from . import plugin as mbplugin
 
 logger = logging.getLogger("musicbrainz.xmlapi")
 
@@ -130,6 +134,11 @@ class AliasEntity:
         name = node.findtext("name") if node.tag == "artist" else node.findtext("title")
         sortName = node.findtext("sort-name")
         ent = AliasEntity(type, mbid, name, sortName)
+        # if this entity is stored in the DB table, set the previously used name and sortName
+        # as default
+        ans = mbplugin.aliasFromDB(type, mbid)
+        if ans:
+            ent.name, ent.sortName = ans
         AliasEntity._entities[mbid] = ent
         return ent
         
@@ -164,6 +173,8 @@ class AliasEntity:
     def __str__(self):
         return self.name
 
+    def __repr__(self):
+        return "AliasEntity({},{})".format(self.type, self.name)
     def __eq__(self, other):
         return self.mbid == other.mbid and self.type == other.type
     
@@ -172,6 +183,7 @@ class AliasEntity:
     
     def url(self):
         return "http://www.musicbrainz.org/{}/{}".format(self.type, self.mbid)
+    
 
 
 class MBTreeItem:
@@ -193,27 +205,44 @@ class MBTreeItem:
         child.pos = pos
         child.parent = self
     
-    def __str__(self):
-        return "{}(mbid={})".format(self.__class__.__name__, self.mbid)
-    
     def __eq__(self, other):
         return self.mbid == other.mbid
     
-    def walk(self):
-        yield self
+    def walk(self, includeSelf=True):
+        if includeSelf:
+            yield self
         for child in self.children.values():
             yield from child.walk()
-     
+    
+    def assignCommonTags(self):
+        children = self.children.values()
+        commonTags = set(reduce(lambda x,y: x & y, [set(child.tags.keys()) for child in children]))
+        commonTagValues = {}
+        differentTags=set()
+        for child in children:
+            t = child.tags
+            for tag in commonTags:
+                if tag not in commonTagValues:
+                    commonTagValues[tag] = t[tag]
+                elif commonTagValues[tag] != t[tag]:
+                    differentTags.add(tag)
+        sameTags = commonTags - differentTags
+        for tag in sameTags:
+            for val in commonTagValues[tag]:
+                if tag not in self.tags or val not in self.tags[tag]:
+                    self.tags.add(tag, val)
+
     def makeElements(self, level):
         if not isinstance(self, Recording):
             contentList = elements.ContentList()
             for pos, child in self.children.items():
                 element = child.makeElements(level)            
                 contentList.insert(pos, element.id)
-            element = level.createContainer(tags=self.tags.asOMGTags(), contents=contentList)
+            element = level.createContainer(tags=self.tags.asOMGTags(mbplugin.tagMap),
+                                            contents=contentList)
         else:
             element = level.collect(self.backendUrl)
-            diff = tags.TagStorageDifference(None, self.tags.asOMGTags())
+            diff = tags.TagStorageDifference(None, self.tags.asOMGTags(mbplugin.tagMap))
             level.changeTags({element: diff})
         element.mbItem = self
         self.element = element
@@ -236,6 +265,15 @@ class MBTreeItem:
                     etags.add(tag)
         return etags
     
+    def passTags(self, excludes):
+        for tag, vals in self.tags.items():
+            if tag in excludes:
+                continue
+            for child in self.walk(False):
+                if tag not in child.tags:
+                    child.tags[tag] = vals
+
+
 class Release(MBTreeItem):
     """A release is the top-level container structure in MusicBrainz that we care about.
     """
@@ -289,6 +327,9 @@ class Medium(MBTreeItem):
         self.children.clear()
         for pos, child in newChildren:
             self.insertChild(pos, child)
+            if isinstance(child, Work):
+                child.passTags(("title", "musicbrainz_workid"))
+                child.assignCommonTags()
     
     def __eq__(self, other):
         return self is other
@@ -424,7 +465,6 @@ class Work(MBTreeItem):
                 self.parentWork.tags["title"] = [relation.findtext('work/title')]
             else:
                 logger.debug("unknown work-work relation {} in {}".format(relation.get("type"), self.mbid))
-                
 
 
 def findReleasesForDiscid(discid):
@@ -444,7 +484,7 @@ def findReleasesForDiscid(discid):
             discids = [disc.get("id") for disc in medium.iterfind('disc-list/disc')]
             Medium(pos, mbit, discids, disctitle if disctitle else None)
         mbit.tags.add('title', title)
-        mbit.tags.add('musicbrainz_releasid', mbit.mbid)
+        mbit.tags.add('musicbrainz_albumid', mbit.mbid)
         artists = release.iterfind('artist-credit/name-credit/artist')
         if artists:
             for art in artists:
@@ -464,7 +504,6 @@ def findReleasesForDiscid(discid):
 def makeReleaseContainer(MBrelease, discid, level):
     release = query("release", MBrelease.mbid, ("recordings",)).find("release")
     
-    # find the correct medium
     pos = MBrelease.mediumForDiscid(discid)
     MBmedium = MBrelease.children[pos]
     
@@ -475,8 +514,8 @@ def makeReleaseContainer(MBrelease, discid, level):
         recording = track.find('recording')
         MBrec = Recording(recording.get("id"), int(track.findtext("position")), MBmedium, i)
         MBrec.tags.add("title", recording.findtext("title"))
-        MBrec.backendUrl = BackendURL.fromString("audiocd://{0}.{1}/ripped/{0}/{1}.flac"
-                                                 .format(discid, i))
+        MBrec.backendUrl = BackendURL.fromString("audiocd://{0}.{1}/{2}/{0}/{1}.flac"
+                                                 .format(discid, i, config.options.audiocd.rippath))
     for _, MBrec in sorted(MBmedium.children.items()):
         MBrec.lookupInfo()
     MBmedium.insertWorks()
@@ -486,7 +525,7 @@ def makeReleaseContainer(MBrelease, discid, level):
         for p, child in MBmedium.children.items():
             MBrelease.insertChild(p, child)
     for p in list(MBrelease.children.keys()):
-        if p != pos:
+        if isinstance(MBrelease.children[p], Medium) and MBrelease.children[p] != MBmedium:
             del MBrelease.children[p] 
     return MBrelease.makeElements(level)
             

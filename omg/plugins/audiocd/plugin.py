@@ -24,11 +24,12 @@ from omg.gui import editor
 
 translate = QtCore.QCoreApplication.translate
 
-drives = None
+def defaultConfig():
+    return {"audiocd": {
+            "rippath": (str, "ripped", "Default path in which ripped tracks are put.")
+        }}
 
 def enable():
-    global drives
-    drives = findDrives()
     from . import filebackend as cdfilebackend
     filebackends.urlTypes["audiocd"] = cdfilebackend.AudioCDURL
     from .gui import ImportAudioCDAction
