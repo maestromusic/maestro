@@ -170,6 +170,8 @@ class AliasEntity:
         self.loaded = True
         return self.aliases
 
+    def isDefault(self):
+        return self.name == self.aliases[0].name and self.sortName == self.aliases[0].sortName
     def __str__(self):
         return self.name
 

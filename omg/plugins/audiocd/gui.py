@@ -20,14 +20,13 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 from PyQt4.QtGui import QDialogButtonBox
 
+from omg import config
 from omg.core import levels, tags
-from omg.gui import delegates, mainwindow, treeview
-from omg.gui.treeactions import TreeAction
-from omg.gui.dialogs import warning
+from omg.gui import dialogs, delegates, mainwindow, treeactions, treeview
 from omg.models import leveltreemodel
-from omg.plugins.musicbrainz import xmlapi
+from omg.plugins.musicbrainz import plugin as mbplugin, xmlapi
 
-class ImportAudioCDAction(TreeAction):
+class ImportAudioCDAction(treeactions.TreeAction):
     
     def __init__(self, parent):
         super().__init__(parent)
@@ -39,7 +38,7 @@ class ImportAudioCDAction(TreeAction):
             try:
                 disc.read()
             except discid.disc.DiscError:
-                warning(self.tr("CDROM drive is empty"))
+                dialogs.warning(self.tr("CDROM drive is empty"))
                 return False
             theDiscid = disc.id        
         releases = xmlapi.findReleasesForDiscid(theDiscid)
@@ -117,9 +116,10 @@ class AliasComboBox(QtGui.QComboBox):
     
     def __init__(self, entity, sortNameItem):
         super().__init__()
-        self.addItem(entity.name)
+        self.addItem(entity.aliases[0].name)
         self.entity = entity
         self.setEditable(True)
+        self.setEditText(entity.name)
         self.sortNameItem = sortNameItem
         self.setItemDelegate(AliasComboDelegate(self))
         self.activated.connect(self._handleActivate)
@@ -131,7 +131,10 @@ class AliasComboBox(QtGui.QComboBox):
             for alias in self.entity.aliases[1:]:
                 self.addItem(alias.name)
                 if alias.locale:
-                    self.setItemData(self.count()-1, ("primary " if alias.primary else "") + "alias for locale {}".format(alias.locale), Qt.ToolTipRole)
+                    self.setItemData(self.count()-1,
+                                     ("primary " if alias.primary else "") + \
+                                     "alias for locale {}".format(alias.locale),
+                                     Qt.ToolTipRole)
             QtGui.qApp.processEvents()
         return super().showPopup()
     
@@ -166,12 +169,14 @@ class AliasWidget(QtGui.QTableWidget):
         self.horizontalHeader().setResizeMode(QtGui.QHeaderView.ResizeToContents)
         self.horizontalHeader().setStretchLastSection(True)
         self.setRowCount(len(self.entities))
+        self.cellChanged.connect(self._handleCellChanged)
         for row, ent in enumerate(self.entities):
             label = QtGui.QTableWidgetItem(", ".join(ent.asTag))
             label.setFlags(Qt.ItemIsEnabled)
             self.setItem(row, 0, label)
             
-            label = QtGui.QLabel('<a href="{}">{}</a>'.format(ent.url(), self.tr("view online")))
+            label = QtGui.QLabel('<a href="{}">{}</a>'.format(ent.url(), self.tr("lookup")))
+            label.setToolTip(ent.url())
             label.setOpenExternalLinks(True)
             self.setCellWidget(row, 1, label)
             
@@ -181,6 +186,13 @@ class AliasWidget(QtGui.QTableWidget):
             self.setCellWidget(row, 2, combo)
             
             self.setItem(row, 3, sortNameItem)
+    
+    def activeEntities(self):
+        entities = []
+        for row, ent in enumerate(self.entities):
+            if self.cellWidget(row, 2).isEnabled():
+                entities.append(ent)
+        return entities
 
     def updateDisabledTags(self, mapping):
         for row, ent in enumerate(self.entities):
@@ -196,6 +208,10 @@ class AliasWidget(QtGui.QTableWidget):
                     widget = self.cellWidget(row, col)
                     widget.setEnabled(state)
 
+    def _handleCellChanged(self, row, col):
+        if col != 3:
+            return
+        self.entities[row].sortName = self.item(row, col).text()
 
 class NewTagsWidget(QtGui.QTableWidget):
     
@@ -270,6 +286,7 @@ class ImportAudioCDDialog(QtGui.QDialog):
         self.aliasWidget = AliasWidget(container.mbItem.collectAliasEntities())
         self.aliasWidget.aliasChanged.connect(self.updateTags)
         
+        
         self.newTagWidget = NewTagsWidget(container.mbItem.collectExternalTags())
         self.newTagWidget.tagConfigChanged.connect(self.aliasWidget.updateDisabledTags)
         self.newTagWidget.tagConfigChanged.connect(self.updateTags)
@@ -289,10 +306,13 @@ class ImportAudioCDDialog(QtGui.QDialog):
         self.resize(mainwindow.mainWindow.width()*0.8, mainwindow.mainWindow.height()*0.8)
     
     def finalize(self):
+        mbplugin.updateDBAliases(self.aliasWidget.activeEntities())
+        for mbname, omgtag in self.newTagWidget.tagMapping.items():
+            config.storage.musicbrainz.tagmap[mbname] = omgtag.name if omgtag else None
         for item in self.release.walk():
             del item.element.mbItem
         self.level.commit()
-        self.accepted.emit()
+        self.accept()
     
     def updateTags(self):
         changes = {}

@@ -56,9 +56,12 @@ def enable():
     global tagMap
     confMap = config.storage.musicbrainz.tagmap
     for mbtag, omgname in confMap.items():
-        omgtag = tags.get(omgname)
-        if omgtag.isInDb():
-            tagMap[mbtag] = omgtag
+        if omgname:
+            omgtag = tags.get(omgname)
+            if omgtag.isInDb():
+                tagMap[mbtag] = omgtag
+        else:
+            tagMap[mbtag] = None
     
 def disable():
     global tagMap
@@ -72,6 +75,16 @@ def aliasFromDB(entity, mbid):
                         entity, mbid).getSingleRow()
     except db.sql.EmptyResultException:
         return None
+    
+def updateDBAliases(entities):
+    for ent in entities:
+        db.query("DELETE FROM {}musicbrainzaliases WHERE entity=? AND mbid=?"
+                 .format(db.prefix), ent.type, ent.mbid)
+        if not ent.isDefault():
+            db.query("INSERT INTO {}musicbrainzaliases (entity, mbid, alias, sortname) "
+                     "VALUES (?,?,?,?)".format(db.prefix),
+                     ent.type, ent.mbid, ent.name, ent.sortName)
+            
 # class MusicBrainzGuesser(profiles.Profile):
 #     
 #     def __init__(self, name, type, state):

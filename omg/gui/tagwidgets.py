@@ -263,7 +263,7 @@ class TagTypeBox(QtGui.QStackedWidget):
             if text[0] == text[-1] and text[0] in ['"',"'"]: # Don't translate if the text is quoted
                 return tags.get(text[1:-1])
             else: return tags.fromTitle(text)
-        except tags.TagValueError: # invalid tagname
+        except (tags.TagValueError, IndexError): # invalid tagname
             return None
         
     def focusInEvent(self,focusEvent):
@@ -285,11 +285,11 @@ class TagTypeBox(QtGui.QStackedWidget):
             self.showLabel()
         else:
             # invalid tagname
-            self.box.setEditText(self._tag.title) # Reset
             self._dialogOpen = True
             QtGui.QMessageBox.warning(self,self.tr("Invalid tagname"),
-                                      self.tr("'{}' is not a valid tagname").format(text))
+                                      self.tr("'{}' is not a valid tagname").format(self.box.currentText()))
             self._dialogOpen = False
+            self.box.setEditText(self._tag.title) # Reset
     
     def keyPressEvent(self,keyEvent):
         if keyEvent.key() == Qt.Key_Escape:
