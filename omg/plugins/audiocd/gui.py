@@ -40,17 +40,38 @@ class ImportAudioCDAction(treeactions.TreeAction):
             except discid.disc.DiscError:
                 dialogs.warning(self.tr("CDROM drive is empty"))
                 return False
-            theDiscid = disc.id        
-        releases = xmlapi.findReleasesForDiscid(theDiscid)
+            theDiscid = disc.id
+        try:
+            releases = xmlapi.findReleasesForDiscid(theDiscid)
+        except xmlapi.UnknownDiscException:
+            dialogs.warning(self.tr("Disc not found"),
+                            self.tr("The MusicBrainz database does not contain an "
+                                    "entry for this disc."))
+            return 
         if len(releases) > 1:
             dialog = ReleaseSelectionDialog(releases, theDiscid)
             if dialog.exec_():
                 release = dialog.selectedRelease
             else:
                 return
+        from . import ripper
+        from .plugin import fileReplacer
+        rip = ripper.RipThread(discid.get_default_device(), theDiscid)
+        rip.trackFinished.connect(fileReplacer.replaceFile)
+        rip.start()
+        progress = dialogs.WaitingDialog("Querying MusicBrainz", "please wait", False)
+        progress.open()        
         stack = self.level().stack.createSubstack(modalDialog=True)
         level = levels.Level("audiocd", self.level(), stack=stack)
-        dialog = ImportAudioCDDialog(level, release, theDiscid)
+        def callback(url):
+            progress.setText(self.tr("Fetching data from:\n{}").format(url))
+            QtGui.qApp.processEvents()
+        xmlapi.queryCallback = callback 
+        container = xmlapi.makeReleaseContainer(release, theDiscid, level)
+        progress.close()
+        xmlapi.queryCallback = None
+        QtGui.qApp.processEvents()
+        dialog = ImportAudioCDDialog(level, release, container)
         if dialog.exec_():
             model = self.parent().model()
             model.insertElements(model.root, len(model.root.contents), [dialog.container])
@@ -267,12 +288,12 @@ class NewTagsWidget(QtGui.QTableWidget):
 
 class ImportAudioCDDialog(QtGui.QDialog):
     
-    def __init__(self, level, release, discid):
+    def __init__(self, level, release, container):
         super().__init__(mainwindow.mainWindow)
         self.setModal(True)
         self.level = level
         level.stack.beginMacro(self.tr("Create Elements from Audio CD"))
-        container = xmlapi.makeReleaseContainer(release, discid, level)
+        
         self.container = container
         self.release = release
         self.model = leveltreemodel.LevelTreeModel(level, [container])

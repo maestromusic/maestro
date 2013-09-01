@@ -27,7 +27,8 @@ class AudioCDURL(filebackends.BackendURL):
     
     def __init__(self, urlString):
         super().__init__(urlString)
-        self.discid, self.tracknr = self.parsedUrl.netloc.split(".")
+        self.discid, tracknr = self.parsedUrl.netloc.split(".")
+        self.tracknr = int(tracknr)
         self.targetPath = self.parsedUrl.path[1:]
     
     @property

@@ -17,7 +17,8 @@
 #
 
 from functools import reduce
-import urllib.request as req
+import urllib.request
+import urllib.error
 
 from lxml import etree
 
@@ -33,21 +34,23 @@ logger = logging.getLogger("musicbrainz.xmlapi")
 
 wsURL = "http://musicbrainz.org/ws/2"
 
+queryCallback = None
 
 def query(resource, mbid, includes=[]):
     """Queries MusicBrainz' web service for *resource* with *mbid* and the given list of includes.
     
     Returns an LXML ElementTree root node. All namespaces are removed from the result.
     """
-    
     url = "{}/{}/{}".format(wsURL, resource, mbid)
+    if queryCallback:
+        queryCallback(url)
     if len(includes) > 0:
         url += "?inc={}".format("+".join(includes))
     ans = db.query("SELECT xml FROM {}musicbrainzqueries WHERE url=?".format(db.prefix), url)
     if len(ans):
         data = ans.getSingle()
     else:
-        with req.urlopen(url) as response:
+        with urllib.request.urlopen(url) as response:
             data = response.readall()
         db.query("INSERT INTO {}musicbrainzqueries (url, xml) VALUES (?,?)"
                  .format(db.prefix), url, data)
@@ -381,7 +384,10 @@ class Recording(MBTreeItem):
                           "chorus master" : "chorusmaster",
                           "performer" : "performer",
                           "engineer" : "engineer",
-                          "producer" : "producer"}
+                          "producer" : "producer",
+                          "editor" : "editor",
+                          "mix" : "mixer",
+                          "mastering" : "mastering"}
             
             if reltype == "instrument":
                 instrument = relation.findtext("attribute-list/attribute")
@@ -469,13 +475,23 @@ class Work(MBTreeItem):
                 logger.debug("unknown work-work relation {} in {}".format(relation.get("type"), self.mbid))
 
 
+class UnknownDiscException(Exception):
+    pass
+
 def findReleasesForDiscid(discid):
     """Finds releases containing specified disc using MusicBrainz.
     
     Returns a list of Release objects, containing Medium objects but no
     recordings.
     """
-    root = query("discid", discid, ("artists",))
+    try:
+        root = query("discid", discid, ("artists",))
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            raise UnknownDiscException()
+        else:
+            raise e
+        
     releases = []
     for release in root.iter("release"):
         mbit = Release(release.get("id"))
@@ -512,12 +528,13 @@ def makeReleaseContainer(MBrelease, discid, level):
     for medium in release.iterfind('medium-list/medium'):
         if int(medium.findtext('position')) == pos:
             break
-    for i, track in enumerate(medium.iterfind('track-list/track')):
+    for track in medium.iterfind('track-list/track'):
         recording = track.find('recording')
-        MBrec = Recording(recording.get("id"), int(track.findtext("position")), MBmedium, i)
+        tracknr = int(track.findtext('number'))
+        MBrec = Recording(recording.get("id"), int(track.findtext("position")), MBmedium, tracknr)
         MBrec.tags.add("title", recording.findtext("title"))
         MBrec.backendUrl = BackendURL.fromString("audiocd://{0}.{1}/{2}/{0}/{1}.flac"
-                                                 .format(discid, i, config.options.audiocd.rippath))
+                                                 .format(discid, tracknr, config.options.audiocd.rippath))
     for _, MBrec in sorted(MBmedium.children.items()):
         MBrec.lookupInfo()
     MBmedium.insertWorks()
