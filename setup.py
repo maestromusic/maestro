@@ -24,10 +24,6 @@ if sys.version_info.major <= 2:
           "Please re-run setup.py with a Python3 interpreter.")
     sys.exit(1)
 
-import distribute_setup
-
-distribute_setup.use_setuptools()
-
 import glob, os.path, subprocess
 from os.path import dirname, exists, join, getmtime
 
