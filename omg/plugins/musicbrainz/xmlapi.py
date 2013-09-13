@@ -217,7 +217,9 @@ class MBTreeItem:
         if includeSelf:
             yield self
         for child in self.children.values():
-            yield from child.walk()
+            for subchild in child.walk():
+                yield subchild
+            #yield from child.walk() py3.3 version
     
     def assignCommonTags(self):
         children = self.children.values()
