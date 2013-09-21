@@ -195,6 +195,7 @@ class PlaybackWidget(dockwidget.DockWidget):
         if backend is None:
             self.titleLabel.setText(self.tr("No backend selected"))
             self.backend = None
+            self.setWindowTitle(self.tr("Playback"))
             return
         self.backend = backend
         self.seekSlider.backend = backend
@@ -205,6 +206,7 @@ class PlaybackWidget(dockwidget.DockWidget):
             self.handleConnectionChange(player.CONNECTED)
         else:
             self.handleConnectionChange(player.DISCONNECTED)
+        self.setWindowTitle("Playback [{}]".format(backend.name))
         self.handlePlaylistChange()
         self.handleFlagsChange()
         

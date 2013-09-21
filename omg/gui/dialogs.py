@@ -19,7 +19,7 @@
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
-from .. import database as db, utils
+from .. import database as db
 from ..core import elements, levels, nodes, tags
 from . import tagwidgets
 
@@ -43,7 +43,26 @@ def warning(title,text,parent=None):
         from . import mainwindow
         parent = mainwindow.mainWindow
     QtGui.QMessageBox.warning(parent, title, text)
+
+
+class WaitingDialog(QtGui.QDialog):
     
+    def __init__(self, title, text, cancelButton=True):
+        from . import mainwindow
+        super().__init__(mainwindow.mainWindow)
+        self.setModal(True)
+        self.setWindowTitle(title)
+        layout = QtGui.QVBoxLayout()
+        self.label = QtGui.QLabel(text)
+        layout.addWidget(self.label)
+        if cancelButton:
+            btnBox = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Cancel)
+            btnBox.rejected.connect(self.reject)
+            layout.addWidget(btnBox)
+        self.setLayout(layout)
+    
+    def setText(self, text):
+        self.label.setText(text)
     
 class FancyPopup(QtGui.QFrame):
     """Fancy popup that looks like a tooltip. It is shown beneath its parent component (usually the button

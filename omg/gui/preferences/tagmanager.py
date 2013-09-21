@@ -159,6 +159,7 @@ class TagManagerTableWidget(QtGui.QTableWidget):
             
             column = self._getColumnIndex("name")
             item = QtGui.QTableWidgetItem(tag.name)
+            item.setData(Qt.ToolTipRole, tag.name)
             if elementCount == 0:
                 item.setFlags(stdFlags | Qt.ItemIsEditable)
             else: item.setFlags(stdFlags)

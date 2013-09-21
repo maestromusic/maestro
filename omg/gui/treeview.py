@@ -141,7 +141,7 @@ class TreeView(QtGui.QTreeView):
     
     actionConfig = TreeActionConfiguration()
     
-    def __init__(self,level,parent=None,affectGlobalSelection=True):
+    def __init__(self,level, parent=None, affectGlobalSelection=True):
         super().__init__(parent)
         self.level = level
         self.affectGlobalSelection = affectGlobalSelection
@@ -205,6 +205,9 @@ class TreeView(QtGui.QTreeView):
                     action.initialize(self.selection)
         
     def contextMenuEvent(self, event):
+        if len(self.treeActions) == 0:
+            event.ignore()
+            return
         menu = self.actionConfig.createMenu(self, self.treeActions)
         for action in self.localActions:
             menu.addAction(action)

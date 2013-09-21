@@ -96,7 +96,6 @@ class AbstractDelegate(QtGui.QStyledItemDelegate):
         self.font = QtGui.QFont()
         assert profile is not None
         self.profile = profile
-        from . import profiles
         profiles.category.profileRemoved.connect(self._handleProfileRemoved)
         profiles.category.profileChanged.connect(self._handleProfileChanged)
     

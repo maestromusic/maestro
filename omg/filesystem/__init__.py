@@ -467,9 +467,12 @@ class FileSystemSynchronizer(QtCore.QObject):
             if idProvider is None:
                 return
             if newHash != track.hash:
-                logger.debug("  ...just updating hash in newfiles")
-                db.query("UPDATE {}newfiles SET hash=?, verified=CURRENT_TIMESTAMP WHERE url=?"
-                         .format(db.prefix), track.hash, str(track.url))
+                logger.debug("... and updating hash in newfiles")
+                track.hash = newHash
+            else:
+                logger.debug("... and updating timestamp")
+            db.query("UPDATE {}newfiles SET hash=?, verified=CURRENT_TIMESTAMP WHERE url=?"
+                     .format(db.prefix), track.hash, str(track.url))
         else:
             if track.id in levels.real:
                 dbTags = levels.real.get(track.id).tags

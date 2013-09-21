@@ -303,7 +303,7 @@ class RealLevel(levels.Level):
         
         data = [(element.id,
                  element.isFile(),
-                 element.type,
+                 element.type if element.isContainer() else 0,
                  len(element.contents) if element.isContainer() else 0)
                         for element in elements]
         db.multiQuery("INSERT INTO {}elements (id, file, type, elements)\

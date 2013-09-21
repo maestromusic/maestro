@@ -92,10 +92,14 @@ class AcoustIDIdentifier:
         then creates the MD5 hash of that data.
         """
         logger.warning("Using fallback FFMPEG method")
-        proc = subprocess.Popen(['ffmpeg', '-i', url.absPath, '-v', 'quiet',
-                                 '-f', 's16le', '-t', '15', '-'],
-                                stdout=subprocess.PIPE,
-                                stderr=self.null)
+        try:
+            proc = subprocess.Popen(['ffmpeg', '-i', url.absPath, '-v', 'quiet',
+                                     '-f', 's16le', '-t', '15', '-'],
+                                    stdout=subprocess.PIPE,
+                                    stderr=self.null)
+        except OSError:
+            logger.warning('ffmpeg not installed - could not compute fallback audio hash.')
+            return None
         data = proc.stdout.read()
         proc.wait()
         hash = hashlib.md5(data).hexdigest()

@@ -44,7 +44,6 @@ class StandardDelegate(AbstractDelegate):
         
         wrapper = node
         element = wrapper.element
-        level = element.level
        
         # These can only be computed when we know whether fitting the fitInTitleRowData did work
         leftTexts,rightTexts = None,None

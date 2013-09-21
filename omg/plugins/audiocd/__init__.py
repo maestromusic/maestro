@@ -1,0 +1,5 @@
+NAME="AudioCD"
+AUTHOR="Michael Helmling"
+VERSION="0.0.1"
+DESCRIPTION=""
+MINOMGVERSION="0.3.0"

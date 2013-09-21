@@ -148,7 +148,7 @@ class FlexiDate:
     give a nonzero *day* if *month* is zero or ``None``. This method raises a :exc:`ValueError` if 
     conversion to :func:`int` fails or if the date is invalid (confer :class:`datetime.date`).
     """
-    def __init__(self, year, month = None, day = None):
+    def __init__(self, year, month=None, day=None):
         self.year = int(year)
         
         if month == 0 or month is None: # cannot pass None to int(), so we have to check for it here
