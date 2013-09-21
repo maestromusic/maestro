@@ -558,7 +558,7 @@ class MainWindow(QtGui.QMainWindow):
         for i, browserDock in enumerate(browserDocks):
             if browserDock.searchBox.hasFocus():
                 nextIndex = (i+1) % len(browserDocks)
-                browserDocks[nextIndex].widget().searchBox.setFocus(Qt.OtherFocusReason)
+                browserDocks[nextIndex].searchBox.setFocus(Qt.OtherFocusReason)
                 return
         browserDocks[0].searchBox.setFocus(Qt.ShortcutFocusReason)
     
