@@ -34,11 +34,18 @@ class ImportAudioCDAction(treeactions.TreeAction):
         
     def doAction(self):
         import discid
-        with discid.read() as disc:
+        device, ok = QtGui.QInputDialog.getText(mainwindow.mainWindow,
+                                            "Select device",
+                                            "CDROM device:",
+                                            QtGui.QLineEdit.Normal,
+                                            discid.get_default_device())
+        if not ok:
+            return
+        with discid.read(device) as disc:
             try:
-                disc.read()
-            except discid.disc.DiscError:
-                dialogs.warning(self.tr("CDROM drive is empty"))
+                disc.read(device)
+            except discid.disc.DiscError as e:
+                dialogs.warning(self.tr("CDROM drive is empty"), str(e))
                 return False
             theDiscid = disc.id
         try:
@@ -54,6 +61,8 @@ class ImportAudioCDAction(treeactions.TreeAction):
                 release = dialog.selectedRelease
             else:
                 return
+        else:
+            release = releases[0]
         from . import ripper
         from .plugin import fileReplacer
         rip = ripper.RipThread(discid.get_default_device(), theDiscid)
