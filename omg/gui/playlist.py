@@ -19,7 +19,7 @@
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from . import treeview, mainwindow, treeactions, playerwidgets, profiles as profilesgui, delegates
+from . import treeview, mainwindow, treeactions, profiles as profilesgui, delegates
 from . import dockwidget
 from ..core import levels, nodes
 from .delegates import playlist as playlistdelegate

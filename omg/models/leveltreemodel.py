@@ -168,8 +168,7 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
     
     def prepareURLs(self, urls, parent):
         """Prepare *urls* to be dropped under *parent*; returns a list of Elements."""
-        
-        files = utils.collectFiles(sorted(url.path() for url in urls))
+        files = utils.collectFiles(urls)
         numFiles = sum(len(v) for v in files.values())
         progress = QtGui.QProgressDialog(self.tr("Importing {0} files...").format(numFiles),
                                          self.tr("Cancel"), 0, numFiles)

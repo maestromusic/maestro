@@ -113,8 +113,7 @@ class WrapperTreeModel(rootedtreemodel.RootedTreeModel):
         if mimeData.hasFormat(config.options.gui.mime):
             wrappers = [wrapper.copy() for wrapper in mimeData.wrappers()]
         else:
-            urls = itertools.chain.from_iterable(
-                                    utils.collectFiles(url.path() for url in mimeData.urls()).values())
+            urls = utils.collectFilesAsList(mimeData.urls())
             wrappers = [Wrapper(element) for element in self.level.collectMany(urls)]
         
         # Compute drop position
