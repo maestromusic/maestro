@@ -569,10 +569,15 @@ class MainWindow(QtGui.QMainWindow):
                         if widget.widgetData.id == id]
         
     def closeEvent(self, event):
+        # If this widget.okToClose opens a dialog, we will get a new change event. Use this list to
+        # avoid calling okToClose on the same widget twice.
+        if not hasattr(self, '_okClosed'):
+            self._okClosed = []
         for widget in itertools.chain(self.centralWidgets(), self.dockWidgets()):
-            if hasattr(widget, "okToClose") and not widget.okToClose():
+            if hasattr(widget, "okToClose") and widget not in self._okClosed and not widget.okToClose():
                 event.ignore()
                 return
+            else: self._okClosed.append(widget)
         event.accept()
 
 

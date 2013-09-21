@@ -135,7 +135,7 @@ class EditorWidget(dockwidget.DockWidget):
     def okToClose(self):
         if self.editor.model().containsUncommitedData():
             return dialogs.question(self.tr("Unsaved changes"),
-                self.tr("The editor contains uncommited changes. Really close?"))
+                                    self.tr("The editor contains uncommited changes. Really close?"))
         return True
 
 
