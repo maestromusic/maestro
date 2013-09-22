@@ -24,7 +24,7 @@ from PyQt4.QtCore import Qt
 
 from .. import config, logging, profiles, utils
 from ..core import flags, tags
-from ..core.elements import ContentList, TYPE_ALBUM
+from ..core.elements import ContentList, TYPE_ALBUM, TYPE_CONTAINER
 
 logger = logging.getLogger(__name__)
 translate = QtCore.QCoreApplication.translate
@@ -187,10 +187,10 @@ class StandardGuesser(profiles.Profile):
         for key, contents in byKey.items():
             metaTags = tags.findCommonTags(contents.values())
             metaTags[tags.TITLE] = [key[1]]
-            self.level.setMajorFlags({album:False for album in contents.values()})
+            self.level.setTypes({album: TYPE_CONTAINER for album in contents.values()})
             container = self.level.createContainer(tags=metaTags,
                                                    contents=ContentList.fromPairs(contents.items()),
-                                                   major=True)
+                                                   type=TYPE_ALBUM)
             self.orders[container] = self.orders[contents[min(contents)]]
             self.albums.append(container)
             self.toplevels.add(container)

@@ -21,7 +21,7 @@ from PyQt4.QtCore import Qt
 
 from .. import database as db
 from ..core import elements, levels, nodes, tags
-from . import tagwidgets
+from . import tagwidgets, widgets
 
 
 def question(title,text,parent=None):
@@ -204,8 +204,18 @@ class MergeDialog(QtGui.QDialog):
         self.elements = [wrapper.element for wrapper in wrappers]
         self.level = self.elements[0].level
         self.parentNode = wrappers[0].parent
+        cTypes = set(elem.type for elem in self.elements if elem.isContainer())
+        containerType = next(iter(cTypes)) if len(cTypes) == 1 else None
         
+        # Layout:
+        # <tagType>  | "of new container:" | <lineEdit>
+        # "Type of new container:"         | <containerType>
+        # <checkbox> "Remove common prefx" | <lineEdit>
+        # <checkbox "assign common tags and flags"
+        # <checkbox> "auto-adjust positions" (only if relevant)
+        # <DialogButtonBox>
         layout = QtGui.QGridLayout()
+        
         self.tagChooser = tagwidgets.TagTypeBox(defaultTag=tags.TITLE, editable=False)
         self.tagChooser.tagChanged.connect(self.updateHints)
         layout.addWidget(self.tagChooser, 0, 0)
@@ -213,19 +223,37 @@ class MergeDialog(QtGui.QDialog):
         layout.addWidget(label, 0, 1)
         self.valueEdit = QtGui.QLineEdit()
         layout.addWidget(self.valueEdit, 0, 2)
+        
+        label = QtGui.QLabel(self.tr('Container type:'))
+        layout.addWidget(label, layout.rowCount(), 0, 1, 2)
+        self.parentTypeBox = widgets.ContainerTypeBox(containerType or elements.TYPE_COLLECTION)
+        layout.addWidget(self.parentTypeBox, layout.rowCount() - 1, 2)
+        
+        self.changeTypeBox = QtGui.QCheckBox(self.tr("Change types to:"))
+        self.changeTypeBox.setChecked(False)
+        if any(elem.isContainer() for elem in self.elements):
+            layout.addWidget(self.changeTypeBox, layout.rowCount(), 0, 1, 2)
+            self.childrenTypeBox = widgets.ContainerTypeBox(elements.TYPE_CONTAINER)
+            layout.addWidget(self.childrenTypeBox, layout.rowCount() - 1, 2)
+            self.childrenTypeBox.setEnabled(False)
+            self.changeTypeBox.toggled.connect(self.childrenTypeBox.setEnabled)
+        
         self.removePrefixBox = QtGui.QCheckBox()
         self.removePrefixBox.setChecked(True)
-        layout.addWidget(self.removePrefixBox, 1, 0, 1, 2)
+        layout.addWidget(self.removePrefixBox, layout.rowCount(), 0, 1, 2)
         self.removeEdit = QtGui.QLineEdit()
-        layout.addWidget(self.removeEdit, 1, 2)
+        layout.addWidget(self.removeEdit, layout.rowCount() - 1, 2)
         self.removePrefixBox.toggled.connect(self.removeEdit.setEnabled)
+        
         self.commonTagsBox = QtGui.QCheckBox(self.tr("Assign common tags and flags"))
         self.commonTagsBox.setChecked(True)
-        layout.addWidget(self.commonTagsBox, 2, 0, 1, 3)
+        layout.addWidget(self.commonTagsBox, layout.rowCount(), 0, 1, 3)
+        
         if isinstance(self.parentNode, nodes.Wrapper):
             self.positionCheckBox = QtGui.QCheckBox(self.tr('Auto-adjust positions'))
             self.positionCheckBox.setChecked(True)
-            layout.addWidget(self.positionCheckBox, 3, 0, 1, 3)
+            layout.addWidget(self.positionCheckBox, layout.rowCount(), 0, 1, 3)
+            
         buttons = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Cancel | QtGui.QDialogButtonBox.Ok)
         buttons.accepted.connect(self.performMerge)
         buttons.rejected.connect(self.reject)
@@ -269,8 +297,10 @@ class MergeDialog(QtGui.QDialog):
         mergeTag = self.tagChooser.getTag()
         containerTags[mergeTag] = [ self.valueEdit.text() ]
         contents = elements.ContentList.fromPairs(enumerate(self.elements, start=1))
-        container = self.level.createContainer(tags=containerTags, flags=containerFlags,
-                                               contents=contents)
+        container = self.level.createContainer(tags=containerTags,
+                                               flags=containerFlags,
+                                               contents=contents,
+                                               type=self.parentTypeBox.currentType())
         if self.removePrefixBox.isChecked():
             childChanges = {}
             prefix = self.removeEdit.text()
@@ -296,6 +326,12 @@ class MergeDialog(QtGui.QDialog):
                         db.commit()
                     self.reject()
                     return
+        if self.changeTypeBox.isChecked():
+            newType = self.childrenTypeBox.currentType()
+            self.level.setTypes({elem: newType for elem in self.elements
+                                               if elem.isContainer
+                                               and elem.type != newType})
+                    
         if isinstance(self.parentNode, nodes.Wrapper):
             parent = self.parentNode.element
             insertPosition = self.wrappers[0].position

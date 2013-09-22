@@ -24,7 +24,7 @@ from ..core import levels, tags, elements
 from ..core.nodes import RootNode, Wrapper
 from ..models import leveltreemodel
 from ..models.browser import BrowserModel
-from . import dialogs
+from . import dialogs, widgets
 
 translate = QtGui.QApplication.translate
 
@@ -339,19 +339,7 @@ class ChangeTypeDialog(QtGui.QDialog):
         if any(container.type != currentType for container in containers):
             currentType = None
             
-        self.typeBox = QtGui.QComboBox()
-        if currentType is None:
-            self.typeBox.addItem('')
-        for type in elements.CONTAINER_TYPES:
-            if type == elements.TYPE_CONTAINER:
-                title = self.tr("(General) container")
-            else: title = elements.getTypeTitle(type)
-            icon = elements.getTypeIcon(type)
-            if icon is not None:
-                self.typeBox.addItem(icon, title, type)
-            else: self.typeBox.addItem(title, type)
-            if type == currentType:
-                self.typeBox.setCurrentIndex(self.typeBox.count() - 1)
+        self.typeBox = widgets.ContainerTypeBox(currentType)
         layout.addWidget(self.typeBox)
         
         buttonBox = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Ok | QtGui.QDialogButtonBox.Cancel)
@@ -361,7 +349,7 @@ class ChangeTypeDialog(QtGui.QDialog):
     
     def _handleOk(self):
         """Save the chosen type and close the dialog."""
-        type = self.typeBox.itemData(self.typeBox.currentIndex())
+        type = self.typeBox.currentType()
         self.level.setTypes({container: type for container in self.containers})
         self.close()
 
