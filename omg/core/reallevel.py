@@ -116,7 +116,7 @@ class RealLevel(levels.Level):
         if any(p not in self for p in params):
             # This means that an element could not be loaded (e.g. params contains the id of a new container
             # which only exists on the editor level).
-            raise levels.ElementGetError(self,[p for p in params if p not in self])
+            raise levels.ElementGetError(self, [p for p in params if p not in self])
      
     def loadFromDb(self, idList, level=None):
         """Load elements specified by *idList* from the database into *level* which defaults to the
@@ -157,7 +157,7 @@ class RealLevel(levels.Level):
             
         # parents
         result = db.query("""
-                SELECT el.id,c.container_id
+                SELECT el.id, c.container_id
                 FROM {0}elements AS el JOIN {0}contents AS c ON el.id = c.element_id
                 WHERE el.id IN ({1})
                 """.format(db.prefix, csIdList))
@@ -166,7 +166,7 @@ class RealLevel(levels.Level):
             
         # tags
         result = db.query("""
-                SELECT el.id,t.tag_id,t.value_id
+                SELECT el.id, t.tag_id, t.value_id
                 FROM {0}elements AS el JOIN {0}tags AS t ON el.id = t.element_id
                 WHERE el.id IN ({1})
                 """.format(db.prefix, csIdList))
@@ -176,7 +176,7 @@ class RealLevel(levels.Level):
             
         # flags
         result = db.query("""
-                SELECT el.id,f.flag_id
+                SELECT el.id, f.flag_id
                 FROM {0}elements AS el JOIN {0}flags AS f ON el.id = f.element_id
                 WHERE el.id IN ({1})
                 """.format(db.prefix, csIdList))
@@ -185,10 +185,10 @@ class RealLevel(levels.Level):
             
         # stickers
         result = db.query("""
-                SELECT element_id,type,data
+                SELECT element_id, type, data
                 FROM {}stickers
                 WHERE element_id IN ({})
-                ORDER BY element_id,type,sort
+                ORDER BY element_id, type, sort
                 """.format(db.prefix, csIdList))
         # This is a bit complicated because the stickers should be stored in tuples, not lists
         # Changing the lists would break undo/redo
@@ -200,7 +200,7 @@ class RealLevel(levels.Level):
                 current = (id, type)
             elif current != (id, type):
                 level.elements[current[0]].stickers[current[1]] = tuple(buffer)
-                current = (id,type)
+                current = (id, type)
                 buffer = []
             element = level.elements[id]
             if element.stickers is None:
@@ -329,7 +329,7 @@ class RealLevel(levels.Level):
         contentData = []
         for element in elements:
             if element.isContainer():
-                contentData.extend((element.id,item[0],item[1]) for item in element.contents.items())
+                contentData.extend((element.id, item[0], item[1]) for item in element.contents.items())
                 for childId in element.contents:
                     if element.id not in self[childId].parents:
                         self[childId].parents.append(element.id)
@@ -385,26 +385,26 @@ class RealLevel(levels.Level):
         if not dbOnly:
             filebackends.changeTags(changes) # might raise TagWriteError
         
-        dbChanges = {el: diffs for el,diffs in changes.items() if el.isInDb()}
+        dbChanges = {el: diffs for el, diffs in changes.items() if el.isInDb()}
         if len(dbChanges) > 0:
             db.transaction()
-            dbRemovals = [(el.id,tag.id,db.idFromValue(tag,value))
-                          for el,diff in dbChanges.items()
-                          for tag,value in diff.getRemovals() if tag.isInDb()]
+            dbRemovals = [(el.id, tag.id, db.idFromValue(tag, value))
+                          for el, diff in dbChanges.items()
+                          for tag, value in diff.getRemovals() if tag.isInDb()]
             if len(dbRemovals):
                 db.multiQuery("DELETE FROM {}tags WHERE element_id=? AND tag_id=? AND value_id=?"
-                              .format(db.prefix),dbRemovals)
+                              .format(db.prefix), dbRemovals)
                 
-            dbAdditions = [(el.id,tag.id,db.idFromValue(tag,value,insert=True))
-                           for el,diff in dbChanges.items()
-                           for tag,value in diff.getAdditions() if tag.isInDb()]
+            dbAdditions = [(el.id, tag.id, db.idFromValue(tag, value, insert=True))
+                           for el, diff in dbChanges.items()
+                           for tag, value in diff.getAdditions() if tag.isInDb()]
             if len(dbAdditions):
-                db.multiQuery("INSERT INTO {}tags (element_id,tag_id,value_id) VALUES (?,?,?)"
-                              .format(db.prefix),dbAdditions)
+                db.multiQuery("INSERT INTO {}tags (element_id, tag_id, value_id) VALUES (?,?,?)"
+                              .format(db.prefix), dbAdditions)
             files = [ (elem.id, ) for elem in dbChanges if elem.isFile() ]
             if len(files) > 0:
                 db.multiQuery("UPDATE {}files SET verified=CURRENT_TIMESTAMP WHERE element_id=?"
-                              .format(db.prefix),files)
+                              .format(db.prefix), files)
             db.commit()
         super()._changeTags(changes)
         
@@ -412,13 +412,13 @@ class RealLevel(levels.Level):
         if not all(element.isInDb() for element in changes.keys()):
             raise levels.ConsistencyError("Elements on real must be added to the DB before adding tags.")
         db.transaction()
-        dbRemovals = [(el.id,flag.id) for el,diff in changes.items() for flag in diff.getRemovals()]
+        dbRemovals = [(el.id, flag.id) for el, diff in changes.items() for flag in diff.getRemovals()]
         if len(dbRemovals):
             db.multiQuery("DELETE FROM {}flags WHERE element_id = ? AND flag_id = ?".format(db.prefix),
                           dbRemovals)
-        dbAdditions = [(el.id,flag.id) for el,diff in changes.items() for flag in diff.getAdditions()]
+        dbAdditions = [(el.id, flag.id) for el, diff in changes.items() for flag in diff.getAdditions()]
         if len(dbAdditions):
-            db.multiQuery("INSERT INTO {}flags (element_id,flag_id) VALUES(?,?)".format(db.prefix),
+            db.multiQuery("INSERT INTO {}flags (element_id, flag_id) VALUES(?,?)".format(db.prefix),
                           dbAdditions)
         db.commit()
         super()._changeFlags(changes)
@@ -445,13 +445,13 @@ class RealLevel(levels.Level):
         values = []
         for element, stickers in elementToStickers.items():
             if stickers is not None:
-                values.extend((element.id, type, i, s) for i,s in enumerate(stickers))
+                values.extend((element.id, type, i, s) for i, s in enumerate(stickers))
         db.transaction()
         db.query("DELETE FROM {}stickers WHERE type = ? AND element_id IN ({})"
-                 .format(db.prefix, db.csIdList(elementToStickers.keys())),type)
+                 .format(db.prefix, db.csIdList(elementToStickers.keys())), type)
         if len(values) > 0:
-            db.multiQuery("INSERT INTO {}stickers (element_id,type,sort,data) VALUES (?,?,?,?)"
-                          .format(db.prefix),values)
+            db.multiQuery("INSERT INTO {}stickers (element_id, type, sort, data) VALUES (?,?,?,?)"
+                          .format(db.prefix), values)
         db.commit()
         super()._setStickers(type, elementToStickers)
         

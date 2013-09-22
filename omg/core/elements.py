@@ -92,7 +92,7 @@ class Element:
             result += " - ".join(self.tags[tagsModule.TITLE])
         elif usePath and self.isFile():
             result += str(self.url)
-        else: result += translate("Element","<No title>")
+        else: result += translate("Element", "<No title>")
 
         return result
     
@@ -221,7 +221,7 @@ class Container(Element):
             stickers = {}
         self.stickers = stickers
     
-    def copy(self,level=None):
+    def copy(self, level=None):
         """Create a copy of this container. Create copies of all attributes. Because contents are stored as
         ids and do not have parent pointers, it is not necessary to copy contents recursively (contrary to
         Wrapper.copy).
@@ -260,10 +260,10 @@ class File(Element):
     will be used. Valid keyword-arguments are parents, tags, flags, stickers.
     """
     def __init__(self, level, id, url, length, **kwargs):
-        if not isinstance(id,int) or not isinstance(url, filebackends.BackendURL) \
-                or not isinstance(length,int):
-            raise TypeError("Invalid type (id,url,length): ({},{},{}) of types ({},{},{})"
-                            .format(id,url,length,type(id),type(url),type(length)))
+        if not isinstance(id, int) or not isinstance(url, filebackends.BackendURL) \
+                or not isinstance(length, int):
+            raise TypeError("Invalid type (id, url, length): ({}, {}, {}) of types ({}, {}, {})"
+                            .format(id, url, length, type(id), type(url), type(length)))
         self.level = level
         self.id = id
         self.url = url
@@ -312,10 +312,10 @@ class ContentList:
     """
     def __init__(self, positions=None, ids=None):
         self.ids = ids if ids is not None else []
-        self.positions = positions if positions is not None else list(range(1,1+len(self.ids)))
+        self.positions = positions if positions is not None else list(range(1, 1+len(self.ids)))
     
     @classmethod
-    def fromPairs(cls,pairs):
+    def fromPairs(cls, pairs):
         """Creates a ContentList from a generator of (position, id) or (position, element) pairs."""
         positions, ids = (list(zp) for zp in zip(*sorted(pairs)))
         ids = [element.id if isinstance(element, Element) else element for element in ids ]
@@ -336,24 +336,24 @@ class ContentList:
     def __len__(self):
         return len(self.ids)
     
-    def __contains__(self,id):
+    def __contains__(self, id):
         return id in self.ids
     
     def __iter__(self):
         return self.ids.__iter__()
         
     def items(self):
-        """Return a generator yielding tuples (position,id) for all ids in the list."""
+        """Return a generator yielding tuples (position, id) for all ids in the list."""
         return zip(self.positions, self.ids)
     
-    def at(self,position):
+    def at(self, position):
         """Return the id at position *position*."""
         try:
             return self.ids[self.positions.index(position)]
         except IndexError:
             raise ValueError("In this list there is no element with position {}".format(position))
     
-    def positionOf(self,id,start=None):
+    def positionOf(self, id, start=None):
         """Return the (first) position corresponding to *id*. Raise a ValueError, if *id* is not contained
         in this list. If *start* is given consider only contents with *position* strictly greater than
         *start*.
@@ -384,7 +384,7 @@ class ContentList:
         self.positions.insert(index, pos)
         self.ids.insert(index, id)
     
-    def remove(self,*,pos=None,index=None):
+    def remove(self, *, pos=None, index=None):
         """Remove an id and its position from the list. You must specify either the position or its index."""
         if pos is not None:
             index = self.positions.index(pos)
@@ -393,12 +393,12 @@ class ContentList:
         del self.ids[index]
         del self.positions[index]
         
-    def removeAll(self,id):
+    def removeAll(self, id):
         """Remove all occurrences of *id* in this list."""
         try:
             index = 0
             while True:
-                index = self.ids.find(id,index)
+                index = self.ids.find(id, index)
                 del self.ids[index]
                 del self.positions[index]
         except ValueError:
@@ -421,9 +421,9 @@ class ContentList:
 #        pos, id = pair
 #        if (i > 0 and self.positions[i-1] >= pos) or \
 #            (i < len(self.positions)-1 and self.positions[i+1] <= pos):
-#            raise ValueError("id/position ({},{}) cannot be inserted at index {} because positions "
+#            raise ValueError("id/position ({}, {}) cannot be inserted at index {} because positions "
 #                             " must be strictly monotonically increasing."""
-#                             .format(id,pos,i))
+#                             .format(id, pos, i))
 #        self.positions[i] = pos
 #        self.ids[i] = id
     

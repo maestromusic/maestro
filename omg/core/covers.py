@@ -150,7 +150,7 @@ def getHTML(path, size=None, attributes=''):
     pixmap.save(buffer, "PNG")
     string = bytes(buffer.buffer().toBase64()).decode('ascii')
     buffer.close()
-    return makeImgTag("data:image/png;base64,"+string)
+    return makeImgTag("data:image/png;base64, "+string)
 
 
 def getAsync(imageLoader, path, size=None):

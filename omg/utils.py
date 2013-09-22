@@ -16,11 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import datetime, locale
-import os
-import functools
-import re
-from collections import OrderedDict
+import datetime, locale, os, functools, re, itertools, collections
 
 from PyQt4 import QtCore, QtGui
 from . import config, strutils
@@ -81,12 +77,13 @@ def absPath(file):
         return file
 
 
-def collectFiles(paths):
-    """Find all music files below the given *paths*.
-    
-    Return them as dict mapping directory to list of FileURLs within."""
+def collectFiles(urls):
+    """Find all music files below the given QUrls. This is used in various dropMimeData methods when urls
+    are received. Return a dict mapping directory to list of FileURLs within. Sort directories and files.
+    """
     from .filebackends.filesystem import FileURL
-    filePaths = OrderedDict()
+    filePaths = collections.OrderedDict()
+    
     def add(file, parent=None):
         if not hasKnownExtension(file):
             return
@@ -94,15 +91,45 @@ def collectFiles(paths):
         if dir not in filePaths:
             filePaths[dir] = []
         filePaths[dir].append(FileURL(file))
-    for path in paths:
+        
+    for url in urls:
+        path = url.path()
         if os.path.isfile(path):
             add(path)
         else:
             for parent, dirs, files in os.walk(path):
-                for f in sorted(files):
+                for f in files:
                     add(os.path.join(parent, f), parent)
                 dirs.sort()
+        
+    def sortFunction(url):
+            dir, file = os.path.split(url.path)
+            i = 0
+            while file[i].isdigit():
+                i += 1
+            if i == 0:
+                return (dir, PointAtInfinity, file)
+            else: return (dir, int(file[:i]), file[i:], file)
+                
+    for files in filePaths.values():
+        files.sort(key=sortFunction)
+
     return filePaths
+
+
+def collectFilesAsList(urls):
+    """Find all music files below the given QUrls. This is used in various dropMimeData methods when urls
+    are received. Return a list of FileURLs. Sort files within each directory, but not the list as whole.
+    """
+    from .filebackends.filesystem import FileURL
+    def checkUrl(url):
+        path = url.path()
+        if os.path.isfile(path):
+            if hasKnownExtension(path):
+                return [FileURL(path)]
+            else: return []
+        else: return itertools.chain.from_iterable(collectFiles([url]).values())
+    return itertools.chain.from_iterable(checkUrl(url) for url in urls)
 
 
 class InverseDifference:

@@ -94,7 +94,7 @@ def init():
     At program start or after changes of that table this method must be called to ensure the module has the
     correct tags and their IDs. Raise a RuntimeError when tags cannot be fetched from the database correctly.
     """
-    global TITLE,ALBUM, db
+    global TITLE, ALBUM, db
     from omg import database as db
     
     if db.prefix+'tagids' not in db.listTables():
@@ -116,21 +116,21 @@ def loadTagTypesFromDB():
     tagList = []
     
     try:
-        result = db.query("SELECT id,tagname,tagtype,title,icon,private FROM {}tagids ORDER BY sort"
+        result = db.query("SELECT id, tagname, tagtype, title, icon, private FROM {}tagids ORDER BY sort"
                            .format(db.prefix))
     except db.sql.DBException:
         logger.error("Could not fetch tags from tagids table.")
         raise RuntimeError()
         
     for row in result:
-        id,tagName,valueType,title,iconPath,private = row
+        id, tagName, valueType, title, iconPath, private = row
         if db.isNull(title) or title == "":
             title = None
             
         if db.isNull(iconPath):
             iconPath = None
         valueType = ValueType.byName(valueType)
-        newTag = Tag(tagName,id,valueType,title,iconPath,private)
+        newTag = Tag(tagName, id, valueType, title, iconPath, private)
         _tagsById[newTag.id] = newTag
         _tagsByName[newTag.name] = newTag
         tagList.append(newTag)
@@ -145,7 +145,7 @@ class ValueType:
         - *description* is a description that will be displayed to the user
         
     """
-    def __init__(self,name,description):
+    def __init__(self, name, description):
         self.name = name
         self.description = description
 
@@ -157,17 +157,17 @@ class ValueType:
                 return type
         else: raise IndexError("There is no value type with name '{}'.".format(name))
         
-    def isValid(self,value):
+    def isValid(self, value):
         """Return whether the given value is a valid tag-value for tags of this type."""
         if self.name == 'varchar':
-            return isinstance(value,str) and 0 < len(value.encode()) <= constants.TAG_VARCHAR_LENGTH
+            return isinstance(value, str) and 0 < len(value.encode()) <= constants.TAG_VARCHAR_LENGTH
         elif self.name == 'text':
-            return isinstance(value,str) and len(value) > 0
+            return isinstance(value, str) and len(value) > 0
         elif self.name == 'date':
-            return isinstance(value,utils.FlexiDate)
+            return isinstance(value, utils.FlexiDate)
         else: assert False
 
-    def convertValue(self,value,crop=False,logCropping=True):
+    def convertValue(self, value, crop=False, logCropping=True):
         """Convert *value* to this type and return the result. If conversion fails, raise a TagValueError.
         If *crop* is True, this method may crop *value* to make it valid (e.g. if *value* is too long for
         a varchar). If *logCropping* is True, cropping will print a logger warning.
@@ -193,27 +193,27 @@ class ValueType:
                 return string
             else: raise TagValueError("text tags must have length > 0")
         elif self.name == 'date':
-            if isinstance(value,utils.FlexiDate):
+            if isinstance(value, utils.FlexiDate):
                 return value
             else:
                 string = str(value)
                 try:
-                    return utils.FlexiDate.strptime(string,crop,logCropping)
+                    return utils.FlexiDate.strptime(string, crop, logCropping)
                 except ValueError as e:
                     raise TagValueError(str(e))
         else: assert False
 
-    def canConvert(self,value,crop=False):
+    def canConvert(self, value, crop=False):
         """Return whether *value* can be converted into this type using convertValue. For *crop* see
         convertValue.
         """
         try:
-            self.convertValue(value,crop,logCropping=False)
+            self.convertValue(value, crop, logCropping=False)
         except TagValueError:
             return False
         else: return True
 
-    def sqlFormat(self,value):
+    def sqlFormat(self, value):
         """Convert *value* into a string that can be inserted into database queries."""
         if self.name == 'varchar':
             if len(value.encode()) > constants.TAG_VARCHAR_LENGTH:
@@ -242,10 +242,10 @@ class ValueType:
 
 
 # Module variables for the existing types
-TYPE_VARCHAR = ValueType('varchar', translate("tags","Standard type for normal (not too long) text values"))
-TYPE_TEXT = ValueType('text', translate("tags","Type for long texts (like e.g. lyrics)"))
-TYPE_DATE = ValueType('date', translate("tags","Type for dates"))
-TYPES = [TYPE_VARCHAR,TYPE_TEXT,TYPE_DATE]
+TYPE_VARCHAR = ValueType('varchar', translate("tags", "Standard type for normal (not too long) text values"))
+TYPE_TEXT = ValueType('text', translate("tags", "Type for long texts (like e.g. lyrics)"))
+TYPE_DATE = ValueType('date', translate("tags", "Type for dates"))
+TYPES = [TYPE_VARCHAR, TYPE_TEXT, TYPE_DATE]
     
     
 class Tag:
@@ -266,7 +266,7 @@ class Tag:
         always only one instance of a given tag and that this instance is updated automatically on
         TagTypeChangeEvents.
     """
-    def __init__(self,name,id=None,type=None,title=None,iconPath=None,private=False):
+    def __init__(self, name, id=None, type=None, title=None, iconPath=None, private=False):
         self.id = id
         self.name = name
         self.type = type
@@ -283,7 +283,7 @@ class Tag:
                 'private': self.private
                 }
     
-    def _setData(self,data):
+    def _setData(self, data):
         """Set some attributes from a dict created with _getData."""
         # self.__dict__.update(data)  would be nicer but doesn't work with properties
         if 'id' in data:
@@ -299,7 +299,7 @@ class Tag:
     
     def _clearData(self):
         """Clear some attributes. This happens when adding a tagtype to the database is undone."""
-        self.id,self.type,self.rawTitle,self.iconPath,self.private = None,None,None,None,False
+        self.id, self.type, self.rawTitle, self.iconPath, self.private = None, None, None, None, False
     
     def isInDb(self):
         """Return whether this tagtype is internal, i.e. contained in the database."""
@@ -318,15 +318,15 @@ class Tag:
         return self._iconPath
 
     @iconPath.setter
-    def iconPath(self,iconPath):
+    def iconPath(self, iconPath):
         """Set the tag's iconPath and load the icon."""
-        assert iconPath is None or isinstance(iconPath,str)
+        assert iconPath is None or isinstance(iconPath, str)
         self._iconPath = iconPath
         if iconPath is not None:
             self._icon = QtGui.QIcon(iconPath)
         else: self._icon = None
         
-    def isValid(self,value):
+    def isValid(self, value):
         """Return whether the given value is a valid tag-value for this tag (this depends only on the
         tag-type).
         """
@@ -334,21 +334,21 @@ class Tag:
             return self.type.isValid(value)
         else: return True
 
-    def convertValue(self,value,crop=False,logCropping=True):
+    def convertValue(self, value, crop=False, logCropping=True):
         """Convert a value to this tagtype. Raise a TagValueError if conversion is not possible.
         If *crop* is True, this method may crop *value* to make it valid (e.g. if *value* is too long for
         a varchar). If *logCropping* is True, cropping will print a logger warning.
         """
         if self.type is None:
             return str(value)
-        else: return self.type.convertValue(value,crop)
+        else: return self.type.convertValue(value, crop)
     
-    def canConvert(self,value,crop=False):
+    def canConvert(self, value, crop=False):
         """Return whether *value* can be converted into this type using convertValue. For *crop* see
         convertValue.
         """
         try:
-            self.convertValue(value,crop,logCropping=False)
+            self.convertValue(value, crop, logCropping=False)
         except TagValueError:
             return False
         else: return True
@@ -359,7 +359,7 @@ class Tag:
             return self.type.fileFormat(string)
         return string
     
-    def sqlFormat(self,value):
+    def sqlFormat(self, value):
         """Convert *value* into a string that can be inserted into database queries."""
         if self.type is None:
             raise ValueError("sqlFormat can only be used with internal tags, not for {}".format(self))
@@ -379,7 +379,7 @@ def isValidTagName(name):
     
     Some tagnames are explicitly forbidden (tracknumber and discnumber).
     """
-    if name.lower() in ['tracknumber','discnumber']:
+    if name.lower() in ['tracknumber', 'discnumber']:
         return False
     try:
         encoded = name.encode('ascii')
@@ -393,7 +393,7 @@ def isInDb(name):
     return name in _tagsByName and _tagsByName[name].isInDb()
 
 
-def get(identifier,addDialogIfNew=False):
+def get(identifier, addDialogIfNew=False):
     """Return the tag identified by *identifier*:
     
         If *identifier* is an integer return the tag with this id.
@@ -402,9 +402,9 @@ def get(identifier,addDialogIfNew=False):
         
     This method does never create a second instance of one tag.
     """
-    if isinstance(identifier,int):
+    if isinstance(identifier, int):
         return _tagsById[identifier]
-    elif isinstance(identifier,str):
+    elif isinstance(identifier, str):
         identifier = identifier.lower()
         if identifier in _tagsByName:
             return _tagsByName[identifier]
@@ -421,7 +421,7 @@ def get(identifier,addDialogIfNew=False):
         return identifier
     else:
         raise TypeError("Identifier's type is neither int nor string nor tag: {} of type {}"
-                            .format(identifier,type(identifier)))
+                            .format(identifier, type(identifier)))
 
 
 def isTitle(title):
@@ -441,7 +441,7 @@ def fromTitle(title):
     else: return get(title)
 
     
-def addTagType(tagType,type,**data):
+def addTagType(tagType, type, **data):
     """Add a tagtype to the database. *tagType* can be a valid tagname or an external tagtype. Using keyword
     arguments you can optionally set attributes of the tagtype which external tagtypes don't have
     Allowed keys are
@@ -450,30 +450,30 @@ def addTagType(tagType,type,**data):
     If the type cannot be added because an element contains a value which is invalid for the chosen type,
     a TagValueError is raised.
     """
-    if isinstance(tagType,str):
+    if isinstance(tagType, str):
         tagType = get(tagType)
     if tagType.isInDb():
         raise ValueError("Cannot add tag '{}' because it is already in the DB.".format(tagType))
     if 'title' in data:
         if data['title'] is not None and isTitle(data['title']):
             raise ValueError("Cannot add tag '{}' with title '{}' because that title exists already."
-                             .format(tagType,data['title']))
+                             .format(tagType, data['title']))
             
-    application.stack.beginMacro(translate("TagTypeUndoCommand","Add tagtype to DB"))
+    application.stack.beginMacro(translate("TagTypeUndoCommand", "Add tagtype to DB"))
     try:
-        _convertTagTypeOnLevels(tagType,type)
+        _convertTagTypeOnLevels(tagType, type)
     except TagValueError as error:
         application.stack.abortMacro()
         raise error
 
     data['type'] = type
-    application.stack.push(TagTypeUndoCommand(ADD,tagType,**data))
+    application.stack.push(TagTypeUndoCommand(ADD, tagType, **data))
     application.stack.endMacro()
     
     return tagType
         
     
-def _addTagType(tagType,**data):
+def _addTagType(tagType, **data):
     """Similar to addTagType, but not undoable. *tagType* must be an external Tag instance. Its value-type
     must be given as keyword-argument 'type'."""
     assert tagType.name in _tagsByName # if the tag was created with get, it is already contained there
@@ -483,27 +483,27 @@ def _addTagType(tagType,**data):
         index = data['index']
     else: index = len(tagList)   
     
-    db.query("UPDATE {}tagids SET sort=sort+1 WHERE sort >= ?".format(db.prefix),index)
+    db.query("UPDATE {}tagids SET sort=sort+1 WHERE sort >= ?".format(db.prefix), index)
  
     tagType._setData(data)
-    tagList.insert(index,tagType)
+    tagList.insert(index, tagType)
     
     if tagType.id is not None: # id has been set in _setData
-        data = (tagType.id,tagType.name,tagType.type.name,tagType.rawTitle,
-                tagType.iconPath,tagType.private,index)
+        data = (tagType.id, tagType.name, tagType.type.name, tagType.rawTitle,
+                tagType.iconPath, tagType.private, index)
         db.query(
-            "INSERT INTO {}tagids (id,tagname,tagtype,title,icon,private,sort) VALUES (?,?,?,?,?,?,?)"
-              .format(db.prefix),*data)
+            "INSERT INTO {}tagids (id, tagname, tagtype, title, icon, private, sort) VALUES (?,?,?,?,?,?,?)"
+              .format(db.prefix), *data)
     else:
         # The difference to the if-part is that we have to get the id from the database
-        data = (tagType.name,tagType.type.name,tagType.rawTitle,tagType.iconPath,tagType.private,index)
+        data = (tagType.name, tagType.type.name, tagType.rawTitle, tagType.iconPath, tagType.private, index)
         tagType.id = db.query(
-            "INSERT INTO {}tagids (tagname,tagtype,title,icon,private,sort) VALUES (?,?,?,?,?,?)"
-              .format(db.prefix),*data).insertId()
-    logger.info("Added new tag '{}' of type '{}'.".format(tagType.name,tagType.type.name))
+            "INSERT INTO {}tagids (tagname, tagtype, title, icon, private, sort) VALUES (?,?,?,?,?,?)"
+              .format(db.prefix), *data).insertId()
+    logger.info("Added new tag '{}' of type '{}'.".format(tagType.name, tagType.type.name))
 
     _tagsById[tagType.id] = tagType
-    application.dispatcher.emit(TagTypeChangedEvent(ADDED,tagType))
+    application.dispatcher.emit(TagTypeChangedEvent(ADDED, tagType))
     return tagType
     
 
@@ -512,18 +512,19 @@ def removeTagType(tagType):
     """
     if not tagType.isInDb():
         raise ValueError("Cannot remove external tagtype '{}' from DB.".format(tagType))
-    if tagType in (TITLE,ALBUM):
+    if tagType in (TITLE, ALBUM):
         raise ValueError("Cannot remove title or album tag.")
-    if db.query("SELECT COUNT(*) FROM {}tags WHERE tag_id = ?".format(db.prefix),tagType.id).getSingle() > 0:
+    if db.query("SELECT COUNT(*) FROM {}tags WHERE tag_id = ?".format(db.prefix),
+                tagType.id).getSingle() > 0:
         raise ValueError("Cannot remove a tag that appears in internal elements.")
     
-    application.stack.beginMacro(translate("TagTypeUndoCommand","Remove tagtype from DB"))
+    application.stack.beginMacro(translate("TagTypeUndoCommand", "Remove tagtype from DB"))
     try:
         _convertTagTypeOnLevels(tagType, None)
     except TagValueError as error:
         application.stack.abortMacro()
         raise error
-    application.stack.push(TagTypeUndoCommand(REMOVE,tagType))
+    application.stack.push(TagTypeUndoCommand(REMOVE, tagType))
     application.stack.endMacro()
     
     
@@ -532,19 +533,19 @@ def _removeTagType(tagType):
     and relations. This will not touch any files though!
     """
     logger.info("Removing tag '{}'.".format(tagType.name))
-    db.query("DELETE FROM {}tagids WHERE id=?".format(db.prefix),tagType.id)
-    db.query("UPDATE {}tagids SET sort=sort-1 WHERE sort > ?".format(db.prefix),tagList.index(tagType))
+    db.query("DELETE FROM {}tagids WHERE id=?".format(db.prefix), tagType.id)
+    db.query("UPDATE {}tagids SET sort=sort-1 WHERE sort > ?".format(db.prefix), tagList.index(tagType))
     del _tagsById[tagType.id]
     tagList.remove(tagType)
     tagType._clearData()
-    application.dispatcher.emit(TagTypeChangedEvent(REMOVED,tagType))
+    application.dispatcher.emit(TagTypeChangedEvent(REMOVED, tagType))
     
 
-def changeTagType(tagType,**data):
+def changeTagType(tagType, **data):
     """Change an internal tagtype. In particular update the single instance *tagType* and the database.
     The keyword arguments determine which properties should be changed::
 
-        changeTagType(tagType,title='Artist',iconPath=None)
+        changeTagType(tagType, title='Artist', iconPath=None)
         
     Allowed keyword arguments are type, title, iconPath, private. If the type or private is changed,
     the tagtype must not appear in any internal elements.
@@ -556,23 +557,23 @@ def changeTagType(tagType,**data):
     if ('type' in data and data['type'] != tagType.type) \
             or ('private' in data and data['private'] != tagType.private):
         count = db.query("SELECT COUNT(*) FROM {}tags WHERE tag_id = ?"
-                         .format(db.prefix),tagType.id).getSingle()
+                         .format(db.prefix), tagType.id).getSingle()
         if count > 0:
             raise ValueError("Cannot change the type of a tag that appears in internal elements.")
     
-    application.stack.beginMacro(translate("TagTypeUndoCommand","Change tagtype"))
+    application.stack.beginMacro(translate("TagTypeUndoCommand", "Change tagtype"))
     if 'type' in data and data['type'] != tagType.type:
         try:
-            _convertTagTypeOnLevels(tagType,data['type'])
+            _convertTagTypeOnLevels(tagType, data['type'])
         except TagValueError as error:
             application.stack.abortMacro()
             raise error
         
-    application.stack.push(TagTypeUndoCommand(CHANGE,tagType,**data))
+    application.stack.push(TagTypeUndoCommand(CHANGE, tagType, **data))
     application.stack.endMacro()
     
     
-def _changeTagType(tagType,**data):
+def _changeTagType(tagType, **data):
     """Like changeTagType, but not undoable."""
     assert tagType.isInDb()
     
@@ -583,10 +584,10 @@ def _changeTagType(tagType,**data):
     
     if 'type' in data and data['type'] != tagType.type:
         type = data['type']
-        if not isinstance(type,ValueType):
+        if not isinstance(type, ValueType):
             raise ValueError("'{}' is not a ValueType.".format(type))
         logger.info("Changing type of tag '{}' from '{}' to '{}'."
-                    .format(tagType.name,tagType.type.name,type.name))
+                    .format(tagType.name, tagType.type.name, type.name))
         assignments.append('tagtype = ?')
         params.append(type.name)
         tagType.type = type
@@ -612,8 +613,8 @@ def _changeTagType(tagType,**data):
     if len(assignments) > 0:
         params.append(tagType.id) # for the WHERE clause
         db.query("UPDATE {}tagids SET {} WHERE id = ?"
-                    .format(db.prefix,','.join(assignments)),*params)
-        application.dispatcher.emit(TagTypeChangedEvent(CHANGED,tagType))
+                    .format(db.prefix, ','.join(assignments)), *params)
+        application.dispatcher.emit(TagTypeChangedEvent(CHANGED, tagType))
 
 
 def _convertTagTypeOnLevels(tagType, valueType):
@@ -631,9 +632,10 @@ def _convertTagTypeOnLevels(tagType, valueType):
         for element in level.elements.values(): # only external elements possible => won't take too long
             if tagType in element.tags:
                 oldValues = element.tags[tagType]
-                newValues = list(map(valueType.convertValue if valueType is not None else str,oldValues))
+                newValues = list(map(valueType.convertValue if valueType is not None else str, oldValues))
                 if oldValues != newValues:
-                    diffs[element] = SingleTagDifference(tagType,replacements=list(zip(oldValues,newValues)))
+                    diffs[element] = SingleTagDifference(tagType, 
+                                                         replacements=list(zip(oldValues, newValues)))
                     
         if len(diffs) > 0:
             level.changeTags(diffs)
@@ -647,10 +649,10 @@ class TagTypeUndoCommand:
     first parameter *action*. Use the methods addTagType, removeTagType and changeTagTyp instead of using
     this command directly.
     """
-    def __init__(self,action,tagType,**data):
-        self.text = {ADD:   translate("TagTypeUndoCommand","Add tagtype to DB"),
-                     REMOVE: translate("TagTypeUndoCommand","Remove tagtype from DB"),
-                     CHANGE: translate("TagTypeUndoCommand","Change tagtype")
+    def __init__(self, action, tagType, **data):
+        self.text = {ADD:   translate("TagTypeUndoCommand", "Add tagtype to DB"),
+                     REMOVE: translate("TagTypeUndoCommand", "Remove tagtype from DB"),
+                     CHANGE: translate("TagTypeUndoCommand", "Change tagtype")
                     }[action]
         self.action = action
         if self.action == ADD:
@@ -667,10 +669,10 @@ class TagTypeUndoCommand:
         
     def redo(self):
         if self.action == ADD:
-            _addTagType(self.tagType,**self.data)
+            _addTagType(self.tagType, **self.data)
         elif self.action == REMOVE:
             _removeTagType(self.tagType)
-        else: _changeTagType(self.tagType,**self.newData)
+        else: _changeTagType(self.tagType, **self.newData)
 
     def undo(self):
         if self.action == ADD:
@@ -678,27 +680,27 @@ class TagTypeUndoCommand:
         elif self.action == REMOVE:
             # Ensure that the same object is recreated, because it might be used in many elements
             # within the undohistory.
-            _addTagType(self.tagType,**self.data)
-        else: _changeTagType(self.tagType,**self.oldData)
+            _addTagType(self.tagType, **self.data)
+        else: _changeTagType(self.tagType, **self.oldData)
 
 
 class TagTypeChangedEvent(ChangeEvent):
     """TagTypeChangedEvents are used when a tagtype (like artist, composer...) is added, changed or removed.
     """
-    def __init__(self,action,tagType):
+    def __init__(self, action, tagType):
         assert action in constants.CHANGE_TYPES
         self.action = action
         self.tagType = tagType
   
     
-def moveTagType(tagType,newIndex):
+def moveTagType(tagType, newIndex):
     """Move *tagType* to the given index within tagList."""
     index = tagList.index(tagType)
     if index == newIndex:
         return
     newList = tagList[:]
     del newList[index]
-    newList.insert(newIndex,tagType)
+    newList.insert(newIndex, tagType)
     application.stack.push(TagTypeOrderUndoCommand(newList))
     
     
@@ -726,8 +728,8 @@ class TagTypeOrderUndoCommand:
     restored exactly when the command is undone. They will be set to values such that the order of
     tags.tagList is restored.
     """ 
-    def __init__(self,newList):
-        self.text = translate("TagTypeOrderUndoCommand","Change tagtype order")
+    def __init__(self, newList):
+        self.text = translate("TagTypeOrderUndoCommand", "Change tagtype order")
         self.oldList = tagList
         self.newList = newList
     
@@ -749,20 +751,20 @@ class TagValueList(list):
     is that a TagValueList stores a reference to the Storage-object and will notify the storage if the list
     is empty. The storage will then remove the list.
     """
-    def __init__(self,storage,aList=None):
-        list.__init__(self,aList if aList is not None else [])
+    def __init__(self, storage, aList=None):
+        list.__init__(self, aList if aList is not None else [])
         self.storage = storage
     
-    def __setitem__(self,key,value):
-        list.__setitem__(self,key,value)
+    def __setitem__(self, key, value):
+        list.__setitem__(self, key, value)
         
-    def __delitem__(self,key):
-        list.__delitem__(self,key)
+    def __delitem__(self, key):
+        list.__delitem__(self, key)
         if len(self) == 0:
             self.storage._removeList(self)
             
-    def remove(self,value):
-        list.remove(self,value)
+    def remove(self, value):
+        list.remove(self, value)
         if len(self) == 0:
             self.storage._removeList(self)
             
@@ -778,53 +780,53 @@ class Storage(dict):
     Storage maps tags to lists of tag-values. The class ensures that an instance never contains an empty
     list and adds a few useful functions to deal with such datastructures.
     """
-    def __init__(self,*args):
+    def __init__(self, *args):
         if len(args) == 1 and type(args[0]) is dict:
             dict.__init__(self)
             self.merge(args[0])
         else:
-            dict.__init__(self,*args)
+            dict.__init__(self, *args)
     
     def copy(self):
         """Return a copy of this storage-object containing copies of the original tag-value-lists."""
-        result = Storage({tag: TagValueList(self,l) for tag,l in self.items()})
+        result = Storage({tag: TagValueList(self, l) for tag, l in self.items()})
         for tagValueList in result.values():
             tagValueList.storage = result
         return result
         
-    def __setitem__(self,key,value):
-        if not isinstance(key,Tag):
+    def __setitem__(self, key, value):
+        if not isinstance(key, Tag):
             raise ValueError("key argument must be a tag instance. I got {}".format(key))
-        if not isinstance(value,Sequence) or isinstance(value,str):
+        if not isinstance(value, Sequence) or isinstance(value, str):
             raise ValueError("value must be a Sequence (but no string. I got {}".format(key))
             
         if len(value) == 0:
             if key in self:
                 del self[key]
             else: pass # I won't save an empty list
-        else: dict.__setitem__(self,key,TagValueList(self,value))
+        else: dict.__setitem__(self, key, TagValueList(self, value))
     
-    def _removeList(self,list):
+    def _removeList(self, list):
         """Remove the given list from the values of this dict. This is called by the lists itself, when
         they become empty (see TagValueList)."""
-        for key,value in self.items():
+        for key, value in self.items():
             if value == list:
                 del self[key]
                 return
                 
-    def add(self,tag,*values):
+    def add(self, tag, *values):
         """Add one or more values to the list of the given tag."""
-        if not isinstance(tag,Tag):
+        if not isinstance(tag, Tag):
             tag = get(tag)
         if tag not in self:
             self[tag] = values
         else: self[tag].extend(values)
 
-    def addUnique(self,tag,*values):
+    def addUnique(self, tag, *values):
         """Add one or more values to the list of the given tag. If a value is already contained in the list,
         do not add it again.
         """
-        if not isinstance(tag,Tag):
+        if not isinstance(tag, Tag):
             tag = get(tag)
         if tag not in self:
             # Values may contain repetitions, so we need to filter them away.
@@ -839,45 +841,45 @@ class Storage(dict):
                 if value not in self[tag]:
                     self[tag].append(value)
                 
-    def remove(self,tag,*values):
+    def remove(self, tag, *values):
         """Remove one or more values from the list of the given tag. If a value is not contained in this
         Storage just skip it.
         """
-        if not isinstance(tag,Tag):
+        if not isinstance(tag, Tag):
             tag = get(tag)
         for value in values:
             try:
                 self[tag].remove(value)
             except ValueError: pass
             
-    def replace(self,tag,oldValue,newValue):
+    def replace(self, tag, oldValue, newValue):
         """Replace a value of *tag*. Because *newValue* will be at the same position where *oldValue* was,
         this might look nicer in displays, than simply removing *oldValue* and appending *newValue*.
         If *oldValue* is not present, add *newValue* anyway.
         """
-        if not isinstance(tag,Tag):
+        if not isinstance(tag, Tag):
             tag = get(tag)
-        for i,value in enumerate(self[tag]):
+        for i, value in enumerate(self[tag]):
             if value == oldValue:
                 self[tag][i] = newValue
                 return
-        else: self.add(tag,newValue)
+        else: self.add(tag, newValue)
     
-    def merge(self,other):
+    def merge(self, other):
         """Add all tags from *other* to this storage. *other* may be another :class:`omg.tags.Storage`
         instance or a :func:`dict` mapping tags to value-lists. This method won't add already existing
         values again.
         """
-        for tag,valueList in other.items():
-            self.addUnique(tag,*valueList)
+        for tag, valueList in other.items():
+            self.addUnique(tag, *valueList)
                 
-    def removeTags(self,other):
+    def removeTags(self, other):
         """Remove all values from *other* from this storage. *other* may be another :class:`omg.tags.Storage`
         instance or a :func:`dict` mapping tags to value-lists. If *other* contains tags and values which are
         not contained in this storage, they will be skipped.
         """
-        for tag,valueList in other.items():
-            self.removeValues(tag,*valueList)
+        for tag, valueList in other.items():
+            self.removeValues(tag, *valueList)
 
     def containsPrivateTags(self):
         """Return whether at least one tag in this object is private."""
@@ -885,28 +887,28 @@ class Storage(dict):
     
     def privateTags(self):
         """Return a Storage-object containing only the private tags of this object."""
-        return Storage({tag: l for tag,l in self.items() if tag.private})
+        return Storage({tag: l for tag, l in self.items() if tag.private})
         
     def withoutPrivateTags(self, copy=False):
         """Return a Storage-object containing the same tags but without private tags. If there are no private
         tags and *copy* is False, return simply this object itself."""
         if copy or any(tag.private for tag in self):
-            return Storage({tag: l for tag,l in self.items() if not tag.private})
+            return Storage({tag: l for tag, l in self.items() if not tag.private})
         else: return self
         
     def getTuples(self):
-        """Return a generator that yields the tags as (tag,value)-tuples.""" 
+        """Return a generator that yields the tags as (tag, value)-tuples.""" 
         for tag in self:
             for value in self[tag]:
-                yield (tag,value)
+                yield (tag, value)
 
 
 class TagDifference:
     """Stores changes to tag-storages and provides methods to apply them.
     
-        - *additions* is a list of (tag,value) pairs
-        - *removals* is a list of (tag,value) pairs
-        - *replacements* is a list of (tag,oldValue,newValue) tuples. This is used to replace
+        - *additions* is a list of (tag, value) pairs
+        - *removals* is a list of (tag, value) pairs
+        - *replacements* is a list of (tag, oldValue, newValue) tuples. This is used to replace
           values keeping the order.
     """
     def __init__(self, additions=None, removals=None, replacements=None):
@@ -914,46 +916,46 @@ class TagDifference:
         self.removals = removals
         self.replacements = replacements
         
-    def apply(self,element, withoutPrivateTags=False):
+    def apply(self, element, withoutPrivateTags=False):
         """Change the tags of *element* (or anything that has a .tags attribute) according to this
         difference object. If *withoutPrivateTags* is True, ignore changes to private tags."""
         if self.removals is not None:
-            for tag,value in self.removals:
+            for tag, value in self.removals:
                 if not (withoutPrivateTags and tag.private):
                     element.tags[tag].remove(value)
         
         if self.replacements is not None:
-            for tag,value,newValue in self.replacements:
+            for tag, value, newValue in self.replacements:
                 if not (withoutPrivateTags and tag.private):
                     index = element.tags[tag].index(value)
                     element.tags[tag][index] = newValue
         
         if self.additions is not None:
-            for tag,value in self.additions:
+            for tag, value in self.additions:
                 if not (withoutPrivateTags and tag.private):
-                    element.tags.add(tag,value)
+                    element.tags.add(tag, value)
             
-    def revert(self,element, withoutPrivateTags=False):
+    def revert(self, element, withoutPrivateTags=False):
         """Undo the changes of this difference object to the tags of *element*.  If *withoutPrivateTags*
         is True, ignore changes to private tags."""
         if self.additions is not None:
-            for tag,value in self.additions:
+            for tag, value in self.additions:
                 if not (withoutPrivateTags and tag.private):
                     element.tags[tag].remove(value)
         
         if self.replacements is not None:
-            for tag,value,newValue in self.replacements:
+            for tag, value, newValue in self.replacements:
                 if not (withoutPrivateTags and tag.private):
                     index = element.tags[tag].index(newValue)
                     element.tags[tag][index] = value
         
         if self.removals is not None:
-            for tag,value in self.removals:
+            for tag, value in self.removals:
                 if not (withoutPrivateTags and tag.private):
-                    element.tags.add(tag,value)
+                    element.tags.add(tag, value)
             
     def getAdditions(self):
-        """Return the list of (tag,value) pairs that are added by this TagDifference. This includes new
+        """Return the list of (tag, value) pairs that are added by this TagDifference. This includes new
         values from the 'replacement' constructor parameter."""
         if self.replacements is not None:
             result = [(tag, newValue) for tag, _, newValue in self.replacements]
@@ -965,7 +967,7 @@ class TagDifference:
         else: return []
         
     def getRemovals(self):
-        """Return the list of (tag,value) pairs that are removed by this TagDifference. This includes old
+        """Return the list of (tag, value) pairs that are removed by this TagDifference. This includes old
         values from the 'replacement' constructor parameter."""
         if self.replacements is not None:
             result = [(tag, oldValue) for tag, oldValue, _ in self.replacements]
@@ -986,16 +988,16 @@ class TagDifference:
 
 class SingleTagDifference(TagDifference):
     """Convenience class that stores changes to a single tagtype. *additions* and *removals* are simply
-    lists of values, *replacements* is a list of (oldValue,newValue) pairs.
+    lists of values, *replacements* is a list of (oldValue, newValue) pairs.
     """
     def __init__(self, tagType, additions=None, removals=None, replacements=None):
         if additions is not None:
-            additions = [(tagType,value) for value in additions]
+            additions = [(tagType, value) for value in additions]
         if removals is not None:
-            removals = [(tagType,value) for value in removals]
+            removals = [(tagType, value) for value in removals]
         if replacements is not None:
-            replacements = [(tagType,oldValue,newValue) for oldValue,newValue in replacements]
-        super().__init__(additions,removals,replacements)
+            replacements = [(tagType, oldValue, newValue) for oldValue, newValue in replacements]
+        super().__init__(additions, removals, replacements)
                          
                          
 class TagStorageDifference(TagDifference):
@@ -1026,32 +1028,32 @@ class TagStorageDifference(TagDifference):
         if self.newTags is None:
             return []
         if self.oldTags is None:
-            return [(tag,value) for tag,values in self.newTags.items() for value in values]
+            return [(tag, value) for tag, values in self.newTags.items() for value in values]
             pass
         result = []
         for newTag, newValues in self.newTags.items():
             oldValues = self.oldTags[newTag] if newTag in self.oldTags else []
-            result.extend((newTag,value) for value in newValues if value not in oldValues)
+            result.extend((newTag, value) for value in newValues if value not in oldValues)
         return result
     
     def getRemovals(self):
         if self.oldTags is None:
             return []
         if self.newTags is None:
-            return [(tag,value) for tag,values in self.oldTags.items() for value in values]
+            return [(tag, value) for tag, values in self.oldTags.items() for value in values]
         result = []
         for oldTag, oldValues in self.oldTags.items():
             newValues = self.newTags[oldTag] if oldTag in self.newTags else []
-            result.extend((oldTag,value) for value in oldValues if value not in newValues)
+            result.extend((oldTag, value) for value in oldValues if value not in newValues)
         return result
     
     def __str__(self):
-        return "TagStorageDifference(old={},new={})".format(self.oldTags, self.newTags)
+        return "TagStorageDifference(old={}, new={})".format(self.oldTags, self.newTags)
     
     
 def findCommonTags(elements):
     """Returns a Storage object containing all tags that are equal in all of the elements."""
-    commonTags = set(reduce(lambda x,y: x & y, [set(elem.tags.keys()) for elem in elements ]))
+    commonTags = set(reduce(lambda x, y: x & y, [set(elem.tags.keys()) for elem in elements ]))
     commonTagValues = {}
     differentTags=set()
     
@@ -1071,13 +1073,13 @@ def findCommonTags(elements):
 
 class TagDict(dict):
     """Ordered dictionary that accepts only tags as keys and will be sorted by their order."""
-    def __setitem__(self,key,value):
-        if not isinstance(key,Tag):
+    def __setitem__(self, key, value):
+        if not isinstance(key, Tag):
             raise ValueError("TagDict accepts only tags as keys. I got {}".format(key))
-        super().__setitem__(key,value)
+        super().__setitem__(key, value)
         
     def items(self):
-        return utils.OrderedDictItems(self,self.keys())
+        return utils.OrderedDictItems(self, self.keys())
 
     def keys(self):
         result = [tag for tag in tagList if tag in self]
@@ -1087,7 +1089,7 @@ class TagDict(dict):
         return result 
     
     def values(self):
-        return utils.OrderedDictValues(self,self.keys())
+        return utils.OrderedDictValues(self, self.keys())
     
     def __iter__(self):
         return self.keys()
