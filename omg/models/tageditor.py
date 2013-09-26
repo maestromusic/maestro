@@ -18,7 +18,7 @@
 
 import collections, itertools
 
-from PyQt4 import QtCore,QtGui
+from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from .. import application, constants, utils
@@ -45,16 +45,16 @@ class Record:
     This data model resembles much more the graphical structure of the tageditor. A Record is considered
     immutable by the Undo-/Redo-system.
     """
-    def __init__(self,tag,value,allElements,elementsWithValue):
+    def __init__(self, tag, value, allElements, elementsWithValue):
         self.tag = tag
         self.value = value
         self.allElements = allElements
-        assert isinstance(elementsWithValue,tuple)
+        assert isinstance(elementsWithValue, tuple)
         self.elementsWithValue = elementsWithValue
     
     def copy(self):
         """Return a copy of this record."""
-        return Record(self.tag,self.value,self.allElements,self.elementsWithValue)
+        return Record(self.tag, self.value, self.allElements, self.elementsWithValue)
         
     def isCommon(self):
         """Return whether the value of this record is present in all elements."""
@@ -73,20 +73,20 @@ class Record:
         if self.isCommon():
             return str(self.value)
         elif len(self.elementsWithValue) == 1:
-            return translate("TagEditor","{} in {}").format(self.value,self.elementsWithValue[0])
+            return translate("TagEditor", "{} in {}").format(self.value, self.elementsWithValue[0])
         elif len(self.getExceptions()) == 1:
-            return translate("TagEditor","{} except in {}").format(self.value,self.getExceptions()[0])
-        else: return translate("TagEditor","{} in {} pieces").format(self.value,len(self.elementsWithValue))
+            return translate("TagEditor", "{} except in {}").format(self.value, self.getExceptions()[0])
+        else: return translate("TagEditor", "{} in {} pieces").format(self.value, len(self.elementsWithValue))
     
     @staticmethod
-    def merge(first,second):
+    def merge(first, second):
         """Merge two records: The result will contain tag and value of *first* and the union of the
         elementsWithValue-lists of both records. If the elements of *second* form a subset of those of
         *first*, this method will simply return *first*."""
         newElements = [el for el in second.elementsWithValue if not el in first.elementsWithValue]
         if len(newElements) > 0:
-            elementsWithValue = tuple(itertools.chain(first.elementsWithValue,newElements))
-            return Record(first.tag,first.value,first.allElements,elementsWithValue)
+            elementsWithValue = tuple(itertools.chain(first.elementsWithValue, newElements))
+            return Record(first.tag, first.value, first.allElements, elementsWithValue)
         else:
             return first
         
@@ -116,20 +116,20 @@ class RecordModel(QtCore.QObject):
     An effect of this design is that RecordModel may have states that would be inconsistent for
     TagEditorModel (e.g. a tag with empty record list, or records with tag A in ''self._records[tag B]'').
     """
-    tagInserted = QtCore.pyqtSignal(int,tags.Tag)
+    tagInserted = QtCore.pyqtSignal(int, tags.Tag)
     tagRemoved = QtCore.pyqtSignal(tags.Tag)
-    tagChanged = QtCore.pyqtSignal(tags.Tag,tags.Tag)
-    recordInserted = QtCore.pyqtSignal(int,Record)
+    tagChanged = QtCore.pyqtSignal(tags.Tag, tags.Tag)
+    recordInserted = QtCore.pyqtSignal(int, Record)
     recordRemoved = QtCore.pyqtSignal(Record)
-    recordChanged = QtCore.pyqtSignal(tags.Tag,Record,Record)
+    recordChanged = QtCore.pyqtSignal(tags.Tag, Record, Record)
 
-    def __getitem__(self,key):
+    def __getitem__(self, key):
         return self._records[key]
 
-    def __setitem__(self,key,value):
+    def __setitem__(self, key, value):
         self._records[key] = value
 
-    def __delitem__(self,key):
+    def __delitem__(self, key):
         del self._records[key]
 
     def keys(self):
@@ -145,64 +145,64 @@ class RecordModel(QtCore.QObject):
     def items(self):
         return self._records.items()
         
-    def setRecords(self,records):
+    def setRecords(self, records):
         """Set the records of this RecordModel."""
         self._records = records
         
-    def copy(self,tag=None):
+    def copy(self, tag=None):
         """Return a copy of this model. If *tag* is given, only the records of this tag are copied."""
         copy = RecordModel()
         copy._records = utils.OrderedDict()
         if tag is None:
-            for tag,records in self._records.items():
+            for tag, records in self._records.items():
                 copy._records[tag] = list(records) # the actual records are immutable and need not be copied
         else: copy._records[tag] = list(self._records[tag])
         return copy
 
-    def insertRecord(self,pos,record):
+    def insertRecord(self, pos, record):
         """Insert *record* at position *pos* into the list of records with tag record.tag. This list must
         exist before you call this method, so you may need to call insertTag first. *pos* may also be -1."""
         assert record.tag in self._records
         if pos == -1:
             pos = len(self._records[record.tag])
-        self._records[record.tag].insert(pos,record)
-        self.recordInserted.emit(pos,record)
+        self._records[record.tag].insert(pos, record)
+        self.recordInserted.emit(pos, record)
 
-    def removeRecord(self,record):
+    def removeRecord(self, record):
         """Remove a record from the model."""
         pos = self._records[record.tag].index(record)
         del self._records[record.tag][pos]
         self.recordRemoved.emit(record)
     
-    def changeRecord(self,tag,oldRecord,newRecord):
+    def changeRecord(self, tag, oldRecord, newRecord):
         """Replace the record *oldRecord* by *newRecord*. The replacement will take place in the list of
         records with tag *tag*, regardless of the tags stored in the records (those tags may differ)."""
         pos = self._records[tag].index(oldRecord)
         self._records[tag][pos] = newRecord
-        self.recordChanged.emit(tag,oldRecord,newRecord)
+        self.recordChanged.emit(tag, oldRecord, newRecord)
         
-    def insertTag(self,pos,tag):
+    def insertTag(self, pos, tag):
         """Insert the given tag at position *pos* into the OrderedDict. The list of records will be empty.
         *pos* may also be -1."""
         if pos == -1:
             pos = len(self._records)
-        self._records.insert(pos,tag,[])
-        self.tagInserted.emit(pos,tag)
+        self._records.insert(pos, tag, [])
+        self.tagInserted.emit(pos, tag)
 
-    def removeTag(self,tag):
+    def removeTag(self, tag):
         """Remove the given tag from the model. The list of records with this tag must be empty before this
         method may be called."""
         assert len(self._records[tag]) == 0
         del self._records[tag]
         self.tagRemoved.emit(tag)
 
-    def changeTag(self,oldTag,newTag):
+    def changeTag(self, oldTag, newTag):
         """Change the tag *oldTag* into *newTag*. This method won't touch any records, so you may have to
         change the tags in the records by calling changeRecord. *newTag* must not already be contained in
         the model."""
         assert oldTag in self._records and newTag not in self._records
-        self._records.changeKey(oldTag,newTag)
-        self.tagChanged.emit(oldTag,newTag)
+        self._records.changeKey(oldTag, newTag)
+        self.tagChanged.emit(oldTag, newTag)
     
    
 class TagEditorUndoCommand:
@@ -222,7 +222,7 @@ class TagEditorUndoCommand:
         self.model = model
         self.method = method
         self.args = args
-        self.undoMethod, self.undoArgs = self._computeUndoMethod(method,args)
+        self.undoMethod, self.undoArgs = self._computeUndoMethod(method, args)
         self.text = '' # no text necessary as these are always used in macros
         
     def redo(self):
@@ -231,7 +231,7 @@ class TagEditorUndoCommand:
     def undo(self):
         getattr(self.model.records, self.undoMethod)(**self.undoArgs)
     
-    def _computeUndoMethod(self,method,args):
+    def _computeUndoMethod(self, method, args):
         """Given a method and a dict of arguments, return the appropriate method and arguments to the first
         method."""
         recordModel = self.model.records
@@ -255,7 +255,7 @@ class TagEditorUndoCommand:
         elif method == 'changeTag':
             undoMethod = 'changeTag'
             undoArgs = {'oldTag': args['newTag'], 'newTag': args['oldTag']}
-        return undoMethod,undoArgs
+        return undoMethod, undoArgs
     
     
 class TagEditorModel(QtCore.QObject):
@@ -312,7 +312,7 @@ class TagEditorModel(QtCore.QObject):
         self.level = None # will be set in self.setElements
         if elements is None:
             elements = []
-        self.setElements(level,elements)
+        self.setElements(level, elements)
 
     def getTags(self):
         """Return the list of tags that are present in any of the elements currently edited."""
@@ -357,7 +357,7 @@ class TagEditorModel(QtCore.QObject):
         # The final result should of course be a dict (tag->list of records). The dict should first
         # contain all internal tags, then the rest.
         result = utils.OrderedDict()
-        for tag in itertools.chain(tags.tagList,elementLists.keys()):
+        for tag in itertools.chain(tags.tagList, elementLists.keys()):
             if tag in result or tag not in elementLists:
                 continue # due to the chain some tags may appear twice
             result[tag] = []
@@ -365,7 +365,7 @@ class TagEditorModel(QtCore.QObject):
                 if len(elementsWithValue) == len(self.elements):
                     elementsWithValue = self.elements # save memory
                 else: elementsWithValue = tuple(elementsWithValue)
-                result[tag].append(Record(tag,value,self.elements,elementsWithValue))
+                result[tag].append(Record(tag, value, self.elements, elementsWithValue))
         return result
 
     def _command(self, method, **args):
@@ -375,11 +375,11 @@ class TagEditorModel(QtCore.QObject):
         """
         if method == 'insertRecord':
             record = args['record']
-            diff = tags.TagDifference(additions=[(record.tag,record.value)])
+            diff = tags.TagDifference(additions=[(record.tag, record.value)])
             self.level.changeTags({element: diff for element in record.elementsWithValue})
         elif method == 'removeRecord':
             record = args['record']
-            diff = tags.TagDifference(removals=[(record.tag,record.value)])
+            diff = tags.TagDifference(removals=[(record.tag, record.value)])
             self.level.changeTags({element: diff for element in record.elementsWithValue})
         elif method == 'changeRecord':
             oldRecord = args['oldRecord']
@@ -390,20 +390,20 @@ class TagEditorModel(QtCore.QObject):
             removeList = list(oldElements - newElements)
             addList = list(newElements - oldElements)
             if len(removeList):
-                diff = tags.TagDifference(removals=[(oldRecord.tag,oldRecord.value)])
+                diff = tags.TagDifference(removals=[(oldRecord.tag, oldRecord.value)])
                 self.level.changeTags({element: diff for element in removeList})
             if len(addList):
-                diff = tags.TagDifference(additions=[(newRecord.tag,newRecord.value)])
+                diff = tags.TagDifference(additions=[(newRecord.tag, newRecord.value)])
                 self.level.changeTags({element: diff for element in addList})
                 
             if oldRecord.tag != newRecord.tag or oldRecord.value != newRecord.value:
                 changeList = list(newElements.intersection(oldElements))
                 if len(changeList):
                     if oldRecord.tag != newRecord.tag:
-                        diff = tags.TagDifference(additions=[(newRecord.tag,newRecord.value)],
-                                                  removals=[(oldRecord.tag,oldRecord.value)])
+                        diff = tags.TagDifference(additions=[(newRecord.tag, newRecord.value)],
+                                                  removals=[(oldRecord.tag, oldRecord.value)])
                     else:
-                        diff = tags.TagDifference(replacements=[(oldRecord.tag,oldRecord.value,
+                        diff = tags.TagDifference(replacements=[(oldRecord.tag, oldRecord.value,
                                                                  newRecord.value)])
                     self.level.changeTags({element: diff for element in changeList})
 
@@ -413,7 +413,7 @@ class TagEditorModel(QtCore.QObject):
         """Add a record to the model. If there is already a record with same tag and value the elements
         with that value will be merged from both records."""
         self.stack.beginMacro(self.tr("Add record"))
-        self._insertRecord(-1,record)
+        self._insertRecord(-1, record)
         self.stack.endMacro()
 
     def _insertRecord(self, pos, record):
@@ -428,7 +428,7 @@ class TagEditorModel(QtCore.QObject):
         if record.tag in self.records.tags():
             for existingRecord in self.records[record.tag]:
                 if existingRecord.value == record.value:
-                    newRecord = Record.merge(existingRecord,record)
+                    newRecord = Record.merge(existingRecord, record)
                     self._command('changeRecord', tag=existingRecord.tag,
                                   oldRecord=existingRecord, newRecord=newRecord)
                     return
@@ -443,7 +443,7 @@ class TagEditorModel(QtCore.QObject):
     def removeRecords(self, records):
         """Remove several records from the model."""
         if len(records) > 0:
-            self.stack.beginMacro(self.tr("Remove %n record(s)",'',len(records)))
+            self.stack.beginMacro(self.tr("Remove %n record(s)", '', len(records)))
             for record in records:
                 self._removeRecord(record)
             self.stack.endMacro()
@@ -487,7 +487,7 @@ class TagEditorModel(QtCore.QObject):
             # either no record with the new value exists or only the elementsWithValue changed
             self._command('changeRecord', tag=oldRecord.tag, oldRecord=oldRecord, newRecord=newRecord)
 
-    def removeTag(self,tag):
+    def removeTag(self, tag):
         """Remove all records with tag *tag*."""
         self.stack.beginMacro(self.tr("Remove tag"))
         # First remove all records
@@ -516,7 +516,7 @@ class TagEditorModel(QtCore.QObject):
                 newRecord = record.copy()
                 newRecord.tag = newTag
                 newRecord.value = newTag.convertValue(record.value)
-                self._command('changeRecord', tag=oldTag, oldRecord=record,newRecord=newRecord)
+                self._command('changeRecord', tag=oldTag, oldRecord=record, newRecord=newRecord)
             self._command('changeTag', oldTag=oldTag, newTag=newTag)
         else:
             # Now things get complicated: We have to remove all records and add them to the existing tag.
@@ -546,7 +546,7 @@ class TagEditorModel(QtCore.QObject):
         if len(records) > 0:
             self.stack.beginMacro(self.tr("Split %n record(s)", '', len(records)))
             for record in records:
-                self._split(record,separator)
+                self._split(record, separator)
             self.stack.endMacro()
         
     def _split(self, record, separator):    
@@ -554,7 +554,7 @@ class TagEditorModel(QtCore.QObject):
         given separator. Handle special cases correctly (',',  'a,a', etc.).
         This method must be called from within a macro.
         """
-        assert record.tag.type in (tags.TYPE_VARCHAR,tags.TYPE_TEXT)
+        assert record.tag.type in (tags.TYPE_VARCHAR, tags.TYPE_TEXT)
         # The type restriction implies that the empty string is the only possible invalid value
         splittedValues = [value for value in record.value.split(separator) if len(value) > 0]
         # Note that splittedValues might be empty (split ',')
@@ -582,7 +582,7 @@ class TagEditorModel(QtCore.QObject):
                     self._changeRecord(record, newRecord)   
             self.stack.endMacro()
 
-    def extendRecords(self,records):
+    def extendRecords(self, records):
         """Make the given records common, i.e. set record.elementsWithValue to all elements."""
         if len(records) > 0:
             self.stack.beginMacro(self.tr("Extend %n record(s)", '', len(records)))
@@ -607,7 +607,7 @@ class TagEditorModel(QtCore.QObject):
             if len(result) == 0:
                 break
             # Filter those that do not appear in the other records
-            result = list(filter(lambda s: s in record.value,result))
+            result = list(filter(lambda s: s in record.value, result))
         return result
     
     def _handleLevelChanged(self, event):
@@ -644,15 +644,15 @@ class TagEditorModel(QtCore.QObject):
         
         for tag in actualRecords:
             if tag not in self.records.tags():
-                self.records.insertTag(len(self.records.tags()),tag)
+                self.records.insertTag(len(self.records.tags()), tag)
                 changed = True
             
-            for i,record in enumerate(actualRecords[tag]):
+            for i, record in enumerate(actualRecords[tag]):
                 if i >= len(self.records[tag]):
-                    self.records.insertRecord(i,record)
+                    self.records.insertRecord(i, record)
                     changed = True
                 elif self.records[tag][i] != record:
-                    self.records.changeRecord(tag,self.records[tag][i],record)
+                    self.records.changeRecord(tag, self.records[tag][i], record)
                     changed = True
         
         if changed:
@@ -687,20 +687,20 @@ class TagEditorModel(QtCore.QObject):
 #                continue
 #            for tag in element.tags:
 #                if tag not in self.records.tags():
-#                    self.records.insertTag(len(self.records.tags()),tag) #TODO
-#                    for i,value in enumerate(element.tags[tag]):
-#                        record = Record(tag,value,self.elements,[element])
-#                        self.records.insertRecord(i,record)
+#                    self.records.insertTag(len(self.records.tags()), tag) #TODO
+#                    for i, value in enumerate(element.tags[tag]):
+#                        record = Record(tag, value, self.elements, [element])
+#                        self.records.insertRecord(i, record)
 #                else:
 #                    for value in element.tags[tag]:
-#                        record = self.records.get(tag,value)
+#                        record = self.records.get(tag, value)
 #                        if record is not None:
 #                            if element not in record.elementsWithValue:
 #                                record.elementsWithValue.append(element) #TODO
 #                                if record not in modified:
 #                                    modified.append(record)
 #                        else:
-#                            record = Record(tag,value,self.elements,[element])
+#                            record = Record(tag, value, self.elements, [element])
 #                            for r in self.records[tag]:
 #                                if len(r.elementsWithValue) == 0:
 #                                    record = r
@@ -710,8 +710,8 @@ class TagEditorModel(QtCore.QObject):
 #                                        modified.append(record)
 #                                    break
 #                            else:
-#                                record = Record(tag,value,self.elements,[element])
-#                                self.records.insertRecord(len(self.records[tag]),record)
+#                                record = Record(tag, value, self.elements, [element])
+#                                self.records.insertRecord(len(self.records[tag]), record)
 #                            
 #        for tag in self.records.tags():
 #            toRemove = [record for record in self.records[tag] if len(record.elementsWithValue) == 0]
@@ -719,5 +719,5 @@ class TagEditorModel(QtCore.QObject):
 #                self.records.removeRecord(record)
 #                
 #        for record in modified:
-#            self.records.changeRecord(tag,record,record) #TODO
+#            self.records.changeRecord(tag, record, record) #TODO
 #                    
