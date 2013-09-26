@@ -361,11 +361,11 @@ class Level(application.ChangeEventDispatcher):
         On real level this method might raise a TagWriteError if writing (some or all) tags to the
         filesystem fails.
         """
-        self._changeSomething(self._changeTags, changes, self.tr("change tags"))
+        self._changeSomething(self._changeTags, changes, self.tr("Change tags"))
         
     def changeFlags(self, changes):
         """Change flags of elements. *changes* maps elements to flags.FlagDifference objects."""
-        self._changeSomething(self._changeFlags, changes, self.tr("change flags"))
+        self._changeSomething(self._changeFlags, changes, self.tr("Change flags"))
 
     def changeStickers(self, changes):
         """Change stickers of elements. *changes* maps elements to stickers.StickersDifference objects."""
@@ -394,7 +394,7 @@ class Level(application.ChangeEventDispatcher):
                                           redoArgs={"containerTypes" : containerTypes},
                                           undoMethod=self._setTypes,
                                           undoArgs={"containerTypes": oldTypes},
-                                          text=self.tr("change container types"))
+                                          text=self.tr("Change container types"))
             self.stack.push(command)
             
     def setCovers(self, coverDict):
@@ -414,7 +414,7 @@ class Level(application.ChangeEventDispatcher):
                                           redoArgs={"contentDict": contentDict},
                                           undoMethod=self._changeContents,
                                           undoArgs={"contentDict": inverseChanges},
-                                          text=self.tr("change contents"))
+                                          text=self.tr("Change contents"))
             self.stack.push(command)
         
     def setContents(self, parent, contents):
@@ -427,7 +427,7 @@ class Level(application.ChangeEventDispatcher):
                                       undoMethod=self._setContents,
                                       undoArgs={"parent": parent,
                                                 "contents": parent.contents},
-                                      text=self.tr("set contents"))
+                                      text=self.tr("Set contents"))
         self.stack.push(command)
         
     def insertContents(self, parent, insertions):
@@ -441,7 +441,7 @@ class Level(application.ChangeEventDispatcher):
                                       undoMethod=self._removeContents,
                                       undoArgs={"parent" : parent,
                                                 "positions" : [pos for pos,_ in insertions]},
-                                      text=self.tr("insert contents"))
+                                      text=self.tr("Insert contents"))
         self.stack.push(command)
         
     def insertContentsAuto(self, parent, index, elements):
@@ -451,7 +451,7 @@ class Level(application.ChangeEventDispatcher):
         (not position) is given by *index*; the position is automatically determined, and
         subsequent elements' positions are shifted if necessary.
         """
-        self.stack.beginMacro(self.tr("insert contents"))
+        self.stack.beginMacro(self.tr("Insert contents"))
         firstPos = 1 if index == 0 else parent.contents.positions[index-1] + 1
         if len(parent.contents) > index:
             #  need to alter positions of subsequent elements
@@ -471,7 +471,7 @@ class Level(application.ChangeEventDispatcher):
                                       undoMethod=self._insertContents,
                                       undoArgs={"parent" : parent,
                                                 "insertions" : undoInsertions},
-                                      text=self.tr("remove contents"))
+                                      text=self.tr("Remove contents"))
         self.stack.push(command)
 
     def removeContentsAuto(self, parent, positions=None, indexes=None):
@@ -497,7 +497,7 @@ class Level(application.ChangeEventDispatcher):
                     shift = -i
                 else:
                     break
-        self.stack.beginMacro(self.tr("remove contents"))
+        self.stack.beginMacro(self.tr("Remove contents"))
         self.removeContents(parent, positions) 
         #TODO: when the positions are not connected, using several different shifts might be more
         # appropriate
@@ -523,7 +523,7 @@ class Level(application.ChangeEventDispatcher):
                                       undoArgs={"parent" : parent,
                                                 "changes" : {b: a for a, b in changes.items()}
                                                 },
-                                      text=self.tr("change positions"))
+                                      text=self.tr("Change positions"))
         self.stack.push(command)
     
     def renameFiles(self, renamings):
@@ -537,7 +537,7 @@ class Level(application.ChangeEventDispatcher):
                                           redoArgs={"renamings" : renamings},
                                           undoMethod=self._renameFiles,
                                           undoArgs={"renamings": reversed},
-                                          text=self.tr("rename files"))
+                                          text=self.tr("Rename files"))
             self.stack.push(command)
     
     def commit(self, elements=None):
@@ -547,7 +547,7 @@ class Level(application.ChangeEventDispatcher):
             elements = self.elements.values()
         if len(elements) == 0:
             return
-        self.stack.beginMacro(self.tr("commit"), transaction=self.parent is real)
+        self.stack.beginMacro(self.tr("Commit"), transaction=self.parent is real)
       
         if self.parent is real:
             # First load all missing files

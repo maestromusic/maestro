@@ -399,7 +399,8 @@ class MainWindow(QtGui.QMainWindow):
     def _handleSavePerspective(self):
         """Ask the user for a name and store the current widget layout and state under this name."""
         name, ok = QtGui.QInputDialog.getText(self, self.tr("Save perspective"),
-                            self.tr("Save the layout and state of the current widgets as a perspective."))
+                            self.tr("Save the layout and state of the current widgets as a perspective."
+                                    "Please specify a name for the new perspective:"))
         if ok and len(name) > 0 and name != DEFAULT_PERSPECTIVE:
             self.savePerspective(name)
             self.updatePerspectiveMenu()

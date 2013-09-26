@@ -5,27 +5,27 @@ SOURCES = \
     ../omg/config/__init__.py \
     ../omg/constants.py \
     ../omg/core/covers.py \
-    ../omg/core/data.py \
     ../omg/core/elements.py \
     ../omg/core/flags.py \
     ../omg/core/__init__.py \
     ../omg/core/levels.py \
     ../omg/core/nodes.py \
     ../omg/core/reallevel.py \
+    ../omg/core/stickers.py \
     ../omg/core/tagcommands.py \
     ../omg/core/tags.py \
     ../omg/database/__init__.py \
     ../omg/database/sql/__init__.py \
-    ../omg/database/sql/myconnpy.py \
-    ../omg/database/sql/oursql.py \
-    ../omg/database/sql/pymysql.py \
+    ../omg/database/sql/mysql.py \
     ../omg/database/sql/qtsql.py \
     ../omg/database/sql/sqlite.py \
     ../omg/database/tables.py \
     ../omg/database/write.py \
     ../omg/filebackends/filesystem.py \
     ../omg/filebackends/__init__.py \
+    ../omg/filebackends/stream.py \
     ../omg/filesystem/dialogs.py \
+    ../omg/filesystem/identification.py \
     ../omg/filesystem/__init__.py \
     ../omg/filesystem/preferences.py \
     ../omg/gui/browserdialog.py \
@@ -38,13 +38,13 @@ SOURCES = \
     ../omg/gui/delegates/playlist.py \
     ../omg/gui/delegates/profiles.py \
     ../omg/gui/dialogs.py \
+    ../omg/gui/dockwidget.py \
     ../omg/gui/editor.py \
     ../omg/gui/filesystembrowser.py \
     ../omg/gui/flageditor.py \
     ../omg/gui/__init__.py \
     ../omg/gui/mainwindow.py \
     ../omg/gui/misc/busyindicator.py \
-    ../omg/gui/misc/dockwidgettitlebutton.py \
     ../omg/gui/misc/dynamicgridlayout.py \
     ../omg/gui/misc/hiddeneditor.py \
     ../omg/gui/misc/iconbuttonbar.py \
@@ -54,7 +54,6 @@ SOURCES = \
     ../omg/gui/misc/listview.py \
     ../omg/gui/misc/widgetlist.py \
     ../omg/gui/playback.py \
-    ../omg/gui/playerwidgets.py \
     ../omg/gui/playlist.py \
     ../omg/gui/preferences/delegates.py \
     ../omg/gui/preferences/flagmanager.py \
@@ -68,6 +67,9 @@ SOURCES = \
     ../omg/gui/tagwidgets.py \
     ../omg/gui/treeactions.py \
     ../omg/gui/treeview.py \
+    ../omg/gui/widgets.py \
+    ../omg/imageloader.py \
+    ../omg/images.py \
     ../omg/__init__.py \
     ../omg/install.py \
     ../omg/logging.py \
@@ -77,7 +79,6 @@ SOURCES = \
     ../omg/models/flageditor.py \
     ../omg/models/__init__.py \
     ../omg/models/leveltreemodel.py \
-    ../omg/models/mimedata.py \
     ../omg/models/playlist.py \
     ../omg/models/rootedtreemodel.py \
     ../omg/models/simplelistmodel.py \
@@ -85,6 +86,11 @@ SOURCES = \
     ../omg/models/treebuilder.py \
     ../omg/models/wrappertreemodel.py \
     ../omg/player.py \
+    ../omg/plugins/audiocd/filebackend.py \
+    ../omg/plugins/audiocd/gui.py \
+    ../omg/plugins/audiocd/__init__.py \
+    ../omg/plugins/audiocd/plugin.py \
+    ../omg/plugins/audiocd/ripper.py \
     ../omg/plugins/configeditor/__init__.py \
     ../omg/plugins/configeditor/plugin.py \
     ../omg/plugins/coverdialog/__init__.py \
@@ -104,6 +110,9 @@ SOURCES = \
     ../omg/plugins/mpd/__init__.py \
     ../omg/plugins/mpd/plugin.py \
     ../omg/plugins/mpd/thread.py \
+    ../omg/plugins/musicbrainz/__init__.py \
+    ../omg/plugins/musicbrainz/plugin.py \
+    ../omg/plugins/musicbrainz/xmlapi.py \
     ../omg/plugins/phonon/__init__.py \
     ../omg/plugins/phonon/plugin.py \
     ../omg/plugins/renamer/gui.py \
@@ -111,11 +120,12 @@ SOURCES = \
     ../omg/plugins/renamer/plugin.py \
     ../omg/plugins/searchanalyzer/__init__.py \
     ../omg/plugins/searchanalyzer/plugin.py \
+    ../omg/plugins/wtf/__init__.py \
+    ../omg/plugins/wtf/plugin.py \
     ../omg/profiles.py \
     ../omg/search/criteria.py \
     ../omg/search/__init__.py \
     ../omg/search/searchbox.py \
-    ../omg/search/searchparser.py \
     ../omg/strutils.py \
     ../omg/undostack.py \
     ../omg/utils.py \

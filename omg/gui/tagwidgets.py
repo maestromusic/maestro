@@ -159,11 +159,11 @@ class TagTypeBox(QtGui.QStackedWidget):
     """
     tagChanged = QtCore.pyqtSignal(tags.Tag)
     
-    # This variable is used to prevent handling editingFinished in some situations.
-    _ignoreEditingFinished = False
+    # This flag is used to prevent handling changes to the combobox in some situations.
+    _ignoreChanges = False
     
     def __init__(self, defaultTag=None, parent=None, editable=True, useCoverLabel=False):
-        QtGui.QStackedWidget.__init__(self, parent)
+        super().__init__(parent)
         self.setSizePolicy(QtGui.QSizePolicy(QtGui.QSizePolicy.Minimum, QtGui.QSizePolicy.Fixed))
         
         if defaultTag is None:
@@ -188,7 +188,7 @@ class TagTypeBox(QtGui.QStackedWidget):
 
         if editable:
             self.box.editingFinished.connect(self._handleEditingFinished)
-        self.box.currentIndexChanged.connect(self._handleEditingFinished)
+        self.box.currentIndexChanged.connect(self._handleCurrentIndexChanged)
         
         self.addWidget(self.box)
         
@@ -196,7 +196,7 @@ class TagTypeBox(QtGui.QStackedWidget):
     
     def _createItems(self):
         """Clear the combobox and refill it with items."""
-        self._ignoreEditingFinished = True
+        self._ignoreChanges = True
         self.box.clear()
         for tag in tags.tagList:
             self._addTagToBox(tag)
@@ -204,10 +204,12 @@ class TagTypeBox(QtGui.QStackedWidget):
                 self.box.setCurrentIndex(self.box.count()-1)
         
         if not self._tag.isInDb():
+            self.box.setCurrentIndex(-1) # without this line the box would still show the last index' icon.
             self.box.setEditText(self._tag.name)
             self.box.insertSeparator(self.box.count())
-            self.box.addItem(self.tr("Add tag to DB..."))
-        self._ignoreEditingFinished = False
+            # self.tr does not work in subclasses
+            self.box.addItem(translate("TagTypeBox", "Add tagtype to DB..."))
+        self._ignoreChanges = False
                 
     def _addTagToBox(self, tag):
         """Add a tag to the box. Display icon and title if available."""
@@ -238,10 +240,9 @@ class TagTypeBox(QtGui.QStackedWidget):
         if tag != self._parseTagFromBox():
             self.box.setEditText(tag.title)
         if tag != self._tag:
-            print("SET TAG", tag, self._tag)
             if self._tag.isInDb() and not tag.isInDb():
                 self.box.insertSeparator(self.box.count())
-                self.box.addItem(self.tr("Add tag to DB..."))
+                self.box.addItem(translate("TagTypeBox", "Add tagtype to DB..."))
             elif not self._tag.isInDb() and tag.isInDb():
                 self.box.removeItem(self.box.count()-1) # Remove "Add tag to DB" 
                 self.box.removeItem(self.box.count()-1) # and separator
@@ -272,11 +273,31 @@ class TagTypeBox(QtGui.QStackedWidget):
             self.showBox()
             self.box.setFocus(focusEvent.reason())
         QtGui.QStackedWidget.focusInEvent(self, focusEvent)
+        
+    def _handleCurrentIndexChanged(self, index):
+        if self._ignoreChanges:
+            return
+        if not self._tag.isInDb() and index == self.box.count() - 1:
+            # Otherwise the dialog will trigger focusOut and then handleEditingFinished
+            self._ignoreChanges = True
+            self.box.setEditText(self._tag.title)
+            
+            # If the user changes the tag in the dialog, setTag will change the tags in the tageditor.
+            # Therefore we enclose both into one macro.
+            application.stack.beginMacro(translate("TagTypeUndoCommand", "Add tagtype to DB"))
+            tagType = AddTagTypeDialog.addTagType(self._tag)
+            if tagType is not None:
+                self.setTag(tagType)
+                application.stack.endMacro()
+            else: application.stack.abortMacro()
+            self._ignoreChanges = False
+        else:
+            self._handleEditingFinished()
     
     def _handleEditingFinished(self):
         """Handle editingFinished signal from EnhancedComboBox if editable is True or the currentIndexChanged
         signal from QComboBox otherwise."""
-        if self._ignoreEditingFinished:
+        if self._ignoreChanges:
             return
         
         tag = self._parseTagFromBox()
@@ -284,14 +305,18 @@ class TagTypeBox(QtGui.QStackedWidget):
             self.setTag(tag)
             self.showLabel()
         else:
-            # invalid tagname
-            # Note: when we open a dialog, self.box will loose focus 
-            # and emit the editingFinished-signal again.
-            self._ignoreEditingFinished = True
-            QtGui.QMessageBox.warning(self, self.tr("Invalid tagname"),
-                                      self.tr("'{}' is not a valid tagname").format(self.box.currentText()))
-            self._ignoreEditingFinished = False
-            self.box.setEditText(self._tag.title) # Reset
+            # Invalid tagname
+            if len(self.box.currentText()) > 0:
+                # Note: when we open a dialog, self.box will loose focus 
+                # and emit the editingFinished-signal again.
+                self._ignoreChanges = True
+                QtGui.QMessageBox.warning(self, translate("AddTagTypeDialog", "Invalid tagname"),
+                                          translate("AddTagTypeDialog", "'{}' is not a valid tagname")
+                                                .format(self.box.currentText()))
+                self._ignoreChanges = False
+                
+            # Reset
+            self.box.setEditText(self._tag.title)
     
     def keyPressEvent(self, keyEvent):
         if keyEvent.key() == Qt.Key_Escape:
