@@ -551,6 +551,8 @@ class TagEditorWidget(QtGui.QWidget):
                             action.triggered.connect(functools.partial(self._editMany,
                                                                        selectedRecords, newValues))
                 else:
+                    action = fancyMenu.addAction(self.tr("Add common start..."))
+                    action.triggered.connect(self._editCommonStart)
                     if any(strutils.numberFromPrefix(r.value)[0] is not None for r in selectedRecords):
                         # Remove the prefix returned in the second tuple part
                         newValues = [r.value[len(strutils.numberFromPrefix(r.value)[1]):]
