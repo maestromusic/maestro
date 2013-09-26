@@ -35,6 +35,7 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
     The root may contain arbitrary level elements, but those elements are always in correspondence
     to the level: containers contain the same children (in the same order) as in the level, etc.
     """
+    rowsDropped = QtCore.pyqtSignal(QtCore.QModelIndex, int, int)
     
     def __init__(self, level, elements=None):
         """Initializes the model for *level*. A new RootNode will be set as root.
@@ -91,6 +92,8 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
 
         if len(elements) > 0:
             self.insertElements(parent, row, elements)
+            self.rowsDropped.emit(self.getIndex(parent), row, row+len(elements)-1)
+            
         application.stack.endMacro()
         return len(elements) != 0
     

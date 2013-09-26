@@ -52,12 +52,19 @@ class EditorTreeView(treeview.DraggingTreeView):
         self.setItemDelegate(editordelegate.EditorDelegate(self, delegateProfile))
         self.autoExpand = True
         self.model().rowsInserted.connect(self._expandInsertedRows)
+        self.model().rowsDropped.connect(self._selectDroppedRows)
        
     def _expandInsertedRows(self, parent, start, end):
         if self.autoExpand:
             for row in range(start, end+1):
                 child = self.model().index(row, 0, parent)
                 self.expand(child)
+            
+    def _selectDroppedRows(self, parent, start, end):
+        self.selectionModel().select(QtGui.QItemSelection(self.model().index(start, 0, parent),
+                                                          self.model().index(end, 0, parent)),
+                                     QtGui.QItemSelectionModel.ClearAndSelect)   
+        self.setFocus(Qt.MouseFocusReason)         
 
     
 class EditorWidget(dockwidget.DockWidget):
@@ -201,7 +208,7 @@ class ExternalTagsWidget(QtGui.QScrollArea):
         self.label.setAlignment(Qt.AlignLeft | Qt.AlignTop)
         self.setWidget(self.label)
         self.setWidgetResizable(True)
-        self.label.setWordWrap(False)
+        self.label.setWordWrap(True)
         self.label.setContentsMargins(5,2,5,2)
         self.label.linkActivated.connect(self._handleLink)
         
@@ -238,7 +245,7 @@ class ExternalTagsWidget(QtGui.QScrollArea):
                                         self._createLink(i,'add',self.tr('Add to database')),
                                         self._createLink(i,'delete',self.tr('Delete'))
                                 ))
-            
+
         self.label.setText('<br>'.join(lines))
         self.setHidden(len(lines) == 0)
         
