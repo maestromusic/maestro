@@ -146,6 +146,7 @@ storage = OrderedDict((
     'perspectives': {},
     'delegates': [],
     'layoutFrozen': False,
+    'merge_dialog_container_type': None, 
 }),
 ("SECTION:player", {
     'profiles': [],

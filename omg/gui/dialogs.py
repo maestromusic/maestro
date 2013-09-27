@@ -15,13 +15,10 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
-
-import string
-
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
-from .. import database as db, strutils
+from .. import database as db, strutils, config
 from ..core import elements, levels, nodes, tags
 from . import tagwidgets, widgets
 
@@ -193,13 +190,13 @@ class MergeDialog(QtGui.QDialog):
       - the container can be assigned the common tags of all children
       - positions of subsequent elements can be lowered accordingly.
     """ 
+    STANDARD_TYPE = elements.TYPE_COLLECTION
     
     def __init__(self, model, wrappers, parent=None):
         """Set up the dialog for *wrappers* (all with the same parent) in *model*.
         
         *parent* refers to the Qt parent object.
         """
-        
         super().__init__(parent)
         self.setMinimumSize(400, 250)
         self.setWindowTitle(self.tr("Merge elements"))
@@ -208,8 +205,8 @@ class MergeDialog(QtGui.QDialog):
         self.elements = [wrapper.element for wrapper in wrappers]
         self.level = self.elements[0].level
         self.parentNode = wrappers[0].parent
-        cTypes = set(elem.type for elem in self.elements if elem.isContainer())
-        containerType = next(iter(cTypes)) if len(cTypes) == 1 else None
+        
+        containerType = config.storage.gui.merge_dialog_container_type or self.STANDARD_TYPE
         
         titleHint = ''
         prefix = ''
@@ -222,6 +219,7 @@ class MergeDialog(QtGui.QDialog):
             # Otherwise elements that happen to start with the same letter would give a common prefix.
             prefix = strutils.commonPrefix(allTitles, separated=True)
             if len(prefix) > 0: 
+                import string
                 titleHint = prefix.strip(string.punctuation + string.whitespace)
         elif len(self.elements) == 1:
             titleHint = ' - '.join(self.elements[0].tags[tags.TITLE])
@@ -239,7 +237,7 @@ class MergeDialog(QtGui.QDialog):
         row += 1
         label = QtGui.QLabel(self.tr('Container type:'))
         layout.addWidget(label, row, 0)
-        self.parentTypeBox = widgets.ContainerTypeBox(containerType or elements.TYPE_COLLECTION)
+        self.parentTypeBox = widgets.ContainerTypeBox(containerType)
         layout.addWidget(self.parentTypeBox, row, 1)
         
         row += 1
@@ -385,6 +383,11 @@ class MergeDialog(QtGui.QDialog):
             #else: Nothing to do: Merge has been performed in the level and the model does not allow a merge
                 
         self.level.stack.endMacro()
+        
+        if containerType != self.STANDARD_TYPE:
+            config.storage.gui.merge_dialog_container_type = containerType
+        else: config.storage.gui.merge_dialog_container_type = None
+            
         self.accept()
         
 
